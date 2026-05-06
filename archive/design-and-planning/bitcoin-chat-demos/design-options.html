@@ -1,0 +1,930 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bitcoin Chat Design Options</title>
+    <style>
+        :root {
+            color-scheme: dark;
+            --page-bg: #030405;
+            --page-text: #f4f0e8;
+            --page-muted: #838b93;
+            --line: rgba(255, 255, 255, 0.1);
+            --orange: #f7931a;
+            --green: #44d58c;
+            --blue: #79b8ff;
+            --red: #ff7777;
+            --shadow: 0 26px 80px rgba(0, 0, 0, 0.45);
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            min-width: 320px;
+            margin: 0;
+            background:
+                radial-gradient(circle at 52% 0%, rgba(247, 147, 26, 0.09), transparent 34%),
+                linear-gradient(180deg, #07090c 0%, #030405 52%, #020202 100%);
+            color: var(--page-text);
+            font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        }
+
+        button,
+        textarea {
+            font: inherit;
+        }
+
+        button {
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .review-shell {
+            min-height: 100vh;
+            padding: 28px clamp(14px, 4vw, 48px) 42px;
+        }
+
+        .review-header {
+            max-width: 1180px;
+            margin: 0 auto 18px;
+            display: grid;
+            gap: 12px;
+        }
+
+        .review-header h1 {
+            margin: 0;
+            font-size: clamp(30px, 4vw, 52px);
+            line-height: 0.98;
+            letter-spacing: 0;
+        }
+
+        .review-header p {
+            max-width: 620px;
+            margin: 0;
+            color: var(--page-muted);
+            font-size: 15px;
+            line-height: 1.6;
+        }
+
+        .design-tabs {
+            max-width: 1180px;
+            margin: 0 auto 18px;
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 10px;
+        }
+
+        .design-tab {
+            min-height: 70px;
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.035);
+            color: var(--page-text);
+            padding: 12px;
+            text-align: left;
+            cursor: pointer;
+            transition: border-color 160ms ease, background 160ms ease, transform 160ms ease;
+        }
+
+        .design-tab:hover,
+        .design-tab[aria-selected="true"] {
+            border-color: rgba(247, 147, 26, 0.58);
+            background: rgba(247, 147, 26, 0.08);
+            transform: translateY(-1px);
+        }
+
+        .design-tab strong,
+        .design-tab span {
+            display: block;
+        }
+
+        .design-tab strong {
+            margin-bottom: 5px;
+            font-size: 15px;
+        }
+
+        .design-tab span {
+            color: var(--page-muted);
+            font-size: 12px;
+            line-height: 1.3;
+        }
+
+        .stage {
+            max-width: 1180px;
+            margin: 0 auto;
+        }
+
+        .design-option {
+            display: none;
+            min-height: min(760px, calc(100vh - 188px));
+        }
+
+        .design-option.is-active {
+            display: block;
+        }
+
+        .mock-note {
+            margin: 12px 0 0;
+            color: #b7c0c9;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+
+        .back {
+            width: 38px;
+            height: 38px;
+            display: grid;
+            place-items: center;
+            border: 1px solid currentColor;
+            border-radius: 8px;
+            color: inherit;
+            text-decoration: none;
+            font-size: 22px;
+            line-height: 1;
+        }
+
+        .message {
+            border-radius: 8px;
+            padding: 12px 14px;
+            line-height: 1.5;
+            font-size: 14px;
+        }
+
+        .message small {
+            display: block;
+            margin-top: 9px;
+            color: inherit;
+            opacity: 0.66;
+            font-size: 11px;
+        }
+
+        .composer {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 10px;
+        }
+
+        .composer textarea {
+            min-height: 50px;
+            resize: none;
+            border-radius: 8px;
+            outline: none;
+        }
+
+        .composer button {
+            min-width: 52px;
+            min-height: 50px;
+            border-radius: 8px;
+            border: 0;
+            cursor: pointer;
+            font-weight: 800;
+        }
+
+        .metric {
+            min-width: 0;
+        }
+
+        .metric span,
+        .metric strong {
+            display: block;
+        }
+
+        .metric span {
+            color: inherit;
+            opacity: 0.66;
+            font-size: 11px;
+            text-transform: uppercase;
+        }
+
+        .metric strong {
+            margin-top: 4px;
+            font-size: 18px;
+        }
+
+        .loading {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .loading i {
+            width: 6px;
+            height: 6px;
+            border-radius: 999px;
+            background: currentColor;
+            opacity: 0.5;
+            animation: blink 1.1s infinite ease-in-out;
+        }
+
+        .loading i:nth-child(2) {
+            animation-delay: 120ms;
+        }
+
+        .loading i:nth-child(3) {
+            animation-delay: 240ms;
+        }
+
+        .option-workbench {
+            color: #f4f0e8;
+            background: #050607;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            box-shadow: var(--shadow);
+            overflow: hidden;
+        }
+
+        .workbench-grid {
+            min-height: inherit;
+            display: grid;
+            grid-template-columns: minmax(0, 1fr);
+            background:
+                linear-gradient(180deg, rgba(255, 255, 255, 0.035), transparent 34%),
+                #050607;
+        }
+
+        .workbench-side {
+            display: none;
+            grid-template-rows: auto 1fr auto;
+            gap: 18px;
+            padding: 18px;
+            background: #111820;
+            color: #f7f3ea;
+        }
+
+        .workbench-brand {
+            display: grid;
+            gap: 13px;
+        }
+
+        .workbench-title {
+            display: flex;
+            align-items: center;
+            gap: 11px;
+        }
+
+        .coin-mark {
+            width: 38px;
+            height: 38px;
+            display: grid;
+            place-items: center;
+            border-radius: 50%;
+            background: var(--orange);
+            color: #15100a;
+            font-weight: 900;
+        }
+
+        .workbench-title h2,
+        .explorer-title h2,
+        .signal-title h2 {
+            margin: 0;
+            letter-spacing: 0;
+        }
+
+        .workbench-title h2 {
+            font-size: 23px;
+        }
+
+        .workbench-side p {
+            margin: 0;
+            color: #aeb8bf;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+
+        .status-list {
+            display: grid;
+            align-content: start;
+            gap: 10px;
+        }
+
+        .status-card {
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.055);
+            padding: 12px;
+        }
+
+        .status-card strong {
+            color: #fff;
+        }
+
+        .workbench-main {
+            display: grid;
+            grid-template-rows: auto minmax(0, 1fr) auto;
+            min-height: 0;
+        }
+
+        .workbench-top {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 14px;
+            padding: 18px 22px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.09);
+            background: rgba(0, 0, 0, 0.28);
+        }
+
+        .workbench-kicker {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            color: #bdf6d4;
+            font-size: 12px;
+            font-weight: 800;
+            text-transform: uppercase;
+        }
+
+        .workbench-kicker::before {
+            content: "";
+            width: 8px;
+            height: 8px;
+            border-radius: 999px;
+            background: var(--green);
+        }
+
+        .workbench-top h3 {
+            margin: 5px 0 0;
+            color: #fff8ea;
+            font-size: 25px;
+        }
+
+        .workbench-top .back {
+            color: #c9d0d6;
+        }
+
+        .workbench-messages {
+            min-height: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            padding: 24px 22px;
+            overflow: hidden;
+        }
+
+        .workbench-messages .assistant {
+            max-width: 690px;
+            align-self: flex-start;
+            background: rgba(255, 255, 255, 0.065);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 12px 30px rgba(0, 0, 0, 0.18);
+            color: #f7f2ea;
+        }
+
+        .workbench-messages .user {
+            max-width: 520px;
+            align-self: flex-end;
+            background: #181f27;
+            border: 1px solid rgba(247, 147, 26, 0.22);
+            color: #fff;
+        }
+
+        .workbench-messages .pending {
+            color: #ffd89f;
+            background: rgba(247, 147, 26, 0.08);
+            border: 1px solid rgba(247, 147, 26, 0.32);
+        }
+
+        .workbench-composer {
+            padding: 16px 22px;
+            background: rgba(0, 0, 0, 0.34);
+            border-top: 1px solid rgba(255, 255, 255, 0.09);
+        }
+
+        .workbench-composer textarea {
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            background: #080a0c;
+            color: #f7f2ea;
+            padding: 14px;
+        }
+
+        .workbench-composer button {
+            background: #f7931a;
+            color: #140c00;
+        }
+
+        .option-explorer {
+            min-height: inherit;
+            display: grid;
+            grid-template-rows: auto minmax(0, 1fr) auto;
+            border: 1px solid rgba(160, 188, 214, 0.2);
+            border-radius: 8px;
+            overflow: hidden;
+            background: #0d1117;
+            box-shadow: var(--shadow);
+        }
+
+        .explorer-header {
+            display: grid;
+            grid-template-columns: auto 1fr auto;
+            align-items: center;
+            gap: 16px;
+            padding: 18px 22px;
+            border-bottom: 1px solid rgba(160, 188, 214, 0.14);
+            background: #121821;
+        }
+
+        .explorer-title {
+            display: grid;
+            gap: 5px;
+        }
+
+        .explorer-title h2 {
+            font-size: 28px;
+        }
+
+        .explorer-title span {
+            color: #9fb0bf;
+            font-size: 13px;
+        }
+
+        .explorer-live {
+            display: flex;
+            gap: 10px;
+            color: #b8c6d2;
+            font-size: 12px;
+        }
+
+        .explorer-live span {
+            border: 1px solid rgba(160, 188, 214, 0.18);
+            border-radius: 8px;
+            padding: 8px 9px;
+            background: rgba(255, 255, 255, 0.04);
+        }
+
+        .explorer-body {
+            min-height: 0;
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) 330px;
+        }
+
+        .explorer-chat {
+            min-height: 0;
+            display: grid;
+            grid-template-rows: minmax(0, 1fr);
+            border-right: 1px solid rgba(160, 188, 214, 0.12);
+        }
+
+        .explorer-messages {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            padding: 20px 18px;
+            overflow: hidden;
+        }
+
+        .explorer-messages .assistant {
+            max-width: 680px;
+            align-self: flex-start;
+            background: #151d27;
+            border: 1px solid rgba(160, 188, 214, 0.14);
+            color: #eef6ff;
+        }
+
+        .explorer-messages .user {
+            max-width: 520px;
+            align-self: flex-end;
+            background: #173a46;
+            border: 1px solid rgba(121, 184, 255, 0.2);
+            color: #f7fbff;
+        }
+
+        .explorer-messages .pending {
+            color: #d8e7f2;
+            border-color: rgba(247, 147, 26, 0.44);
+        }
+
+        .explorer-panel {
+            min-height: 0;
+            display: grid;
+            grid-template-rows: auto 1fr;
+            background: #090d12;
+        }
+
+        .explorer-panel h3 {
+            margin: 0;
+            padding: 18px;
+            border-bottom: 1px solid rgba(160, 188, 214, 0.12);
+            font-size: 14px;
+            text-transform: uppercase;
+        }
+
+        .data-stack {
+            display: grid;
+            align-content: start;
+            gap: 10px;
+            padding: 18px;
+        }
+
+        .data-card {
+            border: 1px solid rgba(160, 188, 214, 0.14);
+            border-radius: 8px;
+            background: #101720;
+            padding: 12px;
+        }
+
+        .data-card code {
+            display: block;
+            margin-top: 8px;
+            color: #88c7ff;
+            font-size: 12px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .explorer-composer {
+            padding: 14px 18px;
+            background: #121821;
+            border-top: 1px solid rgba(160, 188, 214, 0.14);
+        }
+
+        .explorer-composer textarea {
+            border: 1px solid rgba(160, 188, 214, 0.2);
+            background: #0d1117;
+            color: #f3f8fd;
+            padding: 14px;
+        }
+
+        .explorer-composer button {
+            background: #79b8ff;
+            color: #05101d;
+        }
+
+        .option-signal {
+            min-height: inherit;
+            display: grid;
+            grid-template-rows: auto auto minmax(0, 1fr) auto;
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 8px;
+            overflow: hidden;
+            background:
+                linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent 34%),
+                #13120f;
+            box-shadow: var(--shadow);
+        }
+
+        .signal-header {
+            display: grid;
+            grid-template-columns: auto 1fr auto;
+            align-items: center;
+            gap: 16px;
+            padding: 20px 24px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .signal-title h2 {
+            font-size: 30px;
+        }
+
+        .signal-title span {
+            display: block;
+            margin-top: 5px;
+            color: #bab4aa;
+            font-size: 13px;
+        }
+
+        .signal-badge {
+            border: 1px solid rgba(68, 213, 140, 0.38);
+            border-radius: 8px;
+            padding: 9px 10px;
+            color: #d6ffe7;
+            background: rgba(68, 213, 140, 0.08);
+            font-size: 12px;
+            font-weight: 800;
+        }
+
+        .signal-strip {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            background: rgba(255, 255, 255, 0.035);
+        }
+
+        .signal-strip .metric {
+            padding: 14px 18px;
+            border-right: 1px solid rgba(255, 255, 255, 0.09);
+        }
+
+        .signal-strip .metric:last-child {
+            border-right: 0;
+        }
+
+        .signal-strip strong {
+            color: #fff4d8;
+        }
+
+        .signal-messages {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            padding: 22px 24px;
+            overflow: hidden;
+        }
+
+        .signal-messages .assistant {
+            max-width: 720px;
+            align-self: flex-start;
+            background: rgba(255, 255, 255, 0.075);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            color: #fffaf1;
+        }
+
+        .signal-messages .user {
+            max-width: 530px;
+            align-self: flex-end;
+            background: #efe2cc;
+            color: #18130e;
+        }
+
+        .signal-messages .pending {
+            color: #fff2d2;
+            background: rgba(247, 147, 26, 0.11);
+            border-color: rgba(247, 147, 26, 0.32);
+        }
+
+        .signal-composer-wrap {
+            display: grid;
+            gap: 12px;
+            padding: 14px 24px 18px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            background: rgba(0, 0, 0, 0.18);
+        }
+
+        .signal-composer textarea {
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            background: rgba(0, 0, 0, 0.28);
+            color: #fffaf1;
+            padding: 14px;
+        }
+
+        .signal-composer button {
+            background: #fff0c9;
+            color: #191006;
+        }
+
+        .design-option:not(.is-active) {
+            display: none;
+        }
+
+        @keyframes blink {
+            0%,
+            85%,
+            100% {
+                transform: translateY(0);
+                opacity: 0.35;
+            }
+
+            45% {
+                transform: translateY(-3px);
+                opacity: 1;
+            }
+        }
+
+        @media (max-width: 900px) {
+            .review-shell {
+                padding: 18px 12px 30px;
+            }
+
+            .design-tabs {
+                grid-template-columns: 1fr;
+            }
+
+            .design-option {
+                min-height: auto;
+            }
+
+            .workbench-grid,
+            .explorer-body {
+                grid-template-columns: 1fr;
+            }
+
+            .workbench-side,
+            .explorer-panel {
+                display: none;
+            }
+
+            .signal-strip {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+        }
+
+        @media (max-width: 620px) {
+            .review-header h1 {
+                font-size: 34px;
+            }
+
+            .workbench-top,
+            .explorer-header,
+            .signal-header {
+                grid-template-columns: auto 1fr;
+            }
+
+            .workbench-top .metric,
+            .explorer-live,
+            .signal-badge {
+                grid-column: 2;
+                justify-self: start;
+            }
+
+            .composer {
+                grid-template-columns: 1fr;
+            }
+
+            .message {
+                max-width: 100% !important;
+            }
+        }
+    </style>
+</head>
+<body>
+    <main class="review-shell">
+        <header class="review-header">
+            <h1>Bitcoin Chat Minimal Pass</h1>
+            <p>Darker, quieter options with a clear node connection signal and no starter prompt buttons inside the chat.</p>
+        </header>
+
+        <nav class="design-tabs" aria-label="Design options">
+            <button class="design-tab" type="button" aria-selected="false" data-design="workbench">
+                <strong>1. Minimal</strong>
+                <span>Single surface, dark, least text.</span>
+            </button>
+            <button class="design-tab" type="button" aria-selected="true" data-design="explorer">
+                <strong>2. Evidence</strong>
+                <span>Still minimal, with a compact data rail.</span>
+            </button>
+            <button class="design-tab" type="button" aria-selected="false" data-design="signal">
+                <strong>3. Metrics</strong>
+                <span>Minimal chat with a thin status strip.</span>
+            </button>
+        </nav>
+
+        <section class="stage">
+            <article class="design-option option-workbench" data-option="workbench" aria-label="Ledger Workbench design">
+                <div class="workbench-grid">
+                    <aside class="workbench-side">
+                        <div class="workbench-brand">
+                            <a href="/" class="back" aria-label="Back to projects">&larr;</a>
+                            <div class="workbench-title">
+                                <div class="coin-mark">B</div>
+                                <h2>Bitcoin Chat</h2>
+                            </div>
+                            <p>Node data when needed.</p>
+                        </div>
+                        <div class="status-list">
+                            <div class="status-card metric">
+                                <span>Network</span>
+                                <strong>Mainnet</strong>
+                            </div>
+                            <div class="status-card metric">
+                                <span>Sync</span>
+                                <strong>Synced</strong>
+                            </div>
+                            <div class="status-card metric">
+                                <span>Fee range</span>
+                                <strong>7-18 sats/vB</strong>
+                            </div>
+                        </div>
+                        <p>Minimal, connected, read-only.</p>
+                    </aside>
+                    <div class="workbench-main">
+                        <header class="workbench-top">
+                            <div>
+                                <div class="workbench-kicker">Node connected</div>
+                                <h3>Bitcoin Chat</h3>
+                            </div>
+                            <div class="metric">
+                                <span>Height</span>
+                                <strong>842,921</strong>
+                            </div>
+                        </header>
+                        <div class="workbench-messages">
+                            <div class="message assistant">Node connected. Ask anything Bitcoin.</div>
+                            <div class="message user">How many BTC were mined today?</div>
+                            <div class="message assistant">About 456.25 BTC across 73 blocks so far today.<small>Used node data: mined stats</small></div>
+                            <div class="message user">What is a UTXO?</div>
+                            <div class="message assistant pending"><span class="loading">Working on your question <i></i><i></i><i></i></span></div>
+                        </div>
+                        <form class="workbench-composer composer">
+                            <textarea rows="1" placeholder="Ask Bitcoin..."></textarea>
+                            <button type="button" aria-label="Send">-&gt;</button>
+                        </form>
+                    </div>
+                </div>
+            </article>
+
+            <article class="design-option option-explorer is-active" data-option="explorer" aria-label="Explorer Chat design">
+                <header class="explorer-header">
+                    <a href="/" class="back" aria-label="Back to projects">&larr;</a>
+                    <div class="explorer-title">
+                        <h2>Bitcoin Chat</h2>
+                        <span>Node connected</span>
+                    </div>
+                    <div class="explorer-live" aria-label="Node summary">
+                        <span>Height 842,921</span>
+                        <span>Synced</span>
+                        <span>Mainnet</span>
+                    </div>
+                </header>
+                <div class="explorer-body">
+                    <section class="explorer-chat" aria-label="Chat">
+                        <div class="explorer-messages">
+                            <div class="message assistant">Node connected. Source data appears when used.</div>
+                            <div class="message user">What are mempool fees like right now?</div>
+                            <div class="message assistant">Light. Fast estimates are near 18 sats/vB.<small>Node data: mempool, fee estimate</small></div>
+                            <div class="message user">Why does fee rate use sats/vB?</div>
+                            <div class="message assistant pending"><span class="loading">Preparing an answer <i></i><i></i><i></i></span></div>
+                        </div>
+                    </section>
+                    <aside class="explorer-panel" aria-label="Evidence panel">
+                        <h3>Last Node Evidence</h3>
+                        <div class="data-stack">
+                            <div class="data-card metric">
+                                <span>RPC method</span>
+                                <strong>getmempoolinfo</strong>
+                                <code>{"usage": 9437184, "size": 3127}</code>
+                            </div>
+                            <div class="data-card metric">
+                                <span>Estimate target</span>
+                                <strong>6 blocks</strong>
+                                <code>{"feerate": 0.00018}</code>
+                            </div>
+                            <div class="data-card metric">
+                                <span>Safety</span>
+                                <strong>Read-only</strong>
+                                <code>No wallet or broadcast methods exposed</code>
+                            </div>
+                        </div>
+                    </aside>
+                </div>
+                <form class="explorer-composer composer">
+                    <textarea rows="1" placeholder="Ask Bitcoin..."></textarea>
+                    <button type="button" aria-label="Send">-&gt;</button>
+                </form>
+            </article>
+
+            <article class="design-option option-signal" data-option="signal" aria-label="Signal Room design">
+                <header class="signal-header">
+                    <a href="/" class="back" aria-label="Back to projects">&larr;</a>
+                    <div class="signal-title">
+                        <h2>Bitcoin Chat</h2>
+                        <span>Node connected</span>
+                    </div>
+                    <div class="signal-badge">Node online</div>
+                </header>
+                <div class="signal-strip">
+                    <div class="metric">
+                        <span>Height</span>
+                        <strong>842,921</strong>
+                    </div>
+                    <div class="metric">
+                        <span>Chain</span>
+                        <strong>Mainnet</strong>
+                    </div>
+                    <div class="metric">
+                        <span>Fast fee</span>
+                        <strong>18 sats/vB</strong>
+                    </div>
+                    <div class="metric">
+                        <span>Mode</span>
+                        <strong>Read-only</strong>
+                    </div>
+                </div>
+                <div class="signal-messages">
+                    <div class="message assistant">Node connected. Ask anything Bitcoin.</div>
+                    <div class="message user">Is my node synced?</div>
+                    <div class="message assistant">Yes. Mainnet height 842,921. Initial block download is off.<small>Node data: status</small></div>
+                    <div class="message user">Can you explain block difficulty?</div>
+                    <div class="message assistant pending"><span class="loading">Thinking it through <i></i><i></i><i></i></span></div>
+                </div>
+                <div class="signal-composer-wrap">
+                    <form class="signal-composer composer">
+                        <textarea rows="1" placeholder="Ask Bitcoin..."></textarea>
+                        <button type="button" aria-label="Send">-&gt;</button>
+                    </form>
+                </div>
+            </article>
+
+            <p class="mock-note">Static mocks. The chat itself now has no starter question buttons in these options.</p>
+        </section>
+    </main>
+
+    <script>
+        const tabs = Array.from(document.querySelectorAll('.design-tab'));
+        const options = Array.from(document.querySelectorAll('.design-option'));
+
+        tabs.forEach((tab) => {
+            tab.addEventListener('click', () => {
+                const design = tab.dataset.design;
+                tabs.forEach((item) => {
+                    item.setAttribute('aria-selected', String(item === tab));
+                });
+                options.forEach((option) => {
+                    option.classList.toggle('is-active', option.dataset.option === design);
+                });
+            });
+        });
+    </script>
+</body>
+</html>
