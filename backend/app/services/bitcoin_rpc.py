@@ -1,5 +1,6 @@
 import os
 import json
+import socket
 import urllib.error
 import urllib.request
 from base64 import b64encode
@@ -45,6 +46,9 @@ class BitcoinRPCClient:
             headers={
                 "Authorization": f"Basic {b64encode(credentials).decode('ascii')}",
                 "Content-Type": "application/json",
+                "Accept": "application/json",
+                "Connection": "close",
+                "User-Agent": "palmergill-bitcoin-chat/1.0",
             },
             method="POST",
         )
@@ -52,6 +56,8 @@ class BitcoinRPCClient:
         try:
             with urllib.request.urlopen(request, timeout=self.timeout) as response:
                 body = json.loads(response.read().decode("utf-8"))
+        except socket.timeout as exc:
+            raise BitcoinRPCError("Timed out waiting for Bitcoin node response") from exc
         except urllib.error.URLError as exc:
             raise BitcoinRPCError(f"Could not reach Bitcoin node: {exc}") from exc
         except json.JSONDecodeError as exc:

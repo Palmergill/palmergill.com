@@ -22,7 +22,11 @@ def get_node_status() -> Dict[str, Any]:
     if not bitcoin_rpc_client.configured:
         return _demo_status()
 
-    info = bitcoin_rpc_client.call("getblockchaininfo")
+    try:
+        info = bitcoin_rpc_client.call("getblockchaininfo")
+    except BitcoinRPCError as exc:
+        return _rpc_error_response(exc)
+
     return {
         "source": "node",
         "chain": info.get("chain"),
@@ -50,9 +54,13 @@ def get_latest_block() -> Dict[str, Any]:
             "warnings": ["Bitcoin RPC is not configured. Showing demo data."],
         }
 
-    height = bitcoin_rpc_client.call("getblockcount")
-    block_hash = bitcoin_rpc_client.call("getblockhash", [height])
-    block = bitcoin_rpc_client.call("getblock", [block_hash, 1])
+    try:
+        height = bitcoin_rpc_client.call("getblockcount")
+        block_hash = bitcoin_rpc_client.call("getblockhash", [height])
+        block = bitcoin_rpc_client.call("getblock", [block_hash, 1])
+    except BitcoinRPCError as exc:
+        return _rpc_error_response(exc)
+
     return _format_block(block, source="node")
 
 
@@ -64,10 +72,14 @@ def get_block(height_or_hash: str) -> Dict[str, Any]:
         data["subsidy_btc"] = block_subsidy_btc(height)
         return data
 
-    block_hash = height_or_hash
-    if height_or_hash.isdigit():
-        block_hash = bitcoin_rpc_client.call("getblockhash", [int(height_or_hash)])
-    block = bitcoin_rpc_client.call("getblock", [block_hash, 1])
+    try:
+        block_hash = height_or_hash
+        if height_or_hash.isdigit():
+            block_hash = bitcoin_rpc_client.call("getblockhash", [int(height_or_hash)])
+        block = bitcoin_rpc_client.call("getblock", [block_hash, 1])
+    except BitcoinRPCError as exc:
+        return _rpc_error_response(exc)
+
     return _format_block(block, source="node")
 
 
@@ -84,11 +96,14 @@ def get_mempool_summary() -> Dict[str, Any]:
             "warnings": ["Bitcoin RPC is not configured. Showing demo data."],
         }
 
-    mempool = bitcoin_rpc_client.call("getmempoolinfo")
-    estimates = {}
-    for target in (2, 6, 12):
-        estimate = bitcoin_rpc_client.call("estimatesmartfee", [target])
-        estimates[str(target)] = fee_rate_sats_vb(estimate.get("feerate"))
+    try:
+        mempool = bitcoin_rpc_client.call("getmempoolinfo")
+        estimates = {}
+        for target in (2, 6, 12):
+            estimate = bitcoin_rpc_client.call("estimatesmartfee", [target])
+            estimates[str(target)] = fee_rate_sats_vb(estimate.get("feerate"))
+    except BitcoinRPCError as exc:
+        return _rpc_error_response(exc)
 
     return {
         "source": "node",
@@ -116,7 +131,11 @@ def estimate_fee(confirmation_target_blocks: int) -> Dict[str, Any]:
             "warnings": ["Bitcoin RPC is not configured. Showing demo data."],
         }
 
-    estimate = bitcoin_rpc_client.call("estimatesmartfee", [confirmation_target_blocks])
+    try:
+        estimate = bitcoin_rpc_client.call("estimatesmartfee", [confirmation_target_blocks])
+    except BitcoinRPCError as exc:
+        return _rpc_error_response(exc)
+
     btc_per_kvb = estimate.get("feerate")
     return {
         "source": "node",
@@ -146,7 +165,11 @@ def get_transaction(txid: str) -> Dict[str, Any]:
             "warnings": ["Bitcoin RPC is not configured. Showing demo transaction shape."],
         }
 
-    tx = bitcoin_rpc_client.call("getrawtransaction", [txid, True])
+    try:
+        tx = bitcoin_rpc_client.call("getrawtransaction", [txid, True])
+    except BitcoinRPCError as exc:
+        return _rpc_error_response(exc)
+
     outputs = tx.get("vout", [])
     total_output = sum(output.get("value", 0) for output in outputs)
     return {
@@ -189,4 +212,12 @@ def safe_tool_call(name: str, *args: Any, **kwargs: Any) -> Dict[str, Any]:
     try:
         return globals()[name](*args, **kwargs)
     except BitcoinRPCError as exc:
-        return {"source": "error", "error": str(exc), "warnings": ["I cannot reach the Bitcoin node right now."]}
+        return _rpc_error_response(exc)
+
+
+def _rpc_error_response(exc: BitcoinRPCError) -> Dict[str, Any]:
+    return {
+        "source": "error",
+        "error": str(exc),
+        "warnings": ["I cannot reach the Bitcoin node right now."],
+    }
