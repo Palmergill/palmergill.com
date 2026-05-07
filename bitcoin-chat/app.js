@@ -9,10 +9,6 @@ const nodeStatus = document.getElementById('nodeStatus');
 const heightPill = document.getElementById('heightPill');
 const syncPill = document.getElementById('syncPill');
 const chainPill = document.getElementById('chainPill');
-const chatLayout = document.querySelector('.chat-layout');
-const evidencePanel = document.getElementById('evidencePanel');
-const evidenceStack = document.getElementById('evidenceStack');
-const dismissEvidence = document.getElementById('dismissEvidence');
 
 let sessionId = localStorage.getItem('bitcoinChatSessionId');
 
@@ -21,7 +17,7 @@ const starterMessage = {
     text: 'Ask anything Bitcoin. I use live node data when needed.',
 };
 
-function addMessage({ role, text, warnings, toolsUsed, loading = false, error = false }) {
+function addMessage({ role, text, data, warnings, toolsUsed, loading = false, error = false }) {
     const el = document.createElement('article');
     el.className = `message ${role}${loading ? ' loading' : ''}${error ? ' error' : ''}`;
     if (loading) {
@@ -38,20 +34,8 @@ function addMessage({ role, text, warnings, toolsUsed, loading = false, error = 
         el.textContent = text;
     }
 
-    if (toolsUsed?.length || warnings?.length) {
-        const meta = document.createElement('div');
-        meta.className = 'meta';
-        if (toolsUsed?.length) {
-            const tools = document.createElement('span');
-            tools.textContent = `Tools: ${toolsUsed.join(', ')}`;
-            meta.appendChild(tools);
-        }
-        warnings?.forEach((warning) => {
-            const warningEl = document.createElement('span');
-            warningEl.textContent = warning;
-            meta.appendChild(warningEl);
-        });
-        el.appendChild(meta);
+    if (!loading && role === 'assistant') {
+        appendSourceSummary(el, { data, warnings, toolsUsed });
     }
 
     messagesEl.appendChild(el);
@@ -185,13 +169,20 @@ function setNodeStatus(text, available = true) {
     nodeStatus.replaceChildren(dot, document.createTextNode(text));
 }
 
-function compactJson(value) {
-    return JSON.stringify(value, null, 0).replace(/\s+/g, ' ');
-}
-
 function truncate(text, length = 92) {
     if (!text || text.length <= length) return text;
     return `${text.slice(0, length - 3)}...`;
+}
+
+function formatSourceLabel(label) {
+    return label
+        .replace(/^result\./, '')
+        .replace(/_/g, ' ')
+        .replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function formatToolName(tool) {
+    return tool.replace(/^get_/, '').replace(/_/g, ' ');
 }
 
 function flattenData(value, prefix = '') {
@@ -208,62 +199,51 @@ function flattenData(value, prefix = '') {
     });
 }
 
-function addEvidenceCard(label, value, code) {
-    const card = document.createElement('div');
-    card.className = 'evidence-card';
-
-    const labelEl = document.createElement('span');
-    labelEl.textContent = label;
-    const valueEl = document.createElement('strong');
-    valueEl.textContent = value;
-    card.append(labelEl, valueEl);
-
-    if (code) {
-        const codeEl = document.createElement('code');
-        codeEl.textContent = code;
-        card.appendChild(codeEl);
-    }
-
-    evidenceStack.appendChild(card);
-}
-
-function updateEvidence({ data, toolsUsed, warnings } = {}) {
-    evidenceStack.replaceChildren();
+function appendSourceSummary(parent, { data, toolsUsed, warnings } = {}) {
     const hasData = data && typeof data === 'object' && Object.keys(data).length > 0;
     const hasTools = Boolean(toolsUsed?.length);
+    const hasWarnings = Boolean(warnings?.length);
 
-    if (!hasData && !hasTools) {
-        hideEvidence();
+    if (!hasData && !hasTools && !hasWarnings) {
         return;
     }
 
+    const source = document.createElement('div');
+    source.className = 'source-summary';
+
+    const heading = document.createElement('div');
+    heading.className = 'source-heading';
+    heading.textContent = hasTools || hasData ? 'Node-backed context' : 'Note';
+    source.appendChild(heading);
+
+    const items = document.createElement('div');
+    items.className = 'source-items';
+
     if (hasTools) {
-        addEvidenceCard('Tool call', toolsUsed.join(', '), 'read-only');
+        const item = document.createElement('span');
+        item.textContent = `Tool: ${toolsUsed.map(formatToolName).join(', ')}`;
+        items.appendChild(item);
     }
 
     flattenData(hasData ? data : null).slice(0, 3).forEach(([label, value]) => {
-        addEvidenceCard(label, truncate(value, 34));
+        if (label === 'warnings') return;
+        const item = document.createElement('span');
+        item.textContent = `${formatSourceLabel(label)}: ${truncate(value, 34)}`;
+        items.appendChild(item);
     });
 
-    if (hasData) {
-        addEvidenceCard('Response data', 'available', truncate(compactJson(data)));
+    if (items.childElementCount) {
+        source.appendChild(items);
     }
 
     warnings?.slice(0, 2).forEach((warning) => {
-        addEvidenceCard('Warning', warning);
+        const warningEl = document.createElement('div');
+        warningEl.className = 'source-warning';
+        warningEl.textContent = warning;
+        source.appendChild(warningEl);
     });
 
-    showEvidence();
-}
-
-function showEvidence() {
-    evidencePanel.classList.remove('is-hidden');
-    chatLayout.classList.add('has-evidence');
-}
-
-function hideEvidence() {
-    evidencePanel.classList.add('is-hidden');
-    chatLayout.classList.remove('has-evidence');
+    parent.appendChild(source);
 }
 
 async function fetchJson(url, options) {
@@ -275,7 +255,7 @@ async function fetchJson(url, options) {
     return response.json();
 }
 
-async function refreshStatus({ updateEvidencePanel = false } = {}) {
+async function refreshStatus() {
     try {
         const status = await fetchJson(`${API_BASE}/status`);
         const source = status.source === 'node' ? 'Node connected' : 'Demo mode';
@@ -283,9 +263,6 @@ async function refreshStatus({ updateEvidencePanel = false } = {}) {
         heightPill.textContent = `Height ${status.blocks ?? '--'}`;
         syncPill.textContent = status.initial_block_download ? 'Syncing' : 'Synced';
         chainPill.textContent = status.chain || 'Mainnet';
-        if (updateEvidencePanel) {
-            updateEvidence({ data: status, toolsUsed: ['status'], warnings: status.warnings });
-        }
     } catch (error) {
         setNodeStatus('Node unavailable', false);
         heightPill.textContent = 'Height --';
@@ -296,7 +273,6 @@ async function refreshStatus({ updateEvidencePanel = false } = {}) {
 
 async function sendMessage(text) {
     addMessage({ role: 'user', text });
-    hideEvidence();
     const loadingEl = addMessage({ role: 'assistant', text: 'Working on your question...', loading: true });
     setBusy(true);
 
@@ -318,18 +294,13 @@ async function sendMessage(text) {
         addMessage({
             role: 'assistant',
             text: result.answer,
-            warnings: result.warnings,
-            toolsUsed: result.tools_used,
-        });
-        updateEvidence({
             data: result.data,
-            toolsUsed: result.tools_used,
             warnings: result.warnings,
+            toolsUsed: result.tools_used,
         });
         await refreshStatus();
     } catch (error) {
         loadingEl.remove();
-        hideEvidence();
         addMessage({ role: 'assistant', text: error.message, error: true });
     } finally {
         setBusy(false);
@@ -361,10 +332,6 @@ chatForm.addEventListener('submit', async (event) => {
     messageInput.value = '';
     messageInput.style.height = 'auto';
     await sendMessage(text);
-});
-
-dismissEvidence.addEventListener('click', () => {
-    hideEvidence();
 });
 
 addMessage(starterMessage);
