@@ -22,13 +22,19 @@ function readState(window) {
     isComeOutRoll,
     passLine: bets.passLine,
     passLineOdds: oddsBets.passLine,
+    dontPassOdds: oddsBets.dontPass,
     place6: bets.place6,
     field: bets.field,
     comeBets,
     dontComeBets,
+    currentOddsTarget,
     currentPopupBetId,
     status: document.getElementById('gameStatus').textContent,
+    modalTitle: document.getElementById('modalTitle').textContent,
+    modalInfo: document.getElementById('modalCurrentBet').textContent,
     rollDisabled: document.getElementById('rollButton').disabled,
+    resultText: document.getElementById('rollResultBurst').textContent,
+    resultClass: document.getElementById('rollResultBurst').className,
   })`));
 }
 
@@ -120,6 +126,120 @@ describe('craps game regressions', () => {
     expect(state.passLineOdds).toBe(30);
   });
 
+  test('Pass Line odds can be added and removed after the point is established', () => {
+    const window = loadGame();
+    window.eval(`
+      balance = 1000;
+      point = 6;
+      isComeOutRoll = false;
+      bets.passLine = 10;
+      oddsBets.passLine = 10;
+    `);
+
+    window.openBetModal('passLine');
+    expect(readState(window)).toMatchObject({
+      modalTitle: 'Pass Line Odds',
+      currentOddsTarget: { betType: 'passLine', betId: null },
+    });
+
+    window.document.getElementById('betInput').value = '15';
+    window.addOddsFromModal();
+    expect(readState(window)).toMatchObject({
+      balance: 985,
+      passLineOdds: 25,
+      status: 'Added $15 odds to Pass Line',
+    });
+
+    window.openBetModal('passLine');
+    window.document.getElementById('betInput').value = '5';
+    window.removeOddsFromModal();
+    expect(readState(window)).toMatchObject({
+      balance: 990,
+      passLineOdds: 20,
+      status: 'Removed $5 odds from Pass Line',
+    });
+  });
+
+  test("Don't Pass odds can be managed from the line button during a point", () => {
+    const window = loadGame();
+    window.eval(`
+      balance = 1000;
+      point = 8;
+      isComeOutRoll = false;
+      bets.dontPass = 10;
+    `);
+
+    window.openBetModal('dontPass');
+    expect(readState(window)).toMatchObject({
+      modalTitle: "Don't Pass Odds",
+      currentOddsTarget: { betType: 'dontPass', betId: null },
+    });
+
+    window.document.getElementById('betInput').value = '30';
+    window.addOddsFromModal();
+    expect(readState(window)).toMatchObject({
+      balance: 970,
+      dontPassOdds: 30,
+      status: "Added $30 odds to Don't Pass",
+    });
+  });
+
+  test('established Come odds can be added and removed later', () => {
+    const window = loadGame();
+    window.eval(`
+      balance = 1000;
+      point = 8;
+      isComeOutRoll = false;
+      comeBets = [{ id: 4, point: 6, amount: 10, odds: 0 }];
+      nextComeBetId = 5;
+    `);
+
+    window.openOddsModal('come', 4);
+    window.document.getElementById('betInput').value = '20';
+    window.addOddsFromModal();
+    expect(readState(window)).toMatchObject({
+      balance: 980,
+      comeBets: [{ id: 4, point: 6, amount: 10, odds: 20 }],
+      status: 'Added $20 odds to Come 6',
+    });
+
+    window.openOddsModal('come', 4);
+    window.removeOddsFromModal();
+    expect(readState(window)).toMatchObject({
+      balance: 1000,
+      comeBets: [{ id: 4, point: 6, amount: 10, odds: 0 }],
+      status: 'Removed $20 odds from Come 6',
+    });
+  });
+
+  test("established Don't Come odds can be added and removed later", () => {
+    const window = loadGame();
+    window.eval(`
+      balance = 1000;
+      point = 8;
+      isComeOutRoll = false;
+      dontComeBets = [{ id: 7, point: 9, amount: 10, odds: 10 }];
+      nextComeBetId = 8;
+    `);
+
+    window.openOddsModal('dontCome', 7);
+    window.document.getElementById('betInput').value = '15';
+    window.addOddsFromModal();
+    expect(readState(window)).toMatchObject({
+      balance: 985,
+      dontComeBets: [{ id: 7, point: 9, amount: 10, odds: 25 }],
+      status: 'Added $15 odds to DC 9',
+    });
+
+    window.openOddsModal('dontCome', 7);
+    window.removeOddsFromModal();
+    expect(readState(window)).toMatchObject({
+      balance: 1010,
+      dontComeBets: [{ id: 7, point: 9, amount: 10, odds: 0 }],
+      status: 'Removed $25 odds from DC 9',
+    });
+  });
+
   test('roll button stays disabled while point popup is pending or open', () => {
     const window = loadGame();
     const callbacks = [];
@@ -185,6 +305,54 @@ describe('craps game regressions', () => {
     expect(window.document.getElementById('place6Btn').tagName).toBe('BUTTON');
     expect(window.document.getElementById('hard6TileBtn').tagName).toBe('BUTTON');
     expect(window.document.getElementById('comeBtn').disabled).toBe(true);
+  });
+
+  test('resolved losing bets show a loss animation', () => {
+    const window = loadGame();
+    window.eval(`
+      balance = 995;
+      bets.field = 5;
+    `);
+
+    window.resolveRoll(3, 3);
+    const state = readState(window);
+
+    expect(state.balance).toBe(995);
+    expect(state.field).toBe(0);
+    expect(state.resultText).toBe('-$5');
+    expect(state.resultClass).toContain('loss');
+    expect(state.resultClass).toContain('active');
+  });
+
+  test('winning rolls show a net win animation', () => {
+    const window = loadGame();
+    window.eval(`
+      balance = 990;
+      bets.passLine = 10;
+    `);
+
+    window.resolveRoll(3, 4);
+    const state = readState(window);
+
+    expect(state.balance).toBe(1010);
+    expect(state.resultText).toBe('+$10');
+    expect(state.resultClass).toContain('win');
+    expect(state.resultClass).toContain('active');
+  });
+
+  test('pushes do not show a win or loss animation', () => {
+    const window = loadGame();
+    window.eval(`
+      balance = 990;
+      bets.dontPass = 10;
+    `);
+
+    window.resolveRoll(6, 6);
+    const state = readState(window);
+
+    expect(state.balance).toBe(1000);
+    expect(state.resultText).toBe('');
+    expect(state.resultClass).toBe('roll-result-burst');
   });
 });
 

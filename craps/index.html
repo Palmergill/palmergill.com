@@ -130,6 +130,17 @@
             font: inherit;
             padding: 0 2px;
         }
+        .bet-chip .chip-odds {
+            cursor: pointer;
+            color: #bbf7d0;
+            font-weight: 700;
+            margin-left: 2px;
+            background: rgba(34,197,94,0.12);
+            border: 1px solid rgba(187,247,208,0.35);
+            border-radius: 999px;
+            font: inherit;
+            padding: 1px 6px;
+        }
         .bet-chip .chip-x:disabled {
             cursor: not-allowed;
             color: rgba(248,250,252,0.35);
@@ -143,6 +154,8 @@
             margin-top: 10px;
             border: 2px solid #c9a227;
             box-shadow: inset 0 2px 10px rgba(0,0,0,0.3);
+            overflow: hidden;
+            position: relative;
         }
         .dice-container { display: flex; gap: 20px; justify-content: center; margin-bottom: 12px; }
         .die {
@@ -166,6 +179,42 @@
         }
         .die-dot.hidden { opacity: 0; }
         .point-display { color: #ffd700; font-weight: 600; margin-bottom: 12px; text-shadow: 1px 1px 2px rgba(0,0,0,0.5); min-height: 20px; }
+        .roll-result-burst {
+            position: absolute;
+            top: 14px;
+            left: 50%;
+            z-index: 5;
+            min-width: 104px;
+            padding: 8px 14px;
+            border-radius: 999px;
+            border: 2px solid currentColor;
+            background: rgba(13, 51, 32, 0.92);
+            box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+            font-size: 1.15rem;
+            font-weight: 800;
+            letter-spacing: 0;
+            opacity: 0;
+            pointer-events: none;
+            text-align: center;
+            transform: translate(-50%, 8px) scale(0.85);
+        }
+        .roll-result-burst.win {
+            color: #bbf7d0;
+            text-shadow: 0 0 12px rgba(34,197,94,0.75);
+        }
+        .roll-result-burst.loss {
+            color: #fecaca;
+            text-shadow: 0 0 12px rgba(220,38,38,0.75);
+        }
+        .roll-result-burst.active {
+            animation: rollResultBurst 1.2s ease-out forwards;
+        }
+        @keyframes rollResultBurst {
+            0% { opacity: 0; transform: translate(-50%, 12px) scale(0.82); }
+            18% { opacity: 1; transform: translate(-50%, 0) scale(1.12); }
+            42% { opacity: 1; transform: translate(-50%, -4px) scale(1); }
+            100% { opacity: 0; transform: translate(-50%, -34px) scale(0.96); }
+        }
         .roll-btn {
             width: 100%;
             padding: 18px;
@@ -517,6 +566,7 @@
                 <div class="die" id="die2"><div class="die-dot" style="grid-area: 2/2;"></div></div>
             </div>
             <div class="point-display" id="pointDisplay"></div>
+            <div class="roll-result-burst" id="rollResultBurst" aria-live="polite" aria-atomic="true"></div>
             <button class="roll-btn" id="rollButton" onclick="rollDice()">ROLL DICE</button>
         </div>
     </div>
@@ -606,8 +656,10 @@
         let isComeOutRoll = true;
         let lastBets = null;
         let currentModalBet = null;
+        let currentOddsTarget = null;
         let nextComeBetId = 1;
         let isRolling = false;
+        let rollResultTimer = null;
 
         // Multiple Come/Don't Come bets: array of { id, point: null|number, amount: number, odds: number }
         let comeBets = [];
@@ -651,6 +703,27 @@
             document.getElementById('gameStatus').textContent = message;
         }
 
+        function showRollResultAnimation(amount) {
+            const burst = document.getElementById('rollResultBurst');
+            if (rollResultTimer) clearTimeout(rollResultTimer);
+
+            burst.className = 'roll-result-burst';
+            if (amount === 0) {
+                burst.textContent = '';
+                rollResultTimer = null;
+                return;
+            }
+
+            burst.textContent = (amount > 0 ? '+$' : '-$') + Math.abs(amount).toLocaleString();
+            burst.offsetHeight;
+            burst.classList.add(amount > 0 ? 'win' : 'loss', 'active');
+
+            rollResultTimer = setTimeout(() => {
+                burst.classList.remove('active');
+                rollResultTimer = null;
+            }, 1200);
+        }
+
         // ── UI: Dice ──
         function renderDie(dieId, value) {
             const die = document.getElementById(dieId);
@@ -678,8 +751,14 @@
         function openBetModal(betType) {
             // Block come/don't come on come-out
             if ((betType === 'come' || betType === 'dontCome') && isComeOutRoll) return;
+            if ((betType === 'passLine' || betType === 'dontPass') &&
+                    bets[betType] > 0 && canManageOdds(betType)) {
+                openOddsModal(betType);
+                return;
+            }
 
             currentModalBet = betType;
+            currentOddsTarget = null;
             const isComeBet = (betType === 'come' || betType === 'dontCome');
             const name = isComeBet ? (betType === 'come' ? 'Come' : "Don't Come") : (betNames[betType] || betType);
             document.getElementById('modalTitle').textContent = name + ' Bet';
@@ -736,6 +815,7 @@
         function closeBetModal() {
             document.getElementById('betModal').classList.remove('active');
             currentModalBet = null;
+            currentOddsTarget = null;
         }
 
         function getBetUnit(betType) {
@@ -816,6 +896,154 @@
             bet.odds += canAfford;
             balance -= canAfford;
             return true;
+        }
+
+        function getOddsContext(betType, betId = null) {
+            if (betType === 'passLine' || betType === 'dontPass') {
+                if (!point || bets[betType] <= 0) return null;
+                return {
+                    betType: betType,
+                    betId: null,
+                    point: point,
+                    amount: bets[betType],
+                    odds: oddsBets[betType],
+                    label: betNames[betType]
+                };
+            }
+
+            const arr = betType === 'dontCome' ? dontComeBets : comeBets;
+            const bet = arr.find(b => b.id === betId);
+            if (!bet || !bet.point || bet.amount <= 0) return null;
+            return {
+                betType: betType,
+                betId: betId,
+                point: bet.point,
+                amount: bet.amount,
+                odds: bet.odds,
+                label: (betType === 'dontCome' ? 'DC ' : 'Come ') + bet.point
+            };
+        }
+
+        function setOddsAmount(betType, betId, amount) {
+            if (betType === 'passLine' || betType === 'dontPass') {
+                oddsBets[betType] = amount;
+                return true;
+            }
+            const arr = betType === 'dontCome' ? dontComeBets : comeBets;
+            const bet = arr.find(b => b.id === betId);
+            if (!bet) return false;
+            bet.odds = amount;
+            return true;
+        }
+
+        function canManageOdds(betType, betId = null) {
+            return getOddsContext(betType, betId) !== null;
+        }
+
+        function getMaxOddsAmount(context) {
+            return context.amount * oddsMultipliers[context.point];
+        }
+
+        function openOddsModal(betType, betId = null) {
+            const context = getOddsContext(betType, betId);
+            if (!context) {
+                setStatus('Odds are available after a point is set');
+                return;
+            }
+
+            currentModalBet = null;
+            currentOddsTarget = { betType: betType, betId: betId };
+            const maxOdds = getMaxOddsAmount(context);
+            const remaining = Math.max(0, maxOdds - context.odds);
+            const betInput = document.getElementById('betInput');
+            betInput.value = '';
+            betInput.min = 5;
+            betInput.step = 5;
+            betInput.placeholder = context.odds > 0 ? String(context.odds) : '0';
+
+            document.getElementById('modalTitle').textContent = context.label + ' Odds';
+            document.getElementById('modalCurrentBet').textContent =
+                'Bet $' + context.amount + ' on ' + context.point +
+                ' · Odds $' + context.odds + ' / $' + maxOdds +
+                (remaining > 0 ? ' · Can add $' + remaining : ' · Max odds');
+
+            const actionsDiv = document.getElementById('modalActions');
+            if (context.odds > 0) {
+                actionsDiv.className = 'modal-actions three-col';
+                actionsDiv.innerHTML = '<button class="modal-btn cancel" onclick="closeBetModal()">Cancel</button>' +
+                    '<button class="modal-btn remove" onclick="removeOddsFromModal()">Remove Odds</button>' +
+                    '<button class="modal-btn confirm" onclick="addOddsFromModal()">Add Odds</button>';
+            } else {
+                actionsDiv.className = 'modal-actions';
+                actionsDiv.innerHTML = '<button class="modal-btn cancel" onclick="closeBetModal()">Cancel</button>' +
+                    '<button class="modal-btn confirm" onclick="addOddsFromModal()">Add Odds</button>';
+            }
+
+            document.getElementById('betModal').classList.add('active');
+            setTimeout(() => document.getElementById('betInput').focus(), 100);
+        }
+
+        function addOddsFromModal() {
+            if (!currentOddsTarget) return;
+            const context = getOddsContext(currentOddsTarget.betType, currentOddsTarget.betId);
+            if (!context) {
+                closeBetModal();
+                return;
+            }
+
+            const amount = Number(document.getElementById('betInput').value);
+            if (!Number.isInteger(amount) || amount < 5) {
+                document.getElementById('modalCurrentBet').textContent = 'Enter at least $5 in odds';
+                setStatus('Enter at least $5 in odds');
+                return;
+            }
+
+            const maxOdds = getMaxOddsAmount(context);
+            const remaining = maxOdds - context.odds;
+            if (remaining < 5) {
+                document.getElementById('modalCurrentBet').textContent = 'Odds are already maxed';
+                setStatus('Odds are already maxed');
+                return;
+            }
+            if (balance < 5) {
+                document.getElementById('modalCurrentBet').textContent = 'Not enough balance';
+                setStatus('Not enough balance');
+                return;
+            }
+
+            const added = Math.min(amount, remaining, balance);
+            setOddsAmount(context.betType, context.betId, context.odds + added);
+            balance -= added;
+            updateBalance();
+            updateAllDisplays();
+            setStatus('Added $' + added + ' odds to ' + context.label);
+            closeBetModal();
+        }
+
+        function removeOddsFromModal() {
+            if (!currentOddsTarget) return;
+            const context = getOddsContext(currentOddsTarget.betType, currentOddsTarget.betId);
+            if (!context || context.odds <= 0) {
+                setStatus('No odds to remove');
+                closeBetModal();
+                return;
+            }
+
+            const rawAmount = document.getElementById('betInput').value;
+            const amount = rawAmount === '' ? context.odds : Number(rawAmount);
+            if (!Number.isInteger(amount) || amount <= 0) {
+                document.getElementById('modalCurrentBet').textContent = 'Enter an odds amount to remove';
+                setStatus('Enter an odds amount to remove');
+                return;
+            }
+
+            const removed = Math.min(amount, context.odds);
+            setOddsAmount(context.betType, context.betId, context.odds - removed);
+            balance += removed;
+            updateBalance();
+            updateAllDisplays();
+            setStatus('Removed $' + removed + ' odds from ' + context.label);
+            closeBetModal();
         }
 
         function takeMaxOdds(bt) {
@@ -1095,6 +1323,15 @@
                     let text = betNames[bt] + ': $' + bets[bt];
                     if (oddsBets[bt] > 0) text += ' +$' + oddsBets[bt];
                     chip.append(document.createTextNode(text + ' '));
+                    if (canManageOdds(bt)) {
+                        const oddsButton = document.createElement('button');
+                        oddsButton.type = 'button';
+                        oddsButton.className = 'chip-odds';
+                        oddsButton.textContent = 'Odds';
+                        oddsButton.setAttribute('aria-label', 'Manage odds for ' + betNames[bt]);
+                        oddsButton.onclick = () => openOddsModal(bt);
+                        chip.appendChild(oddsButton);
+                    }
                     const clearButton = document.createElement('button');
                     clearButton.type = 'button';
                     clearButton.className = 'chip-x';
@@ -1116,6 +1353,15 @@
                 text += ': $' + bet.amount;
                 if (bet.odds > 0) text += ' +$' + bet.odds;
                 chip.append(document.createTextNode(text + ' '));
+                if (canManageOdds('come', bet.id)) {
+                    const oddsButton = document.createElement('button');
+                    oddsButton.type = 'button';
+                    oddsButton.className = 'chip-odds';
+                    oddsButton.textContent = 'Odds';
+                    oddsButton.setAttribute('aria-label', 'Manage odds for ' + text);
+                    oddsButton.onclick = () => openOddsModal('come', bet.id);
+                    chip.appendChild(oddsButton);
+                }
                 const clearButton = document.createElement('button');
                 clearButton.type = 'button';
                 clearButton.className = 'chip-x';
@@ -1136,6 +1382,15 @@
                 text += ': $' + bet.amount;
                 if (bet.odds > 0) text += ' +$' + bet.odds;
                 chip.append(document.createTextNode(text + ' '));
+                if (canManageOdds('dontCome', bet.id)) {
+                    const oddsButton = document.createElement('button');
+                    oddsButton.type = 'button';
+                    oddsButton.className = 'chip-odds';
+                    oddsButton.textContent = 'Odds';
+                    oddsButton.setAttribute('aria-label', 'Manage odds for ' + text);
+                    oddsButton.onclick = () => openOddsModal('dontCome', bet.id);
+                    chip.appendChild(oddsButton);
+                }
                 const clearButton = document.createElement('button');
                 clearButton.type = 'button';
                 clearButton.className = 'chip-x';
@@ -1215,34 +1470,42 @@
             const isHard = d1 === d2;
             const wasComeOutRoll = isComeOutRoll;
             let winnings = 0;
+            let resolvedStake = 0;
             let messages = [];
 
             // ── One-roll / Center bets ──
             if (bets.any7 > 0) {
+                resolvedStake += bets.any7;
                 if (total === 7) { winnings += bets.any7 * 5; messages.push('Any 7 wins!'); }
                 bets.any7 = 0;
             }
             if (bets.anyCraps > 0) {
+                resolvedStake += bets.anyCraps;
                 if ([2,3,12].includes(total)) { winnings += bets.anyCraps * 8; messages.push('Any Craps wins!'); }
                 bets.anyCraps = 0;
             }
             if (bets.craps2 > 0) {
+                resolvedStake += bets.craps2;
                 if (total === 2) { winnings += bets.craps2 * 31; messages.push('Craps 2 wins!'); }
                 bets.craps2 = 0;
             }
             if (bets.craps3 > 0) {
+                resolvedStake += bets.craps3;
                 if (total === 3) { winnings += bets.craps3 * 16; messages.push('Craps 3 wins!'); }
                 bets.craps3 = 0;
             }
             if (bets.craps12 > 0) {
+                resolvedStake += bets.craps12;
                 if (total === 12) { winnings += bets.craps12 * 31; messages.push('Craps 12 wins!'); }
                 bets.craps12 = 0;
             }
             if (bets.yo11 > 0) {
+                resolvedStake += bets.yo11;
                 if (total === 11) { winnings += bets.yo11 * 16; messages.push('Yo 11 wins!'); }
                 bets.yo11 = 0;
             }
             if (bets.field > 0) {
+                resolvedStake += bets.field;
                 if ([2,3,4,9,10,11,12].includes(total)) {
                     const payout = (total === 2 || total === 12) ? 3 : 2;
                     winnings += bets.field * payout;
@@ -1253,35 +1516,38 @@
 
             // ── Hardways (multi-roll, stay until they lose) ──
             if (bets.hard4 > 0) {
-                if (total === 4 && isHard) { winnings += bets.hard4 * 8; messages.push('Hard 4 wins!'); bets.hard4 = 0; }
-                else if (total === 4 || total === 7) { bets.hard4 = 0; }
+                if (total === 4 && isHard) { resolvedStake += bets.hard4; winnings += bets.hard4 * 8; messages.push('Hard 4 wins!'); bets.hard4 = 0; }
+                else if (total === 4 || total === 7) { resolvedStake += bets.hard4; bets.hard4 = 0; }
             }
             if (bets.hard6 > 0) {
-                if (total === 6 && isHard) { winnings += bets.hard6 * 10; messages.push('Hard 6 wins!'); bets.hard6 = 0; }
-                else if (total === 6 || total === 7) { bets.hard6 = 0; }
+                if (total === 6 && isHard) { resolvedStake += bets.hard6; winnings += bets.hard6 * 10; messages.push('Hard 6 wins!'); bets.hard6 = 0; }
+                else if (total === 6 || total === 7) { resolvedStake += bets.hard6; bets.hard6 = 0; }
             }
             if (bets.hard8 > 0) {
-                if (total === 8 && isHard) { winnings += bets.hard8 * 10; messages.push('Hard 8 wins!'); bets.hard8 = 0; }
-                else if (total === 8 || total === 7) { bets.hard8 = 0; }
+                if (total === 8 && isHard) { resolvedStake += bets.hard8; winnings += bets.hard8 * 10; messages.push('Hard 8 wins!'); bets.hard8 = 0; }
+                else if (total === 8 || total === 7) { resolvedStake += bets.hard8; bets.hard8 = 0; }
             }
             if (bets.hard10 > 0) {
-                if (total === 10 && isHard) { winnings += bets.hard10 * 8; messages.push('Hard 10 wins!'); bets.hard10 = 0; }
-                else if (total === 10 || total === 7) { bets.hard10 = 0; }
+                if (total === 10 && isHard) { resolvedStake += bets.hard10; winnings += bets.hard10 * 8; messages.push('Hard 10 wins!'); bets.hard10 = 0; }
+                else if (total === 10 || total === 7) { resolvedStake += bets.hard10; bets.hard10 = 0; }
             }
 
             // ── Come Out Roll ──
             let justEstablishedPoint = false;
             if (isComeOutRoll) {
                 if (total === 7 || total === 11) {
-                    if (bets.passLine > 0) { winnings += bets.passLine * 2; messages.push('Pass Line wins!'); }
+                    if (bets.passLine > 0) { resolvedStake += bets.passLine + oddsBets.passLine; winnings += bets.passLine * 2; messages.push('Pass Line wins!'); }
+                    if (bets.dontPass > 0 || oddsBets.dontPass > 0) { resolvedStake += bets.dontPass + oddsBets.dontPass; }
                     bets.dontPass = 0; oddsBets.dontPass = 0;
                     messages.push('Natural!');
                     resetPassLineRound();
                 } else if ([2,3,12].includes(total)) {
                     if (bets.dontPass > 0) {
+                        resolvedStake += bets.dontPass + oddsBets.dontPass;
                         if (total !== 12) { winnings += bets.dontPass * 2; messages.push("Don't Pass wins!"); }
                         else { winnings += bets.dontPass; messages.push("Don't Pass pushes on 12"); }
                     }
+                    if (bets.passLine > 0 || oddsBets.passLine > 0) { resolvedStake += bets.passLine + oddsBets.passLine; }
                     bets.passLine = 0; oddsBets.passLine = 0;
                     messages.push('Craps!');
                     resetPassLineRound();
@@ -1309,9 +1575,11 @@
                 if (!bet.point) {
                     // Come bet "come out" roll
                     if (total === 7 || total === 11) {
+                        resolvedStake += bet.amount + bet.odds;
                         winnings += bet.amount * 2; messages.push('Come wins!');
                         comeBetsToRemove.push(i);
                     } else if ([2,3,12].includes(total)) {
+                        resolvedStake += bet.amount + bet.odds;
                         messages.push('Come loses');
                         comeBetsToRemove.push(i);
                     } else {
@@ -1328,6 +1596,7 @@
                 } else {
                     // Come bet point phase
                     if (total === bet.point) {
+                        resolvedStake += bet.amount + bet.odds;
                         winnings += bet.amount * 2;
                         if (bet.odds > 0) {
                             const ow = Math.floor(bet.odds * getOddsPayout(bet.point, true));
@@ -1338,6 +1607,7 @@
                         }
                         comeBetsToRemove.push(i);
                     } else if (total === 7) {
+                        resolvedStake += bet.amount + bet.odds;
                         comeBetsToRemove.push(i);
                     }
                 }
@@ -1355,11 +1625,14 @@
                 if (!bet.point) {
                     // Don't Come bet "come out" roll
                     if (total === 2 || total === 3) {
+                        resolvedStake += bet.amount + bet.odds;
                         winnings += bet.amount * 2; messages.push("Don't Come wins!");
                         dontComeBetsToRemove.push(i);
                     } else if (total === 7 || total === 11) {
+                        resolvedStake += bet.amount + bet.odds;
                         dontComeBetsToRemove.push(i);
                     } else if (total === 12) {
+                        resolvedStake += bet.amount + bet.odds;
                         winnings += bet.amount; messages.push("Don't Come pushes");
                         dontComeBetsToRemove.push(i);
                     } else {
@@ -1376,6 +1649,7 @@
                 } else {
                     // Don't Come bet point phase
                     if (total === 7) {
+                        resolvedStake += bet.amount + bet.odds;
                         winnings += bet.amount * 2;
                         if (bet.odds > 0) {
                             const ow = Math.floor(bet.odds * getOddsPayout(bet.point, false));
@@ -1386,6 +1660,7 @@
                         }
                         dontComeBetsToRemove.push(i);
                     } else if (total === bet.point) {
+                        resolvedStake += bet.amount + bet.odds;
                         dontComeBetsToRemove.push(i);
                     }
                 }
@@ -1410,6 +1685,7 @@
                 // Pass/Don't Pass resolution
                 if (total === point) {
                     if (bets.passLine > 0) {
+                        resolvedStake += bets.passLine + oddsBets.passLine;
                         winnings += bets.passLine * 2;
                         if (oddsBets.passLine > 0) {
                             const ow = Math.floor(oddsBets.passLine * getOddsPayout(point, true));
@@ -1419,11 +1695,14 @@
                             messages.push('Pass Line wins!');
                         }
                     }
+                    if (bets.dontPass > 0 || oddsBets.dontPass > 0) { resolvedStake += bets.dontPass + oddsBets.dontPass; }
                     messages.push('Hit the point!');
                     // Only clear Pass Line and Don't Pass, keep Come/Don't Come
                     resetPassLineRound();
                 } else if (total === 7) {
+                    if (bets.passLine > 0 || oddsBets.passLine > 0) { resolvedStake += bets.passLine + oddsBets.passLine; }
                     if (bets.dontPass > 0) {
+                        resolvedStake += bets.dontPass + oddsBets.dontPass;
                         winnings += bets.dontPass * 2;
                         if (oddsBets.dontPass > 0) {
                             const ow = Math.floor(oddsBets.dontPass * getOddsPayout(point, false));
@@ -1435,6 +1714,7 @@
                     }
                     messages.push('Seven out!');
                     // Clear place bets on 7
+                    resolvedStake += bets.place4 + bets.place5 + bets.place6 + bets.place8 + bets.place9 + bets.place10;
                     bets.place4 = bets.place5 = bets.place6 = bets.place8 = bets.place9 = bets.place10 = 0;
                     resetRound();
                 }
@@ -1448,6 +1728,7 @@
                 ? messages.join(' \u2022 ')
                 : (isComeOutRoll ? 'Place bets & roll' : 'Rolled ' + total);
             setStatus(statusMsg);
+            showRollResultAnimation(winnings - resolvedStake);
         }
 
         function resetPassLineRound() {
