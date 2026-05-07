@@ -17,6 +17,96 @@ MODEL_TIMEOUT_SECONDS = float(os.getenv("BITCOIN_CHAT_MODEL_TIMEOUT_SECONDS", "3
 MAX_TOOL_CALLS = int(os.getenv("BITCOIN_CHAT_MAX_TOOL_CALLS", "6"))
 MAX_SESSION_MESSAGES = int(os.getenv("BITCOIN_CHAT_MAX_SESSION_MESSAGES", "12"))
 TXID_RE = re.compile(r"\b[a-fA-F0-9]{64}\b")
+BITCOIN_ADDRESS_RE = re.compile(
+    r"\b(?:bc1[ac-hj-np-z02-9]{11,71}|[13][a-km-zA-HJ-NP-Z1-9]{25,34})\b",
+    re.IGNORECASE,
+)
+
+BITCOIN_TOPIC_TERMS = (
+    "bitcoin",
+    "btc",
+    "satoshi",
+    "satoshis",
+    "sats",
+    "sats/vb",
+    "sat/vb",
+    "utxo",
+    "mempool",
+    "halving",
+    "hashrate",
+    "hash rate",
+    "proof of work",
+    "proof-of-work",
+    "lightning network",
+    "taproot",
+    "segwit",
+    "bech32",
+    "ordinals",
+    "inscriptions",
+    "coinbase transaction",
+    "block subsidy",
+    "difficulty adjustment",
+)
+BITCOIN_CONTEXT_PHRASES = (
+    "block height",
+    "latest block",
+    "current block",
+    "chain tip",
+    "transaction fee",
+    "fee rate",
+    "fee estimate",
+    "confirmation fee",
+    "confirmations",
+    "node status",
+    "sync status",
+    "mined today",
+    "mined yesterday",
+    "mining difficulty",
+)
+BITCOIN_AMBIGUOUS_TERMS = (
+    "block",
+    "blocks",
+    "transaction",
+    "transactions",
+    "tx",
+    "txid",
+    "fee",
+    "fees",
+    "node",
+    "sync",
+    "mining",
+    "miner",
+    "miners",
+    "difficulty",
+    "wallet",
+    "address",
+)
+OUT_OF_SCOPE_CONTEXT_TERMS = (
+    "bank",
+    "banks",
+    "credit card",
+    "mortgage",
+    "loan",
+    "weather",
+    "recipe",
+    "cook",
+    "cooking",
+    "sports",
+    "football",
+    "basketball",
+    "baseball",
+    "stock",
+    "stocks",
+    "tesla",
+    "apple",
+    "ethereum",
+    "solana",
+    "dogecoin",
+)
+OUT_OF_SCOPE_ANSWER = (
+    "I can only answer questions that are specifically about Bitcoin or directly tied to Bitcoin. "
+    "Try asking about blocks, transactions, mempool fees, node status, mining, difficulty, UTXOs, or other Bitcoin concepts."
+)
 
 _SESSION_MESSAGES: Dict[str, List[Dict[str, str]]] = {}
 
@@ -26,6 +116,8 @@ Expected outcome:
 - Answer with concise Markdown: short paragraphs, bullets for grouped facts, and bold labels for key values.
 - Use node tools for live chain, mempool, block, transaction, fee, and mined-BTC questions.
 - Answer conceptual Bitcoin questions directly when live node data is not needed.
+- Only answer questions that are specifically about Bitcoin or directly tied to Bitcoin.
+- If a user asks about any other topic, refuse briefly and invite a Bitcoin-specific question.
 - Clearly separate facts from interpretation and say what the node could not verify.
 - Use BTC for bitcoin amounts, sats/vB for fee rates, UTC timestamps unless the user supplied a timezone.
 
@@ -171,6 +263,9 @@ def answer_chat(message: str, session_id: str | None = None, timezone_name: str 
             {},
             [],
         )
+
+    if not _is_bitcoin_related(message):
+        return _response(OUT_OF_SCOPE_ANSWER, session_id, [], {}, [])
 
     if os.getenv("OPENAI_API_KEY"):
         try:
@@ -413,6 +508,21 @@ def _is_unsafe_wallet_request(message: str) -> bool:
         "mnemonic",
     )
     return any(term in normalized for term in unsafe_terms)
+
+
+def _is_bitcoin_related(message: str) -> bool:
+    normalized = message.strip().lower()
+    if TXID_RE.search(message) or BITCOIN_ADDRESS_RE.search(message):
+        return True
+    if any(term in normalized for term in BITCOIN_TOPIC_TERMS):
+        return True
+    if any(phrase in normalized for phrase in BITCOIN_CONTEXT_PHRASES):
+        return True
+    if any(term in normalized for term in OUT_OF_SCOPE_CONTEXT_TERMS):
+        return False
+
+    tokens = set(re.findall(r"[a-z0-9]+", normalized))
+    return any(term in tokens for term in BITCOIN_AMBIGUOUS_TERMS)
 
 
 def _looks_conceptual(message: str) -> bool:
