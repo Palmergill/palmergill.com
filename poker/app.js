@@ -694,9 +694,9 @@ const elements = {
     btnAllIn: document.getElementById('btn-allin'),
     btnCancel: document.getElementById('btn-cancel'),
     btnConfirmRaise: document.getElementById('btn-confirm-raise'),
-    handResult: document.getElementById('hand-result'),
-    resultTitle: document.getElementById('result-title'),
-    resultDetails: document.getElementById('result-details'),
+    showdownPanel: document.getElementById('showdown-panel'),
+    showdownTitle: document.getElementById('showdown-title'),
+    showdownDetails: document.getElementById('showdown-details'),
     btnNextHand: document.getElementById('btn-next-hand'),
     decisionTimer: document.getElementById('decision-timer'),
     timerText: document.getElementById('timer-text'),
@@ -988,7 +988,7 @@ document.addEventListener('DOMContentLoaded', () => {
     elements.btnRaise.addEventListener('click', showRaiseControls);
     elements.btnCancel.addEventListener('click', hideRaiseControls);
     elements.btnConfirmRaise.addEventListener('click', confirmRaise);
-    elements.btnNextHand.addEventListener('click', nextHand);
+    elements.btnNextHand.addEventListener('click', handleShowdownPrimaryAction);
     
     elements.raiseSlider.addEventListener('input', (e) => {
         raiseAmount = parseInt(e.target.value);
@@ -1410,6 +1410,15 @@ function confirmRaise() {
     playerAction('raise');
 }
 
+function handleShowdownPrimaryAction() {
+    const myPlayer = gameState?.players?.find(p => p.id === playerId);
+    if (myPlayer && myPlayer.chips <= 0) {
+        buyBackIn();
+        return;
+    }
+    nextHand();
+}
+
 async function nextHand() {
     // Prevent race condition
     if (isRequestPending) {
@@ -1454,12 +1463,13 @@ async function nextHand() {
     } finally {
         isRequestPending = false;
         elements.btnNextHand.disabled = false;
-        elements.btnNextHand.textContent = 'Next Hand';
+        elements.btnNextHand.textContent = 'Ready for Next Hand';
     }
 }
 
 function updateGameDisplay() {
     if (!gameState) return;
+    const isShowdown = gameState.phase === 'showdown';
 
     // Track new hands for stats
     if (gameState.hand_number && gameState.hand_number !== lastHandNumber) {
@@ -1475,9 +1485,13 @@ function updateGameDisplay() {
     elements.handNumber.textContent = gameState.hand_number;
     elements.phase.textContent = gameState.phase.replace('_', ' ').toUpperCase();
     elements.potAmount.innerHTML = ChipStackVisualizer.render(gameState.pot, true, true);
+    elements.gameScreen?.classList.toggle('showdown-active', isShowdown);
+    if (!isShowdown) {
+        hideHandResult();
+    }
     
     // Check if it's your turn
-    const isYourTurn = gameState.current_player === playerId && gameState.phase !== 'showdown';
+    const isYourTurn = gameState.current_player === playerId && !isShowdown;
     
     // Update your info
     const myPlayer = gameState.players.find(p => p.id === playerId);
@@ -1524,6 +1538,8 @@ function updateGameDisplay() {
         } else {
             elements.yourCards.classList.remove('active-turn');
         }
+        const isHumanWinner = gameState.winners?.some(w => w.id === playerId);
+        elements.yourCards.classList.toggle('winner-hand', Boolean(isShowdown && isHumanWinner));
     }
     
     // Update opponents in the same clockwise order the game engine uses.
@@ -1578,8 +1594,9 @@ function getClockwiseOpponents(players, heroId) {
 }
 
 function renderOpponent(player, seatClass = 'seat-1') {
-    const isCurrent = gameState.current_player === player.id;
+    const isCurrent = gameState.phase !== 'showdown' && gameState.current_player === player.id;
     const showCards = gameState.phase === 'showdown' && !player.folded;
+    const isWinner = gameState.winners?.some(w => w.id === player.id);
     const recentAIAction = gameState.last_ai_action?.player_name === player.name ? gameState.last_ai_action : null;
     const recentActionClass = recentAIAction ? 'recent-ai-action' : '';
     const actionLabel = recentAIAction ? formatActionLabel(recentAIAction) : '';
@@ -1589,7 +1606,7 @@ function renderOpponent(player, seatClass = 'seat-1') {
         : AvatarManager.getBotAvatar(player.name);
 
     return `
-        <div class="opponent ${seatClass} ${recentActionClass} ${player.folded ? 'folded' : ''} ${isCurrent ? 'active-turn' : ''}">
+        <div class="opponent ${seatClass} ${recentActionClass} ${player.folded ? 'folded' : ''} ${isCurrent ? 'active-turn' : ''} ${isWinner ? 'winner' : ''}">
             <div class="opponent-avatar">
                 ${AvatarManager.render(avatar, 'small')}
             </div>
@@ -1895,12 +1912,7 @@ function showHandResult() {
     const winner = gameState.winners[0];
     const isMe = winner.id === playerId;
     const myPlayer = gameState.players.find(p => p.id === playerId);
-
-    // Check if player is out of chips
-    if (myPlayer && myPlayer.chips <= 0) {
-        showBuyBackOverlay();
-        return;
-    }
+    const isBusted = Boolean(myPlayer && myPlayer.chips <= 0);
 
     // Record stats for hand result (only once per hand)
     if (!handResultRecorded) {
@@ -1923,58 +1935,21 @@ function showHandResult() {
         SoundManager.playLoss();
     }
     
-    elements.resultTitle.textContent = isMe ? '🎉 You Win!' : `${winner.name} Wins`;
-    
-    let detailsHTML = '';
-    
-    // Winner info
-    detailsHTML += `<div class="result-section">`;
-    detailsHTML += `<div class="result-winner">${winner.name}</div>`;
-    detailsHTML += `<div class="result-amount">+${winner.amount} chips</div>`;
-    detailsHTML += `</div>`;
-    
-    // Winner's hole cards
-    const winnerPlayer = gameState.players.find(p => p.id === winner.id);
-    if (winnerPlayer && winnerPlayer.hand && winnerPlayer.hand.length > 0) {
-        detailsHTML += `<div class="result-section">`;
-        detailsHTML += `<div class="result-section-label">${winner.name}'s Cards</div>`;
-        detailsHTML += `<div class="result-cards">`;
-        detailsHTML += winnerPlayer.hand.map(c => renderCard(c)).join('');
-        detailsHTML += `</div>`;
-        detailsHTML += `</div>`;
-    }
-    
-    // Community cards
-    if (gameState.community_cards && gameState.community_cards.length > 0) {
-        detailsHTML += `<div class="result-section">`;
-        detailsHTML += `<div class="result-section-label">Community Cards</div>`;
-        detailsHTML += `<div class="result-cards">`;
-        detailsHTML += gameState.community_cards.map(c => renderCard(c)).join('');
-        detailsHTML += `</div>`;
-        detailsHTML += `</div>`;
-    }
-    
-    // Best 5-card hand
-    if (winner.hand && winner.hand.length > 0) {
-        detailsHTML += `<div class="result-section">`;
-        detailsHTML += `<div class="result-section-label">Best 5-Card Hand</div>`;
-        detailsHTML += `<div class="result-cards">`;
-        detailsHTML += winner.hand.map(c => renderCard(c)).join('');
-        detailsHTML += `</div>`;
-        // Get hand name from the 5 winning cards
-        const handName = getHandNameFrom5Cards(winner.hand);
-        if (handName) {
-            detailsHTML += `<div class="result-hand-name">${handName}</div>`;
-        }
-        detailsHTML += `</div>`;
-    }
-    
-    elements.resultDetails.innerHTML = detailsHTML;
-    elements.handResult.classList.remove('hidden');
+    const handName = winner.hand && winner.hand.length > 0 ? getHandNameFrom5Cards(winner.hand) : '';
+    const winnerNames = gameState.winners.map(w => w.name).join(', ');
+    const totalWon = gameState.winners.reduce((sum, w) => sum + (w.amount || 0), 0);
+
+    elements.showdownTitle.textContent = isMe ? 'You win' : `${winnerNames} ${gameState.winners.length > 1 ? 'win' : 'wins'}`;
+    elements.showdownDetails.textContent = isBusted
+        ? `${handName || 'Best hand'} - ${totalWon} chips awarded. Buy back to keep playing.`
+        : `${handName || 'Best hand'} - ${totalWon} chips awarded.`;
+    elements.btnNextHand.textContent = isBusted ? 'Buy Back In' : 'Ready for Next Hand';
+    elements.btnNextHand.disabled = false;
+    elements.showdownPanel.classList.remove('hidden');
 }
 
 function hideHandResult() {
-    elements.handResult.classList.add('hidden');
+    elements.showdownPanel?.classList.add('hidden');
 }
 
 function showBuyBackOverlay() {
@@ -2016,7 +1991,7 @@ async function buyBackIn() {
         updateGameState(responseData);
         hideBuyBackOverlay();
         updateGameDisplay();
-        elements.handResult.classList.remove('hidden');
+        showHandResult();
     } catch (error) {
         console.error('Buy-back failed:', error);
         ErrorBoundary.show(error.message || 'Buy-back failed. Please try again.', 'error');

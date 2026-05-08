@@ -968,7 +968,7 @@
         
         .pot-container {
             position: absolute;
-            top: 52%;
+            top: 41%;
             left: 50%;
             transform: translate(-50%, -50%);
             display: flex;
@@ -1114,6 +1114,25 @@
             z-index: 7;
         }
 
+        .opponent.winner,
+        .your-cards.winner-hand .card {
+            border-color: #ffd700;
+            box-shadow:
+                0 0 0 2px rgba(255, 215, 0, 0.35),
+                0 0 24px rgba(255, 215, 0, 0.45),
+                0 10px 24px rgba(0,0,0,0.32);
+            animation: winnerGlow 1.4s ease-in-out infinite alternate;
+        }
+
+        @keyframes winnerGlow {
+            from {
+                filter: brightness(1);
+            }
+            to {
+                filter: brightness(1.18);
+            }
+        }
+
         .opponent-action-badge {
             max-width: 100%;
             padding: 2px 6px;
@@ -1161,6 +1180,48 @@
         .opponent-cards {
             display: flex;
             gap: 2px;
+        }
+
+        .showdown-active .opponent {
+            width: auto;
+            min-width: clamp(82px, 21vw, 112px);
+            gap: 4px;
+            padding: 6px;
+            background: rgba(2, 8, 11, 0.72);
+            border-color: rgba(255,255,255,0.16);
+        }
+
+        .showdown-active .opponent-avatar {
+            display: none;
+        }
+
+        .showdown-active .opponent-cards {
+            gap: clamp(4px, 1.2vw, 6px);
+            justify-content: center;
+        }
+
+        .showdown-active .opponent-cards .card {
+            width: clamp(34px, 10vw, 52px);
+            height: clamp(48px, 14vw, 72px);
+            background: white;
+            border-radius: 7px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: clamp(16px, 4.8vw, 24px);
+            box-shadow: 0 3px 8px rgba(0,0,0,0.3);
+        }
+
+        .showdown-active .opponent-name,
+        .showdown-active .opponent-chips {
+            max-width: 100%;
+            padding: 0 4px;
+            border-radius: 999px;
+            background: rgba(0,0,0,0.25);
+        }
+
+        .showdown-active .opponent-action-badge {
+            display: none;
         }
         
         .card-back {
@@ -1553,6 +1614,43 @@
             cursor: not-allowed;
         }
 
+        .showdown-panel {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            align-items: center;
+            gap: 12px;
+            margin-top: 10px;
+            padding: 10px 12px;
+            border: 1px solid rgba(255, 215, 0, 0.28);
+            border-radius: 10px;
+            background: rgba(5, 12, 18, 0.72);
+            box-shadow: 0 10px 24px rgba(0,0,0,0.24);
+            animation: fadeInUp 0.35s ease-out;
+        }
+
+        .showdown-title {
+            color: #ffd700;
+            font-size: 13px;
+            font-weight: 900;
+            letter-spacing: 0.4px;
+            text-transform: uppercase;
+        }
+
+        .showdown-details {
+            margin-top: 2px;
+            color: #dbeafe;
+            font-size: 12px;
+            line-height: 1.3;
+        }
+
+        .btn-ready {
+            min-width: 132px;
+            padding: 11px 14px;
+            font-size: 13px;
+            border-radius: 8px;
+            white-space: nowrap;
+        }
+
         /* Decision Timer */
         .decision-timer {
             text-align: center;
@@ -1855,6 +1953,18 @@
                 width: clamp(50px, 14vw, 60px);
             }
 
+            .showdown-active .opponent {
+                min-width: 86px;
+                padding: 5px;
+            }
+
+            .showdown-active .opponent-cards .card {
+                width: clamp(32px, 9.2vw, 40px);
+                height: clamp(45px, 13vw, 56px);
+                font-size: clamp(15px, 4.2vw, 19px);
+                border-radius: 6px;
+            }
+
             .opponent.seat-2 {
                 top: 34%;
                 left: 6%;
@@ -1875,12 +1985,40 @@
                 left: 86%;
             }
 
+            .showdown-active .opponent.seat-1 {
+                top: 7%;
+            }
+
+            .showdown-active .opponent.seat-2 {
+                top: 31%;
+                left: 15%;
+            }
+
+            .showdown-active .opponent.seat-3 {
+                top: 31%;
+                left: 85%;
+            }
+
+            .showdown-active .opponent.seat-4 {
+                top: 79%;
+                left: 19%;
+            }
+
+            .showdown-active .opponent.seat-5 {
+                top: 79%;
+                left: 81%;
+            }
+
             .community-cards {
                 transform: translateY(clamp(10px, 3vh, 18px));
             }
 
             .community-label {
                 top: calc(50% + clamp(42px, 9vh, 58px));
+            }
+
+            .pot-container {
+                top: 39%;
             }
 
             .your-section {
@@ -1891,7 +2029,8 @@
                     "cards actions"
                     "strength strength"
                     "timer timer"
-                    "raise raise";
+                    "raise raise"
+                    "showdown showdown";
                 align-items: center;
                 column-gap: 12px;
                 row-gap: 5px;
@@ -2019,6 +2158,28 @@
 
             .your-section .btn-secondary {
                 padding: 10px;
+            }
+
+            .showdown-panel {
+                grid-area: showdown;
+                grid-template-columns: minmax(0, 1fr) auto;
+                margin-top: 0;
+                padding: 8px 10px;
+            }
+
+            .showdown-title {
+                font-size: 12px;
+            }
+
+            .showdown-details {
+                font-size: 11px;
+            }
+
+            .btn-ready {
+                min-width: 116px;
+                min-height: 38px;
+                padding: 8px 10px;
+                font-size: 12px;
             }
         }
 
@@ -2180,14 +2341,12 @@
                     <button class="btn-action btn-call" id="btn-call">Call</button>
                     <button class="btn-action btn-raise" id="btn-raise">Raise</button>
                 </div>
-            </div>
-
-            <!-- Hand Result Overlay -->
-            <div id="hand-result" class="overlay hidden">
-                <div class="result-content">
-                    <h2 id="result-title">Hand Complete</h2>
-                    <div id="result-details"></div>
-                    <button id="btn-next-hand" class="btn-primary">Next Hand</button>
+                <div class="showdown-panel hidden" id="showdown-panel">
+                    <div>
+                        <div class="showdown-title" id="showdown-title">Hand Complete</div>
+                        <div class="showdown-details" id="showdown-details"></div>
+                    </div>
+                    <button id="btn-next-hand" class="btn-primary btn-ready">Ready for Next Hand</button>
                 </div>
             </div>
 
@@ -2224,6 +2383,6 @@
     </div>
 
     <script src="/shared/site-nav.js"></script>
-    <script src="app.js?v=5"></script>
+    <script src="app.js?v=9"></script>
 </body>
 </html>
