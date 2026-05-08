@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin · Logs</title>
+    <link rel="stylesheet" href="/shared/site-nav.css?v=3">
+    <link rel="stylesheet" href="style.css?v=1">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="header-content">
+                <h1>Admin · Logs</h1>
+                <span class="subtitle">Backend log viewer</span>
+            </div>
+        </header>
+
+        <main>
+            <div class="tabs">
+                <button class="tab-btn active" data-tab="db">Structured (DB)</button>
+                <button class="tab-btn" data-tab="file">File (backend.log)</button>
+            </div>
+
+            <section class="controls">
+                <div class="control-group">
+                    <label for="levelFilter">Level</label>
+                    <select id="levelFilter">
+                        <option value="">All</option>
+                        <option value="DEBUG">DEBUG</option>
+                        <option value="INFO">INFO</option>
+                        <option value="WARNING">WARNING</option>
+                        <option value="ERROR">ERROR</option>
+                        <option value="CRITICAL">CRITICAL</option>
+                    </select>
+                </div>
+                <div class="control-group flex-grow">
+                    <label for="searchInput">Search</label>
+                    <input type="text" id="searchInput" placeholder="Filter messages…">
+                </div>
+                <div class="control-group">
+                    <label for="limitInput">Limit</label>
+                    <input type="number" id="limitInput" value="200" min="1" max="5000">
+                </div>
+                <div class="control-group">
+                    <label for="autoRefreshToggle" class="checkbox-label">
+                        <input type="checkbox" id="autoRefreshToggle" checked>
+                        Live tail (3s)
+                    </label>
+                </div>
+                <button id="refreshBtn" class="btn">Refresh</button>
+                <button id="clearBtn" class="btn btn-danger">Clear DB Logs</button>
+            </section>
+
+            <div id="status" class="status"></div>
+
+            <!-- DB Logs Table -->
+            <section id="dbLogsSection" class="logs-section">
+                <table class="logs-table">
+                    <thead>
+                        <tr>
+                            <th class="col-time">Time</th>
+                            <th class="col-level">Level</th>
+                            <th class="col-logger">Logger</th>
+                            <th class="col-msg">Message</th>
+                        </tr>
+                    </thead>
+                    <tbody id="dbLogsBody">
+                        <tr><td colspan="4" class="empty">Loading…</td></tr>
+                    </tbody>
+                </table>
+            </section>
+
+            <!-- File Logs -->
+            <section id="fileLogsSection" class="logs-section hidden">
+                <pre id="fileLogsPre" class="file-logs">Loading…</pre>
+            </section>
+        </main>
+    </div>
+
+    <script src="app.js?v=1"></script>
+</body>
+</html>

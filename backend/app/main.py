@@ -6,7 +6,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, PlainTextResponse
 from app.database_migration import init_db_with_migration
-from app.routers import bitcoin, stocks, poker
+from app.log_handler import install_db_logging
+from app.routers import admin, bitcoin, stocks, poker
 import os
 
 app = FastAPI(title="Palmer Gill API", version="0.2.0-p5")
@@ -21,6 +22,7 @@ PROTECTED_PATH_PREFIXES = (
     "/api",
     "/stock-research",
     "/bitcoin-chat",
+    "/admin",
 )
 
 
@@ -112,10 +114,13 @@ else:
 @app.on_event("startup")
 async def startup():
     init_db_with_migration()
+    # Persist log records to the DB so the admin page can query them
+    install_db_logging()
 
 app.include_router(stocks.router)
 app.include_router(poker.router)
 app.include_router(bitcoin.router)
+app.include_router(admin.router)
 
 @app.get("/health")
 async def health():
@@ -134,6 +139,7 @@ if local_site_root_enabled:
         "/poker": "poker",
         "/craps": "craps",
         "/bitcoin-chat": "bitcoin-chat",
+        "/admin": "admin",
     }.items():
         directory = os.path.join(repo_root, folder)
         if os.path.exists(directory):

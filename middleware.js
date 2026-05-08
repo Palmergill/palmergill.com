@@ -9,6 +9,7 @@ const PUBLIC_PREFIXES = [
 const PROTECTED_PREFIXES = [
   '/stock-research',
   '/bitcoin-chat',
+  '/admin',
   '/api',
 ];
 
@@ -92,6 +93,7 @@ export const config = {
   matcher: [
     '/stock-research/:path*',
     '/bitcoin-chat/:path*',
+    '/admin/:path*',
     '/api/:path*',
   ],
 };

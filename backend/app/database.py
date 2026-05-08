@@ -85,6 +85,18 @@ class StockSummary(Base):
     avg_volume = Column(Float, nullable=True)
     fetched_at = Column(DateTime, default=datetime.utcnow)
 
+class LogEntry(Base):
+    __tablename__ = "logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    timestamp = Column(DateTime, default=datetime.utcnow, index=True)
+    level = Column(String, index=True)  # DEBUG, INFO, WARNING, ERROR, CRITICAL
+    logger_name = Column(String, nullable=True)
+    message = Column(String)
+    path = Column(String, nullable=True)  # request path if HTTP
+    status_code = Column(Integer, nullable=True)
+    method = Column(String, nullable=True)
+
 def get_db():
     db = SessionLocal()
     try:
