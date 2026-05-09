@@ -99,7 +99,7 @@
             : '<div class="empty-slot"></div><div class="empty-slot"></div>';
 
         if (!state.dealerHand.length) {
-            els.dealerTotal.textContent = "?";
+            els.dealerTotal.textContent = "";
             return;
         }
 

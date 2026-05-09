@@ -486,7 +486,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Redraw charts in the active tab (they might not render properly when hidden)
         if (window.lastChartData) {
             setTimeout(() => {
-                const chartData = [...window.lastChartData].reverse();
+                const chartData = window.lastChartData;
                 if (tabId === 'overview') {
                     drawPriceChart(window.lastPriceHistory || chartData);
                     drawEPSChart(chartData);
@@ -990,16 +990,25 @@ document.addEventListener('DOMContentLoaded', () => {
         const companyHQ = document.getElementById('companyHQ');
         const companyWebsite = document.getElementById('companyWebsite');
         
+        const companyName = data.name || summary.name || data.ticker;
+        const aboutParts = [];
+        if (summary.current_price != null) aboutParts.push(`currently trades around $${summary.current_price.toFixed(2)}`);
+        if (summary.market_cap != null) aboutParts.push(`has a market capitalization of ${formatMarketCap(summary.market_cap)}`);
+        if (summary.pe_ratio != null) aboutParts.push(`has a P/E ratio of ${summary.pe_ratio.toFixed(2)}`);
+        const generatedDescription = aboutParts.length
+            ? `${companyName} (${data.ticker}) ${aboutParts.join(', ')}.`
+            : `${companyName} (${data.ticker}) is a publicly traded company.`;
+
         if (companyDescription) {
-            companyDescription.textContent = data.description || `${data.name || data.ticker} is a publicly traded company. Detailed company information is being updated.`;
+            companyDescription.textContent = data.description || generatedDescription;
         }
-        if (companyIndustry) companyIndustry.textContent = data.industry || '-';
-        if (companySector) companySector.textContent = data.sector || '-';
+        if (companyIndustry) companyIndustry.textContent = data.industry || data.sector || 'Public company';
+        if (companySector) companySector.textContent = data.sector || 'Market data';
         if (companyEmployees) {
             companyEmployees.textContent = data.employees ? data.employees.toLocaleString() : '-';
         }
-        if (companyFounded) companyFounded.textContent = data.founded || '-';
-        if (companyHQ) companyHQ.textContent = data.hq || '-';
+        if (companyFounded) companyFounded.textContent = data.founded || data.list_date || '-';
+        if (companyHQ) companyHQ.textContent = data.hq || data.headquarters || '-';
         if (companyWebsite) {
             if (data.website) {
                 companyWebsite.textContent = data.website.replace(/^https?:\/\//, '');
@@ -1119,12 +1128,10 @@ document.addEventListener('DOMContentLoaded', () => {
         // Fetch price history separately to avoid rate limits
         fetchPriceHistory(data.ticker);
         
-        // Draw other charts if their tabs are active
-        if (activeTab === 'financials') {
+        // Draw other charts if their tab is active
+        if (activeTab === 'fundamentals') {
             drawRevenueChart(chartData);
             drawFCFChart(chartData);
-        }
-        if (activeTab === 'valuation') {
             drawPEChart(chartData, window.lastPriceHistory);
         }
         
@@ -1198,7 +1205,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 drawPriceChart(data.prices);
                 // Also redraw P/E chart if we have earnings data
                 if (window.lastChartData) {
-                    const chartData = [...window.lastChartData].reverse();
+                    const chartData = window.lastChartData;
                     drawPEChart(chartData, data.prices);
                 }
             }
@@ -1288,8 +1295,8 @@ function drawEPSChart(data) {
     const canvas = document.getElementById('epsChart');
     if (!canvas) return;
     
-    // Show only last 4 quarters for cleaner chart
-    const chartData = data.slice(-4);
+    // Show the most recent quarterly periods.
+    const chartData = data.slice(-8);
     
     // Get shares outstanding for total earnings calculation
     const sharesOutstanding = window.sharesOutstanding || 1;
@@ -1462,7 +1469,7 @@ function drawEPSChart(data) {
         ctx.fillStyle = '#94a3b8';
         ctx.font = '11px sans-serif';
         ctx.textAlign = 'center';
-        ctx.fillText(d.fiscal_date.slice(0, 7), groupX + groupWidth / 2, padding.top + chartHeight + 20);
+        ctx.fillText(formatQuarterLabel(d), groupX + groupWidth / 2, padding.top + chartHeight + 20);
     });
     
     // Draw line (estimated earnings)
@@ -1644,7 +1651,7 @@ function drawRevenueChart(data) {
         ctx.fillStyle = '#94a3b8';
         ctx.font = '11px sans-serif';
         ctx.textAlign = 'center';
-        ctx.fillText(d.fiscal_date.slice(0, 7), x + barWidth / 2, padding.top + chartHeight + 20);
+        ctx.fillText(formatQuarterLabel(d), x + barWidth / 2, padding.top + chartHeight + 20);
     });
 }
 
@@ -1713,7 +1720,7 @@ function drawFCFChart(data) {
         ctx.fillStyle = '#94a3b8';
         ctx.font = '11px sans-serif';
         ctx.textAlign = 'center';
-        ctx.fillText(d.fiscal_date.slice(0, 7), x + barWidth / 2, padding.top + chartHeight + 20);
+        ctx.fillText(formatQuarterLabel(d), x + barWidth / 2, padding.top + chartHeight + 20);
     });
     
     // Legend
@@ -1900,8 +1907,17 @@ function drawPEChart(data, priceHistory = null) {
         ctx.fillStyle = '#94a3b8';
         ctx.font = '11px sans-serif';
         ctx.textAlign = 'center';
-        ctx.fillText(d.fiscal_date.slice(0, 7), x, padding.top + chartHeight + 20);
+        ctx.fillText(formatQuarterLabel(d), x, padding.top + chartHeight + 20);
     });
+}
+
+function formatQuarterLabel(entry) {
+    const date = new Date(`${entry.fiscal_date}T00:00:00`);
+    if (Number.isNaN(date.getTime())) return entry.period || '';
+
+    const quarter = Math.floor(date.getUTCMonth() / 3) + 1;
+    const year = String(date.getUTCFullYear()).slice(-2);
+    return `Q${quarter} '${year}`;
 }
 
 // Pattern fill helpers for accessibility
@@ -1978,7 +1994,13 @@ function drawPriceChart(data) {
     const ctx = canvas.getContext('2d');
     
     // Prepare data
-    const prices = data.map(d => d.close || d.price).filter(v => v != null);
+    const priceRows = data
+        .map(d => ({
+            price: d.close || d.price,
+            date: d.date || d.fiscal_date || ''
+        }))
+        .filter(d => d.price != null);
+    const prices = priceRows.map(d => d.price);
     if (prices.length === 0) return;
     
     // Calculate percent change for the period
@@ -1989,14 +2011,44 @@ function drawPriceChart(data) {
     const changeColor = isPositive ? '#10b981' : '#ef4444';
     const changeSymbol = isPositive ? '+' : '';
     
-    // Format labels (show every ~15th date)
-    const labels = data.map((d, i) => {
-        if (i % 15 === 0 || i === data.length - 1) {
-            const date = d.date || d.fiscal_date;
-            return date ? date.slice(0, 7) : '';
+    const labels = priceRows.map(d => d.date);
+    const highIndex = prices.reduce((bestIndex, price, index) => (
+        price > prices[bestIndex] ? index : bestIndex
+    ), 0);
+    const highPrice = prices[highIndex];
+    const highMarkerData = prices.map((price, index) => index === highIndex ? price : null);
+
+    const highPointLabelPlugin = {
+        id: 'highPointLabel',
+        afterDatasetsDraw(chart) {
+            const meta = chart.getDatasetMeta(1);
+            const point = meta?.data?.[highIndex];
+            if (!point) return;
+
+            const { ctx, chartArea } = chart;
+            const label = `$${highPrice.toFixed(2)}`;
+            const alignRight = point.x > chartArea.left + chartArea.width * 0.65;
+            const labelX = alignRight ? point.x - 12 : point.x + 12;
+            const labelY = Math.max(chartArea.top + 14, point.y - 12);
+
+            ctx.save();
+            ctx.font = 'bold 12px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+            ctx.textAlign = alignRight ? 'right' : 'left';
+            ctx.textBaseline = 'middle';
+            const width = ctx.measureText(label).width + 14;
+            const boxX = alignRight ? labelX - width : labelX;
+            ctx.fillStyle = 'rgba(15, 23, 42, 0.92)';
+            ctx.strokeStyle = 'rgba(244, 201, 106, 0.75)';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.roundRect(boxX, labelY - 11, width, 22, 6);
+            ctx.fill();
+            ctx.stroke();
+            ctx.fillStyle = '#f4c96a';
+            ctx.fillText(label, alignRight ? labelX - 7 : labelX + 7, labelY);
+            ctx.restore();
         }
-        return '';
-    });
+    };
     
     // Create gradient
     const gradient = ctx.createLinearGradient(0, 0, 0, 300);
@@ -2021,6 +2073,16 @@ function drawPriceChart(data) {
                 pointHoverBackgroundColor: changeColor,
                 pointHoverBorderColor: '#fff',
                 pointHoverBorderWidth: 2
+            }, {
+                label: 'Range high',
+                data: highMarkerData,
+                borderColor: '#f4c96a',
+                backgroundColor: '#f4c96a',
+                pointRadius: 5,
+                pointHoverRadius: 7,
+                pointBorderColor: '#0f172a',
+                pointBorderWidth: 2,
+                showLine: false
             }]
         },
         options: {
@@ -2058,11 +2120,11 @@ function drawPriceChart(data) {
                     callbacks: {
                         title: function(context) {
                             const idx = context[0].dataIndex;
-                            const d = data[idx];
-                            return d.date || d.fiscal_date || '';
+                            return labels[idx] || '';
                         },
                         label: function(context) {
-                            return '$' + context.parsed.y.toFixed(2);
+                            const prefix = context.datasetIndex === 1 ? 'Range high: ' : '';
+                            return prefix + '$' + context.parsed.y.toFixed(2);
                         }
                     }
                 }
@@ -2075,7 +2137,12 @@ function drawPriceChart(data) {
                     },
                     ticks: {
                         color: '#64748b',
-                        maxTicksLimit: 6,
+                        autoSkip: true,
+                        maxTicksLimit: 12,
+                        callback: function(value) {
+                            const label = this.getLabelForValue(value);
+                            return label ? label.slice(0, 7) : '';
+                        },
                         font: {
                             size: 10
                         }
@@ -2101,7 +2168,8 @@ function drawPriceChart(data) {
                 duration: 1000,
                 easing: 'easeOutQuart'
             }
-        }
+        },
+        plugins: [highPointLabelPlugin]
     });
 }
 

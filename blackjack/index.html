@@ -29,18 +29,16 @@
                     <span>Shoe</span>
                     <strong id="shoeCount">312</strong>
                 </div>
-                <button class="icon-button" id="newShoeButton" type="button" title="New shoe" aria-label="New shoe">
+                <button class="icon-button" id="newShoeButton" type="button" title="Shuffle new shoe" aria-label="Shuffle new shoe">
                     <i data-lucide="refresh-cw" aria-hidden="true"></i>
                 </button>
-                <button class="icon-button" id="resetButton" type="button" title="Reset bankroll" aria-label="Reset bankroll">
-                    <i data-lucide="rotate-ccw" aria-hidden="true"></i>
-                </button>
+                <button class="table-reset-button" id="resetButton" type="button">Reset bankroll</button>
             </div>
 
             <section class="dealer-zone" aria-label="Dealer hand">
                 <div class="zone-heading">
                     <span>Dealer</span>
-                    <strong id="dealerTotal">?</strong>
+                    <strong id="dealerTotal"></strong>
                 </div>
                 <div class="cards" id="dealerCards"></div>
             </section>
@@ -93,13 +91,6 @@
                 <button class="secondary-button" id="standButton" type="button">Stand</button>
                 <button class="secondary-button" id="doubleButton" type="button">Double</button>
                 <button class="secondary-button" id="splitButton" type="button">Split</button>
-            </div>
-
-            <div class="rules-strip" aria-label="Rules">
-                <span>3:2 blackjack</span>
-                <span>H17</span>
-                <span>DAS</span>
-                <span>6 decks</span>
             </div>
         </aside>
     </main>

@@ -106,18 +106,6 @@ h1 {
     animation: tableSettle 520ms cubic-bezier(.2, .75, .2, 1) both;
 }
 
-.table::before {
-    position: absolute;
-    inset: 82px 40px auto;
-    height: 172px;
-    border: 2px solid rgba(255, 236, 177, 0.34);
-    border-bottom: 0;
-    border-radius: 180px 180px 0 0;
-    content: "";
-    pointer-events: none;
-    animation: railDraw 620ms ease-out 160ms both;
-}
-
 .table::after {
     position: absolute;
     inset: 0;
@@ -136,7 +124,6 @@ h1 {
 .hand-footer,
 .panel-title,
 .bet-stepper,
-.rules-strip,
 .insurance-controls {
     display: flex;
     align-items: center;
@@ -179,6 +166,11 @@ h1 {
     font-size: 0.86rem;
     font-weight: 950;
     text-transform: uppercase;
+}
+
+.player-zone .zone-heading {
+    justify-content: flex-start;
+    gap: 12px;
 }
 
 .zone-heading strong {
@@ -485,7 +477,8 @@ h1 {
 
 .primary-button,
 .secondary-button,
-.icon-button {
+.icon-button,
+.table-reset-button {
     min-height: 46px;
     border: 1px solid transparent;
     border-radius: 8px;
@@ -522,6 +515,14 @@ h1 {
     height: 20px;
 }
 
+.table-reset-button {
+    padding: 0 14px;
+    border-color: rgba(255, 248, 223, 0.16);
+    background: rgba(255, 255, 255, 0.09);
+    color: #fff8df;
+    white-space: nowrap;
+}
+
 button:hover:not(:disabled) {
     filter: brightness(1.08);
     transform: translateY(-1px);
@@ -534,33 +535,6 @@ button:active:not(:disabled) {
 button:disabled {
     cursor: not-allowed;
     opacity: 0.42;
-}
-
-.rules-strip {
-    flex-wrap: wrap;
-    gap: 8px;
-}
-
-.rules-strip span {
-    padding: 5px 9px;
-    border: 1px solid rgba(214, 234, 213, 0.28);
-    border-radius: 999px;
-    color: #d6ead5;
-    font-size: 0.75rem;
-    font-weight: 850;
-    animation: ruleChipIn 300ms ease-out both;
-}
-
-.rules-strip span:nth-child(2) {
-    animation-delay: 45ms;
-}
-
-.rules-strip span:nth-child(3) {
-    animation-delay: 90ms;
-}
-
-.rules-strip span:nth-child(4) {
-    animation-delay: 135ms;
 }
 
 .value-pop {
@@ -618,11 +592,6 @@ button:disabled {
         border-width: 7px;
     }
 
-    .table::before {
-        inset: 76px 18px auto;
-        height: 116px;
-    }
-
     .table-rail {
         align-items: stretch;
         flex-wrap: wrap;
@@ -665,8 +634,7 @@ button:disabled {
         padding: 12px;
     }
 
-    .panel-title,
-    .rules-strip {
+    .panel-title {
         display: none;
     }
 
@@ -731,17 +699,6 @@ button:disabled {
     to {
         opacity: 1;
         transform: translateX(0);
-    }
-}
-
-@keyframes railDraw {
-    from {
-        opacity: 0;
-        transform: scaleX(0.78) translateY(8px);
-    }
-    to {
-        opacity: 1;
-        transform: scaleX(1) translateY(0);
     }
 }
 
@@ -844,17 +801,6 @@ button:disabled {
     from {
         opacity: 0;
         transform: translateY(8px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
-@keyframes ruleChipIn {
-    from {
-        opacity: 0;
-        transform: translateY(5px);
     }
     to {
         opacity: 1;
