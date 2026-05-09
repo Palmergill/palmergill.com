@@ -53,7 +53,7 @@ class FileLogResponse(BaseModel):
 def list_logs(
     level: Optional[str] = Query(None, description="Filter by level: DEBUG/INFO/WARNING/ERROR"),
     q: Optional[str] = Query(None, description="Substring search across message"),
-    limit: int = Query(200, ge=1, le=1000),
+    limit: int = Query(200, ge=1, le=5000),
     after_id: Optional[int] = Query(None, description="Only return entries with id > after_id (for live tail)"),
     db: Session = Depends(get_db),
 ):

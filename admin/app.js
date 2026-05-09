@@ -21,7 +21,10 @@
 
     let currentTab = 'db';
     let refreshTimer = null;
-    let inflight = false;
+    const inflight = {
+        db: false,
+        file: false,
+    };
 
     function escapeHtml(s) {
         if (s == null) return '';
@@ -50,8 +53,8 @@
     }
 
     async function fetchDbLogs() {
-        if (inflight) return;
-        inflight = true;
+        if (inflight.db) return;
+        inflight.db = true;
         try {
             const params = new URLSearchParams();
             const level = els.levelFilter.value;
@@ -69,11 +72,15 @@
             }
             const data = await res.json();
             renderDbLogs(data);
-            setStatus(`${data.entries.length} of ${data.total} entries · updated ${new Date().toLocaleTimeString()}`);
+            if (currentTab === 'db') {
+                setStatus(`${data.entries.length} of ${data.total} entries · updated ${new Date().toLocaleTimeString()}`);
+            }
         } catch (err) {
-            setStatus(`Failed to load logs: ${err.message}`, true);
+            if (currentTab === 'db') {
+                setStatus(`Failed to load logs: ${err.message}`, true);
+            }
         } finally {
-            inflight = false;
+            inflight.db = false;
         }
     }
 
@@ -97,8 +104,8 @@
     }
 
     async function fetchFileLogs() {
-        if (inflight) return;
-        inflight = true;
+        if (inflight.file) return;
+        inflight.file = true;
         try {
             const limit = els.limitInput.value || '500';
             const res = await fetch(`/api/admin/logs/file?lines=${encodeURIComponent(limit)}`, {
@@ -107,11 +114,15 @@
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             const data = await res.json();
             renderFileLogs(data);
-            setStatus(`${data.lines.length} lines from ${data.path}`);
+            if (currentTab === 'file') {
+                setStatus(`${data.lines.length} lines from ${data.path}`);
+            }
         } catch (err) {
-            setStatus(`Failed to load log file: ${err.message}`, true);
+            if (currentTab === 'file') {
+                setStatus(`Failed to load log file: ${err.message}`, true);
+            }
         } finally {
-            inflight = false;
+            inflight.file = false;
         }
     }
 
