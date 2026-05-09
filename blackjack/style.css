@@ -570,68 +570,123 @@ button:disabled {
 }
 
 @media (max-width: 760px) {
+    body.has-site-nav {
+        overflow: hidden;
+    }
+
     .blackjack-shell {
         width: min(100vw - 20px, 1180px);
-        gap: 12px;
-        padding-top: 16px;
+        min-height: calc(100vh - var(--site-nav-mobile-height, 56px));
+        min-height: calc(100dvh - var(--site-nav-mobile-height, 56px));
+        height: calc(100vh - var(--site-nav-mobile-height, 56px));
+        height: calc(100dvh - var(--site-nav-mobile-height, 56px));
+        grid-template-rows: auto minmax(0, 1fr) auto;
+        gap: 8px;
+        overflow: hidden;
+        padding: 8px 0;
     }
 
     .game-header {
-        align-items: stretch;
-        flex-direction: column;
+        align-items: center;
+        flex-direction: row;
+        gap: 10px;
     }
 
     .chip-ledger {
-        width: 100%;
+        min-width: 132px;
+        width: auto;
+        padding: 7px 9px;
+    }
+
+    .chip-ledger span,
+    .shoe-meter span,
+    .bet-display span {
+        font-size: 0.64rem;
+    }
+
+    .chip-ledger strong,
+    .shoe-meter strong,
+    .bet-display strong {
+        font-size: 1rem;
     }
 
     .table {
-        min-height: 526px;
-        gap: 16px;
-        padding: 12px;
-        border-width: 7px;
+        min-height: 0;
+        grid-template-rows: auto minmax(0, 0.86fr) minmax(0, 1fr);
+        gap: 9px;
+        padding: 8px;
+        border-width: 6px;
     }
 
     .table-rail {
         align-items: stretch;
         flex-wrap: wrap;
+        gap: 8px;
     }
 
     .table-rules {
         flex: 1 1 100%;
         justify-content: center;
         text-align: center;
+        gap: 4px 10px;
     }
 
     .shoe-meter {
         flex: 1;
         min-width: 0;
+        padding: 7px 9px;
     }
 
     .card,
     .empty-slot {
-        width: clamp(54px, 17vw, 68px);
+        width: clamp(46px, 14.5vw, 58px);
+        border-radius: 7px;
     }
 
     .card {
-        padding: 6px;
+        padding: 5px;
     }
 
     .card strong {
-        font-size: 1.35rem;
+        font-size: 1.16rem;
+    }
+
+    .cards {
+        gap: 7px;
+    }
+
+    .dealer-zone,
+    .player-zone {
+        gap: 7px;
     }
 
     .hands {
-        grid-template-columns: 1fr;
+        grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+        gap: 8px;
     }
 
     .hand-panel {
         min-height: 0;
+        gap: 7px;
+        padding: 8px;
+    }
+
+    .hand-meta,
+    .hand-footer {
+        min-height: 18px;
+    }
+
+    .hand-meta span,
+    .hand-footer span,
+    .zone-heading {
+        font-size: 0.74rem;
     }
 
     .control-panel {
-        gap: 10px;
-        padding: 12px;
+        position: relative;
+        bottom: auto;
+        gap: 8px;
+        padding: 9px;
     }
 
     .panel-title {
@@ -639,39 +694,84 @@ button:disabled {
     }
 
     .status-bar {
-        min-height: 48px;
-        padding: 10px;
+        min-height: 40px;
+        padding: 8px 10px;
+        font-size: 0.92rem;
+        line-height: 1.22;
+    }
+
+    .betting-controls {
+        gap: 8px;
+    }
+
+    .bet-display {
+        padding: 7px 10px;
+    }
+
+    .chip-row,
+    .action-grid {
+        gap: 8px;
+    }
+
+    .chip-button {
+        width: min(100%, 50px);
+        font-size: 0.76rem;
+    }
+
+    .primary-button,
+    .secondary-button,
+    .icon-button,
+    .table-reset-button {
+        min-height: 40px;
+    }
+
+    .icon-button {
+        flex-basis: 40px;
+        width: 40px;
+    }
+
+    .table-reset-button {
+        padding: 0 10px;
+        font-size: 0.86rem;
     }
 }
 
 @media (max-width: 430px) {
     h1 {
-        font-size: 2.3rem;
+        font-size: clamp(1.65rem, 8vw, 2.1rem);
     }
 
     .table {
-        min-height: 500px;
+        gap: 8px;
+        padding: 7px;
+        border-width: 5px;
     }
 
     .table-rules {
-        font-size: 0.68rem;
-        gap: 6px 10px;
+        font-size: 0.64rem;
+        gap: 4px 8px;
     }
 
     .chip-row,
     .action-grid {
-        gap: 7px;
+        gap: 6px;
     }
 
     .chip-button {
-        width: min(100%, 56px);
-        font-size: 0.8rem;
+        width: min(100%, 48px);
+        font-size: 0.72rem;
     }
 
     .primary-button,
     .secondary-button,
+    .icon-button,
+    .table-reset-button {
+        min-height: 38px;
+    }
+
     .icon-button {
-        min-height: 44px;
+        flex-basis: 38px;
+        width: 38px;
     }
 }
 
