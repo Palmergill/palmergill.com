@@ -83,6 +83,13 @@ class PotInfo(BaseModel):
     eligible_players: List[str] = Field(..., description="Player IDs eligible to win this pot")
 
 
+class LastActionInfo(BaseModel):
+    """Most recent poker action"""
+    player: str = Field(..., description="Name of the player who acted")
+    action: str = Field(..., description="Action taken: fold, check, call, raise, or all-in")
+    amount: Optional[int] = Field(None, description="Amount associated with the action, when applicable", ge=0)
+
+
 class GameState(BaseModel):
     """Complete game state response"""
     game_id: str = Field(..., description="Unique game identifier")
@@ -95,7 +102,7 @@ class GameState(BaseModel):
     players: List[dict] = Field(..., description="All players in the game (with cards hidden for opponents)")
     current_player: Optional[str] = Field(None, description="ID of player whose turn it is")
     dealer_index: int = Field(..., description="Index of dealer button")
-    last_action: Optional[str] = Field(None, description="Description of last action taken")
+    last_action: Optional[LastActionInfo] = Field(None, description="Most recent action taken")
     winners: Optional[List[dict]] = Field(None, description="Winners from showdown with amounts won")
     action_token: Optional[str] = Field(None, description="Token required for next action (anti-replay)")
 
@@ -1378,7 +1385,7 @@ class SpectatorState(BaseModel):
     players: List[dict] = Field(..., description="Players with hidden hole cards")
     current_player: Optional[str] = Field(None, description="ID of player whose turn it is")
     dealer_index: int = Field(..., description="Index of dealer button")
-    last_action: Optional[str] = Field(None, description="Description of last action taken")
+    last_action: Optional[LastActionInfo] = Field(None, description="Most recent action taken")
     winners: Optional[List[dict]] = Field(None, description="Winners from showdown")
     spectators: int = Field(0, description="Number of active spectators")
 
