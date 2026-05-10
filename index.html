@@ -133,6 +133,28 @@
             grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
             gap: 24px;
         }
+
+        .projects-grid.is-reveal-ready .project-card {
+            opacity: 0;
+            transform: translateY(28px) scale(0.98);
+            transition:
+                opacity 0.65s cubic-bezier(0.22, 1, 0.36, 1),
+                transform 0.65s cubic-bezier(0.22, 1, 0.36, 1),
+                background 0.3s ease,
+                border-color 0.3s ease,
+                box-shadow 0.3s ease;
+            transition-delay: calc(var(--reveal-index, 0) * 80ms);
+            will-change: opacity, transform;
+        }
+
+        .projects-grid.is-reveal-ready .project-card.is-visible {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+        }
+
+        .projects-grid.is-reveal-ready .project-card.is-visible:hover {
+            transform: translateY(-4px) scale(1);
+        }
         
         .project-card {
             background: rgba(255, 255, 255, 0.03);
@@ -230,6 +252,17 @@
             
             .projects-grid {
                 grid-template-columns: 1fr;
+            }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .projects-grid.is-reveal-ready .project-card,
+            .projects-grid.is-reveal-ready .project-card.is-visible {
+                opacity: 1;
+                transform: none;
+                transition: background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+                transition-delay: 0ms;
+                will-change: auto;
             }
         }
     </style>
@@ -430,5 +463,42 @@
         <p>© 2026 Palmer Gill. Built with care. <span style="color: #475569;">v2.0.4</span></p>
     </footer>
     <script src="/shared/site-nav.js"></script>
+    <script>
+        (() => {
+            const grid = document.querySelector('.projects-grid');
+            const cards = Array.from(document.querySelectorAll('.project-card'));
+            const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+            if (!grid || cards.length === 0 || reduceMotion) {
+                return;
+            }
+
+            grid.classList.add('is-reveal-ready');
+            cards.forEach((card, index) => {
+                card.style.setProperty('--reveal-index', index);
+            });
+
+            if (!('IntersectionObserver' in window)) {
+                cards.forEach(card => card.classList.add('is-visible'));
+                return;
+            }
+
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach((entry) => {
+                    if (!entry.isIntersecting) {
+                        return;
+                    }
+
+                    entry.target.classList.add('is-visible');
+                    observer.unobserve(entry.target);
+                });
+            }, {
+                rootMargin: '0px 0px -12% 0px',
+                threshold: 0.16
+            });
+
+            cards.forEach(card => observer.observe(card));
+        })();
+    </script>
 </body>
 </html>
