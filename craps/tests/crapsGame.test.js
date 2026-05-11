@@ -16,40 +16,41 @@ function loadGame() {
 }
 
 function readState(window) {
-  return JSON.parse(window.eval(`JSON.stringify({
-    balance,
-    point,
-    isComeOutRoll,
-    passLine: bets.passLine,
-    passLineOdds: oddsBets.passLine,
-    dontPassOdds: oddsBets.dontPass,
-    place6: bets.place6,
-    field: bets.field,
-    comeBets,
-    dontComeBets,
-    currentOddsTarget,
-    currentPopupBetId,
-    status: document.getElementById('gameStatus').textContent,
-    modalTitle: document.getElementById('modalTitle').textContent,
-    modalInfo: document.getElementById('modalCurrentBet').textContent,
-    rollDisabled: document.getElementById('rollButton').disabled,
-    resultText: document.getElementById('rollResultBurst').textContent,
-    resultClass: document.getElementById('rollResultBurst').className,
-  })`));
+  const game = window.__getGameState();
+  return {
+    balance: game.balance,
+    point: game.point,
+    isComeOutRoll: game.isComeOutRoll,
+    passLine: game.bets.passLine,
+    passLineOdds: game.oddsBets.passLine,
+    dontPassOdds: game.oddsBets.dontPass,
+    place6: game.bets.place6,
+    field: game.bets.field,
+    comeBets: game.comeBets,
+    dontComeBets: game.dontComeBets,
+    currentOddsTarget: game.currentOddsTarget,
+    currentPopupBetId: game.currentPopupBetId,
+    status: window.document.getElementById('gameStatus').textContent,
+    modalTitle: window.document.getElementById('modalTitle').textContent,
+    modalInfo: window.document.getElementById('modalCurrentBet').textContent,
+    rollDisabled: window.document.getElementById('rollButton').disabled,
+    resultText: window.document.getElementById('rollResultBurst').textContent,
+    resultClass: window.document.getElementById('rollResultBurst').className,
+  };
 }
 
 describe('craps game regressions', () => {
   test("established Come and Don't Come bets survive pass-line come-out naturals", () => {
     const window = loadGame();
-    window.eval(`
-      balance = 970;
-      point = null;
-      isComeOutRoll = true;
-      bets.passLine = 10;
-      comeBets = [{ id: 1, point: 6, amount: 10, odds: 5 }];
-      dontComeBets = [{ id: 2, point: 8, amount: 10, odds: 5 }];
-      nextComeBetId = 3;
-    `);
+    window.__setGameState({
+      balance: 970,
+      point: null,
+      isComeOutRoll: true,
+      bets: { passLine: 10 },
+      comeBets: [{ id: 1, point: 6, amount: 10, odds: 5 }],
+      dontComeBets: [{ id: 2, point: 8, amount: 10, odds: 5 }],
+      nextComeBetId: 3,
+    });
 
     window.resolveRoll(3, 4);
     const state = readState(window);
@@ -64,15 +65,15 @@ describe('craps game regressions', () => {
 
   test('point popup odds are capped at the remaining max odds', () => {
     const window = loadGame();
-    window.eval(`
-      balance = 1000;
-      point = 6;
-      isComeOutRoll = false;
-      bets.passLine = 10;
-      oddsBets.passLine = 40;
-      currentPopupBetType = 'passLine';
-      currentPopupBetId = null;
-    `);
+    window.__setGameState({
+      balance: 1000,
+      point: 6,
+      isComeOutRoll: false,
+      bets: { passLine: 10 },
+      oddsBets: { passLine: 40 },
+      currentPopupBetType: 'passLine',
+      currentPopupBetId: null,
+    });
 
     window.takeOddsFromPopup(3);
     const state = readState(window);
@@ -87,16 +88,16 @@ describe('craps game regressions', () => {
       fn();
       return 1;
     };
-    window.eval(`
-      balance = 990;
-      point = 8;
-      isComeOutRoll = false;
-      comeBets = [
+    window.__setGameState({
+      balance: 990,
+      point: 8,
+      isComeOutRoll: false,
+      comeBets: [
         { id: 1, point: 6, amount: 5, odds: 0 },
         { id: 2, point: null, amount: 5, odds: 0 },
-      ];
-      nextComeBetId = 3;
-    `);
+      ],
+      nextComeBetId: 3,
+    });
 
     window.resolveRoll(3, 3);
     expect(readState(window).currentPopupBetId).toBe(2);
@@ -110,15 +111,15 @@ describe('craps game regressions', () => {
 
   test('line odds popup uses the popup point even if the global point changes', () => {
     const window = loadGame();
-    window.eval(`
-      balance = 1000;
-      point = 4;
-      isComeOutRoll = false;
-      bets.passLine = 10;
-    `);
+    window.__setGameState({
+      balance: 1000,
+      point: 4,
+      isComeOutRoll: false,
+      bets: { passLine: 10 },
+    });
 
     window.showPointPopup(4, 'passLine');
-    window.eval('point = 6');
+    window.__setGameState({ point: 6 });
     window.takeOddsFromPopup('max');
     const state = readState(window);
 
@@ -128,13 +129,13 @@ describe('craps game regressions', () => {
 
   test('Pass Line odds can be added and removed after the point is established', () => {
     const window = loadGame();
-    window.eval(`
-      balance = 1000;
-      point = 6;
-      isComeOutRoll = false;
-      bets.passLine = 10;
-      oddsBets.passLine = 10;
-    `);
+    window.__setGameState({
+      balance: 1000,
+      point: 6,
+      isComeOutRoll: false,
+      bets: { passLine: 10 },
+      oddsBets: { passLine: 10 },
+    });
 
     window.openBetModal('passLine');
     expect(readState(window)).toMatchObject({
@@ -162,12 +163,12 @@ describe('craps game regressions', () => {
 
   test("Don't Pass odds can be managed from the line button during a point", () => {
     const window = loadGame();
-    window.eval(`
-      balance = 1000;
-      point = 8;
-      isComeOutRoll = false;
-      bets.dontPass = 10;
-    `);
+    window.__setGameState({
+      balance: 1000,
+      point: 8,
+      isComeOutRoll: false,
+      bets: { dontPass: 10 },
+    });
 
     window.openBetModal('dontPass');
     expect(readState(window)).toMatchObject({
@@ -186,13 +187,13 @@ describe('craps game regressions', () => {
 
   test('established Come odds can be added and removed later', () => {
     const window = loadGame();
-    window.eval(`
-      balance = 1000;
-      point = 8;
-      isComeOutRoll = false;
-      comeBets = [{ id: 4, point: 6, amount: 10, odds: 0 }];
-      nextComeBetId = 5;
-    `);
+    window.__setGameState({
+      balance: 1000,
+      point: 8,
+      isComeOutRoll: false,
+      comeBets: [{ id: 4, point: 6, amount: 10, odds: 0 }],
+      nextComeBetId: 5,
+    });
 
     window.openOddsModal('come', 4);
     window.document.getElementById('betInput').value = '20';
@@ -214,13 +215,13 @@ describe('craps game regressions', () => {
 
   test("established Don't Come odds can be added and removed later", () => {
     const window = loadGame();
-    window.eval(`
-      balance = 1000;
-      point = 8;
-      isComeOutRoll = false;
-      dontComeBets = [{ id: 7, point: 9, amount: 10, odds: 10 }];
-      nextComeBetId = 8;
-    `);
+    window.__setGameState({
+      balance: 1000,
+      point: 8,
+      isComeOutRoll: false,
+      dontComeBets: [{ id: 7, point: 9, amount: 10, odds: 10 }],
+      nextComeBetId: 8,
+    });
 
     window.openOddsModal('dontCome', 7);
     window.document.getElementById('betInput').value = '15';
@@ -260,14 +261,13 @@ describe('craps game regressions', () => {
 
   test('contract Pass Line and established Come bets cannot be cleared', () => {
     const window = loadGame();
-    window.eval(`
-      balance = 975;
-      point = 6;
-      isComeOutRoll = false;
-      bets.passLine = 10;
-      bets.field = 5;
-      comeBets = [{ id: 1, point: 8, amount: 10, odds: 0 }];
-    `);
+    window.__setGameState({
+      balance: 975,
+      point: 6,
+      isComeOutRoll: false,
+      bets: { passLine: 10, field: 5 },
+      comeBets: [{ id: 1, point: 8, amount: 10, odds: 0 }],
+    });
 
     window.clearAllBets();
     const state = readState(window);
@@ -309,10 +309,7 @@ describe('craps game regressions', () => {
 
   test('resolved losing bets show a loss animation', () => {
     const window = loadGame();
-    window.eval(`
-      balance = 995;
-      bets.field = 5;
-    `);
+    window.__setGameState({ balance: 995, bets: { field: 5 } });
 
     window.resolveRoll(3, 3);
     const state = readState(window);
@@ -326,10 +323,7 @@ describe('craps game regressions', () => {
 
   test('winning rolls show a net win animation', () => {
     const window = loadGame();
-    window.eval(`
-      balance = 990;
-      bets.passLine = 10;
-    `);
+    window.__setGameState({ balance: 990, bets: { passLine: 10 } });
 
     window.resolveRoll(3, 4);
     const state = readState(window);
@@ -342,10 +336,7 @@ describe('craps game regressions', () => {
 
   test('pushes do not show a win or loss animation', () => {
     const window = loadGame();
-    window.eval(`
-      balance = 990;
-      bets.dontPass = 10;
-    `);
+    window.__setGameState({ balance: 990, bets: { dontPass: 10 } });
 
     window.resolveRoll(6, 6);
     const state = readState(window);

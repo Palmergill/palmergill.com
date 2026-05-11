@@ -43,6 +43,18 @@ function missingConfig() {
   });
 }
 
+function timingSafeEqual(a, b) {
+  const encoder = new TextEncoder();
+  const aBytes = encoder.encode(a);
+  const bBytes = encoder.encode(b);
+  let mismatch = aBytes.length !== bBytes.length ? 1 : 0;
+  const len = Math.max(aBytes.length, bBytes.length);
+  for (let i = 0; i < len; i++) {
+    mismatch |= (aBytes[i] ?? 0) ^ (bBytes[i] ?? 0);
+  }
+  return mismatch === 0;
+}
+
 function decodeBasicAuth(value) {
   if (!value?.startsWith('Basic ')) {
     return null;
@@ -81,8 +93,8 @@ export default function middleware(request) {
   const credentials = decodeBasicAuth(request.headers.get('authorization'));
   if (
     !credentials ||
-    credentials.username !== username ||
-    credentials.password !== password
+    !timingSafeEqual(credentials.username, username) ||
+    !timingSafeEqual(credentials.password, password)
   ) {
     return unauthorized();
   }

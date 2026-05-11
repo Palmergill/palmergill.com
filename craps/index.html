@@ -1868,6 +1868,33 @@
             closePointPopup();
         }
 
+        // ── Test Helpers ──
+        function __getGameState() {
+            return {
+                balance, point, isComeOutRoll,
+                bets: { ...bets },
+                oddsBets: { ...oddsBets },
+                comeBets: comeBets.map(b => ({ ...b })),
+                dontComeBets: dontComeBets.map(b => ({ ...b })),
+                currentOddsTarget: currentOddsTarget ? { ...currentOddsTarget } : null,
+                currentPopupBetType, currentPopupBetId,
+                nextComeBetId,
+            };
+        }
+
+        function __setGameState(state) {
+            if ('balance' in state) balance = state.balance;
+            if ('point' in state) point = state.point;
+            if ('isComeOutRoll' in state) isComeOutRoll = state.isComeOutRoll;
+            if ('bets' in state) Object.assign(bets, state.bets);
+            if ('oddsBets' in state) Object.assign(oddsBets, state.oddsBets);
+            if ('comeBets' in state) comeBets = state.comeBets.map(b => ({ ...b }));
+            if ('dontComeBets' in state) dontComeBets = state.dontComeBets.map(b => ({ ...b }));
+            if ('nextComeBetId' in state) nextComeBetId = state.nextComeBetId;
+            if ('currentPopupBetType' in state) currentPopupBetType = state.currentPopupBetType;
+            if ('currentPopupBetId' in state) currentPopupBetId = state.currentPopupBetId;
+        }
+
         // ── Initialize ──
         updateBalance();
         updateAllDisplays();

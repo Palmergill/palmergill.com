@@ -1,13 +1,14 @@
 """
 Poker Game API Router - Simplified for debugging
 """
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
-from typing import Optional, Dict
+from typing import Optional, Dict, List
 import uuid
 import asyncio
 import secrets
 import time
+from collections import defaultdict
 
 from app.poker_game import PokerGame
 from app.poker_ai import AIManager
@@ -21,6 +22,26 @@ game_last_accessed: Dict[str, float] = {}
 player_tokens: Dict[str, Dict[str, str]] = {}
 
 GAME_MAX_AGE_SECONDS = 3600
+
+# Simple sliding-window rate limiter: max 60 requests per minute per IP
+_RATE_LIMIT_WINDOW = 60
+_RATE_LIMIT_MAX = 60
+_rate_limit_store: Dict[str, List[float]] = defaultdict(list)
+
+def _check_rate_limit(client_ip: str) -> bool:
+    now = time.time()
+    cutoff = now - _RATE_LIMIT_WINDOW
+    timestamps = _rate_limit_store[client_ip]
+    _rate_limit_store[client_ip] = [t for t in timestamps if t > cutoff]
+    if len(_rate_limit_store[client_ip]) >= _RATE_LIMIT_MAX:
+        return False
+    _rate_limit_store[client_ip].append(now)
+    return True
+
+def _require_rate_limit(request: Request) -> None:
+    client_ip = request.client.host if request.client else "unknown"
+    if not _check_rate_limit(client_ip):
+        raise HTTPException(status_code=429, detail="Too many requests")
 
 def cleanup_old_games():
     """Remove games that haven't been accessed in a while"""
@@ -81,8 +102,9 @@ class BuyBackRequest(BaseModel):
     amount: int = 1000
 
 @router.post("/games")
-async def create_game(request: CreateGameRequest):
+async def create_game(http_request: Request, request: CreateGameRequest):
     """Create a new poker game"""
+    _require_rate_limit(http_request)
     if request.game_type not in ("single", "multiplayer"):
         raise HTTPException(status_code=400, detail="Unsupported game type")
 
@@ -135,8 +157,9 @@ async def create_game(request: CreateGameRequest):
         }
 
 @router.post("/games/join")
-async def join_game(request: JoinGameRequest):
+async def join_game(http_request: Request, request: JoinGameRequest):
     """Join an existing multiplayer game"""
+    _require_rate_limit(http_request)
     if request.game_id not in games:
         raise HTTPException(status_code=404, detail="Game not found")
 
@@ -216,8 +239,9 @@ async def get_game_state(game_id: str, player_id: str, player_token: str, proces
     return game.to_dict(for_player=player_id)
 
 @router.post("/games/{game_id}/action")
-async def player_action(game_id: str, request: ActionRequest):
+async def player_action(game_id: str, http_request: Request, request: ActionRequest):
     """Execute player action"""
+    _require_rate_limit(http_request)
     if game_id not in games:
         raise HTTPException(status_code=404, detail="Game not found")
 

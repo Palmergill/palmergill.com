@@ -575,7 +575,7 @@ const ErrorBoundary = {
 
         // Add close button
         const closeBtn = document.createElement('button');
-        closeBtn.innerHTML = '×';
+        closeBtn.textContent = '×';
         closeBtn.style.cssText = `
             background: none;
             border: none;
@@ -1680,7 +1680,7 @@ function renderCard(card, isPlayerCard = false, dealIndex = null) {
     
     const isRed = card.suit === 'HEARTS' || card.suit === 'DIAMONDS';
     const suitSymbol = { 'HEARTS': '♥', 'DIAMONDS': '♦', 'CLUBS': '♣', 'SPADES': '♠' }[card.suit] || '';
-    const rank = { 14: 'A', 13: 'K', 12: 'Q', 11: 'J' }[card.rank] || card.rank;
+    const rank = { 14: 'A', 13: 'K', 12: 'Q', 11: 'J' }[card.rank] ?? String(Number(card.rank));
     
     // Create unique card ID to track if we've seen it before
     const cardId = `${card.suit}-${card.rank}`;

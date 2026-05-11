@@ -1,8 +1,12 @@
+import re
+
 from sqlalchemy import inspect, text
 from app.database import engine, Base, is_postgres
 import logging
 
 logger = logging.getLogger(__name__)
+
+_SAFE_IDENTIFIER = re.compile(r'^[a-zA-Z_][a-zA-Z0-9_]*$')
 
 def migrate_database():
     """Auto-migrate database schema without losing data"""
@@ -20,6 +24,9 @@ def migrate_database():
                 if col_name not in existing_columns and col_name != 'id':
                     logger.info(f"Adding column {col_name} to stock_summaries")
                     try:
+                        if not _SAFE_IDENTIFIER.match(col_name):
+                            logger.warning(f"Skipping column with invalid name: {col_name!r}")
+                            continue
                         col_type = "FLOAT"
                         if col_name in ['ticker', 'name']:
                             col_type = "VARCHAR"
@@ -27,7 +34,7 @@ def migrate_database():
                             col_type = "DATE"
                         elif col_name in ['fetched_at']:
                             col_type = "TIMESTAMP" if is_postgres else "DATETIME"
-                        
+
                         with engine.connect() as conn:
                             conn.execute(text(f"ALTER TABLE stock_summaries ADD COLUMN {col_name} {col_type}"))
                             conn.commit()
@@ -44,12 +51,15 @@ def migrate_database():
                 if col_name not in existing_columns and col_name != 'id':
                     logger.info(f"Adding column {col_name} to earnings")
                     try:
+                        if not _SAFE_IDENTIFIER.match(col_name):
+                            logger.warning(f"Skipping column with invalid name: {col_name!r}")
+                            continue
                         col_type = "FLOAT"
                         if col_name in ['ticker', 'name', 'period']:
                             col_type = "VARCHAR"
                         elif col_name in ['fiscal_date', 'fetched_at']:
                             col_type = "TIMESTAMP" if is_postgres else "DATETIME"
-                        
+
                         with engine.connect() as conn:
                             conn.execute(text(f"ALTER TABLE earnings ADD COLUMN {col_name} {col_type}"))
                             conn.commit()
