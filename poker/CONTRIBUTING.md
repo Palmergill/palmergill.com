@@ -41,7 +41,7 @@ Thank you for your interest in contributing! This document provides guidelines f
 ./start.sh
 ```
 
-The local site and API will be available at `http://127.0.0.1:8000` with docs at `/docs`.
+The local site and API will be available at `http://127.0.0.1:8000`. The local `/docs` route is FastAPI's generated API docs; the static website docs page is served by production/static hosting at `/docs/`.
 
 ### Frontend Development
 

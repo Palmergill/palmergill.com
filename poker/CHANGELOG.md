@@ -7,6 +7,7 @@ The production poker app is currently the static frontend in `poker/` plus the s
 ## [Unreleased]
 
 ### Changed
+- Updated docs for player-token validation, poker write rate limiting, current local static mounts, and Bitcoin Chat environment variables.
 - Updated poker docs to distinguish the active shared backend from the standalone `poker/backend/` service.
 - Updated API documentation to list only endpoints exposed by the active shared backend.
 - Updated architecture and task docs to remove stale claims about inactive production endpoints.

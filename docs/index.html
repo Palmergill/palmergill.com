@@ -151,15 +151,15 @@
                 <p>Then open:</p>
                 <pre><code>http://127.0.0.1:8000</code></pre>
                 <p>
-                    Protected local app routes and API routes use Basic Auth when credentials are provided.
-                    Poker, craps, blackjack static hosting, and <code>/api/poker/*</code> are intended to stay public.
+                    Protected local app routes, FastAPI docs/OpenAPI JSON, and API routes require Basic Auth.
+                    Poker, craps, blackjack, and <code>/api/poker/*</code> stay public.
                 </p>
                 <pre><code>APP_AUTH_USERNAME=palmer APP_AUTH_PASSWORD=your-password ./start.sh</code></pre>
                 <p>Backend logs are written to:</p>
                 <pre><code>logs/backend.log</code></pre>
                 <p class="note">
-                    The shared backend still reserves <code>/docs</code> for generated FastAPI API docs when served directly.
-                    Both backend API docs and the static website docs route should stay behind Basic Auth.
+                    The shared backend reserves the local <code>/docs</code> path for generated FastAPI API docs.
+                    The static website docs page is served by production/static hosting at <code>/docs/</code>.
                 </p>
             </section>
 
@@ -197,12 +197,16 @@
                 <div class="code-grid">
                     <code>APP_AUTH_USERNAME</code>
                     <code>APP_AUTH_PASSWORD</code>
+                    <code>ALLOWED_ORIGINS</code>
+                    <code>DATABASE_URL</code>
                     <code>USE_REAL_DATA</code>
+                    <code>ALLOW_MOCK_FALLBACK</code>
                     <code>POLYGON_API_KEY</code>
                     <code>FINNHUB_API_KEY</code>
                     <code>BITCOIN_RPC_URL</code>
                     <code>BITCOIN_RPC_USER</code>
                     <code>BITCOIN_RPC_PASSWORD</code>
+                    <code>BITCOIN_CHAT_MODEL_TIMEOUT_SECONDS</code>
                     <code>OPENAI_API_KEY</code>
                 </div>
             </section>
@@ -213,6 +217,7 @@
                 <p>
                     App authentication uses HTTP Basic Auth. If <code>APP_AUTH_PASSWORD</code> is missing in production,
                     protected routes return <code>503</code> instead of accidentally publishing private tools.
+                    Vercel middleware skips that fail-closed behavior outside Vercel so local static development is not blocked.
                 </p>
                 <div class="split-grid">
                     <div class="panel">
@@ -248,7 +253,7 @@
                     </article>
                     <article>
                         <h3><code>/api/poker/*</code></h3>
-                        <p>Integrated poker game endpoints for game creation, game state, player actions, buy-back, next hand, and health.</p>
+                        <p>Integrated poker game endpoints for game creation, game state, player-token validation, player actions, buy-back, next hand, per-IP write rate limiting, and health.</p>
                     </article>
                     <article>
                         <h3><code>/api/bitcoin/*</code></h3>
@@ -385,8 +390,8 @@
                 <p class="section-kicker">Source Docs</p>
                 <h2>Canonical markdown files</h2>
                 <p>
-                    This page summarizes the website documentation in one public HTML page. The source markdown files
-                    remain useful for implementation-level details.
+                    This page summarizes the website documentation in one protected static HTML page. The source markdown files
+                    and setup references remain useful for implementation-level details.
                 </p>
                 <div class="source-list">
                     <a href="/README.md">README.md</a>
@@ -407,7 +412,7 @@
     </main>
 
     <footer class="docs-footer">
-        <p>Site documentation for Palmer Gill. Last organized May 9, 2026.</p>
+        <p>Site documentation for Palmer Gill. Last organized May 15, 2026.</p>
     </footer>
 </body>
 </html>

@@ -12,7 +12,9 @@ The repository also contains `poker/backend/`, a standalone FastAPI poker servic
 
 ## Authentication
 
-`/api/poker/*` is public in both Vercel middleware and the shared FastAPI auth middleware. The API identifies players by the `player_id` returned when creating or joining a game.
+`/api/poker/*` is public in both Vercel middleware and the shared FastAPI auth middleware. The API identifies and authorizes players with the `player_id` and `player_token` returned when creating or joining a game. Keep the token client-side; mutating requests and state polling require it.
+
+Write endpoints use a simple per-IP sliding-window rate limit of 60 requests per minute.
 
 ## Game Storage
 
@@ -43,10 +45,12 @@ Fields:
 | Field | Type | Required | Notes |
 | --- | --- | --- | --- |
 | `player_name` | string | No | Defaults to `Player`. |
-| `game_type` | string | No | `single` starts immediately with AI bots. Any other value creates a multiplayer lobby. |
+| `game_type` | string | No | `single` starts immediately with AI bots; `multiplayer` creates a lobby. |
 | `max_players` | integer | No | Defaults to 6 for multiplayer games. |
 
-Response includes `game_id`, `player_id`, `state`, and `game_type`. Multiplayer lobby responses also include `players` and `waiting`.
+`game_type` must be `single` or `multiplayer`.
+
+Response includes `game_id`, `player_id`, `player_token`, `state`, and `game_type`. Multiplayer lobby responses also include `players` and `waiting`.
 
 ### Join Multiplayer Game
 
@@ -68,7 +72,7 @@ Only multiplayer games in the `waiting` phase can be joined.
 ### Start Multiplayer Game
 
 ```http
-POST /api/poker/games/{game_id}/start?player_id={player_id}
+POST /api/poker/games/{game_id}/start?player_id={player_id}&player_token={player_token}
 ```
 
 Starts a multiplayer game. Only the first player in the lobby can start it, and at least two players are required.
@@ -76,7 +80,7 @@ Starts a multiplayer game. Only the first player in the lobby can start it, and 
 ### Get Game State
 
 ```http
-GET /api/poker/games/{game_id}?player_id={player_id}&process_ai=true
+GET /api/poker/games/{game_id}?player_id={player_id}&player_token={player_token}&process_ai=true
 ```
 
 Returns the current game state for the requesting player. Cards are only visible to the requesting player until showdown.
@@ -86,6 +90,7 @@ Query parameters:
 | Field | Type | Required | Notes |
 | --- | --- | --- | --- |
 | `player_id` | string | Yes | Player identifier returned by create/join. |
+| `player_token` | string | Yes | Player token returned by create/join. |
 | `process_ai` | boolean | No | Defaults to `true`; the frontend passes `false` in multiplayer/lobby polling. |
 
 ### Player Action
@@ -99,6 +104,7 @@ Request:
 ```json
 {
   "player_id": "p0",
+  "player_token": "secret-token",
   "action": "raise",
   "amount": 100
 }
@@ -124,6 +130,7 @@ Request:
 ```json
 {
   "player_id": "p0",
+  "player_token": "secret-token",
   "amount": 1000
 }
 ```
@@ -133,7 +140,7 @@ Adds chips to a busted player between hands. Available only during `showdown` or
 ### Next Hand
 
 ```http
-POST /api/poker/games/{game_id}/next-hand?player_id={player_id}
+POST /api/poker/games/{game_id}/next-hand?player_id={player_id}&player_token={player_token}
 ```
 
 Starts the next hand after showdown or while waiting. The dealer button advances before the hand starts.
@@ -192,8 +199,9 @@ Common status codes:
 | Code | Meaning |
 | --- | --- |
 | `400` | Invalid action, not your turn, game already started, game full, or buy-back unavailable. |
-| `403` | Non-host attempted to start a multiplayer game. |
+| `403` | Invalid player token or non-host attempted to start a multiplayer game. |
 | `404` | Game or player not found. |
+| `429` | Per-IP rate limit exceeded on create, join, or action requests. |
 | `422` | Request body/query validation error. |
 
 ## Frontend Notes

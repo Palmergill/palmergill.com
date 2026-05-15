@@ -1,8 +1,8 @@
 # Polygon.io API Integration Guide
 
-**Version:** v1.0.2
+**Version:** v1.0.3
 
-**Last Updated:** May 9, 2026
+**Last Updated:** May 15, 2026
 
 **API Version:** Polygon REST endpoints used by `backend/app/services/polygon_client.py`
 
@@ -440,8 +440,10 @@ Always check status before processing data.
 
 ## Summary
 
-**Currently using:** 4 endpoints  
-**Total available:** 40+ endpoints  
+**Currently using:** 5 endpoints
+
+**Total available:** 40+ endpoints
+
 **Utilization:** ~10% of Polygon's capabilities
 
 **Key strength:** Financial statements endpoint provides incredibly detailed data that would require multiple API calls elsewhere.

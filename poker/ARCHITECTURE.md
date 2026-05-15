@@ -2,7 +2,7 @@
 
 This document describes the poker app as it is wired in the current root site deployment.
 
-**Last Updated:** May 9, 2026
+**Last Updated:** May 15, 2026
 
 ## Active Runtime
 
@@ -54,6 +54,8 @@ The active shared router provides:
 - Multiplayer lobby create/join/start.
 - In-memory game storage.
 - One-hour cleanup for inactive games.
+- Player-token validation for state polling and player-specific actions.
+- Per-IP rate limiting on create, join, and action requests.
 - Player actions: fold, check, call, raise.
 - Buy-back between hands.
 - Next-hand flow after showdown.

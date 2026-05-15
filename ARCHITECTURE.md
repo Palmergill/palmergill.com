@@ -47,7 +47,7 @@ Important routes:
 - `/health`
 - `/docs` - protected FastAPI docs when accessing the backend service directly
 
-In production, `/` returns API metadata from the Railway API service. In local development, `./start.sh` sets `LOCAL_SITE_ROOT=true`, which makes FastAPI serve the root portfolio page and most active static project folders from the same process.
+In production, `/` returns API metadata from the Railway API service. In local development, `./start.sh` sets `LOCAL_SITE_ROOT=true`, which makes FastAPI serve the root portfolio page and active static project folders from the same process. The local `/docs` path remains FastAPI's generated API documentation path, so the static website docs page is a production/static-host route.
 
 The active deployed API is `backend/app/main.py`. `poker/backend/` contains a standalone poker service with additional endpoints, tests, and deployment files, but the root `Dockerfile` does not copy or run it.
 
@@ -74,4 +74,4 @@ logs/backend.log
 - Static site hosting serves the root static files and project directories.
 - Vercel rewrites `/api/*` to the Railway API.
 - Railway runs the Dockerized FastAPI backend from `backend/`.
-- `/`, `/poker/`, `/craps/`, `/blackjack/`, and `/api/poker/*` are public. Stock research, Bitcoin chat, admin, and other API routes require Basic Auth when app auth is configured.
+- `/`, `/poker/`, `/craps/`, `/blackjack/`, and `/api/poker/*` are public. Stock research, Bitcoin chat, admin, FastAPI docs/OpenAPI JSON, and other API routes require Basic Auth. Protected backend routes return `503` when `APP_AUTH_PASSWORD` is missing.

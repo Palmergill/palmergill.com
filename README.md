@@ -35,9 +35,9 @@ Open:
 http://127.0.0.1:8000
 ```
 
-The local server runs FastAPI and, with `LOCAL_SITE_ROOT=true`, also serves the static root page plus `assets/`, `shared/`, `about/`, `stock-research/`, `poker/`, `craps/`, `blackjack/`, `bitcoin-chat/`, and `admin/`.
+The local server runs FastAPI and, with `LOCAL_SITE_ROOT=true`, also serves the static root page plus `assets/`, `shared/`, `about/`, `stock-research/`, `poker/`, `craps/`, `blackjack/`, `bitcoin-chat/`, and `admin/`. The local `/docs` path is reserved for FastAPI API docs; the static website docs page is served by production static hosting at `/docs/`.
 
-Protected local app routes and API routes require Basic Auth. Set:
+Protected local app routes, FastAPI docs/OpenAPI JSON, and API routes require Basic Auth. Set:
 
 ```bash
 APP_AUTH_USERNAME=palmer APP_AUTH_PASSWORD=your-password ./start.sh

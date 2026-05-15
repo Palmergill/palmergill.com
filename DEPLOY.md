@@ -50,7 +50,7 @@ Health check:
 /health
 ```
 
-The backend mirrors the same Basic Auth check for protected API docs, `/api/*` routes, and locally served app folders. Poker, craps, and `/api/poker/*` remain public in the backend; blackjack is served by static hosting in the current deployment. Stock research, Bitcoin chat, admin, FastAPI docs, and other `/api/*` routes are protected. Protected routes return `503` if `APP_AUTH_PASSWORD` is missing, so set the same `APP_AUTH_USERNAME` and `APP_AUTH_PASSWORD` values in Railway to keep direct backend access usable and protected.
+The backend mirrors the same Basic Auth check for protected API docs, `/api/*` routes, and locally served app folders. Poker, craps, blackjack, and `/api/poker/*` remain public in the backend. Stock research, Bitcoin chat, admin, FastAPI docs/OpenAPI JSON, and other `/api/*` routes are protected. Protected routes return `503` if `APP_AUTH_PASSWORD` is missing, so set the same `APP_AUTH_USERNAME` and `APP_AUTH_PASSWORD` values in Railway to keep direct backend access usable and protected.
 
 The root Railway deployment uses the root `Dockerfile`, which copies only `backend/`. The standalone service under `poker/backend/` is not active in this deployment path.
 
@@ -77,7 +77,7 @@ This runs the API and active static pages together at:
 http://127.0.0.1:8000
 ```
 
-`LOCAL_SITE_ROOT=true` currently mounts `shared/`, `stock-research/`, `poker/`, `craps/`, `bitcoin-chat/`, and `admin/` through FastAPI. The `blackjack/` app is a static site folder served by production static hosting; use a static file server or add a local FastAPI mount if you need that exact route locally.
+`LOCAL_SITE_ROOT=true` currently mounts `assets/`, `shared/`, `about/`, `stock-research/`, `poker/`, `craps/`, `blackjack/`, `bitcoin-chat/`, and `admin/` through FastAPI. The local `/docs` path is still FastAPI's generated API docs path; the static website docs page is served by production/static hosting at `/docs/`.
 
 ## Archived Code
 

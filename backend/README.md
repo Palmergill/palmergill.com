@@ -26,7 +26,7 @@ From the repo root:
 ./start.sh
 ```
 
-That sets `LOCAL_SITE_ROOT=true`, which serves the root portfolio page and configured project folders from the same FastAPI process.
+That sets `LOCAL_SITE_ROOT=true`, which serves the root portfolio page, shared assets, and configured project folders from the same FastAPI process. The local `/docs` path remains the generated FastAPI API docs path, not the static website docs page.
 
 Protected local app routes and API routes require Basic Auth. Run:
 
@@ -39,9 +39,11 @@ Poker, craps, and `/api/poker/*` remain public. Stock research, Bitcoin chat, ad
 ## Useful URLs
 
 - `http://127.0.0.1:8000/` - local site root when `LOCAL_SITE_ROOT=true`
+- `http://127.0.0.1:8000/about/` - about page
 - `http://127.0.0.1:8000/stock-research/` - stock app
 - `http://127.0.0.1:8000/poker/` - poker app
 - `http://127.0.0.1:8000/craps/` - craps app
+- `http://127.0.0.1:8000/blackjack/` - blackjack app
 - `http://127.0.0.1:8000/bitcoin-chat/` - Bitcoin chat app
 - `http://127.0.0.1:8000/admin/` - protected admin/log dashboard
 - `http://127.0.0.1:8000/health` - health check

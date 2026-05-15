@@ -2,7 +2,7 @@
 
 This documents the production wiring for the Bitcoin Chat app at `/bitcoin-chat/`.
 
-Last reviewed against the repo on May 9, 2026.
+Last reviewed against the repo on May 15, 2026.
 
 ## Architecture
 
@@ -82,6 +82,8 @@ BITCOIN_RPC_TIMEOUT_SECONDS=20
 BITCOIN_NETWORK=main
 BITCOIN_MAX_MINED_STATS_BLOCKS=1008
 BITCOIN_CHAT_MAX_TOOL_CALLS=6
+BITCOIN_CHAT_MODEL_TIMEOUT_SECONDS=30
+BITCOIN_CHAT_MAX_SESSION_MESSAGES=12
 BITCOIN_CHAT_MODEL=gpt-5.5
 BITCOIN_CHAT_REASONING_EFFORT=low
 BITCOIN_CHAT_VERBOSITY=medium
@@ -91,6 +93,8 @@ OPENAI_API_KEY=<OpenAI API key for natural-language chat>
 If the password ends with `=`, include the trailing `=` in Railway. Do not wrap the value in quotes.
 
 `OPENAI_API_KEY` is optional for node smoke tests. When it is missing, `/api/bitcoin/chat` falls back to deterministic read-only answers for blocks, transactions, fees, node status, and mined-BTC queries. Set it to enable the natural-language Bitcoin assistant and technical explanations.
+
+`BITCOIN_CHAT_MODEL_TIMEOUT_SECONDS` controls the model call timeout, and `BITCOIN_CHAT_MAX_SESSION_MESSAGES` caps the rolling chat history kept per session.
 
 ## Backend Endpoints
 
