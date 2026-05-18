@@ -1533,19 +1533,33 @@
         .ai-action-indicator {
             position: absolute;
             left: 50%;
-            bottom: -18px;
+            bottom: clamp(12px, 2.5vh, 22px);
+            width: min(calc(100% - 32px), 420px);
+            display: flex;
+            justify-content: center;
             transform: translateX(-50%);
             text-align: center;
             margin: 0;
             min-height: 24px;
             z-index: 8;
             pointer-events: none;
-            animation: fadeInUp 0.45s ease-out;
+            animation: aiActionFadeIn 0.45s ease-out;
+        }
+
+        @keyframes aiActionFadeIn {
+            from {
+                opacity: 0;
+                transform: translate(-50%, 12px);
+            }
+            to {
+                opacity: 1;
+                transform: translate(-50%, 0);
+            }
         }
         
         .ai-action-text {
             display: inline-block;
-            max-width: min(calc(100vw - 44px), 420px);
+            max-width: 100%;
             padding: 7px 14px;
             background: rgba(8, 15, 22, 0.82);
             border: 1px solid rgba(255, 215, 0, 0.32);
@@ -3369,7 +3383,7 @@
             flex: 1 1 auto;
             min-height: 420px;
             margin: 0;
-            overflow: visible;
+            overflow: hidden;
             padding: clamp(64px, 11vh, 96px) clamp(20px, 5vw, 42px) clamp(42px, 8vh, 64px);
             border: 10px solid #5a301c;
             border-radius: var(--radius);
@@ -3404,6 +3418,31 @@
             border-radius: var(--radius);
             background: rgba(5, 31, 22, 0.42);
             box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 12px 28px rgba(0, 0, 0, 0.24);
+        }
+
+        .opponent.seat-1 {
+            top: 17%;
+            left: 50%;
+        }
+
+        .opponent.seat-2 {
+            top: 40%;
+            left: 14%;
+        }
+
+        .opponent.seat-3 {
+            top: 40%;
+            left: 86%;
+        }
+
+        .opponent.seat-4 {
+            top: 70%;
+            left: 22%;
+        }
+
+        .opponent.seat-5 {
+            top: 70%;
+            left: 78%;
         }
 
         .opponent.active-turn,
@@ -3652,6 +3691,34 @@
             .opponent {
                 width: clamp(54px, 15vw, 64px);
                 padding: 5px;
+            }
+
+            .opponent.seat-1 {
+                top: 17%;
+            }
+
+            .opponent.seat-2 {
+                top: 38%;
+                left: 16%;
+            }
+
+            .opponent.seat-3 {
+                top: 38%;
+                left: 84%;
+            }
+
+            .opponent.seat-4 {
+                top: 72%;
+                left: 22%;
+            }
+
+            .opponent.seat-5 {
+                top: 72%;
+                left: 78%;
+            }
+
+            .ai-action-indicator {
+                bottom: 24px;
             }
 
             .your-section {
