@@ -13,9 +13,9 @@
     let dealerAnimation = null;
     let dealerAnimationToken = 0;
 
-    const DEALER_REVEAL_PAUSE_MS = 700;
-    const DEALER_HIT_PAUSE_MS = 1050;
-    const DEALER_SETTLE_PAUSE_MS = 750;
+    const DEALER_REVEAL_PAUSE_MS = 1400;
+    const DEALER_HIT_PAUSE_MS = 1900;
+    const DEALER_SETTLE_PAUSE_MS = 1300;
 
     const els = {
         actionControls: document.getElementById("actionControls"),
@@ -72,8 +72,8 @@
 
     function dealDelay(slotKey) {
         const ordered = initialDealOrder(slotKey);
-        if (ordered !== undefined) return ordered * 130;
-        const delay = fallbackDealIndex * 130;
+        if (ordered !== undefined) return ordered * 280;
+        const delay = fallbackDealIndex * 280;
         fallbackDealIndex += 1;
         return delay;
     }
