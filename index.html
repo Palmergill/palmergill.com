@@ -427,6 +427,21 @@
             transform: rotateY(0);
         }
 
+        .project-card.is-scroll-flipped .project-top,
+        .project-card.is-scroll-flipped .project-bottom {
+            opacity: 0;
+            transform: rotateY(180deg);
+        }
+
+        .project-card.is-scroll-flipped .project-screenshot {
+            opacity: 1;
+            transform: rotateY(0);
+        }
+
+        .project-card.is-scroll-flipped .project-screenshot img {
+            transform: scale(1.035);
+        }
+
         .project-number {
             color: rgba(247, 243, 234, 0.48);
             font-family: Georgia, "Times New Roman", serif;
@@ -656,6 +671,13 @@
                 height: 44px;
             }
 
+            .project-card.is-scroll-flipped,
+            .projects-grid.is-reveal-ready .project-card.is-visible.is-scroll-flipped {
+                border-color: color-mix(in srgb, var(--accent) 52%, rgba(255, 255, 255, 0.16));
+                box-shadow: var(--shadow);
+                transform: translateY(-4px);
+            }
+
         }
 
         @media (max-width: 520px) {
@@ -729,13 +751,16 @@
             .project-card:hover .project-top,
             .project-card:hover .project-bottom,
             .project-card:focus-visible .project-top,
-            .project-card:focus-visible .project-bottom {
+            .project-card:focus-visible .project-bottom,
+            .project-card.is-scroll-flipped .project-top,
+            .project-card.is-scroll-flipped .project-bottom {
                 opacity: 0;
                 transform: none;
             }
 
             .project-card:hover .project-screenshot,
-            .project-card:focus-visible .project-screenshot {
+            .project-card:focus-visible .project-screenshot,
+            .project-card.is-scroll-flipped .project-screenshot {
                 opacity: 1;
                 transform: none;
             }
@@ -970,6 +995,7 @@
         (() => {
             const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
             const revealTargets = [...document.querySelectorAll('.project-card')];
+            const mobileCardsQuery = window.matchMedia('(max-width: 899px) and (hover: none), (max-width: 899px) and (pointer: coarse)');
 
             if (revealTargets.length === 0 || reduceMotion) {
                 return;
@@ -1002,6 +1028,68 @@
             });
 
             revealTargets.forEach(target => observer.observe(target));
+
+            let activeScrollCard = null;
+            let scrollFlipFrame = null;
+
+            const clearScrollFlip = () => {
+                activeScrollCard?.classList.remove('is-scroll-flipped');
+                activeScrollCard = null;
+            };
+
+            const updateScrollFlip = () => {
+                scrollFlipFrame = null;
+
+                if (!mobileCardsQuery.matches) {
+                    clearScrollFlip();
+                    return;
+                }
+
+                const viewportCenter = window.innerHeight * 0.52;
+                const nextActiveCard = revealTargets.reduce((closestCard, card) => {
+                    const rect = card.getBoundingClientRect();
+                    const isInFlipRange = rect.top < viewportCenter && rect.bottom > viewportCenter;
+
+                    if (!isInFlipRange) {
+                        return closestCard;
+                    }
+
+                    if (!closestCard) {
+                        return card;
+                    }
+
+                    const currentDistance = Math.abs((rect.top + rect.bottom) / 2 - viewportCenter);
+                    const closestRect = closestCard.getBoundingClientRect();
+                    const closestDistance = Math.abs((closestRect.top + closestRect.bottom) / 2 - viewportCenter);
+
+                    return currentDistance < closestDistance ? card : closestCard;
+                }, null);
+
+                if (activeScrollCard === nextActiveCard) {
+                    return;
+                }
+
+                clearScrollFlip();
+                activeScrollCard = nextActiveCard;
+                activeScrollCard?.classList.add('is-scroll-flipped');
+            };
+
+            const queueScrollFlipUpdate = () => {
+                if (scrollFlipFrame !== null) {
+                    return;
+                }
+
+                scrollFlipFrame = window.requestAnimationFrame(updateScrollFlip);
+            };
+
+            updateScrollFlip();
+            window.addEventListener('scroll', queueScrollFlipUpdate, { passive: true });
+            window.addEventListener('resize', queueScrollFlipUpdate);
+            if (typeof mobileCardsQuery.addEventListener === 'function') {
+                mobileCardsQuery.addEventListener('change', queueScrollFlipUpdate);
+            } else if (typeof mobileCardsQuery.addListener === 'function') {
+                mobileCardsQuery.addListener(queueScrollFlipUpdate);
+            }
         })();
     </script>
 </body>
