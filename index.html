@@ -402,15 +402,15 @@
         .project-screenshot img {
             width: 100%;
             height: 100%;
-            object-fit: cover;
-            object-position: top center;
+            object-fit: contain;
+            object-position: center;
             filter: saturate(0.96) contrast(1.02);
             transition: transform 260ms ease;
         }
 
         .project-card:hover .project-screenshot img,
         .project-card:focus-visible .project-screenshot img {
-            transform: scale(1.035);
+            transform: none;
         }
 
         .project-card:hover .project-top,
@@ -439,7 +439,7 @@
         }
 
         .project-card.is-scroll-flipped .project-screenshot img {
-            transform: scale(1.035);
+            transform: none;
         }
 
         .project-number {
