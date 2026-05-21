@@ -37,7 +37,7 @@ const CSRFManager = {
     },
 
     // Fetch wrapper that automatically adds CSRF token for state-changing methods
-    async fetch(url, options = {}) {
+    async fetch(url, options = {}, timeoutMs = 10000) {
         const method = (options.method || 'GET').toUpperCase();
         const stateChangingMethods = ['POST', 'PUT', 'PATCH', 'DELETE'];
 
@@ -49,9 +49,16 @@ const CSRFManager = {
             };
         }
 
-        return fetch(url, options);
+        return fetchWithTimeout(url, options, timeoutMs);
     }
 };
+
+function fetchWithTimeout(url, options = {}, timeoutMs = 10000) {
+    const controller = new AbortController();
+    const id = setTimeout(() => controller.abort(), timeoutMs);
+    return fetch(url, { ...options, signal: controller.signal })
+        .finally(() => clearTimeout(id));
+}
 
 // Avatar Manager - Generates and manages player avatars
 const AvatarManager = {
@@ -1190,7 +1197,7 @@ function startLobbyPolling() {
         }
         
         try {
-            const response = await fetch(gameRequestUrl(`/games/${gameId}`, { process_ai: 'false' }));
+            const response = await fetchWithTimeout(gameRequestUrl(`/games/${gameId}`, { process_ai: 'false' }));
             if (response.ok) {
                 const data = await response.json();
                 updateLobbyPlayers(data.players);
@@ -1258,10 +1265,11 @@ async function joinMultiplayerGame() {
 
 async function startMultiplayerGame() {
     if (!gameId) return;
-    
+
     try {
-        const response = await CSRFManager.fetch(gameRequestUrl(`/games/${gameId}/start`), {
-            method: 'POST'
+        const response = await CSRFManager.fetch(`${API_BASE}/api/poker/games/${gameId}/start`, {
+            method: 'POST',
+            body: JSON.stringify({ player_id: playerId, player_token: playerToken })
         });
         
         if (!response.ok) {
@@ -1300,7 +1308,9 @@ function startPolling() {
         pollInFlight = true;
         
         try {
-            const response = await fetch(gameRequestUrl(`/games/${gameId}`, { process_ai: String(processAI) }));
+            const response = processAI
+                ? await fetchWithTimeout(gameRequestUrl(`/games/${gameId}/process-ai`), { method: 'POST' })
+                : await fetchWithTimeout(gameRequestUrl(`/games/${gameId}`, { process_ai: 'false' }));
             if (!response.ok) {
                 if (response.status === 404) {
                     stopPolling();
@@ -1459,8 +1469,9 @@ async function nextHand() {
         elements.btnNextHand.disabled = true;
         showLoading('Dealing next hand...');
 
-        const response = await CSRFManager.fetch(gameRequestUrl(`/games/${gameId}/next-hand`), {
-            method: 'POST'
+        const response = await CSRFManager.fetch(`${API_BASE}/api/poker/games/${gameId}/next-hand`, {
+            method: 'POST',
+            body: JSON.stringify({ player_id: playerId, player_token: playerToken })
         });
 
         if (!response.ok) {
@@ -1900,10 +1911,15 @@ function updateActionButtons() {
     
     if (toCall === 0) {
         elements.btnCall.textContent = 'Check';
+        elements.btnCall.setAttribute('aria-label', 'Check (C)');
     } else {
         const callAmount = Math.min(toCall, myPlayer.chips);
-        elements.btnCall.textContent = myPlayer.chips <= toCall ? 'All In' : `Call ${callAmount}`;
+        const label = myPlayer.chips <= toCall ? 'All In' : `Call ${callAmount}`;
+        elements.btnCall.textContent = label;
+        elements.btnCall.setAttribute('aria-label', `${label} (C)`);
     }
+    elements.btnFold.setAttribute('aria-label', 'Fold (F)');
+    elements.btnRaise.setAttribute('aria-label', 'Raise (R)');
     
     // Hide raise button if can't afford min raise
     const minRaise = gameState.min_raise || 20;
@@ -2199,3 +2215,37 @@ function triggerHapticFeedback() {
         }
     }
 }
+
+// Keyboard shortcuts for poker actions
+// F = fold, C = check/call, R = raise (open controls or confirm), Escape = cancel raise
+document.addEventListener('keydown', (event) => {
+    if (event.target.tagName === 'INPUT' || event.target.tagName === 'TEXTAREA' || event.target.tagName === 'SELECT') return;
+    if (!gameId || !playerId) return;
+
+    const raiseOpen = elements.raiseContainer && !elements.raiseContainer.classList.contains('hidden');
+
+    switch (event.key.toLowerCase()) {
+        case 'f':
+            if (isMyTurn) playerAction('fold');
+            break;
+        case 'c':
+            if (isMyTurn && !raiseOpen) {
+                const myPlayer = gameState?.players?.find(p => p.id === playerId);
+                const toCall = (gameState?.current_bet || 0) - (myPlayer?.bet || 0);
+                playerAction(toCall > 0 ? 'call' : 'check');
+            }
+            break;
+        case 'r':
+            if (isMyTurn) {
+                if (raiseOpen) {
+                    confirmRaise();
+                } else {
+                    showRaiseControls();
+                }
+            }
+            break;
+        case 'escape':
+            if (raiseOpen) hideRaiseControls();
+            break;
+    }
+});

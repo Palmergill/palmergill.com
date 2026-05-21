@@ -1,4 +1,6 @@
+import asyncio
 import base64
+import logging
 import secrets
 
 from fastapi import FastAPI, Request
@@ -9,6 +11,20 @@ from app.database_migration import init_db_with_migration
 from app.log_handler import install_db_logging
 from app.routers import admin, bitcoin, stocks, poker
 import os
+
+logger = logging.getLogger(__name__)
+
+
+async def _periodic_game_cleanup(interval: int = 300) -> None:
+    """Prune stale poker games every `interval` seconds."""
+    while True:
+        await asyncio.sleep(interval)
+        try:
+            removed = poker.cleanup_old_games()
+            if removed:
+                logger.info("Cleaned up %d stale poker game(s)", removed)
+        except Exception:
+            logger.exception("Error during periodic game cleanup")
 
 app = FastAPI(title="Palmer Gill API", version="0.2.0-p5")
 
@@ -116,8 +132,8 @@ else:
 @app.on_event("startup")
 async def startup():
     init_db_with_migration()
-    # Persist log records to the DB so the admin page can query them
     install_db_logging()
+    asyncio.create_task(_periodic_game_cleanup())
 
 app.include_router(stocks.router)
 app.include_router(poker.router)

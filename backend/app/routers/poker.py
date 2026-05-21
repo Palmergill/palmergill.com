@@ -2,10 +2,11 @@
 Poker Game API Router - Simplified for debugging
 """
 from fastapi import APIRouter, HTTPException, Request
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from typing import Optional, Dict, List
 import uuid
-import asyncio
+import os
 import secrets
 import time
 from collections import defaultdict
@@ -19,14 +20,32 @@ router = APIRouter(prefix="/api/poker", tags=["poker"])
 games: Dict[str, PokerGame] = {}
 ai_managers: Dict[str, Optional[AIManager]] = {}
 game_last_accessed: Dict[str, float] = {}
+ai_last_processed: Dict[str, float] = {}
 player_tokens: Dict[str, Dict[str, str]] = {}
 
 GAME_MAX_AGE_SECONDS = 3600
+AI_TURN_MIN_INTERVAL_SECONDS = 1.5
 
 # Simple sliding-window rate limiter: max 60 requests per minute per IP
 _RATE_LIMIT_WINDOW = 60
 _RATE_LIMIT_MAX = 60
+_TRUST_PROXY_HEADERS = os.getenv("TRUST_PROXY_HEADERS", "true").strip().lower() in {"1", "true", "yes", "on"}
 _rate_limit_store: Dict[str, List[float]] = defaultdict(list)
+
+def _client_ip(request: Request) -> str:
+    if _TRUST_PROXY_HEADERS:
+        forwarded_for = request.headers.get("x-forwarded-for")
+        if forwarded_for:
+            first_ip = forwarded_for.split(",", 1)[0].strip()
+            if first_ip:
+                return first_ip
+
+        for header in ("cf-connecting-ip", "x-real-ip"):
+            value = request.headers.get(header)
+            if value:
+                return value.strip()
+
+    return request.client.host if request.client else "unknown"
 
 def _check_rate_limit(client_ip: str) -> bool:
     now = time.time()
@@ -39,8 +58,7 @@ def _check_rate_limit(client_ip: str) -> bool:
     return True
 
 def _require_rate_limit(request: Request) -> None:
-    client_ip = request.client.host if request.client else "unknown"
-    if not _check_rate_limit(client_ip):
+    if not _check_rate_limit(_client_ip(request)):
         raise HTTPException(status_code=429, detail="Too many requests")
 
 def cleanup_old_games():
@@ -53,6 +71,7 @@ def cleanup_old_games():
     for game_id in games_to_remove:
         games.pop(game_id, None)
         ai_managers.pop(game_id, None)
+        ai_last_processed.pop(game_id, None)
         game_last_accessed.pop(game_id, None)
         player_tokens.pop(game_id, None)
     return len(games_to_remove)
@@ -81,6 +100,29 @@ def require_player_token(game_id: str, player_id: str, player_token: Optional[st
         raise HTTPException(status_code=403, detail="Invalid player token")
 
 
+def process_ai_turn_if_needed(game_id: str, game: PokerGame) -> None:
+    """Advance one AI turn for single-player games when the current actor is a bot."""
+    is_single_player = getattr(game, 'game_type', 'single') == 'single'
+    if not is_single_player or game.phase in ('showdown', 'waiting'):
+        return
+
+    active = [p for p in game.players if not p.folded and not p.is_all_in]
+    if len(active) <= 1:
+        game._advance_phase()
+        return
+
+    current = game.get_current_player()
+    if current and not current.is_human:
+        now = time.time()
+        if now - ai_last_processed.get(game_id, 0) < AI_TURN_MIN_INTERVAL_SECONDS:
+            return
+
+        ai_manager = ai_managers.get(game_id)
+        if ai_manager:
+            ai_manager.process_bot_turn()
+            ai_last_processed[game_id] = now
+
+
 class CreateGameRequest(BaseModel):
     player_name: str = Field("Player", max_length=48)
     game_type: str = "single"
@@ -100,6 +142,25 @@ class BuyBackRequest(BaseModel):
     player_id: str
     player_token: str
     amount: int = 1000
+
+class PlayerAuthRequest(BaseModel):
+    player_id: str
+    player_token: str
+
+@router.get("/csrf-token")
+async def get_csrf_token():
+    """Set a CSRF cookie for the frontend double-submit pattern."""
+    token = secrets.token_urlsafe(32)
+    response = JSONResponse({"ok": True})
+    response.set_cookie(
+        key="csrf_token",
+        value=token,
+        httponly=False,  # JS must be able to read it
+        samesite="strict",
+        secure=True,
+        max_age=3600,
+    )
+    return response
 
 @router.post("/games")
 async def create_game(http_request: Request, request: CreateGameRequest):
@@ -189,13 +250,14 @@ async def join_game(http_request: Request, request: JoinGameRequest):
     }
 
 @router.post("/games/{game_id}/start")
-async def start_multiplayer_game(game_id: str, player_id: str, player_token: str):
+async def start_multiplayer_game(game_id: str, http_request: Request, request: PlayerAuthRequest):
     """Start a multiplayer game (host only)"""
+    _require_rate_limit(http_request)
     if game_id not in games:
         raise HTTPException(status_code=404, detail="Game not found")
 
     game = games[game_id]
-    require_player_token(game_id, player_id, player_token)
+    require_player_token(game_id, request.player_id, request.player_token)
 
     if getattr(game, 'game_type', 'single') != "multiplayer":
         raise HTTPException(status_code=400, detail="Not a multiplayer game")
@@ -203,14 +265,14 @@ async def start_multiplayer_game(game_id: str, player_id: str, player_token: str
     if len(game.players) < 2:
         raise HTTPException(status_code=400, detail="Need at least 2 players")
 
-    if game.players[0].id != player_id:
+    if game.players[0].id != request.player_id:
         raise HTTPException(status_code=403, detail="Only host can start")
 
     game.waiting_for_players = False
     game.start_hand()
     update_game_access(game_id)
 
-    return game.to_dict(for_player=player_id)
+    return game.to_dict(for_player=request.player_id)
 
 @router.get("/games/{game_id}")
 async def get_game_state(game_id: str, player_id: str, player_token: str, process_ai: bool = True):
@@ -222,19 +284,23 @@ async def get_game_state(game_id: str, player_id: str, player_token: str, proces
     require_player_token(game_id, player_id, player_token)
     update_game_access(game_id)
 
-    # Process AI turns for single player
-    is_single_player = getattr(game, 'game_type', 'single') == 'single'
-    if process_ai and is_single_player and game.phase not in ('showdown', 'waiting'):
-        active = [p for p in game.players if not p.folded and not p.is_all_in]
-        if len(active) <= 1:
-            game._advance_phase()
-        else:
-            current = game.get_current_player()
-            if current and not current.is_human:
-                ai_manager = ai_managers.get(game_id)
-                if ai_manager:
-                    ai_manager.process_bot_turn()
-                    await asyncio.sleep(1.5)
+    # The process_ai query parameter is retained for old clients, but GET is
+    # intentionally read-only. Use POST /process-ai to advance a bot turn.
+
+    return game.to_dict(for_player=player_id)
+
+
+@router.post("/games/{game_id}/process-ai")
+async def process_ai_turn(game_id: str, http_request: Request, player_id: str, player_token: str):
+    """Advance at most one AI turn for a single-player game."""
+    _require_rate_limit(http_request)
+    if game_id not in games:
+        raise HTTPException(status_code=404, detail="Game not found")
+
+    game = games[game_id]
+    require_player_token(game_id, player_id, player_token)
+    update_game_access(game_id)
+    process_ai_turn_if_needed(game_id, game)
 
     return game.to_dict(for_player=player_id)
 
@@ -296,13 +362,13 @@ async def buy_back(game_id: str, request: BuyBackRequest):
     return game.to_dict(for_player=request.player_id)
 
 @router.post("/games/{game_id}/next-hand")
-async def next_hand(game_id: str, player_id: str, player_token: str):
+async def next_hand(game_id: str, request: PlayerAuthRequest):
     """Start next hand"""
     if game_id not in games:
         raise HTTPException(status_code=404, detail="Game not found")
 
     game = games[game_id]
-    require_player_token(game_id, player_id, player_token)
+    require_player_token(game_id, request.player_id, request.player_token)
 
     if game.phase not in ('showdown', 'waiting'):
         raise HTTPException(status_code=400, detail="Hand still in progress")
@@ -310,7 +376,7 @@ async def next_hand(game_id: str, player_id: str, player_token: str):
     game.dealer_index = (game.dealer_index + 1) % len(game.players)
     game.start_hand()
 
-    return game.to_dict(for_player=player_id)
+    return game.to_dict(for_player=request.player_id)
 
 @router.get("/health")
 async def health_check():
