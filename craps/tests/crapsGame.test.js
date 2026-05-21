@@ -9,10 +9,15 @@ const { JSDOM } = require('jsdom');
 
 function loadGame() {
   const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
-  return new JSDOM(html, {
+  const dom = new JSDOM(html, {
     runScripts: 'dangerously',
     url: 'http://localhost/craps/',
-  }).window;
+  });
+  const rulesScript = fs.readFileSync(path.join(__dirname, '..', 'crapsRules.js'), 'utf8');
+  const appScript = fs.readFileSync(path.join(__dirname, '..', 'app.js'), 'utf8');
+  dom.window.eval(rulesScript);
+  dom.window.eval(appScript);
+  return dom.window;
 }
 
 function readState(window) {
