@@ -1,5 +1,6 @@
 // Poker App Service Worker - Basic caching strategy
 const CACHE_NAME = 'poker-app-v14';
+const CACHE_PREFIX = 'poker-app-';
 const STATIC_ASSETS = [
     '/poker/',
     '/poker/index.html',
@@ -19,6 +20,7 @@ self.addEventListener('install', (event) => {
             })
             .catch((err) => {
                 console.error('[SW] Failed to cache assets:', err);
+                throw err;
             })
     );
 
@@ -35,7 +37,7 @@ self.addEventListener('activate', (event) => {
             .then((cacheNames) => {
                 return Promise.all(
                     cacheNames
-                        .filter((name) => name !== CACHE_NAME)
+                        .filter((name) => name.startsWith(CACHE_PREFIX) && name !== CACHE_NAME)
                         .map((name) => {
                             console.log('[SW] Deleting old cache:', name);
                             return caches.delete(name);

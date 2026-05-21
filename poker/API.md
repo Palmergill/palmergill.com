@@ -80,10 +80,10 @@ Starts a multiplayer game. Only the first player in the lobby can start it, and 
 ### Get Game State
 
 ```http
-GET /api/poker/games/{game_id}?player_id={player_id}&player_token={player_token}&process_ai=true
+GET /api/poker/games/{game_id}?player_id={player_id}&player_token={player_token}
 ```
 
-Returns the current game state for the requesting player. Cards are only visible to the requesting player until showdown.
+Returns the current game state for the requesting player. Cards are only visible to the requesting player until showdown. This endpoint is read-only; it does not advance AI turns.
 
 Query parameters:
 
@@ -91,7 +91,14 @@ Query parameters:
 | --- | --- | --- | --- |
 | `player_id` | string | Yes | Player identifier returned by create/join. |
 | `player_token` | string | Yes | Player token returned by create/join. |
-| `process_ai` | boolean | No | Defaults to `true`; the frontend passes `false` in multiplayer/lobby polling. |
+
+### Process AI Turn
+
+```http
+POST /api/poker/games/{game_id}/process-ai?player_id={player_id}&player_token={player_token}
+```
+
+Advances at most one AI bot turn for a single-player game and returns the updated game state. Multiplayer games and human turns are returned unchanged.
 
 ### Player Action
 
