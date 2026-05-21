@@ -22,20 +22,20 @@ function formatNumber(value, decimals = 2) {
 }
 
 // Store previous values for flash animation
-window.previousValues = {};
+const previousValues = {};
 
 // Helper to update value with flash animation
 function updateValueWithFlash(elementId, newValue, formatter = (v) => v) {
     const element = document.getElementById(elementId);
     if (!element) return;
     
-    const oldValue = window.previousValues[elementId];
+    const oldValue = previousValues[elementId];
     const formattedNew = formatter(newValue);
     
     // Skip if first load or no change
     if (oldValue === undefined || oldValue === formattedNew) {
         element.textContent = formattedNew;
-        window.previousValues[elementId] = formattedNew;
+        previousValues[elementId] = formattedNew;
         return;
     }
     
@@ -55,7 +55,7 @@ function updateValueWithFlash(elementId, newValue, formatter = (v) => v) {
     }
     
     element.textContent = formattedNew;
-    window.previousValues[elementId] = formattedNew;
+    previousValues[elementId] = formattedNew;
     
     // Remove animation class after animation completes
     setTimeout(() => {
@@ -342,15 +342,14 @@ document.addEventListener('DOMContentLoaded', () => {
     
     initTrendingStocks();
 
-    if (!searchForm) {
-        console.error('Search form not found');
-        return;
-    }
-
     // Autocomplete functionality
     let searchTimeout = null;
     let selectedSuggestionIndex = -1;
     let currentSuggestions = [];
+    let currentRetryInterval = null;
+    let lastChartData = null;
+    let lastPriceHistory = null;
+    let sharesOutstanding = 1;
 
     async function fetchSuggestions(query) {
         if (!query || query.length < 1) {
@@ -500,18 +499,18 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById(tabId).classList.add('active');
         
         // Redraw charts in the active tab (they might not render properly when hidden)
-        if (window.lastChartData) {
+        if (lastChartData) {
             setTimeout(() => {
-                const chartData = window.lastChartData;
+                const chartData = lastChartData;
                 if (tabId === 'overview') {
-                    drawPriceChart(window.lastPriceHistory || chartData);
+                    drawPriceChart(lastPriceHistory || chartData);
                     drawEPSChart(chartData);
                 } else if (tabId === 'fundamentals') {
-                    drawPriceChart(window.lastPriceHistory || chartData);
+                    drawPriceChart(lastPriceHistory || chartData);
                     drawEPSChart(chartData);
                     drawRevenueChart(chartData);
                     drawFCFChart(chartData);
-                    drawPEChart(chartData, window.lastPriceHistory);
+                    drawPEChart(chartData, lastPriceHistory);
                 }
             }, 10);
         }
@@ -723,9 +722,9 @@ document.addEventListener('DOMContentLoaded', () => {
     // Retry handler
     retryBtn.addEventListener('click', () => {
         // Clear any running countdown
-        if (window.currentRetryInterval) {
-            clearInterval(window.currentRetryInterval);
-            window.currentRetryInterval = null;
+        if (currentRetryInterval) {
+            clearInterval(currentRetryInterval);
+            currentRetryInterval = null;
         }
         const retryCountdown = document.getElementById('retryCountdown');
         if (retryCountdown) retryCountdown.classList.add('hidden');
@@ -811,6 +810,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function loadStock(ticker, forceRefresh = false, attempt = 1) {
         currentTicker = ticker;
+        if (attempt === 1) {
+            lastChartData = null;
+            lastPriceHistory = null;
+            sharesOutstanding = 1;
+        }
         
         // Show loading
         loading.classList.remove('hidden');
@@ -910,7 +914,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     }, 1000);
                     
                     // Store interval ID so it can be cleared if user clicks retry manually
-                    window.currentRetryInterval = countdownInterval;
+                    currentRetryInterval = countdownInterval;
                 }
             } else {
                 // Show final attempt message
@@ -994,8 +998,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (headerStockPrice && summary.current_price) {
             headerStockPrice.textContent = '$' + summary.current_price.toFixed(2);
         }
-        if (headerStockChange && window.lastPriceHistory && window.lastPriceHistory.length >= 2) {
-            const prices = window.lastPriceHistory.map(d => d.close || d.price).filter(v => v != null);
+        if (headerStockChange && lastPriceHistory && lastPriceHistory.length >= 2) {
+            const prices = lastPriceHistory.map(d => d.close || d.price).filter(v => v != null);
             if (prices.length >= 2) {
                 const currentPrice = prices[prices.length - 1];
                 const priorClose = prices[prices.length - 2];
@@ -1137,8 +1141,8 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // Draw charts (reverse data for chronological order)
         const chartData = [...data.earnings].reverse();
-        window.lastChartData = chartData;  // Store for tab switching
-        window.sharesOutstanding = summary.shares_outstanding; // Store for total earnings calc
+        lastChartData = chartData;  // Store for tab switching
+        sharesOutstanding = summary.shares_outstanding || 1; // Store for total earnings calc
         
         // Get active tab safely
         const activeTabEl = document.querySelector('.tab-content.active');
@@ -1147,18 +1151,14 @@ document.addEventListener('DOMContentLoaded', () => {
         console.log(`Drawing charts for active tab: ${activeTab}`);
         
         // Always draw charts for Overview on load
-        // For now, use earnings data for price chart (will be updated when price history loads)
-        drawPriceChart(chartData);
+        drawPriceChart(lastPriceHistory || chartData);
         drawEPSChart(chartData);
-        
-        // Fetch price history separately to avoid rate limits
-        fetchPriceHistory(data.ticker);
         
         // Draw other charts if their tab is active
         if (activeTab === 'fundamentals') {
             drawRevenueChart(chartData);
             drawFCFChart(chartData);
-            drawPEChart(chartData, window.lastPriceHistory);
+            drawPEChart(chartData, lastPriceHistory);
         }
         
         // Trigger card entrance animations
@@ -1209,9 +1209,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }, 100);
 
-    // Store price history for P/E calculation
-    window.lastPriceHistory = null;
-    
     // Fetch price history separately to avoid rate limits
     async function fetchPriceHistory(ticker) {
         try {
@@ -1226,12 +1223,12 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = await response.json();
             if (data.prices && data.prices.length > 0) {
                 console.log(`Received ${data.prices.length} price points`);
-                window.lastPriceHistory = data.prices;
+                lastPriceHistory = data.prices;
                 // Redraw price chart with real historical data
                 drawPriceChart(data.prices);
                 // Also redraw P/E chart if we have earnings data
-                if (window.lastChartData) {
-                    const chartData = window.lastChartData;
+                if (lastChartData) {
+                    const chartData = lastChartData;
                     drawPEChart(chartData, data.prices);
                 }
             }
@@ -1263,7 +1260,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let originalOrientation = null;
 
     function openChartModal() {
-        if (!window.lastPriceHistory && !window.lastChartData) return;
+        if (!lastPriceHistory && !lastChartData) return;
         
         // Use bottom sheet on mobile
         const isMobile = window.innerWidth <= 768;
@@ -1293,7 +1290,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // Draw full screen chart with more detail
         setTimeout(() => {
-            drawFullScreenPriceChart(window.lastPriceHistory || window.lastChartData);
+            drawFullScreenPriceChart(lastPriceHistory || lastChartData);
         }, 10);
     }
 
@@ -1325,7 +1322,6 @@ function drawEPSChart(data) {
     const chartData = data.slice(-8);
     
     // Get shares outstanding for total earnings calculation
-    const sharesOutstanding = window.sharesOutstanding || 1;
     console.log('Drawing EPS chart, sharesOutstanding:', sharesOutstanding, 'sample EPS:', chartData[0]?.reported_eps);
     
     // Convert EPS to total earnings (in billions) and FCF to billions
