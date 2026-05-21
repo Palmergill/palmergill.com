@@ -7,7 +7,6 @@ const PUBLIC_PREFIXES = [
 ];
 
 const PROTECTED_PREFIXES = [
-  '/docs',
   '/stock-research',
   '/bitcoin-chat',
   '/admin',
@@ -104,8 +103,6 @@ export default function middleware(request) {
 
 export const config = {
   matcher: [
-    '/docs',
-    '/docs/:path*',
     '/stock-research/:path*',
     '/bitcoin-chat/:path*',
     '/admin/:path*',

@@ -19,13 +19,12 @@ Production static hosting should serve those files directly. `vercel.json` rewri
 
 Vercel middleware keeps `/` public and requires Basic Auth for:
 
-- `/docs` and `/docs/*`
 - `/stock-research/*`
 - `/bitcoin-chat/*`
 - `/admin/*`
 - `/api/*`, except `/api/poker/*`
 
-`/poker/*`, `/craps/*`, `/blackjack/*`, and `/api/poker/*` are public.
+`/docs/*`, `/poker/*`, `/craps/*`, `/blackjack/*`, and `/api/poker/*` are public.
 
 Configure these environment variables in Vercel:
 

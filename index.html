@@ -362,11 +362,6 @@
             outline: none;
         }
 
-        .project-card.featured {
-            grid-column: span 8;
-            min-height: 460px;
-        }
-
         .project-top,
         .project-bottom {
             position: relative;
@@ -476,20 +471,11 @@
             letter-spacing: 0;
         }
 
-        .featured .project-title {
-            max-width: 12ch;
-            font-size: clamp(3rem, 5vw, 5.2rem);
-        }
-
         .project-description {
             max-width: 620px;
             margin-top: 20px;
             color: var(--muted);
             font-size: 0.98rem;
-        }
-
-        .featured .project-description {
-            font-size: 1.08rem;
         }
 
         .project-tags {
@@ -610,14 +596,9 @@
         }
 
         @media (max-width: 1050px) {
-            .project-card,
-            .project-card.featured {
+            .project-card {
                 grid-column: span 6;
                 min-height: 390px;
-            }
-
-            .featured .project-title {
-                font-size: clamp(2.5rem, 7vw, 4.2rem);
             }
         }
 
@@ -813,7 +794,7 @@
                 </div>
 
                 <div class="projects-grid">
-                    <a href="/stock-research/" class="project-card featured" data-theme="stock">
+                    <a href="/stock-research/" class="project-card" data-theme="stock">
                         <div class="project-top">
                             <span class="project-number">01</span>
                             <span class="project-icon" aria-hidden="true">
@@ -840,9 +821,59 @@
                         </div>
                     </a>
 
-                    <a href="/poker/" class="project-card" data-theme="poker">
+                    <a href="/bitcoin-chat/" class="project-card" data-theme="bitcoin">
                         <div class="project-top">
                             <span class="project-number">02</span>
+                            <span class="project-icon" aria-hidden="true">
+                                <svg viewBox="0 0 64 64" fill="none">
+                                    <circle cx="32" cy="32" r="22" stroke="currentColor" stroke-width="4"/>
+                                    <path d="M27 16v32M36 16v32M23 24h14c5 0 8 2 8 6s-3 6-8 6H23m0 0h16c5 0 8 2 8 6s-3 6-8 6H23" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+                                </svg>
+                            </span>
+                        </div>
+                        <figure class="project-screenshot">
+                            <img src="/assets/project-screenshots/bitcoin-chat.png" alt="Bitcoin Chat app screenshot" loading="lazy" decoding="async">
+                        </figure>
+                        <div class="project-bottom">
+                            <h3 class="project-title">Bitcoin Chat</h3>
+                            <p class="project-description">A plain-English interface for exploring blocks, transactions, mempool fees, node status, and read-only blockchain data.</p>
+                            <div class="project-tags">
+                                <span class="tag">FastAPI</span>
+                                <span class="tag">Bitcoin Core</span>
+                                <span class="tag">Chat UI</span>
+                            </div>
+                            <span class="project-link">Open project <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+                        </div>
+                    </a>
+
+                    <a href="/docs/" class="project-card" data-theme="docs">
+                        <div class="project-top">
+                            <span class="project-number">03</span>
+                            <span class="project-icon" aria-hidden="true">
+                                <svg viewBox="0 0 64 64" fill="none">
+                                    <path d="M17 10h20l10 10v34H17V10Z" stroke="currentColor" stroke-width="4" stroke-linejoin="round"/>
+                                    <path d="M37 10v12h10M24 31h16M24 39h16M24 47h10" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+                                </svg>
+                            </span>
+                        </div>
+                        <figure class="project-screenshot">
+                            <img src="/assets/project-screenshots/docs.png" alt="Site Documentation screenshot" loading="lazy" decoding="async">
+                        </figure>
+                        <div class="project-bottom">
+                            <h3 class="project-title">Site Documentation</h3>
+                            <p class="project-description">A compact reference for website paths, backend routes, local development, deployment, authentication, providers, and tests.</p>
+                            <div class="project-tags">
+                                <span class="tag">Docs</span>
+                                <span class="tag">Static HTML</span>
+                                <span class="tag">Reference</span>
+                            </div>
+                            <span class="project-link">Open project <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+                        </div>
+                    </a>
+
+                    <a href="/poker/" class="project-card" data-theme="poker">
+                        <div class="project-top">
+                            <span class="project-number">04</span>
                             <span class="project-icon" aria-hidden="true">
                                 <svg viewBox="0 0 64 64" fill="none">
                                     <path d="M32 8c11 10 18 17 18 28 0 7-5 12-12 12-3 0-5-1-6-3-1 2-3 3-6 3-7 0-12-5-12-12 0-11 7-18 18-28Z" stroke="currentColor" stroke-width="4" stroke-linejoin="round"/>
@@ -867,7 +898,7 @@
 
                     <a href="/craps/" class="project-card" data-theme="craps">
                         <div class="project-top">
-                            <span class="project-number">03</span>
+                            <span class="project-number">05</span>
                             <span class="project-icon" aria-hidden="true">
                                 <svg viewBox="0 0 64 64" fill="none">
                                     <rect x="10" y="14" width="22" height="22" rx="5" stroke="currentColor" stroke-width="4"/>
@@ -893,7 +924,7 @@
 
                     <a href="/blackjack/" class="project-card" data-theme="blackjack">
                         <div class="project-top">
-                            <span class="project-number">04</span>
+                            <span class="project-number">06</span>
                             <span class="project-icon" aria-hidden="true">
                                 <svg viewBox="0 0 64 64" fill="none">
                                     <rect x="14" y="10" width="24" height="36" rx="4" stroke="currentColor" stroke-width="4" transform="rotate(-8 14 10)"/>
@@ -912,56 +943,6 @@
                                 <span class="tag">Vanilla JS</span>
                                 <span class="tag">Vegas Rules</span>
                                 <span class="tag">Card Game</span>
-                            </div>
-                            <span class="project-link">Open project <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
-                        </div>
-                    </a>
-
-                    <a href="/bitcoin-chat/" class="project-card" data-theme="bitcoin">
-                        <div class="project-top">
-                            <span class="project-number">05</span>
-                            <span class="project-icon" aria-hidden="true">
-                                <svg viewBox="0 0 64 64" fill="none">
-                                    <circle cx="32" cy="32" r="22" stroke="currentColor" stroke-width="4"/>
-                                    <path d="M27 16v32M36 16v32M23 24h14c5 0 8 2 8 6s-3 6-8 6H23m0 0h16c5 0 8 2 8 6s-3 6-8 6H23" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
-                                </svg>
-                            </span>
-                        </div>
-                        <figure class="project-screenshot">
-                            <img src="/assets/project-screenshots/bitcoin-chat.png" alt="Bitcoin Chat app screenshot" loading="lazy" decoding="async">
-                        </figure>
-                        <div class="project-bottom">
-                            <h3 class="project-title">Bitcoin Chat</h3>
-                            <p class="project-description">A plain-English interface for exploring blocks, transactions, mempool fees, node status, and read-only blockchain data.</p>
-                            <div class="project-tags">
-                                <span class="tag">FastAPI</span>
-                                <span class="tag">Bitcoin Core</span>
-                                <span class="tag">Chat UI</span>
-                            </div>
-                            <span class="project-link">Open project <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
-                        </div>
-                    </a>
-
-                    <a href="/docs/" class="project-card" data-theme="docs">
-                        <div class="project-top">
-                            <span class="project-number">06</span>
-                            <span class="project-icon" aria-hidden="true">
-                                <svg viewBox="0 0 64 64" fill="none">
-                                    <path d="M17 10h20l10 10v34H17V10Z" stroke="currentColor" stroke-width="4" stroke-linejoin="round"/>
-                                    <path d="M37 10v12h10M24 31h16M24 39h16M24 47h10" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
-                                </svg>
-                            </span>
-                        </div>
-                        <figure class="project-screenshot">
-                            <img src="/assets/project-screenshots/docs.png" alt="Site Documentation screenshot" loading="lazy" decoding="async">
-                        </figure>
-                        <div class="project-bottom">
-                            <h3 class="project-title">Site Documentation</h3>
-                            <p class="project-description">A compact reference for website paths, backend routes, local development, deployment, authentication, providers, and tests.</p>
-                            <div class="project-tags">
-                                <span class="tag">Docs</span>
-                                <span class="tag">Static HTML</span>
-                                <span class="tag">Reference</span>
                             </div>
                             <span class="project-link">Open project <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
                         </div>

@@ -6,7 +6,7 @@ Personal project site plus shared API backend.
 
 - `/` - project index
 - `/about/` - professional background and selected project context
-- `/docs/` - protected website documentation
+- `/docs/` - website documentation
 - `/stock-research/` - polished stock research app
 - `/poker/` - Texas Hold'em poker app
 - `/craps/` - craps app
@@ -54,7 +54,7 @@ logs/backend.log
 - Static site: hosted from the repo root and project folders.
 - API service: Railway/FastAPI from `backend/`.
 - Vercel rewrites `/api/*` to the Railway backend in production.
-- The root page `/`, `/poker/`, `/craps/`, `/blackjack/`, and `/api/poker/*` stay public. Stock research, Bitcoin chat, admin, and other `/api/*` routes require Basic Auth; protected routes return `503` if `APP_AUTH_PASSWORD` is missing. Set the same `APP_AUTH_USERNAME` and `APP_AUTH_PASSWORD` values in Vercel and Railway.
+- The root page `/`, `/docs/`, `/poker/`, `/craps/`, `/blackjack/`, and `/api/poker/*` stay public. Stock research, Bitcoin chat, admin, and other `/api/*` routes require Basic Auth; protected routes return `503` if `APP_AUTH_PASSWORD` is missing. Set the same `APP_AUTH_USERNAME` and `APP_AUTH_PASSWORD` values in Vercel and Railway.
 
 ## Repository Layout
 
@@ -63,7 +63,7 @@ backend/          FastAPI API service
 admin/            Protected admin/log dashboard
 shared/           Shared static navigation assets
 about/            About page
-docs/             Protected website docs and provider/setup markdown docs
+docs/             Website docs and provider/setup markdown docs
 stock-research/   Active stock research frontend
 poker/            Active poker frontend and supporting docs/tests
 craps/            Active craps frontend
