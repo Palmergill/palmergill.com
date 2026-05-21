@@ -111,7 +111,7 @@
                             <tr>
                                 <td><code>/stock-research/</code></td>
                                 <td>Stock research app for market data, fundamentals, and charts.</td>
-                                <td>Protected</td>
+                                <td>Public demo, authenticated live data</td>
                             </tr>
                             <tr>
                                 <td><code>/poker/</code></td>
@@ -131,7 +131,7 @@
                             <tr>
                                 <td><code>/bitcoin-chat/</code></td>
                                 <td>Natural-language Bitcoin node explorer and chat interface.</td>
-                                <td>Protected</td>
+                                <td>Public demo, authenticated live data</td>
                             </tr>
                             <tr>
                                 <td><code>/admin/</code></td>
@@ -217,6 +217,8 @@
                     App authentication uses HTTP Basic Auth. If <code>APP_AUTH_PASSWORD</code> is missing in production,
                     protected routes return <code>503</code> instead of accidentally publishing private tools.
                     Vercel middleware skips that fail-closed behavior outside Vercel so local static development is not blocked.
+                    Stock and Bitcoin routes allow unauthenticated demo access, while valid Basic Auth credentials unlock
+                    live provider-backed data.
                 </p>
                 <div class="split-grid">
                     <div class="panel">
@@ -224,19 +226,23 @@
                         <ul>
                             <li><code>/</code></li>
                             <li><code>/docs/*</code></li>
+                            <li><code>/stock-research/*</code> demo mode</li>
+                            <li><code>/bitcoin-chat/*</code> demo mode</li>
                             <li><code>/poker/*</code></li>
                             <li><code>/craps/*</code></li>
                             <li><code>/blackjack/*</code></li>
                             <li><code>/api/poker/*</code></li>
+                            <li><code>/api/stocks/*</code> demo mode without credentials</li>
+                            <li><code>/api/bitcoin/*</code> demo mode without credentials</li>
                         </ul>
                     </div>
                     <div class="panel">
                         <h3>Protected</h3>
                         <ul>
-                            <li><code>/stock-research/*</code></li>
-                            <li><code>/bitcoin-chat/*</code></li>
+                            <li>Live <code>/api/stocks/*</code> with valid Basic Auth credentials</li>
+                            <li>Live <code>/api/bitcoin/*</code> with valid Basic Auth credentials</li>
                             <li><code>/admin/*</code></li>
-                            <li><code>/api/*</code> except <code>/api/poker/*</code></li>
+                            <li><code>/api/*</code> except public demo and poker routes</li>
                         </ul>
                     </div>
                 </div>

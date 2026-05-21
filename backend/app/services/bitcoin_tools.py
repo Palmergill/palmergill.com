@@ -11,6 +11,7 @@ from app.services.bitcoin_rpc import BitcoinRPCError, bitcoin_rpc_client
 
 MAX_MINED_STATS_BLOCKS = int(os.getenv("BITCOIN_MAX_MINED_STATS_BLOCKS", "1008"))
 BITCOIN_DATA_PROVIDER = os.getenv("BITCOIN_DATA_PROVIDER", "mempool").strip().lower()
+DEMO_WARNING = "Public demo mode uses estimated sample Bitcoin data and does not call Palmer's live node, mempool.space, or OpenAI."
 
 
 def _use_rpc() -> bool:
@@ -37,7 +38,108 @@ def _demo_status() -> Dict[str, Any]:
         "headers": 840000,
         "verification_progress": 1,
         "initial_block_download": False,
-        "warnings": ["Bitcoin data provider is not configured. Showing demo data."],
+        "warnings": [DEMO_WARNING],
+    }
+
+
+def get_demo_node_status() -> Dict[str, Any]:
+    return _demo_status()
+
+
+def get_demo_latest_block() -> Dict[str, Any]:
+    now = int(time.time())
+    return {
+        "source": "demo",
+        "height": 840000,
+        "hash": "0000000000000000000320283a032748cef8227873ff4872689bf23f1cda83a5",
+        "time": iso_from_unix(now - 600),
+        "tx_count": 3050,
+        "size": 1847392,
+        "weight": 3992920,
+        "previous_block_hash": "00000000000000000001f7f1f6d92d2c3d5d1a4c1d9e0f5b4a3c2d1e0f9a8b7c",
+        "subsidy_btc": block_subsidy_btc(840000),
+        "warnings": [DEMO_WARNING],
+    }
+
+
+def get_demo_block(height_or_hash: str) -> Dict[str, Any]:
+    height = int(height_or_hash) if height_or_hash.isdigit() else 840000
+    data = get_demo_latest_block()
+    data["height"] = height
+    data["subsidy_btc"] = block_subsidy_btc(height)
+    return data
+
+
+def get_demo_mempool_summary() -> Dict[str, Any]:
+    return {
+        "source": "demo",
+        "tx_count": 12000,
+        "virtual_size_vb": 42000000,
+        "total_fees_btc": 1.35,
+        "memory_usage_bytes": 124000000,
+        "min_relay_fee_btc_kvb": 0.00001,
+        "fee_estimates_sats_vb": {"2": 18.4, "6": 9.7, "12": 5.1},
+        "warnings": [DEMO_WARNING],
+    }
+
+
+def get_demo_fee_estimate(confirmation_target_blocks: int) -> Dict[str, Any]:
+    if confirmation_target_blocks < 1 or confirmation_target_blocks > 1008:
+        raise ValueError("Confirmation target must be between 1 and 1008 blocks")
+
+    demo_rate = max(1.0, round(30 / confirmation_target_blocks, 2))
+    return {
+        "source": "demo",
+        "target_blocks": confirmation_target_blocks,
+        "btc_per_kvb": demo_rate / 100000,
+        "sats_vb": demo_rate,
+        "warnings": [DEMO_WARNING],
+    }
+
+
+def get_demo_mined_stats(start_time: str, end_time: str) -> Dict[str, Any]:
+    start_dt = _parse_iso_time(start_time)
+    end_dt = _parse_iso_time(end_time)
+    if start_dt >= end_dt:
+        raise ValueError("The start time must be before the end time.")
+
+    seconds = (end_dt - start_dt).total_seconds()
+    blocks_counted = max(0, round(seconds / 600))
+    latest_height = 840000
+    subsidy = block_subsidy_btc(latest_height)
+    return {
+        "source": "demo",
+        "start_time": start_dt.isoformat().replace("+00:00", "Z"),
+        "end_time": end_dt.isoformat().replace("+00:00", "Z"),
+        "blocks_counted": blocks_counted,
+        "first_height": latest_height - blocks_counted + 1 if blocks_counted else None,
+        "last_height": latest_height if blocks_counted else None,
+        "subsidy_btc": round(blocks_counted * subsidy, 8),
+        "fees_available": False,
+        "fees_btc": None,
+        "total_miner_reward_available": False,
+        "total_miner_reward_btc": None,
+        "average_block_interval_seconds": 600 if blocks_counted > 1 else None,
+        "warnings": [DEMO_WARNING],
+    }
+
+
+def get_demo_transaction(txid: str) -> Dict[str, Any]:
+    if len(txid) != 64 or any(char not in "0123456789abcdefABCDEF" for char in txid):
+        raise ValueError("That does not look like a valid transaction id.")
+
+    return {
+        "source": "demo",
+        "txid": txid,
+        "confirmed": False,
+        "confirmations": 0,
+        "input_count": 2,
+        "output_count": 2,
+        "total_output_btc": 0.042,
+        "fee_available": False,
+        "fee_btc": None,
+        "fee_rate_sats_vb": None,
+        "warnings": [DEMO_WARNING],
     }
 
 
@@ -79,19 +181,7 @@ def get_node_status() -> Dict[str, Any]:
 
 def get_latest_block() -> Dict[str, Any]:
     if _provider_not_configured():
-        now = int(time.time())
-        return {
-            "source": "demo",
-            "height": 840000,
-            "hash": "0000000000000000000320283a032748cef8227873ff4872689bf23f1cda83a5",
-            "time": iso_from_unix(now - 600),
-            "tx_count": 3050,
-            "size": 1847392,
-            "weight": 3992920,
-            "previous_block_hash": "00000000000000000001f7f1f6d92d2c3d5d1a4c1d9e0f5b4a3c2d1e0f9a8b7c",
-            "subsidy_btc": block_subsidy_btc(840000),
-            "warnings": ["Bitcoin data provider is not configured. Showing demo data."],
-        }
+        return get_demo_latest_block()
 
     if _use_mempool_space():
         try:
@@ -114,11 +204,7 @@ def get_latest_block() -> Dict[str, Any]:
 
 def get_block(height_or_hash: str) -> Dict[str, Any]:
     if _provider_not_configured():
-        height = int(height_or_hash) if height_or_hash.isdigit() else 840000
-        data = get_latest_block()
-        data["height"] = height
-        data["subsidy_btc"] = block_subsidy_btc(height)
-        return data
+        return get_demo_block(height_or_hash)
 
     if _use_mempool_space():
         try:
@@ -144,16 +230,7 @@ def get_block(height_or_hash: str) -> Dict[str, Any]:
 
 def get_mempool_summary() -> Dict[str, Any]:
     if _provider_not_configured():
-        return {
-            "source": "demo",
-            "tx_count": 12000,
-            "virtual_size_vb": 42000000,
-            "total_fees_btc": 1.35,
-            "memory_usage_bytes": 124000000,
-            "min_relay_fee_btc_kvb": 0.00001,
-            "fee_estimates_sats_vb": {"2": 18.4, "6": 9.7, "12": 5.1},
-            "warnings": ["Bitcoin data provider is not configured. Showing demo data."],
-        }
+        return get_demo_mempool_summary()
 
     if _use_mempool_space():
         try:
@@ -203,14 +280,7 @@ def estimate_fee(confirmation_target_blocks: int) -> Dict[str, Any]:
         raise ValueError("Confirmation target must be between 1 and 1008 blocks")
 
     if _provider_not_configured():
-        demo_rate = max(1.0, round(30 / confirmation_target_blocks, 2))
-        return {
-            "source": "demo",
-            "target_blocks": confirmation_target_blocks,
-            "btc_per_kvb": demo_rate / 100000,
-            "sats_vb": demo_rate,
-            "warnings": ["Bitcoin data provider is not configured. Showing demo data."],
-        }
+        return get_demo_fee_estimate(confirmation_target_blocks)
 
     if _use_mempool_space():
         try:
@@ -251,25 +321,7 @@ def get_mined_stats(start_time: str, end_time: str, max_blocks: int = MAX_MINED_
         raise ValueError(f"max_blocks must be between 1 and {MAX_MINED_STATS_BLOCKS}.")
 
     if _provider_not_configured():
-        seconds = (end_dt - start_dt).total_seconds()
-        blocks_counted = max(0, round(seconds / 600))
-        latest_height = 840000
-        subsidy = block_subsidy_btc(latest_height)
-        return {
-            "source": "demo",
-            "start_time": start_dt.isoformat().replace("+00:00", "Z"),
-            "end_time": end_dt.isoformat().replace("+00:00", "Z"),
-            "blocks_counted": blocks_counted,
-            "first_height": latest_height - blocks_counted + 1 if blocks_counted else None,
-            "last_height": latest_height if blocks_counted else None,
-            "subsidy_btc": round(blocks_counted * subsidy, 8),
-            "fees_available": False,
-            "fees_btc": None,
-            "total_miner_reward_available": False,
-            "total_miner_reward_btc": None,
-            "average_block_interval_seconds": 600 if blocks_counted > 1 else None,
-            "warnings": ["Bitcoin data provider is not configured. Showing estimated demo mined stats."],
-        }
+        return get_demo_mined_stats(start_time, end_time)
 
     if _use_mempool_space():
         return _get_mined_stats_from_mempool_space(start_dt, end_dt, max_blocks)
@@ -329,19 +381,7 @@ def get_transaction(txid: str) -> Dict[str, Any]:
         raise ValueError("That does not look like a valid transaction id.")
 
     if _provider_not_configured():
-        return {
-            "source": "demo",
-            "txid": txid,
-            "confirmed": False,
-            "confirmations": 0,
-            "input_count": 2,
-            "output_count": 2,
-            "total_output_btc": 0.042,
-            "fee_available": False,
-            "fee_btc": None,
-            "fee_rate_sats_vb": None,
-            "warnings": ["Bitcoin data provider is not configured. Showing demo transaction shape."],
-        }
+        return get_demo_transaction(txid)
 
     if _use_mempool_space():
         try:
@@ -419,6 +459,28 @@ def safe_tool_call(name: str, *args: Any, **kwargs: Any) -> Dict[str, Any]:
         return _api_error_response(exc)
     except BitcoinRPCError as exc:
         return _rpc_error_response(exc)
+    except ValueError as exc:
+        return {
+            "source": "error",
+            "error": str(exc),
+            "warnings": [str(exc)],
+        }
+
+
+def safe_demo_tool_call(name: str, *args: Any, **kwargs: Any) -> Dict[str, Any]:
+    demo_handlers = {
+        "get_node_status": get_demo_node_status,
+        "get_latest_block": get_demo_latest_block,
+        "get_block": get_demo_block,
+        "get_transaction": get_demo_transaction,
+        "get_mempool_summary": get_demo_mempool_summary,
+        "estimate_fee": get_demo_fee_estimate,
+        "get_mined_stats": get_demo_mined_stats,
+    }
+    try:
+        return demo_handlers[name](*args, **kwargs)
+    except KeyError:
+        return {"source": "error", "error": f"Unknown tool: {name}", "warnings": [f"Unknown tool: {name}"]}
     except ValueError as exc:
         return {
             "source": "error",

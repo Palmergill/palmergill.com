@@ -4,11 +4,13 @@ const PUBLIC_PREFIXES = [
   '/poker',
   '/craps',
   '/api/poker',
+  '/stock-research',
+  '/bitcoin-chat',
+  '/api/stocks',
+  '/api/bitcoin',
 ];
 
 const PROTECTED_PREFIXES = [
-  '/stock-research',
-  '/bitcoin-chat',
   '/admin',
   '/api',
 ];

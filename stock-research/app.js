@@ -277,6 +277,17 @@ document.addEventListener('DOMContentLoaded', () => {
     const searchIconBtnMain = document.getElementById('searchIconBtnMain');
     const searchIconBtnInline = document.getElementById('searchIconBtnInline');
     const closeSearchModal = document.getElementById('closeSearchModal');
+    const demoBanner = document.getElementById('demoBanner');
+
+    function setDemoMode(isDemo, warning) {
+        if (!demoBanner) return;
+        if (isDemo) {
+            demoBanner.textContent = warning || 'Public demo mode uses generated sample stock data. Live market provider calls stay protected.';
+            demoBanner.classList.remove('hidden');
+        } else {
+            demoBanner.classList.add('hidden');
+        }
+    }
     
     // Search Modal Functions
     function openSearchModal() {
@@ -859,6 +870,7 @@ document.addEventListener('DOMContentLoaded', () => {
             
             const data = await response.json();
             console.log('Received data:', data);
+            setDemoMode(Boolean(data._demo), data._warning);
             
             // Validate data
             if (!data || !data.summary) {
@@ -968,6 +980,8 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
         
+        setDemoMode(Boolean(data._demo), data._warning);
+
         // Update header to show stock info instead of logo
         const headerLogo = document.getElementById('headerLogo');
         const headerStockContent = document.getElementById('headerStockContent');

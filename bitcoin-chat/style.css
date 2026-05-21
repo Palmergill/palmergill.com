@@ -117,6 +117,18 @@ h1 {
     font-size: 13px;
 }
 
+.topbar .demo-notice {
+    display: block;
+    max-width: 680px;
+    margin-top: 9px;
+    color: var(--accent-soft);
+    line-height: 1.35;
+}
+
+.topbar .demo-notice[hidden] {
+    display: none;
+}
+
 .status-dot {
     width: 8px;
     height: 8px;

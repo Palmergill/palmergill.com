@@ -34,12 +34,16 @@ PUBLIC_PATH_PREFIXES = (
     "/poker",
     "/craps",
 )
+DEMO_PATH_PREFIXES = (
+    "/api/stocks",
+    "/api/bitcoin",
+    "/stock-research",
+    "/bitcoin-chat",
+)
 PROTECTED_PATH_PREFIXES = (
     "/docs",
     "/openapi.json",
     "/api",
-    "/stock-research",
-    "/bitcoin-chat",
     "/admin",
 )
 
@@ -73,6 +77,23 @@ def is_protected_path(path: str):
     return any(path == prefix or path.startswith(f"{prefix}/") for prefix in PROTECTED_PATH_PREFIXES)
 
 
+def is_demo_path(path: str):
+    return any(path == prefix or path.startswith(f"{prefix}/") for prefix in DEMO_PATH_PREFIXES)
+
+
+def valid_app_credentials(authorization: str | None):
+    config = app_auth_config()
+    credentials = basic_auth_credentials(authorization)
+    if not config or not credentials:
+        return False
+
+    username, password = credentials
+    return (
+        secrets.compare_digest(username, config["username"])
+        and secrets.compare_digest(password, config["password"])
+    )
+
+
 def auth_challenge():
     return PlainTextResponse(
         "Authentication required",
@@ -87,25 +108,30 @@ def missing_auth_config():
 
 @app.middleware("http")
 async def require_app_auth(request: Request, call_next):
-    if not is_protected_path(request.url.path):
+    request.state.demo_mode = False
+    request.state.app_auth_authenticated = False
+
+    authorization = request.headers.get("authorization")
+    if valid_app_credentials(authorization):
+        request.state.app_auth_authenticated = True
         return await call_next(request)
 
-    config = app_auth_config()
-    if not config:
-        return missing_auth_config()
-
-    credentials = basic_auth_credentials(request.headers.get("authorization"))
-    if not credentials:
-        return auth_challenge()
-
-    username, password = credentials
-    if not (
-        secrets.compare_digest(username, config["username"])
-        and secrets.compare_digest(password, config["password"])
+    if authorization and app_auth_config() and (
+        is_demo_path(request.url.path) or is_protected_path(request.url.path)
     ):
         return auth_challenge()
 
-    return await call_next(request)
+    if is_demo_path(request.url.path):
+        request.state.demo_mode = True
+        return await call_next(request)
+
+    if not is_protected_path(request.url.path):
+        return await call_next(request)
+
+    if not app_auth_config():
+        return missing_auth_config()
+
+    return auth_challenge()
 
 # CORS - allow frontend to call backend
 # Allow all origins for development (restrict in production)

@@ -9,12 +9,13 @@ const nodeStatus = document.getElementById('nodeStatus');
 const heightPill = document.getElementById('heightPill');
 const syncPill = document.getElementById('syncPill');
 const chainPill = document.getElementById('chainPill');
+const demoNotice = document.getElementById('demoNotice');
 
 let sessionId = localStorage.getItem('bitcoinChatSessionId');
 
 const starterMessage = {
     role: 'assistant',
-    text: 'Ask anything Bitcoin. I use live Bitcoin data when needed.',
+    text: 'Ask anything Bitcoin. Public visitors get a protected demo; authenticated sessions can use live Bitcoin data when needed.',
 };
 
 function addMessage({ role, text, data, warnings, toolsUsed, loading = false, error = false }) {
@@ -259,6 +260,9 @@ async function refreshStatus() {
     try {
         const status = await fetchJson(`${API_BASE}/status`);
         const liveSource = status.source === 'node' || status.source === 'mempool.space';
+        if (demoNotice) {
+            demoNotice.hidden = status.source !== 'demo';
+        }
         const source = status.source === 'node'
             ? 'Node connected'
             : status.source === 'mempool.space'

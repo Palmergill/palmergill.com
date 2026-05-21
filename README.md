@@ -54,7 +54,7 @@ logs/backend.log
 - Static site: hosted from the repo root and project folders.
 - API service: Railway/FastAPI from `backend/`.
 - Vercel rewrites `/api/*` to the Railway backend in production.
-- The root page `/`, `/docs/`, `/poker/`, `/craps/`, `/blackjack/`, and `/api/poker/*` stay public. Stock research, Bitcoin chat, admin, and other `/api/*` routes require Basic Auth; protected routes return `503` if `APP_AUTH_PASSWORD` is missing. Set the same `APP_AUTH_USERNAME` and `APP_AUTH_PASSWORD` values in Vercel and Railway.
+- The root page `/`, `/docs/`, `/stock-research/`, `/bitcoin-chat/`, `/poker/`, `/craps/`, `/blackjack/`, `/api/poker/*`, `/api/stocks/*`, and `/api/bitcoin/*` stay public. Unauthenticated stock and Bitcoin API requests return demo data only; valid Basic Auth credentials unlock the live provider-backed paths. Admin and other `/api/*` routes require Basic Auth; protected routes return `503` if `APP_AUTH_PASSWORD` is missing. Set the same `APP_AUTH_USERNAME` and `APP_AUTH_PASSWORD` values in Vercel and Railway.
 
 ## Repository Layout
 

@@ -283,6 +283,25 @@ def answer_chat(message: str, session_id: str | None = None, timezone_name: str 
     return fallback
 
 
+def answer_demo_chat(message: str, session_id: str | None = None, timezone_name: str | None = None) -> Dict[str, Any]:
+    session_id = session_id or str(uuid.uuid4())
+    if _is_unsafe_wallet_request(message):
+        return _response(
+            "I can only inspect public blockchain data. I cannot send bitcoin, sign transactions, broadcast transactions, or handle wallet secrets.",
+            session_id,
+            [],
+            {},
+            [bitcoin_tools.DEMO_WARNING],
+        )
+
+    if not _is_bitcoin_related(message):
+        return _response(OUT_OF_SCOPE_ANSWER, session_id, [], {}, [bitcoin_tools.DEMO_WARNING])
+
+    response = _answer_with_local_router(message, session_id, timezone_name, demo=True)
+    response["warnings"] = _unique([bitcoin_tools.DEMO_WARNING] + response.get("warnings", []))
+    return response
+
+
 def _answer_with_model(message: str, session_id: str, timezone_name: str | None) -> Dict[str, Any]:
     history = _SESSION_MESSAGES.get(session_id, [])
     input_items: List[Dict[str, Any]] = [
@@ -330,14 +349,14 @@ def _answer_with_model(message: str, session_id: str, timezone_name: str | None)
     raise OpenAIModelError("The model used too many tool calls for one chat turn.")
 
 
-def _answer_with_local_router(message: str, session_id: str, timezone_name: str | None) -> Dict[str, Any]:
+def _answer_with_local_router(message: str, session_id: str, timezone_name: str | None, demo: bool = False) -> Dict[str, Any]:
     normalized = message.strip().lower()
     tools_used: List[str] = []
     warnings: List[str] = []
 
     txid_match = TXID_RE.search(message)
     if txid_match:
-        data = bitcoin_tools.safe_tool_call("get_transaction", txid_match.group(0))
+        data = _local_tool_call(demo, "get_transaction", txid_match.group(0))
         tools_used.append("get_transaction")
         warnings.extend(data.get("warnings", []))
         return _response(_transaction_answer(data), session_id, tools_used, data, warnings)
@@ -346,19 +365,19 @@ def _answer_with_local_router(message: str, session_id: str, timezone_name: str 
         start_time, end_time, timezone_warning = _today_window(timezone_name)
         if timezone_warning:
             warnings.append(timezone_warning)
-        data = bitcoin_tools.safe_tool_call("get_mined_stats", start_time, end_time)
+        data = _local_tool_call(demo, "get_mined_stats", start_time, end_time)
         tools_used.append("get_mined_stats")
         warnings.extend(data.get("warnings", []))
         return _response(_mined_answer(data, timezone_name), session_id, tools_used, data, warnings)
 
     if "fee" in normalized or "mempool" in normalized:
-        data = bitcoin_tools.safe_tool_call("get_mempool_summary")
+        data = _local_tool_call(demo, "get_mempool_summary")
         tools_used.append("get_mempool_summary")
         warnings.extend(data.get("warnings", []))
         return _response(_mempool_answer(data), session_id, tools_used, data, warnings)
 
     if "sync" in normalized or "node" in normalized or "status" in normalized:
-        data = bitcoin_tools.safe_tool_call("get_node_status")
+        data = _local_tool_call(demo, "get_node_status")
         tools_used.append("get_node_status")
         warnings.extend(data.get("warnings", []))
         return _response(_status_answer(data), session_id, tools_used, data, warnings)
@@ -366,10 +385,10 @@ def _answer_with_local_router(message: str, session_id: str, timezone_name: str 
     if "block" in normalized or "latest" in normalized or "height" in normalized:
         height_match = re.search(r"\b\d{1,7}\b", normalized)
         if height_match and "latest" not in normalized:
-            data = bitcoin_tools.safe_tool_call("get_block", height_match.group(0))
+            data = _local_tool_call(demo, "get_block", height_match.group(0))
             tools_used.append("get_block")
         else:
-            data = bitcoin_tools.safe_tool_call("get_latest_block")
+            data = _local_tool_call(demo, "get_latest_block")
             tools_used.append("get_latest_block")
         warnings.extend(data.get("warnings", []))
         return _response(_block_answer(data), session_id, tools_used, data, warnings)
@@ -377,7 +396,7 @@ def _answer_with_local_router(message: str, session_id: str, timezone_name: str 
     if _looks_conceptual(message):
         return _response(_conceptual_fallback_answer(message), session_id, [], {}, warnings)
 
-    data = bitcoin_tools.safe_tool_call("get_latest_block")
+    data = _local_tool_call(demo, "get_latest_block")
     tools_used.append("get_latest_block")
     warnings.extend(data.get("warnings", []))
     return _response(
@@ -387,6 +406,12 @@ def _answer_with_local_router(message: str, session_id: str, timezone_name: str 
         data,
         warnings,
     )
+
+
+def _local_tool_call(demo: bool, name: str, *args: Any, **kwargs: Any) -> Dict[str, Any]:
+    if demo:
+        return bitcoin_tools.safe_demo_tool_call(name, *args, **kwargs)
+    return bitcoin_tools.safe_tool_call(name, *args, **kwargs)
 
 
 def _openai_response(input_items: List[Dict[str, Any]]) -> Dict[str, Any]:
