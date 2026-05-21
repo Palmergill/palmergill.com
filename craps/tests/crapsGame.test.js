@@ -348,10 +348,12 @@ describe('craps game regressions', () => {
 });
 
 describe('shared nav dependencies', () => {
-  test('lucide script is pinned to an exact version', () => {
+  test('shared nav uses local inline icons instead of a CDN dependency', () => {
     const navSource = fs.readFileSync(path.join(__dirname, '..', '..', 'shared', 'site-nav.js'), 'utf8');
 
-    expect(navSource).toContain('lucide@0.468.0');
+    expect(navSource).toContain('function iconSvg');
+    expect(navSource).toContain('const icons = {');
+    expect(navSource).not.toContain('lucide@');
     expect(navSource).not.toContain('lucide@latest');
   });
 });

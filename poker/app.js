@@ -5,6 +5,8 @@ const API_BASE = '';
 const CSRFManager = {
     TOKEN_COOKIE: 'csrf_token',
     HEADER_NAME: 'X-CSRF-Token',
+    TOKEN_TIMEOUT_MS: 3000,
+    REQUEST_TIMEOUT_MS: 12000,
 
     // Get CSRF token from cookie
     getToken() {
@@ -26,13 +28,19 @@ const CSRFManager = {
 
     async ensureToken() {
         if (this.getToken()) return;
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), this.TOKEN_TIMEOUT_MS);
+
         try {
             await fetch(`${API_BASE}/api/poker/csrf-token`, {
                 method: 'GET',
-                credentials: 'same-origin'
+                credentials: 'same-origin',
+                signal: controller.signal
             });
         } catch (error) {
             console.log('[CSRF] Token bootstrap failed:', error.message);
+        } finally {
+            clearTimeout(timeoutId);
         }
     },
 
@@ -40,6 +48,8 @@ const CSRFManager = {
     async fetch(url, options = {}, timeoutMs = 10000) {
         const method = (options.method || 'GET').toUpperCase();
         const stateChangingMethods = ['POST', 'PUT', 'PATCH', 'DELETE'];
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), this.REQUEST_TIMEOUT_MS);
 
         if (stateChangingMethods.includes(method)) {
             await this.ensureToken();
@@ -49,7 +59,14 @@ const CSRFManager = {
             };
         }
 
-        return fetchWithTimeout(url, options, timeoutMs);
+        try {
+            return await fetch(url, {
+                ...options,
+                signal: options.signal || controller.signal
+            });
+        } finally {
+            clearTimeout(timeoutId);
+        }
     }
 };
 
@@ -1092,6 +1109,27 @@ function hideLoading() {
     }
 }
 
+async function getErrorMessage(response, fallback) {
+    const contentType = response.headers.get('content-type') || '';
+    let payload = null;
+
+    if (contentType.includes('application/json')) {
+        payload = await response.json().catch(() => null);
+    } else {
+        payload = await response.text().catch(() => null);
+    }
+
+    const detail = typeof payload === 'string'
+        ? payload
+        : payload?.detail || payload?.message || payload?.error;
+
+    if (response.status === 404 && /Application not found/i.test(detail || '')) {
+        return 'Poker API is unavailable. The production API backend is not responding.';
+    }
+
+    return detail || fallback;
+}
+
 async function startGame(gameType = 'single') {
     const name = elements.playerName.value.trim() || 'Palmer';
 
@@ -1112,8 +1150,7 @@ async function startGame(gameType = 'single') {
         });
 
         if (!response.ok) {
-            const errorData = await response.json().catch(() => ({}));
-            throw new Error(errorData.detail || 'Failed to start game');
+            throw new Error(await getErrorMessage(response, 'Failed to start game'));
         }
 
         const data = await response.json();
@@ -1138,7 +1175,10 @@ async function startGame(gameType = 'single') {
     } catch (error) {
         console.error('Error starting game:', error);
         hideLoading();
-        ErrorBoundary.show('Failed to start game. Please try again.', 'error');
+        const message = error.name === 'AbortError'
+            ? 'Poker API timed out. Please try again in a moment.'
+            : error.message || 'Failed to start game. Please try again.';
+        ErrorBoundary.show(message, 'error');
         elements.startBtn.disabled = false;
     }
 }
@@ -1237,8 +1277,7 @@ async function joinMultiplayerGame() {
         });
         
         if (!response.ok) {
-            const errorData = await response.json().catch(() => ({}));
-            throw new Error(errorData.detail || 'Failed to join game');
+            throw new Error(await getErrorMessage(response, 'Failed to join game'));
         }
         
         const data = await response.json();
@@ -1273,8 +1312,7 @@ async function startMultiplayerGame() {
         });
         
         if (!response.ok) {
-            const errorData = await response.json().catch(() => ({}));
-            throw new Error(errorData.detail || 'Failed to start game');
+            throw new Error(await getErrorMessage(response, 'Failed to start game'));
         }
         
         const data = await response.json();

@@ -66,11 +66,11 @@
 
         .hero {
             position: relative;
-            min-height: 100svh;
+            min-height: 80svh;
             display: grid;
             align-items: stretch;
             overflow: hidden;
-            padding: clamp(96px, 10vw, 148px) 24px 32px;
+            padding: clamp(84px, 8vw, 118px) 24px 32px;
         }
 
         .hero::before {
@@ -108,41 +108,11 @@
             width: min(100%, var(--max));
             margin: 0 auto;
             display: grid;
-            min-height: calc(100svh - clamp(96px, 10vw, 148px) - 32px);
+            min-height: calc(80svh - clamp(84px, 8vw, 118px) - 32px);
             grid-template-columns: minmax(0, 1fr);
-            grid-template-rows: auto auto minmax(0, 1fr) auto;
+            grid-template-rows: auto minmax(0, 1fr);
             align-items: start;
             row-gap: clamp(26px, 4vw, 52px);
-        }
-
-        .masthead {
-            grid-column: 1;
-            grid-row: 1;
-            display: inline-flex;
-            flex-direction: column;
-            align-items: flex-start;
-            justify-content: flex-start;
-            gap: 14px;
-            justify-self: start;
-        }
-
-        .brand-lockup {
-            display: inline-flex;
-            align-items: center;
-            gap: 18px;
-            color: rgba(247, 243, 234, 0.78);
-            font-size: 0.78rem;
-            font-weight: 700;
-            letter-spacing: 0.22em;
-            text-transform: uppercase;
-        }
-
-        .brand-lockup img {
-            width: clamp(180px, 18vw, 280px);
-            height: clamp(180px, 18vw, 280px);
-            border: 0;
-            object-fit: contain;
-            box-shadow: none;
         }
 
         .social-links {
@@ -188,10 +158,10 @@
 
         .hero-content {
             grid-column: 1;
-            grid-row: 2;
+            grid-row: 1;
             align-self: start;
             width: min(720px, 100%);
-            margin-top: clamp(-78px, -5vw, -46px);
+            margin-top: 0;
             padding-bottom: clamp(16px, 3vw, 34px);
         }
 
@@ -215,6 +185,7 @@
         }
 
         .hero-title {
+            width: min(620px, 100%);
             max-width: min(620px, 100%);
             line-height: 1;
         }
@@ -307,7 +278,7 @@
         .section {
             width: min(100%, var(--max));
             margin: 0 auto;
-            padding: clamp(72px, 10vw, 126px) 24px;
+            padding: clamp(64px, 8vw, 104px) 24px;
         }
 
         .section-header {
@@ -335,11 +306,12 @@
             display: grid;
             grid-template-columns: repeat(12, minmax(0, 1fr));
             gap: 18px;
+            perspective: 1400px;
         }
 
         .project-card {
             position: relative;
-            min-height: 410px;
+            min-height: 390px;
             grid-column: span 4;
             display: flex;
             flex-direction: column;
@@ -354,7 +326,8 @@
             color: var(--text);
             text-decoration: none;
             box-shadow: 0 18px 70px rgba(0, 0, 0, 0.16);
-            transition: transform 220ms ease, border-color 220ms ease, box-shadow 220ms ease, background 220ms ease;
+            transform-style: preserve-3d;
+            transition: transform 520ms cubic-bezier(0.22, 1, 0.36, 1), border-color 220ms ease, box-shadow 220ms ease, background 220ms ease;
         }
 
         .project-card::before {
@@ -366,6 +339,8 @@
                 radial-gradient(circle at 82% 12%, color-mix(in srgb, var(--accent) 25%, transparent), transparent 32%);
             opacity: 0.82;
             pointer-events: none;
+            backface-visibility: hidden;
+            -webkit-backface-visibility: hidden;
         }
 
         .project-card::after {
@@ -375,6 +350,8 @@
             height: 1px;
             background: linear-gradient(90deg, transparent, var(--accent), transparent);
             opacity: 0.62;
+            backface-visibility: hidden;
+            -webkit-backface-visibility: hidden;
         }
 
         .project-card:hover,
@@ -387,19 +364,82 @@
 
         .project-card.featured {
             grid-column: span 8;
-            min-height: 508px;
+            min-height: 460px;
         }
 
         .project-top,
         .project-bottom {
             position: relative;
             z-index: 1;
+            backface-visibility: hidden;
+            -webkit-backface-visibility: hidden;
+            transition: opacity 260ms ease, transform 520ms cubic-bezier(0.22, 1, 0.36, 1);
         }
 
         .project-top {
             display: flex;
             justify-content: space-between;
             gap: 20px;
+        }
+
+        .project-screenshot {
+            position: absolute;
+            inset: 14px;
+            z-index: 1;
+            margin: 0;
+            overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, 0.16);
+            border-radius: var(--radius);
+            background: rgba(0, 0, 0, 0.22);
+            box-shadow: 0 18px 50px rgba(0, 0, 0, 0.22);
+            opacity: 0;
+            transform: rotateY(-180deg);
+            backface-visibility: hidden;
+            -webkit-backface-visibility: hidden;
+            transition: opacity 220ms ease, transform 520ms cubic-bezier(0.22, 1, 0.36, 1);
+        }
+
+        .project-screenshot img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            object-position: center;
+            filter: saturate(0.96) contrast(1.02);
+            transition: transform 260ms ease;
+        }
+
+        .project-card:hover .project-screenshot img,
+        .project-card:focus-visible .project-screenshot img {
+            transform: none;
+        }
+
+        .project-card:hover .project-top,
+        .project-card:hover .project-bottom,
+        .project-card:focus-visible .project-top,
+        .project-card:focus-visible .project-bottom {
+            opacity: 0;
+            transform: rotateY(180deg);
+        }
+
+        .project-card:hover .project-screenshot,
+        .project-card:focus-visible .project-screenshot {
+            opacity: 1;
+            transform: rotateY(0);
+        }
+
+        .project-card.is-scroll-flipped .project-top,
+        .project-card.is-scroll-flipped .project-bottom {
+            opacity: 0;
+            transform: rotateY(180deg);
+        }
+
+        .project-card.is-scroll-flipped .project-screenshot {
+            opacity: 1;
+            transform: rotateY(0);
+        }
+
+        .project-card.is-scroll-flipped .project-screenshot img {
+            transform: none;
         }
 
         .project-number {
@@ -564,11 +604,16 @@
             transform: translateY(0);
         }
 
+        .projects-grid.is-reveal-ready .project-card.is-visible:hover,
+        .projects-grid.is-reveal-ready .project-card.is-visible:focus-visible {
+            transform: translateY(-6px);
+        }
+
         @media (max-width: 1050px) {
             .project-card,
             .project-card.featured {
                 grid-column: span 6;
-                min-height: 430px;
+                min-height: 390px;
             }
 
             .featured .project-title {
@@ -578,13 +623,13 @@
 
         @media (max-width: 899px) {
             .hero {
-                min-height: calc(100svh - var(--site-nav-mobile-height, 56px));
+                min-height: auto;
                 padding: 58px 18px 24px;
             }
 
             .hero-inner {
-                min-height: calc(100svh - var(--site-nav-mobile-height, 56px) - 82px);
-                grid-template-rows: auto auto minmax(0, 1fr) auto;
+                min-height: auto;
+                grid-template-rows: auto minmax(0, 1fr);
                 row-gap: 34px;
             }
 
@@ -592,14 +637,9 @@
                 inset: 14px;
             }
 
-            .brand-lockup img {
-                width: clamp(126px, 34vw, 172px);
-                height: clamp(126px, 34vw, 172px);
-            }
-
             .hero-content {
                 grid-column: 1;
-                grid-row: 2;
+                grid-row: 1;
                 align-self: start;
                 width: min(680px, 100%);
                 margin-top: 0;
@@ -613,8 +653,12 @@
             .project-card,
             .project-card.featured {
                 grid-column: 1 / -1;
-                min-height: 390px;
+                min-height: 360px;
                 padding: 22px;
+            }
+
+            .project-screenshot {
+                inset: 12px;
             }
 
             .project-icon {
@@ -627,15 +671,28 @@
                 height: 44px;
             }
 
+            .project-card.is-scroll-flipped,
+            .projects-grid.is-reveal-ready .project-card.is-visible.is-scroll-flipped {
+                border-color: color-mix(in srgb, var(--accent) 52%, rgba(255, 255, 255, 0.16));
+                box-shadow: var(--shadow);
+                transform: translateY(-4px);
+            }
+
         }
 
         @media (max-width: 520px) {
             .hero-title {
-                max-width: 100%;
+                width: min(100%, 330px);
+                max-width: min(100%, 330px);
+            }
+
+            .hero-copy {
+                margin-top: 22px;
             }
 
             .hero-actions {
                 flex-direction: column;
+                margin-top: 28px;
             }
 
             .button {
@@ -683,6 +740,30 @@
                 opacity: 1;
                 transform: none;
             }
+
+            .project-card:hover,
+            .project-card:focus-visible,
+            .projects-grid.is-reveal-ready .project-card.is-visible:hover,
+            .projects-grid.is-reveal-ready .project-card.is-visible:focus-visible {
+                transform: none;
+            }
+
+            .project-card:hover .project-top,
+            .project-card:hover .project-bottom,
+            .project-card:focus-visible .project-top,
+            .project-card:focus-visible .project-bottom,
+            .project-card.is-scroll-flipped .project-top,
+            .project-card.is-scroll-flipped .project-bottom {
+                opacity: 0;
+                transform: none;
+            }
+
+            .project-card:hover .project-screenshot,
+            .project-card:focus-visible .project-screenshot,
+            .project-card.is-scroll-flipped .project-screenshot {
+                opacity: 1;
+                transform: none;
+            }
         }
     </style>
 </head>
@@ -691,12 +772,6 @@
         <header class="hero">
             <div class="hero-frame" aria-hidden="true"></div>
             <div class="hero-inner">
-                <div class="masthead">
-                    <a class="brand-lockup" href="/" aria-label="Palmer Gill home">
-                        <img src="/assets/palmer-gill-logo.png" alt="" aria-hidden="true">
-                    </a>
-                </div>
-
                 <div class="hero-content">
                     <p class="eyebrow">Personal studio</p>
                     <h1 class="hero-title">
@@ -750,6 +825,9 @@
                                 </svg>
                             </span>
                         </div>
+                        <figure class="project-screenshot">
+                            <img src="/assets/project-screenshots/stock-research.png" alt="Stock Research app screenshot" loading="lazy" decoding="async">
+                        </figure>
                         <div class="project-bottom">
                             <h3 class="project-title">Stock Research</h3>
                             <p class="project-description">A market research workspace for comparing real-time data, company fundamentals, and financial trends with interactive charts and practical metrics close at hand.</p>
@@ -772,6 +850,9 @@
                                 </svg>
                             </span>
                         </div>
+                        <figure class="project-screenshot">
+                            <img src="/assets/project-screenshots/poker.png" alt="Texas Hold'em Poker app screenshot" loading="lazy" decoding="async">
+                        </figure>
                         <div class="project-bottom">
                             <h3 class="project-title">Texas Hold'em Poker</h3>
                             <p class="project-description">A mobile-friendly No-Limit Hold'em game with realistic table flow, hand evaluation, and AI opponents that make each hand feel different.</p>
@@ -795,6 +876,9 @@
                                 </svg>
                             </span>
                         </div>
+                        <figure class="project-screenshot">
+                            <img src="/assets/project-screenshots/craps.png" alt="Craps app screenshot" loading="lazy" decoding="async">
+                        </figure>
                         <div class="project-bottom">
                             <h3 class="project-title">Craps</h3>
                             <p class="project-description">A single-player Vegas-style dice table with Pass Line, Come, proposition bets, point handling, payouts, and fast browser gameplay.</p>
@@ -818,6 +902,9 @@
                                 </svg>
                             </span>
                         </div>
+                        <figure class="project-screenshot">
+                            <img src="/assets/project-screenshots/blackjack.png" alt="Blackjack app screenshot" loading="lazy" decoding="async">
+                        </figure>
                         <div class="project-bottom">
                             <h3 class="project-title">Blackjack</h3>
                             <p class="project-description">A crisp single-player casino table with a six-deck shoe, splits, doubles, insurance, dealer rules, and testable rule logic.</p>
@@ -840,6 +927,9 @@
                                 </svg>
                             </span>
                         </div>
+                        <figure class="project-screenshot">
+                            <img src="/assets/project-screenshots/bitcoin-chat.png" alt="Bitcoin Chat app screenshot" loading="lazy" decoding="async">
+                        </figure>
                         <div class="project-bottom">
                             <h3 class="project-title">Bitcoin Chat</h3>
                             <p class="project-description">A plain-English interface for exploring blocks, transactions, mempool fees, node status, and read-only blockchain data.</p>
@@ -862,6 +952,9 @@
                                 </svg>
                             </span>
                         </div>
+                        <figure class="project-screenshot">
+                            <img src="/assets/project-screenshots/docs.png" alt="Site Documentation screenshot" loading="lazy" decoding="async">
+                        </figure>
                         <div class="project-bottom">
                             <h3 class="project-title">Site Documentation</h3>
                             <p class="project-description">A compact reference for website paths, backend routes, local development, deployment, authentication, providers, and tests.</p>
@@ -902,6 +995,7 @@
         (() => {
             const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
             const revealTargets = [...document.querySelectorAll('.project-card')];
+            const mobileCardsQuery = window.matchMedia('(max-width: 899px) and (hover: none), (max-width: 899px) and (pointer: coarse)');
 
             if (revealTargets.length === 0 || reduceMotion) {
                 return;
@@ -934,6 +1028,68 @@
             });
 
             revealTargets.forEach(target => observer.observe(target));
+
+            let activeScrollCard = null;
+            let scrollFlipFrame = null;
+
+            const clearScrollFlip = () => {
+                activeScrollCard?.classList.remove('is-scroll-flipped');
+                activeScrollCard = null;
+            };
+
+            const updateScrollFlip = () => {
+                scrollFlipFrame = null;
+
+                if (!mobileCardsQuery.matches) {
+                    clearScrollFlip();
+                    return;
+                }
+
+                const viewportCenter = window.innerHeight * 0.52;
+                const nextActiveCard = revealTargets.reduce((closestCard, card) => {
+                    const rect = card.getBoundingClientRect();
+                    const isInFlipRange = rect.top < viewportCenter && rect.bottom > viewportCenter;
+
+                    if (!isInFlipRange) {
+                        return closestCard;
+                    }
+
+                    if (!closestCard) {
+                        return card;
+                    }
+
+                    const currentDistance = Math.abs((rect.top + rect.bottom) / 2 - viewportCenter);
+                    const closestRect = closestCard.getBoundingClientRect();
+                    const closestDistance = Math.abs((closestRect.top + closestRect.bottom) / 2 - viewportCenter);
+
+                    return currentDistance < closestDistance ? card : closestCard;
+                }, null);
+
+                if (activeScrollCard === nextActiveCard) {
+                    return;
+                }
+
+                clearScrollFlip();
+                activeScrollCard = nextActiveCard;
+                activeScrollCard?.classList.add('is-scroll-flipped');
+            };
+
+            const queueScrollFlipUpdate = () => {
+                if (scrollFlipFrame !== null) {
+                    return;
+                }
+
+                scrollFlipFrame = window.requestAnimationFrame(updateScrollFlip);
+            };
+
+            updateScrollFlip();
+            window.addEventListener('scroll', queueScrollFlipUpdate, { passive: true });
+            window.addEventListener('resize', queueScrollFlipUpdate);
+            if (typeof mobileCardsQuery.addEventListener === 'function') {
+                mobileCardsQuery.addEventListener('change', queueScrollFlipUpdate);
+            } else if (typeof mobileCardsQuery.addListener === 'function') {
+                mobileCardsQuery.addListener(queueScrollFlipUpdate);
+            }
         })();
     </script>
 </body>

@@ -10,6 +10,12 @@
     let previousCardSlots = new Map();
     let currentCardSlots = new Map();
     let fallbackDealIndex = 0;
+    let dealerAnimation = null;
+    let dealerAnimationToken = 0;
+
+    const DEALER_REVEAL_PAUSE_MS = 1400;
+    const DEALER_HIT_PAUSE_MS = 1900;
+    const DEALER_SETTLE_PAUSE_MS = 1300;
 
     const els = {
         actionControls: document.getElementById("actionControls"),
@@ -36,7 +42,21 @@
         statusText: document.getElementById("statusText")
     };
 
+    function sleep(ms) {
+        return new Promise((resolve) => setTimeout(resolve, ms));
+    }
+
+    function cloneState(source) {
+        return JSON.parse(JSON.stringify(source));
+    }
+
+    function cancelDealerAnimation() {
+        dealerAnimationToken += 1;
+        dealerAnimation = null;
+    }
+
     function isRoundHiddenDealerCard() {
+        if (dealerAnimation) return !dealerAnimation.holeRevealed;
         return state.status === "playing" || state.status === "insurance";
     }
 
@@ -52,8 +72,8 @@
 
     function dealDelay(slotKey) {
         const ordered = initialDealOrder(slotKey);
-        if (ordered !== undefined) return ordered * 130;
-        const delay = fallbackDealIndex * 130;
+        if (ordered !== undefined) return ordered * 280;
+        const delay = fallbackDealIndex * 280;
         fallbackDealIndex += 1;
         return delay;
     }
@@ -94,21 +114,25 @@
 
     function renderDealer() {
         const hideHole = isRoundHiddenDealerCard();
-        els.dealerCards.innerHTML = state.dealerHand.length
-            ? state.dealerHand.map((card, index) => renderCard(card, hideHole && index === 1, `dealer-card-${index}`)).join("")
+        const dealerHand = dealerAnimation
+            ? state.dealerHand.slice(0, dealerAnimation.visibleDealerCount)
+            : state.dealerHand;
+
+        els.dealerCards.innerHTML = dealerHand.length
+            ? dealerHand.map((card, index) => renderCard(card, hideHole && index === 1, `dealer-card-${index}`)).join("")
             : '<div class="empty-slot"></div><div class="empty-slot"></div>';
 
-        if (!state.dealerHand.length) {
+        if (!dealerHand.length) {
             els.dealerTotal.textContent = "";
             return;
         }
 
         if (hideHole) {
-            els.dealerTotal.textContent = String(game.handValue([state.dealerHand[0]]).total);
+            els.dealerTotal.textContent = String(game.handValue([dealerHand[0]]).total);
             return;
         }
 
-        const dealerValue = game.handValue(state.dealerHand);
+        const dealerValue = game.handValue(dealerHand);
         els.dealerTotal.textContent = dealerValue.bust ? "Bust" : String(dealerValue.total);
     }
 
@@ -131,7 +155,7 @@
                 `<div class="cards">${hand.cards.map((card, cardIndex) => renderCard(card, false, `player-${index}-card-${cardIndex}`)).join("")}</div>`,
                 '<div class="hand-footer">',
                 `<span>${game.formatMoney(hand.bet)}${hand.doubled ? " doubled" : ""}</span>`,
-                handResultLabel(hand),
+                dealerAnimation ? "" : handResultLabel(hand),
                 "</div>",
                 "</article>"
             ].join("");
@@ -142,6 +166,13 @@
     }
 
     function renderControls() {
+        if (dealerAnimation) {
+            els.bettingControls.hidden = true;
+            els.insuranceControls.hidden = true;
+            els.actionControls.hidden = true;
+            return;
+        }
+
         const betting = state.status === "betting" || state.status === "roundOver";
         const insurance = state.status === "insurance";
         const playing = state.status === "playing";
@@ -179,9 +210,9 @@
         const balanceText = game.formatMoney(state.balance);
         const betText = game.formatMoney(state.currentBet);
         const shoeText = String(state.shoe.length);
-        const statusText = state.balance < state.rules.minBet && state.status !== "playing"
+        const statusText = dealerAnimation?.message || (state.balance < state.rules.minBet && state.status !== "playing"
             ? "Out of chips. Reset bankroll to play again."
-            : state.message;
+            : state.message);
 
         els.balance.textContent = balanceText;
         els.shoeCount.textContent = shoeText;
@@ -209,7 +240,68 @@
         previousCardSlots = currentCardSlots;
     }
 
+    function shouldAnimateDealerTurn(previousState, nextState) {
+        if (previousState.status !== "playing" || nextState.status !== "roundOver") return false;
+        if (nextState.dealerHand.length < 2) return false;
+
+        return nextState.playerHands.some((hand) => !game.handValue(hand.cards).bust);
+    }
+
+    function dealerStatusMessage() {
+        const visibleCards = state.dealerHand.slice(0, dealerAnimation.visibleDealerCount);
+        const value = game.handValue(visibleCards);
+
+        if (!dealerAnimation.holeRevealed) return "Dealer turns over the hole card.";
+        if (value.bust) return `Dealer busts with ${value.total}.`;
+        if (dealerAnimation.visibleDealerCount < state.dealerHand.length) return `Dealer has ${value.total}. Taking another card...`;
+        return `Dealer stands on ${value.total}.`;
+    }
+
+    async function animateDealerTurn() {
+        const token = dealerAnimationToken + 1;
+        dealerAnimationToken = token;
+        dealerAnimation = {
+            holeRevealed: false,
+            visibleDealerCount: Math.min(2, state.dealerHand.length),
+            message: "Dealer checks the hole card..."
+        };
+        render();
+
+        await sleep(DEALER_REVEAL_PAUSE_MS);
+        if (token !== dealerAnimationToken) return;
+        dealerAnimation.holeRevealed = true;
+        dealerAnimation.message = dealerStatusMessage();
+        render();
+
+        while (dealerAnimation.visibleDealerCount < state.dealerHand.length) {
+            await sleep(DEALER_HIT_PAUSE_MS);
+            if (token !== dealerAnimationToken) return;
+            dealerAnimation.visibleDealerCount += 1;
+            dealerAnimation.message = dealerStatusMessage();
+            render();
+        }
+
+        await sleep(DEALER_SETTLE_PAUSE_MS);
+        if (token !== dealerAnimationToken) return;
+        dealerAnimation = null;
+        render();
+    }
+
+    function applyAction(action) {
+        if (dealerAnimation) return;
+        const previousState = cloneState(state);
+        state = action(state);
+
+        if (shouldAnimateDealerTurn(previousState, state)) {
+            animateDealerTurn();
+            return;
+        }
+
+        render();
+    }
+
     function updateBet(amount) {
+        if (dealerAnimation) return;
         state = game.setBet(state, amount);
         render();
     }
@@ -221,38 +313,33 @@
     els.betDownButton.addEventListener("click", () => updateBet(state.currentBet - 5));
     els.betUpButton.addEventListener("click", () => updateBet(state.currentBet + 5));
     els.dealButton.addEventListener("click", () => {
-        state = game.startRound(state);
-        render();
+        applyAction((currentState) => game.startRound(currentState));
     });
     els.hitButton.addEventListener("click", () => {
-        state = game.hit(state);
-        render();
+        applyAction((currentState) => game.hit(currentState));
     });
     els.standButton.addEventListener("click", () => {
-        state = game.stand(state);
-        render();
+        applyAction((currentState) => game.stand(currentState));
     });
     els.doubleButton.addEventListener("click", () => {
-        state = game.doubleDown(state);
-        render();
+        applyAction((currentState) => game.doubleDown(currentState));
     });
     els.splitButton.addEventListener("click", () => {
-        state = game.split(state);
-        render();
+        applyAction((currentState) => game.split(currentState));
     });
     els.insuranceButton.addEventListener("click", () => {
-        state = game.takeInsurance(state);
-        render();
+        applyAction((currentState) => game.takeInsurance(currentState));
     });
     els.declineInsuranceButton.addEventListener("click", () => {
-        state = game.declineInsurance(state);
-        render();
+        applyAction((currentState) => game.declineInsurance(currentState));
     });
     els.newShoeButton.addEventListener("click", () => {
+        cancelDealerAnimation();
         state = game.newShoe(state);
         render();
     });
     els.resetButton.addEventListener("click", () => {
+        cancelDealerAnimation();
         state = game.resetBankroll(state);
         render();
     });

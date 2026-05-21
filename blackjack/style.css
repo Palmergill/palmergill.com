@@ -11,7 +11,7 @@ body {
     color: #fff8df;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     -webkit-tap-highlight-color: transparent;
-    animation: pageFadeIn 360ms ease-out both;
+    animation: pageFadeIn 620ms ease-out both;
 }
 
 button {
@@ -103,7 +103,7 @@ h1 {
         inset 0 0 0 2px #d6a64b,
         inset 0 0 86px rgba(0, 0, 0, 0.42),
         0 24px 58px rgba(0, 0, 0, 0.35);
-    animation: tableSettle 520ms cubic-bezier(.2, .75, .2, 1) both;
+    animation: tableSettle 860ms cubic-bezier(.2, .75, .2, 1) both;
 }
 
 .table::after {
@@ -143,7 +143,7 @@ h1 {
     font-size: 0.76rem;
     font-weight: 950;
     text-transform: uppercase;
-    animation: feltTextIn 420ms ease-out 160ms both;
+    animation: feltTextIn 700ms ease-out 260ms both;
 }
 
 .dealer-zone,
@@ -153,11 +153,11 @@ h1 {
     display: grid;
     align-content: start;
     gap: 13px;
-    animation: zoneRise 420ms ease-out both;
+    animation: zoneRise 700ms ease-out both;
 }
 
 .player-zone {
-    animation-delay: 80ms;
+    animation-delay: 140ms;
 }
 
 .zone-heading {
@@ -204,7 +204,7 @@ h1 {
 }
 
 .deal-card {
-    animation: dealCard 360ms cubic-bezier(.16, .84, .28, 1.16) var(--deal-delay, 0ms) both;
+    animation: dealCard 760ms cubic-bezier(.16, .84, .28, 1.16) var(--deal-delay, 0ms) both;
 }
 
 .card span:last-child {
@@ -228,26 +228,26 @@ h1 {
         linear-gradient(135deg, rgba(255,255,255,0.28) 25%, transparent 25%) 0 0 / 16px 16px,
         linear-gradient(225deg, rgba(255,255,255,0.24) 25%, transparent 25%) 0 0 / 16px 16px,
         #a51d2d;
-    animation: cardBackShimmer 2200ms linear infinite;
+    animation: cardBackShimmer 3400ms linear infinite;
 }
 
 .card-back.deal-card {
     animation-name: dealCard, cardBackShimmer;
-    animation-duration: 360ms, 2200ms;
-    animation-delay: var(--deal-delay, 0ms), calc(var(--deal-delay, 0ms) + 520ms);
+    animation-duration: 760ms, 3400ms;
+    animation-delay: var(--deal-delay, 0ms), calc(var(--deal-delay, 0ms) + 900ms);
     animation-timing-function: cubic-bezier(.16, .84, .28, 1.16), linear;
     animation-iteration-count: 1, infinite;
     animation-fill-mode: both, none;
 }
 
 .reveal-card {
-    animation: revealCard 280ms ease-out both;
+    animation: revealCard 720ms ease-out both;
 }
 
 .empty-slot {
     border: 2px dashed rgba(255, 236, 177, 0.32);
     background: rgba(0, 0, 0, 0.1);
-    animation: emptySlotIn 420ms ease-out both;
+    animation: emptySlotIn 680ms ease-out both;
 }
 
 .hands {
@@ -270,7 +270,7 @@ h1 {
 .hand-panel.active {
     border-color: rgba(244, 201, 106, 0.9);
     box-shadow: 0 0 0 2px rgba(244, 201, 106, 0.2), 0 0 22px rgba(244, 201, 106, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.06);
-    animation: activeHandGlow 1800ms ease-in-out 380ms infinite;
+    animation: activeHandGlow 2600ms ease-in-out 620ms infinite;
 }
 
 .empty-hand {
@@ -304,7 +304,7 @@ h1 {
     font-size: 0.72rem;
     font-weight: 950;
     text-transform: uppercase;
-    animation: resultPop 360ms cubic-bezier(.16, .84, .28, 1.16) both;
+    animation: resultPop 680ms cubic-bezier(.16, .84, .28, 1.16) both;
 }
 
 .result-pill.win,
@@ -332,7 +332,7 @@ h1 {
     border-radius: 8px;
     background: rgba(7, 14, 12, 0.84);
     box-shadow: 0 24px 58px rgba(0, 0, 0, 0.35);
-    animation: panelSlideIn 480ms ease-out 80ms both;
+    animation: panelSlideIn 760ms ease-out 140ms both;
 }
 
 .panel-title {
@@ -360,7 +360,7 @@ h1 {
     color: #fff0bd;
     font-weight: 800;
     line-height: 1.35;
-    transition: border-color 160ms ease, background 160ms ease, transform 160ms ease;
+    transition: border-color 240ms ease, background 240ms ease, transform 240ms ease;
 }
 
 .betting-controls {
@@ -410,7 +410,7 @@ h1 {
         inset 0 0 0 8px rgba(127, 29, 29, 0.95),
         inset 0 -7px 10px rgba(0, 0, 0, 0.22),
         0 9px 18px rgba(0, 0, 0, 0.32);
-    transition: transform 140ms ease, filter 140ms ease, box-shadow 140ms ease;
+    transition: transform 220ms ease, filter 220ms ease, box-shadow 220ms ease;
 }
 
 .chip-button:nth-child(2) {
@@ -472,7 +472,7 @@ h1 {
 .action-grid:not([hidden]),
 .betting-controls:not([hidden]),
 .insurance-controls:not([hidden]) {
-    animation: controlsIn 260ms ease-out both;
+    animation: controlsIn 460ms ease-out both;
 }
 
 .primary-button,
@@ -484,7 +484,7 @@ h1 {
     border-radius: 8px;
     cursor: pointer;
     font-weight: 900;
-    transition: transform 140ms ease, filter 140ms ease, box-shadow 140ms ease, border-color 140ms ease;
+    transition: transform 220ms ease, filter 220ms ease, box-shadow 220ms ease, border-color 220ms ease;
 }
 
 .primary-button {
@@ -538,11 +538,11 @@ button:disabled {
 }
 
 .value-pop {
-    animation: valuePop 320ms cubic-bezier(.16, .84, .28, 1.16) both;
+    animation: valuePop 560ms cubic-bezier(.16, .84, .28, 1.16) both;
 }
 
 .message-pop {
-    animation: messagePop 320ms ease-out both;
+    animation: messagePop 560ms ease-out both;
 }
 
 [hidden] {

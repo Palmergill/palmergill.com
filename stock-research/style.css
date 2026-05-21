@@ -1884,7 +1884,7 @@ canvas {
 /* Price chart cursor */
 #priceChart {
     cursor: crosshair;
-    touch-action: manipulation; /* Optimize for touch */
+    touch-action: pan-y;
     -webkit-tap-highlight-color: transparent; /* Remove tap highlight on mobile */
 }
 
@@ -2099,8 +2099,21 @@ body.chart-modal-open {
 
 /* Touch device optimizations */
 @media (pointer: coarse) {
-    #priceChart {
-        cursor: pointer;
+    .chart-wrapper,
+    #priceChart,
+    #epsChart,
+    #revenueChart,
+    #fcfChart,
+    #peChart {
+        touch-action: pan-y;
+    }
+
+    #priceChart,
+    #epsChart,
+    #revenueChart,
+    #fcfChart,
+    #peChart {
+        cursor: default;
     }
     
     .chart-modal-backdrop {
