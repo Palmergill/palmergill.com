@@ -6,10 +6,6 @@ This documents the active poker API served by the shared backend at `backend/app
 
 **Local URL:** `http://127.0.0.1:8000/api/poker` when running `./start.sh` from the repo root.
 
-## Important Note
-
-The repository also contains `poker/backend/`, a standalone FastAPI poker service with many additional endpoints such as tournaments, persistence, CSRF, analytics, detailed health, backups, and spectators. The root Railway deployment does not run that service. Production uses the shared backend in `backend/`.
-
 ## Authentication
 
 `/api/poker/*` is public in both Vercel middleware and the shared FastAPI auth middleware. The API identifies and authorizes players with the `player_id` and `player_token` returned when creating or joining a game. Keep the token client-side; mutating requests and state polling require it.

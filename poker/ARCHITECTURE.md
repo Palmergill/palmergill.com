@@ -24,16 +24,13 @@ graph TB
 
 Production Vercel serves the static frontend and rewrites `/api/*` to the Railway backend. Railway is built from the root `Dockerfile`, which copies `backend/` and runs `uvicorn app.main:app`.
 
-## Repository Split
-
-There are two poker backend code paths:
+## Backend Code Path
 
 | Path | Status | Purpose |
 | --- | --- | --- |
 | `backend/app/routers/poker.py` plus `backend/app/poker_game.py` | Active in root deployment | Public poker API used by `/poker/`. |
-| `poker/backend/` | Standalone/reference service | Richer poker backend with its own tests, config, persistence, analytics, tournaments, CSRF, and deployment files. It is not copied by the root Dockerfile. |
 
-When changing production poker behavior, update the shared backend under `backend/app/` unless the deployment model is intentionally changed.
+When changing production poker behavior, update the shared backend under `backend/app/`.
 
 ## Frontend
 
@@ -106,4 +103,4 @@ npm test
 
 The root Jest config currently includes `poker/tests`, `craps/tests`, and `blackjack/tests`.
 
-The standalone backend under `poker/backend/` has its own pytest suite, but those tests target the standalone service rather than the active shared router.
+Add backend API tests under the shared backend if poker router behavior changes.

@@ -8,8 +8,7 @@
     "test:coverage": "jest --coverage"
   },
   "dependencies": {
-    "@vercel/functions": "^3.5.0",
-    "chart.js": "^4.5.1"
+    "@vercel/functions": "^3.5.0"
   },
   "devDependencies": {
     "jest": "^29.7.0",
@@ -17,8 +16,14 @@
   },
   "jest": {
     "testEnvironment": "jsdom",
-    "roots": ["poker/tests", "craps/tests", "blackjack/tests"],
-    "testMatch": ["**/*.test.js"],
+    "roots": [
+      "poker/tests",
+      "craps/tests",
+      "blackjack/tests"
+    ],
+    "testMatch": [
+      "**/*.test.js"
+    ],
     "collectCoverageFrom": [
       "poker/**/*.js",
       "!poker/tests/**",

@@ -56,4 +56,4 @@ Poker, craps, and `/api/poker/*` remain public. Stock research, Bitcoin chat, ad
 - `/api/bitcoin/*` - Bitcoin provider status, block/transaction/mempool lookups, and chat.
 - `/api/admin/*` - protected structured log and file-tail endpoints.
 
-The root deployment runs this shared backend. `poker/backend/` is a separate standalone poker service and is not imported here.
+The root deployment runs this shared backend. Poker is served by `app/routers/poker.py` plus the shared game and AI modules.

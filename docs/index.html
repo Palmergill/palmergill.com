@@ -189,7 +189,6 @@
                     <li>Static hosting serves the repo root and active app directories.</li>
                     <li>Vercel rewrites <code>/api/*</code> to the Railway backend.</li>
                     <li>Railway builds from the root <code>Dockerfile</code> and runs <code>backend/app/main.py</code>.</li>
-                    <li>The root Dockerfile copies <code>backend/</code>; the standalone <code>poker/backend/</code> service is retained for reference.</li>
                 </ul>
                 <p>The Railway runtime command is:</p>
                 <pre><code>uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}</code></pre>
@@ -365,7 +364,7 @@
                 <pre><code>npm test</code></pre>
                 <pre><code>npm run test:watch</code></pre>
                 <pre><code>npm run test:coverage</code></pre>
-                <p>Backend-specific tests also exist under <code>poker/backend/tests/</code> for the standalone poker service.</p>
+                <p>Backend API behavior should be covered by tests around the shared FastAPI routers when those routes change.</p>
             </section>
 
             <section id="repo-layout" class="doc-section">
@@ -377,12 +376,11 @@
                     <code>shared/</code><span>Shared navigation assets used by project pages.</span>
                     <code>backend/</code><span>Active shared FastAPI API service.</span>
                     <code>stock-research/</code><span>Stock research frontend.</span>
-                    <code>poker/</code><span>Poker frontend, tests, docs, and standalone backend reference code.</span>
+                    <code>poker/</code><span>Poker frontend, tests, and docs.</span>
                     <code>craps/</code><span>Craps frontend and tests.</span>
                     <code>blackjack/</code><span>Blackjack frontend and tests.</span>
                     <code>bitcoin-chat/</code><span>Bitcoin chat frontend.</span>
                     <code>admin/</code><span>Protected log dashboard.</span>
-                    <code>archive/</code><span>Legacy frontends, demos, and planning artifacts.</span>
                 </div>
             </section>
 

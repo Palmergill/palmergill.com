@@ -32,8 +32,6 @@ The active public site is static:
 - `/bitcoin-chat/` - Bitcoin chat app
 - `/admin/` - protected backend log dashboard
 
-Earlier stock-app frontends are retained under `archive/` and are not served by default.
-
 ## Backend
 
 The backend is a FastAPI service in `backend/app`.
@@ -49,7 +47,7 @@ Important routes:
 
 In production, `/` returns API metadata from the Railway API service. In local development, `./start.sh` sets `LOCAL_SITE_ROOT=true`, which makes FastAPI serve the root portfolio page and active static project folders from the same process. The local `/docs` path remains FastAPI's generated API documentation path, so the static website docs page is a production/static-host route.
 
-The active deployed API is `backend/app/main.py`. `poker/backend/` contains a standalone poker service with additional endpoints, tests, and deployment files, but the root `Dockerfile` does not copy or run it.
+The active deployed API is `backend/app/main.py`. Poker routes are part of this shared backend.
 
 ## Local Development
 

@@ -1,6 +1,6 @@
 # Poker Task List
 
-This list tracks the poker app as it is currently wired into the root site. The active production API is the shared backend under `backend/app/`; the standalone `poker/backend/` service is retained separately.
+This list tracks the poker app as it is currently wired into the root site. The active production API is the shared backend under `backend/app/`.
 
 ## Current Active Features
 
@@ -19,8 +19,6 @@ This list tracks the poker app as it is currently wired into the root site. The 
 
 ## High Priority
 
-- [ ] Decide whether `poker/backend/` is a legacy/reference service or should replace the shared `backend/app/routers/poker.py` implementation.
-- [ ] If the standalone service is not going live, remove or archive references to its inactive endpoints from any user-facing docs.
 - [ ] Add API tests for the active shared poker router in `backend/app/routers/poker.py`.
 - [ ] Verify the production `/poker/` frontend against the shared backend after each API change.
 
@@ -29,12 +27,12 @@ This list tracks the poker app as it is currently wired into the root site. The 
 - [ ] Persist active games across backend restarts.
 - [ ] Add optional user accounts or durable player sessions.
 - [ ] Add server-side hand history if it is still a product goal.
-- [ ] Add chat only after choosing the active backend implementation.
+- [ ] Add chat only after defining the shared backend API surface.
 - [ ] Evaluate WebSockets for lower-latency multiplayer updates.
 - [ ] Consider Redis or another shared store before horizontal scaling.
 
 ## Documentation
 
 - [x] Update API docs to match the active shared backend.
-- [x] Update architecture docs to explain the shared backend versus standalone backend split.
+- [x] Update architecture docs to explain the shared backend.
 - [x] Update contributor setup to use the root `./start.sh` and root Jest test flow.

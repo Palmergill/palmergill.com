@@ -57,7 +57,7 @@ http://127.0.0.1:8000/poker/
 npm test
 ```
 
-The root Jest config runs frontend tests for poker, craps, and blackjack. The separate `poker/backend/` pytest suite targets the standalone poker backend, not the shared production router.
+The root Jest config runs frontend tests for poker, craps, and blackjack.
 
 ## Code Style
 
@@ -107,7 +107,6 @@ Use clear, descriptive commit messages:
 [docs] Clarify active poker API
 
 - Document shared backend endpoints
-- Note standalone backend is not part of root Railway deploy
 - Update related setup notes
 ```
 
@@ -134,7 +133,6 @@ Use a short prefix when it helps, but keep the subject focused on the behavior o
 
 Check `TASKS.md` for incomplete tasks. Priority areas:
 
-- **Backend alignment**: Decide whether production should keep using the shared backend or move to `poker/backend/`
 - **Testing**: Add tests for the active shared poker router
 - **Documentation**: User guides, API docs
 - **Performance**: WebSocket migration from polling

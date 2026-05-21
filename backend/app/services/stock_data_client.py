@@ -365,4 +365,3 @@ class StockDataClient:
 
 # Singleton instance
 stock_data_client = StockDataClient()
-yfinance_client = stock_data_client  # Backwards compatibility

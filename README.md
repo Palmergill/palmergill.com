@@ -69,13 +69,10 @@ poker/            Active poker frontend and supporting docs/tests
 craps/            Active craps frontend
 blackjack/        Active blackjack frontend and tests
 bitcoin-chat/     Active Bitcoin chat frontend
-archive/          Legacy frontends, demos, and planning artifacts
 ```
 
 ## Notes
 
-The original site started as only the stock research app. Legacy versions of that UI have been moved into `archive/` so active entrypoints are easier to identify.
-
 Bitcoin Chat production node, Cloudflare Tunnel, and Railway setup are documented in [docs/BITCOIN_CHAT_SETUP.md](docs/BITCOIN_CHAT_SETUP.md).
 
-The production Railway Dockerfile copies and runs `backend/`. The richer standalone poker backend under `poker/backend/` is retained for reference/development and is not part of the root Railway deployment unless the deployment configuration is changed.
+The production Railway Dockerfile copies and runs `backend/`. Poker uses the shared backend router under `backend/app/routers/poker.py`.
