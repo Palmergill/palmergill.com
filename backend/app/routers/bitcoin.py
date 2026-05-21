@@ -30,6 +30,7 @@ async def bitcoin_health():
         "status": "ok" if not status.get("error") else "degraded",
         "source": status.get("source"),
         "node_configured": status.get("source") == "node",
+        "live_data_available": status.get("source") in ("node", "mempool.space"),
         "warnings": status.get("warnings", []),
     }
 

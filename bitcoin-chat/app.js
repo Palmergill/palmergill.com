@@ -14,7 +14,7 @@ let sessionId = localStorage.getItem('bitcoinChatSessionId');
 
 const starterMessage = {
     role: 'assistant',
-    text: 'Ask anything Bitcoin. I use live node data when needed.',
+    text: 'Ask anything Bitcoin. I use live Bitcoin data when needed.',
 };
 
 function addMessage({ role, text, data, warnings, toolsUsed, loading = false, error = false }) {
@@ -213,7 +213,7 @@ function appendSourceSummary(parent, { data, toolsUsed, warnings } = {}) {
 
     const heading = document.createElement('div');
     heading.className = 'source-heading';
-    heading.textContent = hasTools || hasData ? 'Node-backed context' : 'Note';
+    heading.textContent = hasTools || hasData ? 'Live Bitcoin context' : 'Note';
     source.appendChild(heading);
 
     const items = document.createElement('div');
@@ -258,8 +258,13 @@ async function fetchJson(url, options) {
 async function refreshStatus() {
     try {
         const status = await fetchJson(`${API_BASE}/status`);
-        const source = status.source === 'node' ? 'Node connected' : 'Demo mode';
-        setNodeStatus(source, status.source === 'node');
+        const liveSource = status.source === 'node' || status.source === 'mempool.space';
+        const source = status.source === 'node'
+            ? 'Node connected'
+            : status.source === 'mempool.space'
+                ? 'mempool.space connected'
+                : 'Demo mode';
+        setNodeStatus(source, liveSource);
         heightPill.textContent = `Height ${status.blocks ?? '--'}`;
         syncPill.textContent = status.initial_block_download ? 'Syncing' : 'Synced';
         chainPill.textContent = status.chain || 'Mainnet';

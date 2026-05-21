@@ -57,7 +57,7 @@ BITCOIN_CONTEXT_PHRASES = (
     "fee estimate",
     "confirmation fee",
     "confirmations",
-    "node status",
+    "provider status",
     "sync status",
     "mined today",
     "mined yesterday",
@@ -105,20 +105,20 @@ OUT_OF_SCOPE_CONTEXT_TERMS = (
 )
 OUT_OF_SCOPE_ANSWER = (
     "I can only answer questions that are specifically about Bitcoin or directly tied to Bitcoin. "
-    "Try asking about blocks, transactions, mempool fees, node status, mining, difficulty, UTXOs, or other Bitcoin concepts."
+    "Try asking about blocks, transactions, mempool fees, provider status, mining, difficulty, UTXOs, or other Bitcoin concepts."
 )
 
 _SESSION_MESSAGES: Dict[str, List[Dict[str, str]]] = {}
 
-SYSTEM_PROMPT = """You are Palmer's Bitcoin AI: a precise, practical Bitcoin expert grounded in Palmer's read-only Bitcoin Core node.
+SYSTEM_PROMPT = """You are Palmer's Bitcoin AI: a precise, practical Bitcoin expert grounded in live read-only Bitcoin data.
 
 Expected outcome:
 - Answer with concise Markdown: short paragraphs, bullets for grouped facts, and bold labels for key values.
-- Use node tools for live chain, mempool, block, transaction, fee, and mined-BTC questions.
-- Answer conceptual Bitcoin questions directly when live node data is not needed.
+- Use live data tools for chain, mempool, block, transaction, fee, and mined-BTC questions.
+- Answer conceptual Bitcoin questions directly when live data is not needed.
 - Only answer questions that are specifically about Bitcoin or directly tied to Bitcoin.
 - If a user asks about any other topic, refuse briefly and invite a Bitcoin-specific question.
-- Clearly separate facts from interpretation and say what the node could not verify.
+- Clearly separate facts from interpretation and say what the data provider could not verify.
 - Use BTC for bitcoin amounts, sats/vB for fee rates, UTC timestamps unless the user supplied a timezone.
 
 Hard boundaries:
@@ -133,7 +133,7 @@ TOOL_SCHEMAS = [
     {
         "type": "function",
         "name": "get_node_status",
-        "description": "Get Bitcoin Core sync status, chain, current block height, headers, and verification progress.",
+        "description": "Get Bitcoin data provider status, chain, current block height, headers, and verification progress.",
         "strict": True,
         "parameters": {
             "type": "object",
@@ -145,7 +145,7 @@ TOOL_SCHEMAS = [
     {
         "type": "function",
         "name": "get_latest_block",
-        "description": "Get the current chain tip block from the node, including height, hash, timestamp, transaction count, size, weight, and subsidy.",
+        "description": "Get the current chain tip block from live Bitcoin data, including height, hash, timestamp, transaction count, size, weight, and subsidy.",
         "strict": True,
         "parameters": {
             "type": "object",
@@ -381,7 +381,7 @@ def _answer_with_local_router(message: str, session_id: str, timezone_name: str 
     tools_used.append("get_latest_block")
     warnings.extend(data.get("warnings", []))
     return _response(
-        "I can answer live node questions about blocks, transactions, node sync, mempool fees, and mined BTC. The latest chain tip I can see is included below.",
+        "I can answer live Bitcoin questions about blocks, transactions, provider status, mempool fees, and mined BTC. The latest chain tip I can see is included below.",
         session_id,
         tools_used,
         data,

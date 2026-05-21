@@ -2,7 +2,7 @@
 
 This documents the production wiring for the Bitcoin Chat app at `/bitcoin-chat/`.
 
-Last reviewed against the repo on May 15, 2026.
+Last reviewed against the repo on May 21, 2026.
 
 ## Architecture
 
@@ -10,12 +10,24 @@ Last reviewed against the repo on May 15, 2026.
 bitcoin-chat frontend
   -> /api/bitcoin/*
   -> Railway FastAPI backend
-  -> Cloudflare Tunnel
-  -> Mac mini Bitcoin-Qt RPC
-  -> Bitcoin Core node data on external SSD
+  -> mempool.space public API by default
+  -> optional Cloudflare Tunnel / Mac mini Bitcoin-Qt RPC fallback
+  -> optional Bitcoin Core node data on external SSD
 ```
 
-The Bitcoin node runs on the Mac mini with its data directory on:
+By default the backend uses the public mempool.space API:
+
+```bash
+BITCOIN_DATA_PROVIDER=mempool
+BITCOIN_MEMPOOL_API_URL=https://mempool.space/api
+BITCOIN_MEMPOOL_TIMEOUT_SECONDS=10
+```
+
+Set `BITCOIN_DATA_PROVIDER=rpc` only if you want to use the private Bitcoin Core RPC node.
+
+## Optional Bitcoin Core RPC Config
+
+The optional Bitcoin node runs on the Mac mini with its data directory on:
 
 ```text
 /Volumes/SSD/Bitcoin Node/bitcoin
@@ -75,10 +87,9 @@ The tunnel connector must show as healthy in Cloudflare Zero Trust.
 Set these variables in the Railway backend service:
 
 ```bash
-BITCOIN_RPC_URL=https://bitcoin-rpc.palmergill.com/
-BITCOIN_RPC_USER=railway_bitcoin_chat
-BITCOIN_RPC_PASSWORD=<exact rpcpassword from bitcoin.conf>
-BITCOIN_RPC_TIMEOUT_SECONDS=20
+BITCOIN_DATA_PROVIDER=mempool
+BITCOIN_MEMPOOL_API_URL=https://mempool.space/api
+BITCOIN_MEMPOOL_TIMEOUT_SECONDS=10
 BITCOIN_NETWORK=main
 BITCOIN_MAX_MINED_STATS_BLOCKS=1008
 BITCOIN_CHAT_MAX_TOOL_CALLS=6
@@ -90,9 +101,19 @@ BITCOIN_CHAT_VERBOSITY=medium
 OPENAI_API_KEY=<OpenAI API key for natural-language chat>
 ```
 
+If switching back to the private Bitcoin Core node, set:
+
+```bash
+BITCOIN_DATA_PROVIDER=rpc
+BITCOIN_RPC_URL=https://bitcoin-rpc.palmergill.com/
+BITCOIN_RPC_USER=railway_bitcoin_chat
+BITCOIN_RPC_PASSWORD=<exact rpcpassword from bitcoin.conf>
+BITCOIN_RPC_TIMEOUT_SECONDS=20
+```
+
 If the password ends with `=`, include the trailing `=` in Railway. Do not wrap the value in quotes.
 
-`OPENAI_API_KEY` is optional for node smoke tests. When it is missing, `/api/bitcoin/chat` falls back to deterministic read-only answers for blocks, transactions, fees, node status, and mined-BTC queries. Set it to enable the natural-language Bitcoin assistant and technical explanations.
+`OPENAI_API_KEY` is optional for smoke tests. When it is missing, `/api/bitcoin/chat` falls back to deterministic read-only answers for blocks, transactions, fees, provider status, and mined-BTC queries. Set it to enable the natural-language Bitcoin assistant and technical explanations.
 
 `BITCOIN_CHAT_MODEL_TIMEOUT_SECONDS` controls the model call timeout, and `BITCOIN_CHAT_MAX_SESSION_MESSAGES` caps the rolling chat history kept per session.
 
