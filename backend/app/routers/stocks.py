@@ -30,7 +30,9 @@ async def search_stocks_endpoint(q: str = Query(..., min_length=1), limit: int =
                 results = search_stocks(q, limit)
         return {"results": results, "query": q}
     except Exception as e:
-        raise HTTPException(status_code=stock_error_status(e), detail=f"Could not search stocks: {str(e)}")
+        status = stock_error_status(e)
+        detail = "Stock data temporarily unavailable" if status == 503 else f"No results found for '{q}'"
+        raise HTTPException(status_code=status, detail=detail)
 
 
 @router.get("/{ticker}/earnings")
@@ -40,7 +42,9 @@ async def get_earnings(ticker: str, db: Session = Depends(get_db)):
         data = stock_data_client.get_stock_data(ticker, db)
         return {"ticker": ticker, "earnings": data["earnings"]}
     except Exception as e:
-        raise HTTPException(status_code=stock_error_status(e), detail=f"Could not fetch earnings for {ticker}: {str(e)}")
+        status = stock_error_status(e)
+        detail = "Stock data temporarily unavailable" if status == 503 else f"Earnings data not found for '{ticker}'"
+        raise HTTPException(status_code=status, detail=detail)
 
 
 @router.get("/{ticker}/prices")
@@ -55,7 +59,9 @@ async def get_price_history(ticker: str, days: int = 365):
             "prices": price_history
         }
     except Exception as e:
-        raise HTTPException(status_code=stock_error_status(e), detail=f"Could not fetch prices for {ticker}: {str(e)}")
+        status = stock_error_status(e)
+        detail = "Stock data temporarily unavailable" if status == 503 else f"Price history not found for '{ticker}'"
+        raise HTTPException(status_code=status, detail=detail)
 
 
 @router.get("/{ticker}")

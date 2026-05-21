@@ -3729,7 +3729,7 @@
                 <h1>Texas Hold'em</h1>
                 <div class="hand-info">
                     <span class="hand-num">Hand #<span id="hand-number">1</span></span>
-                    <span class="phase" id="phase">Pre-Flop</span>
+                    <span class="phase" id="phase" aria-live="polite">Pre-Flop</span>
                 </div>
             </div>
 
@@ -3741,7 +3741,7 @@
                 </div>
                 
                 <!-- AI Action Indicator -->
-                <div class="ai-action-indicator" id="ai-action-indicator"></div>
+                <div class="ai-action-indicator" id="ai-action-indicator" aria-live="polite" aria-atomic="true"></div>
 
                 <div class="pot-container">
                     <div class="pot">
@@ -3768,7 +3768,7 @@
                 <div class="your-cards" id="your-cards">
                     <!-- Your cards rendered by JS -->
                 </div>
-                <div class="hand-strength" id="hand-strength"></div>
+                <div class="hand-strength" id="hand-strength" aria-live="polite" aria-atomic="true"></div>
                 <div class="decision-timer hidden" id="decision-timer">
                     <span class="timer-text" id="timer-text">Your turn - 30s</span>
                     <div class="timer-bar">
@@ -3847,6 +3847,6 @@
     </div>
 
     <script src="/shared/site-nav.js?v=4"></script>
-    <script src="app.js?v=10"></script>
+    <script src="app.js?v=11"></script>
 </body>
 </html>
