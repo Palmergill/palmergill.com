@@ -302,173 +302,114 @@
             letter-spacing: 0;
         }
 
-        .projects-grid {
+        .projects-list {
             display: grid;
-            grid-template-columns: repeat(12, minmax(0, 1fr));
-            align-items: stretch;
-            gap: 18px;
-            perspective: 1400px;
+            gap: 28px;
         }
 
-        .project-card {
+        .feature-card {
             position: relative;
-            min-height: 390px;
-            grid-column: span 4;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-            overflow: hidden;
-            padding: 26px;
+            display: grid;
+            grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
+            gap: clamp(24px, 3.4vw, 44px);
+            padding: clamp(26px, 3vw, 38px);
             border: 1px solid var(--line);
             border-radius: var(--radius);
             background:
                 linear-gradient(145deg, rgba(255, 255, 255, 0.105), rgba(255, 255, 255, 0.026)),
                 var(--panel);
             color: var(--text);
-            text-decoration: none;
             box-shadow: 0 18px 70px rgba(0, 0, 0, 0.16);
-            transform-style: preserve-3d;
-            transition: transform 520ms cubic-bezier(0.22, 1, 0.36, 1), border-color 220ms ease, box-shadow 220ms ease, background 220ms ease;
+            overflow: hidden;
+            isolation: isolate;
         }
 
-        .project-card::before {
+        .feature-card::before {
             content: "";
             position: absolute;
             inset: 0;
+            z-index: -1;
             background:
-                linear-gradient(135deg, color-mix(in srgb, var(--accent) 36%, transparent), transparent 44%),
-                radial-gradient(circle at 82% 12%, color-mix(in srgb, var(--accent) 25%, transparent), transparent 32%);
-            opacity: 0.82;
+                linear-gradient(135deg, color-mix(in srgb, var(--accent) 28%, transparent), transparent 46%),
+                radial-gradient(circle at 90% 10%, color-mix(in srgb, var(--accent) 22%, transparent), transparent 38%);
+            opacity: 0.78;
             pointer-events: none;
-            backface-visibility: hidden;
-            -webkit-backface-visibility: hidden;
         }
 
-        .project-card::after {
+        .feature-card::after {
             content: "";
             position: absolute;
             inset: auto 0 0;
             height: 1px;
             background: linear-gradient(90deg, transparent, var(--accent), transparent);
-            opacity: 0.62;
-            backface-visibility: hidden;
-            -webkit-backface-visibility: hidden;
+            opacity: 0.6;
         }
 
-        .project-card:hover,
-        .project-card:focus-visible {
-            transform: translateY(-6px);
-            border-color: color-mix(in srgb, var(--accent) 52%, rgba(255, 255, 255, 0.16));
-            box-shadow: var(--shadow);
-            outline: none;
+        .feature-card[data-flip="true"] {
+            grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
         }
 
-        .project-top,
-        .project-bottom {
-            position: relative;
-            z-index: 1;
-            backface-visibility: hidden;
-            -webkit-backface-visibility: hidden;
-            transition: opacity 260ms ease, transform 520ms cubic-bezier(0.22, 1, 0.36, 1);
+        .feature-card[data-flip="true"] .feature-body {
+            order: 2;
         }
 
-        .project-top {
+        .feature-card[data-flip="true"] .feature-gallery {
+            order: 1;
+        }
+
+        .feature-body {
             display: flex;
-            justify-content: space-between;
-            gap: 20px;
+            flex-direction: column;
+            justify-content: center;
+            gap: 18px;
+            min-width: 0;
         }
 
-        .project-screenshot {
-            position: absolute;
-            inset: 14px;
-            z-index: 1;
-            margin: 0;
-            overflow: hidden;
-            border: 1px solid rgba(255, 255, 255, 0.16);
-            border-radius: var(--radius);
-            background: rgba(0, 0, 0, 0.22);
-            box-shadow: 0 18px 50px rgba(0, 0, 0, 0.22);
-            opacity: 0;
-            transform: rotateY(-180deg);
-            backface-visibility: hidden;
-            -webkit-backface-visibility: hidden;
-            transition: opacity 220ms ease, transform 520ms cubic-bezier(0.22, 1, 0.36, 1);
+        .feature-eyebrow {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: var(--accent);
+            font-size: 0.72rem;
+            font-weight: 850;
+            letter-spacing: 0.18em;
+            text-transform: uppercase;
         }
 
-        .project-screenshot img {
-            width: 100%;
-            height: 100%;
-            object-fit: contain;
-            object-position: center;
-            filter: saturate(0.96) contrast(1.02);
-            transition: transform 260ms ease;
+        .feature-eyebrow::before {
+            content: "";
+            width: 26px;
+            height: 1px;
+            background: currentColor;
         }
 
-        .project-card:hover .project-screenshot img,
-        .project-card:focus-visible .project-screenshot img {
-            transform: none;
-        }
-
-        .project-card:hover .project-top,
-        .project-card:hover .project-bottom,
-        .project-card:focus-visible .project-top,
-        .project-card:focus-visible .project-bottom {
-            opacity: 0;
-            transform: rotateY(180deg);
-        }
-
-        .project-card:hover .project-screenshot,
-        .project-card:focus-visible .project-screenshot {
-            opacity: 1;
-            transform: rotateY(0);
-        }
-
-        .project-number {
-            color: rgba(247, 243, 234, 0.48);
+        .feature-eyebrow .feature-index {
+            color: rgba(247, 243, 234, 0.42);
             font-family: Georgia, "Times New Roman", serif;
-            font-size: 1.35rem;
-        }
-
-        .project-icon {
-            width: 92px;
-            height: 92px;
-            display: grid;
-            place-items: center;
-            border: 1px solid rgba(255, 255, 255, 0.18);
-            border-radius: var(--radius);
-            background: rgba(255, 255, 255, 0.08);
-            color: #ffffff;
-            backdrop-filter: blur(18px);
-            -webkit-backdrop-filter: blur(18px);
-        }
-
-        .project-icon svg {
-            width: 54px;
-            height: 54px;
-            stroke: currentColor;
-        }
-
-        .project-title {
-            max-width: 11ch;
-            font-family: Georgia, "Times New Roman", serif;
-            font-size: clamp(2rem, 3vw, 3.1rem);
+            font-size: 1.1rem;
             font-weight: 500;
-            line-height: 0.98;
             letter-spacing: 0;
+            text-transform: none;
+            margin-left: auto;
         }
 
-        .project-description {
-            max-width: 620px;
-            margin-top: 20px;
+        .feature-title {
+            font-family: Georgia, "Times New Roman", serif;
+            font-size: clamp(2rem, 3.6vw, 3.4rem);
+            font-weight: 500;
+            line-height: 1;
+        }
+
+        .feature-description {
             color: var(--muted);
-            font-size: 0.98rem;
+            font-size: 1rem;
+            line-height: 1.6;
         }
 
-        .project-tags {
+        .feature-tags {
             display: flex;
             flex-wrap: wrap;
             gap: 8px;
-            margin-top: 22px;
         }
 
         .tag {
@@ -485,51 +426,269 @@
             letter-spacing: 0.04em;
         }
 
-        .project-link {
+        .feature-link {
             display: inline-flex;
+            align-self: flex-start;
             align-items: center;
             gap: 8px;
-            margin-top: 26px;
-            color: color-mix(in srgb, var(--accent) 72%, #ffffff);
-            font-size: 0.84rem;
+            margin-top: 6px;
+            padding: 12px 18px;
+            border: 1px solid color-mix(in srgb, var(--accent) 42%, rgba(255, 255, 255, 0.12));
+            border-radius: var(--radius);
+            background: color-mix(in srgb, var(--accent) 10%, transparent);
+            color: #ffffff;
+            font-size: 0.82rem;
             font-weight: 850;
             letter-spacing: 0.08em;
+            text-decoration: none;
             text-transform: uppercase;
+            transition: transform 180ms ease, background 180ms ease, border-color 180ms ease;
         }
 
-        .project-link svg {
-            width: 17px;
-            height: 17px;
+        .feature-link:hover,
+        .feature-link:focus-visible {
+            transform: translateY(-2px);
+            background: color-mix(in srgb, var(--accent) 22%, transparent);
+            border-color: color-mix(in srgb, var(--accent) 65%, rgba(255, 255, 255, 0.18));
+            outline: none;
+        }
+
+        .feature-link svg {
+            width: 16px;
+            height: 16px;
             transition: transform 180ms ease;
         }
 
-        .project-card:hover .project-link svg,
-        .project-card:focus-visible .project-link svg {
+        .feature-link:hover svg,
+        .feature-link:focus-visible svg {
             transform: translateX(4px);
         }
 
-        .project-card[data-theme="stock"] {
+        .feature-gallery {
+            display: grid;
+            grid-template-rows: minmax(0, 1fr) auto;
+            gap: 12px;
+            min-width: 0;
+        }
+
+        .feature-stage {
+            position: relative;
+            aspect-ratio: 16 / 10;
+            border: 1px solid rgba(255, 255, 255, 0.14);
+            border-radius: var(--radius);
+            background: rgba(0, 0, 0, 0.28);
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.32);
+            overflow: hidden;
+        }
+
+        .feature-stage img {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            object-position: top center;
+            opacity: 0;
+            transition: opacity 420ms ease;
+        }
+
+        .feature-stage img.is-active {
+            opacity: 1;
+        }
+
+        .feature-thumbs {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 10px;
+        }
+
+        .feature-thumb {
+            position: relative;
+            aspect-ratio: 16 / 10;
+            padding: 0;
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 6px;
+            background: rgba(0, 0, 0, 0.28);
+            overflow: hidden;
+            cursor: pointer;
+            transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+        }
+
+        .feature-thumb img {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            object-position: top center;
+            opacity: 0.7;
+            transition: opacity 220ms ease;
+        }
+
+        .feature-thumb:hover,
+        .feature-thumb:focus-visible {
+            transform: translateY(-2px);
+            border-color: color-mix(in srgb, var(--accent) 55%, rgba(255, 255, 255, 0.2));
+            outline: none;
+        }
+
+        .feature-thumb:hover img,
+        .feature-thumb:focus-visible img {
+            opacity: 1;
+        }
+
+        .feature-thumb.is-active {
+            border-color: color-mix(in srgb, var(--accent) 75%, rgba(255, 255, 255, 0.2));
+            box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 60%, transparent);
+        }
+
+        .feature-thumb.is-active img {
+            opacity: 1;
+        }
+
+        .feature-card[data-theme="stock"] {
             --accent: var(--blue);
         }
 
-        .project-card[data-theme="poker"] {
-            --accent: var(--teal);
-        }
-
-        .project-card[data-theme="craps"] {
-            --accent: var(--coral);
-        }
-
-        .project-card[data-theme="blackjack"] {
-            --accent: var(--gold);
-        }
-
-        .project-card[data-theme="bitcoin"] {
+        .feature-card[data-theme="bitcoin"] {
             --accent: #ff9f3f;
         }
 
-        .project-card[data-theme="docs"] {
-            --accent: var(--plum);
+        .group-card {
+            position: relative;
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            align-items: center;
+            gap: clamp(24px, 4vw, 48px);
+            padding: clamp(24px, 3vw, 34px);
+            border: 1px solid var(--line);
+            border-radius: var(--radius);
+            background:
+                linear-gradient(145deg, rgba(255, 255, 255, 0.085), rgba(255, 255, 255, 0.022)),
+                var(--panel);
+            color: var(--text);
+            text-decoration: none;
+            box-shadow: 0 18px 60px rgba(0, 0, 0, 0.16);
+            overflow: hidden;
+            isolation: isolate;
+            transition: transform 220ms ease, border-color 220ms ease, box-shadow 220ms ease, background 220ms ease;
+        }
+
+        .group-card::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            z-index: -1;
+            background:
+                linear-gradient(135deg, rgba(255, 122, 110, 0.18), transparent 44%),
+                radial-gradient(circle at 92% 14%, rgba(214, 178, 94, 0.18), transparent 38%);
+            opacity: 0.85;
+            pointer-events: none;
+        }
+
+        .group-card::after {
+            content: "";
+            position: absolute;
+            inset: auto 0 0;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, var(--gold), transparent);
+            opacity: 0.5;
+        }
+
+        .group-card:hover,
+        .group-card:focus-visible {
+            transform: translateY(-4px);
+            border-color: rgba(214, 178, 94, 0.46);
+            box-shadow: var(--shadow);
+            outline: none;
+        }
+
+        .group-body {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            min-width: 0;
+        }
+
+        .group-eyebrow {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: var(--gold);
+            font-size: 0.72rem;
+            font-weight: 850;
+            letter-spacing: 0.18em;
+            text-transform: uppercase;
+        }
+
+        .group-eyebrow::before {
+            content: "";
+            width: 26px;
+            height: 1px;
+            background: currentColor;
+        }
+
+        .group-title {
+            font-family: Georgia, "Times New Roman", serif;
+            font-size: clamp(2rem, 3.4vw, 3rem);
+            font-weight: 500;
+            line-height: 1;
+        }
+
+        .group-copy {
+            max-width: 620px;
+            color: var(--muted);
+            font-size: 0.98rem;
+        }
+
+        .group-children {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 4px;
+        }
+
+        .group-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 12px;
+            border: 1px solid rgba(255, 255, 255, 0.16);
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.06);
+            color: rgba(247, 243, 234, 0.86);
+            font-size: 0.78rem;
+            font-weight: 800;
+            letter-spacing: 0.04em;
+        }
+
+        .group-chip svg {
+            width: 14px;
+            height: 14px;
+            color: var(--gold);
+        }
+
+        .group-action {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            color: rgba(247, 243, 234, 0.86);
+            font-size: 0.82rem;
+            font-weight: 850;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            white-space: nowrap;
+        }
+
+        .group-action svg {
+            width: 18px;
+            height: 18px;
+            transition: transform 180ms ease;
+        }
+
+        .group-card:hover .group-action svg,
+        .group-card:focus-visible .group-action svg {
+            transform: translateX(4px);
         }
 
         footer {
@@ -560,7 +719,8 @@
             color: rgba(247, 243, 234, 0.34);
         }
 
-        .projects-grid.is-reveal-ready .project-card {
+        .projects-list.is-reveal-ready .feature-card,
+        .projects-list.is-reveal-ready .group-card {
             opacity: 0;
             transform: translateY(24px);
             transition:
@@ -568,24 +728,18 @@
                 transform 700ms cubic-bezier(0.22, 1, 0.36, 1),
                 border-color 220ms ease,
                 box-shadow 220ms ease;
-            transition-delay: calc(var(--reveal-index, 0) * 70ms);
+            transition-delay: calc(var(--reveal-index, 0) * 80ms);
         }
 
-        .projects-grid.is-reveal-ready .project-card.is-visible {
+        .projects-list.is-reveal-ready .feature-card.is-visible,
+        .projects-list.is-reveal-ready .group-card.is-visible {
             opacity: 1;
             transform: translateY(0);
         }
 
-        .projects-grid.is-reveal-ready .project-card.is-visible:hover,
-        .projects-grid.is-reveal-ready .project-card.is-visible:focus-visible {
-            transform: translateY(-6px);
-        }
-
-        @media (max-width: 1050px) {
-            .project-card {
-                grid-column: span 6;
-                min-height: 390px;
-            }
+        .projects-list.is-reveal-ready .group-card.is-visible:hover,
+        .projects-list.is-reveal-ready .group-card.is-visible:focus-visible {
+            transform: translateY(-4px);
         }
 
         @media (max-width: 899px) {
@@ -617,27 +771,28 @@
                 padding: 74px 18px;
             }
 
-            .project-card,
-            .project-card.featured {
-                grid-column: 1 / -1;
-                min-height: 360px;
+            .feature-card,
+            .feature-card[data-flip="true"] {
+                grid-template-columns: minmax(0, 1fr);
                 padding: 22px;
             }
 
-            .project-screenshot {
-                inset: 12px;
+            .feature-card[data-flip="true"] .feature-body {
+                order: 1;
             }
 
-            .project-icon {
-                width: 76px;
-                height: 76px;
+            .feature-card[data-flip="true"] .feature-gallery {
+                order: 2;
             }
 
-            .project-icon svg {
-                width: 44px;
-                height: 44px;
+            .group-card {
+                grid-template-columns: minmax(0, 1fr);
+                padding: 22px;
             }
 
+            .group-action {
+                margin-top: 6px;
+            }
         }
 
         @media (max-width: 520px) {
@@ -667,19 +822,13 @@
                 justify-content: flex-start;
             }
 
-            .projects-grid {
-                gap: 14px;
+            .projects-list {
+                gap: 20px;
             }
 
-            .project-top {
-                align-items: flex-start;
+            .feature-title {
+                font-size: clamp(1.9rem, 8vw, 2.6rem);
             }
-
-            .project-title,
-            .featured .project-title {
-                font-size: clamp(2.1rem, 10vw, 3rem);
-            }
-
         }
 
         @media (prefers-reduced-motion: reduce) {
@@ -695,30 +844,16 @@
                 animation-iteration-count: 1 !important;
             }
 
-            .projects-grid.is-reveal-ready .project-card,
-            .projects-grid.is-reveal-ready .project-card.is-visible {
+            .projects-list.is-reveal-ready .feature-card,
+            .projects-list.is-reveal-ready .feature-card.is-visible,
+            .projects-list.is-reveal-ready .group-card,
+            .projects-list.is-reveal-ready .group-card.is-visible {
                 opacity: 1;
                 transform: none;
             }
 
-            .project-card:hover,
-            .project-card:focus-visible,
-            .projects-grid.is-reveal-ready .project-card.is-visible:hover,
-            .projects-grid.is-reveal-ready .project-card.is-visible:focus-visible {
-                transform: none;
-            }
-
-            .project-card:hover .project-top,
-            .project-card:hover .project-bottom,
-            .project-card:focus-visible .project-top,
-            .project-card:focus-visible .project-bottom {
-                opacity: 0;
-                transform: none;
-            }
-
-            .project-card:hover .project-screenshot,
-            .project-card:focus-visible .project-screenshot {
-                opacity: 1;
+            .group-card:hover,
+            .group-card:focus-visible {
                 transform: none;
             }
         }
@@ -769,159 +904,115 @@
                     </div>
                 </div>
 
-                <div class="projects-grid">
-                    <a href="/stock-research/" class="project-card" data-theme="stock">
-                        <div class="project-top">
-                            <span class="project-number">01</span>
-                            <span class="project-icon" aria-hidden="true">
-                                <svg viewBox="0 0 64 64" fill="none">
-                                    <path d="M10 47h44" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
-                                    <path d="M14 42 25 31l11 7 14-22" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
-                                    <path d="M48 16h8v8" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
-                                    <path d="M18 21h8M18 26h4" stroke="currentColor" stroke-width="3" stroke-linecap="round" opacity=".62"/>
-                                </svg>
-                            </span>
-                        </div>
-                        <figure class="project-screenshot">
-                            <img src="/assets/project-screenshots/stock-research.png" alt="Stock Research app screenshot" loading="lazy" decoding="async">
-                        </figure>
-                        <div class="project-bottom">
-                            <h3 class="project-title">Stock Research</h3>
-                            <p class="project-description">A market research workspace for comparing real-time data, company fundamentals, and financial trends with interactive charts and practical metrics close at hand.</p>
-                            <div class="project-tags">
+                <div class="projects-list">
+                    <article class="feature-card" data-theme="stock">
+                        <div class="feature-body">
+                            <p class="feature-eyebrow">
+                                Market data
+                                <span class="feature-index">01</span>
+                            </p>
+                            <h3 class="feature-title">Stock Research</h3>
+                            <p class="feature-description">A market research workspace for comparing real-time price action, company fundamentals, and financial trends. Search any ticker to load an interactive price chart, key valuation metrics, multi-quarter earnings and revenue, free cash flow, and profitability ratios — all rendered on canvas with a clean, keyboard-friendly UI. Built on a FastAPI backend with provider failover across Polygon and Finnhub and a protected public demo mode.</p>
+                            <div class="feature-tags">
                                 <span class="tag">FastAPI</span>
                                 <span class="tag">PostgreSQL</span>
                                 <span class="tag">Canvas Charts</span>
+                                <span class="tag">Demo Mode</span>
                             </div>
-                            <span class="project-link">Open project <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
-                        </div>
-                    </a>
-
-                    <a href="/bitcoin-chat/" class="project-card" data-theme="bitcoin">
-                        <div class="project-top">
-                            <span class="project-number">02</span>
-                            <span class="project-icon" aria-hidden="true">
-                                <svg viewBox="0 0 64 64" fill="none">
-                                    <circle cx="32" cy="32" r="22" stroke="currentColor" stroke-width="4"/>
-                                    <path d="M27 16v32M36 16v32M23 24h14c5 0 8 2 8 6s-3 6-8 6H23m0 0h16c5 0 8 2 8 6s-3 6-8 6H23" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+                            <a class="feature-link" href="/stock-research/">
+                                Open project
+                                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                                    <path d="M5 12h14m-6-6 6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                                 </svg>
-                            </span>
+                            </a>
                         </div>
-                        <figure class="project-screenshot">
-                            <img src="/assets/project-screenshots/bitcoin-chat.png" alt="Bitcoin Chat app screenshot" loading="lazy" decoding="async">
-                        </figure>
-                        <div class="project-bottom">
-                            <h3 class="project-title">Bitcoin Chat</h3>
-                            <p class="project-description">A plain-English interface for exploring blocks, transactions, mempool fees, node status, and read-only blockchain data.</p>
-                            <div class="project-tags">
+                        <div class="feature-gallery" data-gallery>
+                            <div class="feature-stage" data-stage>
+                                <img src="/assets/project-screenshots/stock-research-1.png" alt="Stock Research price chart overview for TSLA" class="is-active" loading="lazy" decoding="async">
+                                <img src="/assets/project-screenshots/stock-research-2.png" alt="Stock Research fundamentals charts" loading="lazy" decoding="async">
+                                <img src="/assets/project-screenshots/stock-research-3.png" alt="Stock Research overview for NVDA" loading="lazy" decoding="async">
+                            </div>
+                            <div class="feature-thumbs" role="tablist" aria-label="Stock Research screenshots">
+                                <button type="button" class="feature-thumb is-active" data-index="0" aria-label="Show TSLA overview">
+                                    <img src="/assets/project-screenshots/stock-research-1.png" alt="" loading="lazy" decoding="async">
+                                </button>
+                                <button type="button" class="feature-thumb" data-index="1" aria-label="Show fundamentals charts">
+                                    <img src="/assets/project-screenshots/stock-research-2.png" alt="" loading="lazy" decoding="async">
+                                </button>
+                                <button type="button" class="feature-thumb" data-index="2" aria-label="Show NVDA overview">
+                                    <img src="/assets/project-screenshots/stock-research-3.png" alt="" loading="lazy" decoding="async">
+                                </button>
+                            </div>
+                        </div>
+                    </article>
+
+                    <article class="feature-card" data-theme="bitcoin" data-flip="true">
+                        <div class="feature-body">
+                            <p class="feature-eyebrow">
+                                Bitcoin tooling
+                                <span class="feature-index">02</span>
+                            </p>
+                            <h3 class="feature-title">Bitcoin Chat</h3>
+                            <p class="feature-description">A plain-English interface for exploring Bitcoin blockchain data. Ask about block height, chain status, mempool congestion, fee estimates, recent transactions, or node sync — answers come back as structured cards with the source tool, chain, and data source clearly attributed. Routes natural language to read-only Bitcoin Core RPC calls plus mempool.space context, with a public demo mode for visitors.</p>
+                            <div class="feature-tags">
                                 <span class="tag">FastAPI</span>
                                 <span class="tag">Bitcoin Core</span>
+                                <span class="tag">OpenAI</span>
                                 <span class="tag">Chat UI</span>
                             </div>
-                            <span class="project-link">Open project <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
-                        </div>
-                    </a>
-
-                    <a href="/docs/" class="project-card" data-theme="docs">
-                        <div class="project-top">
-                            <span class="project-number">03</span>
-                            <span class="project-icon" aria-hidden="true">
-                                <svg viewBox="0 0 64 64" fill="none">
-                                    <path d="M17 10h20l10 10v34H17V10Z" stroke="currentColor" stroke-width="4" stroke-linejoin="round"/>
-                                    <path d="M37 10v12h10M24 31h16M24 39h16M24 47h10" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+                            <a class="feature-link" href="/bitcoin-chat/">
+                                Open project
+                                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                                    <path d="M5 12h14m-6-6 6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                                 </svg>
-                            </span>
+                            </a>
                         </div>
-                        <figure class="project-screenshot">
-                            <img src="/assets/project-screenshots/docs.png" alt="Site Documentation screenshot" loading="lazy" decoding="async">
-                        </figure>
-                        <div class="project-bottom">
-                            <h3 class="project-title">Site Documentation</h3>
-                            <p class="project-description">A compact reference for website paths, backend routes, local development, deployment, authentication, providers, and tests.</p>
-                            <div class="project-tags">
-                                <span class="tag">Docs</span>
-                                <span class="tag">Static HTML</span>
-                                <span class="tag">Reference</span>
+                        <div class="feature-gallery" data-gallery>
+                            <div class="feature-stage" data-stage>
+                                <img src="/assets/project-screenshots/bitcoin-chat-1.png" alt="Bitcoin Chat starter screen with node pills" class="is-active" loading="lazy" decoding="async">
+                                <img src="/assets/project-screenshots/bitcoin-chat-2.png" alt="Bitcoin Chat answering a node status question" loading="lazy" decoding="async">
+                                <img src="/assets/project-screenshots/bitcoin-chat-3.png" alt="Bitcoin Chat showing a mempool summary" loading="lazy" decoding="async">
                             </div>
-                            <span class="project-link">Open project <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+                            <div class="feature-thumbs" role="tablist" aria-label="Bitcoin Chat screenshots">
+                                <button type="button" class="feature-thumb is-active" data-index="0" aria-label="Show starter screen">
+                                    <img src="/assets/project-screenshots/bitcoin-chat-1.png" alt="" loading="lazy" decoding="async">
+                                </button>
+                                <button type="button" class="feature-thumb" data-index="1" aria-label="Show node status answer">
+                                    <img src="/assets/project-screenshots/bitcoin-chat-2.png" alt="" loading="lazy" decoding="async">
+                                </button>
+                                <button type="button" class="feature-thumb" data-index="2" aria-label="Show mempool summary">
+                                    <img src="/assets/project-screenshots/bitcoin-chat-3.png" alt="" loading="lazy" decoding="async">
+                                </button>
+                            </div>
                         </div>
-                    </a>
+                    </article>
 
-                    <a href="/poker/" class="project-card" data-theme="poker">
-                        <div class="project-top">
-                            <span class="project-number">04</span>
-                            <span class="project-icon" aria-hidden="true">
-                                <svg viewBox="0 0 64 64" fill="none">
-                                    <path d="M32 8c11 10 18 17 18 28 0 7-5 12-12 12-3 0-5-1-6-3-1 2-3 3-6 3-7 0-12-5-12-12 0-11 7-18 18-28Z" stroke="currentColor" stroke-width="4" stroke-linejoin="round"/>
-                                    <path d="M27 48c0 4-2 7-5 8h20c-3-1-5-4-5-8" stroke="currentColor" stroke-width="4" stroke-linecap="round"/>
-                                </svg>
-                            </span>
-                        </div>
-                        <figure class="project-screenshot">
-                            <img src="/assets/project-screenshots/poker.png" alt="Texas Hold'em Poker app screenshot" loading="lazy" decoding="async">
-                        </figure>
-                        <div class="project-bottom">
-                            <h3 class="project-title">Texas Hold'em Poker</h3>
-                            <p class="project-description">A mobile-friendly No-Limit Hold'em game with realistic table flow, hand evaluation, and AI opponents that make each hand feel different.</p>
-                            <div class="project-tags">
-                                <span class="tag">FastAPI</span>
-                                <span class="tag">AI Opponents</span>
-                                <span class="tag">Mobile First</span>
+                    <a href="/casino/" class="group-card" aria-label="Casino games: poker, craps, blackjack">
+                        <div class="group-body">
+                            <p class="group-eyebrow">Casino games</p>
+                            <h3 class="group-title">Casino</h3>
+                            <p class="group-copy">Three single-player browser table games with Vegas rules, testable hand and bet logic, and mobile-friendly tables.</p>
+                            <div class="group-children" aria-hidden="true">
+                                <span class="group-chip">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3c4 4 7 7 7 11a5 5 0 0 1-9 3 5 5 0 0 1-5-3c0-4 3-7 7-11Z"/><path d="M10 19c0 2-1 3-2 3h8c-1 0-2-1-2-3"/></svg>
+                                    Poker
+                                </span>
+                                <span class="group-chip">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="12" height="12" x="3" y="3" rx="2"/><rect width="12" height="12" x="9" y="9" rx="2"/><path d="M7 7h.01M13 13h.01M17 17h.01"/></svg>
+                                    Craps
+                                </span>
+                                <span class="group-chip">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3.85 8.62a4 4 0 0 1 4.78-4.77 4 4 0 0 1 6.74 0 4 4 0 0 1 4.78 4.78 4 4 0 0 1 0 6.74 4 4 0 0 1-4.78 4.78 4 4 0 0 1-6.74 0 4 4 0 0 1-4.78-4.78 4 4 0 0 1 0-6.75Z"/><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"/><path d="M12 18V6"/></svg>
+                                    Blackjack
+                                </span>
                             </div>
-                            <span class="project-link">Open project <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
                         </div>
-                    </a>
-
-                    <a href="/craps/" class="project-card" data-theme="craps">
-                        <div class="project-top">
-                            <span class="project-number">05</span>
-                            <span class="project-icon" aria-hidden="true">
-                                <svg viewBox="0 0 64 64" fill="none">
-                                    <rect x="10" y="14" width="22" height="22" rx="5" stroke="currentColor" stroke-width="4"/>
-                                    <rect x="32" y="28" width="22" height="22" rx="5" stroke="currentColor" stroke-width="4"/>
-                                    <path d="M21 25h.01M43 39h.01M37 34h.01M49 44h.01" stroke="currentColor" stroke-width="6" stroke-linecap="round"/>
-                                </svg>
-                            </span>
-                        </div>
-                        <figure class="project-screenshot">
-                            <img src="/assets/project-screenshots/craps.png" alt="Craps app screenshot" loading="lazy" decoding="async">
-                        </figure>
-                        <div class="project-bottom">
-                            <h3 class="project-title">Craps</h3>
-                            <p class="project-description">A single-player Vegas-style dice table with Pass Line, Come, proposition bets, point handling, payouts, and fast browser gameplay.</p>
-                            <div class="project-tags">
-                                <span class="tag">Vanilla JS</span>
-                                <span class="tag">Vegas Rules</span>
-                                <span class="tag">Dice Game</span>
-                            </div>
-                            <span class="project-link">Open project <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
-                        </div>
-                    </a>
-
-                    <a href="/blackjack/" class="project-card" data-theme="blackjack">
-                        <div class="project-top">
-                            <span class="project-number">06</span>
-                            <span class="project-icon" aria-hidden="true">
-                                <svg viewBox="0 0 64 64" fill="none">
-                                    <rect x="14" y="10" width="24" height="36" rx="4" stroke="currentColor" stroke-width="4" transform="rotate(-8 14 10)"/>
-                                    <rect x="28" y="18" width="24" height="36" rx="4" stroke="currentColor" stroke-width="4" transform="rotate(8 28 18)"/>
-                                    <path d="M24 26h.01M42 36h.01" stroke="currentColor" stroke-width="7" stroke-linecap="round"/>
-                                </svg>
-                            </span>
-                        </div>
-                        <figure class="project-screenshot">
-                            <img src="/assets/project-screenshots/blackjack.png" alt="Blackjack app screenshot" loading="lazy" decoding="async">
-                        </figure>
-                        <div class="project-bottom">
-                            <h3 class="project-title">Blackjack</h3>
-                            <p class="project-description">A crisp single-player casino table with a six-deck shoe, splits, doubles, insurance, dealer rules, and testable rule logic.</p>
-                            <div class="project-tags">
-                                <span class="tag">Vanilla JS</span>
-                                <span class="tag">Vegas Rules</span>
-                                <span class="tag">Card Game</span>
-                            </div>
-                            <span class="project-link">Open project <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
-                        </div>
+                        <span class="group-action">
+                            View all
+                            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                                <path d="M5 12h14m-6-6 6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                        </span>
                     </a>
                 </div>
             </section>
@@ -951,38 +1042,80 @@
     <script>
         (() => {
             const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-            const revealTargets = [...document.querySelectorAll('.project-card')];
-            if (revealTargets.length === 0 || reduceMotion) {
-                return;
-            }
+            const revealTargets = [...document.querySelectorAll('.projects-list > *')];
+            const projectsList = document.querySelector('.projects-list');
 
-            const projectGrid = document.querySelector('.projects-grid');
-            projectGrid?.classList.add('is-reveal-ready');
-
-            revealTargets.forEach((target, index) => {
-                target.style.setProperty('--reveal-index', String(index % 6));
-            });
-
-            if (!('IntersectionObserver' in window)) {
-                revealTargets.forEach(target => target.classList.add('is-visible'));
-                return;
-            }
-
-            const observer = new IntersectionObserver((entries) => {
-                entries.forEach((entry) => {
-                    if (!entry.isIntersecting) {
-                        return;
-                    }
-
-                    entry.target.classList.add('is-visible');
-                    observer.unobserve(entry.target);
+            if (revealTargets.length > 0 && !reduceMotion) {
+                projectsList?.classList.add('is-reveal-ready');
+                revealTargets.forEach((target, index) => {
+                    target.style.setProperty('--reveal-index', String(index));
                 });
-            }, {
-                rootMargin: '0px 0px -10% 0px',
-                threshold: 0.12
-            });
 
-            revealTargets.forEach(target => observer.observe(target));
+                if ('IntersectionObserver' in window) {
+                    const observer = new IntersectionObserver((entries) => {
+                        entries.forEach((entry) => {
+                            if (!entry.isIntersecting) return;
+                            entry.target.classList.add('is-visible');
+                            observer.unobserve(entry.target);
+                        });
+                    }, { rootMargin: '0px 0px -10% 0px', threshold: 0.12 });
+
+                    revealTargets.forEach(target => observer.observe(target));
+                } else {
+                    revealTargets.forEach(target => target.classList.add('is-visible'));
+                }
+            }
+
+            // Feature card galleries: clicking a thumb swaps the stage image.
+            document.querySelectorAll('[data-gallery]').forEach((gallery) => {
+                const stage = gallery.querySelector('[data-stage]');
+                if (!stage) return;
+                const images = [...stage.querySelectorAll('img')];
+                const thumbs = [...gallery.querySelectorAll('.feature-thumb')];
+
+                const setActive = (index) => {
+                    images.forEach((img, i) => img.classList.toggle('is-active', i === index));
+                    thumbs.forEach((btn, i) => btn.classList.toggle('is-active', i === index));
+                };
+
+                thumbs.forEach((thumb) => {
+                    thumb.addEventListener('click', () => {
+                        const index = Number(thumb.dataset.index);
+                        if (!Number.isNaN(index)) setActive(index);
+                    });
+                });
+
+                // Auto-rotate when the card isn't being interacted with.
+                let timer = null;
+                let userInteracted = false;
+                const advance = () => {
+                    const active = thumbs.findIndex(t => t.classList.contains('is-active'));
+                    const next = (active + 1) % thumbs.length;
+                    setActive(next);
+                };
+                const start = () => {
+                    if (reduceMotion || userInteracted || timer) return;
+                    timer = window.setInterval(advance, 4500);
+                };
+                const stop = () => {
+                    if (timer) { window.clearInterval(timer); timer = null; }
+                };
+                gallery.addEventListener('mouseenter', stop);
+                gallery.addEventListener('mouseleave', () => { if (!userInteracted) start(); });
+                gallery.addEventListener('click', () => { userInteracted = true; stop(); }, true);
+
+                if ('IntersectionObserver' in window) {
+                    const visObserver = new IntersectionObserver((entries) => {
+                        entries.forEach((entry) => {
+                            if (entry.isIntersecting) start();
+                            else stop();
+                        });
+                    }, { threshold: 0.4 });
+                    visObserver.observe(gallery);
+                } else {
+                    start();
+                }
+            });
         })();
     </script>
 </body>

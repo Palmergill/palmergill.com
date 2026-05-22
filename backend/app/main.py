@@ -186,6 +186,7 @@ if local_site_root_enabled:
         "/craps": "craps",
         "/blackjack": "blackjack",
         "/bitcoin-chat": "bitcoin-chat",
+        "/casino": "casino",
         "/admin": "admin",
     }.items():
         directory = os.path.join(repo_root, folder)

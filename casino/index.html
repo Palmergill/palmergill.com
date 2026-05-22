@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Casino Games - Palmer Gill</title>
+    <link rel="icon" type="image/png" href="/assets/palmer-gill-logo-small.png">
+    <link rel="stylesheet" href="/shared/site-nav.css?v=4">
+    <style>
+        :root {
+            --ink: #080a0d;
+            --panel: #111722;
+            --panel-soft: rgba(255, 255, 255, 0.055);
+            --line: rgba(255, 255, 255, 0.14);
+            --line-strong: rgba(255, 255, 255, 0.24);
+            --text: #f7f3ea;
+            --muted: rgba(247, 243, 234, 0.68);
+            --quiet: rgba(247, 243, 234, 0.46);
+            --gold: #d6b25e;
+            --teal: #58d3ad;
+            --coral: #ff7a6e;
+            --radius: 8px;
+            --max: 1180px;
+            --shadow: 0 28px 90px rgba(0, 0, 0, 0.36);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        html {
+            background: var(--ink);
+            color-scheme: dark;
+            scroll-behavior: smooth;
+        }
+
+        body {
+            min-width: 320px;
+            background:
+                linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px) 0 0 / 84px 84px,
+                linear-gradient(180deg, #080a0d 0%, #0b1017 48%, #0a0d12 100%);
+            color: var(--text);
+            font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            line-height: 1.5;
+            overflow-x: hidden;
+        }
+
+        a {
+            color: inherit;
+        }
+
+        img,
+        svg {
+            display: block;
+        }
+
+        .page-shell {
+            position: relative;
+            isolation: isolate;
+        }
+
+        .sr-only {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            white-space: nowrap;
+            border: 0;
+        }
+
+        .hero {
+            position: relative;
+            overflow: hidden;
+            padding: clamp(96px, 10vw, 132px) 24px clamp(40px, 6vw, 64px);
+        }
+
+        .hero::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            z-index: -2;
+            background:
+                linear-gradient(120deg, rgba(8, 10, 13, 0.98) 0%, rgba(8, 10, 13, 0.82) 48%, rgba(255, 122, 110, 0.12) 100%);
+        }
+
+        .hero::after {
+            content: "";
+            position: absolute;
+            inset: 0;
+            z-index: -3;
+            background:
+                linear-gradient(90deg, rgba(255, 255, 255, 0.06) 1px, transparent 1px) 0 0 / 92px 92px,
+                linear-gradient(180deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px) 0 0 / 92px 92px,
+                linear-gradient(135deg, rgba(214, 178, 94, 0.18), transparent 32%);
+            opacity: 0.58;
+        }
+
+        .hero-inner {
+            width: min(100%, var(--max));
+            margin: 0 auto;
+        }
+
+        .eyebrow {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 22px;
+            color: var(--gold);
+            font-size: 0.78rem;
+            font-weight: 800;
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
+        }
+
+        .eyebrow::before {
+            content: "";
+            width: 44px;
+            height: 1px;
+            background: currentColor;
+        }
+
+        h1 {
+            font-family: Georgia, "Times New Roman", serif;
+            font-size: clamp(2.8rem, 6.4vw, 5.6rem);
+            font-weight: 500;
+            line-height: 0.98;
+        }
+
+        .lede {
+            max-width: 640px;
+            margin-top: 24px;
+            color: var(--muted);
+            font-size: clamp(1.04rem, 1.6vw, 1.3rem);
+        }
+
+        .back-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 28px;
+            color: rgba(247, 243, 234, 0.68);
+            font-size: 0.82rem;
+            font-weight: 800;
+            letter-spacing: 0.08em;
+            text-decoration: none;
+            text-transform: uppercase;
+            transition: color 180ms ease;
+        }
+
+        .back-link:hover,
+        .back-link:focus-visible {
+            color: #ffffff;
+            outline: none;
+        }
+
+        .back-link svg {
+            width: 16px;
+            height: 16px;
+            transition: transform 180ms ease;
+        }
+
+        .back-link:hover svg,
+        .back-link:focus-visible svg {
+            transform: translateX(-3px);
+        }
+
+        main {
+            position: relative;
+            z-index: 1;
+        }
+
+        .section {
+            width: min(100%, var(--max));
+            margin: 0 auto;
+            padding: clamp(40px, 5vw, 72px) 24px clamp(64px, 8vw, 104px);
+        }
+
+        .games-grid {
+            display: grid;
+            grid-template-columns: repeat(12, minmax(0, 1fr));
+            align-items: stretch;
+            gap: 18px;
+            perspective: 1400px;
+        }
+
+        .game-card {
+            position: relative;
+            min-height: 420px;
+            grid-column: span 4;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            overflow: hidden;
+            padding: 26px;
+            border: 1px solid var(--line);
+            border-radius: var(--radius);
+            background:
+                linear-gradient(145deg, rgba(255, 255, 255, 0.105), rgba(255, 255, 255, 0.026)),
+                var(--panel);
+            color: var(--text);
+            text-decoration: none;
+            box-shadow: 0 18px 70px rgba(0, 0, 0, 0.16);
+            transform-style: preserve-3d;
+            transition: transform 520ms cubic-bezier(0.22, 1, 0.36, 1), border-color 220ms ease, box-shadow 220ms ease, background 220ms ease;
+        }
+
+        .game-card::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background:
+                linear-gradient(135deg, color-mix(in srgb, var(--accent) 36%, transparent), transparent 44%),
+                radial-gradient(circle at 82% 12%, color-mix(in srgb, var(--accent) 25%, transparent), transparent 32%);
+            opacity: 0.82;
+            pointer-events: none;
+            backface-visibility: hidden;
+            -webkit-backface-visibility: hidden;
+        }
+
+        .game-card::after {
+            content: "";
+            position: absolute;
+            inset: auto 0 0;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, var(--accent), transparent);
+            opacity: 0.62;
+            backface-visibility: hidden;
+            -webkit-backface-visibility: hidden;
+        }
+
+        .game-card:hover,
+        .game-card:focus-visible {
+            transform: translateY(-6px);
+            border-color: color-mix(in srgb, var(--accent) 52%, rgba(255, 255, 255, 0.16));
+            box-shadow: var(--shadow);
+            outline: none;
+        }
+
+        .game-top,
+        .game-bottom {
+            position: relative;
+            z-index: 1;
+            backface-visibility: hidden;
+            -webkit-backface-visibility: hidden;
+            transition: opacity 260ms ease, transform 520ms cubic-bezier(0.22, 1, 0.36, 1);
+        }
+
+        .game-top {
+            display: flex;
+            justify-content: space-between;
+            gap: 20px;
+        }
+
+        .game-screenshot {
+            position: absolute;
+            inset: 14px;
+            z-index: 1;
+            margin: 0;
+            overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, 0.16);
+            border-radius: var(--radius);
+            background: rgba(0, 0, 0, 0.22);
+            box-shadow: 0 18px 50px rgba(0, 0, 0, 0.22);
+            opacity: 0;
+            transform: rotateY(-180deg);
+            backface-visibility: hidden;
+            -webkit-backface-visibility: hidden;
+            transition: opacity 220ms ease, transform 520ms cubic-bezier(0.22, 1, 0.36, 1);
+        }
+
+        .game-screenshot img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            object-position: center;
+            filter: saturate(0.96) contrast(1.02);
+        }
+
+        .game-card:hover .game-top,
+        .game-card:hover .game-bottom,
+        .game-card:focus-visible .game-top,
+        .game-card:focus-visible .game-bottom {
+            opacity: 0;
+            transform: rotateY(180deg);
+        }
+
+        .game-card:hover .game-screenshot,
+        .game-card:focus-visible .game-screenshot {
+            opacity: 1;
+            transform: rotateY(0);
+        }
+
+        .game-number {
+            color: rgba(247, 243, 234, 0.48);
+            font-family: Georgia, "Times New Roman", serif;
+            font-size: 1.35rem;
+        }
+
+        .game-icon {
+            width: 92px;
+            height: 92px;
+            display: grid;
+            place-items: center;
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            border-radius: var(--radius);
+            background: rgba(255, 255, 255, 0.08);
+            color: #ffffff;
+            backdrop-filter: blur(18px);
+            -webkit-backdrop-filter: blur(18px);
+        }
+
+        .game-icon svg {
+            width: 54px;
+            height: 54px;
+            stroke: currentColor;
+        }
+
+        .game-title {
+            font-family: Georgia, "Times New Roman", serif;
+            font-size: clamp(2rem, 3vw, 2.8rem);
+            font-weight: 500;
+            line-height: 1;
+        }
+
+        .game-description {
+            max-width: 620px;
+            margin-top: 18px;
+            color: var(--muted);
+            font-size: 0.98rem;
+        }
+
+        .game-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 22px;
+        }
+
+        .tag {
+            display: inline-flex;
+            min-height: 28px;
+            align-items: center;
+            padding: 0 10px;
+            border: 1px solid rgba(255, 255, 255, 0.13);
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.055);
+            color: rgba(247, 243, 234, 0.76);
+            font-size: 0.72rem;
+            font-weight: 800;
+            letter-spacing: 0.04em;
+        }
+
+        .game-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 26px;
+            color: color-mix(in srgb, var(--accent) 72%, #ffffff);
+            font-size: 0.84rem;
+            font-weight: 850;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+
+        .game-link svg {
+            width: 17px;
+            height: 17px;
+            transition: transform 180ms ease;
+        }
+
+        .game-card:hover .game-link svg,
+        .game-card:focus-visible .game-link svg {
+            transform: translateX(4px);
+        }
+
+        .game-card[data-theme="poker"] {
+            --accent: var(--teal);
+        }
+
+        .game-card[data-theme="craps"] {
+            --accent: var(--coral);
+        }
+
+        .game-card[data-theme="blackjack"] {
+            --accent: var(--gold);
+        }
+
+        footer {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: space-between;
+            gap: 18px;
+            width: min(100%, var(--max));
+            margin: 0 auto;
+            padding: 36px 24px 48px;
+            color: var(--quiet);
+            font-size: 0.9rem;
+        }
+
+        footer a {
+            color: rgba(247, 243, 234, 0.74);
+            text-decoration: none;
+        }
+
+        @media (max-width: 1050px) {
+            .game-card {
+                grid-column: span 6;
+            }
+        }
+
+        @media (max-width: 720px) {
+            .game-card {
+                grid-column: 1 / -1;
+                min-height: 380px;
+                padding: 22px;
+            }
+
+            .game-screenshot {
+                inset: 12px;
+            }
+
+            .game-icon {
+                width: 76px;
+                height: 76px;
+            }
+
+            .game-icon svg {
+                width: 44px;
+                height: 44px;
+            }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            html {
+                scroll-behavior: auto;
+            }
+
+            *,
+            *::before,
+            *::after {
+                transition-duration: 0.01ms !important;
+            }
+
+            .game-card:hover,
+            .game-card:focus-visible {
+                transform: none;
+            }
+
+            .game-card:hover .game-top,
+            .game-card:hover .game-bottom,
+            .game-card:focus-visible .game-top,
+            .game-card:focus-visible .game-bottom {
+                opacity: 0;
+                transform: none;
+            }
+
+            .game-card:hover .game-screenshot,
+            .game-card:focus-visible .game-screenshot {
+                opacity: 1;
+                transform: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="page-shell">
+        <header class="hero">
+            <div class="hero-inner">
+                <p class="eyebrow">Browser games</p>
+                <h1>Casino Games</h1>
+                <p class="lede">Three single-player table games built for fast browser play — testable rule logic, mobile-friendly tables, and the same Vegas math you'd find on a real floor.</p>
+                <a class="back-link" href="/">
+                    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                        <path d="M19 12H5m6-6-6 6 6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                    Back to projects
+                </a>
+            </div>
+        </header>
+
+        <main>
+            <section class="section" aria-labelledby="games-title">
+                <h2 id="games-title" class="sr-only">Casino games</h2>
+
+                <div class="games-grid">
+                    <a href="/poker/" class="game-card" data-theme="poker">
+                        <div class="game-top">
+                            <span class="game-number">01</span>
+                            <span class="game-icon" aria-hidden="true">
+                                <svg viewBox="0 0 64 64" fill="none">
+                                    <path d="M32 8c11 10 18 17 18 28 0 7-5 12-12 12-3 0-5-1-6-3-1 2-3 3-6 3-7 0-12-5-12-12 0-11 7-18 18-28Z" stroke="currentColor" stroke-width="4" stroke-linejoin="round"/>
+                                    <path d="M27 48c0 4-2 7-5 8h20c-3-1-5-4-5-8" stroke="currentColor" stroke-width="4" stroke-linecap="round"/>
+                                </svg>
+                            </span>
+                        </div>
+                        <figure class="game-screenshot">
+                            <img src="/assets/project-screenshots/poker.png" alt="Texas Hold'em Poker app screenshot" loading="lazy" decoding="async">
+                        </figure>
+                        <div class="game-bottom">
+                            <h3 class="game-title">Texas Hold'em Poker</h3>
+                            <p class="game-description">A mobile-friendly No-Limit Hold'em game with realistic table flow, hand evaluation, and AI opponents that make each hand feel different.</p>
+                            <div class="game-tags">
+                                <span class="tag">FastAPI</span>
+                                <span class="tag">AI Opponents</span>
+                                <span class="tag">Mobile First</span>
+                            </div>
+                            <span class="game-link">Open game <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+                        </div>
+                    </a>
+
+                    <a href="/craps/" class="game-card" data-theme="craps">
+                        <div class="game-top">
+                            <span class="game-number">02</span>
+                            <span class="game-icon" aria-hidden="true">
+                                <svg viewBox="0 0 64 64" fill="none">
+                                    <rect x="10" y="14" width="22" height="22" rx="5" stroke="currentColor" stroke-width="4"/>
+                                    <rect x="32" y="28" width="22" height="22" rx="5" stroke="currentColor" stroke-width="4"/>
+                                    <path d="M21 25h.01M43 39h.01M37 34h.01M49 44h.01" stroke="currentColor" stroke-width="6" stroke-linecap="round"/>
+                                </svg>
+                            </span>
+                        </div>
+                        <figure class="game-screenshot">
+                            <img src="/assets/project-screenshots/craps.png" alt="Craps app screenshot" loading="lazy" decoding="async">
+                        </figure>
+                        <div class="game-bottom">
+                            <h3 class="game-title">Craps</h3>
+                            <p class="game-description">A single-player Vegas-style dice table with Pass Line, Come, proposition bets, point handling, payouts, and fast browser gameplay.</p>
+                            <div class="game-tags">
+                                <span class="tag">Vanilla JS</span>
+                                <span class="tag">Vegas Rules</span>
+                                <span class="tag">Dice Game</span>
+                            </div>
+                            <span class="game-link">Open game <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+                        </div>
+                    </a>
+
+                    <a href="/blackjack/" class="game-card" data-theme="blackjack">
+                        <div class="game-top">
+                            <span class="game-number">03</span>
+                            <span class="game-icon" aria-hidden="true">
+                                <svg viewBox="0 0 64 64" fill="none">
+                                    <rect x="14" y="10" width="24" height="36" rx="4" stroke="currentColor" stroke-width="4" transform="rotate(-8 14 10)"/>
+                                    <rect x="28" y="18" width="24" height="36" rx="4" stroke="currentColor" stroke-width="4" transform="rotate(8 28 18)"/>
+                                    <path d="M24 26h.01M42 36h.01" stroke="currentColor" stroke-width="7" stroke-linecap="round"/>
+                                </svg>
+                            </span>
+                        </div>
+                        <figure class="game-screenshot">
+                            <img src="/assets/project-screenshots/blackjack.png" alt="Blackjack app screenshot" loading="lazy" decoding="async">
+                        </figure>
+                        <div class="game-bottom">
+                            <h3 class="game-title">Blackjack</h3>
+                            <p class="game-description">A crisp single-player casino table with a six-deck shoe, splits, doubles, insurance, dealer rules, and testable rule logic.</p>
+                            <div class="game-tags">
+                                <span class="tag">Vanilla JS</span>
+                                <span class="tag">Vegas Rules</span>
+                                <span class="tag">Card Game</span>
+                            </div>
+                            <span class="game-link">Open game <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+                        </div>
+                    </a>
+                </div>
+            </section>
+        </main>
+
+        <footer>
+            <p>© 2026 Palmer Gill. Built with care.</p>
+        </footer>
+    </div>
+
+    <script src="/shared/site-nav.js?v=4"></script>
+</body>
+</html>
