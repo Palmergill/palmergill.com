@@ -76,6 +76,14 @@ body.has-site-nav {
     gap: 8px;
 }
 
+.site-nav__utility {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding-top: 10px;
+    border-top: 1px solid rgba(255, 255, 255, 0.12);
+}
+
 .site-nav__link {
     display: flex;
     width: 52px;
@@ -269,6 +277,11 @@ body.has-site-nav {
 
     .site-nav__items {
         gap: 6px;
+    }
+
+    .site-nav__utility {
+        gap: 6px;
+        padding-top: 12px;
     }
 
     .site-nav__link {

@@ -8,6 +8,7 @@ The active static site lives at the repo root:
 
 - `index.html`
 - `docs/`
+- `login/`
 - `stock-research/`
 - `poker/`
 - `craps/`
@@ -24,7 +25,7 @@ Vercel middleware keeps `/` public and requires Basic Auth for:
 - `/admin/*`
 - `/api/*`, except `/api/poker/*`
 
-`/docs/*`, `/poker/*`, `/craps/*`, `/blackjack/*`, and `/api/poker/*` are public.
+`/docs/*`, `/login/*`, `/poker/*`, `/craps/*`, `/blackjack/*`, and `/api/poker/*` are public. The login page posts to `/login/session`, which sets a signed HttpOnly session cookie for `/admin/*` and protected API requests. Basic Auth remains supported for direct scripted access.
 
 Configure these environment variables in Vercel:
 
@@ -76,4 +77,4 @@ This runs the API and active static pages together at:
 http://127.0.0.1:8000
 ```
 
-`LOCAL_SITE_ROOT=true` currently mounts `assets/`, `shared/`, `about/`, `stock-research/`, `poker/`, `craps/`, `blackjack/`, `bitcoin-chat/`, and `admin/` through FastAPI. The local `/docs` path is still FastAPI's generated API docs path; the static website docs page is served by production/static hosting at `/docs/`.
+`LOCAL_SITE_ROOT=true` currently mounts `assets/`, `shared/`, `about/`, `login/`, `stock-research/`, `poker/`, `craps/`, `blackjack/`, `bitcoin-chat/`, and `admin/` through FastAPI. The local `/docs` path is still FastAPI's generated API docs path; the static website docs page is served by production/static hosting at `/docs/`.

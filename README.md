@@ -7,6 +7,7 @@ Personal project site plus shared API backend.
 - `/` - project index
 - `/about/` - professional background and selected project context
 - `/docs/` - website documentation
+- `/login/` - protected workspace sign-in
 - `/stock-research/` - polished stock research app
 - `/bitcoin-chat/` - Bitcoin chat app
 - `/casino/` - landing page linking the casino games
@@ -55,7 +56,7 @@ logs/backend.log
 - Static site: hosted from the repo root and project folders.
 - API service: Railway/FastAPI from `backend/`.
 - Vercel rewrites `/api/*` to the Railway backend in production.
-- The root page `/`, `/docs/`, `/stock-research/`, `/bitcoin-chat/`, `/casino/`, `/poker/`, `/craps/`, `/blackjack/`, `/api/poker/*`, `/api/stocks/*`, and `/api/bitcoin/*` stay public. Unauthenticated stock and Bitcoin API requests return demo data only; valid Basic Auth credentials unlock the live provider-backed paths. Admin and other `/api/*` routes require Basic Auth; protected routes return `503` if `APP_AUTH_PASSWORD` is missing. Set the same `APP_AUTH_USERNAME` and `APP_AUTH_PASSWORD` values in Vercel and Railway.
+- The root page `/`, `/docs/`, `/login/`, `/stock-research/`, `/bitcoin-chat/`, `/casino/`, `/poker/`, `/craps/`, `/blackjack/`, `/api/poker/*`, `/api/stocks/*`, and `/api/bitcoin/*` stay public. Unauthenticated stock and Bitcoin API requests return demo data only; valid Basic Auth credentials unlock the live provider-backed paths. Admin and other `/api/*` routes require authentication; the login page creates a signed HttpOnly session cookie, and Basic Auth remains supported. Protected routes return `503` if `APP_AUTH_PASSWORD` is missing. Set the same `APP_AUTH_USERNAME` and `APP_AUTH_PASSWORD` values in Vercel and Railway.
 
 ## Repository Layout
 
@@ -63,6 +64,7 @@ logs/backend.log
 backend/          FastAPI API service
 admin/            Protected admin/log dashboard
 shared/           Shared static navigation assets
+login/            Public sign-in page for protected admin tools
 about/            About page
 docs/             Website docs and provider/setup markdown docs
 stock-research/   Active stock research frontend

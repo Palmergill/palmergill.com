@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login · Palmer Gill</title>
+    <link rel="stylesheet" href="/shared/site-nav.css?v=5">
+    <link rel="stylesheet" href="/login/style.css?v=1">
+</head>
+<body>
+    <main class="login-shell">
+        <section class="login-panel" aria-labelledby="loginTitle">
+            <div class="login-brand">
+                <img src="/assets/palmer-gill-logo-small.png" alt="" aria-hidden="true">
+                <span>Palmer Gill</span>
+            </div>
+
+            <div class="login-copy">
+                <p class="eyebrow">Protected workspace</p>
+                <h1 id="loginTitle">Admin sign in</h1>
+                <p>Use your site credentials to view logs and protected operational tools.</p>
+            </div>
+
+            <form class="login-form" id="loginForm" novalidate>
+                <div class="field">
+                    <label for="username">Username</label>
+                    <input id="username" name="username" type="text" autocomplete="username" required>
+                </div>
+
+                <div class="field">
+                    <label for="password">Password</label>
+                    <input id="password" name="password" type="password" autocomplete="current-password" required>
+                </div>
+
+                <p class="status" id="loginStatus" role="status" aria-live="polite"></p>
+
+                <button class="login-button" type="submit">
+                    <span>Sign in</span>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M5 12h14"></path>
+                        <path d="m13 6 6 6-6 6"></path>
+                    </svg>
+                </button>
+            </form>
+        </section>
+
+        <aside class="login-visual" aria-label="Palmer Lake">
+            <div class="visual-caption">
+                <span>Private systems</span>
+                <strong>Logs, diagnostics, and backend tools</strong>
+            </div>
+        </aside>
+    </main>
+
+    <script src="/shared/site-nav.js?v=5"></script>
+    <script src="/login/app.js?v=1"></script>
+</body>
+</html>

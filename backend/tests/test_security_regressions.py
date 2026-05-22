@@ -1,7 +1,7 @@
 from fastapi.testclient import TestClient
 
 from app.log_handler import _redact_sensitive_query_values
-from app.main import app
+from app.main import SESSION_COOKIE_NAME, app, create_app_session_token
 from app.routers import poker
 
 
@@ -80,3 +80,50 @@ def test_log_redaction_removes_sensitive_query_values():
 
     assert "secret123" not in redacted
     assert "player_token=[REDACTED]" in redacted
+
+
+def test_admin_page_redirects_to_login_for_html_requests(monkeypatch):
+    monkeypatch.setenv("APP_AUTH_USERNAME", "palmer")
+    monkeypatch.setenv("APP_AUTH_PASSWORD", "secret")
+    auth_client = TestClient(app)
+
+    response = auth_client.get(
+        "/admin/",
+        headers={"accept": "text/html"},
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 302
+    assert response.headers["location"] == "/login/?next=/admin/"
+
+
+def test_login_session_sets_signed_session_cookie(monkeypatch):
+    monkeypatch.setenv("APP_AUTH_USERNAME", "palmer")
+    monkeypatch.setenv("APP_AUTH_PASSWORD", "secret")
+    auth_client = TestClient(app)
+
+    response = auth_client.post(
+        "/login/session",
+        json={"username": "palmer", "password": "secret"},
+    )
+
+    assert response.status_code == 200
+    assert f"{SESSION_COOKIE_NAME}=" in response.headers["set-cookie"]
+    assert "HttpOnly" in response.headers["set-cookie"]
+
+    protected_response = auth_client.get("/api/unknown")
+    assert protected_response.status_code == 404
+
+
+def test_signed_session_cookie_allows_protected_api_without_basic_auth(monkeypatch):
+    monkeypatch.setenv("APP_AUTH_USERNAME", "palmer")
+    monkeypatch.setenv("APP_AUTH_PASSWORD", "secret")
+    auth_client = TestClient(app)
+    token = create_app_session_token("palmer", "secret")
+
+    response = auth_client.get(
+        "/api/unknown",
+        cookies={SESSION_COOKIE_NAME: token},
+    )
+
+    assert response.status_code == 404

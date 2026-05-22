@@ -1,12 +1,17 @@
 import asyncio
 import base64
+import hashlib
+import hmac
+import json
 import logging
 import secrets
+import time
+from urllib.parse import quote
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, PlainTextResponse
+from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, RedirectResponse
 from app.database_migration import init_db_with_migration
 from app.log_handler import install_db_logging
 from app.routers import admin, bitcoin, stocks, poker
@@ -29,10 +34,13 @@ async def _periodic_game_cleanup(interval: int = 300) -> None:
 app = FastAPI(title="Palmer Gill API", version="0.2.0-p5")
 
 AUTH_REALM = "Palmer Gill Apps"
+SESSION_COOKIE_NAME = "pg_session"
+SESSION_TTL_SECONDS = 8 * 60 * 60
 PUBLIC_PATH_PREFIXES = (
     "/api/poker",
     "/poker",
     "/craps",
+    "/login",
 )
 DEMO_PATH_PREFIXES = (
     "/api/stocks",
@@ -94,7 +102,85 @@ def valid_app_credentials(authorization: str | None):
     )
 
 
-def auth_challenge():
+def _base64url_encode(value: bytes) -> str:
+    return base64.urlsafe_b64encode(value).decode("ascii").rstrip("=")
+
+
+def _base64url_decode(value: str) -> bytes:
+    padding = "=" * (-len(value) % 4)
+    return base64.urlsafe_b64decode(f"{value}{padding}")
+
+
+def _session_signature(secret: str, payload: str) -> str:
+    return _base64url_encode(
+        hmac.new(secret.encode("utf-8"), payload.encode("utf-8"), hashlib.sha256).digest()
+    )
+
+
+def create_app_session_token(username: str, password: str, now: int | None = None) -> str:
+    payload = _base64url_encode(
+        json.dumps(
+            {
+                "u": username,
+                "exp": int(now if now is not None else time.time()) + SESSION_TTL_SECONDS,
+            },
+            separators=(",", ":"),
+        ).encode("utf-8")
+    )
+    return f"{payload}.{_session_signature(password, payload)}"
+
+
+def valid_app_session_cookie(request: Request) -> bool:
+    config = app_auth_config()
+    if not config:
+        return False
+
+    token = request.cookies.get(SESSION_COOKIE_NAME)
+    if not token:
+        return False
+
+    try:
+        payload, signature = token.split(".", 1)
+    except ValueError:
+        return False
+
+    expected_signature = _session_signature(config["password"], payload)
+    if not secrets.compare_digest(signature, expected_signature):
+        return False
+
+    try:
+        data = json.loads(_base64url_decode(payload))
+    except (ValueError, json.JSONDecodeError):
+        return False
+
+    return (
+        secrets.compare_digest(str(data.get("u", "")), config["username"])
+        and int(data.get("exp", 0)) > int(time.time())
+    )
+
+
+def should_redirect_to_login(request: Request) -> bool:
+    path = request.url.path
+    if request.method not in {"GET", "HEAD"}:
+        return False
+    if not (path == "/admin" or path.startswith("/admin/")):
+        return False
+
+    accept = request.headers.get("accept", "")
+    return "text/html" in accept or "*/*" in accept
+
+
+def login_redirect(request: Request):
+    next_path = request.url.path
+    if request.url.query:
+        next_path = f"{next_path}?{request.url.query}"
+    return RedirectResponse(f"/login/?next={quote(next_path, safe='/')}", status_code=302)
+
+
+def auth_challenge(request: Request):
+    if should_redirect_to_login(request):
+        return login_redirect(request)
+
     return PlainTextResponse(
         "Authentication required",
         status_code=401,
@@ -112,14 +198,14 @@ async def require_app_auth(request: Request, call_next):
     request.state.app_auth_authenticated = False
 
     authorization = request.headers.get("authorization")
-    if valid_app_credentials(authorization):
+    if valid_app_credentials(authorization) or valid_app_session_cookie(request):
         request.state.app_auth_authenticated = True
         return await call_next(request)
 
     if authorization and app_auth_config() and (
         is_demo_path(request.url.path) or is_protected_path(request.url.path)
     ):
-        return auth_challenge()
+        return auth_challenge(request)
 
     if is_demo_path(request.url.path):
         request.state.demo_mode = True
@@ -131,7 +217,55 @@ async def require_app_auth(request: Request, call_next):
     if not app_auth_config():
         return missing_auth_config()
 
-    return auth_challenge()
+    return auth_challenge(request)
+
+
+@app.post("/login/session")
+async def login_session(request: Request):
+    config = app_auth_config()
+    if not config:
+        return JSONResponse({"error": "App authentication is not configured"}, status_code=503)
+
+    try:
+        body = await request.json()
+    except ValueError:
+        return JSONResponse({"error": "Invalid login request"}, status_code=400)
+
+    username = str(body.get("username", ""))
+    password = str(body.get("password", ""))
+    if not (
+        secrets.compare_digest(username, config["username"])
+        and secrets.compare_digest(password, config["password"])
+    ):
+        return JSONResponse({"error": "Invalid username or password"}, status_code=401)
+
+    response = JSONResponse({"ok": True, "redirect": "/admin/"})
+    response.set_cookie(
+        SESSION_COOKIE_NAME,
+        create_app_session_token(config["username"], config["password"]),
+        max_age=SESSION_TTL_SECONDS,
+        httponly=True,
+        secure=request.url.scheme == "https",
+        samesite="lax",
+        path="/",
+    )
+    return response
+
+
+@app.api_route("/login/logout", methods=["GET", "POST"])
+async def login_logout(request: Request):
+    if request.method == "GET":
+        response = RedirectResponse("/login/", status_code=302)
+    else:
+        response = JSONResponse({"ok": True})
+    response.delete_cookie(
+        SESSION_COOKIE_NAME,
+        secure=request.url.scheme == "https",
+        samesite="lax",
+        path="/",
+    )
+    return response
+
 
 # CORS - allow frontend to call backend
 # Allow all origins for development (restrict in production)
@@ -188,6 +322,7 @@ if local_site_root_enabled:
         "/bitcoin-chat": "bitcoin-chat",
         "/casino": "casino",
         "/admin": "admin",
+        "/login": "login",
     }.items():
         directory = os.path.join(repo_root, folder)
         if os.path.exists(directory):

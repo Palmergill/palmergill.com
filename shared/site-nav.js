@@ -50,6 +50,15 @@
         }
     ];
 
+    const utilityItems = [
+        {
+            label: "Login",
+            hint: "Admin access",
+            href: "/login/?next=/admin/",
+            icon: "log-in"
+        }
+    ];
+
     const icons = {
         "layout-dashboard": '<rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/>',
         "user-round": '<circle cx="12" cy="8" r="5"/><path d="M20 21a8 8 0 0 0-16 0"/>',
@@ -59,6 +68,7 @@
         "badge-dollar-sign": '<path d="M3.85 8.62a4 4 0 0 1 4.78-4.77 4 4 0 0 1 6.74 0 4 4 0 0 1 4.78 4.78 4 4 0 0 1 0 6.74 4 4 0 0 1-4.78 4.78 4 4 0 0 1-6.74 0 4 4 0 0 1-4.78-4.78 4 4 0 0 1 0-6.75Z"/><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"/><path d="M12 18V6"/>',
         "bitcoin": '<path d="M11.77 19.5c4.2.7 6.93-.54 7.45-3.18.35-1.8-.5-3.03-2.05-3.74 1.15-.4 1.9-1.25 2.08-2.51.46-3.22-2.38-4.35-6.53-4.93L11.66 5l-.46 2.6 1 .16-.56 3.17-1-.17-.45 2.6 1 .17-.65 3.7-1.06-.18-.46 2.61 2.75.46Z"/><path d="m13.2 8.04 1.18.2c1.38.24 2.16.7 1.95 1.85-.22 1.17-1.09 1.33-2.47 1.1l-1.18-.2.52-2.95Z"/><path d="m12.25 13.42 1.42.24c1.62.28 2.47.85 2.24 2.12-.24 1.35-1.2 1.53-2.82 1.25l-1.42-.24.58-3.37Z"/><path d="m10.52 4.35.35-2M14.5 5.02l.35-2M9.15 21l.35-2M13.13 21.68l.35-2"/>',
         "book-open": '<path d="M12 7v14"/><path d="M3 18a2 2 0 0 1 2-2h5a2 2 0 0 1 2 2V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v13Z"/><path d="M21 18a2 2 0 0 0-2-2h-5a2 2 0 0 0-2 2V5a2 2 0 0 1 2-2h5a2 2 0 0 1 2 2v13Z"/>',
+        "log-in": '<path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><path d="M10 17l5-5-5-5"/><path d="M15 12H3"/>',
         menu: '<path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h16"/>'
     };
 
@@ -78,10 +88,11 @@
 
     function isCurrent(href) {
         const path = window.location.pathname;
-        if (href === "/") {
+        const itemPath = new URL(href, window.location.origin).pathname;
+        if (itemPath === "/") {
             return path === "/" || path === "/index.html";
         }
-        return path === href || path.startsWith(href);
+        return path === itemPath || path.startsWith(itemPath);
     }
 
     function close(nav, toggle) {
@@ -98,7 +109,7 @@
         nav.className = "site-nav";
         nav.setAttribute("aria-label", "Site navigation");
 
-        const links = items.map((item) => {
+        const renderLinks = (navItems) => navItems.map((item) => {
             const current = isCurrent(item.href) ? ' aria-current="page"' : "";
             return [
                 `<a class="site-nav__link" href="${item.href}" title="${item.label}"${current}>`,
@@ -111,6 +122,9 @@
             ].join("");
         }).join("");
 
+        const links = renderLinks(items);
+        const utilityLinks = renderLinks(utilityItems);
+
         nav.innerHTML = [
             '<button class="site-nav__toggle" type="button" aria-label="Open navigation" aria-expanded="false">',
             iconSvg("menu"),
@@ -119,6 +133,7 @@
             '<div class="site-nav__panel">',
             '<a class="site-nav__brand" href="/" title="Palmer Gill"><img class="site-nav__brand-logo" src="/assets/palmer-gill-logo-small.png" alt="" aria-hidden="true"><span class="site-nav__label">Palmer Gill</span></a>',
             `<div class="site-nav__items">${links}</div>`,
+            `<div class="site-nav__utility">${utilityLinks}</div>`,
             '</div>'
         ].join("");
 

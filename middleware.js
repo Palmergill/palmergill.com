@@ -1,9 +1,14 @@
 import { next } from '@vercel/functions';
 
+const SESSION_COOKIE_NAME = 'pg_session';
+const SESSION_TTL_SECONDS = 8 * 60 * 60;
+
 const PUBLIC_PREFIXES = [
   '/poker',
   '/craps',
   '/api/poker',
+  '/login/session',
+  '/login/logout',
   '/stock-research',
   '/bitcoin-chat',
   '/api/stocks',
@@ -17,6 +22,81 @@ const PROTECTED_PREFIXES = [
 
 const REALM = 'Palmer Gill Apps';
 
+function base64UrlEncode(value) {
+  const bytes = typeof value === 'string' ? new TextEncoder().encode(value) : value;
+  let binary = '';
+  for (const byte of bytes) {
+    binary += String.fromCharCode(byte);
+  }
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+}
+
+function base64UrlDecode(value) {
+  const base64 = value.replace(/-/g, '+').replace(/_/g, '/');
+  const padded = base64.padEnd(base64.length + ((4 - (base64.length % 4)) % 4), '=');
+  const binary = atob(padded);
+  const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
+  return new TextDecoder().decode(bytes);
+}
+
+async function signSessionValue(secret, value) {
+  const key = await crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign'],
+  );
+  const signature = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(value));
+  return base64UrlEncode(new Uint8Array(signature));
+}
+
+async function createSessionToken(username, password) {
+  const payload = base64UrlEncode(JSON.stringify({
+    u: username,
+    exp: Math.floor(Date.now() / 1000) + SESSION_TTL_SECONDS,
+  }));
+  const signature = await signSessionValue(password, payload);
+  return `${payload}.${signature}`;
+}
+
+function parseCookies(cookieHeader) {
+  const cookies = new Map();
+  if (!cookieHeader) return cookies;
+
+  for (const part of cookieHeader.split(';')) {
+    const separator = part.indexOf('=');
+    if (separator === -1) continue;
+    const name = part.slice(0, separator).trim();
+    const value = part.slice(separator + 1).trim();
+    if (name) cookies.set(name, value);
+  }
+
+  return cookies;
+}
+
+async function validSessionCookie(request, username, password) {
+  const token = parseCookies(request.headers.get('cookie')).get(SESSION_COOKIE_NAME);
+  if (!token) return false;
+
+  const [payload, signature, extra] = token.split('.');
+  if (!payload || !signature || extra) return false;
+
+  const expectedSignature = await signSessionValue(password, payload);
+  if (!timingSafeEqual(signature, expectedSignature)) return false;
+
+  try {
+    const data = JSON.parse(base64UrlDecode(payload));
+    return (
+      data &&
+      timingSafeEqual(String(data.u || ''), username) &&
+      Number(data.exp || 0) > Math.floor(Date.now() / 1000)
+    );
+  } catch {
+    return false;
+  }
+}
+
 function isProtectedPath(pathname) {
   if (PUBLIC_PREFIXES.some((prefix) => (
     pathname === prefix || pathname.startsWith(`${prefix}/`)
@@ -29,7 +109,27 @@ function isProtectedPath(pathname) {
   ));
 }
 
-function unauthorized() {
+function shouldRedirectToLogin(request) {
+  const url = new URL(request.url);
+  if (request.method !== 'GET' && request.method !== 'HEAD') return false;
+  if (!(url.pathname === '/admin' || url.pathname.startsWith('/admin/'))) return false;
+
+  const accept = request.headers.get('accept') || '';
+  return accept.includes('text/html') || accept.includes('*/*');
+}
+
+function loginRedirect(request) {
+  const url = new URL(request.url);
+  const loginUrl = new URL('/login/', url.origin);
+  loginUrl.searchParams.set('next', `${url.pathname}${url.search}`);
+  return Response.redirect(loginUrl, 302);
+}
+
+function unauthorized(request) {
+  if (shouldRedirectToLogin(request)) {
+    return loginRedirect(request);
+  }
+
   return new Response('Authentication required', {
     status: 401,
     headers: {
@@ -41,6 +141,70 @@ function unauthorized() {
 function missingConfig() {
   return new Response('App authentication is not configured', {
     status: 503,
+  });
+}
+
+function jsonResponse(body, status = 200, headers = {}) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: {
+      'Content-Type': 'application/json',
+      ...headers,
+    },
+  });
+}
+
+function sessionCookie(token, request) {
+  const secure = new URL(request.url).protocol === 'https:' ? '; Secure' : '';
+  return `${SESSION_COOKIE_NAME}=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${SESSION_TTL_SECONDS}${secure}`;
+}
+
+function clearSessionCookie(request) {
+  const secure = new URL(request.url).protocol === 'https:' ? '; Secure' : '';
+  return `${SESSION_COOKIE_NAME}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0${secure}`;
+}
+
+async function handleLoginSession(request, username, password) {
+  if (request.method !== 'POST') {
+    return jsonResponse({ error: 'Method not allowed' }, 405, { Allow: 'POST' });
+  }
+
+  if (!password) {
+    return jsonResponse({ error: 'App authentication is not configured' }, 503);
+  }
+
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return jsonResponse({ error: 'Invalid login request' }, 400);
+  }
+
+  const submittedUsername = String(body?.username || '');
+  const submittedPassword = String(body?.password || '');
+  if (
+    !timingSafeEqual(submittedUsername, username) ||
+    !timingSafeEqual(submittedPassword, password)
+  ) {
+    return jsonResponse({ error: 'Invalid username or password' }, 401);
+  }
+
+  const token = await createSessionToken(username, password);
+  return jsonResponse(
+    { ok: true, redirect: '/admin/' },
+    200,
+    { 'Set-Cookie': sessionCookie(token, request) },
+  );
+}
+
+function handleLogout(request) {
+  const url = new URL('/login/', request.url);
+  return new Response(null, {
+    status: 302,
+    headers: {
+      Location: url.toString(),
+      'Set-Cookie': clearSessionCookie(request),
+    },
   });
 }
 
@@ -77,18 +241,29 @@ function decodeBasicAuth(value) {
   }
 }
 
-export default function middleware(request) {
+export default async function middleware(request) {
   const url = new URL(request.url);
+  const username = process.env.APP_AUTH_USERNAME || 'palmer';
+  const password = process.env.APP_AUTH_PASSWORD;
+
+  if (url.pathname === '/login/session') {
+    return handleLoginSession(request, username, password);
+  }
+
+  if (url.pathname === '/login/logout') {
+    return handleLogout(request);
+  }
 
   if (!isProtectedPath(url.pathname)) {
     return next();
   }
 
-  const username = process.env.APP_AUTH_USERNAME || 'palmer';
-  const password = process.env.APP_AUTH_PASSWORD;
-
   if (!password) {
     return process.env.VERCEL ? missingConfig() : next();
+  }
+
+  if (await validSessionCookie(request, username, password)) {
+    return next();
   }
 
   const credentials = decodeBasicAuth(request.headers.get('authorization'));
@@ -97,7 +272,7 @@ export default function middleware(request) {
     !timingSafeEqual(credentials.username, username) ||
     !timingSafeEqual(credentials.password, password)
   ) {
-    return unauthorized();
+    return unauthorized(request);
   }
 
   return next();
@@ -107,6 +282,8 @@ export const config = {
   matcher: [
     '/stock-research/:path*',
     '/bitcoin-chat/:path*',
+    '/login/session',
+    '/login/logout',
     '/admin/:path*',
     '/api/:path*',
   ],
