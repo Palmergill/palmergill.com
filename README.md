@@ -8,10 +8,11 @@ Personal project site plus shared API backend.
 - `/about/` - professional background and selected project context
 - `/docs/` - website documentation
 - `/stock-research/` - polished stock research app
+- `/bitcoin-chat/` - Bitcoin chat app
+- `/casino/` - landing page linking the casino games
 - `/poker/` - Texas Hold'em poker app
 - `/craps/` - craps app
 - `/blackjack/` - blackjack app
-- `/bitcoin-chat/` - Bitcoin chat app
 - `/admin/` - protected backend log dashboard
 
 ## Active Backend Paths
@@ -35,7 +36,7 @@ Open:
 http://127.0.0.1:8000
 ```
 
-The local server runs FastAPI and, with `LOCAL_SITE_ROOT=true`, also serves the static root page plus `assets/`, `shared/`, `about/`, `stock-research/`, `poker/`, `craps/`, `blackjack/`, `bitcoin-chat/`, and `admin/`. The local `/docs` path is reserved for FastAPI API docs; the static website docs page is served by production static hosting at `/docs/`.
+The local server runs FastAPI and, with `LOCAL_SITE_ROOT=true`, also serves the static root page plus `assets/`, `shared/`, `about/`, `stock-research/`, `bitcoin-chat/`, `casino/`, `poker/`, `craps/`, `blackjack/`, and `admin/`. The local `/docs` path is reserved for FastAPI API docs; the static website docs page is served by production static hosting at `/docs/`.
 
 Protected local app routes, FastAPI docs/OpenAPI JSON, and API routes require Basic Auth. Set:
 
@@ -54,7 +55,7 @@ logs/backend.log
 - Static site: hosted from the repo root and project folders.
 - API service: Railway/FastAPI from `backend/`.
 - Vercel rewrites `/api/*` to the Railway backend in production.
-- The root page `/`, `/docs/`, `/stock-research/`, `/bitcoin-chat/`, `/poker/`, `/craps/`, `/blackjack/`, `/api/poker/*`, `/api/stocks/*`, and `/api/bitcoin/*` stay public. Unauthenticated stock and Bitcoin API requests return demo data only; valid Basic Auth credentials unlock the live provider-backed paths. Admin and other `/api/*` routes require Basic Auth; protected routes return `503` if `APP_AUTH_PASSWORD` is missing. Set the same `APP_AUTH_USERNAME` and `APP_AUTH_PASSWORD` values in Vercel and Railway.
+- The root page `/`, `/docs/`, `/stock-research/`, `/bitcoin-chat/`, `/casino/`, `/poker/`, `/craps/`, `/blackjack/`, `/api/poker/*`, `/api/stocks/*`, and `/api/bitcoin/*` stay public. Unauthenticated stock and Bitcoin API requests return demo data only; valid Basic Auth credentials unlock the live provider-backed paths. Admin and other `/api/*` routes require Basic Auth; protected routes return `503` if `APP_AUTH_PASSWORD` is missing. Set the same `APP_AUTH_USERNAME` and `APP_AUTH_PASSWORD` values in Vercel and Railway.
 
 ## Repository Layout
 
@@ -65,10 +66,11 @@ shared/           Shared static navigation assets
 about/            About page
 docs/             Website docs and provider/setup markdown docs
 stock-research/   Active stock research frontend
+bitcoin-chat/     Active Bitcoin chat frontend
+casino/           Casino landing page linking poker, craps, and blackjack
 poker/            Active poker frontend and supporting docs/tests
 craps/            Active craps frontend
 blackjack/        Active blackjack frontend and tests
-bitcoin-chat/     Active Bitcoin chat frontend
 ```
 
 ## Notes
