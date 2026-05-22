@@ -1484,11 +1484,19 @@ function showRaiseControls() {
 
     elements.raiseContainer.classList.remove('hidden');
     elements.actionButtons.classList.add('hidden');
+    const yourSection = document.querySelector('.your-section');
+    yourSection?.classList.add('raise-open');
+    requestAnimationFrame(() => {
+        if (yourSection) {
+            yourSection.scrollTop = yourSection.scrollHeight;
+        }
+    });
 }
 
 function hideRaiseControls() {
     elements.raiseContainer.classList.add('hidden');
     elements.actionButtons.classList.remove('hidden');
+    document.querySelector('.your-section')?.classList.remove('raise-open');
 }
 
 function confirmRaise() {
@@ -1946,6 +1954,8 @@ function getHandNameFrom5Cards(cards) {
 function updateActionButtons() {
     if (!gameState || gameState.phase === 'showdown') {
         elements.actionButtons.classList.add('hidden');
+        elements.raiseContainer.classList.add('hidden');
+        document.querySelector('.your-section')?.classList.remove('raise-open');
         return;
     }
     
@@ -1954,6 +1964,14 @@ function updateActionButtons() {
     
     if (!isMyTurn || !myPlayer) {
         elements.actionButtons.classList.add('hidden');
+        elements.raiseContainer.classList.add('hidden');
+        document.querySelector('.your-section')?.classList.remove('raise-open');
+        return;
+    }
+
+    if (!elements.raiseContainer.classList.contains('hidden')) {
+        elements.actionButtons.classList.add('hidden');
+        document.querySelector('.your-section')?.classList.add('raise-open');
         return;
     }
     
@@ -2176,21 +2194,11 @@ function hideStats() {
 function switchScreen(screenName) {
     Object.values(screens).forEach(screen => screen.classList.remove('active'));
     screens[screenName].classList.add('active');
+    document.body.classList.toggle('poker-game-active', screenName === 'game');
 
-    // Lock orientation to portrait when entering game screen on mobile
     if (screenName === 'game') {
-        lockOrientationPortrait();
         // Initialize gesture manager when entering game screen
         GestureManager.init();
-    }
-}
-
-// Orientation Lock Function
-function lockOrientationPortrait() {
-    if (typeof screen !== 'undefined' && screen.orientation && screen.orientation.lock) {
-        screen.orientation.lock('portrait').catch((err) => {
-            console.log('[Orientation] Could not lock orientation:', err.message);
-        });
     }
 }
 
