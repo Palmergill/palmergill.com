@@ -3128,7 +3128,7 @@
             }
         }
 
-        /* ===== BLACKJACK TABLE THEME ===== */
+        /* ===== POKER TABLE THEME ===== */
         :root {
             --ink: #130d09;
             --panel: rgba(7, 14, 12, 0.84);
@@ -3192,7 +3192,7 @@
         #start-screen::before,
         #join-screen::before,
         #lobby-screen::before {
-            content: "Casino Table";
+            content: "Poker Table";
             display: block;
             margin-bottom: 8px;
             color: var(--gold);
@@ -3736,6 +3736,184 @@
                 padding: 8px 6px;
                 font-size: 0.78rem;
             }
+        }
+
+        /* ===== POKER LAYOUT STABILITY FIXES ===== */
+        #game-screen {
+            height: 100dvh;
+            max-height: 100dvh;
+            gap: clamp(8px, 1.4vh, 12px);
+            overflow: hidden;
+            padding: clamp(14px, 2.2vh, 22px) clamp(16px, 3vw, 32px) clamp(10px, 1.5vh, 14px);
+        }
+
+        .game-header {
+            flex: 0 0 auto;
+        }
+
+        .felt-area {
+            flex: 1 1 0;
+            min-height: 260px;
+        }
+
+        .your-section {
+            flex: 0 0 auto;
+            display: grid;
+            grid-template-columns: minmax(120px, 180px) minmax(160px, 1fr) minmax(340px, 48vw);
+            grid-template-areas:
+                "label cards info"
+                "strength cards actions"
+                "timer timer timer"
+                "raise raise raise"
+                "showdown showdown showdown";
+            align-items: center;
+            column-gap: 18px;
+            row-gap: 8px;
+            padding: 12px 16px;
+        }
+
+        .your-label {
+            grid-area: label;
+            margin: 0;
+            justify-content: flex-start;
+        }
+
+        .your-cards {
+            grid-area: cards;
+            min-height: 0;
+            margin: 0;
+        }
+
+        .your-cards .card {
+            width: clamp(58px, 5.2vw, 72px);
+            height: clamp(82px, 7.3vw, 102px);
+            font-size: clamp(26px, 2.6vw, 34px);
+        }
+
+        .hand-strength {
+            grid-area: strength;
+            min-height: 0;
+            margin: 0;
+        }
+
+        .decision-timer {
+            grid-area: timer;
+            margin: 0;
+        }
+
+        .your-info {
+            grid-area: info;
+            justify-self: stretch;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            min-width: 0;
+            width: auto;
+            margin: 0;
+        }
+
+        .actions {
+            grid-area: actions;
+            display: grid;
+            grid-template-columns: repeat(3, minmax(104px, 1fr));
+            gap: 10px;
+            width: 100%;
+            max-width: none;
+            margin: 0;
+        }
+
+        .btn-action {
+            min-height: 46px;
+            padding: 10px 12px;
+        }
+
+        .raise-container {
+            grid-area: raise;
+            width: 100%;
+            margin: 0;
+            box-sizing: border-box;
+        }
+
+        .showdown-panel {
+            grid-area: showdown;
+            margin-top: 0;
+        }
+
+        @media (max-width: 899px) {
+            #game-screen {
+                height: calc(100dvh - var(--site-nav-mobile-height, 0px));
+                max-height: calc(100dvh - var(--site-nav-mobile-height, 0px));
+                padding: 8px 10px 10px;
+                gap: 8px;
+            }
+
+            .felt-area {
+                min-height: 0;
+            }
+        }
+
+        @media (max-width: 700px) and (orientation: portrait) {
+            .ai-action-indicator {
+                display: flex;
+                top: 41%;
+                bottom: auto;
+                width: min(calc(100% - 48px), 300px);
+                min-height: 0;
+                transform: translate(-50%, -50%);
+                z-index: 9;
+            }
+
+            .ai-action-text {
+                padding: 5px 10px;
+                font-size: 11px;
+                line-height: 1.15;
+                max-width: 100%;
+            }
+
+            .your-section {
+                grid-template-columns: auto minmax(0, 1fr);
+                grid-template-areas:
+                    "label info"
+                    "cards actions"
+                    "strength strength"
+                    "timer timer"
+                    "raise raise"
+                    "showdown showdown";
+                column-gap: 10px;
+                row-gap: 7px;
+                padding: 8px;
+            }
+
+            .your-label {
+                font-size: 10px;
+            }
+
+            .your-cards {
+                justify-content: flex-start;
+                gap: 4px;
+            }
+
+            .actions {
+                grid-template-columns: repeat(3, minmax(0, 1fr));
+                gap: 8px;
+                align-self: center;
+            }
+
+            .btn-action {
+                min-height: 44px;
+                padding: 9px 6px;
+                font-size: 0.78rem;
+            }
+        }
+
+        @media (max-width: 380px) and (orientation: portrait),
+               (max-height: 680px) and (orientation: portrait) {
+            .btn-action {
+                min-height: 44px;
+                padding: 8px 5px;
+            }
+
         }
 
     </style>
