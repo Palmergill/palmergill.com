@@ -32,6 +32,10 @@ body.has-site-nav {
     display: none;
 }
 
+.site-nav__mobile-brand {
+    display: none;
+}
+
 .site-nav__panel {
     display: flex;
     height: 100%;
@@ -213,6 +217,63 @@ body.has-site-nav {
         pointer-events: auto;
     }
 
+    .site-nav__mobile-brand {
+        position: absolute;
+        top: max(6px, env(safe-area-inset-top));
+        left: calc(max(12px, env(safe-area-inset-left)) + 56px);
+        right: max(12px, env(safe-area-inset-right));
+        z-index: calc(var(--site-nav-z) + 2);
+        display: flex;
+        height: 44px;
+        align-items: center;
+        gap: 10px;
+        overflow: hidden;
+        color: #ffffff;
+        text-decoration: none;
+        transition: opacity 150ms ease;
+        pointer-events: auto;
+    }
+
+    .site-nav.is-open .site-nav__mobile-brand {
+        opacity: 0;
+        pointer-events: none;
+    }
+
+    .site-nav__mobile-logo {
+        flex: 0 0 34px;
+        width: 34px;
+        height: 34px;
+        border-radius: 8px;
+        object-fit: cover;
+        object-position: center;
+        box-shadow: 0 0 18px rgba(96, 165, 250, 0.34);
+    }
+
+    .site-nav__mobile-title,
+    .site-nav__mobile-subtitle {
+        display: block;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .site-nav__mobile-title {
+        color: #f8fafc;
+        font-size: 0.94rem;
+        font-weight: 800;
+        line-height: 1.05;
+    }
+
+    .site-nav__mobile-subtitle {
+        margin-top: 2px;
+        color: #94a3b8;
+        font-size: 0.7rem;
+        font-weight: 650;
+        line-height: 1.1;
+        text-transform: uppercase;
+    }
+
     .site-nav__toggle {
         position: absolute;
         top: max(6px, env(safe-area-inset-top));
@@ -273,6 +334,8 @@ body.has-site-nav {
         display: flex;
         gap: 12px;
         padding: 0 14px;
+        background: rgba(255, 255, 255, 0.08);
+        border-color: rgba(255, 255, 255, 0.16);
     }
 
     .site-nav__items {

@@ -129,9 +129,10 @@
             '<button class="site-nav__toggle" type="button" aria-label="Open navigation" aria-expanded="false">',
             iconSvg("menu"),
             '</button>',
+            '<a class="site-nav__mobile-brand" href="/" aria-label="Palmergill.com home"><img class="site-nav__mobile-logo" src="/assets/palmer-gill-logo-small.png" alt="" aria-hidden="true"><span><span class="site-nav__mobile-title">Palmergill.com</span><span class="site-nav__mobile-subtitle">Projects and tools</span></span></a>',
             '<div class="site-nav__backdrop" aria-hidden="true"></div>',
             '<div class="site-nav__panel">',
-            '<a class="site-nav__brand" href="/" title="Palmer Gill"><img class="site-nav__brand-logo" src="/assets/palmer-gill-logo-small.png" alt="" aria-hidden="true"><span class="site-nav__label">Palmer Gill</span></a>',
+            '<a class="site-nav__brand" href="/" title="Palmergill.com"><img class="site-nav__brand-logo" src="/assets/palmer-gill-logo-small.png" alt="" aria-hidden="true"><span><span class="site-nav__label">Palmergill.com</span><span class="site-nav__hint">Projects and tools</span></span></a>',
             `<div class="site-nav__items">${links}</div>`,
             `<div class="site-nav__utility">${utilityLinks}</div>`,
             '</div>'
