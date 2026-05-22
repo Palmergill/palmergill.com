@@ -2,7 +2,7 @@
 
 This documents the production wiring for the Bitcoin Chat app at `/bitcoin-chat/`.
 
-Last reviewed against the repo on May 21, 2026.
+Last reviewed against the repo on May 22, 2026.
 
 ## Architecture
 

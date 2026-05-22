@@ -104,14 +104,29 @@
                                 <td>Public</td>
                             </tr>
                             <tr>
+                                <td><code>/about/</code></td>
+                                <td>Professional background and selected project context.</td>
+                                <td>Public</td>
+                            </tr>
+                            <tr>
                                 <td><code>/docs/</code></td>
                                 <td>Static website documentation page.</td>
-                                <td>Protected</td>
+                                <td>Public</td>
+                            </tr>
+                            <tr>
+                                <td><code>/login/</code></td>
+                                <td>Sign-in page for protected admin tools.</td>
+                                <td>Public</td>
                             </tr>
                             <tr>
                                 <td><code>/stock-research/</code></td>
                                 <td>Stock research app for market data, fundamentals, and charts.</td>
                                 <td>Public demo, authenticated live data</td>
+                            </tr>
+                            <tr>
+                                <td><code>/casino/</code></td>
+                                <td>Landing page linking the casino games.</td>
+                                <td>Public</td>
                             </tr>
                             <tr>
                                 <td><code>/poker/</code></td>
@@ -151,8 +166,9 @@
                 <p>Then open:</p>
                 <pre><code>http://127.0.0.1:8000</code></pre>
                 <p>
-                    Protected local app routes, FastAPI docs/OpenAPI JSON, and API routes require Basic Auth.
-                    Poker, craps, blackjack, and <code>/api/poker/*</code> stay public.
+                    Protected local app routes, FastAPI docs/OpenAPI JSON, and protected API routes require Basic Auth.
+                    Stock and Bitcoin app/API routes run in demo mode without credentials and use live providers with valid
+                    credentials. Poker, craps, blackjack, and <code>/api/poker/*</code> stay public.
                 </p>
                 <pre><code>APP_AUTH_USERNAME=palmer APP_AUTH_PASSWORD=your-password ./start.sh</code></pre>
                 <p>Backend logs are written to:</p>
@@ -173,7 +189,7 @@
                     <span><code>/api/*</code></span>
                     <div>Railway FastAPI</div>
                     <span>service clients</span>
-                    <div>Market data, Bitcoin RPC, database cache, logs</div>
+                    <div>Market data, Bitcoin providers, database cache, logs</div>
                 </div>
                 <p>
                     In local development, <code>LOCAL_SITE_ROOT=true</code> lets FastAPI serve the root site and active app
@@ -202,9 +218,12 @@
                     <code>ALLOW_MOCK_FALLBACK</code>
                     <code>POLYGON_API_KEY</code>
                     <code>FINNHUB_API_KEY</code>
+                    <code>BITCOIN_DATA_PROVIDER</code>
                     <code>BITCOIN_RPC_URL</code>
                     <code>BITCOIN_RPC_USER</code>
                     <code>BITCOIN_RPC_PASSWORD</code>
+                    <code>BITCOIN_MEMPOOL_API_URL</code>
+                    <code>BITCOIN_MEMPOOL_TIMEOUT_SECONDS</code>
                     <code>BITCOIN_CHAT_MODEL_TIMEOUT_SECONDS</code>
                     <code>OPENAI_API_KEY</code>
                 </div>
@@ -214,7 +233,8 @@
                 <p class="section-kicker">Authentication</p>
                 <h2>Protected and public routes</h2>
                 <p>
-                    App authentication uses HTTP Basic Auth. If <code>APP_AUTH_PASSWORD</code> is missing in production,
+                    App authentication supports HTTP Basic Auth and the signed HttpOnly session cookie created by
+                    <code>/login/session</code>. If <code>APP_AUTH_PASSWORD</code> is missing in production,
                     protected routes return <code>503</code> instead of accidentally publishing private tools.
                     Vercel middleware skips that fail-closed behavior outside Vercel so local static development is not blocked.
                     Stock and Bitcoin routes allow unauthenticated demo access, while valid Basic Auth credentials unlock
@@ -319,9 +339,9 @@
                     <article>
                         <h3>Bitcoin Chat</h3>
                         <p>
-                            Chat interface connected to read-only Bitcoin Core RPC methods through Railway and a
-                            Cloudflare Tunnel. It can answer questions about blocks, transactions, mempool fees,
-                            node status, and mined-BTC data.
+                            Chat interface connected to mempool.space by default, with an optional read-only
+                            Bitcoin Core RPC provider through Railway and a Cloudflare Tunnel. It can answer
+                            questions about blocks, transactions, mempool fees, node status, and mined-BTC data.
                         </p>
                         <a href="/bitcoin-chat/">Open app</a>
                     </article>
@@ -352,9 +372,10 @@
                         </ul>
                     </div>
                     <div class="panel">
-                        <h3>Bitcoin Core RPC</h3>
-                        <p>Read-only Bitcoin node data for Bitcoin Chat.</p>
+                        <h3>Bitcoin data</h3>
+                        <p>mempool.space is the default live provider for Bitcoin Chat. A private read-only Bitcoin Core RPC node remains available as an optional provider.</p>
                         <ul>
+                            <li>Default provider: <code>BITCOIN_DATA_PROVIDER=mempool</code></li>
                             <li>Production tunnel hostname: <code>bitcoin-rpc.palmergill.com</code></li>
                             <li>Allowed methods include block, transaction, mempool, and fee-estimate reads.</li>
                             <li>Wallet, signing, broadcast, and private-key methods should stay disabled.</li>
@@ -378,10 +399,13 @@
                 <h2>Where things live</h2>
                 <div class="repo-grid">
                     <code>index.html</code><span>Project launcher page.</span>
+                    <code>about/</code><span>About page.</span>
                     <code>docs/</code><span>Static website docs plus provider/setup markdown docs.</span>
+                    <code>login/</code><span>Sign-in page for protected admin tools.</span>
                     <code>shared/</code><span>Shared navigation assets used by project pages.</span>
                     <code>backend/</code><span>Active shared FastAPI API service.</span>
                     <code>stock-research/</code><span>Stock research frontend.</span>
+                    <code>casino/</code><span>Casino landing page linking poker, craps, and blackjack.</span>
                     <code>poker/</code><span>Poker frontend, tests, and docs.</span>
                     <code>craps/</code><span>Craps frontend and tests.</span>
                     <code>blackjack/</code><span>Blackjack frontend and tests.</span>
@@ -416,7 +440,7 @@
     </main>
 
     <footer class="docs-footer">
-        <p>Site documentation for Palmer Gill. Last organized May 15, 2026.</p>
+        <p>Site documentation for Palmer Gill. Last reviewed May 22, 2026.</p>
     </footer>
 </body>
 </html>

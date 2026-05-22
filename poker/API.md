@@ -85,11 +85,11 @@ Starts a multiplayer game. Only the first player in the lobby can start it, and 
 ### Get Game State
 
 ```http
-GET /api/poker/games/{game_id}?player_id={player_id}
+GET /api/poker/games/{game_id}?player_id={player_id}&process_ai=false
 X-Player-Token: secret-token
 ```
 
-Returns the current game state for the requesting player. Cards are only visible to the requesting player until showdown. This endpoint is read-only; it does not advance AI turns.
+Returns the current game state for the requesting player. Cards are only visible to the requesting player until showdown. This endpoint is read-only; it does not advance AI turns. The `process_ai` query parameter is retained for older clients, but the active frontend sends `process_ai=false` and advances AI turns through `POST /process-ai`.
 
 Query parameters:
 
@@ -180,6 +180,14 @@ Request:
 
 Starts the next hand after showdown or while waiting. The dealer button advances before the hand starts.
 
+### CSRF Compatibility Token
+
+```http
+GET /api/poker/csrf-token
+```
+
+Returns `{ "ok": true }` and sets a `csrf_token` cookie for frontend compatibility with older double-submit flows. The active shared backend authorizes game actions with `player_token`; CSRF tokens are not required for poker API calls.
+
 ### Health
 
 ```http
@@ -241,4 +249,4 @@ Common status codes:
 
 ## Frontend Notes
 
-The current frontend includes compatibility code for CSRF/action-token flows from the standalone backend. The shared backend ignores the extra `action_token` field and does not expose `/api/poker/csrf-token`.
+The current frontend includes compatibility code for CSRF/action-token flows from the old standalone backend. The shared backend ignores the extra `action_token` field and exposes `/api/poker/csrf-token` only as a compatibility helper.

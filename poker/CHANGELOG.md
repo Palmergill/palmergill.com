@@ -7,6 +7,7 @@ The production poker app is currently the static frontend in `poker/` plus the s
 ## [Unreleased]
 
 ### Changed
+- Updated docs for the current stock/Bitcoin public-demo auth model, mempool.space as Bitcoin Chat's default live provider, and the current poker AI/CSRF compatibility endpoints.
 - Updated docs for player-token validation, poker write rate limiting, current local static mounts, and Bitcoin Chat environment variables.
 - Removed references to the deleted standalone poker backend service.
 - Updated API documentation to list only endpoints exposed by the active shared backend.

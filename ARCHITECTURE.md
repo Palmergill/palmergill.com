@@ -24,7 +24,9 @@ FastAPI backend
 The active public site is static:
 
 - `/` - portfolio/project launcher from `index.html`
+- `/about/` - professional background and selected project context
 - `/docs/` - website documentation from `docs/index.html`
+- `/login/` - protected workspace sign-in
 - `/stock-research/` - stock research app
 - `/bitcoin-chat/` - Bitcoin chat app
 - `/casino/` - casino landing page linking poker, craps, and blackjack
@@ -73,4 +75,4 @@ logs/backend.log
 - Static site hosting serves the root static files and project directories.
 - Vercel rewrites `/api/*` to the Railway API.
 - Railway runs the Dockerized FastAPI backend from `backend/`.
-- `/`, `/docs/`, `/casino/`, `/poker/`, `/craps/`, `/blackjack/`, and `/api/poker/*` are public. Stock research, Bitcoin chat, admin, FastAPI docs/OpenAPI JSON, and other API routes require Basic Auth. Protected backend routes return `503` when `APP_AUTH_PASSWORD` is missing.
+- `/`, `/docs/`, `/casino/`, `/poker/`, `/craps/`, `/blackjack/`, `/api/poker/*`, `/stock-research/`, `/bitcoin-chat/`, `/api/stocks/*`, and `/api/bitcoin/*` are public. Stock and Bitcoin routes serve demo data when unauthenticated; valid app credentials unlock live provider-backed data. Admin, FastAPI docs/OpenAPI JSON, and other API routes require authentication. Protected backend routes return `503` when `APP_AUTH_PASSWORD` is missing.

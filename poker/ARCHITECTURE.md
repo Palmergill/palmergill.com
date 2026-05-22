@@ -2,7 +2,7 @@
 
 This document describes the poker app as it is wired in the current root site deployment.
 
-**Last Updated:** May 15, 2026
+**Last Updated:** May 22, 2026
 
 ## Active Runtime
 
@@ -41,7 +41,7 @@ The active frontend is a static vanilla HTML/CSS/JS app:
 - `poker/sw.js` and `poker/manifest.json` - PWA support.
 - `poker/tests/` - Jest utility tests.
 
-The frontend polls game state rather than using WebSockets. AI turns are processed by `GET /api/poker/games/{game_id}` when `process_ai=true`.
+The frontend polls game state rather than using WebSockets. State polling uses `GET /api/poker/games/{game_id}` with `process_ai=false`; AI turns are advanced separately with `POST /api/poker/games/{game_id}/process-ai`.
 
 ## Backend
 

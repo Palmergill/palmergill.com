@@ -7,9 +7,11 @@ The site is split into static project pages and a shared API backend.
 The active static site lives at the repo root:
 
 - `index.html`
+- `about/`
 - `docs/`
 - `login/`
 - `stock-research/`
+- `casino/`
 - `poker/`
 - `craps/`
 - `blackjack/`
@@ -20,12 +22,10 @@ Production static hosting should serve those files directly. `vercel.json` rewri
 
 Vercel middleware keeps `/` public and requires Basic Auth for:
 
-- `/stock-research/*`
-- `/bitcoin-chat/*`
 - `/admin/*`
-- `/api/*`, except `/api/poker/*`
+- `/api/*`, except `/api/poker/*`, `/api/stocks/*`, and `/api/bitcoin/*`
 
-`/docs/*`, `/login/*`, `/poker/*`, `/craps/*`, `/blackjack/*`, and `/api/poker/*` are public. The login page posts to `/login/session`, which sets a signed HttpOnly session cookie for `/admin/*` and protected API requests. Basic Auth remains supported for direct scripted access.
+`/docs/*`, `/login/*`, `/stock-research/*`, `/bitcoin-chat/*`, `/poker/*`, `/craps/*`, `/blackjack/*`, `/api/poker/*`, `/api/stocks/*`, and `/api/bitcoin/*` are public. Unauthenticated stock and Bitcoin API requests run in demo mode; valid app credentials unlock the live provider-backed paths. The login page posts to `/login/session`, which sets a signed HttpOnly session cookie for `/admin/*` and protected API requests. Basic Auth remains supported for direct scripted access.
 
 Configure these environment variables in Vercel:
 
@@ -50,7 +50,7 @@ Health check:
 /health
 ```
 
-The backend mirrors the same Basic Auth check for protected API docs, `/api/*` routes, and locally served app folders. Poker, craps, blackjack, and `/api/poker/*` remain public in the backend. Stock research, Bitcoin chat, admin, FastAPI docs/OpenAPI JSON, and other `/api/*` routes are protected. Protected routes return `503` if `APP_AUTH_PASSWORD` is missing, so set the same `APP_AUTH_USERNAME` and `APP_AUTH_PASSWORD` values in Railway to keep direct backend access usable and protected.
+The backend mirrors the same auth model for protected API docs, `/api/*` routes, and locally served app folders. Poker, craps, blackjack, login, and `/api/poker/*` remain public in the backend. Stock research, Bitcoin chat, `/api/stocks/*`, and `/api/bitcoin/*` allow unauthenticated demo-mode responses and use live providers only after valid app credentials are supplied. Admin, FastAPI docs/OpenAPI JSON, and other `/api/*` routes are protected. Protected routes return `503` if `APP_AUTH_PASSWORD` is missing, so set the same `APP_AUTH_USERNAME` and `APP_AUTH_PASSWORD` values in Railway to keep direct backend access usable and protected.
 
 The root Railway deployment uses the root `Dockerfile`, which copies only `backend/`.
 
@@ -62,6 +62,17 @@ POLYGON_API_KEY=<secret Polygon key>
 ```
 
 `USE_REAL_DATA` defaults to `true` in the app and Docker image; set it to `false` only for local development with synthetic stock data.
+
+Bitcoin Chat uses mempool.space as the default live provider. Configure:
+
+```text
+BITCOIN_DATA_PROVIDER=mempool
+BITCOIN_MEMPOOL_API_URL=https://mempool.space/api
+BITCOIN_MEMPOOL_TIMEOUT_SECONDS=10
+OPENAI_API_KEY=<OpenAI API key for natural-language chat>
+```
+
+Set `BITCOIN_DATA_PROVIDER=rpc` plus `BITCOIN_RPC_URL`, `BITCOIN_RPC_USER`, and `BITCOIN_RPC_PASSWORD` only when routing live Bitcoin reads through the private Bitcoin Core node.
 
 ## Local
 
@@ -77,4 +88,4 @@ This runs the API and active static pages together at:
 http://127.0.0.1:8000
 ```
 
-`LOCAL_SITE_ROOT=true` currently mounts `assets/`, `shared/`, `about/`, `login/`, `stock-research/`, `poker/`, `craps/`, `blackjack/`, `bitcoin-chat/`, and `admin/` through FastAPI. The local `/docs` path is still FastAPI's generated API docs path; the static website docs page is served by production/static hosting at `/docs/`.
+`LOCAL_SITE_ROOT=true` currently mounts `assets/`, `shared/`, `about/`, `login/`, `stock-research/`, `poker/`, `craps/`, `blackjack/`, `bitcoin-chat/`, `casino/`, and `admin/` through FastAPI. The local `/docs` path is still FastAPI's generated API docs path; the static website docs page is served by production/static hosting at `/docs/`.

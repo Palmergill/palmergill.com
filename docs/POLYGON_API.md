@@ -2,7 +2,7 @@
 
 **Version:** v1.0.3
 
-**Last Updated:** May 15, 2026
+**Last Updated:** May 22, 2026
 
 **API Version:** Polygon REST endpoints used by `backend/app/services/polygon_client.py`
 
