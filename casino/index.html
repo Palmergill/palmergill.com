@@ -6,22 +6,26 @@
     <title>Casino Games - Palmer Gill</title>
     <link rel="icon" type="image/png" href="/assets/palmer-gill-logo-small.png">
     <link rel="stylesheet" href="/shared/site-nav.css?v=4">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;700;900&family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
     <style>
         :root {
-            --ink: #080a0d;
-            --panel: #111722;
-            --panel-soft: rgba(255, 255, 255, 0.055);
-            --line: rgba(255, 255, 255, 0.14);
-            --line-strong: rgba(255, 255, 255, 0.24);
-            --text: #f7f3ea;
-            --muted: rgba(247, 243, 234, 0.68);
-            --quiet: rgba(247, 243, 234, 0.46);
-            --gold: #d6b25e;
-            --teal: #58d3ad;
-            --coral: #ff7a6e;
-            --radius: 8px;
+            --felt-deep: #0a3d24;
+            --felt: #1a5c39;
+            --felt-light: #2a7a4a;
+            --wood: #5a341a;
+            --wood-light: #7a4a2a;
+            --wood-dark: #3a2010;
+            --gold: #e8c773;
+            --gold-deep: #c89e4a;
+            --cream: #f5ebd8;
+            --ink: #0a1f12;
+            --text: #f5ebd8;
+            --muted: rgba(245, 235, 216, 0.78);
+            --quiet: rgba(245, 235, 216, 0.5);
+            --radius: 10px;
             --max: 1180px;
-            --shadow: 0 28px 90px rgba(0, 0, 0, 0.36);
         }
 
         * {
@@ -31,73 +35,79 @@
         }
 
         html {
-            background: var(--ink);
+            background: var(--felt-deep);
             color-scheme: dark;
             scroll-behavior: smooth;
         }
 
         body {
             min-width: 320px;
-            background:
-                linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px) 0 0 / 84px 84px,
-                linear-gradient(180deg, #080a0d 0%, #0b1017 48%, #0a0d12 100%);
+            min-height: 100vh;
             color: var(--text);
             font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
             line-height: 1.5;
             overflow-x: hidden;
+            background:
+                radial-gradient(ellipse at 50% 0%, var(--felt-light) 0%, var(--felt) 38%, var(--felt-deep) 100%),
+                var(--felt-deep);
         }
 
-        a {
-            color: inherit;
+        /* felt fiber texture */
+        body::before {
+            content: "";
+            position: fixed;
+            inset: 0;
+            background-image:
+                radial-gradient(circle at 25% 30%, rgba(255,255,255,0.025) 0.5px, transparent 1px),
+                radial-gradient(circle at 75% 60%, rgba(0,0,0,0.06) 0.5px, transparent 1px),
+                radial-gradient(circle at 40% 80%, rgba(255,255,255,0.02) 0.5px, transparent 1px),
+                radial-gradient(circle at 10% 60%, rgba(0,0,0,0.05) 0.5px, transparent 1px);
+            background-size: 6px 6px, 9px 9px, 7px 7px, 11px 11px;
+            opacity: 0.85;
+            pointer-events: none;
+            z-index: 0;
         }
 
-        img,
-        svg {
-            display: block;
-        }
+        a { color: inherit; }
+        img, svg { display: block; }
 
         .page-shell {
             position: relative;
             isolation: isolate;
+            z-index: 1;
         }
 
         .sr-only {
             position: absolute;
-            width: 1px;
-            height: 1px;
-            padding: 0;
-            margin: -1px;
+            width: 1px; height: 1px;
+            padding: 0; margin: -1px;
             overflow: hidden;
             clip: rect(0, 0, 0, 0);
             white-space: nowrap;
             border: 0;
         }
 
+        /* Wood rail beneath site nav */
+        .rail {
+            position: relative;
+            height: 32px;
+            background:
+                linear-gradient(180deg, var(--wood-light) 0%, var(--wood) 50%, var(--wood-dark) 100%);
+            border-bottom: 2px solid #2a1808;
+            box-shadow: inset 0 -8px 14px rgba(0,0,0,0.4), inset 0 4px 8px rgba(200,149,104,0.3);
+        }
+        .rail::after {
+            content: "";
+            position: absolute; left: 0; right: 0; bottom: -10px;
+            height: 10px;
+            background: linear-gradient(180deg, rgba(0,0,0,0.55), transparent);
+            pointer-events: none;
+        }
+
         .hero {
             position: relative;
-            overflow: hidden;
-            padding: clamp(96px, 10vw, 132px) 24px clamp(40px, 6vw, 64px);
-        }
-
-        .hero::before {
-            content: "";
-            position: absolute;
-            inset: 0;
-            z-index: -2;
-            background:
-                linear-gradient(120deg, rgba(8, 10, 13, 0.98) 0%, rgba(8, 10, 13, 0.82) 48%, rgba(255, 122, 110, 0.12) 100%);
-        }
-
-        .hero::after {
-            content: "";
-            position: absolute;
-            inset: 0;
-            z-index: -3;
-            background:
-                linear-gradient(90deg, rgba(255, 255, 255, 0.06) 1px, transparent 1px) 0 0 / 92px 92px,
-                linear-gradient(180deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px) 0 0 / 92px 92px,
-                linear-gradient(135deg, rgba(214, 178, 94, 0.18), transparent 32%);
-            opacity: 0.58;
+            padding: clamp(60px, 8vw, 100px) 24px clamp(36px, 5vw, 60px);
+            text-align: center;
         }
 
         .hero-inner {
@@ -105,48 +115,81 @@
             margin: 0 auto;
         }
 
-        .eyebrow {
+        .suits-row {
             display: flex;
+            justify-content: center;
+            gap: 26px;
+            margin-bottom: 22px;
+            font-size: 1.4rem;
+        }
+        .suits-row span:nth-child(1) { color: var(--cream); }
+        .suits-row span:nth-child(2) { color: #d44a3a; }
+        .suits-row span:nth-child(3) { color: #d44a3a; }
+        .suits-row span:nth-child(4) { color: var(--gold); }
+
+        .eyebrow {
+            display: inline-flex;
             align-items: center;
             gap: 12px;
-            margin-bottom: 22px;
+            margin-bottom: 20px;
             color: var(--gold);
             font-size: 0.78rem;
             font-weight: 800;
-            letter-spacing: 0.2em;
+            letter-spacing: 0.32em;
             text-transform: uppercase;
         }
-
-        .eyebrow::before {
+        .eyebrow::before,
+        .eyebrow::after {
             content: "";
-            width: 44px;
+            width: 40px;
             height: 1px;
             background: currentColor;
+            opacity: 0.6;
         }
 
         h1 {
-            font-family: Georgia, "Times New Roman", serif;
-            font-size: clamp(2.8rem, 6.4vw, 5.6rem);
-            font-weight: 500;
-            line-height: 0.98;
+            font-family: 'Playfair Display', Georgia, "Times New Roman", serif;
+            font-weight: 900;
+            font-size: clamp(2.8rem, 7vw, 5.4rem);
+            line-height: 1;
+            color: var(--cream);
+            letter-spacing: 0.01em;
+            text-shadow:
+                0 2px 0 rgba(0,0,0,0.4),
+                0 4px 18px rgba(0,0,0,0.5);
+        }
+        h1 .amp {
+            font-style: italic;
+            color: var(--gold);
+            font-weight: 700;
         }
 
         .lede {
-            max-width: 640px;
-            margin-top: 24px;
+            max-width: 620px;
+            margin: 22px auto 0;
             color: var(--muted);
-            font-size: clamp(1.04rem, 1.6vw, 1.3rem);
+            font-size: clamp(1.02rem, 1.5vw, 1.2rem);
+        }
+
+        .embossed-divider {
+            display: block;
+            max-width: 320px;
+            margin: 28px auto 0;
+            border: none;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, var(--gold), transparent);
+            opacity: 0.5;
         }
 
         .back-link {
             display: inline-flex;
             align-items: center;
             gap: 8px;
-            margin-top: 28px;
-            color: rgba(247, 243, 234, 0.68);
-            font-size: 0.82rem;
+            margin-top: 24px;
+            color: var(--muted);
+            font-size: 0.8rem;
             font-weight: 800;
-            letter-spacing: 0.08em;
+            letter-spacing: 0.1em;
             text-decoration: none;
             text-transform: uppercase;
             transition: color 180ms ease;
@@ -154,7 +197,7 @@
 
         .back-link:hover,
         .back-link:focus-visible {
-            color: #ffffff;
+            color: var(--cream);
             outline: none;
         }
 
@@ -177,100 +220,180 @@
         .section {
             width: min(100%, var(--max));
             margin: 0 auto;
-            padding: clamp(40px, 5vw, 72px) 24px clamp(64px, 8vw, 104px);
+            padding: clamp(24px, 4vw, 40px) 24px clamp(64px, 8vw, 100px);
         }
 
         .games-grid {
             display: grid;
             grid-template-columns: repeat(12, minmax(0, 1fr));
             align-items: stretch;
-            gap: 18px;
+            gap: 26px;
             perspective: 1400px;
         }
 
         .game-card {
             position: relative;
-            min-height: 420px;
+            min-height: 460px;
             grid-column: span 4;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-            overflow: hidden;
-            padding: 26px;
-            border: 1px solid var(--line);
-            border-radius: var(--radius);
-            background:
-                linear-gradient(145deg, rgba(255, 255, 255, 0.105), rgba(255, 255, 255, 0.026)),
-                var(--panel);
-            color: var(--text);
+            display: block;
             text-decoration: none;
-            box-shadow: 0 18px 70px rgba(0, 0, 0, 0.16);
+            color: var(--text);
+            border-radius: 12px;
+            overflow: hidden;
+            background:
+                radial-gradient(ellipse at 50% 50%, var(--felt-light) 0%, var(--felt) 60%, var(--felt-deep) 100%);
+            border: 6px solid;
+            border-image: linear-gradient(180deg, var(--wood-light) 0%, var(--wood) 50%, var(--wood-dark) 100%) 1;
+            box-shadow:
+                0 0 0 1px #2a1808,
+                0 0 0 8px #1a0f04,
+                0 20px 60px rgba(0,0,0,0.5),
+                inset 0 0 40px rgba(0,0,0,0.3);
             transform-style: preserve-3d;
-            transition: transform 520ms cubic-bezier(0.22, 1, 0.36, 1), border-color 220ms ease, box-shadow 220ms ease, background 220ms ease;
+            transition: transform 520ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 280ms ease;
         }
 
+        /* dashed gold stitch */
         .game-card::before {
             content: "";
             position: absolute;
-            inset: 0;
-            background:
-                linear-gradient(135deg, color-mix(in srgb, var(--accent) 36%, transparent), transparent 44%),
-                radial-gradient(circle at 82% 12%, color-mix(in srgb, var(--accent) 25%, transparent), transparent 32%);
-            opacity: 0.82;
+            inset: 8px;
+            border: 1px dashed rgba(232, 199, 115, 0.35);
+            border-radius: 8px;
             pointer-events: none;
-            backface-visibility: hidden;
-            -webkit-backface-visibility: hidden;
-        }
-
-        .game-card::after {
-            content: "";
-            position: absolute;
-            inset: auto 0 0;
-            height: 1px;
-            background: linear-gradient(90deg, transparent, var(--accent), transparent);
-            opacity: 0.62;
-            backface-visibility: hidden;
-            -webkit-backface-visibility: hidden;
+            z-index: 2;
         }
 
         .game-card:hover,
         .game-card:focus-visible {
             transform: translateY(-6px);
-            border-color: color-mix(in srgb, var(--accent) 52%, rgba(255, 255, 255, 0.16));
-            box-shadow: var(--shadow);
+            box-shadow:
+                0 0 0 1px #2a1808,
+                0 0 0 8px #1a0f04,
+                0 30px 80px rgba(0,0,0,0.6),
+                inset 0 0 60px rgba(0,0,0,0.25);
             outline: none;
         }
 
-        .game-top,
-        .game-bottom {
-            position: relative;
-            z-index: 1;
+        .game-face,
+        .game-screenshot {
+            position: absolute;
+            inset: 0;
             backface-visibility: hidden;
             -webkit-backface-visibility: hidden;
             transition: opacity 260ms ease, transform 520ms cubic-bezier(0.22, 1, 0.36, 1);
         }
 
-        .game-top {
+        .game-face {
+            padding: 42px 28px 30px;
+            text-align: center;
             display: flex;
+            flex-direction: column;
             justify-content: space-between;
-            gap: 20px;
+            opacity: 1;
+            transform: rotateY(0);
+            z-index: 1;
+        }
+
+        .corner-rank {
+            position: absolute;
+            font-family: 'Playfair Display', Georgia, serif;
+            font-weight: 700;
+            font-size: 1.4rem;
+            color: var(--gold);
+            opacity: 0.85;
+            z-index: 3;
+        }
+        .corner-rank.tl { top: 18px; left: 22px; }
+        .corner-rank.br { bottom: 18px; right: 22px; transform: rotate(180deg); }
+
+        .suit-big {
+            font-size: 80px;
+            line-height: 1;
+            margin: 6px 0 14px;
+            text-shadow: 0 6px 18px rgba(0,0,0,0.5);
+        }
+        .game-card[data-suit="spade"] .suit-big { color: #0a0a05; }
+        .game-card[data-suit="spade"] .corner-rank { color: var(--gold); }
+        .game-card[data-suit="heart"] .suit-big { color: #c43a2c; text-shadow: 0 6px 18px rgba(196,58,44,0.45); }
+        .game-card[data-suit="club"] .suit-big { color: var(--gold); text-shadow: 0 6px 18px rgba(232,199,115,0.5); }
+
+        .game-title {
+            font-family: 'Playfair Display', Georgia, serif;
+            font-weight: 700;
+            font-size: clamp(1.7rem, 2.4vw, 2.1rem);
+            color: var(--cream);
+            line-height: 1.1;
+            margin-bottom: 4px;
+            text-shadow: 0 2px 6px rgba(0,0,0,0.4);
+        }
+        .game-title em { font-style: italic; color: var(--gold); }
+
+        .subline {
+            font-family: Inter, sans-serif;
+            font-size: 0.72rem;
+            letter-spacing: 0.32em;
+            text-transform: uppercase;
+            color: var(--gold);
+            margin-bottom: 16px;
+        }
+
+        .game-description {
+            color: var(--muted);
+            font-size: 0.97rem;
+            line-height: 1.55;
+            margin-bottom: 22px;
+            padding: 0 4px;
+        }
+
+        .chips-stack {
+            display: flex;
+            justify-content: center;
+            gap: 6px;
+            margin-bottom: 22px;
+        }
+        .poker-chip {
+            width: 28px; height: 28px;
+            border-radius: 50%;
+            border: 3px dashed rgba(245,235,216,0.85);
+            background: var(--chip);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.5), inset 0 -3px 6px rgba(0,0,0,0.3);
+        }
+        .poker-chip:nth-child(1) { --chip: #c43a2c; }
+        .poker-chip:nth-child(2) { --chip: #1f4f8c; transform: translateY(-2px); }
+        .poker-chip:nth-child(3) { --chip: #1a1a1a; }
+        .poker-chip:nth-child(4) { --chip: var(--gold); transform: translateY(-2px); }
+        .poker-chip:nth-child(5) { --chip: #ffffff; }
+
+        .play-btn {
+            display: inline-block;
+            padding: 12px 28px;
+            font-family: Inter, sans-serif;
+            font-size: 0.8rem;
+            font-weight: 800;
+            letter-spacing: 0.28em;
+            text-transform: uppercase;
+            color: var(--ink);
+            background: linear-gradient(180deg, var(--gold) 0%, var(--gold-deep) 100%);
+            border: 1px solid #8a6c2a;
+            border-radius: 4px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.5);
+            transition: transform 180ms ease;
+        }
+        .game-card:hover .play-btn,
+        .game-card:focus-visible .play-btn {
+            transform: translateY(-2px);
         }
 
         .game-screenshot {
-            position: absolute;
-            inset: 14px;
-            z-index: 1;
             margin: 0;
-            overflow: hidden;
-            border: 1px solid rgba(255, 255, 255, 0.16);
-            border-radius: var(--radius);
-            background: rgba(0, 0, 0, 0.22);
-            box-shadow: 0 18px 50px rgba(0, 0, 0, 0.22);
+            padding: 14px;
             opacity: 0;
             transform: rotateY(-180deg);
-            backface-visibility: hidden;
-            -webkit-backface-visibility: hidden;
-            transition: opacity 220ms ease, transform 520ms cubic-bezier(0.22, 1, 0.36, 1);
+            background: rgba(0,0,0,0.4);
+            display: grid;
+            place-items: center;
+            z-index: 0;
         }
 
         .game-screenshot img {
@@ -278,13 +401,12 @@
             height: 100%;
             object-fit: contain;
             object-position: center;
+            border-radius: 6px;
             filter: saturate(0.96) contrast(1.02);
         }
 
-        .game-card:hover .game-top,
-        .game-card:hover .game-bottom,
-        .game-card:focus-visible .game-top,
-        .game-card:focus-visible .game-bottom {
+        .game-card:hover .game-face,
+        .game-card:focus-visible .game-face {
             opacity: 0;
             transform: rotateY(180deg);
         }
@@ -295,101 +417,6 @@
             transform: rotateY(0);
         }
 
-        .game-number {
-            color: rgba(247, 243, 234, 0.48);
-            font-family: Georgia, "Times New Roman", serif;
-            font-size: 1.35rem;
-        }
-
-        .game-icon {
-            width: 92px;
-            height: 92px;
-            display: grid;
-            place-items: center;
-            border: 1px solid rgba(255, 255, 255, 0.18);
-            border-radius: var(--radius);
-            background: rgba(255, 255, 255, 0.08);
-            color: #ffffff;
-            backdrop-filter: blur(18px);
-            -webkit-backdrop-filter: blur(18px);
-        }
-
-        .game-icon svg {
-            width: 54px;
-            height: 54px;
-            stroke: currentColor;
-        }
-
-        .game-title {
-            font-family: Georgia, "Times New Roman", serif;
-            font-size: clamp(2rem, 3vw, 2.8rem);
-            font-weight: 500;
-            line-height: 1;
-        }
-
-        .game-description {
-            max-width: 620px;
-            margin-top: 18px;
-            color: var(--muted);
-            font-size: 0.98rem;
-        }
-
-        .game-tags {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 8px;
-            margin-top: 22px;
-        }
-
-        .tag {
-            display: inline-flex;
-            min-height: 28px;
-            align-items: center;
-            padding: 0 10px;
-            border: 1px solid rgba(255, 255, 255, 0.13);
-            border-radius: 999px;
-            background: rgba(255, 255, 255, 0.055);
-            color: rgba(247, 243, 234, 0.76);
-            font-size: 0.72rem;
-            font-weight: 800;
-            letter-spacing: 0.04em;
-        }
-
-        .game-link {
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            margin-top: 26px;
-            color: color-mix(in srgb, var(--accent) 72%, #ffffff);
-            font-size: 0.84rem;
-            font-weight: 850;
-            letter-spacing: 0.08em;
-            text-transform: uppercase;
-        }
-
-        .game-link svg {
-            width: 17px;
-            height: 17px;
-            transition: transform 180ms ease;
-        }
-
-        .game-card:hover .game-link svg,
-        .game-card:focus-visible .game-link svg {
-            transform: translateX(4px);
-        }
-
-        .game-card[data-theme="poker"] {
-            --accent: var(--teal);
-        }
-
-        .game-card[data-theme="craps"] {
-            --accent: var(--coral);
-        }
-
-        .game-card[data-theme="blackjack"] {
-            --accent: var(--gold);
-        }
-
         footer {
             display: flex;
             flex-wrap: wrap;
@@ -398,13 +425,13 @@
             gap: 18px;
             width: min(100%, var(--max));
             margin: 0 auto;
-            padding: 36px 24px 48px;
+            padding: 30px 24px 50px;
             color: var(--quiet);
             font-size: 0.9rem;
         }
 
         footer a {
-            color: rgba(247, 243, 234, 0.74);
+            color: rgba(245, 235, 216, 0.7);
             text-decoration: none;
         }
 
@@ -417,49 +444,27 @@
         @media (max-width: 720px) {
             .game-card {
                 grid-column: 1 / -1;
-                min-height: 380px;
-                padding: 22px;
+                min-height: 420px;
             }
-
-            .game-screenshot {
-                inset: 12px;
-            }
-
-            .game-icon {
-                width: 76px;
-                height: 76px;
-            }
-
-            .game-icon svg {
-                width: 44px;
-                height: 44px;
+            .suit-big {
+                font-size: 64px;
             }
         }
 
         @media (prefers-reduced-motion: reduce) {
-            html {
-                scroll-behavior: auto;
-            }
-
-            *,
-            *::before,
-            *::after {
+            html { scroll-behavior: auto; }
+            *, *::before, *::after {
                 transition-duration: 0.01ms !important;
             }
-
             .game-card:hover,
             .game-card:focus-visible {
                 transform: none;
             }
-
-            .game-card:hover .game-top,
-            .game-card:hover .game-bottom,
-            .game-card:focus-visible .game-top,
-            .game-card:focus-visible .game-bottom {
+            .game-card:hover .game-face,
+            .game-card:focus-visible .game-face {
                 opacity: 0;
                 transform: none;
             }
-
             .game-card:hover .game-screenshot,
             .game-card:focus-visible .game-screenshot {
                 opacity: 1;
@@ -470,11 +475,17 @@
 </head>
 <body>
     <div class="page-shell">
+        <div class="rail" aria-hidden="true"></div>
+
         <header class="hero">
             <div class="hero-inner">
+                <div class="suits-row" aria-hidden="true">
+                    <span>♠</span><span>♥</span><span>♦</span><span>♣</span>
+                </div>
                 <p class="eyebrow">Browser games</p>
-                <h1>Casino Games</h1>
-                <p class="lede">Three single-player table games built for fast browser play — testable rule logic, mobile-friendly tables, and the same Vegas math you'd find on a real floor.</p>
+                <h1>House <span class="amp">&amp;</span> Table</h1>
+                <p class="lede">Pull up a seat. Three single-player table games built for fast browser play — real Vegas math, mobile-friendly tables, and rule logic you can trust.</p>
+                <hr class="embossed-divider">
                 <a class="back-link" href="/">
                     <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
                         <path d="M19 12H5m6-6-6 6 6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
@@ -489,88 +500,77 @@
                 <h2 id="games-title" class="sr-only">Casino games</h2>
 
                 <div class="games-grid">
-                    <a href="/poker/" class="game-card" data-theme="poker">
-                        <div class="game-top">
-                            <span class="game-number">01</span>
-                            <span class="game-icon" aria-hidden="true">
-                                <svg viewBox="0 0 64 64" fill="none">
-                                    <path d="M32 8c11 10 18 17 18 28 0 7-5 12-12 12-3 0-5-1-6-3-1 2-3 3-6 3-7 0-12-5-12-12 0-11 7-18 18-28Z" stroke="currentColor" stroke-width="4" stroke-linejoin="round"/>
-                                    <path d="M27 48c0 4-2 7-5 8h20c-3-1-5-4-5-8" stroke="currentColor" stroke-width="4" stroke-linecap="round"/>
-                                </svg>
-                            </span>
+                    <a href="/poker/" class="game-card" data-suit="spade">
+                        <span class="corner-rank tl">A♠</span>
+                        <span class="corner-rank br">A♠</span>
+                        <div class="game-face">
+                            <div>
+                                <div class="suit-big" aria-hidden="true">♠</div>
+                                <h3 class="game-title">Texas Hold'em</h3>
+                                <p class="subline">No-Limit · 6 Seats</p>
+                                <p class="game-description">Mobile-friendly No-Limit Hold'em with realistic table flow, hand evaluation, and AI opponents that play different each hand.</p>
+                            </div>
+                            <div>
+                                <div class="chips-stack" aria-hidden="true">
+                                    <span class="poker-chip"></span><span class="poker-chip"></span><span class="poker-chip"></span><span class="poker-chip"></span><span class="poker-chip"></span>
+                                </div>
+                                <span class="play-btn">Sit Down</span>
+                            </div>
                         </div>
                         <figure class="game-screenshot">
                             <img src="/assets/project-screenshots/poker.png" alt="Texas Hold'em Poker app screenshot" loading="lazy" decoding="async">
                         </figure>
-                        <div class="game-bottom">
-                            <h3 class="game-title">Texas Hold'em Poker</h3>
-                            <p class="game-description">A mobile-friendly No-Limit Hold'em game with realistic table flow, hand evaluation, and AI opponents that make each hand feel different.</p>
-                            <div class="game-tags">
-                                <span class="tag">FastAPI</span>
-                                <span class="tag">AI Opponents</span>
-                                <span class="tag">Mobile First</span>
-                            </div>
-                            <span class="game-link">Open game <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
-                        </div>
                     </a>
 
-                    <a href="/craps/" class="game-card" data-theme="craps">
-                        <div class="game-top">
-                            <span class="game-number">02</span>
-                            <span class="game-icon" aria-hidden="true">
-                                <svg viewBox="0 0 64 64" fill="none">
-                                    <rect x="10" y="14" width="22" height="22" rx="5" stroke="currentColor" stroke-width="4"/>
-                                    <rect x="32" y="28" width="22" height="22" rx="5" stroke="currentColor" stroke-width="4"/>
-                                    <path d="M21 25h.01M43 39h.01M37 34h.01M49 44h.01" stroke="currentColor" stroke-width="6" stroke-linecap="round"/>
-                                </svg>
-                            </span>
+                    <a href="/craps/" class="game-card" data-suit="heart">
+                        <span class="corner-rank tl">K♥</span>
+                        <span class="corner-rank br">K♥</span>
+                        <div class="game-face">
+                            <div>
+                                <div class="suit-big" aria-hidden="true">♥</div>
+                                <h3 class="game-title">Craps</h3>
+                                <p class="subline">Pass · Come · Field</p>
+                                <p class="game-description">A Vegas-style dice table — Pass Line, Come, propositions, point handling, payouts, all in your browser.</p>
+                            </div>
+                            <div>
+                                <div class="chips-stack" aria-hidden="true">
+                                    <span class="poker-chip"></span><span class="poker-chip"></span><span class="poker-chip"></span><span class="poker-chip"></span><span class="poker-chip"></span>
+                                </div>
+                                <span class="play-btn">Shooter Up</span>
+                            </div>
                         </div>
                         <figure class="game-screenshot">
                             <img src="/assets/project-screenshots/craps.png" alt="Craps app screenshot" loading="lazy" decoding="async">
                         </figure>
-                        <div class="game-bottom">
-                            <h3 class="game-title">Craps</h3>
-                            <p class="game-description">A single-player Vegas-style dice table with Pass Line, Come, proposition bets, point handling, payouts, and fast browser gameplay.</p>
-                            <div class="game-tags">
-                                <span class="tag">Vanilla JS</span>
-                                <span class="tag">Vegas Rules</span>
-                                <span class="tag">Dice Game</span>
-                            </div>
-                            <span class="game-link">Open game <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
-                        </div>
                     </a>
 
-                    <a href="/blackjack/" class="game-card" data-theme="blackjack">
-                        <div class="game-top">
-                            <span class="game-number">03</span>
-                            <span class="game-icon" aria-hidden="true">
-                                <svg viewBox="0 0 64 64" fill="none">
-                                    <rect x="14" y="10" width="24" height="36" rx="4" stroke="currentColor" stroke-width="4" transform="rotate(-8 14 10)"/>
-                                    <rect x="28" y="18" width="24" height="36" rx="4" stroke="currentColor" stroke-width="4" transform="rotate(8 28 18)"/>
-                                    <path d="M24 26h.01M42 36h.01" stroke="currentColor" stroke-width="7" stroke-linecap="round"/>
-                                </svg>
-                            </span>
+                    <a href="/blackjack/" class="game-card" data-suit="club">
+                        <span class="corner-rank tl">Q♣</span>
+                        <span class="corner-rank br">Q♣</span>
+                        <div class="game-face">
+                            <div>
+                                <div class="suit-big" aria-hidden="true">♣</div>
+                                <h3 class="game-title">Blackjack</h3>
+                                <p class="subline">Six-Deck Shoe</p>
+                                <p class="game-description">A crisp single-player table with splits, doubles, insurance, full dealer rules — and a clean count to twenty-one.</p>
+                            </div>
+                            <div>
+                                <div class="chips-stack" aria-hidden="true">
+                                    <span class="poker-chip"></span><span class="poker-chip"></span><span class="poker-chip"></span><span class="poker-chip"></span><span class="poker-chip"></span>
+                                </div>
+                                <span class="play-btn">Take a Card</span>
+                            </div>
                         </div>
                         <figure class="game-screenshot">
                             <img src="/assets/project-screenshots/blackjack.png" alt="Blackjack app screenshot" loading="lazy" decoding="async">
                         </figure>
-                        <div class="game-bottom">
-                            <h3 class="game-title">Blackjack</h3>
-                            <p class="game-description">A crisp single-player casino table with a six-deck shoe, splits, doubles, insurance, dealer rules, and testable rule logic.</p>
-                            <div class="game-tags">
-                                <span class="tag">Vanilla JS</span>
-                                <span class="tag">Vegas Rules</span>
-                                <span class="tag">Card Game</span>
-                            </div>
-                            <span class="game-link">Open game <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
-                        </div>
                     </a>
                 </div>
             </section>
         </main>
 
         <footer>
-            <p>© 2026 Palmer Gill. Built with care.</p>
+            <p>© 2026 Palmer Gill. Table closes at dawn.</p>
         </footer>
     </div>
 
