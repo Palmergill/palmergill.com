@@ -575,12 +575,15 @@ function updateAllDisplays() {
     // Place bet buttons
     ['place4','place5','place6','place8','place9','place10'].forEach(bt => {
         const btn = document.getElementById(bt + 'Btn');
+        const boardBtn = document.getElementById('boardPlace' + bt.replace('place', '') + 'Btn');
         const info = document.getElementById(bt + 'Info');
         if (bets[bt] > 0) {
             btn.classList.add('has-bet');
+            if (boardBtn) boardBtn.classList.add('has-bet');
             info.textContent = '$' + bets[bt];
         } else {
             btn.classList.remove('has-bet');
+            if (boardBtn) boardBtn.classList.remove('has-bet');
             info.textContent = '';
         }
     });
@@ -608,16 +611,33 @@ function updateAllDisplays() {
         }
     });
 
+    const fieldBoardBtn = document.getElementById('fieldBoardBtn');
+    const fieldBoardInfo = document.getElementById('fieldBoardInfo');
+    if (fieldBoardBtn && fieldBoardInfo) {
+        if (bets.field > 0) {
+            fieldBoardBtn.classList.add('has-bet');
+            fieldBoardInfo.textContent = '$' + bets.field;
+        } else {
+            fieldBoardBtn.classList.remove('has-bet');
+            fieldBoardInfo.textContent = 'One-roll bet';
+        }
+    }
+
     // Center info summary
-    const centerBets = ['any7','anyCraps','field','craps2','craps3','craps12','yo11','hard4','hard6','hard8','hard10'];
+    const centerBets = ['any7','anyCraps','craps2','craps3','craps12','yo11','hard4','hard6','hard8','hard10'];
     const activeCenters = centerBets.filter(b => bets[b] > 0);
     const centerTotal = centerBets.reduce((s, b) => s + bets[b], 0);
+    const centerBoardBtn = document.getElementById('centerBoardBtn');
+    if (centerBoardBtn) {
+        centerBoardBtn.classList.toggle('has-bet', centerTotal > 0);
+    }
     document.getElementById('centerInfo').textContent = activeCenters.length > 0
         ? activeCenters.length + ' bets \u2022 $' + centerTotal
         : 'Props & Hardways';
 
     // Active bets strip
     updateActiveBetsStrip();
+    updateBoardChips();
 
     // Max odds button
     updateMaxOddsButton();
@@ -625,12 +645,15 @@ function updateAllDisplays() {
 }
 
 function updateMainBetBtn(bt, btnId, infoId, oddsChipId) {
+    const btn = document.getElementById(btnId);
     const info = document.getElementById(infoId);
     const chip = document.getElementById(oddsChipId);
     if (bets[bt] > 0) {
         info.textContent = '$' + bets[bt];
+        if (btn) btn.classList.add('has-bet');
     } else {
         info.textContent = 'Tap to bet';
+        if (btn) btn.classList.remove('has-bet');
     }
     if (chip) {
         if (oddsBets[bt] > 0) {
@@ -640,6 +663,95 @@ function updateMainBetBtn(bt, btnId, infoId, oddsChipId) {
             chip.classList.remove('visible');
         }
     }
+}
+
+function formatChipAmount(amount) {
+    return '$' + Number(amount || 0).toLocaleString();
+}
+
+function getChipStyle(amount, kind = 'base') {
+    if (kind === 'odds') return { color: '#f4c96a', text: '#161b10' };
+    if (kind === 'dont') return { color: '#1d4ed8', text: '#ffffff' };
+    if (amount >= 100) return { color: '#111827', text: '#ffffff' };
+    if (amount >= 50) return { color: '#f8fafc', text: '#111827' };
+    if (amount >= 25) return { color: '#1d4ed8', text: '#ffffff' };
+    return { color: '#b91c1c', text: '#ffffff' };
+}
+
+function addBoardChip(zoneId, amount, options = {}) {
+    const zone = document.getElementById(zoneId);
+    if (!zone || amount <= 0) return;
+
+    const stack = document.createElement('span');
+    stack.className = 'board-chip-stack';
+    if (options.variant) stack.classList.add('stack-' + options.variant);
+    stack.setAttribute('aria-hidden', 'true');
+
+    const chipCount = Math.min(3, Math.max(1, Math.ceil(amount / 25)));
+    const style = getChipStyle(amount, options.kind);
+    for (let i = 0; i < chipCount; i++) {
+        const chip = document.createElement('span');
+        chip.className = 'casino-chip';
+        chip.style.setProperty('--chip-color', style.color);
+        chip.style.setProperty('--chip-text', style.text);
+        chip.setAttribute('data-amount', i === chipCount - 1 ? formatChipAmount(amount) : '');
+        stack.appendChild(chip);
+    }
+
+    const noteText = options.note || (options.odds > 0 ? '+' + formatChipAmount(options.odds) + ' odds' : '');
+    if (noteText) {
+        const note = document.createElement('span');
+        note.className = 'chip-note';
+        note.textContent = noteText;
+        stack.appendChild(note);
+    }
+
+    zone.appendChild(stack);
+}
+
+function updateBoardChips() {
+    document.querySelectorAll('.board-chip-stack').forEach(chip => chip.remove());
+
+    addBoardChip('passLineBtn', bets.passLine, { odds: oddsBets.passLine });
+    addBoardChip('dontPassBtn', bets.dontPass, { odds: oddsBets.dontPass, kind: 'dont' });
+    addBoardChip('fieldBoardBtn', bets.field);
+
+    const centerKeys = ['any7','anyCraps','craps2','craps3','craps12','yo11','hard4','hard6','hard8','hard10'];
+    const centerTotal = centerKeys.reduce((sum, key) => sum + bets[key], 0);
+    const centerCount = centerKeys.filter(key => bets[key] > 0).length;
+    addBoardChip('centerBoardBtn', centerTotal, { note: centerCount + ' bet' + (centerCount === 1 ? '' : 's') });
+
+    [4, 5, 6, 8, 9, 10].forEach(num => {
+        addBoardChip('boardPlace' + num + 'Btn', bets['place' + num], { variant: 'place' });
+
+        const comeAtPoint = comeBets.filter(bet => bet.point === num);
+        comeAtPoint.forEach(bet => {
+            addBoardChip('boardPlace' + num + 'Btn', bet.amount, {
+                variant: 'come',
+                odds: bet.odds,
+                note: bet.odds > 0 ? 'Come +' + formatChipAmount(bet.odds) : 'Come'
+            });
+        });
+
+        const dontComeAtPoint = dontComeBets.filter(bet => bet.point === num);
+        dontComeAtPoint.forEach(bet => {
+            addBoardChip('boardPlace' + num + 'Btn', bet.amount, {
+                variant: 'dont-come',
+                kind: 'dont',
+                odds: bet.odds,
+                note: bet.odds > 0 ? 'DC +' + formatChipAmount(bet.odds) : 'DC'
+            });
+        });
+    });
+
+    const waitingCome = comeBets
+        .filter(bet => !bet.point)
+        .reduce((sum, bet) => sum + bet.amount, 0);
+    const waitingDontCome = dontComeBets
+        .filter(bet => !bet.point)
+        .reduce((sum, bet) => sum + bet.amount, 0);
+    addBoardChip('comeBtn', waitingCome);
+    addBoardChip('dontComeBtn', waitingDontCome, { kind: 'dont' });
 }
 
 function updateActiveBetsStrip() {

@@ -1267,8 +1267,144 @@
         }
 
         .main-bets {
-            grid-template-columns: repeat(2, minmax(0, 1fr));
-            gap: 12px;
+            grid-template-columns: repeat(6, minmax(0, 1fr));
+            grid-template-rows: auto minmax(104px, auto) minmax(96px, auto) minmax(70px, auto) minmax(86px, auto);
+            gap: 8px;
+            min-width: 0;
+        }
+
+        .layout-section,
+        .number-zone {
+            position: relative;
+            z-index: 1;
+            min-width: 0;
+        }
+
+        .layout-section {
+            border: 1px solid rgba(255, 236, 177, 0.36);
+            border-radius: var(--radius);
+            background: rgba(5, 31, 22, 0.34);
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+        }
+
+        .place-row {
+            grid-column: 1 / -1;
+            padding: 9px;
+        }
+
+        .layout-section-heading {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            margin-bottom: 8px;
+            color: var(--muted);
+            font-size: 0.68rem;
+            font-weight: 900;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+        }
+
+        .layout-section-heading span:last-child {
+            color: #fff0bd;
+            font-size: 0.66rem;
+            letter-spacing: 0;
+            text-align: right;
+        }
+
+        .place-number-row {
+            display: grid;
+            grid-template-columns: repeat(6, minmax(0, 1fr));
+            gap: 7px;
+        }
+
+        .number-zone {
+            display: grid;
+            min-height: 88px;
+            place-items: center;
+            padding: 10px 6px 8px;
+            overflow: hidden;
+            border: 1px solid rgba(255, 236, 177, 0.32);
+            border-radius: var(--radius);
+            background:
+                linear-gradient(180deg, rgba(255, 248, 223, 0.07), rgba(255, 248, 223, 0.015)),
+                rgba(3, 26, 18, 0.54);
+            color: var(--text);
+            cursor: pointer;
+            font: inherit;
+            transition: transform 140ms ease, filter 140ms ease, box-shadow 140ms ease, border-color 140ms ease;
+        }
+
+        .number-zone:hover,
+        .number-zone:focus-visible {
+            filter: brightness(1.08);
+            transform: translateY(-1px);
+            outline: none;
+        }
+
+        .number-zone.has-bet {
+            border-color: rgba(244, 201, 106, 0.9);
+            background:
+                linear-gradient(180deg, rgba(244, 201, 106, 0.18), rgba(255, 248, 223, 0.025)),
+                rgba(3, 26, 18, 0.66);
+            box-shadow: 0 0 0 2px rgba(244, 201, 106, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+        }
+
+        .number-zone .num {
+            color: var(--text);
+            font-size: clamp(1.8rem, 4vw, 3rem);
+            font-weight: 950;
+            line-height: 0.9;
+        }
+
+        .number-zone .payout {
+            color: var(--muted);
+            font-size: 0.62rem;
+            font-weight: 900;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+        }
+
+        .center-zone {
+            grid-column: 1 / 3;
+            grid-row: 2 / 4;
+        }
+
+        .field-zone {
+            grid-column: 3 / -1;
+            grid-row: 2;
+        }
+
+        .come {
+            grid-column: 3 / 5;
+            grid-row: 3;
+        }
+
+        .dont-come {
+            grid-column: 5 / -1;
+            grid-row: 3;
+        }
+
+        .dont {
+            grid-column: 1 / -1;
+            grid-row: 4;
+        }
+
+        .pass {
+            grid-column: 1 / -1;
+            grid-row: 5;
+        }
+
+        .field-numbers {
+            position: relative;
+            z-index: 1;
+            display: block;
+            margin-top: 8px;
+            color: #fff0bd;
+            font-size: clamp(1rem, 3vw, 1.55rem);
+            font-weight: 950;
+            letter-spacing: 0.08em;
+            line-height: 1;
         }
 
         .bet-btn {
@@ -1335,6 +1471,109 @@
         .center-btn-tile .payout,
         .center-btn-tile .bet-info {
             color: var(--muted);
+        }
+
+        .board-chip-stack {
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            z-index: 4;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 48px;
+            min-height: 42px;
+            pointer-events: none;
+            transform: translate(-50%, -50%);
+        }
+
+        .number-zone .board-chip-stack {
+            top: auto;
+            bottom: 6px;
+            transform: translateX(-50%);
+        }
+
+        .number-zone .stack-place {
+            left: 31%;
+        }
+
+        .number-zone .stack-come {
+            left: 51%;
+        }
+
+        .number-zone .stack-dont-come {
+            left: 71%;
+        }
+
+        .center-zone .board-chip-stack {
+            top: auto;
+            bottom: 15px;
+        }
+
+        .field-zone .board-chip-stack,
+        .come .board-chip-stack,
+        .dont-come .board-chip-stack {
+            top: auto;
+            bottom: 12px;
+        }
+
+        .dont .board-chip-stack,
+        .pass .board-chip-stack {
+            left: auto;
+            right: 18px;
+            top: 50%;
+            transform: translateY(-50%);
+        }
+
+        .casino-chip {
+            position: relative;
+            display: grid;
+            width: 40px;
+            height: 40px;
+            flex: 0 0 auto;
+            place-items: center;
+            border: 2px dashed rgba(255, 255, 255, 0.9);
+            border-radius: 50%;
+            background: var(--chip-color, #b91c1c);
+            color: var(--chip-text, #ffffff);
+            font-size: 0.68rem;
+            font-weight: 950;
+            line-height: 1;
+            text-shadow: 0 1px 1px rgba(0, 0, 0, 0.4);
+            box-shadow:
+                inset 0 0 0 4px rgba(255, 255, 255, 0.9),
+                inset 0 0 0 9px color-mix(in srgb, var(--chip-color, #b91c1c) 72%, #000000),
+                inset 0 -7px 10px rgba(0, 0, 0, 0.24),
+                0 8px 15px rgba(0, 0, 0, 0.35);
+        }
+
+        .casino-chip + .casino-chip {
+            margin-left: -17px;
+            transform: translateY(-4px);
+        }
+
+        .casino-chip:nth-child(3) {
+            transform: translateY(-8px);
+        }
+
+        .casino-chip::after {
+            content: attr(data-amount);
+        }
+
+        .chip-note {
+            position: absolute;
+            left: 50%;
+            top: calc(100% - 1px);
+            padding: 2px 6px;
+            border: 1px solid rgba(244, 201, 106, 0.4);
+            border-radius: 999px;
+            background: rgba(6, 15, 11, 0.88);
+            color: #fff0bd;
+            font-size: 0.56rem;
+            font-weight: 900;
+            letter-spacing: 0.03em;
+            white-space: nowrap;
+            transform: translateX(-50%);
         }
 
         .quick-actions {
@@ -1601,13 +1840,77 @@
             }
 
             .main-bets {
-                grid-template-columns: repeat(3, minmax(0, 1fr));
-                gap: 8px;
+                grid-template-columns: repeat(6, minmax(0, 1fr));
+                grid-template-rows: auto minmax(92px, auto) minmax(82px, auto) minmax(58px, auto) minmax(70px, auto);
+                gap: 6px;
+            }
+
+            .place-row {
+                padding: 6px;
+            }
+
+            .layout-section-heading {
+                margin-bottom: 6px;
+                font-size: 0.58rem;
+            }
+
+            .layout-section-heading span:last-child {
+                font-size: 0.56rem;
+            }
+
+            .place-number-row {
+                gap: 5px;
+            }
+
+            .number-zone {
+                min-height: 66px;
+                padding: 7px 3px 5px;
+            }
+
+            .number-zone .num {
+                font-size: clamp(1.25rem, 7vw, 2rem);
+            }
+
+            .number-zone .payout {
+                font-size: 0.52rem;
+                letter-spacing: 0;
             }
 
             .bet-btn {
-                min-height: 84px;
+                min-height: 82px;
                 padding: 10px 7px;
+            }
+
+            .center-zone {
+                grid-column: 1 / 3;
+                grid-row: 2 / 4;
+            }
+
+            .field-zone {
+                grid-column: 3 / -1;
+                grid-row: 2;
+            }
+
+            .come {
+                grid-column: 3 / 5;
+                grid-row: 3;
+            }
+
+            .dont-come {
+                grid-column: 5 / -1;
+                grid-row: 3;
+            }
+
+            .dont {
+                grid-column: 1 / -1;
+                grid-row: 4;
+                min-height: 58px;
+            }
+
+            .pass {
+                grid-column: 1 / -1;
+                grid-row: 5;
+                min-height: 70px;
             }
 
             .bet-btn .label {
@@ -1619,6 +1922,29 @@
                 margin-top: 8px;
                 font-size: 0.7rem;
                 line-height: 1.2;
+            }
+
+            .field-numbers {
+                font-size: clamp(0.8rem, 4.6vw, 1.05rem);
+            }
+
+            .casino-chip {
+                width: 32px;
+                height: 32px;
+                font-size: 0.58rem;
+                box-shadow:
+                    inset 0 0 0 3px rgba(255, 255, 255, 0.9),
+                    inset 0 0 0 7px color-mix(in srgb, var(--chip-color, #b91c1c) 72%, #000000),
+                    inset 0 -6px 8px rgba(0, 0, 0, 0.22),
+                    0 7px 12px rgba(0, 0, 0, 0.32);
+            }
+
+            .casino-chip + .casino-chip {
+                margin-left: -14px;
+            }
+
+            .chip-note {
+                font-size: 0.5rem;
             }
 
             .quick-actions {
@@ -1702,34 +2028,73 @@
     <main class="table">
         <div class="status-bar" id="gameStatus">Place bets & roll</div>
 
-        <div class="main-bets">
-            <button type="button" class="bet-btn pass" id="passLineBtn" onclick="openBetModal('passLine')">
-                <span class="label">PASS LINE</span>
-                <span class="amt" id="passLineInfo">Tap to bet</span>
-                <span class="odds-chip" id="passLineOddsChip"></span>
+        <div class="main-bets" aria-label="Craps betting layout">
+            <section class="layout-section place-row" aria-label="Place numbers">
+                <div class="layout-section-heading">
+                    <span>Place Bets</span>
+                    <span id="placeInfo">4, 5, 6, 8, 9, 10</span>
+                </div>
+                <div class="place-number-row">
+                    <button type="button" class="number-zone place4" id="boardPlace4Btn" onclick="openBetModal('place4')" aria-label="Place 4 bet">
+                        <span class="num">4</span>
+                        <span class="payout">9:5</span>
+                    </button>
+                    <button type="button" class="number-zone place5" id="boardPlace5Btn" onclick="openBetModal('place5')" aria-label="Place 5 bet">
+                        <span class="num">5</span>
+                        <span class="payout">7:5</span>
+                    </button>
+                    <button type="button" class="number-zone place6" id="boardPlace6Btn" onclick="openBetModal('place6')" aria-label="Place 6 bet">
+                        <span class="num">6</span>
+                        <span class="payout">7:6</span>
+                    </button>
+                    <button type="button" class="number-zone place8" id="boardPlace8Btn" onclick="openBetModal('place8')" aria-label="Place 8 bet">
+                        <span class="num">8</span>
+                        <span class="payout">7:6</span>
+                    </button>
+                    <button type="button" class="number-zone place9" id="boardPlace9Btn" onclick="openBetModal('place9')" aria-label="Place 9 bet">
+                        <span class="num">9</span>
+                        <span class="payout">7:5</span>
+                    </button>
+                    <button type="button" class="number-zone place10" id="boardPlace10Btn" onclick="openBetModal('place10')" aria-label="Place 10 bet">
+                        <span class="num">10</span>
+                        <span class="payout">9:5</span>
+                    </button>
+                </div>
+            </section>
+
+            <button type="button" class="bet-btn center center-zone" id="centerBoardBtn" onclick="openCenterMenu()">
+                <span class="label">CENTER</span>
+                <span class="amt" id="centerInfo">Props & Hardways</span>
             </button>
-            <button type="button" class="bet-btn dont" id="dontPassBtn" onclick="openBetModal('dontPass')">
-                <span class="label">DON'T PASS</span>
-                <span class="amt" id="dontPassInfo">Tap to bet</span>
-                <span class="odds-chip" id="dontPassOddsChip"></span>
+
+            <button type="button" class="bet-btn field-zone" id="fieldBoardBtn" onclick="openBetModal('field')">
+                <span class="label">FIELD</span>
+                <span class="field-numbers">2 3 4 9 10 11 12</span>
+                <span class="amt" id="fieldBoardInfo">One-roll bet</span>
             </button>
+
             <button type="button" class="bet-btn come disabled" id="comeBtn" onclick="openBetModal('come')" disabled>
                 <span class="label">COME</span>
                 <span class="amt" id="comeInfo">Tap to bet</span>
                 <span class="odds-chip" id="comeOddsChip"></span>
             </button>
+
             <button type="button" class="bet-btn dont-come disabled" id="dontComeBtn" onclick="openBetModal('dontCome')" disabled>
                 <span class="label">DON'T COME</span>
                 <span class="amt" id="dontComeInfo">Tap to bet</span>
                 <span class="odds-chip" id="dontComeOddsChip"></span>
             </button>
-            <button type="button" class="bet-btn place" onclick="openPlaceMenu()">
-                <span class="label">PLACE</span>
-                <span class="amt" id="placeInfo">4, 5, 6, 8, 9, 10</span>
+
+            <button type="button" class="bet-btn dont" id="dontPassBtn" onclick="openBetModal('dontPass')">
+                <span class="label">DON'T PASS</span>
+                <span class="amt" id="dontPassInfo">Tap to bet</span>
+                <span class="odds-chip" id="dontPassOddsChip"></span>
             </button>
-            <button type="button" class="bet-btn center" onclick="openCenterMenu()">
-                <span class="label">CENTER</span>
-                <span class="amt" id="centerInfo">Props & Hardways</span>
+
+            <button type="button" class="bet-btn pass" id="passLineBtn" onclick="openBetModal('passLine')">
+                <span class="label">PASS LINE</span>
+                <span class="amt" id="passLineInfo">Tap to bet</span>
+                <span class="odds-chip" id="passLineOddsChip"></span>
             </button>
         </div>
 

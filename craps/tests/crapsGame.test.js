@@ -312,6 +312,39 @@ describe('craps game regressions', () => {
     expect(window.document.getElementById('comeBtn').disabled).toBe(true);
   });
 
+  test('active bets render as chips on the board layout', () => {
+    const window = loadGame();
+    window.__setGameState({
+      balance: 840,
+      point: 6,
+      isComeOutRoll: false,
+      bets: {
+        passLine: 15,
+        field: 10,
+        any7: 5,
+        hard6: 10,
+        place4: 5,
+        place6: 12,
+        place8: 12,
+      },
+      oddsBets: { passLine: 30 },
+      comeBets: [
+        { id: 1, point: 6, amount: 10, odds: 20 },
+        { id: 2, point: null, amount: 5, odds: 0 },
+      ],
+      dontComeBets: [{ id: 3, point: 8, amount: 10, odds: 10 }],
+      nextComeBetId: 4,
+    });
+
+    window.updateAllDisplays();
+
+    expect(window.document.querySelectorAll('.board-chip-stack')).toHaveLength(9);
+    expect(window.document.querySelector('#passLineBtn .chip-note').textContent).toBe('+$30 odds');
+    expect(window.document.querySelector('#boardPlace6Btn .stack-come .chip-note').textContent).toBe('Come +$20');
+    expect(window.document.querySelector('#boardPlace8Btn .stack-dont-come .chip-note').textContent).toBe('DC +$10');
+    expect(window.document.querySelector('#centerBoardBtn .chip-note').textContent).toBe('2 bets');
+  });
+
   test('resolved losing bets show a loss animation', () => {
     const window = loadGame();
     window.__setGameState({ balance: 995, bets: { field: 5 } });
