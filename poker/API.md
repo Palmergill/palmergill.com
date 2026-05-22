@@ -8,7 +8,7 @@ This documents the active poker API served by the shared backend at `backend/app
 
 ## Authentication
 
-`/api/poker/*` is public in both Vercel middleware and the shared FastAPI auth middleware. The API identifies and authorizes players with the `player_id` and `player_token` returned when creating or joining a game. Keep the token client-side; mutating requests and state polling require it.
+`/api/poker/*` is public in both Vercel middleware and the shared FastAPI auth middleware. The API identifies and authorizes players with the `player_id` and `player_token` returned when creating or joining a game. Keep the token client-side and do not put it in URLs. State polling sends the token in `X-Player-Token`; mutating requests send it in the JSON body.
 
 Write endpoints use a simple per-IP sliding-window rate limit of 60 requests per minute.
 
@@ -68,7 +68,16 @@ Only multiplayer games in the `waiting` phase can be joined.
 ### Start Multiplayer Game
 
 ```http
-POST /api/poker/games/{game_id}/start?player_id={player_id}&player_token={player_token}
+POST /api/poker/games/{game_id}/start
+```
+
+Request:
+
+```json
+{
+  "player_id": "p0",
+  "player_token": "secret-token"
+}
 ```
 
 Starts a multiplayer game. Only the first player in the lobby can start it, and at least two players are required.
@@ -76,7 +85,8 @@ Starts a multiplayer game. Only the first player in the lobby can start it, and 
 ### Get Game State
 
 ```http
-GET /api/poker/games/{game_id}?player_id={player_id}&player_token={player_token}
+GET /api/poker/games/{game_id}?player_id={player_id}
+X-Player-Token: secret-token
 ```
 
 Returns the current game state for the requesting player. Cards are only visible to the requesting player until showdown. This endpoint is read-only; it does not advance AI turns.
@@ -86,12 +96,26 @@ Query parameters:
 | Field | Type | Required | Notes |
 | --- | --- | --- | --- |
 | `player_id` | string | Yes | Player identifier returned by create/join. |
-| `player_token` | string | Yes | Player token returned by create/join. |
+
+Headers:
+
+| Header | Required | Notes |
+| --- | --- | --- |
+| `X-Player-Token` | Yes | Player token returned by create/join. |
 
 ### Process AI Turn
 
 ```http
-POST /api/poker/games/{game_id}/process-ai?player_id={player_id}&player_token={player_token}
+POST /api/poker/games/{game_id}/process-ai
+```
+
+Request:
+
+```json
+{
+  "player_id": "p0",
+  "player_token": "secret-token"
+}
 ```
 
 Advances at most one AI bot turn for a single-player game and returns the updated game state. Multiplayer games and human turns are returned unchanged.
@@ -133,17 +157,25 @@ Request:
 ```json
 {
   "player_id": "p0",
-  "player_token": "secret-token",
-  "amount": 1000
+  "player_token": "secret-token"
 }
 ```
 
-Adds chips to a busted player between hands. Available only during `showdown` or `waiting`.
+Sets a busted player back to the server-defined buy-back stack between hands. Available only during `showdown` or `waiting`.
 
 ### Next Hand
 
 ```http
-POST /api/poker/games/{game_id}/next-hand?player_id={player_id}&player_token={player_token}
+POST /api/poker/games/{game_id}/next-hand
+```
+
+Request:
+
+```json
+{
+  "player_id": "p0",
+  "player_token": "secret-token"
+}
 ```
 
 Starts the next hand after showdown or while waiting. The dealer button advances before the hand starts.

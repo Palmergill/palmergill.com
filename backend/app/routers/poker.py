@@ -1,7 +1,7 @@
 """
 Poker Game API Router - Simplified for debugging
 """
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Header, HTTPException, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from typing import Optional, Dict, List
@@ -29,8 +29,9 @@ AI_TURN_MIN_INTERVAL_SECONDS = 1.5
 # Simple sliding-window rate limiter: max 60 requests per minute per IP
 _RATE_LIMIT_WINDOW = 60
 _RATE_LIMIT_MAX = 60
-_TRUST_PROXY_HEADERS = os.getenv("TRUST_PROXY_HEADERS", "true").strip().lower() in {"1", "true", "yes", "on"}
+_TRUST_PROXY_HEADERS = os.getenv("TRUST_PROXY_HEADERS", "false").strip().lower() in {"1", "true", "yes", "on"}
 _rate_limit_store: Dict[str, List[float]] = defaultdict(list)
+BUY_BACK_AMOUNT = 1000
 
 def _client_ip(request: Request) -> str:
     if _TRUST_PROXY_HEADERS:
@@ -137,11 +138,6 @@ class ActionRequest(BaseModel):
     player_token: str
     action: str
     amount: Optional[int] = None
-
-class BuyBackRequest(BaseModel):
-    player_id: str
-    player_token: str
-    amount: int = 1000
 
 class PlayerAuthRequest(BaseModel):
     player_id: str
@@ -275,7 +271,12 @@ async def start_multiplayer_game(game_id: str, http_request: Request, request: P
     return game.to_dict(for_player=request.player_id)
 
 @router.get("/games/{game_id}")
-async def get_game_state(game_id: str, player_id: str, player_token: str, process_ai: bool = True):
+async def get_game_state(
+    game_id: str,
+    player_id: str,
+    player_token: Optional[str] = Header(None, alias="X-Player-Token"),
+    process_ai: bool = True,
+):
     """Get current game state"""
     if game_id not in games:
         raise HTTPException(status_code=404, detail="Game not found")
@@ -291,18 +292,18 @@ async def get_game_state(game_id: str, player_id: str, player_token: str, proces
 
 
 @router.post("/games/{game_id}/process-ai")
-async def process_ai_turn(game_id: str, http_request: Request, player_id: str, player_token: str):
+async def process_ai_turn(game_id: str, http_request: Request, request: PlayerAuthRequest):
     """Advance at most one AI turn for a single-player game."""
     _require_rate_limit(http_request)
     if game_id not in games:
         raise HTTPException(status_code=404, detail="Game not found")
 
     game = games[game_id]
-    require_player_token(game_id, player_id, player_token)
+    require_player_token(game_id, request.player_id, request.player_token)
     update_game_access(game_id)
     process_ai_turn_if_needed(game_id, game)
 
-    return game.to_dict(for_player=player_id)
+    return game.to_dict(for_player=request.player_id)
 
 @router.post("/games/{game_id}/action")
 async def player_action(game_id: str, http_request: Request, request: ActionRequest):
@@ -337,13 +338,11 @@ async def player_action(game_id: str, http_request: Request, request: ActionRequ
     return game.to_dict(for_player=request.player_id)
 
 @router.post("/games/{game_id}/buy-back")
-async def buy_back(game_id: str, request: BuyBackRequest):
+async def buy_back(game_id: str, http_request: Request, request: PlayerAuthRequest):
     """Add chips for a busted player before the next hand."""
+    _require_rate_limit(http_request)
     if game_id not in games:
         raise HTTPException(status_code=404, detail="Game not found")
-
-    if request.amount <= 0:
-        raise HTTPException(status_code=400, detail="Buy-back amount must be positive")
 
     game = games[game_id]
     require_player_token(game_id, request.player_id, request.player_token)
@@ -354,16 +353,19 @@ async def buy_back(game_id: str, request: BuyBackRequest):
     if game.phase not in ('showdown', 'waiting'):
         raise HTTPException(status_code=400, detail="Buy-back is only available between hands")
 
-    player.chips += request.amount
     if player.chips > 0:
-        player.is_all_in = False
+        raise HTTPException(status_code=400, detail="Buy-back is only available for busted players")
+
+    player.chips = BUY_BACK_AMOUNT
+    player.is_all_in = False
 
     update_game_access(game_id)
     return game.to_dict(for_player=request.player_id)
 
 @router.post("/games/{game_id}/next-hand")
-async def next_hand(game_id: str, request: PlayerAuthRequest):
+async def next_hand(game_id: str, http_request: Request, request: PlayerAuthRequest):
     """Start next hand"""
+    _require_rate_limit(http_request)
     if game_id not in games:
         raise HTTPException(status_code=404, detail="Game not found")
 

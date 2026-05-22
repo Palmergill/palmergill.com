@@ -696,10 +696,15 @@ function escapeHtml(value) {
 function gameRequestUrl(path, params = {}) {
     const query = new URLSearchParams({
         ...params,
-        player_id: playerId,
-        player_token: playerToken
+        player_id: playerId
     });
     return `${API_BASE}/api/poker${path}?${query.toString()}`;
+}
+
+function playerAuthHeaders(headers = {}) {
+    return playerToken
+        ? { 'X-Player-Token': playerToken, ...headers }
+        : { ...headers };
 }
 
 // DOM Elements
@@ -1237,7 +1242,10 @@ function startLobbyPolling() {
         }
         
         try {
-            const response = await fetchWithTimeout(gameRequestUrl(`/games/${gameId}`, { process_ai: 'false' }));
+            const response = await fetchWithTimeout(
+                gameRequestUrl(`/games/${gameId}`, { process_ai: 'false' }),
+                { headers: playerAuthHeaders() }
+            );
             if (response.ok) {
                 const data = await response.json();
                 updateLobbyPlayers(data.players);
@@ -1347,8 +1355,14 @@ function startPolling() {
         
         try {
             const response = processAI
-                ? await fetchWithTimeout(gameRequestUrl(`/games/${gameId}/process-ai`), { method: 'POST' })
-                : await fetchWithTimeout(gameRequestUrl(`/games/${gameId}`, { process_ai: 'false' }));
+                ? await CSRFManager.fetch(`${API_BASE}/api/poker/games/${gameId}/process-ai`, {
+                    method: 'POST',
+                    body: JSON.stringify({ player_id: playerId, player_token: playerToken })
+                })
+                : await fetchWithTimeout(
+                    gameRequestUrl(`/games/${gameId}`, { process_ai: 'false' }),
+                    { headers: playerAuthHeaders() }
+                );
             if (!response.ok) {
                 if (response.status === 404) {
                     stopPolling();
@@ -2047,7 +2061,7 @@ async function buyBackIn() {
     try {
         const response = await CSRFManager.fetch(`${API_BASE}/api/poker/games/${gameId}/buy-back`, {
             method: 'POST',
-            body: JSON.stringify({ player_id: playerId, player_token: playerToken, amount: 1000 })
+            body: JSON.stringify({ player_id: playerId, player_token: playerToken })
         });
 
         if (!response.ok) {

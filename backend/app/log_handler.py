@@ -5,6 +5,7 @@ Captures Python `logging` records and persists them to the `logs` table so
 the admin page can display structured logs alongside the file-based logs.
 """
 import logging
+import re
 from datetime import datetime
 
 from app.database import SessionLocal, LogEntry
@@ -17,6 +18,16 @@ _EXCLUDED_LOGGERS = {
     "sqlalchemy.dialects",
     "sqlalchemy.orm",
 }
+
+_SENSITIVE_QUERY_RE = re.compile(
+    r"([?&](?:player_token|token|password|api_key|apikey|secret)=)([^&\s\"]+)",
+    re.IGNORECASE,
+)
+
+
+def _redact_sensitive_query_values(message: str) -> str:
+    """Remove bearer tokens and other secrets from logged request URLs."""
+    return _SENSITIVE_QUERY_RE.sub(r"\1[REDACTED]", message)
 
 
 def _is_excluded_record(record: logging.LogRecord) -> bool:
@@ -59,7 +70,7 @@ class DatabaseLogHandler(logging.Handler):
                     timestamp=datetime.utcfromtimestamp(record.created),
                     level=record.levelname,
                     logger_name=record.name,
-                    message=self.format(record),
+                    message=_redact_sensitive_query_values(self.format(record)),
                     path=getattr(record, "path", None),
                     status_code=getattr(record, "status_code", None),
                     method=getattr(record, "method", None),

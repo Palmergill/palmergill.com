@@ -32,7 +32,7 @@ def stock_error_status(error: Exception) -> int:
 async def search_stocks_endpoint(
     request: Request,
     q: str = Query(..., min_length=1),
-    limit: int = 10,
+    limit: int = Query(10, ge=1, le=25),
 ):
     """Search stocks by ticker or company name"""
     try:
@@ -84,7 +84,11 @@ async def get_earnings(request: Request, ticker: str, db: Session = Depends(get_
 
 
 @router.get("/{ticker}/prices")
-async def get_price_history(request: Request, ticker: str, days: int = 365):
+async def get_price_history(
+    request: Request,
+    ticker: str,
+    days: int = Query(365, ge=1, le=1000),
+):
     """Get daily price history for a ticker"""
     try:
         price_history = (
