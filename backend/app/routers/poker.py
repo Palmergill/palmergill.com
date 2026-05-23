@@ -5,18 +5,21 @@ from fastapi import APIRouter, Header, HTTPException, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from typing import Optional, Dict, List
+import json
 import uuid
 import os
 import secrets
 import time
 from collections import defaultdict
+from datetime import datetime, timedelta, timezone
 
-from app.poker_game import PokerGame
-from app.poker_ai import AIManager
+from app.poker_game import Card, Player, PokerGame, Rank, Suit
+from app.poker_ai import AIManager, PokerAI
+from app.database import PokerGameState, SessionLocal
 
 router = APIRouter(prefix="/api/poker", tags=["poker"])
 
-# In-memory game storage
+# Hot in-process game cache. Each active game is also snapshotted to the DB.
 games: Dict[str, PokerGame] = {}
 ai_managers: Dict[str, Optional[AIManager]] = {}
 game_last_accessed: Dict[str, float] = {}
@@ -32,6 +35,17 @@ _RATE_LIMIT_MAX = 60
 _TRUST_PROXY_HEADERS = os.getenv("TRUST_PROXY_HEADERS", "false").strip().lower() in {"1", "true", "yes", "on"}
 _rate_limit_store: Dict[str, List[float]] = defaultdict(list)
 BUY_BACK_AMOUNT = 1000
+BOT_AGGRESSION_BY_NAME = {
+    "Shelby": 0.3,
+    "Freya": 0.5,
+    "Charlie": 0.7,
+    "Diana": 0.6,
+    "Eve": 0.4,
+}
+
+
+def utc_now():
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 def _client_ip(request: Request) -> str:
     if _TRUST_PROXY_HEADERS:
@@ -62,6 +76,160 @@ def _require_rate_limit(request: Request) -> None:
     if not _check_rate_limit(_client_ip(request)):
         raise HTTPException(status_code=429, detail="Too many requests")
 
+
+def _ai_manager_for_game(game: PokerGame) -> Optional[AIManager]:
+    if getattr(game, "game_type", "single") != "single":
+        return None
+
+    manager = AIManager(game)
+    for player in game.players:
+        if not player.is_human:
+            manager.bots[player.id] = PokerAI(
+                aggression=BOT_AGGRESSION_BY_NAME.get(player.name, 0.5)
+            )
+    return manager
+
+
+def _serialize_card(card: Card) -> dict:
+    return {"suit": card.suit.name, "rank": card.rank.value}
+
+
+def _deserialize_card(data: dict) -> Card:
+    return Card(suit=Suit[data["suit"]], rank=Rank(data["rank"]))
+
+
+def _serialize_player(player: Player) -> dict:
+    return {
+        "id": player.id,
+        "name": player.name,
+        "chips": player.chips,
+        "hand": [_serialize_card(card) for card in player.hand],
+        "bet": player.bet,
+        "total_bet": player.total_bet,
+        "folded": player.folded,
+        "is_all_in": player.is_all_in,
+        "is_human": player.is_human,
+    }
+
+
+def _deserialize_player(data: dict) -> Player:
+    return Player(
+        id=data["id"],
+        name=data["name"],
+        chips=data["chips"],
+        hand=[_deserialize_card(card) for card in data.get("hand", [])],
+        bet=data.get("bet", 0),
+        total_bet=data.get("total_bet", 0),
+        folded=data.get("folded", False),
+        is_all_in=data.get("is_all_in", False),
+        is_human=data.get("is_human", False),
+    )
+
+
+def _serialize_game(game: PokerGame) -> dict:
+    return {
+        "game_id": game.game_id,
+        "players": [_serialize_player(player) for player in game.players],
+        "deck": [_serialize_card(card) for card in game.deck.cards],
+        "community_cards": [_serialize_card(card) for card in game.community_cards],
+        "pot": game.pot,
+        "current_bet": game.current_bet,
+        "dealer_index": game.dealer_index,
+        "current_player_index": game.current_player_index,
+        "small_blind": game.small_blind,
+        "big_blind": game.big_blind,
+        "phase": game.phase,
+        "round_bets": game.round_bets,
+        "min_raise": game.min_raise,
+        "winners": game.winners,
+        "last_action": game.last_action,
+        "last_ai_action": game.last_ai_action,
+        "hand_number": game.hand_number,
+        "acted_this_round": list(game.acted_this_round),
+        "round_start_player": game.round_start_player,
+        "game_type": getattr(game, "game_type", "single"),
+        "max_players": getattr(game, "max_players", 6),
+        "waiting_for_players": getattr(game, "waiting_for_players", False),
+    }
+
+
+def _deserialize_game(data: dict) -> PokerGame:
+    game = PokerGame(data["game_id"])
+    game.players = [_deserialize_player(player) for player in data.get("players", [])]
+    game.deck.cards = [_deserialize_card(card) for card in data.get("deck", [])]
+    game.community_cards = [_deserialize_card(card) for card in data.get("community_cards", [])]
+    game.pot = data.get("pot", 0)
+    game.current_bet = data.get("current_bet", 0)
+    game.dealer_index = data.get("dealer_index", 0)
+    game.current_player_index = data.get("current_player_index", 0)
+    game.small_blind = data.get("small_blind", 10)
+    game.big_blind = data.get("big_blind", 20)
+    game.phase = data.get("phase", "waiting")
+    game.round_bets = data.get("round_bets", {})
+    game.min_raise = data.get("min_raise", game.big_blind)
+    game.winners = data.get("winners", [])
+    game.last_action = data.get("last_action")
+    game.last_ai_action = data.get("last_ai_action")
+    game.hand_number = data.get("hand_number", 0)
+    game.acted_this_round = set(data.get("acted_this_round", []))
+    game.round_start_player = data.get("round_start_player", 0)
+    game.game_type = data.get("game_type", "single")
+    game.max_players = data.get("max_players", 6)
+    game.waiting_for_players = data.get("waiting_for_players", False)
+    return game
+
+
+def save_game_state(game_id: str) -> None:
+    game = games.get(game_id)
+    if not game:
+        return
+
+    payload = json.dumps(
+        {
+            "game": _serialize_game(game),
+            "player_tokens": player_tokens.get(game_id, {}),
+            "game_last_accessed": game_last_accessed.get(game_id, time.time()),
+            "ai_last_processed": ai_last_processed.get(game_id, 0),
+        },
+        separators=(",", ":"),
+    ).encode("utf-8")
+
+    db = SessionLocal()
+    try:
+        row = db.get(PokerGameState, game_id)
+        if row is None:
+            row = PokerGameState(game_id=game_id, payload=payload)
+            db.add(row)
+        else:
+            row.payload = payload
+            row.updated_at = utc_now()
+        db.commit()
+    finally:
+        db.close()
+
+
+def load_game_state(game_id: str) -> bool:
+    if game_id in games:
+        return True
+
+    db = SessionLocal()
+    try:
+        row = db.get(PokerGameState, game_id)
+        if row is None:
+            return False
+
+        data = json.loads(row.payload.decode("utf-8"))
+        game = _deserialize_game(data["game"])
+        games[game_id] = game
+        player_tokens[game_id] = data.get("player_tokens", {})
+        game_last_accessed[game_id] = data.get("game_last_accessed", time.time())
+        ai_last_processed[game_id] = data.get("ai_last_processed", 0)
+        ai_managers[game_id] = _ai_manager_for_game(game)
+        return True
+    finally:
+        db.close()
+
+
 def cleanup_old_games():
     """Remove games that haven't been accessed in a while"""
     current_time = time.time()
@@ -75,7 +243,21 @@ def cleanup_old_games():
         ai_last_processed.pop(game_id, None)
         game_last_accessed.pop(game_id, None)
         player_tokens.pop(game_id, None)
-    return len(games_to_remove)
+
+    persisted_removed = 0
+    db = SessionLocal()
+    try:
+        cutoff = utc_now() - timedelta(seconds=GAME_MAX_AGE_SECONDS)
+        stale_rows = db.query(PokerGameState).filter(PokerGameState.updated_at < cutoff).all()
+        for row in stale_rows:
+            db.delete(row)
+            persisted_removed += 1
+        if persisted_removed:
+            db.commit()
+    finally:
+        db.close()
+
+    return len(games_to_remove) + persisted_removed
 
 def update_game_access(game_id: str):
     """Update last access time for a game"""
@@ -145,7 +327,11 @@ class PlayerAuthRequest(BaseModel):
 
 @router.get("/csrf-token")
 async def get_csrf_token():
-    """Set a CSRF cookie for the frontend double-submit pattern."""
+    """Compatibility endpoint for older poker clients.
+
+    The active API authorizes player actions with per-player tokens, not CSRF
+    cookies. New clients do not need this endpoint.
+    """
     token = secrets.token_urlsafe(32)
     response = JSONResponse({"ok": True})
     response.set_cookie(
@@ -188,6 +374,7 @@ async def create_game(http_request: Request, request: CreateGameRequest):
         ai_managers[game_id] = ai_manager
         update_game_access(game_id)
         cleanup_old_games()
+        save_game_state(game_id)
 
         return {
             "game_id": game_id,
@@ -202,6 +389,7 @@ async def create_game(http_request: Request, request: CreateGameRequest):
         ai_managers[game_id] = None
         update_game_access(game_id)
         cleanup_old_games()
+        save_game_state(game_id)
 
         return {
             "game_id": game_id,
@@ -217,7 +405,7 @@ async def create_game(http_request: Request, request: CreateGameRequest):
 async def join_game(http_request: Request, request: JoinGameRequest):
     """Join an existing multiplayer game"""
     _require_rate_limit(http_request)
-    if request.game_id not in games:
+    if not load_game_state(request.game_id):
         raise HTTPException(status_code=404, detail="Game not found")
 
     game = games[request.game_id]
@@ -235,6 +423,7 @@ async def join_game(http_request: Request, request: JoinGameRequest):
     player = game.add_player(normalize_player_name(request.player_name), is_human=True)
     player_token = create_player_token(request.game_id, player.id)
     update_game_access(request.game_id)
+    save_game_state(request.game_id)
 
     return {
         "game_id": request.game_id,
@@ -249,7 +438,7 @@ async def join_game(http_request: Request, request: JoinGameRequest):
 async def start_multiplayer_game(game_id: str, http_request: Request, request: PlayerAuthRequest):
     """Start a multiplayer game (host only)"""
     _require_rate_limit(http_request)
-    if game_id not in games:
+    if not load_game_state(game_id):
         raise HTTPException(status_code=404, detail="Game not found")
 
     game = games[game_id]
@@ -267,6 +456,7 @@ async def start_multiplayer_game(game_id: str, http_request: Request, request: P
     game.waiting_for_players = False
     game.start_hand()
     update_game_access(game_id)
+    save_game_state(game_id)
 
     return game.to_dict(for_player=request.player_id)
 
@@ -278,12 +468,13 @@ async def get_game_state(
     process_ai: bool = True,
 ):
     """Get current game state"""
-    if game_id not in games:
+    if not load_game_state(game_id):
         raise HTTPException(status_code=404, detail="Game not found")
 
     game = games[game_id]
     require_player_token(game_id, player_id, player_token)
     update_game_access(game_id)
+    save_game_state(game_id)
 
     # The process_ai query parameter is retained for old clients, but GET is
     # intentionally read-only. Use POST /process-ai to advance a bot turn.
@@ -295,13 +486,14 @@ async def get_game_state(
 async def process_ai_turn(game_id: str, http_request: Request, request: PlayerAuthRequest):
     """Advance at most one AI turn for a single-player game."""
     _require_rate_limit(http_request)
-    if game_id not in games:
+    if not load_game_state(game_id):
         raise HTTPException(status_code=404, detail="Game not found")
 
     game = games[game_id]
     require_player_token(game_id, request.player_id, request.player_token)
     update_game_access(game_id)
     process_ai_turn_if_needed(game_id, game)
+    save_game_state(game_id)
 
     return game.to_dict(for_player=request.player_id)
 
@@ -309,7 +501,7 @@ async def process_ai_turn(game_id: str, http_request: Request, request: PlayerAu
 async def player_action(game_id: str, http_request: Request, request: ActionRequest):
     """Execute player action"""
     _require_rate_limit(http_request)
-    if game_id not in games:
+    if not load_game_state(game_id):
         raise HTTPException(status_code=404, detail="Game not found")
 
     game = games[game_id]
@@ -335,13 +527,14 @@ async def player_action(game_id: str, http_request: Request, request: ActionRequ
     if not success:
         raise HTTPException(status_code=400, detail="Action failed")
 
+    save_game_state(game_id)
     return game.to_dict(for_player=request.player_id)
 
 @router.post("/games/{game_id}/buy-back")
 async def buy_back(game_id: str, http_request: Request, request: PlayerAuthRequest):
     """Add chips for a busted player before the next hand."""
     _require_rate_limit(http_request)
-    if game_id not in games:
+    if not load_game_state(game_id):
         raise HTTPException(status_code=404, detail="Game not found")
 
     game = games[game_id]
@@ -360,13 +553,14 @@ async def buy_back(game_id: str, http_request: Request, request: PlayerAuthReque
     player.is_all_in = False
 
     update_game_access(game_id)
+    save_game_state(game_id)
     return game.to_dict(for_player=request.player_id)
 
 @router.post("/games/{game_id}/next-hand")
 async def next_hand(game_id: str, http_request: Request, request: PlayerAuthRequest):
     """Start next hand"""
     _require_rate_limit(http_request)
-    if game_id not in games:
+    if not load_game_state(game_id):
         raise HTTPException(status_code=404, detail="Game not found")
 
     game = games[game_id]
@@ -377,6 +571,8 @@ async def next_hand(game_id: str, http_request: Request, request: PlayerAuthRequ
 
     game.dealer_index = (game.dealer_index + 1) % len(game.players)
     game.start_hand()
+    update_game_access(game_id)
+    save_game_state(game_id)
 
     return game.to_dict(for_player=request.player_id)
 

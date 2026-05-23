@@ -1,7 +1,7 @@
-from sqlalchemy import create_engine, Column, String, Float, Date, DateTime, Integer
-from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy import create_engine, Column, String, Float, Date, DateTime, Integer, LargeBinary
+from sqlalchemy.orm import declarative_base
 from sqlalchemy.orm import sessionmaker
-from datetime import datetime
+from datetime import datetime, timezone
 
 import os
 
@@ -26,6 +26,10 @@ else:
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
+
+def utc_now():
+    return datetime.now(timezone.utc).replace(tzinfo=None)
+
 class EarningsRecord(Base):
     __tablename__ = "earnings"
     
@@ -40,7 +44,7 @@ class EarningsRecord(Base):
     free_cash_flow = Column(Float, nullable=True)
     pe_ratio = Column(Float, nullable=True)  # Historical P/E at time of earnings
     price = Column(Float, nullable=True)  # Stock price at time of earnings
-    fetched_at = Column(DateTime, default=datetime.utcnow)
+    fetched_at = Column(DateTime, default=utc_now)
 
 class StockSummary(Base):
     __tablename__ = "stock_summaries"
@@ -83,19 +87,28 @@ class StockSummary(Base):
     working_capital = Column(Float, nullable=True)
     # Market data
     avg_volume = Column(Float, nullable=True)
-    fetched_at = Column(DateTime, default=datetime.utcnow)
+    fetched_at = Column(DateTime, default=utc_now)
 
 class LogEntry(Base):
     __tablename__ = "logs"
 
     id = Column(Integer, primary_key=True, index=True)
-    timestamp = Column(DateTime, default=datetime.utcnow, index=True)
+    timestamp = Column(DateTime, default=utc_now, index=True)
     level = Column(String, index=True)  # DEBUG, INFO, WARNING, ERROR, CRITICAL
     logger_name = Column(String, nullable=True)
     message = Column(String)
     path = Column(String, nullable=True)  # request path if HTTP
     status_code = Column(Integer, nullable=True)
     method = Column(String, nullable=True)
+
+
+class PokerGameState(Base):
+    __tablename__ = "poker_game_states"
+
+    game_id = Column(String, primary_key=True, index=True)
+    payload = Column(LargeBinary, nullable=False)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now, index=True)
+
 
 def get_db():
     db = SessionLocal()

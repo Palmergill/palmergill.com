@@ -6,7 +6,7 @@ the admin page can display structured logs alongside the file-based logs.
 """
 import logging
 import re
-from datetime import datetime
+from datetime import datetime, timezone
 
 from app.database import SessionLocal, LogEntry
 
@@ -67,7 +67,7 @@ class DatabaseLogHandler(logging.Handler):
             session = SessionLocal()
             try:
                 entry = LogEntry(
-                    timestamp=datetime.utcfromtimestamp(record.created),
+                    timestamp=datetime.fromtimestamp(record.created, timezone.utc).replace(tzinfo=None),
                     level=record.levelname,
                     logger_name=record.name,
                     message=_redact_sensitive_query_values(self.format(record)),

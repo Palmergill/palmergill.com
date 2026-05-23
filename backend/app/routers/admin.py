@@ -8,7 +8,7 @@ import os
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from sqlalchemy.orm import Session
 from sqlalchemy import desc
 
@@ -25,6 +25,8 @@ LOG_FILE_PATH = os.path.join(_REPO_ROOT, "logs", "backend.log")
 
 
 class LogEntryOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     timestamp: str
     level: str
@@ -33,9 +35,6 @@ class LogEntryOut(BaseModel):
     path: Optional[str] = None
     status_code: Optional[int] = None
     method: Optional[str] = None
-
-    class Config:
-        from_attributes = True
 
 
 class LogsResponse(BaseModel):

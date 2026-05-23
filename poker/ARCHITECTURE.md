@@ -49,7 +49,7 @@ The active shared router provides:
 
 - Single-player games with five AI bots.
 - Multiplayer lobby create/join/start.
-- In-memory game storage.
+- Database-backed game snapshots with an in-process cache.
 - One-hour cleanup for inactive games.
 - Player-token validation for state polling and player-specific actions.
 - Per-IP rate limiting on create, join, and action requests.
@@ -58,7 +58,7 @@ The active shared router provides:
 - Next-hand flow after showdown.
 - Basic poker health endpoint.
 
-The active shared router does not provide tournaments, persisted games, chat endpoints, detailed health, analytics, backups, spectator endpoints, CSRF token issuance, or WebSockets.
+The active shared router does not provide tournaments, chat endpoints, detailed health, analytics, backups, spectator endpoints, CSRF enforcement, or WebSockets.
 
 ## Data Flow
 

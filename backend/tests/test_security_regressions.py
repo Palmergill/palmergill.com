@@ -1,7 +1,14 @@
 from fastapi.testclient import TestClient
 
 from app.log_handler import _redact_sensitive_query_values
-from app.main import SESSION_COOKIE_NAME, app, create_app_session_token
+from app.database import Base, PokerGameState, SessionLocal, engine
+from app.main import (
+    AUTH_RATE_LIMIT_MAX_ATTEMPTS,
+    SESSION_COOKIE_NAME,
+    _auth_failure_store,
+    app,
+    create_app_session_token,
+)
 from app.routers import poker
 
 
@@ -15,6 +22,14 @@ def setup_function():
     poker.ai_last_processed.clear()
     poker.player_tokens.clear()
     poker._rate_limit_store.clear()
+    _auth_failure_store.clear()
+    Base.metadata.create_all(bind=engine)
+    db = SessionLocal()
+    try:
+        db.query(PokerGameState).delete()
+        db.commit()
+    finally:
+        db.close()
 
 
 def create_single_player_game():
@@ -120,10 +135,63 @@ def test_signed_session_cookie_allows_protected_api_without_basic_auth(monkeypat
     monkeypatch.setenv("APP_AUTH_PASSWORD", "secret")
     auth_client = TestClient(app)
     token = create_app_session_token("palmer", "secret")
+    auth_client.cookies.set(SESSION_COOKIE_NAME, token)
+
+    response = auth_client.get("/api/unknown")
+
+    assert response.status_code == 404
+
+
+def test_login_session_rate_limits_repeated_failures(monkeypatch):
+    monkeypatch.setenv("APP_AUTH_USERNAME", "palmer")
+    monkeypatch.setenv("APP_AUTH_PASSWORD", "secret")
+    auth_client = TestClient(app)
+
+    for _ in range(AUTH_RATE_LIMIT_MAX_ATTEMPTS):
+        response = auth_client.post(
+            "/login/session",
+            json={"username": "palmer", "password": "wrong"},
+        )
+        assert response.status_code == 401
+
+    limited_response = auth_client.post(
+        "/login/session",
+        json={"username": "palmer", "password": "secret"},
+    )
+
+    assert limited_response.status_code == 429
+
+
+def test_malformed_basic_auth_returns_challenge(monkeypatch):
+    monkeypatch.setenv("APP_AUTH_USERNAME", "palmer")
+    monkeypatch.setenv("APP_AUTH_PASSWORD", "secret")
+    auth_client = TestClient(app)
 
     response = auth_client.get(
         "/api/unknown",
-        cookies={SESSION_COOKIE_NAME: token},
+        headers={"authorization": "Basic not-base64"},
     )
 
-    assert response.status_code == 404
+    assert response.status_code == 401
+
+
+def test_poker_game_state_loads_from_persisted_store_after_memory_clear():
+    data = create_single_player_game()
+    game_id = data["game_id"]
+    player_id = data["player_id"]
+    player_token = data["player_token"]
+
+    poker.games.clear()
+    poker.ai_managers.clear()
+    poker.game_last_accessed.clear()
+    poker.ai_last_processed.clear()
+    poker.player_tokens.clear()
+
+    response = client.get(
+        f"/api/poker/games/{game_id}",
+        params={"player_id": player_id},
+        headers={"X-Player-Token": player_token},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["game_id"] == game_id

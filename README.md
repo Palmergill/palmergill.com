@@ -27,6 +27,8 @@ Personal project site plus shared API backend.
 
 ## Local Development
 
+Requires Python 3.10 or newer. `./start.sh` creates `backend/venv` when it is missing and installs backend dependencies before starting FastAPI.
+
 ```bash
 ./start.sh
 ```
@@ -56,7 +58,8 @@ logs/backend.log
 - Static site: hosted from the repo root and project folders.
 - API service: Railway/FastAPI from `backend/`.
 - Vercel rewrites `/api/*` to the Railway backend in production.
-- The root page `/`, `/docs/`, `/login/`, `/stock-research/`, `/bitcoin-chat/`, `/casino/`, `/poker/`, `/craps/`, `/blackjack/`, `/api/poker/*`, `/api/stocks/*`, and `/api/bitcoin/*` stay public. Unauthenticated stock and Bitcoin API requests return demo data only; valid Basic Auth credentials unlock the live provider-backed paths. Admin and other `/api/*` routes require authentication; the login page creates a signed HttpOnly session cookie, and Basic Auth remains supported. Protected routes return `503` if `APP_AUTH_PASSWORD` is missing. Set the same `APP_AUTH_USERNAME` and `APP_AUTH_PASSWORD` values in Vercel and Railway.
+- The root page `/`, `/docs/`, `/login/`, `/stock-research/`, `/bitcoin-chat/`, `/casino/`, `/poker/`, `/craps/`, `/blackjack/`, `/api/poker/*`, `/api/stocks/*`, and `/api/bitcoin/*` stay public. Unauthenticated stock and Bitcoin API requests return demo data only; valid Basic Auth credentials unlock the live provider-backed paths. Admin and other `/api/*` routes require authentication; the login page creates a signed HttpOnly session cookie, failed sign-ins are rate-limited, and Basic Auth remains supported. Protected routes return `503` if `APP_AUTH_PASSWORD` is missing. Set the same `APP_AUTH_USERNAME` and `APP_AUTH_PASSWORD` values in Vercel and Railway.
+- Poker games are cached in process and snapshotted to the backend database so a fresh backend process can recover active games until inactive cleanup removes them.
 
 ## Repository Layout
 

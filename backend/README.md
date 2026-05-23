@@ -5,10 +5,12 @@ FastAPI service for the Palmer Gill project site.
 ## Setup
 
 ```bash
-python -m venv venv
+python3.11 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
 ```
+
+Python 3.10 or newer is required by the pinned FastAPI dependency. From the repo root, `./start.sh` will create `backend/venv` automatically when it is missing.
 
 ## Run API Only
 

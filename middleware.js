@@ -2,6 +2,9 @@ import { next } from '@vercel/functions';
 
 const SESSION_COOKIE_NAME = 'pg_session';
 const SESSION_TTL_SECONDS = 8 * 60 * 60;
+const AUTH_RATE_LIMIT_WINDOW_SECONDS = Number(process.env.APP_AUTH_RATE_LIMIT_WINDOW_SECONDS || 900);
+const AUTH_RATE_LIMIT_MAX_ATTEMPTS = Number(process.env.APP_AUTH_RATE_LIMIT_MAX_ATTEMPTS || 8);
+const authFailureStore = new Map();
 
 const PUBLIC_PREFIXES = [
   '/poker',
@@ -144,6 +147,14 @@ function missingConfig() {
   });
 }
 
+function tooManyAuthAttempts() {
+  return jsonResponse(
+    { error: 'Too many sign-in attempts. Try again later.' },
+    429,
+    { 'Retry-After': String(AUTH_RATE_LIMIT_WINDOW_SECONDS) },
+  );
+}
+
 function jsonResponse(body, status = 200, headers = {}) {
   return new Response(JSON.stringify(body), {
     status,
@@ -152,6 +163,48 @@ function jsonResponse(body, status = 200, headers = {}) {
       ...headers,
     },
   });
+}
+
+function clientIp(request) {
+  const forwardedFor = request.headers.get('x-forwarded-for');
+  if (forwardedFor) {
+    const firstIp = forwardedFor.split(',', 1)[0].trim();
+    if (firstIp) return firstIp;
+  }
+
+  return request.headers.get('cf-connecting-ip') ||
+    request.headers.get('x-real-ip') ||
+    'unknown';
+}
+
+function authRateLimitKey(request) {
+  return clientIp(request);
+}
+
+function recentAuthFailures(key, now = Date.now()) {
+  const cutoff = now - (AUTH_RATE_LIMIT_WINDOW_SECONDS * 1000);
+  const attempts = (authFailureStore.get(key) || []).filter((t) => t > cutoff);
+  if (attempts.length) {
+    authFailureStore.set(key, attempts);
+  } else {
+    authFailureStore.delete(key);
+  }
+  return attempts;
+}
+
+function authRateLimited(request) {
+  return recentAuthFailures(authRateLimitKey(request)).length >= AUTH_RATE_LIMIT_MAX_ATTEMPTS;
+}
+
+function recordAuthFailure(request) {
+  const key = authRateLimitKey(request);
+  const attempts = recentAuthFailures(key);
+  attempts.push(Date.now());
+  authFailureStore.set(key, attempts);
+}
+
+function clearAuthFailures(request) {
+  authFailureStore.delete(authRateLimitKey(request));
 }
 
 function sessionCookie(token, request) {
@@ -173,10 +226,15 @@ async function handleLoginSession(request, username, password) {
     return jsonResponse({ error: 'App authentication is not configured' }, 503);
   }
 
+  if (authRateLimited(request)) {
+    return tooManyAuthAttempts();
+  }
+
   let body;
   try {
     body = await request.json();
   } catch {
+    recordAuthFailure(request);
     return jsonResponse({ error: 'Invalid login request' }, 400);
   }
 
@@ -186,9 +244,11 @@ async function handleLoginSession(request, username, password) {
     !timingSafeEqual(submittedUsername, username) ||
     !timingSafeEqual(submittedPassword, password)
   ) {
+    recordAuthFailure(request);
     return jsonResponse({ error: 'Invalid username or password' }, 401);
   }
 
+  clearAuthFailures(request);
   const token = await createSessionToken(username, password);
   return jsonResponse(
     { ok: true, redirect: '/admin/' },
@@ -263,7 +323,12 @@ export default async function middleware(request) {
   }
 
   if (await validSessionCookie(request, username, password)) {
+    clearAuthFailures(request);
     return next();
+  }
+
+  if (request.headers.get('authorization') && authRateLimited(request)) {
+    return tooManyAuthAttempts();
   }
 
   const credentials = decodeBasicAuth(request.headers.get('authorization'));
@@ -272,9 +337,13 @@ export default async function middleware(request) {
     !timingSafeEqual(credentials.username, username) ||
     !timingSafeEqual(credentials.password, password)
   ) {
+    if (request.headers.get('authorization')) {
+      recordAuthFailure(request);
+    }
     return unauthorized(request);
   }
 
+  clearAuthFailures(request);
   return next();
 }
 

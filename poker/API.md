@@ -186,7 +186,7 @@ Starts the next hand after showdown or while waiting. The dealer button advances
 GET /api/poker/csrf-token
 ```
 
-Returns `{ "ok": true }` and sets a `csrf_token` cookie for frontend compatibility with older double-submit flows. The active shared backend authorizes game actions with `player_token`; CSRF tokens are not required for poker API calls.
+Returns `{ "ok": true }` and sets a `csrf_token` cookie only for older clients that still call this compatibility endpoint. The active shared backend authorizes game actions with `player_token`; current clients do not use CSRF cookies for poker API calls.
 
 ### Health
 
@@ -247,6 +247,6 @@ Common status codes:
 | `429` | Per-IP rate limit exceeded on create, join, or action requests. |
 | `422` | Request body/query validation error. |
 
-## Frontend Notes
+## State Storage
 
-The current frontend includes compatibility code for CSRF/action-token flows from the old standalone backend. The shared backend ignores the extra `action_token` field and exposes `/api/poker/csrf-token` only as a compatibility helper.
+Active games are cached in process and snapshotted to the backend database after creates, joins, state reads, AI turns, player actions, buy-backs, and next-hand transitions. This lets a fresh backend process recover a game by `game_id` and player token until the one-hour inactive-game cleanup removes it.

@@ -1,11 +1,13 @@
 import asyncio
 import base64
+import binascii
 import hashlib
 import hmac
 import json
 import logging
 import secrets
 import time
+from contextlib import asynccontextmanager, suppress
 from urllib.parse import quote
 
 from fastapi import FastAPI, Request
@@ -20,6 +22,19 @@ import os
 logger = logging.getLogger(__name__)
 
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    init_db_with_migration()
+    install_db_logging()
+    cleanup_task = asyncio.create_task(_periodic_game_cleanup())
+    try:
+        yield
+    finally:
+        cleanup_task.cancel()
+        with suppress(asyncio.CancelledError):
+            await cleanup_task
+
+
 async def _periodic_game_cleanup(interval: int = 300) -> None:
     """Prune stale poker games every `interval` seconds."""
     while True:
@@ -31,11 +46,20 @@ async def _periodic_game_cleanup(interval: int = 300) -> None:
         except Exception:
             logger.exception("Error during periodic game cleanup")
 
-app = FastAPI(title="Palmer Gill API", version="0.2.0-p5")
+app = FastAPI(title="Palmer Gill API", version="0.2.0-p5", lifespan=lifespan)
 
 AUTH_REALM = "Palmer Gill Apps"
 SESSION_COOKIE_NAME = "pg_session"
 SESSION_TTL_SECONDS = 8 * 60 * 60
+AUTH_RATE_LIMIT_WINDOW_SECONDS = int(os.getenv("APP_AUTH_RATE_LIMIT_WINDOW_SECONDS", "900"))
+AUTH_RATE_LIMIT_MAX_ATTEMPTS = int(os.getenv("APP_AUTH_RATE_LIMIT_MAX_ATTEMPTS", "8"))
+TRUST_PROXY_HEADERS = os.getenv("TRUST_PROXY_HEADERS", "false").strip().lower() in {
+    "1",
+    "true",
+    "yes",
+    "on",
+}
+_auth_failure_store: dict[str, list[float]] = {}
 PUBLIC_PATH_PREFIXES = (
     "/api/poker",
     "/poker",
@@ -74,8 +98,62 @@ def basic_auth_credentials(authorization: str | None):
         decoded = base64.b64decode(authorization.removeprefix("Basic ")).decode("utf-8")
         username, password = decoded.split(":", 1)
         return username, password
-    except (ValueError, UnicodeDecodeError):
+    except (binascii.Error, ValueError, UnicodeDecodeError):
         return None
+
+
+def client_ip(request: Request) -> str:
+    if TRUST_PROXY_HEADERS:
+        forwarded_for = request.headers.get("x-forwarded-for")
+        if forwarded_for:
+            first_ip = forwarded_for.split(",", 1)[0].strip()
+            if first_ip:
+                return first_ip
+
+        for header in ("cf-connecting-ip", "x-real-ip"):
+            value = request.headers.get(header)
+            if value:
+                return value.strip()
+
+    return request.client.host if request.client else "unknown"
+
+
+def _auth_rate_limit_key(request: Request) -> str:
+    return client_ip(request)
+
+
+def _recent_auth_failures(key: str, now: float | None = None) -> list[float]:
+    now = time.time() if now is None else now
+    cutoff = now - AUTH_RATE_LIMIT_WINDOW_SECONDS
+    attempts = [t for t in _auth_failure_store.get(key, []) if t > cutoff]
+    if attempts:
+        _auth_failure_store[key] = attempts
+    else:
+        _auth_failure_store.pop(key, None)
+    return attempts
+
+
+def auth_rate_limited(request: Request) -> bool:
+    return len(_recent_auth_failures(_auth_rate_limit_key(request))) >= AUTH_RATE_LIMIT_MAX_ATTEMPTS
+
+
+def record_auth_failure(request: Request) -> None:
+    key = _auth_rate_limit_key(request)
+    attempts = _recent_auth_failures(key)
+    attempts.append(time.time())
+    _auth_failure_store[key] = attempts
+
+
+def clear_auth_failures(request: Request) -> None:
+    _auth_failure_store.pop(_auth_rate_limit_key(request), None)
+
+
+def auth_rate_limit_response():
+    return JSONResponse(
+        {"error": "Too many sign-in attempts. Try again later."},
+        status_code=429,
+        headers={"Retry-After": str(AUTH_RATE_LIMIT_WINDOW_SECONDS)},
+    )
 
 
 def is_protected_path(path: str):
@@ -200,11 +278,15 @@ async def require_app_auth(request: Request, call_next):
     authorization = request.headers.get("authorization")
     if valid_app_credentials(authorization) or valid_app_session_cookie(request):
         request.state.app_auth_authenticated = True
+        clear_auth_failures(request)
         return await call_next(request)
 
     if authorization and app_auth_config() and (
         is_demo_path(request.url.path) or is_protected_path(request.url.path)
     ):
+        if auth_rate_limited(request):
+            return auth_rate_limit_response()
+        record_auth_failure(request)
         return auth_challenge(request)
 
     if is_demo_path(request.url.path):
@@ -226,9 +308,13 @@ async def login_session(request: Request):
     if not config:
         return JSONResponse({"error": "App authentication is not configured"}, status_code=503)
 
+    if auth_rate_limited(request):
+        return auth_rate_limit_response()
+
     try:
         body = await request.json()
     except ValueError:
+        record_auth_failure(request)
         return JSONResponse({"error": "Invalid login request"}, status_code=400)
 
     username = str(body.get("username", ""))
@@ -237,8 +323,10 @@ async def login_session(request: Request):
         secrets.compare_digest(username, config["username"])
         and secrets.compare_digest(password, config["password"])
     ):
+        record_auth_failure(request)
         return JSONResponse({"error": "Invalid username or password"}, status_code=401)
 
+    clear_auth_failures(request)
     response = JSONResponse({"ok": True, "redirect": "/admin/"})
     response.set_cookie(
         SESSION_COOKIE_NAME,
@@ -288,12 +376,6 @@ else:
         allow_methods=["*"],
         allow_headers=["*"],
     )
-
-@app.on_event("startup")
-async def startup():
-    init_db_with_migration()
-    install_db_logging()
-    asyncio.create_task(_periodic_game_cleanup())
 
 app.include_router(stocks.router)
 app.include_router(poker.router)

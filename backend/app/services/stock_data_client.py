@@ -6,7 +6,7 @@ This module provides unified access to stock data.
 - Mock Data: Explicit local/dev fallback (set USE_REAL_DATA=false)
 """
 
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from typing import Optional, List
 import logging
 import os
@@ -19,6 +19,10 @@ CACHE_TTL = {
     "financials": timedelta(hours=24),
     "company_info": timedelta(hours=24),
 }
+
+
+def utc_now():
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 def _env_flag(name: str, default: bool) -> bool:
     value = os.getenv(name)
@@ -86,7 +90,7 @@ class StockDataClient:
     def _is_cache_fresh(self, fetched_at: datetime, data_type: str = "price") -> bool:
         """Check if cached data is still fresh based on data type."""
         ttl = CACHE_TTL.get(data_type, timedelta(hours=1))
-        return datetime.utcnow() - fetched_at < ttl
+        return utc_now() - fetched_at < ttl
     
     def get_stock_data(self, ticker: str, db, force_refresh: bool = False) -> dict:
         """Get comprehensive stock data for a ticker."""
@@ -175,7 +179,7 @@ class StockDataClient:
         if not summary:
             return None
         
-        cache_age = datetime.utcnow() - summary.fetched_at
+        cache_age = utc_now() - summary.fetched_at
         max_ttl = max(CACHE_TTL.values())
         
         if not accept_stale and cache_age > max_ttl:
@@ -197,7 +201,7 @@ class StockDataClient:
             return 0
         try:
             fetched_at = datetime.fromisoformat(fetched_at_iso.replace('Z', '+00:00'))
-            age = datetime.utcnow() - fetched_at.replace(tzinfo=None)
+            age = utc_now() - fetched_at.replace(tzinfo=None)
             return round(age.total_seconds() / 3600, 1)
         except Exception:
             return 0
@@ -218,7 +222,7 @@ class StockDataClient:
         for e in data.get("earnings", []):
             record = EarningsRecord(
                 ticker=ticker,
-                fiscal_date=self._parse_date(e.get("fiscal_date")) or datetime.utcnow().date(),
+                fiscal_date=self._parse_date(e.get("fiscal_date")) or utc_now().date(),
                 period=e.get("period", "Q"),
                 reported_eps=e.get("reported_eps"),
                 estimated_eps=e.get("estimated_eps"),
@@ -267,7 +271,7 @@ class StockDataClient:
             "working_capital": data.get("working_capital"),
             # Market data
             "avg_volume": data.get("avg_volume"),
-            "fetched_at": datetime.utcnow()
+            "fetched_at": utc_now()
         }
         
         summary = db.query(StockSummary).filter(StockSummary.ticker == ticker).first()

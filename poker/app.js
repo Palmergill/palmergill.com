@@ -1,58 +1,20 @@
 // Poker Game Frontend - Oval Table Design
 const API_BASE = '';
 
-// CSRF Protection Utilities
-const CSRFManager = {
-    TOKEN_COOKIE: 'csrf_token',
-    HEADER_NAME: 'X-CSRF-Token',
-    TOKEN_TIMEOUT_MS: 3000,
+const APIRequest = {
     REQUEST_TIMEOUT_MS: 12000,
 
-    // Get CSRF token from cookie
-    getToken() {
-        const match = document.cookie.match(new RegExp(`${this.TOKEN_COOKIE}=([^;]+)`));
-        return match ? decodeURIComponent(match[1]) : null;
-    },
-
-    // Get headers for state-changing requests (POST/PUT/PATCH/DELETE)
     getHeaders(contentType = 'application/json') {
-        const headers = {
-            'Content-Type': contentType
-        };
-        const token = this.getToken();
-        if (token) {
-            headers[this.HEADER_NAME] = token;
-        }
-        return headers;
+        return { 'Content-Type': contentType };
     },
 
-    async ensureToken() {
-        if (this.getToken()) return;
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), this.TOKEN_TIMEOUT_MS);
-
-        try {
-            await fetch(`${API_BASE}/api/poker/csrf-token`, {
-                method: 'GET',
-                credentials: 'same-origin',
-                signal: controller.signal
-            });
-        } catch (error) {
-            console.log('[CSRF] Token bootstrap failed:', error.message);
-        } finally {
-            clearTimeout(timeoutId);
-        }
-    },
-
-    // Fetch wrapper that automatically adds CSRF token for state-changing methods
-    async fetch(url, options = {}, timeoutMs = 10000) {
+    async fetch(url, options = {}) {
         const method = (options.method || 'GET').toUpperCase();
         const stateChangingMethods = ['POST', 'PUT', 'PATCH', 'DELETE'];
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), this.REQUEST_TIMEOUT_MS);
 
         if (stateChangingMethods.includes(method)) {
-            await this.ensureToken();
             options.headers = {
                 ...this.getHeaders(),
                 ...(options.headers || {})
@@ -657,7 +619,6 @@ let raiseAmount = 0;
 let pollIntervalId = null;
 let pollInFlight = false;
 let isRequestPending = false; // Lock to prevent race conditions
-let actionToken = null; // Anti-replay token for security
 const AI_POLL_INTERVAL_MS = 1800;
 const CLOCKWISE_OPPONENT_SEATS = {
     1: ['seat-1'],
@@ -667,14 +628,8 @@ const CLOCKWISE_OPPONENT_SEATS = {
     5: ['seat-4', 'seat-2', 'seat-1', 'seat-3', 'seat-5']
 };
 
-// Helper function to update game state and extract action token
 function updateGameState(newState) {
     gameState = newState;
-    // Extract and store action token if present (for security)
-    if (newState.action_token) {
-        actionToken = newState.action_token;
-        delete gameState.action_token; // Remove from state to avoid confusion
-    }
 }
 let turnStartTime = null;
 let turnTimerId = null;
@@ -1146,7 +1101,7 @@ async function startGame(gameType = 'single') {
         elements.startBtn.disabled = true;
         showLoading('Starting game...');
 
-        const response = await CSRFManager.fetch(`${API_BASE}/api/poker/games`, {
+        const response = await APIRequest.fetch(`${API_BASE}/api/poker/games`, {
             method: 'POST',
             body: JSON.stringify({ 
                 player_name: name,
@@ -1276,7 +1231,7 @@ async function joinMultiplayerGame() {
     }
     
     try {
-        const response = await CSRFManager.fetch(`${API_BASE}/api/poker/games/join`, {
+        const response = await APIRequest.fetch(`${API_BASE}/api/poker/games/join`, {
             method: 'POST',
             body: JSON.stringify({ 
                 game_id: joinGameId,
@@ -1314,7 +1269,7 @@ async function startMultiplayerGame() {
     if (!gameId) return;
 
     try {
-        const response = await CSRFManager.fetch(`${API_BASE}/api/poker/games/${gameId}/start`, {
+        const response = await APIRequest.fetch(`${API_BASE}/api/poker/games/${gameId}/start`, {
             method: 'POST',
             body: JSON.stringify({ player_id: playerId, player_token: playerToken })
         });
@@ -1355,7 +1310,7 @@ function startPolling() {
         
         try {
             const response = processAI
-                ? await CSRFManager.fetch(`${API_BASE}/api/poker/games/${gameId}/process-ai`, {
+                ? await APIRequest.fetch(`${API_BASE}/api/poker/games/${gameId}/process-ai`, {
                     method: 'POST',
                     body: JSON.stringify({ player_id: playerId, player_token: playerToken })
                 })
@@ -1417,9 +1372,8 @@ async function playerAction(action) {
     try {
         const body = { player_id: playerId, player_token: playerToken, action };
         if (amount !== null) body.amount = amount;
-        if (actionToken) body.action_token = actionToken; // Include anti-replay token
         
-        const response = await CSRFManager.fetch(`${API_BASE}/api/poker/games/${gameId}/action`, {
+        const response = await APIRequest.fetch(`${API_BASE}/api/poker/games/${gameId}/action`, {
             method: 'POST',
             body: JSON.stringify(body)
         });
@@ -1529,7 +1483,7 @@ async function nextHand() {
         elements.btnNextHand.disabled = true;
         showLoading('Dealing next hand...');
 
-        const response = await CSRFManager.fetch(`${API_BASE}/api/poker/games/${gameId}/next-hand`, {
+        const response = await APIRequest.fetch(`${API_BASE}/api/poker/games/${gameId}/next-hand`, {
             method: 'POST',
             body: JSON.stringify({ player_id: playerId, player_token: playerToken })
         });
@@ -2077,7 +2031,7 @@ async function buyBackIn() {
 
     isRequestPending = true;
     try {
-        const response = await CSRFManager.fetch(`${API_BASE}/api/poker/games/${gameId}/buy-back`, {
+        const response = await APIRequest.fetch(`${API_BASE}/api/poker/games/${gameId}/buy-back`, {
             method: 'POST',
             body: JSON.stringify({ player_id: playerId, player_token: playerToken })
         });

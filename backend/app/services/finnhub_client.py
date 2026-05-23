@@ -10,9 +10,13 @@ import requests
 from typing import Optional, Dict, List
 import logging
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 logger = logging.getLogger(__name__)
+
+
+def utc_now():
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
 class FinnhubEstimatesClient:
@@ -47,7 +51,7 @@ class FinnhubEstimatesClient:
         cache_key = f"finnhub_estimates_{ticker}"
         cached = self._cache.get(cache_key)
         if cached:
-            age = datetime.utcnow() - cached["timestamp"]
+            age = utc_now() - cached["timestamp"]
             if age < timedelta(hours=6):
                 logger.info(f"[Finnhub] Using cached estimates for {ticker}")
                 return cached["data"]
@@ -109,7 +113,7 @@ class FinnhubEstimatesClient:
                 # Cache the result
                 self._cache[cache_key] = {
                     "data": earnings_data,
-                    "timestamp": datetime.utcnow()
+                    "timestamp": utc_now()
                 }
                 return earnings_data
             
