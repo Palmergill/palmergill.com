@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine, Column, String, Float, Date, DateTime, Integer, LargeBinary
+from sqlalchemy import create_engine, Column, String, Float, Date, DateTime, Integer, LargeBinary, Boolean, Text
 from sqlalchemy.orm import declarative_base
 from sqlalchemy.orm import sessionmaker
 from datetime import datetime, timezone
@@ -100,6 +100,30 @@ class LogEntry(Base):
     path = Column(String, nullable=True)  # request path if HTTP
     status_code = Column(Integer, nullable=True)
     method = Column(String, nullable=True)
+
+
+class AnalyticsEvent(Base):
+    __tablename__ = "analytics_events"
+
+    id = Column(Integer, primary_key=True, index=True)
+    timestamp = Column(DateTime, default=utc_now, index=True)
+    event_type = Column(String, index=True)  # request, page_view, app_event
+    event_name = Column(String, nullable=True, index=True)
+    app = Column(String, nullable=True, index=True)
+    path = Column(String, nullable=True, index=True)
+    method = Column(String, nullable=True)
+    status_code = Column(Integer, nullable=True, index=True)
+    outcome = Column(String, nullable=True, index=True)  # success, warning, error
+    referrer = Column(String, nullable=True)
+    user_agent = Column(String, nullable=True)
+    ip_address = Column(String, nullable=True)
+    visitor_id = Column(String, nullable=True, index=True)
+    session_id = Column(String, nullable=True, index=True)
+    is_authenticated = Column(Boolean, default=False, index=True)
+    is_admin = Column(Boolean, default=False, index=True)
+    username = Column(String, nullable=True)
+    duration_ms = Column(Float, nullable=True)
+    metadata_json = Column(Text, nullable=True)
 
 
 class PokerGameState(Base):

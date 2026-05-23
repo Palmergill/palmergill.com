@@ -1120,6 +1120,13 @@ function resolveRoll(d1, d2) {
         : (isComeOutRoll ? 'Place bets & roll' : 'Rolled ' + total);
     setStatus(statusMsg);
     showRollResultAnimation(winnings - resolvedStake);
+    window.pgAnalytics?.track?.('craps_roll_resolved', {
+        total,
+        point,
+        come_out: wasComeOutRoll,
+        net: winnings - resolvedStake,
+        balance,
+    });
 }
 
 function resetPassLineRound() {

@@ -307,10 +307,15 @@ async function sendMessage(text) {
             warnings: result.warnings,
             toolsUsed: result.tools_used,
         });
+        window.pgAnalytics?.track?.('bitcoin_chat_answered', {
+            tools_used: result.tools_used || [],
+            warnings: result.warnings?.length || 0,
+        });
         await refreshStatus();
     } catch (error) {
         loadingEl.remove();
         addMessage({ role: 'assistant', text: error.message, error: true });
+        window.pgAnalytics?.track?.('bitcoin_chat_failed', { message: error.message });
     } finally {
         setBusy(false);
         messageInput.focus();
@@ -338,6 +343,7 @@ chatForm.addEventListener('submit', async (event) => {
     event.preventDefault();
     const text = messageInput.value.trim();
     if (!text) return;
+    window.pgAnalytics?.track?.('bitcoin_chat_sent', { length: text.length });
     messageInput.value = '';
     messageInput.style.height = 'auto';
     await sendMessage(text);

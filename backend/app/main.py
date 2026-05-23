@@ -14,9 +14,11 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, RedirectResponse
+from app.database import SessionLocal
 from app.database_migration import init_db_with_migration
 from app.log_handler import install_db_logging
-from app.routers import admin, bitcoin, stocks, poker
+from app.routers import admin, analytics, bitcoin, stocks, poker
+from app.routers.analytics import cleanup_old_analytics, record_analytics_event
 import os
 
 logger = logging.getLogger(__name__)
@@ -27,12 +29,16 @@ async def lifespan(app: FastAPI):
     init_db_with_migration()
     install_db_logging()
     cleanup_task = asyncio.create_task(_periodic_game_cleanup())
+    analytics_cleanup_task = asyncio.create_task(_periodic_retention_cleanup())
     try:
         yield
     finally:
         cleanup_task.cancel()
+        analytics_cleanup_task.cancel()
         with suppress(asyncio.CancelledError):
             await cleanup_task
+        with suppress(asyncio.CancelledError):
+            await analytics_cleanup_task
 
 
 async def _periodic_game_cleanup(interval: int = 300) -> None:
@@ -45,6 +51,27 @@ async def _periodic_game_cleanup(interval: int = 300) -> None:
                 logger.info("Cleaned up %d stale poker game(s)", removed)
         except Exception:
             logger.exception("Error during periodic game cleanup")
+
+
+async def _periodic_retention_cleanup(interval: int = 6 * 60 * 60) -> None:
+    """Prune analytics and log data on a 90-day retention window."""
+    while True:
+        await asyncio.sleep(interval)
+        try:
+            db = SessionLocal()
+            try:
+                analytics_removed = cleanup_old_analytics(db)
+                logs_removed = admin.cleanup_old_logs(db)
+            finally:
+                db.close()
+            if analytics_removed or logs_removed:
+                logger.info(
+                    "Deleted %d analytics event(s) and %d log entry(s) older than 90 days",
+                    analytics_removed,
+                    logs_removed,
+                )
+        except Exception:
+            logger.exception("Error during periodic retention cleanup")
 
 app = FastAPI(title="Palmer Gill API", version="0.2.0-p5", lifespan=lifespan)
 
@@ -61,6 +88,7 @@ TRUST_PROXY_HEADERS = os.getenv("TRUST_PROXY_HEADERS", "false").strip().lower() 
 }
 _auth_failure_store: dict[str, list[float]] = {}
 PUBLIC_PATH_PREFIXES = (
+    "/api/analytics",
     "/api/poker",
     "/poker",
     "/craps",
@@ -270,6 +298,70 @@ def missing_auth_config():
     return PlainTextResponse("App authentication is not configured", status_code=503)
 
 
+def _should_record_request_analytics(path: str) -> bool:
+    ignored_prefixes = (
+        "/api/analytics",
+        "/assets",
+        "/shared",
+        "/favicon.ico",
+    )
+    return not any(path == prefix or path.startswith(f"{prefix}/") for prefix in ignored_prefixes)
+
+
+def _request_cookie(request: Request, name: str) -> str | None:
+    value = request.cookies.get(name)
+    return value if value and len(value) <= 120 else None
+
+
+def _analytics_username(request: Request) -> str | None:
+    if not getattr(request.state, "app_auth_authenticated", False):
+        return None
+    config = app_auth_config()
+    return config["username"] if config else None
+
+
+@app.middleware("http")
+async def record_request_analytics(request: Request, call_next):
+    started = time.perf_counter()
+    response = None
+    error_raised = False
+    try:
+        response = await call_next(request)
+        return response
+    except Exception:
+        error_raised = True
+        raise
+    finally:
+        path = request.url.path
+        if _should_record_request_analytics(path):
+            status_code = 500 if error_raised else getattr(response, "status_code", None)
+            try:
+                db = SessionLocal()
+                try:
+                    record_analytics_event(
+                        db,
+                        event_type="request",
+                        event_name="http_request",
+                        app=analytics.app_from_path(path),
+                        path=path,
+                        method=request.method,
+                        status_code=status_code,
+                        referrer=request.headers.get("referer"),
+                        user_agent=request.headers.get("user-agent"),
+                        ip_address=client_ip(request),
+                        visitor_id=_request_cookie(request, "pg_visitor_id"),
+                        session_id=_request_cookie(request, "pg_session_id"),
+                        is_authenticated=bool(getattr(request.state, "app_auth_authenticated", False)),
+                        is_admin=path == "/admin" or path.startswith("/admin/") or path.startswith("/api/admin"),
+                        username=_analytics_username(request),
+                        duration_ms=(time.perf_counter() - started) * 1000,
+                    )
+                finally:
+                    db.close()
+            except Exception:
+                logger.exception("Failed to record request analytics")
+
+
 @app.middleware("http")
 async def require_app_auth(request: Request, call_next):
     request.state.demo_mode = False
@@ -380,6 +472,7 @@ else:
 app.include_router(stocks.router)
 app.include_router(poker.router)
 app.include_router(bitcoin.router)
+app.include_router(analytics.router)
 app.include_router(admin.router)
 
 @app.get("/health")

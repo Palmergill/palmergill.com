@@ -1114,6 +1114,7 @@ async function startGame(gameType = 'single') {
         }
 
         const data = await response.json();
+        window.pgAnalytics?.track?.('poker_game_started', { game_type: gameType });
         gameId = data.game_id;
         playerId = data.player_id;
         playerToken = data.player_token;
@@ -1244,6 +1245,7 @@ async function joinMultiplayerGame() {
         }
         
         const data = await response.json();
+        window.pgAnalytics?.track?.('poker_multiplayer_joined');
         gameId = data.game_id;
         playerId = data.player_id;
         playerToken = data.player_token;

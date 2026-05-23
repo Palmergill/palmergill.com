@@ -7,6 +7,7 @@ const AUTH_RATE_LIMIT_MAX_ATTEMPTS = Number(process.env.APP_AUTH_RATE_LIMIT_MAX_
 const authFailureStore = new Map();
 
 const PUBLIC_PREFIXES = [
+  '/api/analytics',
   '/poker',
   '/craps',
   '/api/poker',

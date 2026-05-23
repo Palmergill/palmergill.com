@@ -4,15 +4,24 @@ Admin API router - exposes log data for the admin dashboard.
 Endpoints are mounted under /api/admin and protected by the same Basic Auth
 middleware that protects /api/*.
 """
+from __future__ import annotations
+
 import os
+import csv
+import io
+from collections import Counter, defaultdict
+from datetime import timedelta
+from urllib.parse import urlparse
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import Response
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy.orm import Session
-from sqlalchemy import desc
+from sqlalchemy import desc, or_
 
-from app.database import LogEntry, get_db
+from app.database import AnalyticsEvent, LogEntry, get_db, utc_now
+from app.routers.analytics import RETENTION_DAYS, cleanup_old_analytics, classify_outcome
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
@@ -48,23 +57,177 @@ class FileLogResponse(BaseModel):
     truncated: bool
 
 
+class LogSummaryResponse(BaseModel):
+    success: int
+    warning: int
+    error: int
+    total: int
+
+
+class AnalyticsEventOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    timestamp: str
+    event_type: str
+    event_name: Optional[str] = None
+    app: Optional[str] = None
+    path: Optional[str] = None
+    method: Optional[str] = None
+    status_code: Optional[int] = None
+    outcome: Optional[str] = None
+    referrer: Optional[str] = None
+    user_agent: Optional[str] = None
+    ip_address: Optional[str] = None
+    visitor_id: Optional[str] = None
+    session_id: Optional[str] = None
+    is_authenticated: bool = False
+    is_admin: bool = False
+    username: Optional[str] = None
+    duration_ms: Optional[float] = None
+    metadata_json: Optional[str] = None
+
+
+class AnalyticsEventsResponse(BaseModel):
+    entries: List[AnalyticsEventOut]
+    total: int
+
+
+class RetentionResponse(BaseModel):
+    retention_days: int
+    analytics_total: int
+    logs_total: int
+    analytics_expired: int
+    logs_expired: int
+
+
+def _cutoff(hours: int):
+    return utc_now() - timedelta(hours=hours)
+
+
+def _iso(value):
+    return value.isoformat() if value else ""
+
+
+def _top(counter: Counter, limit: int = 8):
+    return [{"name": str(name or "(unknown)"), "count": count} for name, count in counter.most_common(limit)]
+
+
+def _referrer_host(referrer: str | None) -> str:
+    if not referrer:
+        return "direct"
+    try:
+        parsed = urlparse(referrer)
+        return parsed.netloc or referrer
+    except ValueError:
+        return referrer
+
+
+def _csv_response(filename: str, headers: list[str], rows: list[list[object]]) -> Response:
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(headers)
+    writer.writerows(rows)
+    return Response(
+        content=output.getvalue(),
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+def _analytics_out(row: AnalyticsEvent) -> AnalyticsEventOut:
+    return AnalyticsEventOut(
+        id=row.id,
+        timestamp=_iso(row.timestamp),
+        event_type=row.event_type,
+        event_name=row.event_name,
+        app=row.app,
+        path=row.path,
+        method=row.method,
+        status_code=row.status_code,
+        outcome=row.outcome,
+        referrer=row.referrer,
+        user_agent=row.user_agent,
+        ip_address=row.ip_address,
+        visitor_id=row.visitor_id,
+        session_id=row.session_id,
+        is_authenticated=bool(row.is_authenticated),
+        is_admin=bool(row.is_admin),
+        username=row.username,
+        duration_ms=row.duration_ms,
+        metadata_json=row.metadata_json,
+    )
+
+
+def cleanup_old_logs(db: Session, days: int = RETENTION_DAYS) -> int:
+    cutoff = utc_now() - timedelta(days=days)
+    deleted = db.query(LogEntry).filter(LogEntry.timestamp < cutoff).delete()
+    db.commit()
+    return deleted
+
+
+def _apply_log_filters(query, level=None, outcome=None, q=None, after_id=None):
+    if level:
+        query = query.filter(LogEntry.level == level.upper())
+    if outcome:
+        outcome = outcome.lower()
+        if outcome == "success":
+            query = query.filter(LogEntry.level.notin_(["WARNING", "ERROR", "CRITICAL"]))
+            query = query.filter((LogEntry.status_code == None) | (LogEntry.status_code < 400))  # noqa: E711
+        elif outcome == "warning":
+            query = query.filter(
+                (LogEntry.level == "WARNING")
+                | ((LogEntry.status_code >= 400) & (LogEntry.status_code < 500))
+            )
+        elif outcome == "error":
+            query = query.filter(
+                LogEntry.level.in_(["ERROR", "CRITICAL"])
+                | (LogEntry.status_code >= 500)
+            )
+    if q:
+        like = f"%{q}%"
+        query = query.filter(
+            or_(
+                LogEntry.message.ilike(like),
+                LogEntry.path.ilike(like),
+                LogEntry.logger_name.ilike(like),
+                LogEntry.method.ilike(like),
+            )
+        )
+    if after_id is not None:
+        query = query.filter(LogEntry.id > after_id)
+    return query
+
+
+def _apply_analytics_filters(query, hours=24, event_type=None, app=None, outcome=None, q=None):
+    query = query.filter(AnalyticsEvent.timestamp >= _cutoff(hours))
+    if event_type:
+        query = query.filter(AnalyticsEvent.event_type == event_type)
+    if app:
+        query = query.filter(AnalyticsEvent.app == app)
+    if outcome:
+        query = query.filter(AnalyticsEvent.outcome == outcome)
+    if q:
+        like = f"%{q}%"
+        query = query.filter(
+            AnalyticsEvent.path.ilike(like)
+            | AnalyticsEvent.event_name.ilike(like)
+            | AnalyticsEvent.referrer.ilike(like)
+        )
+    return query
+
+
 @router.get("/logs", response_model=LogsResponse)
 def list_logs(
     level: Optional[str] = Query(None, description="Filter by level: DEBUG/INFO/WARNING/ERROR"),
+    outcome: Optional[str] = Query(None, description="Filter by outcome: success/warning/error"),
     q: Optional[str] = Query(None, description="Substring search across message"),
     limit: int = Query(200, ge=1, le=5000),
     after_id: Optional[int] = Query(None, description="Only return entries with id > after_id (for live tail)"),
     db: Session = Depends(get_db),
 ):
     """Return structured log entries from the database, newest first."""
-    query = db.query(LogEntry)
-
-    if level:
-        query = query.filter(LogEntry.level == level.upper())
-    if q:
-        query = query.filter(LogEntry.message.ilike(f"%{q}%"))
-    if after_id is not None:
-        query = query.filter(LogEntry.id > after_id)
+    query = _apply_log_filters(db.query(LogEntry), level, outcome, q, after_id)
 
     total = query.count()
     rows = query.order_by(desc(LogEntry.id)).limit(limit).all()
@@ -85,12 +248,66 @@ def list_logs(
     return LogsResponse(entries=entries, total=total)
 
 
+@router.get("/logs/export")
+def export_logs(
+    level: Optional[str] = Query(None),
+    outcome: Optional[str] = Query(None),
+    q: Optional[str] = Query(None),
+    limit: int = Query(5000, ge=1, le=5000),
+    db: Session = Depends(get_db),
+):
+    query = _apply_log_filters(db.query(LogEntry), level, outcome, q)
+    rows = query.order_by(desc(LogEntry.id)).limit(limit).all()
+    return _csv_response(
+        "admin-logs.csv",
+        ["id", "timestamp", "level", "logger", "method", "path", "status_code", "message"],
+        [
+            [
+                row.id,
+                _iso(row.timestamp),
+                row.level,
+                row.logger_name,
+                row.method,
+                row.path,
+                row.status_code,
+                row.message,
+            ]
+            for row in rows
+        ],
+    )
+
+
+@router.get("/logs/summary", response_model=LogSummaryResponse)
+def summarize_logs(
+    hours: int = Query(24, ge=1, le=2160),
+    db: Session = Depends(get_db),
+):
+    """Return condensed success/warning/error log counts."""
+    rows = db.query(LogEntry).filter(LogEntry.timestamp >= _cutoff(hours)).all()
+    counts = Counter()
+    for row in rows:
+        counts[classify_outcome(row.status_code, row.level)] += 1
+
+    return LogSummaryResponse(
+        success=counts["success"],
+        warning=counts["warning"],
+        error=counts["error"],
+        total=sum(counts.values()),
+    )
+
+
 @router.delete("/logs")
 def clear_logs(db: Session = Depends(get_db)):
     """Delete all stored log entries."""
     deleted = db.query(LogEntry).delete()
     db.commit()
     return {"deleted": deleted}
+
+
+@router.delete("/logs/retention")
+def prune_logs(db: Session = Depends(get_db)):
+    deleted = cleanup_old_logs(db)
+    return {"deleted": deleted, "retention_days": RETENTION_DAYS}
 
 
 @router.get("/logs/file", response_model=FileLogResponse)
@@ -124,3 +341,255 @@ def read_log_file(
         path=LOG_FILE_PATH,
         truncated=truncated,
     )
+
+
+@router.get("/analytics/summary")
+def analytics_summary(
+    hours: int = Query(24, ge=1, le=2160),
+    db: Session = Depends(get_db),
+):
+    """Return dashboard-ready analytics aggregates."""
+    cutoff = _cutoff(hours)
+    rows = db.query(AnalyticsEvent).filter(AnalyticsEvent.timestamp >= cutoff).all()
+
+    outcome_counts = Counter(row.outcome or "success" for row in rows)
+    event_type_counts = Counter(row.event_type or "unknown" for row in rows)
+    top_pages = Counter(row.path for row in rows if row.event_type == "page_view" and row.path)
+    top_apps = Counter(row.app for row in rows if row.app)
+    top_events = Counter(row.event_name for row in rows if row.event_type == "app_event" and row.event_name)
+    top_referrers = Counter(_referrer_host(row.referrer) for row in rows if row.event_type == "page_view")
+    authenticated = sum(1 for row in rows if row.is_authenticated)
+    admin = sum(1 for row in rows if row.is_admin)
+    visitors = {row.visitor_id for row in rows if row.visitor_id}
+    sessions = {row.session_id for row in rows if row.session_id}
+    avg_duration_values = [row.duration_ms for row in rows if row.duration_ms is not None and row.event_type == "request"]
+    avg_duration_ms = sum(avg_duration_values) / len(avg_duration_values) if avg_duration_values else 0
+
+    recent_errors = [
+        {
+            "id": row.id,
+            "timestamp": _iso(row.timestamp),
+            "app": row.app,
+            "path": row.path,
+            "event_name": row.event_name,
+            "status_code": row.status_code,
+            "duration_ms": row.duration_ms,
+        }
+        for row in sorted(
+            (r for r in rows if r.outcome == "error"),
+            key=lambda item: item.timestamp,
+            reverse=True,
+        )[:8]
+    ]
+
+    return {
+        "window_hours": hours,
+        "total": len(rows),
+        "page_views": event_type_counts["page_view"],
+        "requests": event_type_counts["request"],
+        "app_events": event_type_counts["app_event"],
+        "unique_visitors": len(visitors),
+        "sessions": len(sessions),
+        "success": outcome_counts["success"],
+        "warning": outcome_counts["warning"],
+        "error": outcome_counts["error"],
+        "authenticated": authenticated,
+        "public": len(rows) - authenticated,
+        "admin": admin,
+        "avg_duration_ms": round(avg_duration_ms, 1),
+        "top_pages": _top(top_pages),
+        "top_apps": _top(top_apps),
+        "top_events": _top(top_events),
+        "top_referrers": _top(top_referrers),
+        "recent_errors": recent_errors,
+    }
+
+
+@router.get("/analytics/timeseries")
+def analytics_timeseries(
+    hours: int = Query(24, ge=1, le=2160),
+    db: Session = Depends(get_db),
+):
+    """Return hourly success/warning/error buckets for the selected window."""
+    cutoff = _cutoff(hours)
+    rows = db.query(AnalyticsEvent).filter(AnalyticsEvent.timestamp >= cutoff).all()
+    buckets = defaultdict(lambda: {"success": 0, "warning": 0, "error": 0, "page_views": 0, "requests": 0})
+
+    for row in rows:
+        if not row.timestamp:
+            continue
+        bucket_time = row.timestamp.replace(minute=0, second=0, microsecond=0)
+        bucket = buckets[bucket_time]
+        bucket[row.outcome or "success"] += 1
+        if row.event_type == "page_view":
+            bucket["page_views"] += 1
+        if row.event_type == "request":
+            bucket["requests"] += 1
+
+    return {
+        "points": [
+            {"timestamp": _iso(timestamp), **values}
+            for timestamp, values in sorted(buckets.items())
+        ]
+    }
+
+
+@router.get("/analytics/events", response_model=AnalyticsEventsResponse)
+def list_analytics_events(
+    event_type: Optional[str] = Query(None),
+    app: Optional[str] = Query(None),
+    outcome: Optional[str] = Query(None),
+    q: Optional[str] = Query(None),
+    hours: int = Query(24, ge=1, le=2160),
+    limit: int = Query(200, ge=1, le=5000),
+    db: Session = Depends(get_db),
+):
+    query = _apply_analytics_filters(db.query(AnalyticsEvent), hours, event_type, app, outcome, q)
+    total = query.count()
+    rows = query.order_by(desc(AnalyticsEvent.id)).limit(limit).all()
+    return AnalyticsEventsResponse(
+        total=total,
+        entries=[_analytics_out(row) for row in rows],
+    )
+
+
+@router.get("/analytics/export")
+def export_analytics_events(
+    event_type: Optional[str] = Query(None),
+    app: Optional[str] = Query(None),
+    outcome: Optional[str] = Query(None),
+    q: Optional[str] = Query(None),
+    hours: int = Query(24, ge=1, le=2160),
+    limit: int = Query(5000, ge=1, le=5000),
+    db: Session = Depends(get_db),
+):
+    query = _apply_analytics_filters(db.query(AnalyticsEvent), hours, event_type, app, outcome, q)
+    rows = query.order_by(desc(AnalyticsEvent.id)).limit(limit).all()
+    return _csv_response(
+        "analytics-events.csv",
+        [
+            "id", "timestamp", "type", "event", "app", "method", "path", "status_code",
+            "outcome", "duration_ms", "admin", "authenticated", "username", "visitor_id",
+            "session_id", "ip_address", "referrer", "user_agent", "metadata_json",
+        ],
+        [
+            [
+                row.id,
+                _iso(row.timestamp),
+                row.event_type,
+                row.event_name,
+                row.app,
+                row.method,
+                row.path,
+                row.status_code,
+                row.outcome,
+                row.duration_ms,
+                row.is_admin,
+                row.is_authenticated,
+                row.username,
+                row.visitor_id,
+                row.session_id,
+                row.ip_address,
+                row.referrer,
+                row.user_agent,
+                row.metadata_json,
+            ]
+            for row in rows
+        ],
+    )
+
+
+@router.get("/analytics/slow")
+def slow_analytics_events(
+    hours: int = Query(24, ge=1, le=2160),
+    limit: int = Query(8, ge=1, le=50),
+    db: Session = Depends(get_db),
+):
+    rows = (
+        db.query(AnalyticsEvent)
+        .filter(AnalyticsEvent.timestamp >= _cutoff(hours))
+        .filter(AnalyticsEvent.duration_ms != None)  # noqa: E711
+        .order_by(desc(AnalyticsEvent.duration_ms))
+        .limit(limit)
+        .all()
+    )
+    return {"entries": [_analytics_out(row) for row in rows]}
+
+
+@router.get("/analytics/error-groups")
+def analytics_error_groups(
+    hours: int = Query(24, ge=1, le=2160),
+    limit: int = Query(8, ge=1, le=50),
+    db: Session = Depends(get_db),
+):
+    rows = (
+        db.query(AnalyticsEvent)
+        .filter(AnalyticsEvent.timestamp >= _cutoff(hours))
+        .filter(AnalyticsEvent.outcome == "error")
+        .all()
+    )
+    groups = {}
+    for row in rows:
+        key = (row.app or "", row.path or "", row.event_name or "", row.status_code or "")
+        group = groups.setdefault(
+            key,
+            {
+                "app": row.app,
+                "path": row.path,
+                "event_name": row.event_name,
+                "status_code": row.status_code,
+                "count": 0,
+                "last_seen": _iso(row.timestamp),
+                "sample_id": row.id,
+            },
+        )
+        group["count"] += 1
+        if row.timestamp and _iso(row.timestamp) >= group["last_seen"]:
+            group["last_seen"] = _iso(row.timestamp)
+            group["sample_id"] = row.id
+
+    return {
+        "groups": sorted(groups.values(), key=lambda item: (item["count"], item["last_seen"]), reverse=True)[:limit]
+    }
+
+
+@router.get("/analytics/apps")
+def analytics_apps(
+    hours: int = Query(24, ge=1, le=2160),
+    db: Session = Depends(get_db),
+):
+    rows = db.query(AnalyticsEvent.app).filter(AnalyticsEvent.timestamp >= _cutoff(hours)).distinct().all()
+    return {"apps": sorted(row[0] for row in rows if row[0])}
+
+
+@router.delete("/analytics/retention")
+def prune_analytics(db: Session = Depends(get_db)):
+    deleted = cleanup_old_analytics(db)
+    return {"deleted": deleted, "retention_days": RETENTION_DAYS}
+
+
+@router.get("/retention", response_model=RetentionResponse)
+def retention_status(db: Session = Depends(get_db)):
+    cutoff = utc_now() - timedelta(days=RETENTION_DAYS)
+    analytics_total = db.query(AnalyticsEvent).count()
+    logs_total = db.query(LogEntry).count()
+    analytics_expired = db.query(AnalyticsEvent).filter(AnalyticsEvent.timestamp < cutoff).count()
+    logs_expired = db.query(LogEntry).filter(LogEntry.timestamp < cutoff).count()
+    return RetentionResponse(
+        retention_days=RETENTION_DAYS,
+        analytics_total=analytics_total,
+        logs_total=logs_total,
+        analytics_expired=analytics_expired,
+        logs_expired=logs_expired,
+    )
+
+
+@router.delete("/retention")
+def prune_retained_data(db: Session = Depends(get_db)):
+    analytics_deleted = cleanup_old_analytics(db)
+    logs_deleted = cleanup_old_logs(db)
+    return {
+        "analytics_deleted": analytics_deleted,
+        "logs_deleted": logs_deleted,
+        "retention_days": RETENTION_DAYS,
+    }

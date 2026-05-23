@@ -547,6 +547,7 @@ document.addEventListener('DOMContentLoaded', () => {
             showShelbyEasterEgg();
             return;
         }
+        window.pgAnalytics?.track?.('stock_ticker_searched', { ticker });
         
         // Visual feedback (only if button has spinner elements)
         const btnText = searchBtn?.querySelector?.('.btn-text');
@@ -884,6 +885,11 @@ document.addEventListener('DOMContentLoaded', () => {
             updateLoadingProgress(3);
             
             displayResults(data);
+            window.pgAnalytics?.track?.('stock_ticker_loaded', {
+                ticker,
+                demo: Boolean(data._demo),
+                attempt,
+            });
             
         } catch (err) {
             console.error('Error in loadStock fetch:', err);
@@ -929,6 +935,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     currentRetryInterval = countdownInterval;
                 }
             } else {
+                window.pgAnalytics?.track?.('stock_ticker_failed', {
+                    ticker,
+                    message: err.message,
+                    attempt,
+                });
                 // Show final attempt message
                 const retryCountdown = document.getElementById('retryCountdown');
                 if (retryCountdown) {

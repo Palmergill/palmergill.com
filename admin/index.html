@@ -3,82 +3,256 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin · Logs</title>
+    <title>Admin · Palmer Gill</title>
     <link rel="stylesheet" href="/shared/site-nav.css?v=6">
-    <link rel="stylesheet" href="/admin/style.css?v=1">
+    <link rel="stylesheet" href="/admin/style.css?v=2">
 </head>
 <body>
     <div class="container">
         <header>
             <div class="header-content">
-                <h1>Admin · Logs</h1>
-                <span class="subtitle">Backend log viewer</span>
+                <div>
+                    <h1>Admin</h1>
+                    <span class="subtitle">Traffic, app analytics, and logs</span>
+                </div>
+                <div class="header-actions">
+                    <label for="windowSelect">Window</label>
+                    <select id="windowSelect">
+                        <option value="1">1 hour</option>
+                        <option value="24" selected>24 hours</option>
+                        <option value="168">7 days</option>
+                        <option value="720">30 days</option>
+                        <option value="2160">90 days</option>
+                    </select>
+                    <button id="refreshBtn" class="btn">Refresh</button>
+                </div>
             </div>
         </header>
 
         <main>
-            <div class="tabs">
-                <button class="tab-btn active" data-tab="db">Structured (DB)</button>
-                <button class="tab-btn" data-tab="file">File (backend.log)</button>
-            </div>
-
-            <section class="controls">
-                <div class="control-group">
-                    <label for="levelFilter">Level</label>
-                    <select id="levelFilter">
-                        <option value="">All</option>
-                        <option value="DEBUG">DEBUG</option>
-                        <option value="INFO">INFO</option>
-                        <option value="WARNING">WARNING</option>
-                        <option value="ERROR">ERROR</option>
-                        <option value="CRITICAL">CRITICAL</option>
-                    </select>
-                </div>
-                <div class="control-group flex-grow">
-                    <label for="searchInput">Search</label>
-                    <input type="text" id="searchInput" placeholder="Filter messages…">
-                </div>
-                <div class="control-group">
-                    <label for="limitInput">Limit</label>
-                    <input type="number" id="limitInput" value="200" min="1" max="5000">
-                </div>
-                <div class="control-group">
-                    <label for="autoRefreshToggle" class="checkbox-label">
-                        <input type="checkbox" id="autoRefreshToggle" checked>
-                        Live tail (3s)
-                    </label>
-                </div>
-                <button id="refreshBtn" class="btn">Refresh</button>
-                <button id="clearBtn" class="btn btn-danger">Clear DB Logs</button>
-            </section>
+            <nav class="tabs" aria-label="Admin sections">
+                <button class="tab-btn active" data-view="dashboard">Dashboard</button>
+                <button class="tab-btn" data-view="analytics">Analytics</button>
+                <button class="tab-btn" data-view="logs">Logs</button>
+            </nav>
 
             <div id="status" class="status"></div>
 
-            <!-- DB Logs Table -->
-            <section id="dbLogsSection" class="logs-section">
+            <section id="dashboardView" class="view">
+                <div class="metric-grid">
+                    <article class="metric-card">
+                        <span>Page views</span>
+                        <strong id="metricPageViews">--</strong>
+                    </article>
+                    <article class="metric-card">
+                        <span>Unique visitors</span>
+                        <strong id="metricVisitors">--</strong>
+                    </article>
+                    <article class="metric-card">
+                        <span>Success</span>
+                        <strong id="metricSuccess">--</strong>
+                    </article>
+                    <article class="metric-card warning">
+                        <span>Warnings</span>
+                        <strong id="metricWarning">--</strong>
+                    </article>
+                    <article class="metric-card error">
+                        <span>Errors</span>
+                        <strong id="metricError">--</strong>
+                    </article>
+                    <article class="metric-card">
+                        <span>Admin events</span>
+                        <strong id="metricAdmin">--</strong>
+                    </article>
+                    <article class="metric-card">
+                        <span>Avg request</span>
+                        <strong id="metricDuration">--</strong>
+                    </article>
+                </div>
+
+                <div class="panel-grid">
+                    <section class="panel">
+                        <h2>Traffic over time</h2>
+                        <div id="timelineChart" class="chart-box" aria-label="Traffic over time">
+                            <canvas id="trafficChart"></canvas>
+                        </div>
+                    </section>
+                    <section class="panel">
+                        <h2>Outcome mix</h2>
+                        <div id="outcomeChartBox" class="chart-box compact-chart" aria-label="Success warning error mix">
+                            <canvas id="outcomeChart"></canvas>
+                        </div>
+                    </section>
+                    <section class="panel">
+                        <h2>Top apps chart</h2>
+                        <div id="appsChartBox" class="chart-box compact-chart" aria-label="Top apps by event count">
+                            <canvas id="appsChart"></canvas>
+                        </div>
+                    </section>
+                    <section class="panel">
+                        <h2>Recent errors</h2>
+                        <div id="recentErrors" class="compact-list"></div>
+                    </section>
+                    <section class="panel">
+                        <h2>Repeated errors</h2>
+                        <div id="errorGroups" class="compact-list"></div>
+                    </section>
+                    <section class="panel">
+                        <h2>Slow requests</h2>
+                        <div id="slowRequests" class="compact-list"></div>
+                    </section>
+                    <section class="panel">
+                        <h2>Top pages</h2>
+                        <div id="topPages" class="compact-list"></div>
+                    </section>
+                    <section class="panel">
+                        <h2>Top apps</h2>
+                        <div id="topApps" class="compact-list"></div>
+                    </section>
+                    <section class="panel">
+                        <h2>Top referrers</h2>
+                        <div id="topReferrers" class="compact-list"></div>
+                    </section>
+                    <section class="panel">
+                        <h2>App events</h2>
+                        <div id="topEvents" class="compact-list"></div>
+                    </section>
+                    <section class="panel">
+                        <h2>Retention</h2>
+                        <div id="retentionStatus" class="compact-list"></div>
+                    </section>
+                </div>
+            </section>
+
+            <section id="analyticsView" class="view hidden">
+                <section class="controls">
+                    <div class="control-group">
+                        <label for="eventTypeFilter">Type</label>
+                        <select id="eventTypeFilter">
+                            <option value="">All</option>
+                            <option value="page_view">Page views</option>
+                            <option value="request">Requests</option>
+                            <option value="app_event">App events</option>
+                        </select>
+                    </div>
+                    <div class="control-group">
+                        <label for="outcomeFilter">Outcome</label>
+                        <select id="outcomeFilter">
+                            <option value="">All</option>
+                            <option value="success">Success</option>
+                            <option value="warning">Warning</option>
+                            <option value="error">Error</option>
+                        </select>
+                    </div>
+                    <div class="control-group">
+                        <label for="appFilter">App</label>
+                        <select id="appFilter">
+                            <option value="">All</option>
+                        </select>
+                    </div>
+                    <div class="control-group flex-grow">
+                        <label for="analyticsSearch">Search</label>
+                        <input type="text" id="analyticsSearch" placeholder="Path, event, referrer">
+                    </div>
+                    <div class="control-group">
+                        <label for="analyticsLimit">Limit</label>
+                        <input type="number" id="analyticsLimit" value="200" min="1" max="5000">
+                    </div>
+                    <button id="exportAnalyticsBtn" class="btn" type="button">Export CSV</button>
+                </section>
+
                 <table class="logs-table">
                     <thead>
                         <tr>
                             <th class="col-time">Time</th>
-                            <th class="col-level">Level</th>
-                            <th class="col-logger">Logger</th>
-                            <th class="col-msg">Message</th>
+                            <th>Type</th>
+                            <th>Outcome</th>
+                            <th>App</th>
+                            <th>Path / Event</th>
+                            <th>Status</th>
+                            <th>Visitor</th>
                         </tr>
                     </thead>
-                    <tbody id="dbLogsBody">
-                        <tr><td colspan="4" class="empty">Loading…</td></tr>
+                    <tbody id="analyticsBody">
+                        <tr><td colspan="7" class="empty">Loading...</td></tr>
                     </tbody>
                 </table>
             </section>
 
-            <!-- File Logs -->
-            <section id="fileLogsSection" class="logs-section hidden">
-                <pre id="fileLogsPre" class="file-logs">Loading…</pre>
+            <section id="logsView" class="view hidden">
+                <div class="tabs compact">
+                    <button class="tab-btn active" data-log-tab="db">Structured DB</button>
+                    <button class="tab-btn" data-log-tab="file">File tail</button>
+                </div>
+
+                <section class="controls">
+                    <div class="control-group">
+                        <label for="levelFilter">Level</label>
+                        <select id="levelFilter">
+                            <option value="">All</option>
+                            <option value="DEBUG">DEBUG</option>
+                            <option value="INFO">INFO</option>
+                            <option value="WARNING">WARNING</option>
+                            <option value="ERROR">ERROR</option>
+                            <option value="CRITICAL">CRITICAL</option>
+                        </select>
+                    </div>
+                    <div class="control-group">
+                        <label for="logOutcomeFilter">Outcome</label>
+                        <select id="logOutcomeFilter">
+                            <option value="">All</option>
+                            <option value="success">Success</option>
+                            <option value="warning">Warning</option>
+                            <option value="error">Error</option>
+                        </select>
+                    </div>
+                    <div class="control-group flex-grow">
+                        <label for="searchInput">Search</label>
+                        <input type="text" id="searchInput" placeholder="Filter messages">
+                    </div>
+                    <div class="control-group">
+                        <label for="limitInput">Limit</label>
+                        <input type="number" id="limitInput" value="200" min="1" max="5000">
+                    </div>
+                    <div class="control-group">
+                        <label for="autoRefreshToggle" class="checkbox-label">
+                            <input type="checkbox" id="autoRefreshToggle" checked>
+                            Live tail
+                        </label>
+                    </div>
+                    <button id="clearBtn" class="btn btn-danger">Clear DB Logs</button>
+                    <button id="exportLogsBtn" class="btn" type="button">Export CSV</button>
+                </section>
+
+                <section id="dbLogsSection" class="logs-section">
+                    <table class="logs-table">
+                        <thead>
+                            <tr>
+                                <th class="col-time">Time</th>
+                                <th class="col-level">Level</th>
+                                <th>Status</th>
+                                <th>Method</th>
+                                <th>Path</th>
+                                <th class="col-logger">Logger</th>
+                                <th class="col-msg">Message</th>
+                            </tr>
+                        </thead>
+                        <tbody id="dbLogsBody">
+                            <tr><td colspan="7" class="empty">Loading...</td></tr>
+                        </tbody>
+                    </table>
+                </section>
+
+                <section id="fileLogsSection" class="logs-section hidden">
+                    <pre id="fileLogsPre" class="file-logs">Loading...</pre>
+                </section>
             </section>
         </main>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <script src="/shared/site-nav.js?v=6"></script>
-    <script src="/admin/app.js?v=1"></script>
+    <script src="/shared/analytics.js?v=1"></script>
+    <script src="/admin/app.js?v=2"></script>
 </body>
 </html>

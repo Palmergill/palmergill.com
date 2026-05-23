@@ -57,9 +57,11 @@
 
             const data = await response.json().catch(() => ({}));
             if (!response.ok) {
+                window.pgAnalytics?.track?.("login_failed", { status: response.status });
                 throw new Error(data.error || "Unable to sign in.");
             }
 
+            window.pgAnalytics?.track?.("login_success");
             setStatus("Signed in. Opening admin.", true);
             window.location.assign(safeNextPath());
         } catch (error) {

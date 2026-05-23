@@ -291,6 +291,13 @@
         if (dealerAnimation) return;
         const previousState = cloneState(state);
         state = action(state);
+        if (previousState.status !== "roundOver" && state.status === "roundOver") {
+            window.pgAnalytics?.track?.("blackjack_round_completed", {
+                balance: state.balance,
+                results: state.playerHands.map((hand) => hand.result || "unknown"),
+                dealer_total: game.handValue(state.dealerHand).total,
+            });
+        }
 
         if (shouldAnimateDealerTurn(previousState, state)) {
             animateDealerTurn();
@@ -313,6 +320,7 @@
     els.betDownButton.addEventListener("click", () => updateBet(state.currentBet - 5));
     els.betUpButton.addEventListener("click", () => updateBet(state.currentBet + 5));
     els.dealButton.addEventListener("click", () => {
+        window.pgAnalytics?.track?.("blackjack_round_started", { bet: state.currentBet });
         applyAction((currentState) => game.startRound(currentState));
     });
     els.hitButton.addEventListener("click", () => {
@@ -334,6 +342,7 @@
         applyAction((currentState) => game.declineInsurance(currentState));
     });
     els.newShoeButton.addEventListener("click", () => {
+        window.pgAnalytics?.track?.("blackjack_new_shoe");
         cancelDealerAnimation();
         state = game.newShoe(state);
         render();
