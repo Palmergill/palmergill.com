@@ -7,7 +7,7 @@
     <meta name="description" content="Play Texas Hold'em poker against AI opponents">
     <meta name="theme-color" content="#080a0d">
     <link rel="stylesheet" href="/shared/site-nav.css?v=6">
-    <link rel="stylesheet" href="style.css?v=12">
+    <link rel="stylesheet" href="style.css?v=13">
     <link rel="manifest" href="manifest.json">
     <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'%3E%3Crect fill='%230a0a0f' width='192' height='192' rx='24'/%3E%3Ctext x='96' y='130' font-size='100' text-anchor='middle'%3E🃏%3C/text%3E%3C/svg%3E">
     <script>
@@ -162,7 +162,7 @@
                     <button class="btn-action btn-call" id="btn-call">Call</button>
                     <button class="btn-action btn-raise" id="btn-raise">Raise</button>
                 </div>
-                <div class="showdown-panel hidden" id="showdown-panel">
+                <div class="showdown-panel hidden" id="showdown-panel" aria-live="assertive" aria-atomic="true">
                     <div>
                         <div class="showdown-title" id="showdown-title">Hand Complete</div>
                         <div class="showdown-details" id="showdown-details"></div>
@@ -206,6 +206,6 @@
     <script src="/shared/site-nav.js?v=6"></script>
     <script src="/shared/analytics.js?v=1"></script>
     <script src="/shared/api-base.js?v=1"></script>
-    <script src="app.js?v=12"></script>
+    <script src="app.js?v=13"></script>
 </body>
 </html>

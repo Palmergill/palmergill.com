@@ -1970,7 +1970,9 @@ function showHandResult() {
     updateGameDisplay();
 
     const winner = gameState.winners[0];
-    const isMe = winner.id === playerId;
+    const myWin = gameState.winners.find(w => w.id === playerId);
+    const isMe = Boolean(myWin);
+    const isChop = Boolean(myWin && gameState.winners.length > 1);
     const myPlayer = gameState.players.find(p => p.id === playerId);
     const isBusted = Boolean(myPlayer && myPlayer.chips <= 0);
 
@@ -1981,7 +1983,7 @@ function showHandResult() {
             // Get hand strength text if available
             const handStrengthEl = elements.handStrength.querySelector('.hand-strength-text');
             const handName = handStrengthEl ? handStrengthEl.textContent : null;
-            StatsManager.recordHandWin(winner.amount, handName);
+            StatsManager.recordHandWin(myWin.amount, handName);
         } else if (myPlayer) {
             // Record loss (amount lost is player's bet this hand)
             StatsManager.recordHandLoss(myPlayer.bet || 0);
@@ -1998,18 +2000,29 @@ function showHandResult() {
     const handName = winner.hand && winner.hand.length > 0 ? getHandNameFrom5Cards(winner.hand) : '';
     const winnerNames = gameState.winners.map(w => w.name).join(', ');
     const totalWon = gameState.winners.reduce((sum, w) => sum + (w.amount || 0), 0);
+    const outcomeClass = isMe ? (isChop ? 'showdown-chop' : 'showdown-win') : 'showdown-loss';
+    const outcomeLabel = isMe ? (isChop ? 'CHOP' : 'WIN') : 'LOSS';
 
-    elements.showdownTitle.textContent = isMe ? 'You win' : `${winnerNames} ${gameState.winners.length > 1 ? 'win' : 'wins'}`;
+    elements.showdownTitle.textContent = isMe ? (isChop ? 'You chop the pot' : 'You won') : 'You lost';
     elements.showdownDetails.textContent = isBusted
-        ? `${handName || 'Best hand'} - ${totalWon} chips awarded. Buy back to keep playing.`
-        : `${handName || 'Best hand'} - ${totalWon} chips awarded.`;
+        ? `${winnerNames} ${gameState.winners.length > 1 ? 'win' : 'wins'} with ${handName || 'best hand'} - ${totalWon} chips awarded. Buy back to keep playing.`
+        : `${winnerNames} ${gameState.winners.length > 1 ? 'win' : 'wins'} with ${handName || 'best hand'} - ${totalWon} chips awarded.`;
     elements.btnNextHand.textContent = isBusted ? 'Buy Back In' : 'Ready for Next Hand';
     elements.btnNextHand.disabled = false;
+    elements.showdownPanel.classList.remove('showdown-win', 'showdown-loss', 'showdown-chop', 'showdown-animate');
+    elements.showdownPanel.classList.add(outcomeClass);
+    elements.showdownPanel.dataset.outcomeLabel = outcomeLabel;
+    void elements.showdownPanel.offsetWidth;
+    elements.showdownPanel.classList.add('showdown-animate');
     elements.showdownPanel.classList.remove('hidden');
 }
 
 function hideHandResult() {
     elements.showdownPanel?.classList.add('hidden');
+    elements.showdownPanel?.classList.remove('showdown-win', 'showdown-loss', 'showdown-chop', 'showdown-animate');
+    if (elements.showdownPanel) {
+        delete elements.showdownPanel.dataset.outcomeLabel;
+    }
 }
 
 function showBuyBackOverlay() {
