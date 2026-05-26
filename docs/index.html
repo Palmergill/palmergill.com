@@ -44,6 +44,7 @@
         <aside class="toc" aria-label="Documentation sections">
             <h2>Contents</h2>
             <a href="#overview">Overview</a>
+            <a href="#design">Design System</a>
             <a href="#site-map">Site Map</a>
             <a href="#local-development">Local Development</a>
             <a href="#architecture">Architecture</a>
@@ -81,6 +82,288 @@
                         <span>Hosting</span>
                         <strong>Vercel + Railway</strong>
                         <p>Static routes stay on the website host; <code>/api/*</code> rewrites to Railway.</p>
+                    </div>
+                </div>
+            </section>
+
+            <section id="design" class="doc-section">
+                <p class="section-kicker">Design System</p>
+                <h2>Visual language and components</h2>
+                <p>
+                    The project launcher, apps, and docs share an editorial dark theme.
+                    Inter carries body and UI copy, Georgia handles display titles on hero
+                    sections, and SFMono-Regular renders code and tokens. The palette grounds
+                    on a near-black navy and pairs warm gold and bone with cooler blue,
+                    teal, and plum accents. Individual apps shift the accent — Stock Research
+                    leans blue, Bitcoin Chat leans orange, the project launcher and casino lean
+                    gold and warm bone.
+                </p>
+
+                <h3 class="subsection-title">Surfaces and ground</h3>
+                <div class="swatch-grid">
+                    <div class="swatch">
+                        <div class="swatch-chip" style="background: #080a0d;"></div>
+                        <strong>Ink</strong>
+                        <code>#080a0d</code>
+                        <p>Page ground behind all gradients and panels.</p>
+                    </div>
+                    <div class="swatch">
+                        <div class="swatch-chip" style="background: #111722;"></div>
+                        <strong>Panel</strong>
+                        <code>#111722</code>
+                        <p>Card and section surface; usually layered over Ink.</p>
+                    </div>
+                    <div class="swatch">
+                        <div class="swatch-chip" style="background: #172033;"></div>
+                        <strong>Panel strong</strong>
+                        <code>#172033</code>
+                        <p>Elevated card surface used for navigation and admin panes.</p>
+                    </div>
+                    <div class="swatch">
+                        <div class="swatch-chip" style="background: #050914;"></div>
+                        <strong>Code well</strong>
+                        <code>#050914</code>
+                        <p>Background for code blocks and the login backdrop.</p>
+                    </div>
+                    <div class="swatch">
+                        <div class="swatch-chip is-grid"></div>
+                        <strong>Line</strong>
+                        <code>rgba(255, 255, 255, 0.12)</code>
+                        <p>Default 1px hairline used on most card borders.</p>
+                    </div>
+                    <div class="swatch">
+                        <div class="swatch-chip is-grid" style="background-color: rgba(255, 255, 255, 0.22);"></div>
+                        <strong>Line strong</strong>
+                        <code>rgba(255, 255, 255, 0.22)</code>
+                        <p>Used for the brand chip and emphasized borders.</p>
+                    </div>
+                </div>
+
+                <h3 class="subsection-title">Text</h3>
+                <div class="swatch-grid">
+                    <div class="swatch">
+                        <div class="swatch-chip" style="background: #f7f3ea;"></div>
+                        <strong>Bone</strong>
+                        <code>#f7f3ea</code>
+                        <p>Warm text on the project launcher, about, and casino pages.</p>
+                    </div>
+                    <div class="swatch">
+                        <div class="swatch-chip" style="background: #f8fafc;"></div>
+                        <strong>Slate white</strong>
+                        <code>#f8fafc</code>
+                        <p>Cooler text on docs, admin, and the FastAPI surfaces.</p>
+                    </div>
+                    <div class="swatch">
+                        <div class="swatch-chip" style="background: #cbd5e1;"></div>
+                        <strong>Body</strong>
+                        <code>#cbd5e1</code>
+                        <p>Default paragraph color inside cards and sections.</p>
+                    </div>
+                    <div class="swatch">
+                        <div class="swatch-chip" style="background: #9aa8bd;"></div>
+                        <strong>Muted</strong>
+                        <code>#9aa8bd</code>
+                        <p>Secondary copy, captions, and table-of-contents links.</p>
+                    </div>
+                </div>
+
+                <h3 class="subsection-title">Accents</h3>
+                <div class="swatch-grid">
+                    <div class="swatch">
+                        <div class="swatch-chip" style="background: #38bdf8;"></div>
+                        <strong>Sky</strong>
+                        <code>#38bdf8</code>
+                        <p>Docs accent, active nav, kicker headings, flow nodes.</p>
+                    </div>
+                    <div class="swatch">
+                        <div class="swatch-chip" style="background: #72a9ff;"></div>
+                        <strong>Blue</strong>
+                        <code>#72a9ff</code>
+                        <p>Stock Research accent and hero glow on the project launcher.</p>
+                    </div>
+                    <div class="swatch">
+                        <div class="swatch-chip" style="background: #d6b25e;"></div>
+                        <strong>Gold</strong>
+                        <code>#d6b25e</code>
+                        <p>Editorial accent on eyebrows, casino, and the project launcher.</p>
+                    </div>
+                    <div class="swatch">
+                        <div class="swatch-chip" style="background: #58d3ad;"></div>
+                        <strong>Teal</strong>
+                        <code>#58d3ad</code>
+                        <p>Soft secondary accent on hero washes.</p>
+                    </div>
+                    <div class="swatch">
+                        <div class="swatch-chip" style="background: #ff7a6e;"></div>
+                        <strong>Coral</strong>
+                        <code>#ff7a6e</code>
+                        <p>Casino accent and warm highlight on group cards.</p>
+                    </div>
+                    <div class="swatch">
+                        <div class="swatch-chip" style="background: #a675ff;"></div>
+                        <strong>Plum</strong>
+                        <code>#a675ff</code>
+                        <p>Reserved accent for hero gradient washes.</p>
+                    </div>
+                    <div class="swatch">
+                        <div class="swatch-chip" style="background: #ff9f3f;"></div>
+                        <strong>Bitcoin orange</strong>
+                        <code>#ff9f3f</code>
+                        <p>Bitcoin Chat accent on the project launcher card.</p>
+                    </div>
+                </div>
+
+                <h3 class="subsection-title">Status</h3>
+                <div class="swatch-grid">
+                    <div class="swatch">
+                        <div class="swatch-chip" style="background: #22c55e;"></div>
+                        <strong>Success</strong>
+                        <code>#22c55e</code>
+                        <p>Positive status, summary-card eyebrow label color.</p>
+                    </div>
+                    <div class="swatch">
+                        <div class="swatch-chip" style="background: #f59e0b;"></div>
+                        <strong>Warning</strong>
+                        <code>#f59e0b</code>
+                        <p>Note callout left border and cautious states.</p>
+                    </div>
+                    <div class="swatch">
+                        <div class="swatch-chip" style="background: #fca5a5;"></div>
+                        <strong>Danger</strong>
+                        <code>#fca5a5</code>
+                        <p>Form errors and destructive UI feedback.</p>
+                    </div>
+                </div>
+
+                <h3 class="subsection-title">Typography</h3>
+                <dl class="type-grid">
+                    <div class="type-sample">
+                        <dt>Display serif <code>Georgia</code></dt>
+                        <dd class="type-display">Built across the stack.</dd>
+                    </div>
+                    <div class="type-sample">
+                        <dt>Section heading <code>Inter 700</code></dt>
+                        <dd class="type-h2">How requests move through the system</dd>
+                    </div>
+                    <div class="type-sample">
+                        <dt>Eyebrow <code>Inter 800, tracking 0.12em</code></dt>
+                        <dd class="type-eyebrow">Design System</dd>
+                    </div>
+                    <div class="type-sample">
+                        <dt>Body <code>Inter 400</code></dt>
+                        <dd class="type-body">Paragraph copy renders at 1rem with 1.6 line height on a cool slate color for comfortable reading inside dark panels.</dd>
+                    </div>
+                    <div class="type-sample">
+                        <dt>Mono <code>SFMono-Regular</code></dt>
+                        <dd class="type-mono">uvicorn app.main:app --host 0.0.0.0 --port 8000</dd>
+                    </div>
+                </dl>
+
+                <h3 class="subsection-title">Buttons</h3>
+                <div class="component-row">
+                    <a class="sample-button is-primary" href="#design">Primary action</a>
+                    <a class="sample-button is-accent" href="#design">Accent action</a>
+                    <a class="sample-button" href="#design">Secondary</a>
+                    <a class="sample-button is-ghost" href="#design">Ghost link</a>
+                </div>
+
+                <h3 class="subsection-title">Tags and chips</h3>
+                <div class="component-row">
+                    <span class="sample-tag">FastAPI</span>
+                    <span class="sample-tag">Static frontend</span>
+                    <span class="sample-tag">Polygon.io</span>
+                    <span class="sample-tag is-status-ok">Healthy</span>
+                    <span class="sample-tag is-status-warn">Demo mode</span>
+                    <span class="sample-tag is-status-danger">Auth required</span>
+                </div>
+
+                <h3 class="subsection-title">Summary cards</h3>
+                <div class="summary-grid">
+                    <div class="summary-card">
+                        <span>Pattern</span>
+                        <strong>Eyebrow, headline, supporting copy</strong>
+                        <p>Used for at-a-glance facts inside doc sections and the overview grid.</p>
+                    </div>
+                    <div class="summary-card">
+                        <span>Width</span>
+                        <strong>Equal-column auto grid</strong>
+                        <p>The container uses <code>repeat(3, minmax(0, 1fr))</code> and collapses to one column under 980px.</p>
+                    </div>
+                    <div class="summary-card">
+                        <span>Tone</span>
+                        <strong>Quiet by default</strong>
+                        <p>Surface tint is a 3.5% white overlay so cards sit gently above the panel.</p>
+                    </div>
+                </div>
+
+                <h3 class="subsection-title">Split panels</h3>
+                <div class="split-grid">
+                    <div class="panel">
+                        <h3>Panel</h3>
+                        <p>Used when two related lists need to sit side by side, like Public vs. Protected routes or the Polygon vs. Bitcoin provider pair.</p>
+                        <ul>
+                            <li>Subtle hairline border</li>
+                            <li>Equal-height columns</li>
+                            <li>Collapses to one column on narrow screens</li>
+                        </ul>
+                    </div>
+                    <div class="panel">
+                        <h3>Inline code</h3>
+                        <p>Body copy uses <code>code</code> chips for paths, env vars, and short identifiers like <code>APP_AUTH_PASSWORD</code> and <code>/api/poker/*</code>.</p>
+                    </div>
+                </div>
+
+                <h3 class="subsection-title">Note callout</h3>
+                <p class="note">
+                    Notes carry a warm amber left bar and reuse body color. They mark warnings, gotchas, or any
+                    rule that should not be missed — like a reserved local path or a fail-closed auth behavior.
+                </p>
+
+                <h3 class="subsection-title">Code blocks</h3>
+                <pre><code>APP_AUTH_USERNAME=palmer APP_AUTH_PASSWORD=your-password ./start.sh</code></pre>
+
+                <h3 class="subsection-title">Flow diagram</h3>
+                <div class="flow">
+                    <div>Browser</div>
+                    <span>request</span>
+                    <div>Static host</div>
+                    <span><code>/api/*</code></span>
+                    <div>Railway FastAPI</div>
+                </div>
+
+                <h3 class="subsection-title">Design tokens</h3>
+                <div class="token-grid">
+                    <div class="token-card">
+                        <div class="radius-preview" style="border-radius: 8px;"></div>
+                        <strong>Radius</strong>
+                        <code>8px</code>
+                        <p>Standard corner radius for panels, buttons, and inputs. Chips use a pill radius of 999px.</p>
+                    </div>
+                    <div class="token-card">
+                        <div class="shadow-preview"></div>
+                        <strong>Elevation</strong>
+                        <code>0 24px 70px rgba(0,0,0,0.28)</code>
+                        <p>Used on the hero status panel, modal popovers, and lifted cards.</p>
+                    </div>
+                    <div class="token-card">
+                        <strong>Max width</strong>
+                        <code>1180px</code>
+                        <p>Top-level container width across the docs, home, and about pages.</p>
+                    </div>
+                    <div class="token-card">
+                        <strong>Body font</strong>
+                        <code>Inter</code>
+                        <p>System-stack fallback through ui-sans-serif and BlinkMacSystemFont.</p>
+                    </div>
+                    <div class="token-card">
+                        <strong>Display font</strong>
+                        <code>Georgia</code>
+                        <p>Used on hero, feature, and group titles in the project launcher and about page.</p>
+                    </div>
+                    <div class="token-card">
+                        <strong>Mobile breakpoints</strong>
+                        <code>980px / 680px</code>
+                        <p>Layout collapses to single column at 980px; padding tightens below 680px.</p>
                     </div>
                 </div>
             </section>
