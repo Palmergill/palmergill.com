@@ -1,10 +1,10 @@
 // Poker App Service Worker - Basic caching strategy
-const CACHE_NAME = 'poker-app-v15';
+const CACHE_NAME = 'poker-app-v16';
 const CACHE_PREFIX = 'poker-app-';
 const STATIC_ASSETS = [
     '/poker/',
     '/poker/index.html',
-    '/poker/app.js?v=13',
+    '/poker/app.js?v=14',
     '/poker/manifest.json'
 ];
 

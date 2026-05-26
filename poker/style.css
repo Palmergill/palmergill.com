@@ -4209,6 +4209,10 @@ button:disabled {
     --showdown-accent-soft: rgba(244, 201, 106, 0.18);
 }
 
+.showdown-dismiss {
+    display: none;
+}
+
 .showdown-panel.showdown-win {
     --showdown-accent: var(--teal, #58d3ad);
     --showdown-accent-soft: rgba(88, 211, 173, 0.2);
@@ -4252,7 +4256,7 @@ button:disabled {
 }
 
 @media (max-width: 700px), (orientation: landscape) and (max-height: 520px) {
-    body.poker-game-active .showdown-panel:not(.hidden) {
+    body.poker-game-active .showdown-panel:not(.hidden):not(.showdown-dismissed) {
         position: fixed;
         top: 50%;
         left: 50%;
@@ -4280,7 +4284,32 @@ button:disabled {
         animation: showdownMobileReveal 1100ms cubic-bezier(.16, .84, .22, 1) both;
     }
 
-    body.poker-game-active .showdown-panel:not(.hidden)::before {
+    body.poker-game-active .showdown-panel:not(.hidden):not(.showdown-dismissed) .showdown-dismiss {
+        position: absolute;
+        top: 8px;
+        right: 8px;
+        z-index: 2;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 36px;
+        height: 36px;
+        padding: 0;
+        border: 1px solid rgba(255, 255, 255, 0.16);
+        border-radius: 999px;
+        background: rgba(0, 0, 0, 0.24);
+        color: var(--text, #fff8df);
+        font-size: 1.4rem;
+        font-weight: 600;
+        line-height: 1;
+    }
+
+    body.poker-game-active .showdown-panel:not(.hidden):not(.showdown-dismissed) .showdown-dismiss:focus-visible {
+        outline: 2px solid var(--showdown-accent);
+        outline-offset: 2px;
+    }
+
+    body.poker-game-active .showdown-panel:not(.hidden):not(.showdown-dismissed)::before {
         content: attr(data-outcome-label);
         display: inline-flex;
         align-items: center;
@@ -4300,7 +4329,7 @@ button:disabled {
         animation: showdownBadgePulse 1500ms ease-out 260ms both;
     }
 
-    body.poker-game-active .showdown-panel:not(.hidden)::after {
+    body.poker-game-active .showdown-panel:not(.hidden):not(.showdown-dismissed)::after {
         content: "";
         position: absolute;
         inset: -18%;
@@ -4313,19 +4342,19 @@ button:disabled {
         animation: showdownSpark 1000ms ease-out 120ms both;
     }
 
-    body.poker-game-active .showdown-panel > * {
+    body.poker-game-active .showdown-panel:not(.hidden):not(.showdown-dismissed) > * {
         position: relative;
         z-index: 1;
     }
 
-    body.poker-game-active .showdown-title {
+    body.poker-game-active .showdown-panel:not(.hidden):not(.showdown-dismissed) .showdown-title {
         font-size: clamp(1.9rem, 10vw, 2.7rem);
         line-height: 0.95;
         letter-spacing: 0;
         text-transform: none;
     }
 
-    body.poker-game-active .showdown-details {
+    body.poker-game-active .showdown-panel:not(.hidden):not(.showdown-dismissed) .showdown-details {
         max-width: 31ch;
         margin-top: 8px;
         color: var(--text, #fff8df);
@@ -4333,12 +4362,38 @@ button:disabled {
         line-height: 1.35;
     }
 
-    body.poker-game-active .btn-ready {
+    body.poker-game-active .showdown-panel:not(.hidden) .btn-ready {
         width: 100%;
         min-height: 48px;
         border-color: color-mix(in srgb, var(--showdown-accent) 40%, transparent);
         background: color-mix(in srgb, var(--showdown-accent) 16%, rgba(8, 10, 13, 0.72));
         color: var(--text, #fff8df);
+    }
+
+    body.poker-game-active .showdown-panel.showdown-dismissed:not(.hidden) {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 8px;
+        margin-top: 0;
+        padding: 8px;
+        border-color: color-mix(in srgb, var(--showdown-accent) 42%, transparent);
+        background: rgba(8, 10, 13, 0.72);
+        box-shadow:
+            inset 0 1px 0 rgba(255, 255, 255, 0.06),
+            0 14px 30px rgba(0, 0, 0, 0.28);
+        animation: none;
+    }
+
+    body.poker-game-active .showdown-panel.showdown-dismissed .showdown-title {
+        color: var(--showdown-accent);
+        font-size: 0.82rem;
+        line-height: 1.1;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+    }
+
+    body.poker-game-active .showdown-panel.showdown-dismissed .showdown-details,
+    body.poker-game-active .showdown-panel.showdown-dismissed .showdown-dismiss {
+        display: none;
     }
 }
 
@@ -4394,9 +4449,9 @@ button:disabled {
 
 @media (prefers-reduced-motion: reduce) {
     .showdown-panel.showdown-animate,
-    body.poker-game-active .showdown-panel:not(.hidden),
-    body.poker-game-active .showdown-panel:not(.hidden)::before,
-    body.poker-game-active .showdown-panel:not(.hidden)::after {
+    body.poker-game-active .showdown-panel:not(.hidden):not(.showdown-dismissed),
+    body.poker-game-active .showdown-panel:not(.hidden):not(.showdown-dismissed)::before,
+    body.poker-game-active .showdown-panel:not(.hidden):not(.showdown-dismissed)::after {
         animation: none;
     }
 }

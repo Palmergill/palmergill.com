@@ -642,6 +642,7 @@ let hasVibratedThisTurn = false; // Track if we've vibrated for current turn
 let seenCards = new Set(); // Track cards we've already animated
 let lastHandNumber = 0; // Track hand number for stats
 let handResultRecorded = false; // Prevent duplicate stat recording
+let dismissedShowdownHand = null;
 
 function escapeHtml(value) {
     return String(value ?? '')
@@ -704,6 +705,7 @@ const elements = {
     showdownPanel: document.getElementById('showdown-panel'),
     showdownTitle: document.getElementById('showdown-title'),
     showdownDetails: document.getElementById('showdown-details'),
+    btnDismissShowdown: document.getElementById('btn-dismiss-showdown'),
     btnNextHand: document.getElementById('btn-next-hand'),
     decisionTimer: document.getElementById('decision-timer'),
     timerText: document.getElementById('timer-text'),
@@ -996,6 +998,7 @@ document.addEventListener('DOMContentLoaded', () => {
     elements.btnRaise.addEventListener('click', showRaiseControls);
     elements.btnCancel.addEventListener('click', hideRaiseControls);
     elements.btnConfirmRaise.addEventListener('click', confirmRaise);
+    elements.btnDismissShowdown?.addEventListener('click', dismissShowdownPopup);
     elements.btnNextHand.addEventListener('click', handleShowdownPrimaryAction);
     
     elements.raiseSlider.addEventListener('input', (e) => {
@@ -1472,6 +1475,19 @@ function handleShowdownPrimaryAction() {
     nextHand();
 }
 
+function getShowdownHandKey() {
+    return `${gameId || 'local'}:${gameState?.hand_number || 'unknown'}`;
+}
+
+function dismissShowdownPopup() {
+    if (!elements.showdownPanel || elements.showdownPanel.classList.contains('hidden')) return;
+
+    dismissedShowdownHand = getShowdownHandKey();
+    elements.showdownPanel.classList.add('showdown-dismissed');
+    elements.showdownPanel.classList.remove('showdown-animate');
+    elements.btnNextHand?.focus({ preventScroll: true });
+}
+
 async function nextHand() {
     // Prevent race condition
     if (isRequestPending) {
@@ -1533,6 +1549,7 @@ function updateGameDisplay() {
         }
         lastHandNumber = gameState.hand_number;
         handResultRecorded = false; // Reset for new hand
+        dismissedShowdownHand = null;
     }
 
     // Update header
@@ -2002,6 +2019,7 @@ function showHandResult() {
     const totalWon = gameState.winners.reduce((sum, w) => sum + (w.amount || 0), 0);
     const outcomeClass = isMe ? (isChop ? 'showdown-chop' : 'showdown-win') : 'showdown-loss';
     const outcomeLabel = isMe ? (isChop ? 'CHOP' : 'WIN') : 'LOSS';
+    const isDismissed = dismissedShowdownHand === getShowdownHandKey();
 
     elements.showdownTitle.textContent = isMe ? (isChop ? 'You chop the pot' : 'You won') : 'You lost';
     elements.showdownDetails.textContent = isBusted
@@ -2009,17 +2027,21 @@ function showHandResult() {
         : `${winnerNames} ${gameState.winners.length > 1 ? 'win' : 'wins'} with ${handName || 'best hand'} - ${totalWon} chips awarded.`;
     elements.btnNextHand.textContent = isBusted ? 'Buy Back In' : 'Ready for Next Hand';
     elements.btnNextHand.disabled = false;
-    elements.showdownPanel.classList.remove('showdown-win', 'showdown-loss', 'showdown-chop', 'showdown-animate');
+    elements.showdownPanel.classList.remove('showdown-win', 'showdown-loss', 'showdown-chop', 'showdown-animate', 'showdown-dismissed');
     elements.showdownPanel.classList.add(outcomeClass);
+    elements.showdownPanel.classList.toggle('showdown-dismissed', isDismissed);
     elements.showdownPanel.dataset.outcomeLabel = outcomeLabel;
-    void elements.showdownPanel.offsetWidth;
-    elements.showdownPanel.classList.add('showdown-animate');
+    if (!isDismissed) {
+        void elements.showdownPanel.offsetWidth;
+        elements.showdownPanel.classList.add('showdown-animate');
+    }
     elements.showdownPanel.classList.remove('hidden');
 }
 
 function hideHandResult() {
     elements.showdownPanel?.classList.add('hidden');
-    elements.showdownPanel?.classList.remove('showdown-win', 'showdown-loss', 'showdown-chop', 'showdown-animate');
+    elements.showdownPanel?.classList.remove('showdown-win', 'showdown-loss', 'showdown-chop', 'showdown-animate', 'showdown-dismissed');
+    dismissedShowdownHand = null;
     if (elements.showdownPanel) {
         delete elements.showdownPanel.dataset.outcomeLabel;
     }
