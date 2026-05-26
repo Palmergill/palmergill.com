@@ -1,6 +1,9 @@
-const API_BASE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-    ? 'http://localhost:8000/api/bitcoin'
-    : '/api/bitcoin';
+// API_BASE = `${API_ORIGIN}/api/bitcoin`. See /shared/api-base.js — for an
+// uncommon dev setup where the static site is served separately from FastAPI,
+// set `window.PALMER_API_ORIGIN = 'http://localhost:8000'` before this script.
+const API_BASE = ((typeof window !== 'undefined' && typeof window.API_ORIGIN === 'string')
+    ? window.API_ORIGIN
+    : '') + '/api/bitcoin';
 
 const messagesEl = document.getElementById('messages');
 const chatForm = document.getElementById('chatForm');

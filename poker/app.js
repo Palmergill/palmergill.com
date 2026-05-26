@@ -1,5 +1,9 @@
 // Poker Game Frontend - Oval Table Design
-const API_BASE = '';
+// API_BASE is the API origin, shared across all static apps. See
+// /shared/api-base.js for the source of truth and how to override it.
+const API_BASE = (typeof window !== 'undefined' && typeof window.API_ORIGIN === 'string')
+    ? window.API_ORIGIN
+    : '';
 
 const APIRequest = {
     REQUEST_TIMEOUT_MS: 12000,
@@ -31,13 +35,6 @@ const APIRequest = {
         }
     }
 };
-
-function fetchWithTimeout(url, options = {}, timeoutMs = 10000) {
-    const controller = new AbortController();
-    const id = setTimeout(() => controller.abort(), timeoutMs);
-    return fetch(url, { ...options, signal: controller.signal })
-        .finally(() => clearTimeout(id));
-}
 
 // Avatar Manager - Generates and manages player avatars
 const AvatarManager = {
@@ -361,12 +358,19 @@ const StatsManager = {
     },
 
     getFormattedStats() {
+        // Coerce all numeric fields. Stats round-trip through localStorage, and a
+        // tampered store could otherwise inject HTML strings into the templates
+        // below (which write via innerHTML).
+        const toInt = (v) => {
+            const n = Number(v);
+            return Number.isFinite(n) ? Math.trunc(n) : 0;
+        };
         return {
-            handsPlayed: this.stats.handsPlayed,
-            handsWon: this.stats.handsWon,
+            handsPlayed: toInt(this.stats.handsPlayed),
+            handsWon: toInt(this.stats.handsWon),
             winRate: this.getWinRate(),
-            biggestPotWon: this.stats.biggestPotWon,
-            netProfit: this.getNetProfit(),
+            biggestPotWon: toInt(this.stats.biggestPotWon),
+            netProfit: toInt(this.getNetProfit()),
             bestHand: this.stats.bestHand || 'None yet'
         };
     }
@@ -1198,7 +1202,7 @@ function startLobbyPolling() {
         }
         
         try {
-            const response = await fetchWithTimeout(
+            const response = await APIRequest.fetch(
                 gameRequestUrl(`/games/${gameId}`, { process_ai: 'false' }),
                 { headers: playerAuthHeaders() }
             );
@@ -1316,7 +1320,7 @@ function startPolling() {
                     method: 'POST',
                     body: JSON.stringify({ player_id: playerId, player_token: playerToken })
                 })
-                : await fetchWithTimeout(
+                : await APIRequest.fetch(
                     gameRequestUrl(`/games/${gameId}`, { process_ai: 'false' }),
                     { headers: playerAuthHeaders() }
                 );

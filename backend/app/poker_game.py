@@ -408,6 +408,14 @@ class PokerGame:
         # Reset round tracking
         self.acted_this_round = set()
 
+        # Defensive: if no one can act (everyone left is folded or all-in),
+        # `_betting_is_closed()` should have routed us to `_run_out_board()`
+        # already. If that invariant ever breaks we'd otherwise spin forever
+        # looking for the next actor — run out the board instead.
+        if not any(not p.folded and not p.is_all_in for p in self.players):
+            self._run_out_board()
+            return
+
         # Find first active player after dealer for next round (skip folded players only)
         # All-in players still get cards dealt, they just don't bet
         self.current_player_index = (self.dealer_index + 1) % len(self.players)

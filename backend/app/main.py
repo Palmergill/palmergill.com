@@ -41,37 +41,55 @@ async def lifespan(app: FastAPI):
             await analytics_cleanup_task
 
 
+# Cap individual cleanup invocations. If a sync DB call hangs (lock contention,
+# disk stall, etc.), we want the periodic loop to recover instead of stalling
+# all future cleanup runs.
+_CLEANUP_TIMEOUT_SECONDS = 30
+
+
+async def _run_with_timeout(label: str, func, *args, timeout: int = _CLEANUP_TIMEOUT_SECONDS):
+    """Run `func(*args)` in a thread with a timeout, logging timeouts/errors."""
+    try:
+        return await asyncio.wait_for(asyncio.to_thread(func, *args), timeout=timeout)
+    except asyncio.TimeoutError:
+        logger.warning("%s timed out after %ds", label, timeout)
+        return None
+    except Exception:
+        logger.exception("Error during %s", label)
+        return None
+
+
 async def _periodic_game_cleanup(interval: int = 300) -> None:
     """Prune stale poker games every `interval` seconds."""
     while True:
         await asyncio.sleep(interval)
-        try:
-            removed = poker.cleanup_old_games()
-            if removed:
-                logger.info("Cleaned up %d stale poker game(s)", removed)
-        except Exception:
-            logger.exception("Error during periodic game cleanup")
+        removed = await _run_with_timeout("poker game cleanup", poker.cleanup_old_games)
+        if removed:
+            logger.info("Cleaned up %d stale poker game(s)", removed)
 
 
 async def _periodic_retention_cleanup(interval: int = 6 * 60 * 60) -> None:
     """Prune analytics and log data on a 90-day retention window."""
+
+    def _retention_cycle():
+        db = SessionLocal()
+        try:
+            return cleanup_old_analytics(db), admin.cleanup_old_logs(db)
+        finally:
+            db.close()
+
     while True:
         await asyncio.sleep(interval)
-        try:
-            db = SessionLocal()
-            try:
-                analytics_removed = cleanup_old_analytics(db)
-                logs_removed = admin.cleanup_old_logs(db)
-            finally:
-                db.close()
-            if analytics_removed or logs_removed:
-                logger.info(
-                    "Deleted %d analytics event(s) and %d log entry(s) older than 90 days",
-                    analytics_removed,
-                    logs_removed,
-                )
-        except Exception:
-            logger.exception("Error during periodic retention cleanup")
+        result = await _run_with_timeout("retention cleanup", _retention_cycle)
+        if not result:
+            continue
+        analytics_removed, logs_removed = result
+        if analytics_removed or logs_removed:
+            logger.info(
+                "Deleted %d analytics event(s) and %d log entry(s) older than 90 days",
+                analytics_removed,
+                logs_removed,
+            )
 
 app = FastAPI(title="Palmer Gill API", version="0.2.0-p5", lifespan=lifespan)
 

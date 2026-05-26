@@ -68,7 +68,9 @@ function showRollResultAnimation(amount) {
 function renderDie(dieId, value) {
     const die = document.getElementById(dieId);
     die.innerHTML = '';
-    const pattern = dicePatterns[value];
+    // dicePatterns only covers 1–6. Out-of-range values would otherwise crash
+    // the dot loop below; render a blank face instead.
+    const pattern = dicePatterns[value] || [];
     for (let row = 1; row <= 3; row++) {
         for (let col = 1; col <= 3; col++) {
             const dot = document.createElement('div');

@@ -15,7 +15,7 @@ from urllib.parse import urlparse
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from fastapi.responses import Response
+from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy.orm import Session
 from sqlalchemy import desc, or_
@@ -123,13 +123,28 @@ def _referrer_host(referrer: str | None) -> str:
         return referrer
 
 
-def _csv_response(filename: str, headers: list[str], rows: list[list[object]]) -> Response:
-    output = io.StringIO()
-    writer = csv.writer(output)
-    writer.writerow(headers)
-    writer.writerows(rows)
-    return Response(
-        content=output.getvalue(),
+def _csv_response(filename: str, headers: list[str], rows) -> StreamingResponse:
+    """Stream CSV rows row-by-row so we never materialize the full payload.
+
+    `rows` may be a list or any iterable / generator. Each yielded chunk is one
+    encoded CSV line — the StringIO buffer is reused after each emit.
+    """
+
+    def generate():
+        buffer = io.StringIO()
+        writer = csv.writer(buffer)
+        writer.writerow(headers)
+        yield buffer.getvalue()
+        buffer.seek(0)
+        buffer.truncate()
+        for row in rows:
+            writer.writerow(row)
+            yield buffer.getvalue()
+            buffer.seek(0)
+            buffer.truncate()
+
+    return StreamingResponse(
+        generate(),
         media_type="text/csv",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )

@@ -1,4 +1,7 @@
-const API_BASE = '/api';
+// API_BASE = `${API_ORIGIN}/api`. See /shared/api-base.js for overrides.
+const API_BASE = ((typeof window !== 'undefined' && typeof window.API_ORIGIN === 'string')
+    ? window.API_ORIGIN
+    : '') + '/api';
 
 let currentTicker = '';
 
