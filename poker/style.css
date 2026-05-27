@@ -3471,7 +3471,7 @@ button:disabled {
     flex: 1 1 auto;
     min-height: 420px;
     margin: 0;
-    overflow: hidden;
+    overflow: visible;
     padding: clamp(64px, 11vh, 96px) clamp(20px, 5vw, 42px) clamp(42px, 8vh, 64px);
     border: 10px solid #5a301c;
     border-radius: var(--radius);
