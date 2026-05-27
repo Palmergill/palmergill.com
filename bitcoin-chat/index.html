@@ -3,19 +3,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bitcoin Chat</title>
-    <meta name="description" content="Bitcoin chat — ask about price, mempool, mining, and protocol topics. By Palmer Gill.">
+    <title>Bitcoin Chat & Explorer</title>
+    <meta name="description" content="Bitcoin chat and explorer — inspect blocks, transactions, mempool fees, mining, and protocol topics. By Palmer Gill.">
     <meta name="theme-color" content="#080a0d">
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://palmergill.com/bitcoin-chat/">
-    <meta property="og:title" content="Bitcoin Chat — Palmer Gill">
-    <meta property="og:description" content="Bitcoin chat — ask about price, mempool, mining, and protocol topics.">
+    <meta property="og:title" content="Bitcoin Chat & Explorer — Palmer Gill">
+    <meta property="og:description" content="Bitcoin chat and explorer — inspect blocks, transactions, mempool fees, mining, and protocol topics.">
     <meta property="og:image" content="https://palmergill.com/assets/palmer-gill-logo.png">
     <meta property="og:image:width" content="960">
     <meta property="og:image:height" content="960">
     <meta name="twitter:card" content="summary">
-    <meta name="twitter:title" content="Bitcoin Chat — Palmer Gill">
-    <meta name="twitter:description" content="Bitcoin chat — ask about price, mempool, mining, and protocol topics.">
+    <meta name="twitter:title" content="Bitcoin Chat & Explorer — Palmer Gill">
+    <meta name="twitter:description" content="Bitcoin chat and explorer — inspect blocks, transactions, mempool fees, mining, and protocol topics.">
     <meta name="twitter:image" content="https://palmergill.com/assets/palmer-gill-logo.png">
     <link rel="icon" type="image/png" href="/assets/palmer-gill-logo-small.png">
     <link rel="stylesheet" href="/shared/site-nav.css?v=6">
@@ -27,7 +27,7 @@
             <header class="topbar">
                 <a href="/" class="back-link" aria-label="Back to projects">&larr;</a>
                 <div class="title-group">
-                    <h1>Bitcoin Chat</h1>
+                    <h1>Bitcoin Chat & Explorer</h1>
                     <p id="nodeStatus"><span class="status-dot" aria-hidden="true"></span>Checking Bitcoin data...</p>
                     <p id="demoNotice" class="demo-notice" hidden>Public demo mode uses sample Bitcoin data and local answers. Live node and OpenAI calls stay protected.</p>
                 </div>
@@ -39,6 +39,50 @@
             </header>
 
             <div class="chat-layout">
+                <aside class="explorer-panel" aria-labelledby="explorerTitle">
+                    <div class="explorer-header">
+                        <div>
+                            <p class="explorer-kicker">Explorer</p>
+                            <h2 id="explorerTitle">Chain Lookup</h2>
+                        </div>
+                        <button type="button" id="refreshExplorerBtn" class="ghost-button">Refresh</button>
+                    </div>
+
+                    <form id="explorerSearchForm" class="explorer-search">
+                        <label class="sr-only" for="explorerInput">Search by block height, block hash, or transaction id</label>
+                        <input id="explorerInput" type="text" inputmode="text" autocomplete="off" spellcheck="false" placeholder="Block height, hash, or txid">
+                        <div class="explorer-search-row">
+                            <select id="explorerType" aria-label="Lookup type">
+                                <option value="auto">Auto</option>
+                                <option value="block">Block</option>
+                                <option value="tx">Transaction</option>
+                            </select>
+                            <button type="submit">Lookup</button>
+                        </div>
+                    </form>
+
+                    <div id="explorerStatus" class="explorer-status" role="status"></div>
+
+                    <div class="explorer-grid" aria-label="Bitcoin explorer summaries">
+                        <article class="explorer-card" id="latestBlockCard">
+                            <div class="card-heading">
+                                <span>Latest block</span>
+                                <button type="button" class="card-action" data-ask="latest">Ask</button>
+                            </div>
+                            <div class="card-body muted">Loading latest block...</div>
+                        </article>
+
+                        <article class="explorer-card" id="mempoolCard">
+                            <div class="card-heading">
+                                <span>Mempool</span>
+                                <button type="button" class="card-action" data-ask="mempool">Ask</button>
+                            </div>
+                            <div class="card-body muted">Loading mempool...</div>
+                        </article>
+                    </div>
+
+                    <section class="explorer-result" id="explorerResult" aria-live="polite" hidden></section>
+                </aside>
                 <div id="messages" class="messages" aria-live="polite"></div>
             </div>
 

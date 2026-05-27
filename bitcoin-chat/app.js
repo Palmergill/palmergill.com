@@ -13,8 +13,24 @@ const heightPill = document.getElementById('heightPill');
 const syncPill = document.getElementById('syncPill');
 const chainPill = document.getElementById('chainPill');
 const demoNotice = document.getElementById('demoNotice');
+const explorerEls = {
+    panel: document.querySelector('.explorer-panel'),
+    form: document.getElementById('explorerSearchForm'),
+    input: document.getElementById('explorerInput'),
+    type: document.getElementById('explorerType'),
+    status: document.getElementById('explorerStatus'),
+    refresh: document.getElementById('refreshExplorerBtn'),
+    latestCard: document.getElementById('latestBlockCard'),
+    mempoolCard: document.getElementById('mempoolCard'),
+    result: document.getElementById('explorerResult'),
+};
 
 let sessionId = localStorage.getItem('bitcoinChatSessionId');
+const explorerState = {
+    latestBlock: null,
+    mempool: null,
+    lastResult: null,
+};
 
 const starterMessage = {
     role: 'assistant',
@@ -259,6 +275,292 @@ async function fetchJson(url, options) {
     return response.json();
 }
 
+function formatInteger(value) {
+    if (value === null || value === undefined || value === '') return '--';
+    const n = Number(value);
+    return Number.isFinite(n) ? n.toLocaleString() : String(value);
+}
+
+function formatBtc(value) {
+    if (value === null || value === undefined || value === '') return '--';
+    const n = Number(value);
+    if (!Number.isFinite(n)) return String(value);
+    return `${n.toFixed(n < 0.01 ? 8 : 4)} BTC`;
+}
+
+function formatBytes(value) {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return '--';
+    if (n >= 1e9) return `${(n / 1e9).toFixed(2)} GB`;
+    if (n >= 1e6) return `${(n / 1e6).toFixed(2)} MB`;
+    if (n >= 1e3) return `${(n / 1e3).toFixed(1)} KB`;
+    return `${n} B`;
+}
+
+function formatTimestamp(value) {
+    if (!value) return '--';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return value;
+    return date.toLocaleString(undefined, {
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+    });
+}
+
+function shortHash(value, left = 10, right = 8) {
+    if (!value) return '--';
+    const text = String(value);
+    if (text.length <= left + right + 3) return text;
+    return `${text.slice(0, left)}...${text.slice(-right)}`;
+}
+
+function explorerSetStatus(message, isError = false) {
+    if (!explorerEls.status) return;
+    explorerEls.status.textContent = message || '';
+    explorerEls.status.classList.toggle('is-error', Boolean(isError));
+}
+
+function statRow(label, value) {
+    const row = document.createElement('div');
+    row.className = 'stat-row';
+    const labelEl = document.createElement('span');
+    labelEl.textContent = label;
+    const valueEl = document.createElement('strong');
+    valueEl.textContent = value ?? '--';
+    row.append(labelEl, valueEl);
+    return row;
+}
+
+function appendWarnings(parent, warnings) {
+    if (!Array.isArray(warnings) || !warnings.length) return;
+    const list = document.createElement('div');
+    list.className = 'warning-list';
+    warnings.slice(0, 2).forEach((warning) => {
+        const item = document.createElement('span');
+        item.textContent = warning;
+        list.appendChild(item);
+    });
+    parent.appendChild(list);
+}
+
+function cardBody(card) {
+    const body = card?.querySelector('.card-body');
+    if (!body) return null;
+    body.classList.remove('muted');
+    body.replaceChildren();
+    return body;
+}
+
+function renderCardError(card, message) {
+    const body = cardBody(card);
+    if (!body) return;
+    body.classList.add('muted');
+    body.textContent = message;
+}
+
+function renderLatestBlock(data) {
+    if (!data || data.error) {
+        renderCardError(explorerEls.latestCard, data?.error || 'Latest block unavailable.');
+        return;
+    }
+    explorerState.latestBlock = data;
+    const body = cardBody(explorerEls.latestCard);
+    if (!body) return;
+    body.append(
+        statRow('Height', formatInteger(data.height)),
+        statRow('Tx count', formatInteger(data.tx_count)),
+        statRow('Mined', formatTimestamp(data.time)),
+        statRow('Hash', shortHash(data.hash)),
+        statRow('Source', data.source || '--')
+    );
+    appendWarnings(body, data.warnings);
+}
+
+function renderMempool(data) {
+    if (!data || data.error) {
+        renderCardError(explorerEls.mempoolCard, data?.error || 'Mempool unavailable.');
+        return;
+    }
+    explorerState.mempool = data;
+    const body = cardBody(explorerEls.mempoolCard);
+    if (!body) return;
+    const fees = data.fee_estimates_sats_vb || {};
+    const feeRow = document.createElement('div');
+    feeRow.className = 'fee-row';
+    [
+        ['Fast', fees['2']],
+        ['Hour', fees['6']],
+        ['Economy', fees['12']],
+    ].forEach(([label, value]) => {
+        const chip = document.createElement('div');
+        chip.className = 'fee-chip';
+        const labelEl = document.createElement('span');
+        labelEl.textContent = label;
+        const valueEl = document.createElement('strong');
+        valueEl.textContent = value === null || value === undefined ? '--' : `${Number(value).toFixed(1)} sats/vB`;
+        chip.append(labelEl, valueEl);
+        feeRow.appendChild(chip);
+    });
+    body.append(
+        statRow('Transactions', formatInteger(data.tx_count)),
+        statRow('Virtual size', formatBytes(data.virtual_size_vb)),
+        statRow('Total fees', formatBtc(data.total_fees_btc)),
+        feeRow,
+        statRow('Source', data.source || '--')
+    );
+    appendWarnings(body, data.warnings);
+}
+
+function renderExplorerResult(kind, data) {
+    if (!explorerEls.result) return;
+    explorerState.lastResult = { kind, data };
+    explorerEls.result.hidden = false;
+    explorerEls.result.replaceChildren();
+
+    const heading = document.createElement('div');
+    heading.className = 'result-heading';
+    const title = document.createElement('h3');
+    title.textContent = kind === 'tx' ? 'Transaction' : 'Block';
+    const ask = document.createElement('button');
+    ask.type = 'button';
+    ask.className = 'card-action';
+    ask.dataset.ask = 'result';
+    ask.textContent = 'Ask';
+    heading.append(title, ask);
+
+    const body = document.createElement('div');
+    body.className = 'result-body';
+    if (!data || data.error) {
+        body.appendChild(statRow('Error', data?.error || 'Lookup failed.'));
+        appendWarnings(body, data?.warnings);
+        explorerEls.result.append(heading, body);
+        return;
+    }
+
+    if (kind === 'tx') {
+        body.append(
+            statRow('Txid', shortHash(data.txid, 12, 12)),
+            statRow('Status', data.confirmed ? `${formatInteger(data.confirmations)} confirmations` : 'Unconfirmed'),
+            statRow('Block', data.block_height ? formatInteger(data.block_height) : '--'),
+            statRow('Inputs / outputs', `${formatInteger(data.input_count)} / ${formatInteger(data.output_count)}`),
+            statRow('Total output', formatBtc(data.total_output_btc)),
+            statRow('Fee rate', data.fee_rate_sats_vb == null ? '--' : `${Number(data.fee_rate_sats_vb).toFixed(2)} sats/vB`),
+            statRow('Source', data.source || '--')
+        );
+    } else {
+        body.append(
+            statRow('Height', formatInteger(data.height)),
+            statRow('Tx count', formatInteger(data.tx_count)),
+            statRow('Mined', formatTimestamp(data.time)),
+            statRow('Subsidy', formatBtc(data.subsidy_btc)),
+            statRow('Hash', shortHash(data.hash, 12, 12)),
+            statRow('Source', data.source || '--')
+        );
+    }
+    appendWarnings(body, data.warnings);
+    explorerEls.result.append(heading, body);
+}
+
+function promptForExplorer(kind, data) {
+    if (!data || data.error) {
+        return 'Explain why this Bitcoin explorer lookup failed and what I should try next.';
+    }
+    if (kind === 'latest') {
+        return `Explain the latest Bitcoin block at height ${data.height}, hash ${data.hash}, with ${data.tx_count} transactions.`;
+    }
+    if (kind === 'mempool') {
+        const fees = data.fee_estimates_sats_vb || {};
+        return `Explain the current Bitcoin mempool: ${data.tx_count} transactions, ${formatBtc(data.total_fees_btc)} total fees, and fee estimates of ${fees['2'] ?? '--'}, ${fees['6'] ?? '--'}, and ${fees['12'] ?? '--'} sats/vB.`;
+    }
+    if (kind === 'tx') {
+        return `Explain this Bitcoin transaction: ${data.txid}. Include confirmation status, fee rate, input/output counts, and what can and cannot be inferred.`;
+    }
+    return `Explain Bitcoin block ${data.height || data.hash}. Include transaction count, subsidy, timestamp, and what this block tells us.`;
+}
+
+function askChat(prompt) {
+    if (!prompt) return;
+    messageInput.value = prompt;
+    messageInput.dispatchEvent(new Event('input'));
+    chatForm.requestSubmit();
+}
+
+async function refreshExplorer() {
+    explorerSetStatus('Refreshing chain summaries...');
+    try {
+        const [latest, mempool] = await Promise.all([
+            fetchJson(`${API_BASE}/block/latest`),
+            fetchJson(`${API_BASE}/mempool/summary`),
+        ]);
+        renderLatestBlock(latest);
+        renderMempool(mempool);
+        explorerSetStatus(`Explorer updated ${new Date().toLocaleTimeString()}`);
+    } catch (error) {
+        explorerSetStatus(`Explorer refresh failed: ${error.message}`, true);
+        renderCardError(explorerEls.latestCard, 'Latest block unavailable.');
+        renderCardError(explorerEls.mempoolCard, 'Mempool unavailable.');
+    }
+}
+
+function inferLookupType(value, selected) {
+    if (selected === 'block' || selected === 'tx') return selected;
+    if (/^\d+$/.test(value)) return 'block';
+    if (/^[a-fA-F0-9]{64}$/.test(value)) return 'tx';
+    return null;
+}
+
+async function lookupExplorer(value, selectedType) {
+    const query = value.trim();
+    if (!query) {
+        explorerSetStatus('Enter a block height, block hash, or transaction id.', true);
+        return;
+    }
+    const type = inferLookupType(query, selectedType);
+    if (!type) {
+        explorerSetStatus('Use a block height, a 64-character hash, or choose a lookup type.', true);
+        return;
+    }
+
+    explorerSetStatus(type === 'tx' ? 'Looking up transaction...' : 'Looking up block...');
+    try {
+        const data = type === 'tx'
+            ? await fetchJson(`${API_BASE}/tx/${encodeURIComponent(query)}`)
+            : await fetchJson(`${API_BASE}/block/${encodeURIComponent(query)}`);
+        renderExplorerResult(type, data);
+        explorerSetStatus(type === 'tx' ? 'Transaction loaded.' : 'Block loaded.');
+        window.pgAnalytics?.track?.('bitcoin_explorer_lookup', { type });
+    } catch (error) {
+        renderExplorerResult(type, { error: error.message, warnings: [error.message] });
+        explorerSetStatus(`Lookup failed: ${error.message}`, true);
+        window.pgAnalytics?.track?.('bitcoin_explorer_failed', { type, message: error.message });
+    }
+}
+
+function wireExplorer() {
+    if (!explorerEls.panel) return;
+    explorerEls.refresh?.addEventListener('click', () => {
+        window.pgAnalytics?.track?.('bitcoin_explorer_refreshed');
+        refreshExplorer();
+    });
+    explorerEls.form?.addEventListener('submit', (event) => {
+        event.preventDefault();
+        lookupExplorer(explorerEls.input?.value || '', explorerEls.type?.value || 'auto');
+    });
+    explorerEls.panel.addEventListener('click', (event) => {
+        const button = event.target.closest('[data-ask]');
+        if (!button) return;
+        const askType = button.getAttribute('data-ask');
+        if (askType === 'latest') askChat(promptForExplorer('latest', explorerState.latestBlock));
+        else if (askType === 'mempool') askChat(promptForExplorer('mempool', explorerState.mempool));
+        else if (askType === 'result' && explorerState.lastResult) {
+            askChat(promptForExplorer(explorerState.lastResult.kind, explorerState.lastResult.data));
+        }
+    });
+}
+
 async function refreshStatus() {
     try {
         const status = await fetchJson(`${API_BASE}/status`);
@@ -369,4 +671,6 @@ if (promptChipsContainer) {
         promptChipsContainer.hidden = true;
     }, { once: true });
 }
+wireExplorer();
 refreshStatus();
+refreshExplorer();
