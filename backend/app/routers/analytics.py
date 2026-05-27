@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import json
+import os
 import re
+import time
 from datetime import datetime, timedelta
 from typing import Any, Optional
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -14,6 +16,9 @@ from app.database import AnalyticsEvent, get_db, utc_now
 router = APIRouter(prefix="/api/analytics", tags=["analytics"])
 
 RETENTION_DAYS = 90
+ANALYTICS_RATE_LIMIT_WINDOW_SECONDS = int(os.getenv("ANALYTICS_RATE_LIMIT_WINDOW_SECONDS", "60"))
+ANALYTICS_RATE_LIMIT_MAX_EVENTS = int(os.getenv("ANALYTICS_RATE_LIMIT_MAX_EVENTS", "120"))
+_analytics_rate_limit_store: dict[str, list[float]] = {}
 _SENSITIVE_KEY_RE = re.compile(
     r"(password|passwd|pwd|token|secret|api[_-]?key|apikey|authorization|cookie|session)",
     re.IGNORECASE,
@@ -87,6 +92,23 @@ def safe_json(value: dict[str, Any] | None) -> str | None:
     return json.dumps(redact_metadata(value), separators=(",", ":"), default=str)[:8000]
 
 
+def _analytics_client_key(request: Request) -> str:
+    return request.client.host if request.client else "unknown"
+
+
+def _analytics_rate_limited(request: Request, now: float | None = None) -> bool:
+    now = time.time() if now is None else now
+    key = _analytics_client_key(request)
+    cutoff = now - ANALYTICS_RATE_LIMIT_WINDOW_SECONDS
+    attempts = [t for t in _analytics_rate_limit_store.get(key, []) if t > cutoff]
+    if len(attempts) >= ANALYTICS_RATE_LIMIT_MAX_EVENTS:
+        _analytics_rate_limit_store[key] = attempts
+        return True
+    attempts.append(now)
+    _analytics_rate_limit_store[key] = attempts
+    return False
+
+
 def record_analytics_event(
     db: Session,
     *,
@@ -145,6 +167,9 @@ async def create_event(
     request: Request,
     db: Session = Depends(get_db),
 ):
+    if _analytics_rate_limited(request):
+        raise HTTPException(status_code=429, detail="Too many analytics events. Try again later.")
+
     path = payload.path or request.headers.get("x-analytics-path") or request.url.path
     is_admin = path == "/admin" or path.startswith("/admin/") or path.startswith("/api/admin")
     event = record_analytics_event(

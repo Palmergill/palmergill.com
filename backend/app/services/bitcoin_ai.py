@@ -4,7 +4,7 @@ import re
 import uuid
 import urllib.error
 import urllib.request
-from datetime import datetime, time, timezone
+from datetime import datetime, time, timedelta, timezone
 from typing import Any, Dict, List
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -362,13 +362,13 @@ def _answer_with_local_router(message: str, session_id: str, timezone_name: str 
         return _response(_transaction_answer(data), session_id, tools_used, data, warnings)
 
     if "mined" in normalized or "how many btc" in normalized:
-        start_time, end_time, timezone_warning = _today_window(timezone_name)
+        start_time, end_time, window_label, timezone_warning = _mined_window(message, timezone_name)
         if timezone_warning:
             warnings.append(timezone_warning)
         data = _local_tool_call(demo, "get_mined_stats", start_time, end_time)
         tools_used.append("get_mined_stats")
         warnings.extend(data.get("warnings", []))
-        return _response(_mined_answer(data, timezone_name), session_id, tools_used, data, warnings)
+        return _response(_mined_answer(data, window_label), session_id, tools_used, data, warnings)
 
     if "fee" in normalized or "mempool" in normalized:
         data = _local_tool_call(demo, "get_mempool_summary")
@@ -559,20 +559,48 @@ def _looks_conceptual(message: str) -> bool:
     return any(term in normalized for term in ("explain", "how does", "why", "what is", "utxo", "mining", "difficulty"))
 
 
-def _today_window(timezone_name: str | None) -> tuple[str, str, str | None]:
+def _user_zone(timezone_name: str | None) -> tuple[ZoneInfo | timezone, str | None]:
     warning = None
     try:
         user_zone = ZoneInfo(timezone_name or "UTC")
     except ZoneInfoNotFoundError:
         user_zone = timezone.utc
-        warning = f"Unknown timezone {timezone_name}; interpreted today in UTC."
+        warning = f"Unknown timezone {timezone_name}; interpreted the time window in UTC."
+    return user_zone, warning
+
+
+def _iso_utc(value: datetime) -> str:
+    return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def _today_window(timezone_name: str | None) -> tuple[str, str, str | None]:
+    user_zone, warning = _user_zone(timezone_name)
 
     now = datetime.now(user_zone)
     start_local = datetime.combine(now.date(), time.min, tzinfo=user_zone)
     end_local = now
-    start_utc = start_local.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
-    end_utc = end_local.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
-    return start_utc, end_utc, warning
+    return _iso_utc(start_local), _iso_utc(end_local), warning
+
+
+def _mined_window(message: str, timezone_name: str | None) -> tuple[str, str, str, str | None]:
+    normalized = message.strip().lower()
+    user_zone, warning = _user_zone(timezone_name)
+    now = datetime.now(user_zone)
+
+    last_hours = re.search(r"\blast\s+(\d{1,3})\s+hours?\b", normalized)
+    if last_hours:
+        hours = max(1, min(168, int(last_hours.group(1))))
+        start = now - timedelta(hours=hours)
+        return _iso_utc(start), _iso_utc(now), f"the last {hours} hour{'s' if hours != 1 else ''}", warning
+
+    if "yesterday" in normalized:
+        target = now.date() - timedelta(days=1)
+        start = datetime.combine(target, time.min, tzinfo=user_zone)
+        end = start + timedelta(days=1, microseconds=-1)
+        return _iso_utc(start), _iso_utc(end), f"yesterday ({timezone_name or 'UTC'})", warning
+
+    start_utc, end_utc, _ = _today_window(timezone_name)
+    return start_utc, end_utc, f"today ({timezone_name or 'UTC'})", warning
 
 
 def _status_answer(data: Dict[str, Any]) -> str:
@@ -616,12 +644,11 @@ def _mempool_answer(data: Dict[str, Any]) -> str:
     )
 
 
-def _mined_answer(data: Dict[str, Any], timezone_name: str | None) -> str:
+def _mined_answer(data: Dict[str, Any], window_label: str) -> str:
     if data.get("error"):
         return data["error"]
-    zone_text = timezone_name or "UTC"
     return (
-        f"So far today (**{zone_text}**):\n\n"
+        f"For **{window_label}**:\n\n"
         f"- **Blocks counted:** {data.get('blocks_counted')}\n"
         f"- **New subsidy:** {data.get('subsidy_btc')} BTC\n"
         "- **Not included:** transaction fees, because fees are not new BTC issuance"

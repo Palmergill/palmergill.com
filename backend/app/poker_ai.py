@@ -2,7 +2,7 @@
 AI Bot for Texas Hold'em Poker
 """
 import random
-import asyncio
+import time
 from typing import Optional
 from app.poker_game import PokerGame, Player, Card, HandRank
 
@@ -261,7 +261,7 @@ class AIManager:
                 'player_name': current.name,
                 'action': decision['action'],
                 'amount': decision.get('amount'),
-                'timestamp': asyncio.get_event_loop().time()
+                'timestamp': time.monotonic()
             }
         else:
             logger.warning(f"Bot {current.name} failed to execute {decision['action']}")

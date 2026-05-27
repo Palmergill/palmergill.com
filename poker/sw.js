@@ -4,8 +4,13 @@ const CACHE_PREFIX = 'poker-app-';
 const STATIC_ASSETS = [
     '/poker/',
     '/poker/index.html',
-    '/poker/app.js?v=14',
-    '/poker/manifest.json'
+    '/poker/style.css?v=15',
+    '/poker/app.js?v=16',
+    '/poker/manifest.json',
+    '/shared/site-nav.css?v=6',
+    '/shared/site-nav.js?v=6',
+    '/shared/analytics.js?v=1',
+    '/shared/api-base.js?v=1'
 ];
 
 // Install event - cache static assets

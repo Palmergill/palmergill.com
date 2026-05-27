@@ -9,12 +9,14 @@ from app.main import (
     app,
     create_app_session_token,
 )
+from app.routers import analytics as analytics_router
 from app.routers.admin import cleanup_old_logs
 from app.routers.analytics import cleanup_old_analytics, record_analytics_event, safe_json
 from app.routers import poker
+from app.services import bitcoin_ai
 from app.poker_ai import AIManager
 from app.poker_game import PokerGame
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 
 
 client = TestClient(app)
@@ -27,6 +29,7 @@ def setup_function():
     poker.ai_last_processed.clear()
     poker.player_tokens.clear()
     poker._rate_limit_store.clear()
+    analytics_router._analytics_rate_limit_store.clear()
     _auth_failure_store.clear()
     Base.metadata.create_all(bind=engine)
     db = SessionLocal()
@@ -343,3 +346,59 @@ def test_poker_game_state_loads_from_persisted_store_after_memory_clear():
 
     assert response.status_code == 200
     assert response.json()["game_id"] == game_id
+
+
+def test_public_analytics_events_are_rate_limited(monkeypatch):
+    monkeypatch.setattr(analytics_router, "ANALYTICS_RATE_LIMIT_MAX_EVENTS", 2)
+    monkeypatch.setattr(analytics_router, "ANALYTICS_RATE_LIMIT_WINDOW_SECONDS", 60)
+    analytics_router._analytics_rate_limit_store.clear()
+
+    payload = {
+        "event_type": "app_event",
+        "event_name": "rate_limit_probe",
+        "app": "test",
+        "path": "/test",
+    }
+
+    assert client.post("/api/analytics/events", json=payload).status_code == 200
+    assert client.post("/api/analytics/events", json=payload).status_code == 200
+    limited = client.post("/api/analytics/events", json=payload)
+
+    assert limited.status_code == 429
+
+    db = SessionLocal()
+    try:
+        assert db.query(AnalyticsEvent).filter(AnalyticsEvent.event_name == "rate_limit_probe").count() == 2
+    finally:
+        db.close()
+
+
+def test_bitcoin_mined_yesterday_uses_yesterday_window(monkeypatch):
+    captured = {}
+
+    def fake_tool_call(demo, name, start_time, end_time):
+        captured["demo"] = demo
+        captured["name"] = name
+        captured["start_time"] = start_time
+        captured["end_time"] = end_time
+        return {
+            "source": "demo",
+            "blocks_counted": 144,
+            "subsidy_btc": 450,
+            "warnings": [],
+        }
+
+    monkeypatch.setattr(bitcoin_ai, "_local_tool_call", fake_tool_call)
+
+    response = bitcoin_ai.answer_demo_chat("How many BTC were mined yesterday?", timezone_name="UTC")
+    start = datetime.fromisoformat(captured["start_time"].replace("Z", "+00:00"))
+    end = datetime.fromisoformat(captured["end_time"].replace("Z", "+00:00"))
+    expected_day = datetime.now(timezone.utc).date() - timedelta(days=1)
+
+    assert captured["demo"] is True
+    assert captured["name"] == "get_mined_stats"
+    assert start.date() == expected_day
+    assert start.hour == 0 and start.minute == 0 and start.second == 0
+    assert end.date() == expected_day
+    assert end.hour == 23 and end.minute == 59 and end.second == 59
+    assert "yesterday" in response["answer"].lower()
