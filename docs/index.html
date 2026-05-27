@@ -89,7 +89,7 @@
                     <div class="summary-card">
                         <span>Backend</span>
                         <strong>FastAPI</strong>
-                        <p>Shared routes support stock data, poker, Bitcoin chat, and admin logs.</p>
+                        <p>Shared routes support stock data, poker, Bitcoin chat, analytics ingest, and admin logs.</p>
                     </div>
                     <div class="summary-card">
                         <span>Hosting</span>
@@ -542,14 +542,17 @@
                         <ul>
                             <li><code>/</code></li>
                             <li><code>/docs/*</code></li>
+                            <li><code>/login/*</code></li>
                             <li><code>/stock-research/*</code> demo mode</li>
                             <li><code>/bitcoin-chat/*</code> demo mode</li>
+                            <li><code>/casino/*</code></li>
                             <li><code>/poker/*</code></li>
                             <li><code>/craps/*</code></li>
                             <li><code>/blackjack/*</code></li>
                             <li><code>/api/poker/*</code></li>
                             <li><code>/api/stocks/*</code> demo mode without credentials</li>
                             <li><code>/api/bitcoin/*</code> demo mode without credentials</li>
+                            <li><code>/api/analytics/*</code></li>
                         </ul>
                     </div>
                     <div class="panel">
@@ -558,7 +561,7 @@
                             <li>Live <code>/api/stocks/*</code> with valid Basic Auth credentials</li>
                             <li>Live <code>/api/bitcoin/*</code> with valid Basic Auth credentials</li>
                             <li><code>/admin/*</code></li>
-                            <li><code>/api/*</code> except public demo and poker routes</li>
+                            <li><code>/api/*</code> except public demo, poker, and analytics routes</li>
                         </ul>
                     </div>
                 </div>
@@ -574,15 +577,19 @@
                     </article>
                     <article>
                         <h3><code>/api/poker/*</code></h3>
-                        <p>Integrated poker game endpoints for game creation, game state, player-token validation, player actions, buy-back, next hand, per-IP write rate limiting, and health.</p>
+                        <p>Integrated poker game endpoints for game creation (cash, sit-and-go tournament, or multiplayer lobby), game state, player-token validation, player actions, buy-back, next hand, per-IP write rate limiting, and health. Includes a <code>GET /api/poker/games/{game_id}/ws</code> WebSocket push channel; clients fall back to polling.</p>
                     </article>
                     <article>
                         <h3><code>/api/bitcoin/*</code></h3>
                         <p>Bitcoin health, node status, latest block, block lookup, transaction lookup, mempool summary, and chat.</p>
                     </article>
                     <article>
+                        <h3><code>/api/analytics/*</code></h3>
+                        <p>Public client analytics ingest. <code>POST /api/analytics/events</code> records page views and app events; the admin dashboard surfaces aggregates via the protected analytics endpoints under <code>/api/admin/analytics/*</code>.</p>
+                    </article>
+                    <article>
                         <h3><code>/api/admin/*</code></h3>
-                        <p>Protected structured log and file-tail endpoints used by the admin dashboard.</p>
+                        <p>Protected structured log, log file-tail, and analytics summary endpoints used by the admin dashboard.</p>
                     </article>
                     <article>
                         <h3><code>/health</code></h3>
@@ -611,8 +618,10 @@
                     <article>
                         <h3>Texas Hold'em Poker</h3>
                         <p>
-                            Browser poker app with AI opponents, multiplayer lobbies, persisted player stats,
-                            theme controls, card deck themes, dark mode, PWA support, and a public integrated API.
+                            Browser poker app with named AI personalities, single-table sit-and-go tournaments,
+                            multiplayer lobbies, WebSocket-driven state updates with polling fallback, persisted
+                            player stats and per-session hand history, theme controls, card deck themes, dark mode,
+                            PWA support, and a public integrated API.
                         </p>
                         <a href="/poker/">Open app</a>
                     </article>

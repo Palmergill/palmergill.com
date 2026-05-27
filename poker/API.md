@@ -14,7 +14,7 @@ Write endpoints use a simple per-IP sliding-window rate limit of 60 requests per
 
 ## Game Storage
 
-Games are stored in memory in the shared backend process and expire after one hour without access. A backend restart clears active games.
+Games are cached in process and snapshotted to the backend database after every mutating call. They expire after one hour without access. A fresh backend process can recover an in-flight game by `game_id` and player token until the cleanup window removes it. See "State Storage" below for the full list of trigger points.
 
 ## Endpoints
 
@@ -24,7 +24,7 @@ Games are stored in memory in the shared backend process and expire after one ho
 POST /api/poker/games
 ```
 
-Creates either a single-player game with five AI bots or a multiplayer lobby.
+Creates either a single-player cash game against five AI bots, a sit-and-go tournament against the same lineup, or a multiplayer lobby.
 
 Request:
 
@@ -41,10 +41,10 @@ Fields:
 | Field | Type | Required | Notes |
 | --- | --- | --- | --- |
 | `player_name` | string | No | Defaults to `Player`. |
-| `game_type` | string | No | `single` starts immediately with AI bots; `multiplayer` creates a lobby. |
+| `game_type` | string | No | `single` starts a cash game against AI; `tournament` starts a sit-and-go against AI with a 12-level blind schedule; `multiplayer` creates a lobby. |
 | `max_players` | integer | No | Defaults to 6 for multiplayer games. |
 
-`game_type` must be `single` or `multiplayer`.
+`game_type` must be `single`, `tournament`, or `multiplayer`.
 
 Response includes `game_id`, `player_id`, `player_token`, `state`, and `game_type`. Multiplayer lobby responses also include `players` and `waiting`.
 
@@ -118,7 +118,7 @@ Request:
 }
 ```
 
-Advances at most one AI bot turn for a single-player game and returns the updated game state. Multiplayer games and human turns are returned unchanged.
+Advances at most one AI bot turn for a single-player or tournament game and returns the updated game state. Multiplayer games and human turns are returned unchanged.
 
 ### Player Action
 
@@ -180,6 +180,14 @@ Request:
 
 Starts the next hand after showdown or while waiting. The dealer button advances before the hand starts.
 
+### WebSocket Push Channel
+
+```http
+GET /api/poker/games/{game_id}/ws
+```
+
+Server-to-client push channel. On connect the server emits `{"type": "hello", "game_id": "..."}` once, then `{"type": "state_changed"}` whenever any mutating action lands. Clients should react to each ping by issuing a regular `GET /api/poker/games/{game_id}` to fetch the new state; the WebSocket itself carries no game payload and requires no auth, so a stray subscriber only learns "this game changed." Polling at a 3s cadence is used as a fallback when the socket is unavailable.
+
 ### CSRF Compatibility Token
 
 ```http
@@ -223,9 +231,10 @@ The shared backend returns a `state` object shaped like:
 | `last_ai_action` | Last AI action for display. |
 | `hand_number` | Current hand number. |
 | `min_raise` | Minimum raise amount. |
-| `game_type` | `single` or `multiplayer`. |
+| `game_type` | `single`, `tournament`, or `multiplayer`. |
 | `max_players` | Multiplayer seat limit. |
 | `waiting_for_players` | Lobby/waiting flag. |
+| `tournament` | Present only when `game_type` is `tournament`. Includes the current blind level, blinds, hands until the next level, and an ordered list of eliminations. |
 
 ## Errors
 

@@ -5,15 +5,16 @@ This list tracks the poker app as it is currently wired into the root site. The 
 ## Current Active Features
 
 - [x] Static `/poker/` frontend with vanilla HTML/CSS/JS.
-- [x] Single-player Texas Hold'em against five AI bots.
+- [x] Single-player Texas Hold'em against five AI bots with named personality archetypes.
+- [x] Single-table sit-and-go tournament mode with a 12-level blind schedule and elimination tracking.
 - [x] Multiplayer lobby create/join/start flow.
-- [x] Polling-based game updates.
+- [x] WebSocket push channel for state-change notifications, with polling fallback.
 - [x] Player actions: fold, check, call, raise.
 - [x] Buy-back flow for busted players between hands.
 - [x] Next-hand flow after showdown.
-- [x] In-memory game cleanup after one hour of inactivity.
+- [x] Database-backed game snapshots with an in-process cache; one-hour cleanup for inactive games.
 - [x] PWA manifest and service worker.
-- [x] Local browser stats via `localStorage`.
+- [x] Local browser stats via `localStorage`, including a per-session hand history panel.
 - [x] Sound effects, haptic turn notification, themes, card deck themes, and mobile gestures.
 - [x] Root Jest utility tests for poker frontend helpers.
 
@@ -24,11 +25,12 @@ This list tracks the poker app as it is currently wired into the root site. The 
 
 ## Product/Backend Improvements
 
-- [ ] Persist active games across backend restarts.
+- [x] Persist active games across backend restarts (DB snapshot per mutation).
 - [ ] Add optional user accounts or durable player sessions.
+- [x] Per-session hand history (client-side, last 20 hands).
 - [ ] Add server-side hand history if it is still a product goal.
 - [ ] Add chat only after defining the shared backend API surface.
-- [ ] Evaluate WebSockets for lower-latency multiplayer updates.
+- [x] WebSocket push channel for lower-latency multiplayer updates (polling stays as fallback).
 - [ ] Consider Redis or another shared store before horizontal scaling.
 
 ## Documentation

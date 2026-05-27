@@ -2,7 +2,7 @@
 
 This document describes the poker app as it is wired in the current root site deployment.
 
-**Last Updated:** May 22, 2026
+**Last Updated:** May 27, 2026
 
 ## Active Runtime
 
@@ -41,13 +41,14 @@ The active frontend is a static vanilla HTML/CSS/JS app:
 - `poker/sw.js` and `poker/manifest.json` - PWA support.
 - `poker/tests/` - Jest utility tests.
 
-The frontend polls game state rather than using WebSockets. State polling uses `GET /api/poker/games/{game_id}` with `process_ai=false`; AI turns are advanced separately with `POST /api/poker/games/{game_id}/process-ai`.
+The frontend subscribes to a WebSocket push channel at `/api/poker/games/{game_id}/ws` and falls back to polling. The server fans a `state_changed` ping to subscribed sockets whenever a mutating action lands; the client then fetches the latest state via the regular `GET /api/poker/games/{game_id}` endpoint with `process_ai=false`. Polling continues at a 3s cadence as a fallback. AI turns are advanced separately with `POST /api/poker/games/{game_id}/process-ai`.
 
 ## Backend
 
 The active shared router provides:
 
-- Single-player games with five AI bots.
+- Single-player games against five named AI bots with distinct personality archetypes (TAG, LP, Maniac, Rock, Std).
+- Single-table sit-and-go tournament mode with a 12-level blind schedule and elimination tracking.
 - Multiplayer lobby create/join/start.
 - Database-backed game snapshots with an in-process cache.
 - One-hour cleanup for inactive games.
@@ -56,9 +57,10 @@ The active shared router provides:
 - Player actions: fold, check, call, raise.
 - Buy-back between hands.
 - Next-hand flow after showdown.
+- WebSocket push channel for state-change notifications.
 - Basic poker health endpoint.
 
-The active shared router does not provide tournaments, chat endpoints, detailed health, analytics, backups, spectator endpoints, CSRF enforcement, or WebSockets.
+The active shared router does not provide chat endpoints, detailed health, analytics, backups, spectator endpoints, or CSRF enforcement.
 
 ## Data Flow
 
@@ -91,7 +93,7 @@ sequenceDiagram
 - Static frontend: served from `poker/` by Vercel/root static hosting.
 - API: `/api/poker/*` is routed to the shared Railway backend.
 - Auth: `/poker/*` and `/api/poker/*` are public.
-- Persistence: active games live in process memory and do not survive backend restarts.
+- Persistence: active games are kept in process memory and snapshotted to the backend database after each mutation, so a fresh backend process can recover a game by `game_id` and player token until the one-hour inactive cleanup removes it.
 
 ## Tests
 

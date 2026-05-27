@@ -56,8 +56,9 @@ Poker, craps, blackjack, login, and `/api/poker/*` remain public. Stock research
 ## Routers
 
 - `/api/stocks/*` - stock lookup, summary, earnings, and price history.
-- `/api/poker/*` - active integrated poker game API.
+- `/api/poker/*` - active integrated poker game API plus the `GET /api/poker/games/{game_id}/ws` WebSocket push channel.
 - `/api/bitcoin/*` - Bitcoin provider status, block/transaction/mempool lookups, and chat.
-- `/api/admin/*` - protected structured log and file-tail endpoints.
+- `/api/analytics/*` - public client analytics ingest (`POST /api/analytics/events`).
+- `/api/admin/*` - protected structured log and file-tail endpoints, including the analytics summary surfaced in the admin dashboard.
 
 The root deployment runs this shared backend. Poker is served by `app/routers/poker.py` plus the shared game and AI modules.

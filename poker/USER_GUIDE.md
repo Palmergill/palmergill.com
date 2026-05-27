@@ -19,8 +19,8 @@ Welcome to the Poker App! This guide will help you get started playing Texas Hol
 
 1. Visit https://palmergill.com/poker/
 2. Enter your name
-3. Click "Play vs AI" for a single-player game, or create/join a multiplayer game
-4. Single-player play starts automatically against five AI opponents
+3. Click "Play vs AI" for a single-player cash game, "Sit-and-Go Tournament" for a single-table SNG against AI, or create/join a multiplayer game
+4. Single-player and tournament modes start automatically against five named AI opponents
 
 ---
 
@@ -157,8 +157,13 @@ Click "Stats" on the start screen to view:
 - Biggest pot won
 - Net profit/loss
 - Best hand achieved
+- Last 20 hands with result, hole cards, board, and P/L
 
-Stats persist across sessions using browser storage.
+Stats persist across sessions using browser storage. The hand history can be cleared independently with the "Clear" control in the modal.
+
+### Sit-and-Go Tournament
+
+Click "Sit-and-Go Tournament" on the start screen to play a single-table SNG against the same five AI opponents. Everyone starts with 1500 chips and a 12-level blind schedule escalates every six hands. The in-game banner shows the current level, blinds, hands until the next level, and players remaining; eliminations are tracked in order so finishing position is preserved.
 
 ### Multiplayer
 
@@ -239,10 +244,17 @@ Watch for:
 
 ### Bluffing
 
-AI opponents have different personalities:
-- Some fold easily to aggression
-- Others call too much
-- Adjust your strategy accordingly
+AI opponents have distinct personality archetypes labeled on each seat:
+
+| Bot | Archetype | What to expect |
+|-----|-----------|---------------|
+| Reg | Tight-Aggressive (TAG) | Folds weak hands, bets value hard. |
+| Cal | Loose-Passive (LP) | Calls too much; raise for value, fold to its aggression. |
+| Action Jackson | Maniac | Bets and raises light; trap with strong hands. |
+| Stone | Rock | Folds almost everything; respect a raise. |
+| Avery | Standard | Balanced baseline. |
+
+Adjust your strategy by opponent.
 
 ---
 
@@ -275,7 +287,7 @@ AI opponents have different personalities:
 
 ### Lost Connection
 
-The game polls the backend for updates. If polling does not recover:
+The game uses a WebSocket push channel for live updates and falls back to polling when the socket is unavailable. If neither recovers:
 1. Refresh the page
 2. Use the same game ID if you have it
 

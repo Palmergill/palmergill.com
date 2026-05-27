@@ -135,7 +135,7 @@ Check `TASKS.md` for incomplete tasks. Priority areas:
 
 - **Testing**: Add tests for the active shared poker router
 - **Documentation**: User guides, API docs
-- **Performance**: WebSocket migration from polling
+- **Reliability**: Reconnect/backoff hardening on the WebSocket push channel
 
 ## Reporting Issues
 
