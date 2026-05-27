@@ -4,6 +4,19 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Casino Games - Palmer Gill</title>
+    <meta name="description" content="Browser-based casino games — Texas Hold'em poker, craps, and blackjack — built by Palmer Gill.">
+    <meta name="theme-color" content="#0a3d24">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://palmergill.com/casino/">
+    <meta property="og:title" content="Casino Games — Palmer Gill">
+    <meta property="og:description" content="Browser-based casino games — Texas Hold'em poker, craps, and blackjack.">
+    <meta property="og:image" content="https://palmergill.com/assets/palmer-gill-logo.png">
+    <meta property="og:image:width" content="960">
+    <meta property="og:image:height" content="960">
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="Casino Games — Palmer Gill">
+    <meta name="twitter:description" content="Browser-based casino games — Texas Hold'em poker, craps, and blackjack.">
+    <meta name="twitter:image" content="https://palmergill.com/assets/palmer-gill-logo.png">
     <link rel="icon" type="image/png" href="/assets/palmer-gill-logo-small.png">
     <link rel="stylesheet" href="/shared/site-nav.css?v=6">
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -229,6 +242,128 @@
             align-items: stretch;
             gap: 26px;
             perspective: 1400px;
+        }
+
+        .your-house {
+            margin-bottom: clamp(32px, 4vw, 48px);
+            padding: clamp(20px, 3vw, 32px);
+            border: 1px solid rgba(232, 199, 115, 0.28);
+            border-radius: 14px;
+            background:
+                linear-gradient(180deg, rgba(232, 199, 115, 0.06), rgba(0, 0, 0, 0.18));
+            box-shadow: 0 10px 36px rgba(0, 0, 0, 0.36);
+        }
+
+        .your-house-header {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            margin-bottom: 22px;
+        }
+
+        .your-house-title {
+            font-family: "Playfair Display", Georgia, serif;
+            font-size: clamp(1.4rem, 2.4vw, 1.8rem);
+            font-weight: 700;
+            color: var(--gold);
+            letter-spacing: 0.02em;
+        }
+
+        .your-house-name {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 0.84rem;
+            color: var(--muted);
+        }
+
+        .your-house-name input {
+            min-width: 120px;
+            padding: 7px 12px;
+            border: 1px solid rgba(232, 199, 115, 0.3);
+            border-radius: 8px;
+            background: rgba(0, 0, 0, 0.28);
+            color: var(--cream);
+            font: inherit;
+            font-size: 0.86rem;
+        }
+
+        .your-house-name input:focus {
+            outline: none;
+            border-color: var(--gold);
+            box-shadow: 0 0 0 2px rgba(232, 199, 115, 0.24);
+        }
+
+        .your-house-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 14px;
+        }
+
+        .stat-tile {
+            padding: 16px 18px;
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 10px;
+            background: rgba(0, 0, 0, 0.28);
+        }
+
+        .stat-label {
+            color: var(--quiet);
+            font-size: 0.7rem;
+            font-weight: 700;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+        }
+
+        .stat-value {
+            margin-top: 8px;
+            font-family: "Playfair Display", Georgia, serif;
+            font-size: clamp(1.4rem, 2.4vw, 1.9rem);
+            font-weight: 700;
+            color: var(--cream);
+            line-height: 1.1;
+        }
+
+        .stat-value.is-positive { color: #74d39a; }
+        .stat-value.is-negative { color: #e07a6a; }
+
+        .your-house-foot {
+            margin-top: 14px;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            gap: 12px;
+            font-size: 0.78rem;
+            color: var(--quiet);
+        }
+
+        .your-house-reset {
+            border: 1px solid rgba(232, 199, 115, 0.3);
+            border-radius: 999px;
+            background: transparent;
+            color: var(--cream);
+            padding: 6px 14px;
+            font-size: 0.74rem;
+            font-weight: 700;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            cursor: pointer;
+            transition: background 180ms ease, border-color 180ms ease;
+        }
+
+        .your-house-reset:hover,
+        .your-house-reset:focus-visible {
+            background: rgba(232, 199, 115, 0.14);
+            border-color: var(--gold);
+            outline: none;
+        }
+
+        @media (max-width: 720px) {
+            .your-house-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
         }
 
         .game-card {
@@ -499,6 +634,38 @@
             <section class="section" aria-labelledby="games-title">
                 <h2 id="games-title" class="sr-only">Casino games</h2>
 
+                <aside class="your-house" id="yourHouse" aria-labelledby="yourHouseTitle" hidden>
+                    <div class="your-house-header">
+                        <h3 class="your-house-title" id="yourHouseTitle">Your House</h3>
+                        <label class="your-house-name">
+                            <span>Name</span>
+                            <input type="text" id="yourHouseName" maxlength="24" autocomplete="off" spellcheck="false" placeholder="Anonymous">
+                        </label>
+                    </div>
+                    <div class="your-house-grid">
+                        <div class="stat-tile">
+                            <div class="stat-label">Bankroll</div>
+                            <div class="stat-value" id="statBankroll">$0</div>
+                        </div>
+                        <div class="stat-tile">
+                            <div class="stat-label">Hands Played</div>
+                            <div class="stat-value" id="statHands">0</div>
+                        </div>
+                        <div class="stat-tile">
+                            <div class="stat-label">Net P/L</div>
+                            <div class="stat-value" id="statNet">$0</div>
+                        </div>
+                        <div class="stat-tile">
+                            <div class="stat-label">Biggest Win</div>
+                            <div class="stat-value" id="statBiggest">$0</div>
+                        </div>
+                    </div>
+                    <div class="your-house-foot">
+                        <span id="statBreakdown">No games played yet.</span>
+                        <button type="button" class="your-house-reset" id="yourHouseReset">Reset all</button>
+                    </div>
+                </aside>
+
                 <div class="games-grid">
                     <a href="/poker/" class="game-card" data-suit="spade">
                         <span class="corner-rank tl">A♠</span>
@@ -576,5 +743,72 @@
 
     <script src="/shared/site-nav.js?v=6"></script>
     <script src="/shared/analytics.js?v=1"></script>
+    <script src="/shared/casino-profile.js?v=1"></script>
+    <script>
+        (function () {
+            const profile = window.CasinoProfile;
+            if (!profile) return;
+
+            const panel = document.getElementById('yourHouse');
+            const nameInput = document.getElementById('yourHouseName');
+            const resetBtn = document.getElementById('yourHouseReset');
+            const bankrollEl = document.getElementById('statBankroll');
+            const handsEl = document.getElementById('statHands');
+            const netEl = document.getElementById('statNet');
+            const biggestEl = document.getElementById('statBiggest');
+            const breakdownEl = document.getElementById('statBreakdown');
+
+            if (!panel) return;
+
+            function fmtMoney(n) {
+                const sign = n < 0 ? '-' : '';
+                return sign + '$' + Math.abs(Math.round(n)).toLocaleString();
+            }
+
+            function classifyMoney(el, value) {
+                el.classList.remove('is-positive', 'is-negative');
+                if (value > 0) el.classList.add('is-positive');
+                else if (value < 0) el.classList.add('is-negative');
+            }
+
+            function gameLabel(game) {
+                return { poker: 'Poker', craps: 'Craps', blackjack: 'Blackjack' }[game] || game;
+            }
+
+            function render() {
+                const bankroll = profile.getBankroll();
+                const stats = profile.getAggregateStats();
+                bankrollEl.textContent = fmtMoney(bankroll);
+                handsEl.textContent = stats.totalHands.toLocaleString();
+                netEl.textContent = fmtMoney(stats.netProfit);
+                classifyMoney(netEl, stats.netProfit);
+                biggestEl.textContent = fmtMoney(stats.biggestWin);
+
+                const parts = Object.entries(stats.byGame)
+                    .filter(([, s]) => s.handsPlayed > 0)
+                    .map(([game, s]) => `${gameLabel(game)} ${s.handsPlayed} · ${fmtMoney(s.netProfit)}`);
+                breakdownEl.textContent = parts.length ? parts.join('  •  ') : 'No games played yet.';
+            }
+
+            nameInput.value = profile.getDisplayName();
+            nameInput.addEventListener('change', () => {
+                const saved = profile.setDisplayName(nameInput.value);
+                nameInput.value = saved;
+            });
+
+            resetBtn.addEventListener('click', () => {
+                if (!window.confirm('Reset bankroll and stats across all casino games?')) return;
+                profile.resetAll();
+                nameInput.value = '';
+                render();
+            });
+
+            panel.hidden = false;
+            render();
+            window.addEventListener('storage', (e) => {
+                if (e.key && e.key.startsWith('casino-')) render();
+            });
+        })();
+    </script>
 </body>
 </html>

@@ -1,6 +1,12 @@
 (function () {
     const game = window.BlackjackGame;
-    let state = game.createState();
+    const profile = window.CasinoProfile || null;
+    const initialBankroll = profile ? profile.getBankroll() : undefined;
+    let state = game.createState(
+        initialBankroll !== undefined ? { bankroll: initialBankroll } : {}
+    );
+    let balanceBeforeRound = state.balance;
+    const shoeStats = { wins: 0, losses: 0, pushes: 0, dealerBusts: 0, rounds: 0 };
     let previousUi = {
         balance: null,
         bet: null,
@@ -21,6 +27,14 @@
         actionControls: document.getElementById("actionControls"),
         activeHandLabel: document.getElementById("activeHandLabel"),
         balance: document.getElementById("balance"),
+        statWins: document.getElementById("statWins"),
+        statLosses: document.getElementById("statLosses"),
+        statPushes: document.getElementById("statPushes"),
+        statDealerBust: document.getElementById("statDealerBust"),
+        statHiLo: document.getElementById("statHiLo"),
+        countTile: document.getElementById("countTile"),
+        countToggleButton: document.getElementById("countToggleButton"),
+        strategyToggleButton: document.getElementById("strategyToggleButton"),
         betAmount: document.getElementById("betAmount"),
         bettingControls: document.getElementById("bettingControls"),
         betDownButton: document.getElementById("betDownButton"),
@@ -44,6 +58,173 @@
 
     function sleep(ms) {
         return new Promise((resolve) => setTimeout(resolve, ms));
+    }
+
+    function renderShoeStats() {
+        if (!els.statWins) return;
+        els.statWins.textContent = shoeStats.wins;
+        els.statLosses.textContent = shoeStats.losses;
+        els.statPushes.textContent = shoeStats.pushes;
+        const pct = shoeStats.rounds === 0
+            ? "0%"
+            : Math.round((shoeStats.dealerBusts / shoeStats.rounds) * 100) + "%";
+        els.statDealerBust.textContent = pct;
+    }
+
+    // Basic strategy lookup. dealerKey ∈ {2..10, "A"}. Player keys: hard total,
+    // soft total (with usable ace), or pair rank.
+    const BASIC_STRATEGY = {
+        pairs: {
+            "A": "Y Y Y Y Y Y Y Y Y Y".split(" "),
+            "10": "N N N N N N N N N N".split(" "),
+            "9": "Y Y Y Y Y N Y Y N N".split(" "),
+            "8": "Y Y Y Y Y Y Y Y Y Y".split(" "),
+            "7": "Y Y Y Y Y Y N N N N".split(" "),
+            "6": "Y Y Y Y Y N N N N N".split(" "),
+            "5": "N N N N N N N N N N".split(" "),
+            "4": "N N N Y Y N N N N N".split(" "),
+            "3": "Y Y Y Y Y Y N N N N".split(" "),
+            "2": "Y Y Y Y Y Y N N N N".split(" "),
+        },
+        soft: {
+            20: "S S S S S S S S S S".split(" "),
+            19: "S S S S S S S S S S".split(" "),
+            18: "S D D D D S S H H H".split(" "),
+            17: "H D D D D H H H H H".split(" "),
+            16: "H H D D D H H H H H".split(" "),
+            15: "H H D D D H H H H H".split(" "),
+            14: "H H H D D H H H H H".split(" "),
+            13: "H H H D D H H H H H".split(" "),
+        },
+        hard: {
+            17: "S S S S S S S S S S".split(" "),
+            16: "S S S S S H H H H H".split(" "),
+            15: "S S S S S H H H H H".split(" "),
+            14: "S S S S S H H H H H".split(" "),
+            13: "S S S S S H H H H H".split(" "),
+            12: "H H S S S H H H H H".split(" "),
+            11: "D D D D D D D D D H".split(" "),
+            10: "D D D D D D D D H H".split(" "),
+            9:  "H D D D D H H H H H".split(" "),
+            8:  "H H H H H H H H H H".split(" "),
+        }
+    };
+
+    function dealerKeyIndex(card) {
+        if (!card) return -1;
+        const r = card.rank;
+        if (r === "A") return 9;
+        if (r === "K" || r === "Q" || r === "J" || r === "10") return 8;
+        return Number(r) - 2;
+    }
+
+    function recommendAction(hand, dealerUpCard, canSplitHand, canDoubleHand) {
+        if (!hand || hand.cards.length < 2 || !dealerUpCard) return null;
+        const idx = dealerKeyIndex(dealerUpCard);
+        if (idx < 0) return null;
+        const cards = hand.cards;
+
+        if (canSplitHand && cards.length === 2 && cards[0].rank === cards[1].rank) {
+            const rankKey = ["K","Q","J"].includes(cards[0].rank) ? "10" : cards[0].rank;
+            const row = BASIC_STRATEGY.pairs[rankKey];
+            if (row && row[idx] === "Y") return "split";
+        }
+
+        const value = game.handValue(cards);
+        if (value.soft && value.total >= 13 && value.total <= 20) {
+            const row = BASIC_STRATEGY.soft[value.total];
+            if (row) {
+                const code = row[idx];
+                if (code === "D") return canDoubleHand ? "double" : (value.total === 18 && idx <= 1 ? "stand" : "hit");
+                if (code === "S") return "stand";
+                return "hit";
+            }
+        }
+
+        let row = BASIC_STRATEGY.hard[value.total];
+        if (!row && value.total >= 17) row = BASIC_STRATEGY.hard[17];
+        if (!row && value.total <= 8) row = BASIC_STRATEGY.hard[8];
+        if (!row) return null;
+        const code = row[idx];
+        if (code === "D") return canDoubleHand ? "double" : "hit";
+        if (code === "S") return "stand";
+        return "hit";
+    }
+
+    let strategyVisible = false;
+    try { strategyVisible = localStorage.getItem("blackjack-strategy-visible") === "true"; } catch (e) {}
+
+    function clearRecommendation() {
+        [els.hitButton, els.standButton, els.doubleButton, els.splitButton].forEach((b) => {
+            if (b) b.classList.remove("is-recommended");
+        });
+    }
+
+    function renderStrategyHint() {
+        clearRecommendation();
+        if (els.strategyToggleButton) {
+            els.strategyToggleButton.setAttribute("aria-pressed", strategyVisible ? "true" : "false");
+            els.strategyToggleButton.textContent = strategyVisible ? "Hide hint" : "Strategy hint";
+        }
+        if (!strategyVisible) return;
+        if (state.status !== "playing") return;
+        const hand = state.playerHands[state.activeHandIndex];
+        if (!hand || hand.stood || hand.result) return;
+        const action = recommendAction(
+            hand,
+            state.dealerHand[0],
+            game.canSplit ? game.canSplit(state) : (game.canSplitHand ? game.canSplitHand(state, hand) : false),
+            game.canDoubleHand ? game.canDoubleHand(state, hand) : (state.balance >= hand.bet && hand.cards.length === 2)
+        );
+        const map = { hit: els.hitButton, stand: els.standButton, double: els.doubleButton, split: els.splitButton };
+        const btn = map[action];
+        if (btn && !btn.disabled) btn.classList.add("is-recommended");
+    }
+
+    function hiLoValue(card) {
+        if (!card) return 0;
+        const r = card.rank;
+        if (r === "A" || r === "K" || r === "Q" || r === "J" || r === "10") return -1;
+        if (r === "7" || r === "8" || r === "9") return 0;
+        return 1;
+    }
+
+    function runningCount() {
+        let count = 0;
+        state.playerHands.forEach((h) => h.cards.forEach((c) => count += hiLoValue(c)));
+        const hideHole = isRoundHiddenDealerCard();
+        state.dealerHand.forEach((card, idx) => {
+            if (hideHole && idx === 1) return;
+            count += hiLoValue(card);
+        });
+        return count;
+    }
+
+    let countVisible = false;
+    try { countVisible = localStorage.getItem("blackjack-count-visible") === "true"; } catch (e) {}
+
+    function renderHiLo() {
+        if (!els.countTile) return;
+        els.countTile.hidden = !countVisible;
+        els.countToggleButton?.setAttribute("aria-pressed", countVisible ? "true" : "false");
+        if (els.countToggleButton) els.countToggleButton.textContent = countVisible ? "Hide count" : "Show count";
+        if (!countVisible) return;
+        const c = runningCount();
+        const sign = c > 0 ? "+" : "";
+        els.statHiLo.textContent = sign + c;
+        els.statHiLo.classList.remove("is-positive", "is-negative");
+        if (c > 0) els.statHiLo.classList.add("is-positive");
+        else if (c < 0) els.statHiLo.classList.add("is-negative");
+    }
+
+    function resetShoeStats() {
+        shoeStats.wins = 0;
+        shoeStats.losses = 0;
+        shoeStats.pushes = 0;
+        shoeStats.dealerBusts = 0;
+        shoeStats.rounds = 0;
+        renderShoeStats();
+        renderHiLo();
     }
 
     function cloneState(source) {
@@ -207,6 +388,7 @@
     function render() {
         currentCardSlots = new Map();
         fallbackDealIndex = 0;
+        renderHiLo();
         const balanceText = game.formatMoney(state.balance);
         const betText = game.formatMoney(state.currentBet);
         const shoeText = String(state.shoe.length);
@@ -220,6 +402,7 @@
         renderDealer();
         renderHands();
         renderControls();
+        renderStrategyHint();
 
         if (previousUi.balance !== null && previousUi.balance !== balanceText) pulse(els.balance, "value-pop");
         if (previousUi.bet !== null && previousUi.bet !== betText) pulse(els.betAmount, "value-pop");
@@ -291,13 +474,36 @@
         if (dealerAnimation) return;
         const previousState = cloneState(state);
         state = action(state);
+
+        if (previousState.status === "betting" && state.status !== "betting") {
+            balanceBeforeRound = previousState.balance;
+        }
+
         if (previousState.status !== "roundOver" && state.status === "roundOver") {
+            const delta = state.balance - balanceBeforeRound;
+            state.playerHands.forEach((hand) => {
+                if (hand.result === "win") shoeStats.wins++;
+                else if (hand.result === "lose") shoeStats.losses++;
+                else if (hand.result === "push") shoeStats.pushes++;
+            });
+            if (game.handValue(state.dealerHand).bust) shoeStats.dealerBusts++;
+            shoeStats.rounds++;
+            renderShoeStats();
+            if (profile) {
+                profile.recordSession("blackjack", {
+                    handsPlayed: state.playerHands.length || 1,
+                    netProfit: delta,
+                    biggestWin: Math.max(0, delta)
+                });
+            }
             window.pgAnalytics?.track?.("blackjack_round_completed", {
                 balance: state.balance,
                 results: state.playerHands.map((hand) => hand.result || "unknown"),
                 dealer_total: game.handValue(state.dealerHand).total,
             });
         }
+
+        if (profile) profile.setBankroll(state.balance);
 
         if (shouldAnimateDealerTurn(previousState, state)) {
             animateDealerTurn();
@@ -345,13 +551,34 @@
         window.pgAnalytics?.track?.("blackjack_new_shoe");
         cancelDealerAnimation();
         state = game.newShoe(state);
+        resetShoeStats();
         render();
     });
     els.resetButton.addEventListener("click", () => {
         cancelDealerAnimation();
         state = game.resetBankroll(state);
+        balanceBeforeRound = state.balance;
+        if (profile) profile.setBankroll(state.balance);
+        resetShoeStats();
         render();
     });
 
+    if (els.countToggleButton) {
+        els.countToggleButton.addEventListener("click", () => {
+            countVisible = !countVisible;
+            try { localStorage.setItem("blackjack-count-visible", String(countVisible)); } catch (e) {}
+            renderHiLo();
+        });
+    }
+    if (els.strategyToggleButton) {
+        els.strategyToggleButton.addEventListener("click", () => {
+            strategyVisible = !strategyVisible;
+            try { localStorage.setItem("blackjack-strategy-visible", String(strategyVisible)); } catch (e) {}
+            renderStrategyHint();
+        });
+    }
+
+    renderShoeStats();
+    renderHiLo();
     render();
 })();

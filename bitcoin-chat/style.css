@@ -368,6 +368,38 @@ h1 {
     line-height: 1.4;
 }
 
+.prompt-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 10px clamp(16px, 3.4vw, 34px) 6px;
+    border-top: 1px solid var(--line);
+    background: rgba(8, 10, 13, 0.96);
+}
+
+.prompt-chips[hidden] { display: none; }
+
+.prompt-chip {
+    padding: 7px 13px;
+    border: 1px solid rgba(255, 159, 63, 0.32);
+    border-radius: 999px;
+    background: rgba(255, 159, 63, 0.08);
+    color: rgba(247, 243, 234, 0.86);
+    font: inherit;
+    font-size: 0.78rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: transform 160ms ease, background 160ms ease, border-color 160ms ease;
+}
+
+.prompt-chip:hover,
+.prompt-chip:focus-visible {
+    transform: translateY(-1px);
+    background: rgba(255, 159, 63, 0.18);
+    border-color: rgba(255, 159, 63, 0.6);
+    outline: none;
+}
+
 .composer {
     display: grid;
     grid-template-columns: 1fr auto;

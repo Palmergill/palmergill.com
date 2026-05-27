@@ -1950,6 +1950,120 @@ body {
     color: #ffd700;
 }
 
+.hand-history {
+    margin-top: 16px;
+    padding-top: 12px;
+    border-top: 1px solid rgba(255,255,255,0.1);
+}
+.hand-history-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: 8px;
+}
+.hand-history h4 {
+    margin: 0;
+    color: #ffd700;
+    font-size: 14px;
+    font-weight: 700;
+}
+.hh-clear {
+    background: none;
+    border: none;
+    color: #94a3b8;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: underline;
+    padding: 0;
+}
+.hh-clear:hover { color: #fff; }
+.hand-history-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    max-height: 260px;
+    overflow-y: auto;
+}
+.hand-history-row {
+    display: grid;
+    grid-template-columns: 56px 1fr 70px 50px;
+    gap: 8px;
+    align-items: center;
+    padding: 6px 0;
+    font-size: 12px;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+.hh-result {
+    text-align: center;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    font-size: 10px;
+}
+.hh-win { background: rgba(16, 185, 129, 0.18); color: #34d399; }
+.hh-loss { background: rgba(239, 68, 68, 0.18); color: #f87171; }
+.hh-chop { background: rgba(168, 168, 168, 0.18); color: #cbd5e1; }
+.hh-cards {
+    color: #f7f3ea;
+    font-weight: 600;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.hh-board { color: #94a3b8; font-weight: 500; }
+.hh-amt {
+    text-align: right;
+    font-weight: 700;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.hh-amt.positive { color: #10b981; }
+.hh-amt.negative { color: #ef4444; }
+.hh-when {
+    color: #64748b;
+    font-size: 11px;
+    text-align: right;
+}
+.tournament-banner {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-around;
+    gap: 10px;
+    margin: 6px 12px 0;
+    padding: 8px 14px;
+    border: 1px solid rgba(255, 215, 0, 0.32);
+    border-radius: 10px;
+    background: rgba(255, 215, 0, 0.08);
+    font-size: 0.78rem;
+    color: rgba(247, 243, 234, 0.86);
+}
+.tournament-banner[hidden] { display: none; }
+.tournament-banner strong { color: #ffd700; font-weight: 800; margin-left: 4px; }
+
+.opponent-personality {
+    display: block;
+    margin-top: 2px;
+    color: rgba(255, 215, 0, 0.7);
+    font-size: 0.62rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.hand-history-empty {
+    margin-top: 14px;
+    padding: 16px;
+    border: 1px dashed rgba(255,255,255,0.1);
+    border-radius: 8px;
+    color: #94a3b8;
+    font-size: 13px;
+    text-align: center;
+}
+
 @media (max-width: 700px) and (orientation: portrait) {
     .game-header {
         min-height: 46px;

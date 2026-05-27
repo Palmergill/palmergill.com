@@ -1,7 +1,7 @@
 """
 Poker Game API Router - Simplified for debugging
 """
-from fastapi import APIRouter, Header, HTTPException, Request
+from fastapi import APIRouter, Header, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from typing import Optional, Dict, List
@@ -34,6 +34,46 @@ player_tokens: Dict[str, Dict[str, str]] = {}
 # swapped out mid-turn). The guard lock protects the lookup dict itself.
 _game_locks: Dict[str, asyncio.Lock] = {}
 _game_locks_guard: Optional[asyncio.Lock] = None
+
+# Per-game WebSocket subscribers. Connecting clients append their socket to
+# this set; mutating endpoints call `notify_game_changed(game_id)` to fan a
+# "state_changed" ping to everyone. Clients then fetch the latest state via
+# the existing JSON endpoint — that keeps a single serializer (no parallel
+# protocols) while collapsing perceived latency from poll cycles to ~ms.
+_game_subscribers: Dict[str, set] = defaultdict(set)
+
+
+def schedule_game_changed(game_id: str) -> None:
+    """Sync wrapper that schedules a WS broadcast on the running loop.
+
+    Used from sync mutation sites that already hold the per-game lock — the
+    broadcast itself is fire-and-forget so it doesn't block the response.
+    """
+    try:
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            loop.create_task(notify_game_changed(game_id))
+    except RuntimeError:
+        # No running loop (e.g. import-time call) — silently skip.
+        pass
+
+
+async def notify_game_changed(game_id: str) -> None:
+    subs = list(_game_subscribers.get(game_id, ()))
+    if not subs:
+        return
+    payload = {"type": "state_changed", "game_id": game_id}
+    dead = []
+    for ws in subs:
+        try:
+            await ws.send_json(payload)
+        except Exception:
+            dead.append(ws)
+    if dead:
+        bucket = _game_subscribers.get(game_id)
+        if bucket is not None:
+            for ws in dead:
+                bucket.discard(ws)
 
 
 def _ensure_locks_guard() -> asyncio.Lock:
@@ -68,6 +108,12 @@ BOT_AGGRESSION_BY_NAME = {
     "Charlie": 0.7,
     "Diana": 0.6,
     "Eve": 0.4,
+    # New personality-named bots from the AI personalities feature.
+    "Reg": 0.7,
+    "Cal": 0.2,
+    "Action Jackson": 0.95,
+    "Stone": 0.35,
+    "Avery": 0.5,
 }
 
 
@@ -105,7 +151,7 @@ def _require_rate_limit(request: Request) -> None:
 
 
 def _ai_manager_for_game(game: PokerGame) -> Optional[AIManager]:
-    if getattr(game, "game_type", "single") != "single":
+    if getattr(game, "game_type", "single") not in ("single", "tournament"):
         return None
 
     manager = AIManager(game)
@@ -177,6 +223,7 @@ def _serialize_game(game: PokerGame) -> dict:
         "game_type": getattr(game, "game_type", "single"),
         "max_players": getattr(game, "max_players", 6),
         "waiting_for_players": getattr(game, "waiting_for_players", False),
+        "tournament": getattr(game, "tournament", None),
     }
 
 
@@ -203,6 +250,7 @@ def _deserialize_game(data: dict) -> PokerGame:
     game.game_type = data.get("game_type", "single")
     game.max_players = data.get("max_players", 6)
     game.waiting_for_players = data.get("waiting_for_players", False)
+    game.tournament = data.get("tournament")
     return game
 
 
@@ -233,6 +281,9 @@ def save_game_state(game_id: str) -> None:
         db.commit()
     finally:
         db.close()
+
+    # Every save reflects a state mutation worth broadcasting.
+    schedule_game_changed(game_id)
 
 
 def load_game_state(game_id: str) -> bool:
@@ -380,7 +431,7 @@ async def get_csrf_token():
 async def create_game(http_request: Request, request: CreateGameRequest):
     """Create a new poker game"""
     _require_rate_limit(http_request)
-    if request.game_type not in ("single", "multiplayer"):
+    if request.game_type not in ("single", "multiplayer", "tournament"):
         raise HTTPException(status_code=400, detail="Unsupported game type")
 
     game_id = str(uuid.uuid4())[:8]
@@ -392,14 +443,19 @@ async def create_game(http_request: Request, request: CreateGameRequest):
     human = game.add_player(normalize_player_name(request.player_name), is_human=True)
     player_token = create_player_token(game_id, human.id)
 
-    if request.game_type == "single":
-        # Add AI bots
+    if request.game_type in ("single", "tournament"):
+        # Add AI bots with named personalities so each opponent plays differently.
+        # The roster mixes archetypes — one of each plus a TAG variant — to
+        # give a single-table experience the feel of a real mixed lineup.
         ai_manager = AIManager(game)
-        ai_manager.add_bot("Shelby", aggression=0.3)
-        ai_manager.add_bot("Freya", aggression=0.5)
-        ai_manager.add_bot("Charlie", aggression=0.7)
-        ai_manager.add_bot("Diana", aggression=0.6)
-        ai_manager.add_bot("Eve", aggression=0.4)
+        ai_manager.add_bot("Reg",            personality="tag")
+        ai_manager.add_bot("Cal",            personality="lp")
+        ai_manager.add_bot("Action Jackson", personality="mn")
+        ai_manager.add_bot("Stone",          personality="rock")
+        ai_manager.add_bot("Avery",          personality="std")
+
+        if request.game_type == "tournament":
+            game.configure_tournament()
 
         game.start_hand()
         games[game_id] = game
@@ -413,7 +469,7 @@ async def create_game(http_request: Request, request: CreateGameRequest):
             "player_id": human.id,
             "player_token": player_token,
             "state": game.to_dict(for_player=human.id),
-            "game_type": "single"
+            "game_type": request.game_type,
         }
     else:
         # Multiplayer - waiting for players
@@ -628,3 +684,39 @@ async def health_check():
     """Health check endpoint"""
     cleaned = cleanup_old_games()
     return {"status": "ok", "active_games": len(games), "cleaned_games": cleaned}
+
+
+@router.websocket("/games/{game_id}/ws")
+async def game_ws(websocket: WebSocket, game_id: str):
+    """WebSocket push channel for a poker game.
+
+    Clients connect after they've joined a game and receive a
+    ``{"type":"state_changed"}`` ping whenever a mutating action lands. The
+    client should then issue a regular GET against ``/games/{game_id}`` to
+    pull the latest state — this keeps a single serializer in play and lets
+    the existing polling code be a fallback when WS is unavailable.
+
+    Auth note: the WS is read-only (server -> client) and only emits a
+    notification; the actual state payload still requires the player token
+    via the GET endpoint, so eavesdropping on the WS leaks nothing more than
+    "this game changed."
+    """
+    await websocket.accept()
+    bucket = _game_subscribers[game_id]
+    bucket.add(websocket)
+    try:
+        # Greet with one ping so the client can immediately fetch the latest
+        # state without waiting for the next mutation.
+        await websocket.send_json({"type": "hello", "game_id": game_id})
+        while True:
+            # We don't expect inbound traffic — but receive_text keeps the
+            # connection alive and surfaces disconnects promptly.
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        pass
+    except Exception:
+        pass
+    finally:
+        bucket.discard(websocket)
+        if not bucket:
+            _game_subscribers.pop(game_id, None)

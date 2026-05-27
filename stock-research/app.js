@@ -1026,17 +1026,30 @@ document.addEventListener('DOMContentLoaded', () => {
         if (headerStockPrice && summary.current_price) {
             headerStockPrice.textContent = '$' + summary.current_price.toFixed(2);
         }
+        let computedChangePercent = null;
         if (headerStockChange && lastPriceHistory && lastPriceHistory.length >= 2) {
             const prices = lastPriceHistory.map(d => d.close || d.price).filter(v => v != null);
             if (prices.length >= 2) {
                 const currentPrice = prices[prices.length - 1];
                 const priorClose = prices[prices.length - 2];
                 const changePercent = ((currentPrice - priorClose) / priorClose) * 100;
+                computedChangePercent = changePercent;
                 const isPositive = changePercent >= 0;
                 const changeSymbol = isPositive ? '+' : '';
                 headerStockChange.textContent = `${changeSymbol}${changePercent.toFixed(2)}%`;
                 headerStockChange.className = 'header-change-badge ' + (isPositive ? 'positive' : 'negative');
             }
+        }
+
+        // Cache the latest snapshot for the watchlist (so saved tickers can show
+        // price + delta on the empty state without re-fetching).
+        if (window.Watchlist && data.ticker) {
+            window.Watchlist.touchSnapshot(data.ticker, {
+                name: data.name || summary.name || '',
+                price: summary.current_price ?? null,
+                changePercent: computedChangePercent
+            });
+            window.Watchlist.syncToggleButton();
         }
         
         // Populate About section

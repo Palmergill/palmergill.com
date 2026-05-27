@@ -29,6 +29,10 @@
         topPages: document.getElementById('topPages'),
         topApps: document.getElementById('topApps'),
         topReferrers: document.getElementById('topReferrers'),
+        casinoPoker: document.getElementById('casinoPoker'),
+        casinoCraps: document.getElementById('casinoCraps'),
+        casinoBlackjack: document.getElementById('casinoBlackjack'),
+        casinoTotal: document.getElementById('casinoTotal'),
         topEvents: document.getElementById('topEvents'),
         retentionStatus: document.getElementById('retentionStatus'),
         eventTypeFilter: document.getElementById('eventTypeFilter'),
@@ -175,6 +179,21 @@
         renderCompactList(els.topReferrers, summary.top_referrers, 'No referrers yet', 'referrer');
         renderCompactList(els.topEvents, summary.top_events, 'No app events yet', 'event');
         renderRecentErrors(summary.recent_errors || []);
+        renderCasinoCards(summary.top_apps || []);
+    }
+
+    function renderCasinoCards(apps) {
+        // top_apps entries look like { app: 'poker', count: N } (and similar keys).
+        const counts = { poker: 0, craps: 0, blackjack: 0 };
+        apps.forEach((entry) => {
+            const name = entry?.app || entry?.name || entry?.key;
+            const c = Number(entry?.count ?? entry?.events ?? entry?.value ?? 0);
+            if (name in counts) counts[name] = c;
+        });
+        if (els.casinoPoker) els.casinoPoker.textContent = number(counts.poker);
+        if (els.casinoCraps) els.casinoCraps.textContent = number(counts.craps);
+        if (els.casinoBlackjack) els.casinoBlackjack.textContent = number(counts.blackjack);
+        if (els.casinoTotal) els.casinoTotal.textContent = number(counts.poker + counts.craps + counts.blackjack);
     }
 
     async function refreshDebugPanels() {

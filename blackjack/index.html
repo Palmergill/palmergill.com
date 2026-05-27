@@ -4,8 +4,30 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Blackjack - Vegas Table</title>
+    <meta name="description" content="Browser-based blackjack with splits, doubles, insurance, and a six-deck shoe — by Palmer Gill.">
+    <meta name="theme-color" content="#080a0d">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://palmergill.com/blackjack/">
+    <meta property="og:title" content="Blackjack — Palmer Gill">
+    <meta property="og:description" content="Browser-based blackjack with splits, doubles, insurance, and a six-deck shoe.">
+    <meta property="og:image" content="https://palmergill.com/assets/palmer-gill-logo.png">
+    <meta property="og:image:width" content="960">
+    <meta property="og:image:height" content="960">
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="Blackjack — Palmer Gill">
+    <meta name="twitter:description" content="Browser-based blackjack with splits, doubles, insurance, and a six-deck shoe.">
+    <meta name="twitter:image" content="https://palmergill.com/assets/palmer-gill-logo.png">
+    <link rel="icon" type="image/png" href="/assets/palmer-gill-logo-small.png">
     <link rel="stylesheet" href="/shared/site-nav.css?v=6">
-    <link rel="stylesheet" href="./style.css?v=6">
+    <link rel="manifest" href="./manifest.json">
+    <link rel="stylesheet" href="./style.css?v=9">
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/blackjack/sw.js', { scope: '/blackjack/' }).catch(() => {});
+            });
+        }
+    </script>
 </head>
 <body>
     <main class="blackjack-shell">
@@ -18,6 +40,14 @@
                 <strong id="balance">$1000</strong>
             </div>
         </header>
+
+        <section class="session-stats" aria-label="Shoe stats">
+            <div class="session-tile"><span>Wins</span><strong id="statWins">0</strong></div>
+            <div class="session-tile"><span>Losses</span><strong id="statLosses">0</strong></div>
+            <div class="session-tile"><span>Pushes</span><strong id="statPushes">0</strong></div>
+            <div class="session-tile"><span>Dealer bust</span><strong id="statDealerBust">0%</strong></div>
+            <div class="session-tile session-tile-count" id="countTile" hidden><span>Hi-Lo count</span><strong id="statHiLo">0</strong></div>
+        </section>
 
         <section class="table" aria-label="Blackjack table">
             <div class="table-rail">
@@ -32,6 +62,8 @@
                 <button class="icon-button" id="newShoeButton" type="button" title="Shuffle new shoe" aria-label="Shuffle new shoe">
                     <i data-lucide="refresh-cw" aria-hidden="true"></i>
                 </button>
+                <button class="table-reset-button" id="countToggleButton" type="button" aria-pressed="false">Show count</button>
+                <button class="table-reset-button" id="strategyToggleButton" type="button" aria-pressed="false">Strategy hint</button>
                 <button class="table-reset-button" id="resetButton" type="button">Reset bankroll</button>
             </div>
 
@@ -96,8 +128,9 @@
     </main>
 
     <script src="./blackjackGame.js"></script>
+    <script src="/shared/casino-profile.js?v=1"></script>
     <script src="/shared/analytics.js?v=1"></script>
-    <script src="./app.js?v=6"></script>
+    <script src="./app.js?v=11"></script>
     <script src="/shared/site-nav.js?v=6"></script>
 </body>
 </html>

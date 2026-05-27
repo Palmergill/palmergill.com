@@ -1,8 +1,9 @@
 const rules = window.CrapsRules;
 const betNames = rules.BET_NAMES;
+const casinoProfile = window.CasinoProfile || null;
 
 // ── Game State ──
-let balance = 1000;
+let balance = casinoProfile ? casinoProfile.getBankroll() : 1000;
 let point = null;
 let isComeOutRoll = true;
 let lastBets = null;
@@ -37,6 +38,7 @@ const dicePatterns = {
 // ── UI: Balance ──
 function updateBalance() {
     document.getElementById('balance').textContent = '$' + balance.toLocaleString();
+    if (casinoProfile) casinoProfile.setBankroll(balance);
 }
 
 function setStatus(message) {
@@ -104,6 +106,23 @@ function openBetModal(betType) {
     const isComeBet = (betType === 'come' || betType === 'dontCome');
     const name = isComeBet ? (betType === 'come' ? 'Come' : "Don't Come") : (betNames[betType] || betType);
     document.getElementById('modalTitle').textContent = name + ' Bet';
+
+    const explain = document.getElementById('modalBetExplain');
+    if (explain) {
+        const info = BET_INFO[betType];
+        if (info) {
+            const heading = document.createElement('strong');
+            heading.textContent = 'How it works';
+            const body = document.createTextNode(info.rule);
+            const br = document.createElement('br');
+            const edge = document.createElement('span');
+            edge.className = 'edge';
+            edge.textContent = `Pays ${info.payout} · House edge ${info.edge}`;
+            explain.replaceChildren(heading, body, br, edge);
+        } else {
+            explain.replaceChildren();
+        }
+    }
     const betInput = document.getElementById('betInput');
     betInput.value = '';
     betInput.min = getBetUnit(betType);
@@ -470,6 +489,82 @@ function clearAllBets() {
     dontComeBets = [];
     updateBalance();
     updateAllDisplays();
+}
+
+const BET_INFO = {
+    passLine: { rule: "Even-money line bet. Come-out wins on 7/11, loses on 2/3/12. After point: wins if point repeats before 7.", payout: "1:1", edge: "1.41%" },
+    dontPass: { rule: "Inverse of pass. Come-out wins on 2/3, push on 12, loses on 7/11. After point: wins on 7 before point.", payout: "1:1", edge: "1.36%" },
+    come: { rule: "Acts like pass line but bet after the point. Next roll sets its own come point.", payout: "1:1", edge: "1.41%" },
+    dontCome: { rule: "Inverse of come. Establishes its own come point on the next roll.", payout: "1:1", edge: "1.36%" },
+    field: { rule: "Single-roll bet on 2, 3, 4, 9, 10, 11, 12. Pays double on 2 and 12.", payout: "1:1 (2:1 on 2/12)", edge: "5.56%" },
+    place4: { rule: "Wins if 4 rolls before 7. Off on come-out by default.", payout: "9:5", edge: "6.67%" },
+    place5: { rule: "Wins if 5 rolls before 7.", payout: "7:5", edge: "4.00%" },
+    place6: { rule: "Wins if 6 rolls before 7. One of the best place bets.", payout: "7:6", edge: "1.52%" },
+    place8: { rule: "Wins if 8 rolls before 7. One of the best place bets.", payout: "7:6", edge: "1.52%" },
+    place9: { rule: "Wins if 9 rolls before 7.", payout: "7:5", edge: "4.00%" },
+    place10: { rule: "Wins if 10 rolls before 7.", payout: "9:5", edge: "6.67%" },
+    any7: { rule: "One-roll bet on any 7. High variance, big edge.", payout: "4:1", edge: "16.67%" },
+    anyCraps: { rule: "One-roll bet on 2, 3, or 12.", payout: "7:1", edge: "11.11%" },
+    craps2: { rule: "One-roll bet on exactly 2.", payout: "30:1", edge: "13.89%" },
+    craps3: { rule: "One-roll bet on exactly 3.", payout: "15:1", edge: "11.11%" },
+    craps12: { rule: "One-roll bet on exactly 12.", payout: "30:1", edge: "13.89%" },
+    yo11: { rule: "One-roll bet on exactly 11.", payout: "15:1", edge: "11.11%" },
+    hard4: { rule: "Wins if 2-2 rolls before any other 4 or any 7.", payout: "7:1", edge: "11.11%" },
+    hard6: { rule: "Wins if 3-3 rolls before any other 6 or any 7.", payout: "9:1", edge: "9.09%" },
+    hard8: { rule: "Wins if 4-4 rolls before any other 8 or any 7.", payout: "9:1", edge: "9.09%" },
+    hard10: { rule: "Wins if 5-5 rolls before any other 10 or any 7.", payout: "7:1", edge: "11.11%" }
+};
+
+const BET_PRESETS = {
+    passOdds: {
+        label: "$5 Pass + Odds",
+        // Only the pass line is valid pre-point. Odds are taken via Max Odds once a point hits.
+        bets: { passLine: 5 },
+        comeOutOnly: true,
+        followUp: "After the point, tap Max Odds to back this bet."
+    },
+    field: {
+        label: "$5 Field",
+        bets: { field: 5 }
+    },
+    place68: {
+        label: "Place 6 & 8",
+        bets: { place6: 6, place8: 6 },
+        pointOnly: true
+    },
+    ironCross: {
+        label: "Iron Cross",
+        bets: { field: 5, place5: 5, place6: 6, place8: 6 },
+        pointOnly: true
+    }
+};
+
+function loadPreset(name) {
+    const preset = BET_PRESETS[name];
+    if (!preset) return;
+    if (preset.comeOutOnly && !isComeOutRoll) {
+        setStatus(`${preset.label} works best on come-out. Wait for the next roll.`);
+        return;
+    }
+    if (preset.pointOnly && isComeOutRoll) {
+        setStatus(`${preset.label} needs a point. Roll the pass line first.`);
+        return;
+    }
+    let total = 0;
+    Object.values(preset.bets).forEach((v) => total += v);
+    if (total > balance) {
+        setStatus(`Need $${total} for ${preset.label}, only have $${balance}.`);
+        return;
+    }
+    Object.entries(preset.bets).forEach(([bt, amt]) => {
+        if (bets[bt] !== undefined) {
+            bets[bt] = (bets[bt] || 0) + amt;
+            balance -= amt;
+        }
+    });
+    updateBalance();
+    updateAllDisplays();
+    setStatus(preset.followUp || `${preset.label} loaded.`);
 }
 
 function repeatLastBets() {
@@ -1121,12 +1216,20 @@ function resolveRoll(d1, d2) {
         ? messages.join(' \u2022 ')
         : (isComeOutRoll ? 'Place bets & roll' : 'Rolled ' + total);
     setStatus(statusMsg);
-    showRollResultAnimation(winnings - resolvedStake);
+    const netRoll = winnings - resolvedStake;
+    showRollResultAnimation(netRoll);
+    if (casinoProfile && resolvedStake > 0) {
+        casinoProfile.recordSession('craps', {
+            handsPlayed: 1,
+            netProfit: netRoll,
+            biggestWin: Math.max(0, netRoll)
+        });
+    }
     window.pgAnalytics?.track?.('craps_roll_resolved', {
         total,
         point,
         come_out: wasComeOutRoll,
-        net: winnings - resolvedStake,
+        net: netRoll,
         balance,
     });
 }
@@ -1298,3 +1401,13 @@ function __setGameState(state) {
 // ── Initialize ──
 updateBalance();
 updateAllDisplays();
+
+// Tag every bet button with a native-tooltip explainer so desktop hover surfaces
+// the rule + house edge without needing to open the modal.
+document.querySelectorAll('[onclick^="openBetModal"]').forEach((btn) => {
+    const match = btn.getAttribute('onclick').match(/openBetModal\('([^']+)'\)/);
+    if (!match) return;
+    const info = BET_INFO[match[1]];
+    if (!info) return;
+    btn.setAttribute('title', `${info.rule}\n\nPays ${info.payout} · House edge ${info.edge}`);
+});

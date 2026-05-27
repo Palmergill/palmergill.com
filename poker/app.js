@@ -280,6 +280,48 @@ const StatsManager = {
         bestHand: null,
         sessionStart: null
     },
+    HAND_HISTORY_KEY: 'poker-hand-history',
+    HAND_HISTORY_MAX: 20,
+    history: [],
+
+    loadHistory() {
+        try {
+            const raw = localStorage.getItem(this.HAND_HISTORY_KEY);
+            if (!raw) { this.history = []; return; }
+            const parsed = JSON.parse(raw);
+            this.history = Array.isArray(parsed) ? parsed.slice(0, this.HAND_HISTORY_MAX) : [];
+        } catch (e) { this.history = []; }
+    },
+
+    saveHistory() {
+        try {
+            localStorage.setItem(
+                this.HAND_HISTORY_KEY,
+                JSON.stringify(this.history.slice(0, this.HAND_HISTORY_MAX))
+            );
+        } catch (e) {}
+    },
+
+    recordHand({ result, amount, handName, holeCards, board }) {
+        const entry = {
+            ts: Date.now(),
+            result, // 'win' | 'loss' | 'chop'
+            amount: Number(amount) || 0,
+            handName: handName || null,
+            holeCards: Array.isArray(holeCards) ? holeCards.slice(0, 2) : null,
+            board: Array.isArray(board) ? board.slice(0, 5) : null
+        };
+        this.history.unshift(entry);
+        if (this.history.length > this.HAND_HISTORY_MAX) {
+            this.history.length = this.HAND_HISTORY_MAX;
+        }
+        this.saveHistory();
+    },
+
+    clearHistory() {
+        this.history = [];
+        this.saveHistory();
+    },
 
     init() {
         // Load saved stats from localStorage
@@ -293,6 +335,7 @@ const StatsManager = {
             }
         }
         this.stats.sessionStart = new Date().toISOString();
+        this.loadHistory();
     },
 
     save() {
@@ -958,6 +1001,10 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     
     elements.startBtn.addEventListener('click', () => startGame('single'));
+    const tournamentBtn = document.getElementById('start-tournament-btn');
+    if (tournamentBtn) {
+        tournamentBtn.addEventListener('click', () => startGame('tournament'));
+    }
     
     // Multiplayer buttons
     const createMultiplayerBtn = document.getElementById('create-multiplayer-btn');
@@ -1303,7 +1350,11 @@ async function startMultiplayerGame() {
 function startPolling() {
     // Clear any existing polling
     stopPolling();
-    
+
+    // Open the WS push channel alongside polling. Polling stays as a fallback
+    // (and primary cadence) so a missed WS frame still resolves within ~3s.
+    if (gameId) connectGameWs(gameId);
+
     // Don't process AI for multiplayer games
     const processAI = gameState?.game_type !== 'multiplayer';
     
@@ -1357,6 +1408,86 @@ function stopPolling() {
         pollIntervalId = null;
     }
     pollInFlight = false;
+    disconnectGameWs();
+}
+
+// ── Realtime WebSocket push channel ──────────────────────────────────────
+// When the server pings us with `{type:"state_changed"}`, we trigger an
+// immediate fetch instead of waiting for the next poll cycle. Polling stays
+// in place as a fallback (and as the primary mechanism if the WS connection
+// can't be established or drops repeatedly).
+let gameWs = null;
+let gameWsReconnectTimer = null;
+let gameWsReconnectAttempts = 0;
+let gameWsBackoffUntil = 0;
+
+function buildGameWsUrl(gid) {
+    const origin = window.API_ORIGIN || window.location.origin;
+    const url = new URL(origin, window.location.href);
+    url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
+    url.pathname = `/api/poker/games/${gid}/ws`;
+    return url.toString();
+}
+
+function connectGameWs(gid) {
+    if (!gid || !('WebSocket' in window)) return;
+    if (gameWs) { try { gameWs.close(); } catch (e) {} gameWs = null; }
+    if (Date.now() < gameWsBackoffUntil) return;
+    try {
+        const ws = new WebSocket(buildGameWsUrl(gid));
+        gameWs = ws;
+        ws.onopen = () => { gameWsReconnectAttempts = 0; };
+        ws.onmessage = (event) => {
+            try {
+                const msg = JSON.parse(event.data);
+                if (!msg) return;
+                if (msg.type === 'state_changed' || msg.type === 'hello') {
+                    pollOnceNow();
+                }
+            } catch (e) { /* ignore malformed frames */ }
+        };
+        ws.onerror = () => { /* will surface in onclose */ };
+        ws.onclose = () => {
+            gameWs = null;
+            if (gameId !== gid) return; // moved on, don't reconnect
+            gameWsReconnectAttempts += 1;
+            // Cap reconnect attempts and back off; polling keeps state fresh.
+            if (gameWsReconnectAttempts > 5) {
+                gameWsBackoffUntil = Date.now() + 60_000;
+                return;
+            }
+            const delayMs = Math.min(30_000, 1000 * Math.pow(2, gameWsReconnectAttempts));
+            gameWsReconnectTimer = setTimeout(() => connectGameWs(gid), delayMs);
+        };
+    } catch (e) {
+        // Backoff briefly so we don't tight-loop on misconfig
+        gameWsBackoffUntil = Date.now() + 30_000;
+    }
+}
+
+function disconnectGameWs() {
+    if (gameWsReconnectTimer) { clearTimeout(gameWsReconnectTimer); gameWsReconnectTimer = null; }
+    if (gameWs) { try { gameWs.close(); } catch (e) {} gameWs = null; }
+    gameWsReconnectAttempts = 0;
+    gameWsBackoffUntil = 0;
+}
+
+// Triggered by WS ping. Runs one off-cycle fetch immediately. Polling continues
+// in parallel so a missed ping never leaves state stale for long.
+let pollOnceInFlight = false;
+async function pollOnceNow() {
+    if (pollOnceInFlight) return;
+    if (!gameId || !playerId) return;
+    pollOnceInFlight = true;
+    try {
+        const url = gameRequestUrl(`/games/${gameId}`, { process_ai: gameState?.game_type === 'multiplayer' ? 'false' : 'true' });
+        const response = await APIRequest.fetch(url, { headers: playerAuthHeaders() });
+        if (!response.ok) return;
+        const data = await response.json();
+        gameState = data;
+        updateGameDisplay();
+    } catch (e) { /* polling cycle will catch the next update */ }
+    finally { pollOnceInFlight = false; }
 }
 
 async function playerAction(action) {
@@ -1537,6 +1668,26 @@ async function nextHand() {
     }
 }
 
+function renderTournamentBanner(state) {
+    const banner = document.getElementById('tournament-banner');
+    if (!banner) return;
+    const t = state && state.tournament;
+    if (!t || state.game_type !== 'tournament') {
+        banner.hidden = true;
+        return;
+    }
+    banner.hidden = false;
+    const levelEl = document.getElementById('tb-level');
+    const blindsEl = document.getElementById('tb-blinds');
+    const nextEl = document.getElementById('tb-next');
+    const aliveEl = document.getElementById('tb-alive');
+    if (levelEl) levelEl.textContent = t.level;
+    if (blindsEl) blindsEl.textContent = `${state.small_blind} / ${state.big_blind}`;
+    if (nextEl) nextEl.textContent = t.next_level_in;
+    const alive = (state.players || []).filter((p) => p.chips > 0).length;
+    if (aliveEl) aliveEl.textContent = alive;
+}
+
 function updateGameDisplay() {
     if (!gameState) return;
     const isShowdown = gameState.phase === 'showdown';
@@ -1556,6 +1707,7 @@ function updateGameDisplay() {
     elements.handNumber.textContent = gameState.hand_number;
     elements.phase.textContent = gameState.phase.replace('_', ' ').toUpperCase();
     elements.potAmount.innerHTML = ChipStackVisualizer.render(gameState.pot, true, true);
+    renderTournamentBanner(gameState);
     elements.gameScreen?.classList.toggle('showdown-active', isShowdown);
     if (!isShowdown) {
         hideHandResult();
@@ -1678,7 +1830,7 @@ function renderOpponent(player, seatClass = 'seat-1') {
                     : `<div class="card-back ${player.folded ? 'folded' : ''}">🂠</div><div class="card-back ${player.folded ? 'folded' : ''}">🂠</div>`
                 }
             </div>
-            <span class="opponent-name">${escapeHtml(player.name)}</span>
+            <span class="opponent-name">${escapeHtml(player.name)}${player.ai_personality_label ? `<span class="opponent-personality" title="${escapeHtml(player.ai_personality_label)}">${escapeHtml(player.ai_personality_label)}</span>` : ''}</span>
             <span class="opponent-chips">${ChipStackVisualizer.renderCompact(player.chips)}</span>
             ${player.bet > 0 ? `<span class="opponent-bet">${ChipStackVisualizer.renderCompact(player.bet)}</span>` : ''}
             ${actionLabel ? `<span class="opponent-action-badge">${escapeHtml(actionLabel)}</span>` : ''}
@@ -1996,14 +2148,28 @@ function showHandResult() {
     // Record stats for hand result (only once per hand)
     if (!handResultRecorded) {
         handResultRecorded = true;
+        const handStrengthEl = elements.handStrength?.querySelector('.hand-strength-text');
+        const handName = handStrengthEl ? handStrengthEl.textContent : null;
+        const holeCards = (myPlayer && myPlayer.hole_cards) || (myPlayer && myPlayer.cards) || null;
+        const board = gameState.community_cards || gameState.board || null;
         if (isMe) {
-            // Get hand strength text if available
-            const handStrengthEl = elements.handStrength.querySelector('.hand-strength-text');
-            const handName = handStrengthEl ? handStrengthEl.textContent : null;
             StatsManager.recordHandWin(myWin.amount, handName);
+            StatsManager.recordHand({
+                result: isChop ? 'chop' : 'win',
+                amount: myWin.amount,
+                handName,
+                holeCards,
+                board
+            });
         } else if (myPlayer) {
-            // Record loss (amount lost is player's bet this hand)
             StatsManager.recordHandLoss(myPlayer.bet || 0);
+            StatsManager.recordHand({
+                result: 'loss',
+                amount: -(myPlayer.bet || 0),
+                handName,
+                holeCards,
+                board
+            });
         }
     }
     
@@ -2152,6 +2318,7 @@ function endGame() {
 function showStats() {
     const stats = StatsManager.getFormattedStats();
     const netProfitClass = stats.netProfit >= 0 ? 'positive' : 'negative';
+    const historyHtml = renderHandHistory(StatsManager.history || []);
 
     elements.statsContent.innerHTML = `
         <div class="stat-row">
@@ -2178,8 +2345,60 @@ function showStats() {
             <span class="stat-label">Best Hand</span>
             <span class="stat-value">${escapeHtml(stats.bestHand)}</span>
         </div>
+        ${historyHtml}
     `;
+    const clearBtn = elements.statsContent.querySelector('#clearHistoryBtn');
+    if (clearBtn) {
+        clearBtn.addEventListener('click', () => {
+            if (!window.confirm('Clear hand history?')) return;
+            StatsManager.clearHistory();
+            showStats();
+        });
+    }
     elements.statsModal.classList.remove('hidden');
+}
+
+function formatHistoryCard(card) {
+    if (!card) return '·';
+    if (typeof card === 'string') return card;
+    if (typeof card === 'object') {
+        const r = card.rank || card.value || card.r || '?';
+        const s = card.suit || card.s || '';
+        const suitSym = { hearts: '♥', diamonds: '♦', spades: '♠', clubs: '♣', h: '♥', d: '♦', s: '♠', c: '♣' };
+        return `${r}${suitSym[s] || s || ''}`;
+    }
+    return String(card);
+}
+
+function renderHandHistory(history) {
+    if (!history || history.length === 0) {
+        return '<div class="hand-history-empty">No hand history yet — finish a hand to start logging.</div>';
+    }
+    const rows = history.slice(0, 20).map((h) => {
+        const result = h.result === 'win' ? 'Win' : h.result === 'chop' ? 'Chop' : 'Loss';
+        const amt = (h.amount > 0 ? '+' : '') + (h.amount || 0);
+        const cls = h.amount > 0 ? 'positive' : h.amount < 0 ? 'negative' : '';
+        const hole = (h.holeCards || []).map(formatHistoryCard).join(' ');
+        const board = (h.board || []).map(formatHistoryCard).join(' ');
+        const when = h.ts ? new Date(h.ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+        return `
+            <li class="hand-history-row">
+                <span class="hh-result hh-${h.result}">${result}</span>
+                <span class="hh-cards">${escapeHtml(hole) || '—'}<span class="hh-board"> · ${escapeHtml(board) || 'no board'}</span></span>
+                <span class="hh-amt ${cls}">${escapeHtml(String(amt))}</span>
+                <span class="hh-when">${escapeHtml(when)}</span>
+            </li>
+        `;
+    }).join('');
+    return `
+        <div class="hand-history">
+            <div class="hand-history-head">
+                <h4>Last ${history.length} hands</h4>
+                <button type="button" id="clearHistoryBtn" class="hh-clear">Clear</button>
+            </div>
+            <ul class="hand-history-list">${rows}</ul>
+        </div>
+    `;
 }
 
 function hideStats() {

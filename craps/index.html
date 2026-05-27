@@ -4,7 +4,29 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Craps - Palmer Gill</title>
+    <meta name="description" content="Browser-based craps with pass, come, place, and odds bets — by Palmer Gill.">
+    <meta name="theme-color" content="#080a0d">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://palmergill.com/craps/">
+    <meta property="og:title" content="Craps — Palmer Gill">
+    <meta property="og:description" content="Browser-based craps with pass, come, place, and odds bets.">
+    <meta property="og:image" content="https://palmergill.com/assets/palmer-gill-logo.png">
+    <meta property="og:image:width" content="960">
+    <meta property="og:image:height" content="960">
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="Craps — Palmer Gill">
+    <meta name="twitter:description" content="Browser-based craps with pass, come, place, and odds bets.">
+    <meta name="twitter:image" content="https://palmergill.com/assets/palmer-gill-logo.png">
+    <link rel="icon" type="image/png" href="/assets/palmer-gill-logo-small.png">
+    <link rel="manifest" href="./manifest.json">
     <link rel="stylesheet" href="/shared/site-nav.css?v=6">
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/craps/sw.js', { scope: '/craps/' }).catch(() => {});
+            });
+        }
+    </script>
     <style>
         :root {
             --ink: #080a0d;
@@ -292,18 +314,33 @@
         .odds-chip.visible { display: block; }
 
         .quick-actions,
+        .bet-presets,
         .active-bets-strip {
             position: relative;
             z-index: 1;
         }
 
-        .quick-actions {
+        .quick-actions,
+        .bet-presets {
             display: flex;
             flex-wrap: wrap;
-            grid-column: 1;
+            grid-column: 1 / -1;
             gap: 8px;
             align-content: start;
             justify-content: flex-start;
+        }
+
+        .bet-presets {
+            align-items: center;
+            padding-top: 4px;
+        }
+
+        .bet-presets-label {
+            color: rgba(247, 243, 234, 0.6);
+            font-size: 0.66rem;
+            font-weight: 800;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
         }
 
         .quick-btn,
@@ -766,6 +803,38 @@
             font-size: 0.82rem;
             font-weight: 700;
             text-align: center;
+        }
+
+        .bet-info-strip {
+            margin-bottom: 14px;
+            padding: 10px 12px;
+            border: 1px solid rgba(214, 178, 94, 0.28);
+            border-radius: 8px;
+            background: rgba(214, 178, 94, 0.08);
+            color: var(--muted);
+            font-size: 0.78rem;
+            line-height: 1.45;
+        }
+        .bet-info-strip:empty { display: none; }
+        .bet-info-strip strong {
+            display: block;
+            margin-bottom: 4px;
+            color: var(--text);
+            font-size: 0.74rem;
+            font-weight: 800;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+        }
+        .bet-info-strip .edge {
+            display: inline-block;
+            margin-top: 4px;
+            padding: 2px 8px;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.08);
+            color: rgba(247, 243, 234, 0.86);
+            font-size: 0.7rem;
+            font-weight: 800;
+            letter-spacing: 0.04em;
         }
 
         .bet-modal input {
@@ -2104,6 +2173,14 @@
             <button class="quick-btn" id="clearAllBtn" onclick="clearAllBets()">Clear All</button>
         </div>
 
+        <div class="bet-presets" aria-label="Bet presets">
+            <span class="bet-presets-label">Presets</span>
+            <button class="quick-btn" onclick="loadPreset('passOdds')">$5 Pass + Odds</button>
+            <button class="quick-btn" onclick="loadPreset('field')">$5 Field</button>
+            <button class="quick-btn" onclick="loadPreset('place68')">Place 6 &amp; 8</button>
+            <button class="quick-btn" onclick="loadPreset('ironCross')">Iron Cross</button>
+        </div>
+
         <div class="active-bets-strip" id="activeBetsStrip"></div>
 
         <div class="dice-area">
@@ -2159,6 +2236,7 @@
     <div class="bet-modal" id="betModal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
         <div class="bet-modal-content">
             <h3 id="modalTitle">Bet</h3>
+            <div class="bet-info-strip" id="modalBetExplain"></div>
             <div class="current-bet-info" id="modalCurrentBet"></div>
             <label class="sr-only" for="betInput">Bet amount</label>
             <input type="number" id="betInput" placeholder="0" min="5" step="5" aria-describedby="modalCurrentBet">
@@ -2197,8 +2275,9 @@
     </footer>
 
     <script src="crapsRules.js?v=1"></script>
+    <script src="/shared/casino-profile.js?v=1"></script>
     <script src="/shared/analytics.js?v=1"></script>
-    <script src="app.js?v=1"></script>
+    <script src="app.js?v=4"></script>
     <script src="/shared/site-nav.js?v=6"></script>
 </body>
 </html>

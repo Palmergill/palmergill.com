@@ -188,6 +188,160 @@ header {
     padding: 0 12px;
 }
 
+.watchlist-btn {
+    min-width: 68px;
+    height: 32px;
+    border-radius: 6px;
+    border: 1px solid rgba(255, 215, 0, 0.35);
+    background: rgba(255, 215, 0, 0.08);
+    color: #ffd76a;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    margin-left: 8px;
+    padding: 0 12px;
+    transition: background 160ms ease, border-color 160ms ease;
+}
+.watchlist-btn:hover { background: rgba(255, 215, 0, 0.16); border-color: rgba(255, 215, 0, 0.55); }
+.watchlist-btn[aria-pressed="true"] {
+    background: rgba(255, 215, 0, 0.24);
+    border-color: rgba(255, 215, 0, 0.7);
+    color: #fff8dc;
+}
+
+.watchlist-section { margin-bottom: 12px; }
+
+.compare-section { margin-bottom: 16px; }
+.compare-hint { color: #94a3b8; font-size: 12px; }
+.compare-form {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 10px;
+}
+.compare-form input {
+    flex: 1;
+    height: 36px;
+    padding: 0 12px;
+    border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.18);
+    background: rgba(0,0,0,0.32);
+    color: #f7f3ea;
+    text-transform: uppercase;
+    font: inherit;
+    font-size: 14px;
+}
+.compare-add-btn {
+    min-width: 60px;
+    height: 36px;
+    padding: 0 14px;
+    border: 1px solid rgba(99, 156, 255, 0.4);
+    border-radius: 8px;
+    background: rgba(99, 156, 255, 0.14);
+    color: #c7dafd;
+    font: inherit;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+}
+.compare-add-btn:hover { background: rgba(99, 156, 255, 0.24); }
+.compare-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+.compare-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 10px 5px 12px;
+    border: 1px solid rgba(255,255,255,0.18);
+    border-radius: 999px;
+    background: rgba(255,255,255,0.06);
+    font-size: 13px;
+    font-weight: 700;
+    color: #f7f3ea;
+}
+.compare-chip button {
+    margin: 0;
+    width: 18px;
+    height: 18px;
+    padding: 0;
+    border: none;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.12);
+    color: #f7f3ea;
+    cursor: pointer;
+    font-size: 11px;
+    line-height: 1;
+}
+.compare-chip button:hover { background: rgba(255,255,255,0.24); }
+.compare-table {
+    margin-top: 6px;
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 10px;
+    overflow: hidden;
+}
+.compare-table table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+}
+.compare-table th,
+.compare-table td {
+    padding: 10px 12px;
+    text-align: right;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+.compare-table th:first-child,
+.compare-table td:first-child {
+    text-align: left;
+    color: #94a3b8;
+    font-weight: 700;
+}
+.compare-table thead th {
+    background: rgba(0,0,0,0.32);
+    color: #f7f3ea;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+}
+.compare-table td.is-positive { color: #4ade80; }
+.compare-table td.is-negative { color: #f87171; }
+.compare-table tr:last-child td { border-bottom: none; }
+.compare-empty {
+    padding: 14px;
+    color: #94a3b8;
+    text-align: center;
+    font-size: 13px;
+}
+.trending-label-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 8px;
+}
+.link-button {
+    background: none;
+    border: none;
+    color: #94a3b8;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: underline;
+    padding: 0;
+}
+.link-button:hover { color: #fff; }
+
+.watchlist-item-delta {
+    display: block;
+    margin-top: 2px;
+    font-size: 11px;
+    font-weight: 700;
+}
+.watchlist-item-delta.is-positive { color: #4ade80; }
+.watchlist-item-delta.is-negative { color: #f87171; }
+
 .header-row-2 {
     display: flex;
     padding: 8px 20px;

@@ -4,6 +4,20 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Bitcoin Chat</title>
+    <meta name="description" content="Bitcoin chat — ask about price, mempool, mining, and protocol topics. By Palmer Gill.">
+    <meta name="theme-color" content="#080a0d">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://palmergill.com/bitcoin-chat/">
+    <meta property="og:title" content="Bitcoin Chat — Palmer Gill">
+    <meta property="og:description" content="Bitcoin chat — ask about price, mempool, mining, and protocol topics.">
+    <meta property="og:image" content="https://palmergill.com/assets/palmer-gill-logo.png">
+    <meta property="og:image:width" content="960">
+    <meta property="og:image:height" content="960">
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="Bitcoin Chat — Palmer Gill">
+    <meta name="twitter:description" content="Bitcoin chat — ask about price, mempool, mining, and protocol topics.">
+    <meta name="twitter:image" content="https://palmergill.com/assets/palmer-gill-logo.png">
+    <link rel="icon" type="image/png" href="/assets/palmer-gill-logo-small.png">
     <link rel="stylesheet" href="/shared/site-nav.css?v=6">
     <link rel="stylesheet" href="style.css">
 </head>
@@ -26,6 +40,14 @@
 
             <div class="chat-layout">
                 <div id="messages" class="messages" aria-live="polite"></div>
+            </div>
+
+            <div id="promptChips" class="prompt-chips" aria-label="Suggested prompts">
+                <button type="button" class="prompt-chip" data-prompt="What's in the mempool right now?">What's in the mempool?</button>
+                <button type="button" class="prompt-chip" data-prompt="What's pushing the Bitcoin price today?">What's moving the price?</button>
+                <button type="button" class="prompt-chip" data-prompt="Walk me through how a block is mined.">How does a block get mined?</button>
+                <button type="button" class="prompt-chip" data-prompt="When is the next halving and what changes?">Next halving</button>
+                <button type="button" class="prompt-chip" data-prompt="What are current fee estimates?">Current fees</button>
             </div>
 
             <form id="chatForm" class="composer">

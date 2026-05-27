@@ -353,4 +353,20 @@ chatForm.addEventListener('submit', async (event) => {
 });
 
 addMessage(starterMessage);
+
+const promptChipsContainer = document.getElementById('promptChips');
+if (promptChipsContainer) {
+    promptChipsContainer.querySelectorAll('.prompt-chip').forEach((chip) => {
+        chip.addEventListener('click', () => {
+            const prompt = chip.getAttribute('data-prompt');
+            if (!prompt) return;
+            messageInput.value = prompt;
+            messageInput.dispatchEvent(new Event('input'));
+            chatForm.requestSubmit();
+        });
+    });
+    chatForm.addEventListener('submit', () => {
+        promptChipsContainer.hidden = true;
+    }, { once: true });
+}
 refreshStatus();

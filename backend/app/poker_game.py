@@ -81,6 +81,8 @@ class Player:
     folded: bool = False
     is_all_in: bool = False
     is_human: bool = False
+    ai_personality: Optional[str] = None
+    ai_personality_label: Optional[str] = None
 
     def to_dict(self, show_cards: bool = False):
         return {
@@ -92,7 +94,9 @@ class Player:
             'total_bet': self.total_bet,
             'folded': self.folded,
             'is_all_in': self.is_all_in,
-            'is_human': self.is_human
+            'is_human': self.is_human,
+            'ai_personality': self.ai_personality,
+            'ai_personality_label': self.ai_personality_label,
         }
 
 @dataclass
@@ -133,9 +137,13 @@ class PokerGame:
         self.acted_this_round: set = set()  # Track who has acted in current betting round
         self.round_start_player: int = 0  # Who started this betting round
         # Multiplayer support
-        self.game_type = "single"  # "single" or "multiplayer"
+        self.game_type = "single"  # "single", "multiplayer", or "tournament"
         self.max_players = 6
         self.waiting_for_players = False
+        # Tournament state. Blinds escalate every `hands_per_level` hands using
+        # a fixed schedule. Eliminated players stay in `players` (for ranking)
+        # but with chips=0. Tournament ends when only one entrant has chips.
+        self.tournament: Optional[Dict] = None
 
     def add_player(self, name: str, is_human: bool = False) -> Player:
         player_id = f"p{len(self.players)}"
@@ -148,11 +156,109 @@ class PokerGame:
         self.players.append(player)
         return player
 
+    # ── Tournament helpers ───────────────────────────────────────────────
+    TOURNAMENT_BLIND_SCHEDULE = [
+        (10, 20),
+        (15, 30),
+        (25, 50),
+        (50, 100),
+        (75, 150),
+        (100, 200),
+        (150, 300),
+        (200, 400),
+        (300, 600),
+        (500, 1000),
+        (750, 1500),
+        (1000, 2000),
+    ]
+    TOURNAMENT_STARTING_CHIPS = 1500
+    TOURNAMENT_HANDS_PER_LEVEL = 6
+
+    def configure_tournament(self) -> None:
+        """Switch the game into tournament mode. Must be called before start_hand."""
+        self.game_type = "tournament"
+        for player in self.players:
+            player.chips = self.TOURNAMENT_STARTING_CHIPS
+        sb, bb = self.TOURNAMENT_BLIND_SCHEDULE[0]
+        self.small_blind = sb
+        self.big_blind = bb
+        self.tournament = {
+            "level": 1,
+            "hands_per_level": self.TOURNAMENT_HANDS_PER_LEVEL,
+            "schedule": list(self.TOURNAMENT_BLIND_SCHEDULE),
+            "eliminated": [],          # player ids in elimination order
+            "started_at": time.time(),
+        }
+
+    def _advance_tournament_level(self) -> None:
+        """Bump blinds based on hand number. Called at the top of start_hand."""
+        if not self.tournament:
+            return
+        schedule = self.tournament.get("schedule") or list(self.TOURNAMENT_BLIND_SCHEDULE)
+        per_level = max(1, int(self.tournament.get("hands_per_level") or self.TOURNAMENT_HANDS_PER_LEVEL))
+        # hand_number was already incremented when this is called.
+        level_idx = min(len(schedule) - 1, (self.hand_number - 1) // per_level)
+        sb, bb = schedule[level_idx]
+        self.small_blind = sb
+        self.big_blind = bb
+        self.tournament["level"] = level_idx + 1
+
+    def _record_tournament_eliminations(self) -> None:
+        """Mark any zero-chip players eliminated, preserving order."""
+        if not self.tournament:
+            return
+        eliminated = self.tournament.setdefault("eliminated", [])
+        for player in self.players:
+            if player.chips <= 0 and player.id not in eliminated:
+                eliminated.append(player.id)
+
+    def tournament_is_over(self) -> bool:
+        if not self.tournament:
+            return False
+        return sum(1 for p in self.players if p.chips > 0) <= 1
+
+    def tournament_standings(self) -> List[Dict]:
+        """Standings ordered from winner down. Eliminated players land last."""
+        if not self.tournament:
+            return []
+        eliminated_ids = list(self.tournament.get("eliminated", []))
+        # Survivors sorted by chips desc are the lead pack.
+        survivors = sorted(
+            [p for p in self.players if p.chips > 0],
+            key=lambda p: -p.chips,
+        )
+        # Eliminations reversed: latest-out finishes higher than earliest-out.
+        eliminated_players = []
+        for pid in reversed(eliminated_ids):
+            for p in self.players:
+                if p.id == pid:
+                    eliminated_players.append(p)
+                    break
+        ranked = survivors + eliminated_players
+        return [
+            {
+                "rank": idx + 1,
+                "player_id": p.id,
+                "name": p.name,
+                "chips": p.chips,
+            }
+            for idx, p in enumerate(ranked)
+        ]
+
     def start_hand(self):
         if len(self.players) < 2:
             return False
 
+        # In tournaments, eliminated players can't take their seat. Bail early
+        # if only one player has chips left.
+        if self.tournament and self.tournament_is_over():
+            self.phase = "showdown"
+            self.winners = self.tournament_standings()[:1]
+            return False
+
         self.hand_number += 1
+        if self.tournament:
+            self._advance_tournament_level()
         self.deck.reset()
         self.community_cards = []
         self.pot = 0
@@ -629,6 +735,10 @@ class PokerGame:
                     'hand': [c.to_dict() for c in best_hand_cards]
                 })
 
+        # Tournament: mark any newly busted player eliminated. Order matters
+        # for final standings, so capture this right after winnings settle.
+        self._record_tournament_eliminations()
+
     def to_dict(self, for_player: Optional[str] = None) -> dict:
         """Convert game state to dict for API response"""
         return {
@@ -647,5 +757,15 @@ class PokerGame:
             'min_raise': self.min_raise,
             'game_type': getattr(self, 'game_type', 'single'),
             'max_players': getattr(self, 'max_players', 6),
-            'waiting_for_players': getattr(self, 'waiting_for_players', False)
+            'waiting_for_players': getattr(self, 'waiting_for_players', False),
+            'small_blind': self.small_blind,
+            'big_blind': self.big_blind,
+            'tournament': {
+                'level': self.tournament.get('level', 1),
+                'hands_per_level': self.tournament.get('hands_per_level', self.TOURNAMENT_HANDS_PER_LEVEL),
+                'next_level_in': max(0, self.tournament.get('hands_per_level', self.TOURNAMENT_HANDS_PER_LEVEL) - ((self.hand_number) % self.tournament.get('hands_per_level', self.TOURNAMENT_HANDS_PER_LEVEL))),
+                'eliminated': list(self.tournament.get('eliminated', [])),
+                'standings': self.tournament_standings(),
+                'over': self.tournament_is_over(),
+            } if self.tournament else None,
         }

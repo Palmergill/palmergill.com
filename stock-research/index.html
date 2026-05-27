@@ -4,8 +4,22 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Stock Research</title>
+    <meta name="description" content="Polished stock research app — fundamentals, charts, and news for any ticker. By Palmer Gill.">
+    <meta name="theme-color" content="#080a0d">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://palmergill.com/stock-research/">
+    <meta property="og:title" content="Stock Research — Palmer Gill">
+    <meta property="og:description" content="Polished stock research app — fundamentals, charts, and news for any ticker.">
+    <meta property="og:image" content="https://palmergill.com/assets/palmer-gill-logo.png">
+    <meta property="og:image:width" content="960">
+    <meta property="og:image:height" content="960">
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="Stock Research — Palmer Gill">
+    <meta name="twitter:description" content="Polished stock research app — fundamentals, charts, and news for any ticker.">
+    <meta name="twitter:image" content="https://palmergill.com/assets/palmer-gill-logo.png">
+    <link rel="icon" type="image/png" href="/assets/palmer-gill-logo-small.png">
     <link rel="stylesheet" href="/shared/site-nav.css?v=6">
-    <link rel="stylesheet" href="style.css?v=2">
+    <link rel="stylesheet" href="style.css?v=3">
 </head>
 <body>
     <div class="container">
@@ -23,6 +37,7 @@
                     <div class="header-stock-right">
                         <span id="headerStockPrice" class="header-price-large">$417.44</span>
                         <span id="headerStockChange" class="header-change-badge positive">+5.2%</span>
+                        <button id="watchlistBtn" class="watchlist-btn" type="button" aria-pressed="false" title="Add to watchlist">★ Save</button>
                         <button id="searchIconBtnInline" class="search-icon-btn-inline" title="Search">Search</button>
                     </div>
                 </div>
@@ -169,6 +184,27 @@
                 <h3 class="empty-title">Discover Your Next Investment</h3>
                 <p class="empty-description">Search for any stock ticker to access real-time data, interactive charts, and comprehensive financial metrics.</p>
                 
+                <div id="compareSection" class="trending-stocks compare-section">
+                    <div class="trending-label-row">
+                        <span class="trending-label">Compare</span>
+                        <span class="compare-hint">Add up to 4 tickers</span>
+                    </div>
+                    <form id="compareForm" class="compare-form">
+                        <input id="compareInput" type="text" maxlength="8" placeholder="Add ticker (e.g. NVDA)" autocomplete="off">
+                        <button type="submit" class="compare-add-btn">Add</button>
+                    </form>
+                    <div id="compareChips" class="compare-chips"></div>
+                    <div id="compareTable" class="compare-table" hidden></div>
+                </div>
+
+                <div id="watchlistSection" class="trending-stocks watchlist-section" hidden>
+                    <div class="trending-label-row">
+                        <span class="trending-label">Your Watchlist</span>
+                        <button type="button" id="clearWatchlistBtn" class="link-button">Clear</button>
+                    </div>
+                    <div id="watchlistGrid" class="trending-grid"></div>
+                </div>
+
                 <div class="trending-stocks">
                     <span class="trending-label">Trending Now</span>
                     <div class="trending-grid">
@@ -453,5 +489,7 @@
     <script src="/shared/analytics.js?v=1"></script>
     <script src="/shared/api-base.js?v=1"></script>
     <script src="app.js?v=9"></script>
+    <script src="watchlist.js?v=1"></script>
+    <script src="compare.js?v=1"></script>
 </body>
 </html>

@@ -247,6 +247,54 @@ h1 {
     gap: 16px;
 }
 
+.casino-panel {
+    margin-bottom: 16px;
+    padding: 16px;
+    background: rgba(255,255,255,0.035);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 8px;
+}
+.casino-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px;
+}
+.casino-card {
+    padding: 14px 16px;
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 8px;
+    background: rgba(0,0,0,0.32);
+}
+.casino-card-total {
+    background: rgba(214, 178, 94, 0.08);
+    border-color: rgba(214, 178, 94, 0.32);
+}
+.casino-label {
+    display: block;
+    color: #94a3b8;
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+.casino-card strong {
+    display: block;
+    margin-top: 4px;
+    color: #f7f3ea;
+    font-size: 1.8rem;
+    font-weight: 700;
+    line-height: 1.1;
+}
+.casino-sub {
+    display: block;
+    margin-top: 4px;
+    color: #94a3b8;
+    font-size: 0.74rem;
+}
+@media (max-width: 760px) {
+    .casino-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
 .panel {
     padding: 16px;
     background: rgba(255,255,255,0.035);
