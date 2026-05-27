@@ -371,6 +371,11 @@ def analytics_summary(
     event_type_counts = Counter(row.event_type or "unknown" for row in rows)
     top_pages = Counter(row.path for row in rows if row.event_type == "page_view" and row.path)
     top_apps = Counter(row.app for row in rows if row.app)
+    casino_app_events = Counter(
+        row.app
+        for row in rows
+        if row.event_type == "app_event" and row.app in {"poker", "craps", "blackjack"}
+    )
     top_events = Counter(row.event_name for row in rows if row.event_type == "app_event" and row.event_name)
     top_referrers = Counter(_referrer_host(row.referrer) for row in rows if row.event_type == "page_view")
     authenticated = sum(1 for row in rows if row.is_authenticated)
@@ -414,6 +419,7 @@ def analytics_summary(
         "avg_duration_ms": round(avg_duration_ms, 1),
         "top_pages": _top(top_pages),
         "top_apps": _top(top_apps),
+        "casino_app_events": _top(casino_app_events),
         "top_events": _top(top_events),
         "top_referrers": _top(top_referrers),
         "recent_errors": recent_errors,

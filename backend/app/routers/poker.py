@@ -15,7 +15,7 @@ from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 
 from app.poker_game import Card, Player, PokerGame, Rank, Suit
-from app.poker_ai import AIManager, PokerAI
+from app.poker_ai import AIManager, PERSONALITIES, PokerAI
 from app.database import PokerGameState, SessionLocal
 
 router = APIRouter(prefix="/api/poker", tags=["poker"])
@@ -157,9 +157,19 @@ def _ai_manager_for_game(game: PokerGame) -> Optional[AIManager]:
     manager = AIManager(game)
     for player in game.players:
         if not player.is_human:
-            manager.bots[player.id] = PokerAI(
-                aggression=BOT_AGGRESSION_BY_NAME.get(player.name, 0.5)
-            )
+            personality = getattr(player, "ai_personality", None)
+            if personality in PERSONALITIES:
+                p = PERSONALITIES[personality]
+                manager.bots[player.id] = PokerAI(
+                    aggression=p["aggression"],
+                    looseness=p["looseness"],
+                    personality=personality,
+                )
+                player.ai_personality_label = p["label"]
+            else:
+                manager.bots[player.id] = PokerAI(
+                    aggression=BOT_AGGRESSION_BY_NAME.get(player.name, 0.5)
+                )
     return manager
 
 
@@ -182,6 +192,8 @@ def _serialize_player(player: Player) -> dict:
         "folded": player.folded,
         "is_all_in": player.is_all_in,
         "is_human": player.is_human,
+        "ai_personality": player.ai_personality,
+        "ai_personality_label": player.ai_personality_label,
     }
 
 
@@ -196,6 +208,8 @@ def _deserialize_player(data: dict) -> Player:
         folded=data.get("folded", False),
         is_all_in=data.get("is_all_in", False),
         is_human=data.get("is_human", False),
+        ai_personality=data.get("ai_personality"),
+        ai_personality_label=data.get("ai_personality_label"),
     )
 
 
@@ -254,7 +268,7 @@ def _deserialize_game(data: dict) -> PokerGame:
     return game
 
 
-def save_game_state(game_id: str) -> None:
+def save_game_state(game_id: str, *, broadcast: bool = True) -> None:
     game = games.get(game_id)
     if not game:
         return
@@ -282,8 +296,8 @@ def save_game_state(game_id: str) -> None:
     finally:
         db.close()
 
-    # Every save reflects a state mutation worth broadcasting.
-    schedule_game_changed(game_id)
+    if broadcast:
+        schedule_game_changed(game_id)
 
 
 def load_game_state(game_id: str) -> bool:
@@ -366,27 +380,30 @@ def require_player_token(game_id: str, player_id: str, player_token: Optional[st
         raise HTTPException(status_code=403, detail="Invalid player token")
 
 
-def process_ai_turn_if_needed(game_id: str, game: PokerGame) -> None:
-    """Advance one AI turn for single-player games when the current actor is a bot."""
-    is_single_player = getattr(game, 'game_type', 'single') == 'single'
-    if not is_single_player or game.phase in ('showdown', 'waiting'):
-        return
+def process_ai_turn_if_needed(game_id: str, game: PokerGame) -> bool:
+    """Advance one AI turn for AI-backed games when the current actor is a bot."""
+    is_ai_game = getattr(game, 'game_type', 'single') in ('single', 'tournament')
+    if not is_ai_game or game.phase in ('showdown', 'waiting'):
+        return False
 
     active = [p for p in game.players if not p.folded and not p.is_all_in]
     if len(active) <= 1:
         game._advance_phase()
-        return
+        return True
 
     current = game.get_current_player()
     if current and not current.is_human:
         now = time.time()
         if now - ai_last_processed.get(game_id, 0) < AI_TURN_MIN_INTERVAL_SECONDS:
-            return
+            return False
 
         ai_manager = ai_managers.get(game_id)
         if ai_manager:
             ai_manager.process_bot_turn()
             ai_last_processed[game_id] = now
+            return True
+
+    return False
 
 
 class CreateGameRequest(BaseModel):
@@ -569,7 +586,7 @@ async def get_game_state(
         game = games[game_id]
         require_player_token(game_id, player_id, player_token)
         update_game_access(game_id)
-        save_game_state(game_id)
+        save_game_state(game_id, broadcast=False)
 
         # The process_ai query parameter is retained for old clients, but GET is
         # intentionally read-only. Use POST /process-ai to advance a bot turn.
@@ -589,8 +606,8 @@ async def process_ai_turn(game_id: str, http_request: Request, request: PlayerAu
         game = games[game_id]
         require_player_token(game_id, request.player_id, request.player_token)
         update_game_access(game_id)
-        process_ai_turn_if_needed(game_id, game)
-        save_game_state(game_id)
+        changed = process_ai_turn_if_needed(game_id, game)
+        save_game_state(game_id, broadcast=changed)
 
         return game.to_dict(for_player=request.player_id)
 

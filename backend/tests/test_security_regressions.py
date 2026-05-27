@@ -12,6 +12,8 @@ from app.main import (
 from app.routers.admin import cleanup_old_logs
 from app.routers.analytics import cleanup_old_analytics, record_analytics_event, safe_json
 from app.routers import poker
+from app.poker_ai import AIManager
+from app.poker_game import PokerGame
 from datetime import timedelta
 
 
@@ -85,6 +87,61 @@ def test_buy_back_uses_server_defined_amount_for_busted_players():
 
     assert response.status_code == 200
     assert game._get_player(data["player_id"]).chips == poker.BUY_BACK_AMOUNT
+
+
+def test_tournament_next_hand_skips_eliminated_players():
+    game = PokerGame("tour")
+    for name in ["Hero", "Reg", "Cal", "Stone", "Avery", "Action"]:
+        game.add_player(name, is_human=(name == "Hero"))
+    game.configure_tournament()
+
+    game.players[2].chips = 0
+    game.players[3].chips = 0
+    game._record_tournament_eliminations()
+    game.dealer_index = 2
+
+    assert game.start_hand() is True
+
+    eliminated = {game.players[2].id, game.players[3].id}
+    assert game.current_player_index not in {2, 3}
+    for idx, player in enumerate(game.players):
+        if player.id in eliminated:
+            assert player.hand == []
+            assert player.folded is True
+            assert player.is_all_in is True
+        else:
+            assert len(player.hand) == 2
+            assert player.folded is False
+
+
+def test_tournament_processes_ai_turns():
+    game = PokerGame("tour-ai")
+    game.add_player("Hero", is_human=True)
+    game.add_player("Reg", is_human=False)
+    game.configure_tournament()
+    game.start_hand()
+    game.current_player_index = 1
+
+    poker.ai_managers[game.game_id] = poker._ai_manager_for_game(game)
+    poker.ai_last_processed.clear()
+
+    assert poker.process_ai_turn_if_needed(game.game_id, game) is True
+    assert game.last_action is not None
+
+
+def test_poker_serialization_preserves_ai_personality_metadata():
+    game = PokerGame("persist")
+    game.add_player("Hero", is_human=True)
+    manager = AIManager(game)
+    bot = manager.add_bot("Cal", personality="lp")
+
+    restored = poker._deserialize_game(poker._serialize_game(game))
+    restored_bot = restored._get_player(bot.id)
+    restored_manager = poker._ai_manager_for_game(restored)
+
+    assert restored_bot.ai_personality == "lp"
+    assert restored_bot.ai_personality_label == "Loose-Passive"
+    assert restored_manager.bots[bot.id].looseness == poker.PERSONALITIES["lp"]["looseness"]
 
 
 def test_stock_price_history_rejects_unbounded_day_ranges():

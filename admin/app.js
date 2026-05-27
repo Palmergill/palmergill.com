@@ -179,11 +179,11 @@
         renderCompactList(els.topReferrers, summary.top_referrers, 'No referrers yet', 'referrer');
         renderCompactList(els.topEvents, summary.top_events, 'No app events yet', 'event');
         renderRecentErrors(summary.recent_errors || []);
-        renderCasinoCards(summary.top_apps || []);
+        renderCasinoCards(summary.casino_app_events || []);
     }
 
     function renderCasinoCards(apps) {
-        // top_apps entries look like { app: 'poker', count: N } (and similar keys).
+        // casino_app_events entries look like { app: 'poker', count: N }.
         const counts = { poker: 0, craps: 0, blackjack: 0 };
         apps.forEach((entry) => {
             const name = entry?.app || entry?.name || entry?.key;

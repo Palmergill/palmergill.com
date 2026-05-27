@@ -245,6 +245,22 @@ class PokerGame:
             for idx, p in enumerate(ranked)
         ]
 
+    def _eligible_player_indices(self) -> List[int]:
+        if not self.tournament:
+            return list(range(len(self.players)))
+        return [idx for idx, player in enumerate(self.players) if player.chips > 0]
+
+    def _normalize_tournament_dealer(self, eligible_indices: List[int]) -> None:
+        if not self.tournament or self.dealer_index in eligible_indices:
+            return
+        if not eligible_indices:
+            return
+        for offset in range(1, len(self.players) + 1):
+            idx = (self.dealer_index + offset) % len(self.players)
+            if idx in eligible_indices:
+                self.dealer_index = idx
+                return
+
     def start_hand(self):
         if len(self.players) < 2:
             return False
@@ -255,6 +271,14 @@ class PokerGame:
             self.phase = "showdown"
             self.winners = self.tournament_standings()[:1]
             return False
+
+        eligible_indices = self._eligible_player_indices()
+        if len(eligible_indices) < 2:
+            self.phase = "showdown"
+            self.winners = self.tournament_standings()[:1] if self.tournament else []
+            return False
+
+        self._normalize_tournament_dealer(eligible_indices)
 
         self.hand_number += 1
         if self.tournament:
@@ -269,32 +293,43 @@ class PokerGame:
         self.last_action = None
 
         # Reset players
-        for player in self.players:
+        eligible_set = set(eligible_indices)
+        for idx, player in enumerate(self.players):
             player.hand = []
             player.bet = 0
             player.total_bet = 0
-            player.folded = False
-            player.is_all_in = False
+            if self.tournament and idx not in eligible_set:
+                player.folded = True
+                player.is_all_in = True
+            else:
+                player.folded = False
+                player.is_all_in = False
 
         # Deal cards
         for _ in range(2):
-            for player in self.players:
-                player.hand.extend(self.deck.deal(1))
+            for idx in eligible_indices:
+                self.players[idx].hand.extend(self.deck.deal(1))
 
         # Post blinds. Heads-up is special: the button posts the small blind
         # and acts first preflop.
-        if len(self.players) == 2:
+        dealer_pos = eligible_indices.index(self.dealer_index)
+        if len(eligible_indices) == 2:
             sb_index = self.dealer_index
-            bb_index = (self.dealer_index + 1) % len(self.players)
+            bb_index = eligible_indices[(dealer_pos + 1) % len(eligible_indices)]
         else:
-            sb_index = (self.dealer_index + 1) % len(self.players)
-            bb_index = (self.dealer_index + 2) % len(self.players)
+            sb_index = eligible_indices[(dealer_pos + 1) % len(eligible_indices)]
+            bb_index = eligible_indices[(dealer_pos + 2) % len(eligible_indices)]
 
         self._post_blind(self.players[sb_index], self.small_blind)
         self._post_blind(self.players[bb_index], self.big_blind)
 
         self.current_bet = self.big_blind
-        self.current_player_index = sb_index if len(self.players) == 2 else (bb_index + 1) % len(self.players)
+        bb_pos = eligible_indices.index(bb_index)
+        self.current_player_index = (
+            sb_index
+            if len(eligible_indices) == 2
+            else eligible_indices[(bb_pos + 1) % len(eligible_indices)]
+        )
         self.min_raise = self.big_blind
         self.acted_this_round = set()
         self.round_start_player = self.current_player_index

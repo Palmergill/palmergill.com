@@ -482,7 +482,7 @@
         if (previousState.status !== "roundOver" && state.status === "roundOver") {
             const delta = state.balance - balanceBeforeRound;
             state.playerHands.forEach((hand) => {
-                if (hand.result === "win") shoeStats.wins++;
+                if (hand.result === "win" || hand.result === "blackjack") shoeStats.wins++;
                 else if (hand.result === "lose") shoeStats.losses++;
                 else if (hand.result === "push") shoeStats.pushes++;
             });
