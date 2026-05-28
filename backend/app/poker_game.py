@@ -436,11 +436,12 @@ class PokerGame:
         call_amount = self.current_bet - player.bet
         total_needed = call_amount + amount
 
+        # Strict inequality here is load-bearing: when chips == total_needed
+        # the player can only commit by going all-in, so we accept under-min
+        # amounts (handled in the all-in branch below). Flipping to >= would
+        # silently reject legitimate all-ins.
         if amount < self.min_raise and player.chips > total_needed:
             return False  # Raise too small
-
-        # A raise resets who has acted (everyone gets to act again)
-        self.acted_this_round = {player_id}
 
         if player.chips <= total_needed:
             # All-in raise
@@ -453,10 +454,23 @@ class PokerGame:
 
             if player.bet > self.current_bet:
                 self.current_bet = player.bet
-                self.min_raise = actual_raise
+                # An all-in that constitutes a full raise reopens action and
+                # raises the min. An under-min all-in does neither: players
+                # who already acted only get to call/fold the extra, not
+                # re-raise. This matches standard no-limit hold'em rules.
+                if actual_raise >= self.min_raise:
+                    self.min_raise = actual_raise
+                    self.acted_this_round = {player_id}
+                else:
+                    self.acted_this_round.add(player_id)
+            else:
+                # All-in for less than the call amount — not a raise at all.
+                self.acted_this_round.add(player_id)
 
             self.last_action = {'player': player.name, 'action': 'all-in', 'amount': player.bet}
         else:
+            # A full raise resets who has acted (everyone gets to act again)
+            self.acted_this_round = {player_id}
             player.chips -= total_needed
             player.bet += total_needed
             player.total_bet += total_needed
@@ -776,6 +790,13 @@ class PokerGame:
 
     def to_dict(self, for_player: Optional[str] = None) -> dict:
         """Convert game state to dict for API response"""
+        # get_current_player mutates current_player_index when the current
+        # slot is folded — avoid calling it twice from a serializer.
+        current = self.get_current_player()
+        hands_per_level = (
+            self.tournament.get('hands_per_level', self.TOURNAMENT_HANDS_PER_LEVEL)
+            if self.tournament else self.TOURNAMENT_HANDS_PER_LEVEL
+        )
         return {
             'game_id': self.game_id,
             'phase': self.phase,
@@ -783,7 +804,7 @@ class PokerGame:
             'current_bet': self.current_bet,
             'community_cards': [c.to_dict() for c in self.community_cards],
             'players': [p.to_dict(show_cards=for_player == p.id or self.phase == 'showdown') for p in self.players],
-            'current_player': self.get_current_player().id if self.get_current_player() else None,
+            'current_player': current.id if current else None,
             'dealer_index': self.dealer_index,
             'winners': self.winners,
             'last_action': self.last_action,
@@ -797,8 +818,11 @@ class PokerGame:
             'big_blind': self.big_blind,
             'tournament': {
                 'level': self.tournament.get('level', 1),
-                'hands_per_level': self.tournament.get('hands_per_level', self.TOURNAMENT_HANDS_PER_LEVEL),
-                'next_level_in': max(0, self.tournament.get('hands_per_level', self.TOURNAMENT_HANDS_PER_LEVEL) - ((self.hand_number) % self.tournament.get('hands_per_level', self.TOURNAMENT_HANDS_PER_LEVEL))),
+                'hands_per_level': hands_per_level,
+                # When hand_number is an exact multiple of hands_per_level
+                # the next hand starts a new level (0 hands remaining), not
+                # a full level away.
+                'next_level_in': (hands_per_level - self.hand_number % hands_per_level) % hands_per_level,
                 'eliminated': list(self.tournament.get('eliminated', [])),
                 'standings': self.tournament_standings(),
                 'over': self.tournament_is_over(),

@@ -116,12 +116,41 @@
         return amount * (ODDS_MULTIPLIERS[point] || 0);
     }
 
-    function calculateOddsToAdd({ point, amount, odds = 0, balance = 0, multiplier }) {
+    // Real casinos require odds amounts that produce whole-dollar payouts
+    // (e.g. multiples of 2 on a 3:2 point, multiples of 5 on a 6:5 point) so
+    // the house doesn't quietly pocket fractions. Round any requested amount
+    // down to the nearest legal increment.
+    function oddsIncrement(point, isPass) {
+        if (isPass) {
+            if (point === 5 || point === 9) return 2;   // 3:2 needs even
+            if (point === 6 || point === 8) return 5;   // 6:5 needs multiple of 5
+            return 1;                                    // 2:1 on 4/10
+        }
+        if (point === 5 || point === 9) return 3;       // 2:3 needs multiple of 3
+        if (point === 6 || point === 8) return 6;       // 5:6 needs multiple of 6
+        return 2;                                        // 1:2 needs even
+    }
+
+    function legalOddsAmount({ point, requested, remaining, balance = 0, isPass = true }) {
+        if (!point || requested <= 0 || remaining <= 0) return 0;
+        const available = Math.min(requested, remaining, balance);
+        if (available < 5) return 0;
+        const increment = oddsIncrement(point, isPass);
+        const legal = Math.floor(available / increment) * increment;
+        return legal >= 5 ? legal : 0;
+    }
+
+    function calculateOddsToAdd({ point, amount, odds = 0, balance = 0, multiplier, isPass = true }) {
         if (!point || amount === 0) return 0;
         const maxAmount = getMaxOddsAmount(amount, point);
-        const requestedAmount = multiplier === "max" ? maxAmount : amount * multiplier;
-        const available = Math.min(requestedAmount, maxAmount - odds, balance);
-        return available >= 5 ? available : 0;
+        const requested = multiplier === "max" ? maxAmount : amount * multiplier;
+        return legalOddsAmount({
+            point,
+            requested,
+            remaining: maxAmount - odds,
+            balance,
+            isPass
+        });
     }
 
     function emptyResolution(bets) {
@@ -199,6 +228,7 @@
         getBetUnit,
         getMaxOddsAmount,
         getOddsPayout,
+        legalOddsAmount,
         resolveHardwayBets,
         resolveOneRollBets,
         resolvePlaceBetsOnSeven,

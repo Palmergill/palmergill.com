@@ -251,8 +251,12 @@ class AIManager:
             success = self.game.action_raise(current.id, decision['amount'])
         elif decision['action'] == 'all-in':
             to_call = self.game.current_bet - current.bet
-            all_in_amount = current.chips - to_call
-            success = self.game.action_raise(current.id, all_in_amount)
+            if current.chips <= to_call:
+                # Bot can't even cover the call — go all-in via call().
+                success = self.game.action_call(current.id)
+            else:
+                all_in_amount = current.chips - to_call
+                success = self.game.action_raise(current.id, all_in_amount)
         
         if success:
             logger.info(f"Bot {current.name} successfully executed {decision['action']}")

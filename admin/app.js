@@ -775,14 +775,27 @@
     els.analyticsBody.addEventListener('click', (event) => {
         const row = event.target.closest('[data-analytics-index]');
         if (!row) return;
-        const detail = els.analyticsBody.querySelector(`[data-detail-for="analytics-${row.dataset.analyticsIndex}"]`);
-        if (detail) detail.classList.toggle('hidden');
+        const idx = row.dataset.analyticsIndex;
+        const detail = els.analyticsBody.querySelector(`[data-detail-for="analytics-${idx}"]`);
+        if (detail) {
+            detail.classList.toggle('hidden');
+        } else {
+            // After pagination, a stale data-analytics-index may point past
+            // the rendered rows. Surface the mismatch instead of silently
+            // doing nothing.
+            console.warn('Analytics detail row missing for index', idx);
+        }
     });
     els.dbBody.addEventListener('click', (event) => {
         const row = event.target.closest('[data-log-index]');
         if (!row) return;
-        const detail = els.dbBody.querySelector(`[data-detail-for="log-${row.dataset.logIndex}"]`);
-        if (detail) detail.classList.toggle('hidden');
+        const idx = row.dataset.logIndex;
+        const detail = els.dbBody.querySelector(`[data-detail-for="log-${idx}"]`);
+        if (detail) {
+            detail.classList.toggle('hidden');
+        } else {
+            console.warn('Log detail row missing for index', idx);
+        }
     });
 
     refreshDashboard();

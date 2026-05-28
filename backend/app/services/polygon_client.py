@@ -538,18 +538,21 @@ class PolygonClient:
         try:
             if len(financials) < 5:
                 return None
-            
+
             # Get latest quarter revenue
             latest = financials[0].get("financials", {}).get("income_statement", {}).get("revenues", {})
             latest_rev = latest.get("value") if isinstance(latest, dict) else None
-            
+
             # Get same quarter last year (4 quarters back)
             year_ago = financials[4].get("financials", {}).get("income_statement", {}).get("revenues", {})
             year_ago_rev = year_ago.get("value") if isinstance(year_ago, dict) else None
-            
-            if latest_rev and year_ago_rev and year_ago_rev > 0:
-                growth = ((latest_rev - year_ago_rev) / year_ago_rev) * 100
-                return round(growth, 2)
+
+            # Distinguish "no data" (None) from "zero revenue" — a legitimate
+            # zero shouldn't be silently treated as missing data.
+            if latest_rev is None or year_ago_rev is None or year_ago_rev <= 0:
+                return None
+            growth = ((latest_rev - year_ago_rev) / year_ago_rev) * 100
+            return round(growth, 2)
         except Exception as e:
             logger.warning(f"Could not calculate revenue growth: {e}")
         return None

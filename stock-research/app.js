@@ -145,7 +145,10 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Add ripple effect to all buttons
     function createRipple(event) {
-        const button = event.currentTarget;
+        const button = event.currentTarget instanceof HTMLButtonElement
+            ? event.currentTarget
+            : event.target.closest('button');
+        if (!button) return;
         const circle = document.createElement('span');
         const diameter = Math.max(button.clientWidth, button.clientHeight);
         const radius = diameter / 2;
@@ -165,9 +168,10 @@ document.addEventListener('DOMContentLoaded', () => {
         setTimeout(() => circle.remove(), 600);
     }
     
-    document.querySelectorAll('button').forEach(button => {
-        button.addEventListener('click', createRipple);
-    });
+    // Delegate from the document root so re-rendered buttons (filter,
+    // search) don't accumulate fresh listeners each time, which leaked
+    // memory and fired the ripple callback multiple times per click.
+    document.addEventListener('click', createRipple);
     
     // Magnetic button effect for primary buttons
     function initMagneticButtons() {
@@ -583,7 +587,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const hint = document.querySelector('.shelby-hint');
         
         if (!overlay || !canvas) return;
-        
+
+        let heartInterval = null;
+
         // Show overlay
         overlay.classList.remove('hidden');
         setTimeout(() => overlay.classList.add('visible'), 10);
@@ -704,11 +710,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 setTimeout(() => heart.remove(), 7000);
             }
             
-            // Create hearts continuously
-            const heartInterval = setInterval(createHeart, 300);
-            
-            // Store interval for cleanup
-            overlay.dataset.heartInterval = heartInterval;
+            // Create hearts continuously. Keep the id in the closure so the
+            // close handler can clear it reliably — storing it on dataset
+            // round-trips through a string and parseInt(NaN) silently leaks
+            // the interval if the value is lost or replaced.
+            heartInterval = setInterval(createHeart, 300);
         }
         
         // Click to close
@@ -720,8 +726,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 hint.classList.remove('visible');
                 heartsContainer.innerHTML = '';
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
-                if (overlay.dataset.heartInterval) {
-                    clearInterval(parseInt(overlay.dataset.heartInterval));
+                if (heartInterval !== null) {
+                    clearInterval(heartInterval);
+                    heartInterval = null;
                 }
             }, 1000);
             overlay.removeEventListener('click', closeOverlay);

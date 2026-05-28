@@ -106,7 +106,15 @@ def _cutoff(hours: int):
 
 
 def _iso(value):
-    return value.isoformat() if value else ""
+    if not value:
+        return ""
+    # Stored timestamps come from utc_now() which is naive UTC. Append 'Z'
+    # so the admin frontend's `new Date(value)` parses them as UTC instead
+    # of local time.
+    text = value.isoformat()
+    if getattr(value, "tzinfo", None) is None:
+        return f"{text}Z"
+    return text
 
 
 def _top(counter: Counter, limit: int = 8):

@@ -25,7 +25,11 @@ const explorerEls = {
     result: document.getElementById('explorerResult'),
 };
 
-let sessionId = localStorage.getItem('bitcoinChatSessionId');
+// Session id is stored in an HttpOnly cookie issued by /api/bitcoin/chat.
+// JavaScript deliberately never receives or sends it; fetch attaches the
+// cookie automatically.
+// Clean up any session id left in localStorage from before the cookie cutover.
+try { localStorage.removeItem('bitcoinChatSessionId'); } catch (_) { /* ignore */ }
 const explorerState = {
     latestBlock: null,
     mempool: null,
@@ -113,6 +117,12 @@ function appendParagraph(parent, lines) {
 
 function renderRichText(parent, text) {
     const lines = text.split(/\r?\n/);
+    // Count fences up front. An odd number means the model returned an
+    // unmatched ``` somewhere; treat the *last* opener as malformed (drop
+    // it) so the trailing paragraphs render as prose instead of getting
+    // swallowed into a never-closing code block.
+    const fenceCount = lines.reduce((n, l) => n + (l.trim().startsWith('```') ? 1 : 0), 0);
+    let remainingFenceToggles = fenceCount - (fenceCount % 2);
     let paragraphLines = [];
     let listEl = null;
     let codeBlock = null;
@@ -121,6 +131,12 @@ function renderRichText(parent, text) {
         const trimmed = line.trim();
 
         if (trimmed.startsWith('```')) {
+            if (remainingFenceToggles <= 0) {
+                // Unbalanced trailing fence — render the marker as prose.
+                paragraphLines.push(trimmed);
+                return;
+            }
+            remainingFenceToggles -= 1;
             appendParagraph(parent, paragraphLines);
             paragraphLines = [];
             listEl = null;
@@ -593,17 +609,15 @@ async function sendMessage(text) {
     try {
         const payload = {
             message: text,
-            session_id: sessionId,
             timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         };
         const result = await fetchJson(`${API_BASE}/chat`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
             body: JSON.stringify(payload),
         });
 
-        sessionId = result.session_id;
-        localStorage.setItem('bitcoinChatSessionId', sessionId);
         loadingEl.remove();
         addMessage({
             role: 'assistant',

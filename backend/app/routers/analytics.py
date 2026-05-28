@@ -93,7 +93,12 @@ def safe_json(value: dict[str, Any] | None) -> str | None:
 
 
 def _analytics_client_key(request: Request) -> str:
-    return request.client.host if request.client else "unknown"
+    # Route through the shared helper so this respects TRUST_PROXY_HEADERS.
+    # Behind a proxy, request.client.host is the proxy's IP and every visitor
+    # collapses to the same bucket — defeating the rate limit.
+    from app.main import client_ip
+
+    return client_ip(request)
 
 
 def _analytics_rate_limited(request: Request, now: float | None = None) -> bool:

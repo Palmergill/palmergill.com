@@ -204,8 +204,9 @@ const GestureManager = {
     },
 
     handleSwipeLeft() {
-        // Swipe left to fold
-        if (isMyTurn && gameState?.phase !== 'showdown') {
+        // Swipe left to fold. Guard on gameState so a pre-load swipe doesn't
+        // fire a no-op fold against null state.
+        if (gameState && isMyTurn && gameState.phase !== 'showdown') {
             this.showGestureFeedback('👋 Fold', 'left');
             playerAction('fold');
         }
@@ -213,7 +214,7 @@ const GestureManager = {
 
     handleSwipeRight() {
         // Swipe right to check (if possible) or show feedback
-        if (isMyTurn && gameState?.phase !== 'showdown') {
+        if (gameState && isMyTurn && gameState.phase !== 'showdown') {
             const myPlayer = gameState.players.find(p => p.id === playerId);
             const toCall = (gameState.current_bet || 0) - (myPlayer?.bet || 0);
 

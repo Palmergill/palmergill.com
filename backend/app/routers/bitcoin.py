@@ -1,12 +1,19 @@
 from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, HTTPException, Request
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 from app.services import bitcoin_ai, bitcoin_tools
 
 
 router = APIRouter(prefix="/api/bitcoin", tags=["bitcoin"])
+
+# Session id is opaque and used to resume conversations. Issue it as an
+# HttpOnly cookie so XSS / third-party scripts can't read it from
+# localStorage. Frontend sends nothing — the browser attaches the cookie.
+BITCOIN_SESSION_COOKIE = "pg_bitcoin_session"
+BITCOIN_SESSION_TTL_SECONDS = 30 * 24 * 60 * 60
 
 
 def is_demo_request(request: Request) -> bool:
@@ -21,7 +28,6 @@ class BitcoinChatRequest(BaseModel):
 
 class BitcoinChatResponse(BaseModel):
     answer: str
-    session_id: str
     tools_used: list[str]
     data: Dict[str, Any]
     warnings: list[str] = []
@@ -92,6 +98,26 @@ async def mempool_summary(request: Request):
 
 @router.post("/chat", response_model=BitcoinChatResponse)
 async def bitcoin_chat(http_request: Request, request: BitcoinChatRequest):
+    # Prefer the cookie over the body, so a stolen body token can't be
+    # replayed against a different victim.
+    session_id = http_request.cookies.get(BITCOIN_SESSION_COOKIE) or request.session_id
+
     if is_demo_request(http_request):
-        return bitcoin_ai.answer_demo_chat(request.message, request.session_id, request.timezone)
-    return bitcoin_ai.answer_chat(request.message, request.session_id, request.timezone)
+        result = bitcoin_ai.answer_demo_chat(request.message, session_id, request.timezone)
+    else:
+        result = bitcoin_ai.answer_chat(request.message, session_id, request.timezone)
+
+    cookie_session_id = result["session_id"]
+    body = {key: value for key, value in result.items() if key != "session_id"}
+    response = JSONResponse(content=body)
+    secure = http_request.url.scheme == "https"
+    response.set_cookie(
+        BITCOIN_SESSION_COOKIE,
+        cookie_session_id,
+        max_age=BITCOIN_SESSION_TTL_SECONDS,
+        httponly=True,
+        samesite="lax",
+        secure=secure,
+        path="/api/bitcoin",
+    )
+    return response

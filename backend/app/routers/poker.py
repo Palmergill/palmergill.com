@@ -4,7 +4,7 @@ Poker Game API Router - Simplified for debugging
 from fastapi import APIRouter, Header, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
-from typing import Optional, Dict, List
+from typing import Optional, Dict, List, Tuple
 import asyncio
 import json
 import uuid
@@ -34,6 +34,9 @@ player_tokens: Dict[str, Dict[str, str]] = {}
 # swapped out mid-turn). The guard lock protects the lookup dict itself.
 _game_locks: Dict[str, asyncio.Lock] = {}
 _game_locks_guard: Optional[asyncio.Lock] = None
+_game_persist_locks: Dict[str, asyncio.Lock] = {}
+_game_save_versions: Dict[str, int] = defaultdict(int)
+_game_persisted_versions: Dict[str, int] = defaultdict(int)
 
 # Per-game WebSocket subscribers. Connecting clients append their socket to
 # this set; mutating endpoints call `notify_game_changed(game_id)` to fan a
@@ -94,6 +97,11 @@ async def _game_lock(game_id: str) -> asyncio.Lock:
         return lock
 
 GAME_MAX_AGE_SECONDS = 3600
+# Persisted snapshots stick around far longer than the in-memory TTL: in a
+# multi-worker deployment, worker A may still have a game in memory while
+# worker B's `updated_at` is stale (the row's last write was on A). Pruning
+# the row on B's schedule would yank the game out from under A.
+PERSISTED_GAME_MAX_AGE_SECONDS = 24 * 60 * 60
 AI_TURN_MIN_INTERVAL_SECONDS = 1.5
 
 # Simple sliding-window rate limiter: max 60 requests per minute per IP
@@ -268,12 +276,12 @@ def _deserialize_game(data: dict) -> PokerGame:
     return game
 
 
-def save_game_state(game_id: str, *, broadcast: bool = True) -> None:
+def _serialize_game_payload(game_id: str) -> Optional[bytes]:
+    """Serialize a game snapshot to bytes. Cheap, safe to run under a lock."""
     game = games.get(game_id)
     if not game:
-        return
-
-    payload = json.dumps(
+        return None
+    return json.dumps(
         {
             "game": _serialize_game(game),
             "player_tokens": player_tokens.get(game_id, {}),
@@ -283,6 +291,9 @@ def save_game_state(game_id: str, *, broadcast: bool = True) -> None:
         separators=(",", ":"),
     ).encode("utf-8")
 
+
+def _persist_game_payload(game_id: str, payload: bytes) -> None:
+    """Write a pre-serialized snapshot to the database. May block on disk I/O."""
     db = SessionLocal()
     try:
         row = db.get(PokerGameState, game_id)
@@ -296,6 +307,62 @@ def save_game_state(game_id: str, *, broadcast: bool = True) -> None:
     finally:
         db.close()
 
+
+def save_game_state(game_id: str, *, broadcast: bool = True) -> None:
+    """Synchronous save. Use ``save_game_state_deferred`` from inside an
+    ``async with lock:`` block so the lock can be released before the
+    blocking DB write."""
+    payload = _serialize_game_payload(game_id)
+    if payload is None:
+        return
+    _game_save_versions[game_id] += 1
+    version = _game_save_versions[game_id]
+    _persist_game_payload(game_id, payload)
+    _game_persisted_versions[game_id] = max(_game_persisted_versions[game_id], version)
+    if broadcast:
+        schedule_game_changed(game_id)
+
+
+def save_game_state_deferred(game_id: str, *, broadcast: bool = True) -> Optional[Tuple[int, bytes, bool]]:
+    """Serialize the snapshot now (cheap, safe under a lock) and return the
+    payload plus broadcast flag for the caller to persist after releasing the
+    lock. Returns ``None`` if the game is gone.
+
+    Holding the per-game ``asyncio.Lock`` during a synchronous SQLAlchemy
+    commit can throttle other actions on that game by tens or hundreds of
+    milliseconds; this lets callers split the work."""
+    payload = _serialize_game_payload(game_id)
+    if payload is None:
+        return None
+    _game_save_versions[game_id] += 1
+    return _game_save_versions[game_id], payload, broadcast
+
+
+async def flush_game_state(game_id: str, deferred: Optional[Tuple[int, bytes, bool]]) -> None:
+    """Persist a snapshot returned from ``save_game_state_deferred`` off the
+    request lock and the event loop."""
+    if deferred is None:
+        return
+    version, payload, broadcast = deferred
+    persist_lock = _game_persist_locks.get(game_id)
+    if persist_lock is None:
+        persist_lock = asyncio.Lock()
+        _game_persist_locks[game_id] = persist_lock
+
+    async with persist_lock:
+        # A newer request may have serialized a later snapshot while this
+        # request was waiting to persist. Do not let an older snapshot commit
+        # after newer state and roll the database row back.
+        if version < _game_save_versions.get(game_id, version):
+            if broadcast:
+                schedule_game_changed(game_id)
+            return
+        if version <= _game_persisted_versions.get(game_id, 0):
+            if broadcast:
+                schedule_game_changed(game_id)
+            return
+        await asyncio.to_thread(_persist_game_payload, game_id, payload)
+        _game_persisted_versions[game_id] = version
     if broadcast:
         schedule_game_changed(game_id)
 
@@ -340,13 +407,21 @@ def cleanup_old_games():
         game_last_accessed.pop(game_id, None)
         player_tokens.pop(game_id, None)
         _game_locks.pop(game_id, None)
+        _game_persist_locks.pop(game_id, None)
+        _game_save_versions.pop(game_id, None)
+        _game_persisted_versions.pop(game_id, None)
 
     persisted_removed = 0
     db = SessionLocal()
     try:
-        cutoff = utc_now() - timedelta(seconds=GAME_MAX_AGE_SECONDS)
+        cutoff = utc_now() - timedelta(seconds=PERSISTED_GAME_MAX_AGE_SECONDS)
         stale_rows = db.query(PokerGameState).filter(PokerGameState.updated_at < cutoff).all()
         for row in stale_rows:
+            # Skip rows that are still live in *this* worker's memory — the
+            # in-memory game is authoritative and the row would just be
+            # recreated on the next save.
+            if row.game_id in games:
+                continue
             db.delete(row)
             persisted_removed += 1
         if persisted_removed:
@@ -381,7 +456,13 @@ def require_player_token(game_id: str, player_id: str, player_token: Optional[st
 
 
 def process_ai_turn_if_needed(game_id: str, game: PokerGame) -> bool:
-    """Advance one AI turn for AI-backed games when the current actor is a bot."""
+    """Advance AI turns while the current actor is a bot.
+
+    Runs the bot turn in a loop so a streak of consecutive bots resolves in
+    one round-trip instead of forcing the client to re-call /process-ai
+    between each bot — which both pays RTT per bot and risks the human
+    getting to act between bot turns when they shouldn't be able to.
+    """
     is_ai_game = getattr(game, 'game_type', 'single') in ('single', 'tournament')
     if not is_ai_game or game.phase in ('showdown', 'waiting'):
         return False
@@ -391,19 +472,30 @@ def process_ai_turn_if_needed(game_id: str, game: PokerGame) -> bool:
         game._advance_phase()
         return True
 
-    current = game.get_current_player()
-    if current and not current.is_human:
-        now = time.time()
-        if now - ai_last_processed.get(game_id, 0) < AI_TURN_MIN_INTERVAL_SECONDS:
-            return False
+    now = time.time()
+    if now - ai_last_processed.get(game_id, 0) < AI_TURN_MIN_INTERVAL_SECONDS:
+        return False
+
+    advanced = False
+    # Cap iterations so a buggy state can't spin forever.
+    for _ in range(len(game.players) * 4):
+        if game.phase in ('showdown', 'waiting'):
+            break
+        current = game.get_current_player()
+        if not current or current.is_human:
+            break
 
         ai_manager = ai_managers.get(game_id)
-        if ai_manager:
-            ai_manager.process_bot_turn()
-            ai_last_processed[game_id] = now
-            return True
+        if not ai_manager:
+            break
 
-    return False
+        ai_manager.process_bot_turn()
+        advanced = True
+
+    if advanced:
+        ai_last_processed[game_id] = time.time()
+
+    return advanced
 
 
 class CreateGameRequest(BaseModel):
@@ -531,9 +623,8 @@ async def join_game(http_request: Request, request: JoinGameRequest):
         player = game.add_player(normalize_player_name(request.player_name), is_human=True)
         player_token = create_player_token(request.game_id, player.id)
         update_game_access(request.game_id)
-        save_game_state(request.game_id)
-
-        return {
+        deferred = save_game_state_deferred(request.game_id)
+        response = {
             "game_id": request.game_id,
             "player_id": player.id,
             "player_token": player_token,
@@ -541,6 +632,9 @@ async def join_game(http_request: Request, request: JoinGameRequest):
             "players": [p.to_dict() for p in game.players],
             "waiting": len(game.players) < 2
         }
+
+    await flush_game_state(request.game_id, deferred)
+    return response
 
 @router.post("/games/{game_id}/start")
 async def start_multiplayer_game(game_id: str, http_request: Request, request: PlayerAuthRequest):
@@ -566,9 +660,11 @@ async def start_multiplayer_game(game_id: str, http_request: Request, request: P
         game.waiting_for_players = False
         game.start_hand()
         update_game_access(game_id)
-        save_game_state(game_id)
+        deferred = save_game_state_deferred(game_id)
+        result = game.to_dict(for_player=request.player_id)
 
-        return game.to_dict(for_player=request.player_id)
+    await flush_game_state(game_id, deferred)
+    return result
 
 @router.get("/games/{game_id}")
 async def get_game_state(
@@ -586,12 +682,13 @@ async def get_game_state(
         game = games[game_id]
         require_player_token(game_id, player_id, player_token)
         update_game_access(game_id)
-        save_game_state(game_id, broadcast=False)
-
+        deferred = save_game_state_deferred(game_id, broadcast=False)
         # The process_ai query parameter is retained for old clients, but GET is
         # intentionally read-only. Use POST /process-ai to advance a bot turn.
+        result = game.to_dict(for_player=player_id)
 
-        return game.to_dict(for_player=player_id)
+    await flush_game_state(game_id, deferred)
+    return result
 
 
 @router.post("/games/{game_id}/process-ai")
@@ -607,9 +704,11 @@ async def process_ai_turn(game_id: str, http_request: Request, request: PlayerAu
         require_player_token(game_id, request.player_id, request.player_token)
         update_game_access(game_id)
         changed = process_ai_turn_if_needed(game_id, game)
-        save_game_state(game_id, broadcast=changed)
+        deferred = save_game_state_deferred(game_id, broadcast=changed)
+        result = game.to_dict(for_player=request.player_id)
 
-        return game.to_dict(for_player=request.player_id)
+    await flush_game_state(game_id, deferred)
+    return result
 
 @router.post("/games/{game_id}/action")
 async def player_action(game_id: str, http_request: Request, request: ActionRequest):
@@ -643,8 +742,11 @@ async def player_action(game_id: str, http_request: Request, request: ActionRequ
         if not success:
             raise HTTPException(status_code=400, detail="Action failed")
 
-        save_game_state(game_id)
-        return game.to_dict(for_player=request.player_id)
+        deferred = save_game_state_deferred(game_id)
+        result = game.to_dict(for_player=request.player_id)
+
+    await flush_game_state(game_id, deferred)
+    return result
 
 @router.post("/games/{game_id}/buy-back")
 async def buy_back(game_id: str, http_request: Request, request: PlayerAuthRequest):
@@ -671,8 +773,11 @@ async def buy_back(game_id: str, http_request: Request, request: PlayerAuthReque
         player.is_all_in = False
 
         update_game_access(game_id)
-        save_game_state(game_id)
-        return game.to_dict(for_player=request.player_id)
+        deferred = save_game_state_deferred(game_id)
+        result = game.to_dict(for_player=request.player_id)
+
+    await flush_game_state(game_id, deferred)
+    return result
 
 @router.post("/games/{game_id}/next-hand")
 async def next_hand(game_id: str, http_request: Request, request: PlayerAuthRequest):
@@ -692,9 +797,11 @@ async def next_hand(game_id: str, http_request: Request, request: PlayerAuthRequ
         game.dealer_index = (game.dealer_index + 1) % len(game.players)
         game.start_hand()
         update_game_access(game_id)
-        save_game_state(game_id)
+        deferred = save_game_state_deferred(game_id)
+        result = game.to_dict(for_player=request.player_id)
 
-        return game.to_dict(for_player=request.player_id)
+    await flush_game_state(game_id, deferred)
+    return result
 
 @router.get("/health")
 async def health_check():

@@ -10,7 +10,11 @@ def sats_to_btc(sats: int) -> float:
     return float(Decimal(sats) / SATOSHIS_PER_BTC)
 
 
-def btc_to_sats(btc: float) -> int:
+def btc_to_sats(btc) -> int:
+    # Accept Decimal or numeric inputs without forcing a float round-trip,
+    # which loses precision past ~8 decimal places — significant for fee math.
+    if isinstance(btc, Decimal):
+        return int(btc * SATOSHIS_PER_BTC)
     return int(Decimal(str(btc)) * SATOSHIS_PER_BTC)
 
 

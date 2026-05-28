@@ -1,5 +1,4 @@
 // Poker App Service Worker - Basic caching strategy
-const CACHE_NAME = 'poker-app-v16';
 const CACHE_PREFIX = 'poker-app-';
 const STATIC_ASSETS = [
     '/poker/',
@@ -12,6 +11,19 @@ const STATIC_ASSETS = [
     '/shared/analytics.js?v=1',
     '/shared/api-base.js?v=1'
 ];
+
+// Derive the cache name from the asset list so any ?v= bump
+// automatically invalidates the previous cache — no manual sync of the
+// CACHE_NAME constant required.
+function buildCacheName(prefix, assets) {
+    let hash = 5381;
+    const joined = assets.join('|');
+    for (let i = 0; i < joined.length; i++) {
+        hash = ((hash << 5) + hash + joined.charCodeAt(i)) >>> 0;
+    }
+    return `${prefix}${hash.toString(36)}`;
+}
+const CACHE_NAME = buildCacheName(CACHE_PREFIX, STATIC_ASSETS);
 
 // Install event - cache static assets
 self.addEventListener('install', (event) => {
@@ -111,6 +123,23 @@ self.addEventListener('fetch', (event) => {
                     console.error('[SW] Navigation fetch failed:', error);
                     return caches.match('/poker/index.html');
                 })
+        );
+        return;
+    }
+
+    // Scripts and styles should prefer the network so an app.js/style.css
+    // deploy is visible immediately even if the URL version was not bumped.
+    if (['script', 'style', 'worker'].includes(request.destination) || /\.(js|css)$/.test(url.pathname)) {
+        event.respondWith(
+            fetch(request)
+                .then((networkResponse) => {
+                    if (networkResponse.ok && url.origin === self.location.origin) {
+                        caches.open(CACHE_NAME)
+                            .then((cache) => cache.put(request, networkResponse.clone()));
+                    }
+                    return networkResponse;
+                })
+                .catch(() => caches.match(request))
         );
         return;
     }

@@ -53,6 +53,11 @@
         return Math.floor(n);
     }
 
+    // Module-level flag: when the stored stats blob is unreadable, freeze
+    // writes for this page load so a single bad parse doesn't silently
+    // overwrite the user's history with `{}`.
+    let statsBlocked = false;
+
     function readStats() {
         const raw = safeRead(STORAGE_KEYS.stats);
         if (!raw) return {};
@@ -60,11 +65,23 @@
             const parsed = JSON.parse(raw);
             return parsed && typeof parsed === 'object' ? parsed : {};
         } catch (e) {
+            // Preserve the corrupt blob under a recovery key so the user can
+            // pull it back manually, then block further writes for the rest
+            // of the session.
+            try {
+                if (!localStorage.getItem(`${STORAGE_KEYS.stats}-corrupt`)) {
+                    localStorage.setItem(`${STORAGE_KEYS.stats}-corrupt`, raw);
+                }
+            } catch (_) {
+                // ignore quota / disabled localStorage
+            }
+            statsBlocked = true;
             return {};
         }
     }
 
     function writeStats(stats) {
+        if (statsBlocked) return;
         safeWrite(STORAGE_KEYS.stats, JSON.stringify(stats));
     }
 

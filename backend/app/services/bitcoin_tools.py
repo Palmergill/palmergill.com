@@ -404,7 +404,9 @@ def get_transaction(txid: str) -> Dict[str, Any]:
     fee_rate = None
     if input_value_btc is not None and tx.get("vsize"):
         fee_btc = input_value_btc - total_output
-        fee_rate = round(btc_to_sats(float(fee_btc)) / tx["vsize"], 2)
+        # Pass the Decimal through — the float() cast was discarding the
+        # last few decimal places before scaling, distorting fee_rate.
+        fee_rate = round(btc_to_sats(fee_btc) / tx["vsize"], 2)
 
     block_height = None
     if tx.get("blockhash"):

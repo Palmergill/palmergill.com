@@ -190,6 +190,26 @@ describe('craps game regressions', () => {
     });
   });
 
+  test('manual odds entry rounds down to legal payout increments', () => {
+    const window = loadGame();
+    window.__setGameState({
+      balance: 1000,
+      point: 5,
+      isComeOutRoll: false,
+      bets: { passLine: 10 },
+    });
+
+    window.openBetModal('passLine');
+    window.document.getElementById('betInput').value = '11';
+    window.addOddsFromModal();
+
+    expect(readState(window)).toMatchObject({
+      balance: 990,
+      passLineOdds: 10,
+      status: 'Added $10 odds to Pass Line',
+    });
+  });
+
   test('established Come odds can be added and removed later', () => {
     const window = loadGame();
     window.__setGameState({

@@ -6,6 +6,7 @@ the admin page can display structured logs alongside the file-based logs.
 """
 import logging
 import re
+import sys
 from datetime import datetime, timezone
 
 from app.database import SessionLocal, LogEntry
@@ -80,7 +81,16 @@ class DatabaseLogHandler(logging.Handler):
             finally:
                 session.close()
         except Exception:
-            # Never let logging itself crash the app
+            # The DB write failed (table missing, schema mismatch, locked,
+            # etc.). Degrade to stderr so the message isn't lost — silently
+            # swallowing it makes startup / test-env issues invisible.
+            try:
+                sys.stderr.write(
+                    f"[db-log-fallback] {record.levelname} {record.name}: "
+                    f"{self.format(record)}\n"
+                )
+            except Exception:
+                pass
             self.handleError(record)
 
 

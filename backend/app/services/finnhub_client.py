@@ -99,13 +99,19 @@ class FinnhubEstimatesClient:
                         fiscal_date = period
                 except Exception:
                     fiscal_date = None
-                
+
+                # Preserve the upstream fiscal year/quarter so the merge layer
+                # doesn't have to guess from the calendar month — non-calendar
+                # fiscal years (e.g. retailers ending in January) would
+                # otherwise get mis-bucketed and drop the EPS estimate.
                 earnings_data.append({
                     "fiscal_date": fiscal_date,
                     "reported_eps": item.get("actual"),
                     "estimated_eps": item.get("estimate"),
                     "surprise_pct": item.get("surprisePercent"),
-                    "period": period
+                    "period": period,
+                    "fiscal_year": item.get("year"),
+                    "fiscal_quarter": item.get("quarter"),
                 })
             
             if earnings_data:
@@ -136,13 +142,19 @@ class FinnhubEstimatesClient:
         if not finnhub_estimates:
             return polygon_earnings
         
-        # Create lookup by year-quarter from Finnhub data
+        # Create lookup by year-quarter from Finnhub data. Prefer the
+        # upstream fiscal_year/fiscal_quarter fields — inferring from
+        # fiscal_date assumes a calendar fiscal year, which mismatches
+        # retailers and other non-calendar reporters.
         finnhub_by_quarter = {}
         for e in finnhub_estimates:
+            fy = e.get("fiscal_year")
+            fq = e.get("fiscal_quarter")
+            if fy and fq:
+                finnhub_by_quarter[f"{fy}-Q{fq}"] = e
+                continue
             date_key = e.get("fiscal_date", "")
             if date_key and len(date_key) >= 7:  # "2025-12-31"
-                year_month = date_key[:7]  # "2025-12"
-                # Determine quarter from month
                 month = int(date_key[5:7])
                 quarter = (month - 1) // 3 + 1  # 1, 2, 3, 4
                 year_q = f"{date_key[:4]}-Q{quarter}"

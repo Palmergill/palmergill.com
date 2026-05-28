@@ -4,6 +4,11 @@ const SESSION_COOKIE_NAME = 'pg_session';
 const SESSION_TTL_SECONDS = 8 * 60 * 60;
 const AUTH_RATE_LIMIT_WINDOW_SECONDS = Number(process.env.APP_AUTH_RATE_LIMIT_WINDOW_SECONDS || 900);
 const AUTH_RATE_LIMIT_MAX_ATTEMPTS = Number(process.env.APP_AUTH_RATE_LIMIT_MAX_ATTEMPTS || 8);
+// Best-effort, per-isolate auth-failure tracking. On Vercel each instance is
+// ephemeral and isolated, so MAX_ATTEMPTS is enforced per cold start, not
+// globally. For a real lockout, back this with a shared store (Vercel KV /
+// Redis). The current setup still raises the cost of online guessing — an
+// attacker has to keep churning isolates to keep guessing.
 const authFailureStore = new Map();
 
 const PUBLIC_PREFIXES = [

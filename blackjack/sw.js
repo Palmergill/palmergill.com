@@ -1,5 +1,4 @@
 // Blackjack Service Worker — cache-first for app shell, network-first for navigations.
-const CACHE_NAME = 'blackjack-app-v1';
 const CACHE_PREFIX = 'blackjack-app-';
 const STATIC_ASSETS = [
     '/blackjack/',
@@ -12,6 +11,18 @@ const STATIC_ASSETS = [
     '/shared/site-nav.css?v=6',
     '/shared/site-nav.js?v=6'
 ];
+
+// Derive the cache name from the asset list so any ?v= bump invalidates
+// the previous cache automatically.
+function buildCacheName(prefix, assets) {
+    let hash = 5381;
+    const joined = assets.join('|');
+    for (let i = 0; i < joined.length; i++) {
+        hash = ((hash << 5) + hash + joined.charCodeAt(i)) >>> 0;
+    }
+    return `${prefix}${hash.toString(36)}`;
+}
+const CACHE_NAME = buildCacheName(CACHE_PREFIX, STATIC_ASSETS);
 
 self.addEventListener('install', (event) => {
     event.waitUntil(
@@ -52,6 +63,20 @@ self.addEventListener('fetch', (event) => {
                     return res;
                 })
                 .catch(() => caches.match('/blackjack/index.html'))
+        );
+        return;
+    }
+
+    if (['script', 'style', 'worker'].includes(request.destination) || /\.(js|css)$/.test(url.pathname)) {
+        event.respondWith(
+            fetch(request)
+                .then((res) => {
+                    if (res.ok && url.origin === self.location.origin) {
+                        caches.open(CACHE_NAME).then((c) => c.put(request, res.clone()));
+                    }
+                    return res;
+                })
+                .catch(() => caches.match(request))
         );
         return;
     }

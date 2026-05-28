@@ -235,13 +235,14 @@ function getOddsPayout(p, isPass) {
     return rules.getOddsPayout(p, isPass);
 }
 
-function addOddsToBet(bet, multiplier) {
+function addOddsToBet(bet, multiplier, isPass = true) {
     const canAfford = rules.calculateOddsToAdd({
         point: bet?.point,
         amount: bet?.amount || 0,
         odds: bet?.odds || 0,
         balance,
-        multiplier
+        multiplier,
+        isPass
     });
     if (!canAfford) return false;
     bet.odds += canAfford;
@@ -362,7 +363,19 @@ function addOddsFromModal() {
         return;
     }
 
-    const added = Math.min(amount, remaining, balance);
+    const isPass = context.betType === 'passLine' || context.betType === 'come';
+    const added = rules.legalOddsAmount({
+        point: context.point,
+        requested: amount,
+        remaining,
+        balance,
+        isPass
+    });
+    if (!added) {
+        document.getElementById('modalCurrentBet').textContent = 'Enter a legal odds increment';
+        setStatus('Enter a legal odds increment');
+        return;
+    }
     setOddsAmount(context.betType, context.betId, context.odds + added);
     balance -= added;
     updateBalance();
@@ -402,7 +415,7 @@ function takeMaxOdds(bt) {
     if (bt === 'passLine' || bt === 'dontPass') { pt = point; }
     if (!pt || bets[bt] === 0) return;
     const lineBet = { point: pt, amount: bets[bt], odds: oddsBets[bt] };
-    if (addOddsToBet(lineBet, 'max')) {
+    if (addOddsToBet(lineBet, 'max', bt === 'passLine')) {
         oddsBets[bt] = lineBet.odds;
         updateBalance();
         updateAllDisplays();
@@ -413,7 +426,7 @@ function takeMaxOddsComeBet(index, isDontCome) {
     const arr = isDontCome ? dontComeBets : comeBets;
     if (index < 0 || index >= arr.length) return;
     const bet = arr[index];
-    if (addOddsToBet(bet, 'max')) {
+    if (addOddsToBet(bet, 'max', !isDontCome)) {
         updateBalance();
         updateAllDisplays();
     }
@@ -472,6 +485,7 @@ function clearComeBet(index, isDontCome) {
 }
 
 function clearAllBets() {
+    clearPendingPointPopups();
     Object.keys(bets).forEach(bt => {
         if (canClearBet(bt)) {
             balance += bets[bt] + (oddsBets[bt] || 0);
@@ -1235,6 +1249,7 @@ function resolveRoll(d1, d2) {
 }
 
 function resetPassLineRound() {
+    clearPendingPointPopups();
     // Only clear Pass Line related bets, keep Come/Don't Come
     point = null;
     isComeOutRoll = true;
@@ -1246,6 +1261,7 @@ function resetPassLineRound() {
 }
 
 function resetRound() {
+    clearPendingPointPopups();
     point = null;
     isComeOutRoll = true;
     document.getElementById('pointDisplay').textContent = '';
@@ -1269,15 +1285,40 @@ let currentPopupBetType = 'passLine';
 let currentPopupBetId = null; // Stable id into comeBets/dontComeBets arrays
 let currentPopupPoint = null;
 let pendingPointPopupSchedules = 0;
+let pointPopupQueueTimer = null;
+
+// Track scheduled popup timeouts so we can cancel them on close/reset and
+// keep stale popups from firing after the user has moved on.
+const pendingPointPopupTimers = new Set();
 
 function schedulePointPopup(pt, betType = 'passLine', betId = null, delay = 0) {
     pendingPointPopupSchedules++;
     updateRollButton();
-    setTimeout(() => {
+    let timer;
+    timer = setTimeout(() => {
+        if (timer !== undefined) pendingPointPopupTimers.delete(timer);
         pendingPointPopupSchedules--;
         showPointPopup(pt, betType, betId);
         updateRollButton();
     }, delay);
+    pendingPointPopupTimers.add(timer);
+}
+
+function clearPendingPointPopups() {
+    pendingPointPopupTimers.forEach((t) => clearTimeout(t));
+    pendingPointPopupSchedules -= pendingPointPopupTimers.size;
+    if (pendingPointPopupSchedules < 0) pendingPointPopupSchedules = 0;
+    pendingPointPopupTimers.clear();
+    if (pointPopupQueueTimer) {
+        clearTimeout(pointPopupQueueTimer);
+        pointPopupQueueTimer = null;
+    }
+    if (pointPopupTimer) {
+        clearTimeout(pointPopupTimer);
+        pointPopupTimer = null;
+    }
+    pointPopupQueue = [];
+    document.getElementById('pointPopup')?.classList.remove('active');
 }
 
 function showPointPopup(pt, betType = 'passLine', betId = null) {
@@ -1337,7 +1378,11 @@ function closePointPopup() {
     }
     // Show next popup in queue if any
     if (pointPopupQueue.length > 0) {
-        setTimeout(showNextPointPopup, 300);
+        if (pointPopupQueueTimer) clearTimeout(pointPopupQueueTimer);
+        pointPopupQueueTimer = setTimeout(() => {
+            pointPopupQueueTimer = null;
+            showNextPointPopup();
+        }, 300);
     }
     updateRollButton();
 }
@@ -1360,7 +1405,8 @@ function takeOddsFromPopup(multiplier) {
         return;
     }
 
-    if (addOddsToBet(targetBet, multiplier)) {
+    const isPass = betType === 'passLine' || betType === 'come';
+    if (addOddsToBet(targetBet, multiplier, isPass)) {
         if (betType !== 'come' && betType !== 'dontCome') {
             oddsBets[betType] = targetBet.odds;
         }

@@ -24,21 +24,75 @@ import os
 logger = logging.getLogger(__name__)
 
 
+# Bounded queue of pending analytics writes. The request middleware pushes
+# event-kwargs dicts here (non-blocking) and a single background worker
+# drains them — keeping synchronous SQLite writes off the event loop.
+_ANALYTICS_QUEUE_MAX = 10_000
+_analytics_event_queue: asyncio.Queue[dict] | None = None
+_analytics_dropped = 0
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    global _analytics_event_queue
     init_db_with_migration()
     install_db_logging()
+    _analytics_event_queue = asyncio.Queue(maxsize=_ANALYTICS_QUEUE_MAX)
     cleanup_task = asyncio.create_task(_periodic_game_cleanup())
     analytics_cleanup_task = asyncio.create_task(_periodic_retention_cleanup())
+    analytics_writer_task = asyncio.create_task(_analytics_writer())
     try:
         yield
     finally:
         cleanup_task.cancel()
         analytics_cleanup_task.cancel()
+        analytics_writer_task.cancel()
         with suppress(asyncio.CancelledError):
             await cleanup_task
         with suppress(asyncio.CancelledError):
             await analytics_cleanup_task
+        with suppress(asyncio.CancelledError):
+            await analytics_writer_task
+
+
+async def _analytics_writer() -> None:
+    """Drain queued analytics events into the database off the request path."""
+    assert _analytics_event_queue is not None
+    while True:
+        kwargs = await _analytics_event_queue.get()
+        try:
+            await asyncio.to_thread(_write_analytics_event, kwargs)
+        except Exception:
+            logger.exception("Failed to flush analytics event")
+        finally:
+            _analytics_event_queue.task_done()
+
+
+def _write_analytics_event(kwargs: dict) -> None:
+    db = SessionLocal()
+    try:
+        record_analytics_event(db, **kwargs)
+    finally:
+        db.close()
+
+
+def _enqueue_analytics_event(kwargs: dict) -> None:
+    global _analytics_dropped
+    queue = _analytics_event_queue
+    if queue is None:
+        return
+    try:
+        queue.put_nowait(kwargs)
+    except asyncio.QueueFull:
+        _analytics_dropped += 1
+        # Log once every 100 drops so a flood doesn't spam, but we still
+        # surface that we're losing data.
+        if _analytics_dropped % 100 == 1:
+            logger.warning(
+                "Analytics queue full (capacity %d); dropped %d event(s) so far",
+                _ANALYTICS_QUEUE_MAX,
+                _analytics_dropped,
+            )
 
 
 # Cap individual cleanup invocations. If a sync DB call hangs (lock contention,
@@ -104,6 +158,10 @@ TRUST_PROXY_HEADERS = os.getenv("TRUST_PROXY_HEADERS", "false").strip().lower() 
     "yes",
     "on",
 }
+# Best-effort, per-process auth-failure tracking. On serverless / multi-worker
+# deployments each instance has its own dict, so MAX_ATTEMPTS is enforced per
+# instance rather than globally. For a hard lockout, back this with Redis or
+# another shared store.
 _auth_failure_store: dict[str, list[float]] = {}
 PUBLIC_PATH_PREFIXES = (
     "/api/analytics",
@@ -353,31 +411,26 @@ async def record_request_analytics(request: Request, call_next):
         path = request.url.path
         if _should_record_request_analytics(path):
             status_code = 500 if error_raised else getattr(response, "status_code", None)
-            try:
-                db = SessionLocal()
-                try:
-                    record_analytics_event(
-                        db,
-                        event_type="request",
-                        event_name="http_request",
-                        app=analytics.app_from_path(path),
-                        path=path,
-                        method=request.method,
-                        status_code=status_code,
-                        referrer=request.headers.get("referer"),
-                        user_agent=request.headers.get("user-agent"),
-                        ip_address=client_ip(request),
-                        visitor_id=_request_cookie(request, "pg_visitor_id"),
-                        session_id=_request_cookie(request, "pg_session_id"),
-                        is_authenticated=bool(getattr(request.state, "app_auth_authenticated", False)),
-                        is_admin=path == "/admin" or path.startswith("/admin/") or path.startswith("/api/admin"),
-                        username=_analytics_username(request),
-                        duration_ms=(time.perf_counter() - started) * 1000,
-                    )
-                finally:
-                    db.close()
-            except Exception:
-                logger.exception("Failed to record request analytics")
+            # Enqueue for a background worker — synchronous SQLite writes in
+            # the request finalizer would serialize the event loop on the
+            # write lock under load.
+            _enqueue_analytics_event({
+                "event_type": "request",
+                "event_name": "http_request",
+                "app": analytics.app_from_path(path),
+                "path": path,
+                "method": request.method,
+                "status_code": status_code,
+                "referrer": request.headers.get("referer"),
+                "user_agent": request.headers.get("user-agent"),
+                "ip_address": client_ip(request),
+                "visitor_id": _request_cookie(request, "pg_visitor_id"),
+                "session_id": _request_cookie(request, "pg_session_id"),
+                "is_authenticated": bool(getattr(request.state, "app_auth_authenticated", False)),
+                "is_admin": path == "/admin" or path.startswith("/admin/") or path.startswith("/api/admin"),
+                "username": _analytics_username(request),
+                "duration_ms": (time.perf_counter() - started) * 1000,
+            })
 
 
 @app.middleware("http")

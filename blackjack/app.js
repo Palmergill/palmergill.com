@@ -506,7 +506,13 @@
         if (profile) profile.setBankroll(state.balance);
 
         if (shouldAnimateDealerTurn(previousState, state)) {
-            animateDealerTurn();
+            // Catch rejections so a thrown animation step doesn't leave an
+            // unhandled promise and a half-rendered dealer.
+            animateDealerTurn().catch((err) => {
+                console.error("Dealer animation failed", err);
+                dealerAnimation = null;
+                render();
+            });
             return;
         }
 
