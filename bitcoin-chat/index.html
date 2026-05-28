@@ -49,13 +49,14 @@
                     </div>
 
                     <form id="explorerSearchForm" class="explorer-search">
-                        <label class="sr-only" for="explorerInput">Search by block height, block hash, or transaction id</label>
-                        <input id="explorerInput" type="text" inputmode="text" autocomplete="off" spellcheck="false" placeholder="Block height, hash, or txid">
+                        <label class="sr-only" for="explorerInput">Search by block height, block hash, transaction id, or address</label>
+                        <input id="explorerInput" type="text" inputmode="text" autocomplete="off" spellcheck="false" placeholder="Block, txid, or address">
                         <div class="explorer-search-row">
                             <select id="explorerType" aria-label="Lookup type">
                                 <option value="auto">Auto</option>
                                 <option value="block">Block</option>
                                 <option value="tx">Transaction</option>
+                                <option value="address">Address</option>
                             </select>
                             <button type="submit">Lookup</button>
                         </div>

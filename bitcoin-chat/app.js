@@ -35,6 +35,7 @@ const explorerState = {
     mempool: null,
     lastResult: null,
 };
+const BITCOIN_ADDRESS_RE = /^(?:bc1[ac-hj-np-z02-9]{11,71}|[13][a-km-zA-HJ-NP-Z1-9]{25,34})$/i;
 
 const starterMessage = {
     role: 'assistant',
@@ -304,6 +305,15 @@ function formatBtc(value) {
     return `${n.toFixed(n < 0.01 ? 8 : 4)} BTC`;
 }
 
+function formatSignedBtc(value) {
+    if (value === null || value === undefined || value === '') return '--';
+    const n = Number(value);
+    if (!Number.isFinite(n)) return String(value);
+    if (n === 0) return '0.00000000 BTC';
+    const sign = n > 0 ? '+' : '-';
+    return `${sign}${Math.abs(n).toFixed(Math.abs(n) < 0.01 ? 8 : 4)} BTC`;
+}
+
 function formatBytes(value) {
     const n = Number(value);
     if (!Number.isFinite(n)) return '--';
@@ -439,7 +449,7 @@ function renderExplorerResult(kind, data) {
     const heading = document.createElement('div');
     heading.className = 'result-heading';
     const title = document.createElement('h3');
-    title.textContent = kind === 'tx' ? 'Transaction' : 'Block';
+    title.textContent = kind === 'tx' ? 'Transaction' : kind === 'address' ? 'Address' : 'Block';
     const ask = document.createElement('button');
     ask.type = 'button';
     ask.className = 'card-action';
@@ -466,6 +476,17 @@ function renderExplorerResult(kind, data) {
             statRow('Fee rate', data.fee_rate_sats_vb == null ? '--' : `${Number(data.fee_rate_sats_vb).toFixed(2)} sats/vB`),
             statRow('Source', data.source || '--')
         );
+    } else if (kind === 'address') {
+        body.append(
+            statRow('Address', shortHash(data.address, 14, 12)),
+            statRow('Confirmed balance', formatBtc(data.confirmed_balance_btc)),
+            statRow('Unconfirmed delta', formatSignedBtc(data.unconfirmed_delta_btc)),
+            statRow('Total balance', formatBtc(data.total_balance_btc)),
+            statRow('Transactions', `${formatInteger(data.chain_tx_count)} confirmed / ${formatInteger(data.mempool_tx_count)} mempool`),
+            statRow('UTXOs', `${formatInteger(data.utxo_count)} current, ${formatInteger(data.utxos_returned)} shown`),
+            statRow('Source', data.source || '--')
+        );
+        appendUtxos(body, data.utxos);
     } else {
         body.append(
             statRow('Height', formatInteger(data.height)),
@@ -478,6 +499,31 @@ function renderExplorerResult(kind, data) {
     }
     appendWarnings(body, data.warnings);
     explorerEls.result.append(heading, body);
+}
+
+function appendUtxos(parent, utxos) {
+    if (!Array.isArray(utxos) || !utxos.length) return;
+    const section = document.createElement('div');
+    section.className = 'utxo-list';
+    const heading = document.createElement('div');
+    heading.className = 'utxo-list-heading';
+    heading.textContent = 'Current UTXOs';
+    section.appendChild(heading);
+    utxos.slice(0, 10).forEach((utxo) => {
+        const row = document.createElement('div');
+        row.className = 'utxo-row';
+        const main = document.createElement('span');
+        main.textContent = `${shortHash(utxo.txid, 8, 6)}:${utxo.vout ?? 0}`;
+        const value = document.createElement('strong');
+        value.textContent = formatBtc(utxo.value_btc);
+        const meta = document.createElement('span');
+        meta.textContent = utxo.confirmed
+            ? `${formatInteger(utxo.confirmations)} conf${utxo.block_height ? ` · #${formatInteger(utxo.block_height)}` : ''}`
+            : 'Unconfirmed';
+        row.append(main, value, meta);
+        section.appendChild(row);
+    });
+    parent.appendChild(section);
 }
 
 function promptForExplorer(kind, data) {
@@ -493,6 +539,9 @@ function promptForExplorer(kind, data) {
     }
     if (kind === 'tx') {
         return `Explain this Bitcoin transaction: ${data.txid}. Include confirmation status, fee rate, input/output counts, and what can and cannot be inferred.`;
+    }
+    if (kind === 'address') {
+        return `Explain this public Bitcoin address snapshot: ${data.address}. Include confirmed balance, unconfirmed delta, transaction counts, current UTXO count, and avoid inferring ownership or identity.`;
     }
     return `Explain Bitcoin block ${data.height || data.hash}. Include transaction count, subsidy, timestamp, and what this block tells us.`;
 }
@@ -522,8 +571,9 @@ async function refreshExplorer() {
 }
 
 function inferLookupType(value, selected) {
-    if (selected === 'block' || selected === 'tx') return selected;
+    if (selected === 'block' || selected === 'tx' || selected === 'address') return selected;
     if (/^\d+$/.test(value)) return 'block';
+    if (BITCOIN_ADDRESS_RE.test(value)) return 'address';
     if (/^[a-fA-F0-9]{64}$/.test(value)) return 'tx';
     return null;
 }
@@ -531,22 +581,29 @@ function inferLookupType(value, selected) {
 async function lookupExplorer(value, selectedType) {
     const query = value.trim();
     if (!query) {
-        explorerSetStatus('Enter a block height, block hash, or transaction id.', true);
+        explorerSetStatus('Enter a block height, block hash, transaction id, or Bitcoin address.', true);
         return;
     }
     const type = inferLookupType(query, selectedType);
     if (!type) {
-        explorerSetStatus('Use a block height, a 64-character hash, or choose a lookup type.', true);
+        explorerSetStatus('Use a block height, 64-character hash, transaction id, or Bitcoin address.', true);
         return;
     }
 
-    explorerSetStatus(type === 'tx' ? 'Looking up transaction...' : 'Looking up block...');
+    const loadingText = type === 'tx'
+        ? 'Looking up transaction...'
+        : type === 'address'
+            ? 'Looking up address and UTXOs...'
+            : 'Looking up block...';
+    explorerSetStatus(loadingText);
     try {
         const data = type === 'tx'
             ? await fetchJson(`${API_BASE}/tx/${encodeURIComponent(query)}`)
-            : await fetchJson(`${API_BASE}/block/${encodeURIComponent(query)}`);
+            : type === 'address'
+                ? await fetchJson(`${API_BASE}/address/${encodeURIComponent(query)}?utxo_limit=25`)
+                : await fetchJson(`${API_BASE}/block/${encodeURIComponent(query)}`);
         renderExplorerResult(type, data);
-        explorerSetStatus(type === 'tx' ? 'Transaction loaded.' : 'Block loaded.');
+        explorerSetStatus(type === 'tx' ? 'Transaction loaded.' : type === 'address' ? 'Address loaded.' : 'Block loaded.');
         window.pgAnalytics?.track?.('bitcoin_explorer_lookup', { type });
     } catch (error) {
         renderExplorerResult(type, { error: error.message, warnings: [error.message] });

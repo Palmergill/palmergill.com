@@ -14,7 +14,7 @@ from app.routers.admin import cleanup_old_logs
 from app.routers.analytics import cleanup_old_analytics, record_analytics_event, safe_json
 from app.routers import poker
 from app.routers.bitcoin import BITCOIN_SESSION_COOKIE
-from app.services import bitcoin_ai
+from app.services import bitcoin_ai, bitcoin_tools
 from app.poker_ai import AIManager
 from app.poker_game import PokerGame
 from datetime import datetime, timedelta, timezone
@@ -249,6 +249,40 @@ def test_bitcoin_chat_session_cookie_is_not_exposed_to_browser(monkeypatch):
     assert second.status_code == 200
     assert "session_id" not in second.json()
     assert seen_sessions[-1] == "issued-session"
+
+
+def test_bitcoin_address_lookup_returns_demo_utxos_without_auth():
+    address = "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kygt080"
+    response = client.get(f"/api/bitcoin/address/{address}", params={"utxo_limit": 1})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["source"] == "demo"
+    assert body["address"] == address
+    assert body["utxo_count"] == 2
+    assert body["utxos_returned"] == 1
+    assert len(body["utxos"]) == 1
+    assert body["utxos"][0]["value_sats"] == 125000
+
+
+def test_demo_bitcoin_address_lookup_normalizes_address_and_uses_hex_hash():
+    address = "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kygt080"
+    body = bitcoin_tools.get_demo_address(f"  {address}  ", utxo_limit=1)
+    block_hash = body["utxos"][0]["block_hash"]
+
+    assert body["address"] == address
+    assert len(block_hash) == 64
+    int(block_hash, 16)
+
+
+def test_bitcoin_chat_routes_address_questions_to_address_tool():
+    address = "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kygt080"
+    result = bitcoin_ai.answer_demo_chat(f"what UTXOs are on {address}?", session_id="demo-session")
+
+    assert result["tools_used"] == ["get_address"]
+    assert result["data"]["address"] == address
+    assert result["data"]["utxos"]
+    assert "does not prove who controls the address" in result["answer"]
 
 
 def test_stock_price_history_rejects_unbounded_day_ranges():

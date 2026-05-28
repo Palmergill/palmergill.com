@@ -422,6 +422,55 @@ h1 {
     color: var(--accent-soft);
 }
 
+.utxo-list {
+    display: grid;
+    gap: 7px;
+    margin-top: 4px;
+    border-top: 1px solid rgba(255, 255, 255, 0.09);
+    padding-top: 11px;
+}
+
+.utxo-list-heading {
+    color: var(--muted-2);
+    font-size: 11px;
+    font-weight: 900;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.utxo-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1.1fr) minmax(104px, 0.7fr);
+    gap: 3px 9px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    background: rgba(0, 0, 0, 0.18);
+    padding: 8px 9px;
+}
+
+.utxo-row span,
+.utxo-row strong {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.utxo-row span:first-child {
+    color: #d9e0e7;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    font-size: 12px;
+}
+
+.utxo-row strong {
+    justify-self: end;
+    color: var(--accent-soft);
+}
+
+.utxo-row span:last-child {
+    grid-column: 1 / -1;
+    color: var(--muted-2);
+    font-size: 12px;
+}
+
 .messages {
     min-height: 0;
     display: flex;

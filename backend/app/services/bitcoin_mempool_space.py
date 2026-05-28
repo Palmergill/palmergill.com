@@ -50,6 +50,12 @@ class MempoolSpaceClient:
     def get_transaction(self, txid: str) -> Dict[str, Any]:
         return self.get_json(f"/tx/{urllib.parse.quote(txid)}")
 
+    def get_address(self, address: str) -> Dict[str, Any]:
+        return self.get_json(f"/address/{urllib.parse.quote(address)}")
+
+    def get_address_utxos(self, address: str) -> List[Dict[str, Any]]:
+        return self.get_json(f"/address/{urllib.parse.quote(address)}/utxo")
+
     def _request(self, path: str, expect_json: bool) -> Any:
         url = f"{self.base_url}{path}"
         request = urllib.request.Request(

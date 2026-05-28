@@ -1,4 +1,5 @@
 import os
+import re
 import time
 from datetime import datetime, timezone
 from decimal import Decimal
@@ -12,6 +13,9 @@ from app.services.bitcoin_rpc import BitcoinRPCError, bitcoin_rpc_client
 MAX_MINED_STATS_BLOCKS = int(os.getenv("BITCOIN_MAX_MINED_STATS_BLOCKS", "1008"))
 BITCOIN_DATA_PROVIDER = os.getenv("BITCOIN_DATA_PROVIDER", "mempool").strip().lower()
 DEMO_WARNING = "Public demo mode uses estimated sample Bitcoin data and does not call Palmer's live node, mempool.space, or OpenAI."
+BITCOIN_ADDRESS_PATTERN = r"(?:bc1[ac-hj-np-z02-9]{11,71}|[13][a-km-zA-HJ-NP-Z1-9]{25,34})"
+BITCOIN_ADDRESS_RE = re.compile(rf"^{BITCOIN_ADDRESS_PATTERN}$", re.IGNORECASE)
+DEFAULT_ADDRESS_UTXO_LIMIT = 25
 
 
 def _use_rpc() -> bool:
@@ -139,6 +143,56 @@ def get_demo_transaction(txid: str) -> Dict[str, Any]:
         "fee_available": False,
         "fee_btc": None,
         "fee_rate_sats_vb": None,
+        "warnings": [DEMO_WARNING],
+    }
+
+
+def get_demo_address(address: str, utxo_limit: int = DEFAULT_ADDRESS_UTXO_LIMIT) -> Dict[str, Any]:
+    address = _validate_address(address)
+    _validate_utxo_limit(utxo_limit)
+    utxos = [
+        {
+            "txid": "b" * 64,
+            "vout": 0,
+            "value_sats": 125000,
+            "value_btc": sats_to_btc(125000),
+            "confirmed": True,
+            "confirmations": 18,
+            "block_height": 839982,
+            "block_hash": "00000000000000000005a9f68c2f4d7e8b1c3a4d5e6f708192a3b4c5d6e7f809",
+            "block_time": iso_from_unix(int(time.time()) - 10800),
+        },
+        {
+            "txid": "c" * 64,
+            "vout": 1,
+            "value_sats": 42000,
+            "value_btc": sats_to_btc(42000),
+            "confirmed": False,
+            "confirmations": 0,
+            "block_height": None,
+            "block_hash": None,
+            "block_time": None,
+        },
+    ][:utxo_limit]
+    confirmed_balance_sats = 125000
+    unconfirmed_delta_sats = 42000
+    total_balance_sats = confirmed_balance_sats + unconfirmed_delta_sats
+    return {
+        "source": "demo",
+        "address": address,
+        "confirmed_balance_sats": confirmed_balance_sats,
+        "confirmed_balance_btc": sats_to_btc(confirmed_balance_sats),
+        "unconfirmed_delta_sats": unconfirmed_delta_sats,
+        "unconfirmed_delta_btc": sats_to_btc(unconfirmed_delta_sats),
+        "total_balance_sats": total_balance_sats,
+        "total_balance_btc": sats_to_btc(total_balance_sats),
+        "chain_tx_count": 7,
+        "mempool_tx_count": 1,
+        "funded_txo_count": 9,
+        "spent_txo_count": 7,
+        "utxo_count": 2,
+        "utxos_returned": len(utxos),
+        "utxos": utxos,
         "warnings": [DEMO_WARNING],
     }
 
@@ -436,6 +490,30 @@ def get_transaction(txid: str) -> Dict[str, Any]:
     }
 
 
+def get_address(address: str, utxo_limit: int = DEFAULT_ADDRESS_UTXO_LIMIT) -> Dict[str, Any]:
+    address = _validate_address(address)
+    _validate_utxo_limit(utxo_limit)
+
+    if _provider_not_configured():
+        return get_demo_address(address, utxo_limit)
+
+    if not _use_mempool_space():
+        return {
+            "source": "error",
+            "error": "Address lookup requires an indexed provider such as mempool.space; this Bitcoin Core RPC setup is intentionally read-only and not address-indexed.",
+            "warnings": ["Switch BITCOIN_DATA_PROVIDER to mempool for public address and UTXO lookups."],
+        }
+
+    try:
+        address_data = mempool_space_client.get_address(address)
+        utxos = mempool_space_client.get_address_utxos(address)
+        tip_height = mempool_space_client.get_tip_height()
+    except MempoolSpaceError as exc:
+        return _api_error_response(exc)
+
+    return _format_mempool_address(address_data, utxos, tip_height, utxo_limit)
+
+
 def _format_block(block: Dict[str, Any], source: str) -> Dict[str, Any]:
     height = block.get("height")
     return {
@@ -475,6 +553,7 @@ def safe_demo_tool_call(name: str, *args: Any, **kwargs: Any) -> Dict[str, Any]:
         "get_latest_block": get_demo_latest_block,
         "get_block": get_demo_block,
         "get_transaction": get_demo_transaction,
+        "get_address": get_demo_address,
         "get_mempool_summary": get_demo_mempool_summary,
         "estimate_fee": get_demo_fee_estimate,
         "get_mined_stats": get_demo_mined_stats,
@@ -556,6 +635,65 @@ def _format_mempool_transaction(tx: Dict[str, Any], tip_height: int) -> Dict[str
     }
 
 
+def _format_mempool_address(
+    address_data: Dict[str, Any],
+    utxos: List[Dict[str, Any]],
+    tip_height: int,
+    utxo_limit: int,
+) -> Dict[str, Any]:
+    chain = address_data.get("chain_stats", {}) or {}
+    mempool = address_data.get("mempool_stats", {}) or {}
+    confirmed_balance_sats = int(chain.get("funded_txo_sum") or 0) - int(chain.get("spent_txo_sum") or 0)
+    unconfirmed_delta_sats = int(mempool.get("funded_txo_sum") or 0) - int(mempool.get("spent_txo_sum") or 0)
+    total_balance_sats = confirmed_balance_sats + unconfirmed_delta_sats
+    selected_utxos = utxos[:utxo_limit]
+    formatted_utxos = [_format_mempool_utxo(utxo, tip_height) for utxo in selected_utxos]
+    mempool_tx_count = mempool.get("tx_count")
+    warnings = (
+        ["This address has mempool activity; balance and UTXO details may change between provider calls."]
+        if mempool_tx_count
+        else []
+    )
+
+    return {
+        "source": "mempool.space",
+        "address": address_data.get("address"),
+        "confirmed_balance_sats": confirmed_balance_sats,
+        "confirmed_balance_btc": sats_to_btc(confirmed_balance_sats),
+        "unconfirmed_delta_sats": unconfirmed_delta_sats,
+        "unconfirmed_delta_btc": sats_to_btc(unconfirmed_delta_sats),
+        "total_balance_sats": total_balance_sats,
+        "total_balance_btc": sats_to_btc(total_balance_sats),
+        "chain_tx_count": chain.get("tx_count"),
+        "mempool_tx_count": mempool_tx_count,
+        "funded_txo_count": (chain.get("funded_txo_count") or 0) + (mempool.get("funded_txo_count") or 0),
+        "spent_txo_count": (chain.get("spent_txo_count") or 0) + (mempool.get("spent_txo_count") or 0),
+        "utxo_count": len(utxos),
+        "utxos_returned": len(formatted_utxos),
+        "utxos": formatted_utxos,
+        "warnings": warnings,
+    }
+
+
+def _format_mempool_utxo(utxo: Dict[str, Any], tip_height: int) -> Dict[str, Any]:
+    status = utxo.get("status", {}) or {}
+    block_height = status.get("block_height")
+    confirmed = bool(status.get("confirmed"))
+    confirmations = tip_height - block_height + 1 if confirmed and block_height is not None else 0
+    value_sats = int(utxo.get("value") or 0)
+    return {
+        "txid": utxo.get("txid"),
+        "vout": utxo.get("vout"),
+        "value_sats": value_sats,
+        "value_btc": sats_to_btc(value_sats),
+        "confirmed": confirmed,
+        "confirmations": confirmations,
+        "block_height": block_height,
+        "block_hash": status.get("block_hash"),
+        "block_time": iso_from_unix(status.get("block_time")),
+    }
+
+
 def _get_mined_stats_from_mempool_space(start_dt: datetime, end_dt: datetime, max_blocks: int) -> Dict[str, Any]:
     start_ts = int(start_dt.timestamp())
     end_ts = int(end_dt.timestamp())
@@ -621,6 +759,18 @@ def _recommended_fee_for_target(fees: Dict[str, Any], target_blocks: int) -> flo
     if target_blocks <= 6:
         return fees.get("hourFee")
     return fees.get("economyFee") or fees.get("minimumFee")
+
+
+def _validate_address(address: str) -> str:
+    normalized = (address or "").strip()
+    if not BITCOIN_ADDRESS_RE.match(normalized):
+        raise ValueError("That does not look like a supported Bitcoin address.")
+    return normalized
+
+
+def _validate_utxo_limit(utxo_limit: int) -> None:
+    if utxo_limit < 1 or utxo_limit > 100:
+        raise ValueError("UTXO limit must be between 1 and 100.")
 
 
 def _sats_vb_to_btc_kvb(sats_vb: Any) -> float | None:

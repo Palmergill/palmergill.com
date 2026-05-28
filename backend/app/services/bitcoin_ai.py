@@ -17,10 +17,8 @@ MODEL_TIMEOUT_SECONDS = float(os.getenv("BITCOIN_CHAT_MODEL_TIMEOUT_SECONDS", "3
 MAX_TOOL_CALLS = int(os.getenv("BITCOIN_CHAT_MAX_TOOL_CALLS", "6"))
 MAX_SESSION_MESSAGES = int(os.getenv("BITCOIN_CHAT_MAX_SESSION_MESSAGES", "12"))
 TXID_RE = re.compile(r"\b[a-fA-F0-9]{64}\b")
-BITCOIN_ADDRESS_RE = re.compile(
-    r"\b(?:bc1[ac-hj-np-z02-9]{11,71}|[13][a-km-zA-HJ-NP-Z1-9]{25,34})\b",
-    re.IGNORECASE,
-)
+BITCOIN_ADDRESS_RE = re.compile(rf"\b{bitcoin_tools.BITCOIN_ADDRESS_PATTERN}\b", re.IGNORECASE)
+LOCAL_ADDRESS_UTXO_LIMIT = 10
 
 BITCOIN_TOPIC_TERMS = (
     "bitcoin",
@@ -190,6 +188,29 @@ TOOL_SCHEMAS = [
     },
     {
         "type": "function",
+        "name": "get_address",
+        "description": "Inspect a public Bitcoin address, including confirmed balance, unconfirmed delta, transaction counts, and current UTXOs. Never infer ownership or identity from the address.",
+        "strict": True,
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "address": {
+                    "type": "string",
+                    "description": "A public Bitcoin address.",
+                },
+                "utxo_limit": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 100,
+                    "description": "Maximum number of UTXOs to return.",
+                },
+            },
+            "required": ["address", "utxo_limit"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "type": "function",
         "name": "get_mempool_summary",
         "description": "Get current mempool pressure, transaction count, virtual size, total fees, memory use, min relay fee, and fee estimates.",
         "strict": True,
@@ -247,6 +268,7 @@ TOOL_HANDLERS = {
     "get_latest_block": bitcoin_tools.get_latest_block,
     "get_block": bitcoin_tools.get_block,
     "get_transaction": bitcoin_tools.get_transaction,
+    "get_address": bitcoin_tools.get_address,
     "get_mempool_summary": bitcoin_tools.get_mempool_summary,
     "estimate_fee": bitcoin_tools.estimate_fee,
     "get_mined_stats": bitcoin_tools.get_mined_stats,
@@ -360,6 +382,13 @@ def _answer_with_local_router(message: str, session_id: str, timezone_name: str 
         tools_used.append("get_transaction")
         warnings.extend(data.get("warnings", []))
         return _response(_transaction_answer(data), session_id, tools_used, data, warnings)
+
+    address_match = BITCOIN_ADDRESS_RE.search(message)
+    if address_match:
+        data = _local_tool_call(demo, "get_address", address_match.group(0), LOCAL_ADDRESS_UTXO_LIMIT)
+        tools_used.append("get_address")
+        warnings.extend(data.get("warnings", []))
+        return _response(_address_answer(data), session_id, tools_used, data, warnings)
 
     if "mined" in normalized or "how many btc" in normalized:
         start_time, end_time, window_label, timezone_warning = _mined_window(message, timezone_name)
@@ -672,6 +701,27 @@ def _transaction_answer(data: Dict[str, Any]) -> str:
         f"- **Outputs:** {data.get('output_count')}\n"
         f"- **Total output:** {data.get('total_output_btc')} BTC\n"
         f"- **Fee:** {fee_text}"
+    )
+
+
+def _address_answer(data: Dict[str, Any]) -> str:
+    if data.get("error"):
+        return data["error"]
+    utxo_count = data.get("utxo_count")
+    unconfirmed = data.get("unconfirmed_delta_btc")
+    unconfirmed_line = (
+        f"\n- **Unconfirmed delta:** {unconfirmed} BTC"
+        if unconfirmed not in (None, 0, 0.0)
+        else ""
+    )
+    return (
+        "That public Bitcoin address snapshot shows:\n\n"
+        f"- **Confirmed balance:** {data.get('confirmed_balance_btc')} BTC\n"
+        f"- **Total balance:** {data.get('total_balance_btc')} BTC"
+        f"{unconfirmed_line}\n"
+        f"- **Transactions:** {data.get('chain_tx_count')} confirmed, {data.get('mempool_tx_count')} unconfirmed\n"
+        f"- **Current UTXOs:** {utxo_count}\n\n"
+        "This is public chain data only; it does not prove who controls the address."
     )
 
 

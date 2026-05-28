@@ -1,6 +1,6 @@
 from typing import Any, Dict, Optional
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
@@ -83,6 +83,20 @@ async def transaction(request: Request, txid: str):
         if is_demo_request(request):
             return bitcoin_tools.get_demo_transaction(txid)
         return bitcoin_tools.get_transaction(txid)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@router.get("/address/{address}")
+async def address(
+    request: Request,
+    address: str,
+    utxo_limit: int = Query(bitcoin_tools.DEFAULT_ADDRESS_UTXO_LIMIT, ge=1, le=100),
+):
+    try:
+        if is_demo_request(request):
+            return bitcoin_tools.get_demo_address(address, utxo_limit)
+        return bitcoin_tools.get_address(address, utxo_limit)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
 
