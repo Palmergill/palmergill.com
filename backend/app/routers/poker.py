@@ -467,8 +467,14 @@ def process_ai_turn_if_needed(game_id: str, game: PokerGame) -> bool:
     if not is_ai_game or game.phase in ('showdown', 'waiting'):
         return False
 
+    # When at most one player can still bet, there may be no bot decisions left
+    # and we can run the board out. But only once that lone live player has
+    # already matched the current bet — if they still owe a call they are
+    # entitled to call or fold first. Advancing unconditionally resolves the
+    # hand at showdown behind their back (e.g. a bot shoves and the human never
+    # gets to act on it).
     active = [p for p in game.players if not p.folded and not p.is_all_in]
-    if len(active) <= 1:
+    if len(active) <= 1 and all(p.bet >= game.current_bet for p in active):
         game._advance_phase()
         return True
 

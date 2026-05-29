@@ -99,21 +99,6 @@ class Player:
             'ai_personality_label': self.ai_personality_label,
         }
 
-@dataclass
-class ChatMessage:
-    player_id: str
-    player_name: str
-    message: str
-    timestamp: float
-
-    def to_dict(self):
-        return {
-            'player_id': self.player_id,
-            'player_name': self.player_name,
-            'message': self.message,
-            'timestamp': self.timestamp
-        }
-
 
 class PokerGame:
     def __init__(self, game_id: str):
@@ -698,9 +683,6 @@ class PokerGame:
 
         # High Card
         return (HandRank.HIGH_CARD.value, ranks)
-
-    def _is_straight(self, ranks: List[int]) -> bool:
-        return self._straight_high(ranks) is not None
 
     def _straight_high(self, ranks: List[int]) -> Optional[int]:
         unique = sorted(set(ranks), reverse=True)

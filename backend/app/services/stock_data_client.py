@@ -87,11 +87,6 @@ class StockDataClient:
                 "Real stock data is enabled, but POLYGON_API_KEY is not configured"
             )
     
-    def _is_cache_fresh(self, fetched_at: datetime, data_type: str = "price") -> bool:
-        """Check if cached data is still fresh based on data type."""
-        ttl = CACHE_TTL.get(data_type, timedelta(hours=1))
-        return utc_now() - fetched_at < ttl
-    
     def get_stock_data(self, ticker: str, db, force_refresh: bool = False) -> dict:
         """Get comprehensive stock data for a ticker."""
         from app.database import EarningsRecord, StockSummary

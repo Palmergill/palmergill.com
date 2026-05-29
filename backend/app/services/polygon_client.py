@@ -208,31 +208,6 @@ class PolygonClient:
         
         return data.get("results", [])
     
-    def _get_52_week_range(self, ticker: str) -> Dict:
-        """Get 52-week high/low from aggregates"""
-        end_date = datetime.now()
-        start_date = end_date - timedelta(days=365)
-        
-        url = f"{self.BASE_URL}/v2/aggs/ticker/{ticker}/range/1/day/{start_date.strftime('%Y-%m-%d')}/{end_date.strftime('%Y-%m-%d')}"
-        params = {
-            "adjusted": "true",
-            "sort": "asc",
-            "apiKey": self.api_key
-        }
-        
-        response = requests.get(url, params=params, timeout=10)
-        response.raise_for_status()
-        data = response.json()
-        
-        if data.get("results") and len(data["results"]) > 0:
-            highs = [r.get("h") for r in data["results"] if r.get("h")]
-            lows = [r.get("l") for r in data["results"] if r.get("l")]
-            return {
-                "high": max(highs) if highs else None,
-                "low": min(lows) if lows else None
-            }
-        return {}
-    
     def _get_price_history(self, ticker: str, days: int = 365) -> List[Dict]:
         """Get daily price history for the specified number of days"""
         try:
@@ -432,74 +407,6 @@ class PolygonClient:
         
         return earnings
     
-    def _calculate_historical_pe(self, earnings: List[Dict], price_history: List[Dict] = None) -> List[Dict]:
-        """Calculate historical TTM P/E for each earnings quarter using actual prices."""
-        if not earnings or len(earnings) < 4:
-            return earnings
-        
-        # Create price lookup by date
-        price_by_date = {}
-        if price_history:
-            for p in price_history:
-                price_by_date[p.get("date", "")] = p.get("close")
-        
-        # Process earnings from oldest to newest for TTM calculation
-        processed = []
-        for i in range(len(earnings)):
-            e = earnings[i].copy()
-            
-            # Calculate TTM EPS (sum of this quarter + 3 previous quarters)
-            ttm_eps = 0
-            quarters_in_ttm = 0
-            
-            for j in range(i, min(i + 4, len(earnings))):
-                eps = earnings[j].get("reported_eps")
-                if eps and eps > 0:
-                    ttm_eps += eps
-                    quarters_in_ttm += 1
-            
-            # Calculate P/E if we have TTM EPS and price data
-            if quarters_in_ttm >= 3 and ttm_eps > 0 and price_history:
-                fiscal_date = e.get("fiscal_date", "")
-                # Try to find price on or near the earnings date
-                price = None
-                
-                # Try exact date first
-                if fiscal_date in price_by_date:
-                    price = price_by_date[fiscal_date]
-                else:
-                    # Find closest date within 5 days
-                    from datetime import datetime, timedelta
-                    try:
-                        earnings_date = datetime.strptime(fiscal_date, "%Y-%m-%d")
-                        for days_offset in range(1, 6):
-                            # Try forward
-                            check_date = (earnings_date + timedelta(days=days_offset)).strftime("%Y-%m-%d")
-                            if check_date in price_by_date:
-                                price = price_by_date[check_date]
-                                break
-                            # Try backward
-                            check_date = (earnings_date - timedelta(days=days_offset)).strftime("%Y-%m-%d")
-                            if check_date in price_by_date:
-                                price = price_by_date[check_date]
-                                break
-                    except Exception:
-                        pass
-                
-                if price:
-                    e["pe_ratio"] = round(price / ttm_eps, 2)
-                    e["price"] = price
-                else:
-                    e["pe_ratio"] = None
-                    e["price"] = None
-            else:
-                e["pe_ratio"] = None
-                e["price"] = None
-            
-            processed.append(e)
-        
-        return processed
-    
     def _calculate_pe(self, details: Dict, price_data: Dict, earnings: List[Dict]) -> Optional[float]:
         """Calculate P/E ratio from price and TTM earnings"""
         try:
@@ -555,26 +462,6 @@ class PolygonClient:
             return round(growth, 2)
         except Exception as e:
             logger.warning(f"Could not calculate revenue growth: {e}")
-        return None
-    
-    def _get_latest_fcf(self, financials: List[Dict]) -> Optional[float]:
-        """Get latest quarter free cash flow"""
-        try:
-            if not financials:
-                return None
-            
-            fin = financials[0].get("financials", {})
-            cash_flow = fin.get("cash_flow_statement", {})
-            
-            # Try FCF field first, then operating cash flow
-            for key in ["free_cash_flow", "net_cash_flow_from_operating_activities"]:
-                fcf_data = cash_flow.get(key)
-                if isinstance(fcf_data, dict):
-                    return fcf_data.get("value")
-                elif fcf_data is not None:
-                    return fcf_data
-        except Exception as e:
-            logger.warning(f"Could not get FCF: {e}")
         return None
     
     def _extract_metric(self, financials: List[Dict], metric_name: str) -> Optional[float]:
