@@ -6,10 +6,10 @@ body {
     min-height: 100vh;
     margin: 0;
     background:
-        radial-gradient(circle at 10% 10%, rgba(213, 164, 74, 0.16), transparent 28%),
+        radial-gradient(circle at 10% 10%, rgba(232, 199, 115, 0.16), transparent 28%),
         linear-gradient(135deg, #130d09 0%, #2f1a10 42%, #061711 100%);
     color: #fff8df;
-    font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-family: var(--font-body);
     -webkit-tap-highlight-color: transparent;
     animation: pageFadeIn 620ms ease-out both;
 }
@@ -38,7 +38,7 @@ button {
 
 .eyebrow {
     margin: 0 0 5px;
-    color: #f4c96a;
+    color: #e8c773;
     font-size: 0.76rem;
     font-weight: 900;
     letter-spacing: 0.08em;
@@ -52,7 +52,9 @@ h2 {
 
 h1 {
     color: #fff8df;
+    font-family: var(--font-display);
     font-size: clamp(2.45rem, 5vw, 5.1rem);
+    font-weight: 700;
     line-height: 0.88;
     text-shadow: 0 3px 0 rgba(0, 0, 0, 0.24);
 }
@@ -63,7 +65,7 @@ h1 {
     gap: 2px;
     min-width: 116px;
     padding: 10px 12px;
-    border: 1px solid rgba(244, 201, 106, 0.4);
+    border: 1px solid rgba(232, 199, 115, 0.4);
     border-radius: 8px;
     background: rgba(8, 15, 13, 0.58);
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
@@ -81,7 +83,7 @@ h1 {
     display: grid;
     gap: 2px;
     padding: 8px 12px;
-    border: 1px solid rgba(244, 201, 106, 0.28);
+    border: 1px solid rgba(232, 199, 115, 0.28);
     border-radius: 8px;
     background: rgba(8, 15, 13, 0.5);
 }
@@ -95,7 +97,7 @@ h1 {
 }
 
 .session-tile strong {
-    color: #f4c96a;
+    color: #e8c773;
     font-size: 1.1rem;
 }
 
@@ -108,14 +110,14 @@ h1 {
 
 #countToggleButton[aria-pressed="true"],
 #strategyToggleButton[aria-pressed="true"] {
-    background: rgba(244, 201, 106, 0.18);
-    border-color: rgba(244, 201, 106, 0.6);
+    background: rgba(232, 199, 115, 0.18);
+    border-color: rgba(232, 199, 115, 0.6);
 }
 
 .secondary-button.is-recommended {
     position: relative;
-    border-color: #f4c96a;
-    box-shadow: 0 0 0 2px rgba(244, 201, 106, 0.4), 0 0 18px rgba(244, 201, 106, 0.32);
+    border-color: #e8c773;
+    box-shadow: 0 0 0 2px rgba(232, 199, 115, 0.4), 0 0 18px rgba(232, 199, 115, 0.32);
 }
 
 .secondary-button.is-recommended::after {
@@ -123,7 +125,7 @@ h1 {
     position: absolute;
     top: 4px;
     right: 6px;
-    color: #f4c96a;
+    color: #e8c773;
     font-size: 0.8rem;
 }
 
@@ -139,7 +141,7 @@ h1 {
 .chip-ledger strong,
 .shoe-meter strong,
 .bet-display strong {
-    color: #f4c96a;
+    color: #e8c773;
     font-size: 1.2rem;
     display: inline-block;
     transform-origin: center;
@@ -232,7 +234,7 @@ h1 {
 }
 
 .zone-heading strong {
-    color: #f4c96a;
+    color: #e8c773;
     font-size: 1rem;
 }
 
@@ -326,8 +328,8 @@ h1 {
 }
 
 .hand-panel.active {
-    border-color: rgba(244, 201, 106, 0.9);
-    box-shadow: 0 0 0 2px rgba(244, 201, 106, 0.2), 0 0 22px rgba(244, 201, 106, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    border-color: rgba(232, 199, 115, 0.9);
+    box-shadow: 0 0 0 2px rgba(232, 199, 115, 0.2), 0 0 22px rgba(232, 199, 115, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.06);
     animation: activeHandGlow 2600ms ease-in-out 620ms infinite;
 }
 
@@ -353,7 +355,7 @@ h1 {
 }
 
 .hand-meta strong {
-    color: #f4c96a;
+    color: #e8c773;
 }
 
 .result-pill {
@@ -386,7 +388,7 @@ h1 {
     align-content: start;
     gap: 13px;
     padding: 16px;
-    border: 1px solid rgba(244, 201, 106, 0.24);
+    border: 1px solid rgba(232, 199, 115, 0.24);
     border-radius: 8px;
     background: rgba(7, 14, 12, 0.84);
     box-shadow: 0 24px 58px rgba(0, 0, 0, 0.35);
@@ -412,9 +414,9 @@ h1 {
 .status-bar {
     min-height: 58px;
     padding: 12px;
-    border: 1px solid rgba(244, 201, 106, 0.35);
+    border: 1px solid rgba(232, 199, 115, 0.35);
     border-radius: 8px;
-    background: rgba(244, 201, 106, 0.11);
+    background: rgba(232, 199, 115, 0.11);
     color: #fff0bd;
     font-weight: 800;
     line-height: 1.35;
@@ -432,7 +434,7 @@ h1 {
     justify-content: space-between;
     gap: 12px;
     padding: 10px;
-    border: 1px solid rgba(244, 201, 106, 0.25);
+    border: 1px solid rgba(232, 199, 115, 0.25);
     border-radius: 8px;
     background: rgba(255, 255, 255, 0.045);
 }
@@ -511,7 +513,7 @@ h1 {
         inset 0 0 0 4px rgba(255, 255, 255, 0.82),
         inset 0 0 0 8px var(--chip-ring),
         inset 0 -7px 10px rgba(0, 0, 0, 0.22),
-        0 0 0 3px rgba(244, 201, 106, 0.58),
+        0 0 0 3px rgba(232, 199, 115, 0.58),
         0 13px 24px rgba(0, 0, 0, 0.38);
     transform: translateY(-4px) scale(1.05);
 }
@@ -547,7 +549,7 @@ h1 {
 
 .primary-button {
     flex: 1;
-    background: linear-gradient(180deg, #f4c96a, #d7a143);
+    background: linear-gradient(180deg, #e8c773, #c89e4a);
     color: #161b10;
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28);
 }
@@ -623,7 +625,7 @@ button:disabled {
         bottom: 0;
         z-index: 5;
         grid-template-columns: minmax(0, 1fr);
-        border-color: rgba(244, 201, 106, 0.34);
+        border-color: rgba(232, 199, 115, 0.34);
     }
 }
 
@@ -936,10 +938,10 @@ button:disabled {
 
 @keyframes activeHandGlow {
     0%, 100% {
-        box-shadow: 0 0 0 2px rgba(244, 201, 106, 0.2), 0 0 18px rgba(244, 201, 106, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+        box-shadow: 0 0 0 2px rgba(232, 199, 115, 0.2), 0 0 18px rgba(232, 199, 115, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.06);
     }
     50% {
-        box-shadow: 0 0 0 2px rgba(244, 201, 106, 0.38), 0 0 28px rgba(244, 201, 106, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+        box-shadow: 0 0 0 2px rgba(232, 199, 115, 0.38), 0 0 28px rgba(232, 199, 115, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.06);
     }
 }
 
@@ -974,18 +976,18 @@ button:disabled {
 @keyframes messagePop {
     0% {
         transform: translateY(0);
-        border-color: rgba(244, 201, 106, 0.35);
-        background: rgba(244, 201, 106, 0.11);
+        border-color: rgba(232, 199, 115, 0.35);
+        background: rgba(232, 199, 115, 0.11);
     }
     40% {
         transform: translateY(-2px);
-        border-color: rgba(244, 201, 106, 0.72);
-        background: rgba(244, 201, 106, 0.18);
+        border-color: rgba(232, 199, 115, 0.72);
+        background: rgba(232, 199, 115, 0.18);
     }
     100% {
         transform: translateY(0);
-        border-color: rgba(244, 201, 106, 0.35);
-        background: rgba(244, 201, 106, 0.11);
+        border-color: rgba(232, 199, 115, 0.35);
+        background: rgba(232, 199, 115, 0.11);
     }
 }
 

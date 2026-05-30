@@ -20,6 +20,10 @@
     <link rel="icon" type="image/png" href="/assets/palmer-gill-logo-small.png">
     <link rel="manifest" href="./manifest.json">
     <link rel="stylesheet" href="/shared/site-nav.css?v=6">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;700;900&family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/shared/casino-theme.css?v=1">
     <script>
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
@@ -28,25 +32,9 @@
         }
     </script>
     <style>
-        :root {
-            --ink: #080a0d;
-            --panel: #111722;
-            --panel-soft: rgba(255, 255, 255, 0.055);
-            --line: rgba(255, 255, 255, 0.14);
-            --line-strong: rgba(255, 255, 255, 0.24);
-            --text: #f7f3ea;
-            --muted: rgba(247, 243, 234, 0.68);
-            --quiet: rgba(247, 243, 234, 0.46);
-            --gold: #d6b25e;
-            --teal: #58d3ad;
-            --blue: #72a9ff;
-            --coral: #ff7a6e;
-            --danger: #ff6f7d;
-            --radius: 8px;
-            --max: 1080px;
-            --shadow: 0 28px 90px rgba(0, 0, 0, 0.36);
-        }
-
+        /* Theme tokens (palette, gold, fonts) come from the live :root below
+           plus /shared/casino-theme.css. The earlier duplicate :root that this
+           replaced was fully shadowed and has been removed. */
         * {
             box-sizing: border-box;
             margin: 0;
@@ -67,7 +55,7 @@
                 radial-gradient(circle at 12% 74%, rgba(37, 130, 92, 0.2), transparent 30%),
                 linear-gradient(180deg, #080d0b 0%, #091611 48%, #080f0c 100%);
             color: var(--text);
-            font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            font-family: var(--font-body);
             line-height: 1.5;
             -webkit-tap-highlight-color: transparent;
         }
@@ -128,7 +116,7 @@
         }
 
         .header h1 {
-            font-family: Georgia, "Times New Roman", serif;
+            font-family: var(--font-display);
             font-size: clamp(3.4rem, 9vw, 7rem);
             font-weight: 500;
             line-height: 0.9;
@@ -158,7 +146,7 @@
 
         .balance {
             color: var(--gold);
-            font-family: Georgia, "Times New Roman", serif;
+            font-family: var(--font-display);
             font-size: clamp(1.75rem, 4vw, 2.55rem);
             font-weight: 500;
             line-height: 1;
@@ -187,7 +175,7 @@
             border-radius: inherit;
             background:
                 linear-gradient(135deg, rgba(255, 122, 110, 0.15), transparent 42%),
-                radial-gradient(circle at 88% 14%, rgba(214, 178, 94, 0.16), transparent 30%);
+                radial-gradient(circle at 88% 14%, rgba(232, 199, 115, 0.16), transparent 30%);
             pointer-events: none;
         }
 
@@ -199,9 +187,9 @@
             align-items: center;
             min-height: 46px;
             padding: 0 16px;
-            border: 1px solid rgba(214, 178, 94, 0.28);
+            border: 1px solid rgba(232, 199, 115, 0.28);
             border-radius: var(--radius);
-            background: rgba(214, 178, 94, 0.1);
+            background: rgba(232, 199, 115, 0.1);
             color: color-mix(in srgb, var(--gold) 80%, #ffffff);
             font-size: 0.88rem;
             font-weight: 800;
@@ -302,9 +290,9 @@
             z-index: 2;
             display: none;
             padding: 4px 8px;
-            border: 1px solid rgba(214, 178, 94, 0.48);
+            border: 1px solid rgba(232, 199, 115, 0.48);
             border-radius: 999px;
-            background: rgba(214, 178, 94, 0.16);
+            background: rgba(232, 199, 115, 0.16);
             color: var(--gold);
             font-size: 0.62rem;
             font-weight: 850;
@@ -314,33 +302,18 @@
         .odds-chip.visible { display: block; }
 
         .quick-actions,
-        .bet-presets,
         .active-bets-strip {
             position: relative;
             z-index: 1;
         }
 
-        .quick-actions,
-        .bet-presets {
+        .quick-actions {
             display: flex;
             flex-wrap: wrap;
             grid-column: 1 / -1;
             gap: 8px;
             align-content: start;
             justify-content: flex-start;
-        }
-
-        .bet-presets {
-            align-items: center;
-            padding-top: 4px;
-        }
-
-        .bet-presets-label {
-            color: rgba(247, 243, 234, 0.6);
-            font-size: 0.66rem;
-            font-weight: 800;
-            letter-spacing: 0.14em;
-            text-transform: uppercase;
         }
 
         .quick-btn,
@@ -369,8 +342,8 @@
         .quick-btn:hover,
         .quick-btn:focus-visible {
             transform: translateY(-2px);
-            border-color: rgba(214, 178, 94, 0.5);
-            background: rgba(214, 178, 94, 0.1);
+            border-color: rgba(232, 199, 115, 0.5);
+            background: rgba(232, 199, 115, 0.1);
             color: #ffffff;
             outline: none;
         }
@@ -397,9 +370,9 @@
             gap: 6px;
             min-height: 34px;
             padding: 4px 10px 4px 12px;
-            border: 1px solid rgba(214, 178, 94, 0.34);
+            border: 1px solid rgba(232, 199, 115, 0.34);
             border-radius: 999px;
-            background: rgba(214, 178, 94, 0.1);
+            background: rgba(232, 199, 115, 0.1);
             color: color-mix(in srgb, var(--gold) 72%, #ffffff);
             font-size: 0.74rem;
             font-weight: 760;
@@ -604,7 +577,7 @@
 
         .menu-header h2 {
             color: var(--text);
-            font-family: Georgia, "Times New Roman", serif;
+            font-family: var(--font-display);
             font-size: clamp(2rem, 5vw, 4rem);
             font-weight: 500;
             line-height: 0.96;
@@ -625,8 +598,8 @@
         .close-btn:hover,
         .close-btn:focus-visible {
             transform: translateY(-2px);
-            border-color: rgba(214, 178, 94, 0.5);
-            background: rgba(214, 178, 94, 0.1);
+            border-color: rgba(232, 199, 115, 0.5);
+            background: rgba(232, 199, 115, 0.1);
             outline: none;
         }
 
@@ -652,10 +625,10 @@
             align-items: center;
             justify-content: center;
             padding: 12px;
-            border: 1px solid rgba(214, 178, 94, 0.34);
+            border: 1px solid rgba(232, 199, 115, 0.34);
             border-radius: var(--radius);
             background:
-                linear-gradient(145deg, rgba(214, 178, 94, 0.14), rgba(255, 255, 255, 0.024)),
+                linear-gradient(145deg, rgba(232, 199, 115, 0.14), rgba(255, 255, 255, 0.024)),
                 var(--panel);
             color: var(--gold);
             box-shadow: 0 18px 70px rgba(0, 0, 0, 0.16);
@@ -674,7 +647,7 @@
 
         .number-btn .num {
             color: #ffffff;
-            font-family: Georgia, "Times New Roman", serif;
+            font-family: var(--font-display);
             font-size: clamp(2.5rem, 8vw, 5rem);
             font-weight: 500;
             line-height: 0.95;
@@ -697,7 +670,7 @@
         .number-btn.has-bet {
             border-color: rgba(247, 243, 234, 0.68);
             background:
-                linear-gradient(145deg, rgba(214, 178, 94, 0.24), rgba(255, 255, 255, 0.045)),
+                linear-gradient(145deg, rgba(232, 199, 115, 0.24), rgba(255, 255, 255, 0.045)),
                 var(--panel);
         }
 
@@ -753,9 +726,9 @@
         }
 
         .center-btn-tile.has-bet {
-            border-color: rgba(214, 178, 94, 0.72);
+            border-color: rgba(232, 199, 115, 0.72);
             background:
-                linear-gradient(145deg, rgba(255, 122, 110, 0.2), rgba(214, 178, 94, 0.08)),
+                linear-gradient(145deg, rgba(255, 122, 110, 0.2), rgba(232, 199, 115, 0.08)),
                 var(--panel);
         }
 
@@ -778,7 +751,7 @@
             width: 100%;
             max-width: 380px;
             padding: 24px;
-            border: 1px solid rgba(214, 178, 94, 0.34);
+            border: 1px solid rgba(232, 199, 115, 0.34);
             border-radius: var(--radius);
             background:
                 linear-gradient(145deg, rgba(255, 255, 255, 0.105), rgba(255, 255, 255, 0.026)),
@@ -789,7 +762,7 @@
         .bet-modal h3 {
             margin-bottom: 10px;
             color: var(--text);
-            font-family: Georgia, "Times New Roman", serif;
+            font-family: var(--font-display);
             font-size: 2rem;
             font-weight: 500;
             line-height: 1;
@@ -808,9 +781,9 @@
         .bet-info-strip {
             margin-bottom: 14px;
             padding: 10px 12px;
-            border: 1px solid rgba(214, 178, 94, 0.28);
+            border: 1px solid rgba(232, 199, 115, 0.28);
             border-radius: 8px;
-            background: rgba(214, 178, 94, 0.08);
+            background: rgba(232, 199, 115, 0.08);
             color: var(--muted);
             font-size: 0.78rem;
             line-height: 1.45;
@@ -847,7 +820,7 @@
             color: var(--text);
             appearance: textfield;
             -moz-appearance: textfield;
-            font-family: Georgia, "Times New Roman", serif;
+            font-family: var(--font-display);
             font-size: 2.1rem;
             font-weight: 500;
             text-align: center;
@@ -860,7 +833,7 @@
         }
 
         .bet-modal input:focus {
-            border-color: rgba(214, 178, 94, 0.62);
+            border-color: rgba(232, 199, 115, 0.62);
             outline: none;
         }
 
@@ -896,8 +869,8 @@
 
         .quick-amt:hover,
         .quick-amt:focus-visible {
-            border-color: rgba(214, 178, 94, 0.5);
-            background: rgba(214, 178, 94, 0.1);
+            border-color: rgba(232, 199, 115, 0.5);
+            background: rgba(232, 199, 115, 0.1);
             outline: none;
         }
 
@@ -964,7 +937,7 @@
             width: 100%;
             max-width: 380px;
             padding: 28px;
-            border: 1px solid rgba(214, 178, 94, 0.34);
+            border: 1px solid rgba(232, 199, 115, 0.34);
             border-radius: var(--radius);
             background:
                 linear-gradient(145deg, rgba(255, 255, 255, 0.105), rgba(255, 255, 255, 0.026)),
@@ -985,7 +958,7 @@
         .point-popup .point-number {
             margin: 16px 0;
             color: #ffffff;
-            font-family: Georgia, "Times New Roman", serif;
+            font-family: var(--font-display);
             font-size: 5rem;
             font-weight: 500;
             line-height: 0.9;
@@ -1005,8 +978,8 @@
         }
 
         .odds-btn {
-            border: 1px solid rgba(214, 178, 94, 0.34);
-            background: rgba(214, 178, 94, 0.1);
+            border: 1px solid rgba(232, 199, 115, 0.34);
+            background: rgba(232, 199, 115, 0.1);
             color: var(--gold);
             font-size: 0.9rem;
             font-weight: 850;
@@ -1160,17 +1133,17 @@
             }
         }
 
-        /* Blackjack-inspired casino table theme */
+        /* Casino table theme — warm felt + wood. Brand gold and fonts come
+           from /shared/casino-theme.css; only craps-specific tokens here. */
         :root {
             --ink: #130d09;
             --panel: rgba(7, 14, 12, 0.84);
             --panel-soft: rgba(255, 255, 255, 0.045);
-            --line: rgba(244, 201, 106, 0.24);
-            --line-strong: rgba(244, 201, 106, 0.4);
+            --line: rgba(232, 199, 115, 0.24);
+            --line-strong: rgba(232, 199, 115, 0.4);
             --text: #fff8df;
             --muted: #d6ead5;
             --quiet: rgba(214, 234, 213, 0.72);
-            --gold: #f4c96a;
             --teal: #58d3ad;
             --blue: #72a9ff;
             --coral: #ff7a6e;
@@ -1187,10 +1160,10 @@
         body {
             min-height: 100vh;
             background:
-                radial-gradient(circle at 10% 10%, rgba(213, 164, 74, 0.16), transparent 28%),
+                radial-gradient(circle at 10% 10%, rgba(232, 199, 115, 0.16), transparent 28%),
                 linear-gradient(135deg, #130d09 0%, #2f1a10 42%, #061711 100%);
             color: var(--text);
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            font-family: var(--font-body);
             line-height: 1.4;
             animation: pageFadeIn 360ms ease-out both;
         }
@@ -1327,9 +1300,9 @@
             grid-column: 1 / -1;
             min-height: 58px;
             padding: 12px;
-            border: 1px solid rgba(244, 201, 106, 0.35);
+            border: 1px solid rgba(232, 199, 115, 0.35);
             border-radius: var(--radius);
-            background: rgba(244, 201, 106, 0.11);
+            background: rgba(232, 199, 115, 0.11);
             color: #fff0bd;
             font-size: 0.88rem;
             line-height: 1.35;
@@ -1412,11 +1385,11 @@
         }
 
         .number-zone.has-bet {
-            border-color: rgba(244, 201, 106, 0.9);
+            border-color: rgba(232, 199, 115, 0.9);
             background:
-                linear-gradient(180deg, rgba(244, 201, 106, 0.18), rgba(255, 248, 223, 0.025)),
+                linear-gradient(180deg, rgba(232, 199, 115, 0.18), rgba(255, 248, 223, 0.025)),
                 rgba(3, 26, 18, 0.66);
-            box-shadow: 0 0 0 2px rgba(244, 201, 106, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+            box-shadow: 0 0 0 2px rgba(232, 199, 115, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.06);
         }
 
         .number-zone .num {
@@ -1488,7 +1461,7 @@
 
         .bet-btn::before {
             background:
-                linear-gradient(135deg, rgba(244, 201, 106, 0.12), transparent 48%),
+                linear-gradient(135deg, rgba(232, 199, 115, 0.12), transparent 48%),
                 radial-gradient(circle at 86% 16%, rgba(255, 255, 255, 0.06), transparent 32%);
             opacity: 1;
         }
@@ -1517,9 +1490,9 @@
         .bet-btn.has-bet,
         .number-btn.has-bet,
         .center-btn-tile.has-bet {
-            border-color: rgba(244, 201, 106, 0.9);
-            background: rgba(244, 201, 106, 0.14);
-            box-shadow: 0 0 0 2px rgba(244, 201, 106, 0.2), 0 0 22px rgba(244, 201, 106, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+            border-color: rgba(232, 199, 115, 0.9);
+            background: rgba(232, 199, 115, 0.14);
+            box-shadow: 0 0 0 2px rgba(232, 199, 115, 0.2), 0 0 22px rgba(232, 199, 115, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.06);
         }
 
         .bet-btn .label,
@@ -1634,7 +1607,7 @@
             left: 50%;
             top: calc(100% - 1px);
             padding: 2px 6px;
-            border: 1px solid rgba(244, 201, 106, 0.4);
+            border: 1px solid rgba(232, 199, 115, 0.4);
             border-radius: 999px;
             background: rgba(6, 15, 11, 0.88);
             color: #fff0bd;
@@ -1674,9 +1647,9 @@
 
         .bet-chip,
         .odds-chip {
-            border: 1px solid rgba(244, 201, 106, 0.34);
+            border: 1px solid rgba(232, 199, 115, 0.34);
             border-radius: 999px;
-            background: rgba(244, 201, 106, 0.1);
+            background: rgba(232, 199, 115, 0.1);
             color: #fff0bd;
         }
 
@@ -1719,7 +1692,7 @@
             min-height: 46px;
             border: 1px solid transparent;
             border-radius: var(--radius);
-            background: linear-gradient(180deg, #f4c96a, #d7a143);
+            background: linear-gradient(180deg, #e8c773, #c89e4a);
             color: #161b10;
             font-weight: 900;
             letter-spacing: 0;
@@ -1729,7 +1702,7 @@
 
         .submenu {
             background:
-                radial-gradient(circle at 10% 10%, rgba(213, 164, 74, 0.16), transparent 28%),
+                radial-gradient(circle at 10% 10%, rgba(232, 199, 115, 0.16), transparent 28%),
                 linear-gradient(135deg, #130d09 0%, #2f1a10 42%, #061711 100%);
         }
 
@@ -1774,7 +1747,7 @@
         }
 
         .bet-modal input {
-            border: 1px solid rgba(244, 201, 106, 0.25);
+            border: 1px solid rgba(232, 199, 115, 0.25);
             border-radius: var(--radius);
             background: rgba(255, 255, 255, 0.045);
             color: var(--text);
@@ -1783,7 +1756,7 @@
         }
 
         .bet-modal input:focus {
-            border-color: rgba(244, 201, 106, 0.72);
+            border-color: rgba(232, 199, 115, 0.72);
         }
 
         .quick-amt {
@@ -2173,14 +2146,6 @@
             <button class="quick-btn" id="clearAllBtn" onclick="clearAllBets()">Clear All</button>
         </div>
 
-        <div class="bet-presets" aria-label="Bet presets">
-            <span class="bet-presets-label">Presets</span>
-            <button class="quick-btn" onclick="loadPreset('passOdds')">$5 Pass + Odds</button>
-            <button class="quick-btn" onclick="loadPreset('field')">$5 Field</button>
-            <button class="quick-btn" onclick="loadPreset('place68')">Place 6 &amp; 8</button>
-            <button class="quick-btn" onclick="loadPreset('ironCross')">Iron Cross</button>
-        </div>
-
         <div class="active-bets-strip" id="activeBetsStrip"></div>
 
         <div class="dice-area">
@@ -2277,7 +2242,7 @@
     <script src="crapsRules.js?v=1"></script>
     <script src="/shared/casino-profile.js?v=1"></script>
     <script src="/shared/analytics.js?v=1"></script>
-    <script src="app.js?v=4"></script>
+    <script src="app.js?v=5"></script>
     <script src="/shared/site-nav.js?v=6"></script>
 </body>
 </html>

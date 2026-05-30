@@ -61,8 +61,8 @@ body {
 
 /* Animations */
 @keyframes pulse {
-    0%, 100% { box-shadow: 0 0 0 0 rgba(255, 215, 0, 0.5); }
-    50% { box-shadow: 0 0 0 10px rgba(255, 215, 0, 0); }
+    0%, 100% { box-shadow: 0 0 0 0 rgba(232, 199, 115, 0.5); }
+    50% { box-shadow: 0 0 0 10px rgba(232, 199, 115, 0); }
 }
 
 @keyframes fadeInUp {
@@ -496,8 +496,8 @@ body {
 #start-screen h1 {
     font-size: 2.5rem;
     font-weight: 700;
-    color: #ffd700;
-    text-shadow: 0 0 20px rgba(255, 215, 0, 0.3);
+    color: #e8c773;
+    text-shadow: 0 0 20px rgba(232, 199, 115, 0.3);
     margin-bottom: 8px;
 }
 
@@ -530,14 +530,14 @@ body {
 }
 
 .start-form input:focus {
-    border-color: #ffd700;
+    border-color: #e8c773;
 }
 
 .btn-primary {
     padding: 18px 32px;
     font-size: 1.2rem;
     font-weight: 600;
-    background: linear-gradient(135deg, #ffd700 0%, #ffaa00 100%);
+    background: linear-gradient(135deg, #e8c773 0%, #ffaa00 100%);
     color: #000;
     border: none;
     border-radius: 12px;
@@ -574,9 +574,6 @@ body {
     --app-border: rgba(255,255,255,0.1);
     --app-input-bg: rgba(255,255,255,0.05);
     --app-overlay-bg: rgba(10,10,15,0.9);
-    --felt-primary: #1a472a;
-    --felt-secondary: #0d3320;
-    --felt-accent: #0f172a;
 }
 
 /* Light mode overrides */
@@ -799,7 +796,7 @@ body {
 
 .chips-amount {
     font-weight: 700;
-    color: #ffd700;
+    color: #e8c773;
     white-space: nowrap;
 }
 
@@ -923,7 +920,7 @@ body {
 .pot {
     font-size: 20px;
     font-weight: 700;
-    color: #ffd700;
+    color: #e8c773;
 }
 
 .pot::before {
@@ -939,7 +936,7 @@ body {
     align-items: center;
     gap: 0;
     padding: 7px 12px;
-    border: 1px solid rgba(255, 215, 0, 0.32);
+    border: 1px solid rgba(232, 199, 115, 0.32);
     border-radius: 999px;
     background: rgba(4, 12, 18, 0.62);
     box-shadow: 0 8px 20px rgba(0,0,0,0.22);
@@ -980,7 +977,7 @@ body {
         radial-gradient(ellipse at 50% 55%, #1d7a4d 0%, #115335 54%, #082415 100%);
     box-shadow:
         inset 0 0 75px rgba(0,0,0,0.42),
-        inset 0 0 0 2px rgba(255, 215, 0, 0.08),
+        inset 0 0 0 2px rgba(232, 199, 115, 0.08),
         0 20px 45px rgba(0,0,0,0.38);
 }
 
@@ -988,7 +985,7 @@ body {
     content: '';
     position: absolute;
     inset: clamp(18px, 5vw, 34px);
-    border: 2px solid rgba(255, 215, 0, 0.22);
+    border: 2px solid rgba(232, 199, 115, 0.22);
     border-radius: 48% / 42%;
     pointer-events: none;
     z-index: 1;
@@ -1075,23 +1072,23 @@ body {
 }
 
 .opponent.active-turn {
-    background: rgba(255, 215, 0, 0.15);
-    border: 2px solid #ffd700;
+    background: rgba(232, 199, 115, 0.15);
+    border: 2px solid #e8c773;
     animation: pulse 1.5s infinite;
     z-index: 6;
 }
 
 .opponent.active-turn .opponent-name {
-    color: #ffd700;
+    color: #e8c773;
     font-weight: 700;
 }
 
 .opponent.recent-ai-action {
-    border-color: rgba(255, 215, 0, 0.72);
+    border-color: rgba(232, 199, 115, 0.72);
     background: rgba(56, 40, 8, 0.72);
     box-shadow:
-        0 0 0 1px rgba(255, 215, 0, 0.16),
-        0 0 26px rgba(255, 215, 0, 0.3),
+        0 0 0 1px rgba(232, 199, 115, 0.16),
+        0 0 26px rgba(232, 199, 115, 0.3),
         0 10px 24px rgba(0,0,0,0.32);
     animation: aiSeatReveal 1.65s ease-out both;
     z-index: 7;
@@ -1099,10 +1096,10 @@ body {
 
 .opponent.winner,
 .your-cards.winner-hand .card {
-    border-color: #ffd700;
+    border-color: #e8c773;
     box-shadow:
-        0 0 0 2px rgba(255, 215, 0, 0.35),
-        0 0 24px rgba(255, 215, 0, 0.45),
+        0 0 0 2px rgba(232, 199, 115, 0.35),
+        0 0 24px rgba(232, 199, 115, 0.45),
         0 10px 24px rgba(0,0,0,0.32);
     animation: winnerGlow 1.4s ease-in-out infinite alternate;
 }
@@ -1121,7 +1118,7 @@ body {
     max-width: 100%;
     padding: 2px 6px;
     border-radius: 999px;
-    background: #ffd700;
+    background: #e8c773;
     color: #1f1700;
     font-size: clamp(8px, 2.2vw, 10px);
     font-weight: 900;
@@ -1239,7 +1236,7 @@ body {
 
 .opponent-chips {
     font-size: clamp(10px, 2.6vw, 12px);
-    color: #ffd700;
+    color: #e8c773;
     font-weight: 600;
 }
 
@@ -1315,7 +1312,7 @@ body {
 }
 
 .your-avatar-container .avatar {
-    border: 3px solid #ffd700;
+    border: 3px solid #e8c773;
     box-shadow: 0 0 15px rgba(255,215,0,0.3);
 }
 
@@ -1493,8 +1490,8 @@ body {
 }
 
 .your-cards.active-turn .card {
-    border-color: #ffd700;
-    box-shadow: 0 0 20px rgba(255, 215, 0, 0.5), 0 4px 12px rgba(0,0,0,0.4);
+    border-color: #e8c773;
+    box-shadow: 0 0 20px rgba(232, 199, 115, 0.5), 0 4px 12px rgba(0,0,0,0.4);
     animation: pulse 1.5s infinite;
 }
 
@@ -1536,7 +1533,7 @@ body {
     max-width: 100%;
     padding: 7px 14px;
     background: rgba(8, 15, 22, 0.82);
-    border: 1px solid rgba(255, 215, 0, 0.32);
+    border: 1px solid rgba(232, 199, 115, 0.32);
     border-radius: 999px;
     font-size: 13px;
     font-weight: 800;
@@ -1549,12 +1546,12 @@ body {
 .hand-strength-text {
     display: inline-block;
     padding: 4px 12px;
-    background: rgba(255, 215, 0, 0.15);
-    border: 1px solid rgba(255, 215, 0, 0.3);
+    background: rgba(232, 199, 115, 0.15);
+    border: 1px solid rgba(232, 199, 115, 0.3);
     border-radius: 12px;
     font-size: 12px;
     font-weight: 600;
-    color: #ffd700;
+    color: #e8c773;
     text-transform: uppercase;
     letter-spacing: 0.5px;
     animation: fadeInUp 0.3s ease-out;
@@ -1572,7 +1569,7 @@ body {
 
 .your-chips {
     font-size: 16px;
-    color: #ffd700;
+    color: #e8c773;
 }
 
 /* Actions */
@@ -1623,7 +1620,7 @@ body {
     gap: 12px;
     margin-top: 10px;
     padding: 10px 12px;
-    border: 1px solid rgba(255, 215, 0, 0.28);
+    border: 1px solid rgba(232, 199, 115, 0.28);
     border-radius: 10px;
     background: rgba(5, 12, 18, 0.72);
     box-shadow: 0 10px 24px rgba(0,0,0,0.24);
@@ -1631,7 +1628,7 @@ body {
 }
 
 .showdown-title {
-    color: #ffd700;
+    color: #e8c773;
     font-size: 13px;
     font-weight: 900;
     letter-spacing: 0.4px;
@@ -1671,7 +1668,7 @@ body {
 
 .timer-fill {
     height: 100%;
-    background: linear-gradient(90deg, #10b981 0%, #ffd700 50%, #ef4444 100%);
+    background: linear-gradient(90deg, #10b981 0%, #e8c773 50%, #ef4444 100%);
     transition: width 1s linear;
     border-radius: 2px;
 }
@@ -1694,7 +1691,7 @@ body {
     height: 20px;
     border: 3px solid rgba(255,255,255,0.3);
     border-radius: 50%;
-    border-top-color: #ffd700;
+    border-top-color: #e8c773;
     animation: spin 1s ease-in-out infinite;
     margin-right: 8px;
     vertical-align: middle;
@@ -1724,7 +1721,7 @@ body {
     width: 50px;
     height: 50px;
     border: 4px solid rgba(255,215,0,0.2);
-    border-top-color: #ffd700;
+    border-top-color: #e8c773;
     border-radius: 50%;
     animation: spin 1s linear infinite;
     margin-bottom: 16px;
@@ -1762,7 +1759,7 @@ body {
     -webkit-appearance: none;
     width: 20px;
     height: 20px;
-    background: #ffd700;
+    background: #e8c773;
     border-radius: 50%;
     cursor: pointer;
 }
@@ -1800,7 +1797,7 @@ body {
 .raise-amount-display {
     font-size: 20px;
     font-weight: 700;
-    color: #ffd700;
+    color: #e8c773;
 }
 
 .raise-actions {
@@ -1848,7 +1845,7 @@ body {
 }
 
 .result-content h2 {
-    color: #ffd700;
+    color: #e8c773;
     margin-bottom: 16px;
     font-size: 1.5rem;
 }
@@ -1906,7 +1903,7 @@ body {
 }
 
 .result-hand-name {
-    color: #ffd700;
+    color: #e8c773;
     font-size: 0.9rem;
     margin-top: 4px;
 }
@@ -1947,7 +1944,7 @@ body {
 }
 
 .stat-value.gold {
-    color: #ffd700;
+    color: #e8c773;
 }
 
 .hand-history {
@@ -1963,7 +1960,7 @@ body {
 }
 .hand-history h4 {
     margin: 0;
-    color: #ffd700;
+    color: #e8c773;
     font-size: 14px;
     font-weight: 700;
 }
@@ -2035,19 +2032,19 @@ body {
     gap: 10px;
     margin: 6px 12px 0;
     padding: 8px 14px;
-    border: 1px solid rgba(255, 215, 0, 0.32);
+    border: 1px solid rgba(232, 199, 115, 0.32);
     border-radius: 10px;
-    background: rgba(255, 215, 0, 0.08);
+    background: rgba(232, 199, 115, 0.08);
     font-size: 0.78rem;
     color: rgba(247, 243, 234, 0.86);
 }
 .tournament-banner[hidden] { display: none; }
-.tournament-banner strong { color: #ffd700; font-weight: 800; margin-left: 4px; }
+.tournament-banner strong { color: #e8c773; font-weight: 800; margin-left: 4px; }
 
 .opponent-personality {
     display: block;
     margin-top: 2px;
-    color: rgba(255, 215, 0, 0.7);
+    color: rgba(232, 199, 115, 0.7);
     font-size: 0.62rem;
     font-weight: 700;
     text-transform: uppercase;
@@ -2417,7 +2414,6 @@ body {
     --text: #f7f3ea;
     --muted: rgba(247, 243, 234, 0.68);
     --quiet: rgba(247, 243, 234, 0.46);
-    --gold: #d6b25e;
     --teal: #58d3ad;
     --blue: #72a9ff;
     --coral: #ff7a6e;
@@ -2506,7 +2502,7 @@ input {
 #join-screen h1,
 #lobby-screen h1 {
     color: var(--text);
-    font-family: Georgia, "Times New Roman", serif;
+    font-family: var(--font-display);
     font-size: clamp(2.8rem, 8vw, 5.3rem);
     font-weight: 500;
     line-height: 0.9;
@@ -2550,7 +2546,7 @@ input {
 }
 
 .start-form input:focus {
-    border-color: rgba(214, 178, 94, 0.62);
+    border-color: rgba(232, 199, 115, 0.62);
     background: rgba(8, 10, 13, 0.72);
 }
 
@@ -2593,8 +2589,8 @@ input {
 .raise-controls button:hover,
 .raise-controls button:focus-visible {
     transform: translateY(-2px);
-    border-color: rgba(214, 178, 94, 0.5) !important;
-    background: rgba(214, 178, 94, 0.1) !important;
+    border-color: rgba(232, 199, 115, 0.5) !important;
+    background: rgba(232, 199, 115, 0.1) !important;
     outline: none;
 }
 
@@ -2610,9 +2606,9 @@ input {
     align-items: center;
     margin: 4px;
     padding: 0 10px;
-    border: 1px solid rgba(214, 178, 94, 0.26);
+    border: 1px solid rgba(232, 199, 115, 0.26);
     border-radius: 999px;
-    background: rgba(214, 178, 94, 0.08);
+    background: rgba(232, 199, 115, 0.08);
     color: color-mix(in srgb, var(--gold) 70%, #ffffff);
     font-size: 0.74rem;
     font-weight: 800;
@@ -2645,7 +2641,7 @@ input {
 .game-header::before {
     content: "Texas Hold'em";
     color: var(--text);
-    font-family: Georgia, "Times New Roman", serif;
+    font-family: var(--font-display);
     font-size: clamp(1.9rem, 5vw, 4.2rem);
     font-weight: 500;
     line-height: 0.92;
@@ -2674,7 +2670,7 @@ input {
 
 .hand-info .phase {
     color: var(--gold);
-    font-family: Georgia, "Times New Roman", serif;
+    font-family: var(--font-display);
     font-size: clamp(1.45rem, 3.6vw, 2.4rem);
     font-weight: 500;
     line-height: 1;
@@ -2692,7 +2688,7 @@ input {
         radial-gradient(ellipse at 50% 55%, rgba(35, 92, 69, 0.94) 0%, rgba(20, 63, 47, 0.92) 48%, rgba(8, 22, 17, 0.96) 100%) !important;
     box-shadow:
         inset 0 0 86px rgba(0, 0, 0, 0.42),
-        inset 0 0 0 2px rgba(214, 178, 94, 0.1),
+        inset 0 0 0 2px rgba(232, 199, 115, 0.1),
         0 28px 90px rgba(0, 0, 0, 0.36);
     backdrop-filter: blur(18px);
     -webkit-backdrop-filter: blur(18px);
@@ -2700,11 +2696,11 @@ input {
 
 .felt-area::before {
     inset: clamp(18px, 4vw, 32px);
-    border: 1px solid rgba(214, 178, 94, 0.3);
+    border: 1px solid rgba(232, 199, 115, 0.3);
     border-radius: inherit;
     background:
         linear-gradient(135deg, rgba(88, 211, 173, 0.12), transparent 45%),
-        linear-gradient(315deg, rgba(214, 178, 94, 0.1), transparent 42%);
+        linear-gradient(315deg, rgba(232, 199, 115, 0.1), transparent 42%);
     opacity: 1;
 }
 
@@ -2744,9 +2740,9 @@ input {
 
 .pot .chips-display {
     padding: 8px 13px;
-    border: 1px solid rgba(214, 178, 94, 0.34);
+    border: 1px solid rgba(232, 199, 115, 0.34);
     border-radius: 999px;
-    background: rgba(214, 178, 94, 0.1);
+    background: rgba(232, 199, 115, 0.1);
     color: color-mix(in srgb, var(--gold) 72%, #ffffff);
     box-shadow: 0 18px 42px rgba(0, 0, 0, 0.24);
 }
@@ -2763,8 +2759,8 @@ input {
 }
 
 .opponent.active-turn {
-    border: 1px solid rgba(214, 178, 94, 0.7);
-    background: rgba(214, 178, 94, 0.13);
+    border: 1px solid rgba(232, 199, 115, 0.7);
+    background: rgba(232, 199, 115, 0.13);
 }
 
 .opponent-name {
@@ -2790,9 +2786,9 @@ input {
 .opponent-action-badge,
 .hand-strength-text,
 .ai-action-text {
-    border: 1px solid rgba(214, 178, 94, 0.34);
+    border: 1px solid rgba(232, 199, 115, 0.34);
     border-radius: 999px;
-    background: rgba(214, 178, 94, 0.1);
+    background: rgba(232, 199, 115, 0.1);
     color: color-mix(in srgb, var(--gold) 76%, #ffffff);
     box-shadow: 0 18px 42px rgba(0, 0, 0, 0.24);
 }
@@ -2803,8 +2799,8 @@ input {
 }
 
 .your-avatar-container .avatar {
-    border: 1px solid rgba(214, 178, 94, 0.72);
-    box-shadow: 0 0 22px rgba(214, 178, 94, 0.24);
+    border: 1px solid rgba(232, 199, 115, 0.72);
+    box-shadow: 0 0 22px rgba(232, 199, 115, 0.24);
 }
 
 .card-back {
@@ -2855,8 +2851,8 @@ input {
     border-radius: var(--radius);
     background:
         linear-gradient(90deg, rgba(8, 10, 13, 0.28) 0%, rgba(8, 10, 13, 0.08) 27%, transparent 42%, transparent 58%, rgba(8, 10, 13, 0.08) 73%, rgba(8, 10, 13, 0.28) 100%),
-        linear-gradient(90deg, rgba(214, 178, 94, 0.13) 1px, transparent 1px) 18% 0 / 1px 100% no-repeat,
-        linear-gradient(90deg, rgba(214, 178, 94, 0.13) 1px, transparent 1px) 82% 0 / 1px 100% no-repeat,
+        linear-gradient(90deg, rgba(232, 199, 115, 0.13) 1px, transparent 1px) 18% 0 / 1px 100% no-repeat,
+        linear-gradient(90deg, rgba(232, 199, 115, 0.13) 1px, transparent 1px) 82% 0 / 1px 100% no-repeat,
         linear-gradient(90deg, rgba(255, 255, 255, 0.028) 1px, transparent 1px) 0 0 / 42px 42px,
         radial-gradient(ellipse at 50% 0%, rgba(88, 211, 173, 0.13), transparent 44%),
         linear-gradient(145deg, rgba(255, 255, 255, 0.115), rgba(255, 255, 255, 0.028)),
@@ -2874,7 +2870,7 @@ input {
     border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: var(--radius);
     background:
-        linear-gradient(135deg, rgba(214, 178, 94, 0.12), transparent 36%),
+        linear-gradient(135deg, rgba(232, 199, 115, 0.12), transparent 36%),
         linear-gradient(315deg, rgba(114, 169, 255, 0.08), transparent 38%);
     pointer-events: none;
 }
@@ -2887,9 +2883,9 @@ input {
     z-index: 0;
     width: min(54vw, 620px);
     aspect-ratio: 5 / 1;
-    border: 1px solid rgba(214, 178, 94, 0.18);
+    border: 1px solid rgba(232, 199, 115, 0.18);
     border-radius: 50%;
-    background: radial-gradient(ellipse at center, rgba(214, 178, 94, 0.08), transparent 64%);
+    background: radial-gradient(ellipse at center, rgba(232, 199, 115, 0.08), transparent 64%);
     transform: translate(-50%, -50%);
     pointer-events: none;
 }
@@ -2913,7 +2909,7 @@ input {
     content: "";
     width: min(74px, 14vw);
     height: 1px;
-    background: rgba(214, 178, 94, 0.34);
+    background: rgba(232, 199, 115, 0.34);
 }
 
 .your-cards {
@@ -2929,7 +2925,7 @@ input {
     top: 50%;
     z-index: -1;
     color: rgba(247, 243, 234, 0.055);
-    font-family: Georgia, "Times New Roman", serif;
+    font-family: var(--font-display);
     font-size: clamp(4.4rem, 12vw, 8.5rem);
     line-height: 1;
     transform: translateY(-50%);
@@ -2944,7 +2940,7 @@ input {
 .your-cards::after {
     content: "♦";
     right: clamp(24px, 12vw, 170px);
-    color: rgba(214, 178, 94, 0.07);
+    color: rgba(232, 199, 115, 0.07);
 }
 
 .your-name {
@@ -2957,7 +2953,7 @@ input {
     min-width: min(100%, 260px);
     margin: 8px auto 14px;
     padding: 10px 14px;
-    border: 1px solid rgba(214, 178, 94, 0.22);
+    border: 1px solid rgba(232, 199, 115, 0.22);
     border-radius: var(--radius);
     background: rgba(8, 10, 13, 0.42);
     box-shadow: 0 16px 38px rgba(0, 0, 0, 0.2);
@@ -3060,7 +3056,7 @@ input {
 }
 
 .result-content h2 {
-    font-family: Georgia, "Times New Roman", serif;
+    font-family: var(--font-display);
     font-size: clamp(2rem, 6vw, 3.4rem);
     font-weight: 500;
     line-height: 0.95;
@@ -3090,7 +3086,7 @@ input {
 
 .loading-overlay .spinner,
 .loading-spinner {
-    border-color: rgba(214, 178, 94, 0.2);
+    border-color: rgba(232, 199, 115, 0.2);
     border-top-color: var(--gold);
 }
 
@@ -3216,16 +3212,15 @@ input {
     }
 }
 
-/* ===== POKER TABLE THEME ===== */
+/* ===== POKER TABLE THEME (live) — brand gold + fonts from /shared/casino-theme.css ===== */
 :root {
     --ink: #130d09;
     --panel: rgba(7, 14, 12, 0.84);
     --panel-strong: rgba(7, 14, 12, 0.92);
-    --line: rgba(244, 201, 106, 0.24);
+    --line: rgba(232, 199, 115, 0.24);
     --text: #fff8df;
     --muted: #d6ead5;
     --quiet: rgba(214, 234, 213, 0.72);
-    --gold: #f4c96a;
     --teal: #58d3ad;
     --blue: #72a9ff;
     --coral: #ff7a6e;
@@ -3246,10 +3241,10 @@ body {
     min-height: 100dvh;
     overflow: hidden;
     background:
-        radial-gradient(circle at 10% 10%, rgba(213, 164, 74, 0.16), transparent 28%),
+        radial-gradient(circle at 10% 10%, rgba(232, 199, 115, 0.16), transparent 28%),
         linear-gradient(135deg, #130d09 0%, #2f1a10 42%, #061711 100%);
     color: var(--text);
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-family: var(--font-body);
     line-height: 1.4;
     animation: pageFadeIn 360ms ease-out both;
 }
@@ -3304,9 +3299,9 @@ body {
 .game-header h1 {
     margin: 0;
     color: var(--text);
-    font-family: inherit;
+    font-family: var(--font-display);
     font-size: clamp(2.45rem, 5vw, 5.1rem);
-    font-weight: 800;
+    font-weight: 700;
     line-height: 0.88;
     letter-spacing: 0;
     text-shadow: 0 3px 0 rgba(0, 0, 0, 0.24);
@@ -3339,7 +3334,7 @@ body {
 
 .start-form input {
     min-height: 48px;
-    border: 1px solid rgba(244, 201, 106, 0.25);
+    border: 1px solid rgba(232, 199, 115, 0.25);
     border-radius: var(--radius);
     background: rgba(255, 255, 255, 0.045);
     color: var(--text);
@@ -3347,7 +3342,7 @@ body {
 }
 
 .start-form input:focus {
-    border-color: rgba(244, 201, 106, 0.72);
+    border-color: rgba(232, 199, 115, 0.72);
     background: rgba(255, 255, 255, 0.07);
     outline: none;
 }
@@ -3367,7 +3362,7 @@ body {
 
 .btn-primary {
     border: 1px solid transparent;
-    background: linear-gradient(180deg, #f4c96a, #d7a143) !important;
+    background: linear-gradient(180deg, #e8c773, #c89e4a) !important;
     color: #161b10;
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28);
 }
@@ -3405,9 +3400,9 @@ button:disabled {
     min-height: 30px;
     margin: 4px;
     padding: 0 10px;
-    border: 1px solid rgba(244, 201, 106, 0.25);
+    border: 1px solid rgba(232, 199, 115, 0.25);
     border-radius: 999px;
-    background: rgba(244, 201, 106, 0.1);
+    background: rgba(232, 199, 115, 0.1);
     color: #fff0bd;
     font-size: 0.72rem;
     font-weight: 900;
@@ -3444,7 +3439,7 @@ button:disabled {
     align-items: start;
     min-width: 132px;
     padding: 10px 12px;
-    border: 1px solid rgba(244, 201, 106, 0.4);
+    border: 1px solid rgba(232, 199, 115, 0.4);
     border-radius: var(--radius);
     background: rgba(8, 15, 13, 0.58);
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
@@ -3535,9 +3530,9 @@ button:disabled {
 
 .opponent.active-turn,
 .opponent.recent-ai-action {
-    border-color: rgba(244, 201, 106, 0.9);
-    background: rgba(244, 201, 106, 0.13);
-    box-shadow: 0 0 0 2px rgba(244, 201, 106, 0.2), 0 0 22px rgba(244, 201, 106, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    border-color: rgba(232, 199, 115, 0.9);
+    background: rgba(232, 199, 115, 0.13);
+    box-shadow: 0 0 0 2px rgba(232, 199, 115, 0.2), 0 0 22px rgba(232, 199, 115, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 
 .opponent-name,
@@ -3570,9 +3565,9 @@ button:disabled {
 .opponent-action-badge,
 .hand-strength-text,
 .ai-action-text {
-    border: 1px solid rgba(244, 201, 106, 0.34);
+    border: 1px solid rgba(232, 199, 115, 0.34);
     border-radius: 999px;
-    background: rgba(244, 201, 106, 0.1);
+    background: rgba(232, 199, 115, 0.1);
     color: #fff0bd;
     box-shadow: 0 12px 28px rgba(0, 0, 0, 0.22);
 }
@@ -3652,14 +3647,14 @@ button:disabled {
 
 .your-cards.active-turn .card {
     border: 0;
-    box-shadow: 0 0 0 3px rgba(244, 201, 106, 0.58), 0 13px 24px rgba(0, 0, 0, 0.38);
+    box-shadow: 0 0 0 3px rgba(232, 199, 115, 0.58), 0 13px 24px rgba(0, 0, 0, 0.38);
 }
 
 .your-info {
     min-width: 180px;
     margin: 8px auto 14px;
     padding: 10px 12px;
-    border: 1px solid rgba(244, 201, 106, 0.25);
+    border: 1px solid rgba(232, 199, 115, 0.25);
     border-radius: var(--radius);
     background: rgba(255, 255, 255, 0.045);
 }
@@ -3689,15 +3684,15 @@ button:disabled {
 }
 
 .btn-call {
-    border-color: rgba(244, 201, 106, 0.35);
-    background: rgba(244, 201, 106, 0.11);
+    border-color: rgba(232, 199, 115, 0.35);
+    background: rgba(232, 199, 115, 0.11);
     color: #fff0bd;
 }
 
 .btn-raise,
 #btn-confirm-raise {
     border-color: transparent;
-    background: linear-gradient(180deg, #f4c96a, #d7a143);
+    background: linear-gradient(180deg, #e8c773, #c89e4a);
     color: #161b10;
 }
 
@@ -3712,7 +3707,7 @@ button:disabled {
 .overlay,
 .loading-overlay {
     background:
-        radial-gradient(circle at 10% 10%, rgba(213, 164, 74, 0.16), transparent 28%),
+        radial-gradient(circle at 10% 10%, rgba(232, 199, 115, 0.16), transparent 28%),
         rgba(6, 15, 11, 0.9);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
@@ -4319,8 +4314,8 @@ button:disabled {
 }
 
 .showdown-panel {
-    --showdown-accent: var(--gold, #f4c96a);
-    --showdown-accent-soft: rgba(244, 201, 106, 0.18);
+    --showdown-accent: var(--gold, #e8c773);
+    --showdown-accent-soft: rgba(232, 199, 115, 0.18);
 }
 
 .showdown-dismiss {
@@ -4338,8 +4333,8 @@ button:disabled {
 }
 
 .showdown-panel.showdown-chop {
-    --showdown-accent: var(--gold, #f4c96a);
-    --showdown-accent-soft: rgba(244, 201, 106, 0.2);
+    --showdown-accent: var(--gold, #e8c773);
+    --showdown-accent-soft: rgba(232, 199, 115, 0.2);
 }
 
 .showdown-panel.showdown-animate {

@@ -529,58 +529,6 @@ const BET_INFO = {
     hard10: { rule: "Wins if 5-5 rolls before any other 10 or any 7.", payout: "7:1", edge: "11.11%" }
 };
 
-const BET_PRESETS = {
-    passOdds: {
-        label: "$5 Pass + Odds",
-        // Only the pass line is valid pre-point. Odds are taken via Max Odds once a point hits.
-        bets: { passLine: 5 },
-        comeOutOnly: true,
-        followUp: "After the point, tap Max Odds to back this bet."
-    },
-    field: {
-        label: "$5 Field",
-        bets: { field: 5 }
-    },
-    place68: {
-        label: "Place 6 & 8",
-        bets: { place6: 6, place8: 6 },
-        pointOnly: true
-    },
-    ironCross: {
-        label: "Iron Cross",
-        bets: { field: 5, place5: 5, place6: 6, place8: 6 },
-        pointOnly: true
-    }
-};
-
-function loadPreset(name) {
-    const preset = BET_PRESETS[name];
-    if (!preset) return;
-    if (preset.comeOutOnly && !isComeOutRoll) {
-        setStatus(`${preset.label} works best on come-out. Wait for the next roll.`);
-        return;
-    }
-    if (preset.pointOnly && isComeOutRoll) {
-        setStatus(`${preset.label} needs a point. Roll the pass line first.`);
-        return;
-    }
-    let total = 0;
-    Object.values(preset.bets).forEach((v) => total += v);
-    if (total > balance) {
-        setStatus(`Need $${total} for ${preset.label}, only have $${balance}.`);
-        return;
-    }
-    Object.entries(preset.bets).forEach(([bt, amt]) => {
-        if (bets[bt] !== undefined) {
-            bets[bt] = (bets[bt] || 0) + amt;
-            balance -= amt;
-        }
-    });
-    updateBalance();
-    updateAllDisplays();
-    setStatus(preset.followUp || `${preset.label} loaded.`);
-}
-
 function repeatLastBets() {
     if (!lastBets) return;
     if (hasLockedContractBets()) {

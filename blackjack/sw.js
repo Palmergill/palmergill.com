@@ -5,8 +5,9 @@ const STATIC_ASSETS = [
     '/blackjack/index.html',
     '/blackjack/app.js?v=11',
     '/blackjack/blackjackGame.js',
-    '/blackjack/style.css?v=9',
+    '/blackjack/style.css?v=10',
     '/blackjack/manifest.json',
+    '/shared/casino-theme.css?v=1',
     '/shared/casino-profile.js?v=1',
     '/shared/site-nav.css?v=6',
     '/shared/site-nav.js?v=6'
