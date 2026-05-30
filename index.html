@@ -170,6 +170,23 @@
             width: min(720px, 100%);
         }
 
+        .hero-media {
+            display: none;
+        }
+
+        .hero-photo {
+            width: 100%;
+            max-height: min(620px, 68vh);
+            aspect-ratio: 3 / 4;
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            border-radius: var(--radius);
+            object-fit: cover;
+            object-position: center;
+            box-shadow:
+                0 24px 72px rgba(0, 0, 0, 0.38),
+                0 0 0 1px rgba(214, 178, 94, 0.08);
+        }
+
         .eyebrow {
             display: flex;
             align-items: center;
@@ -641,6 +658,24 @@
             transform: translateY(0);
         }
 
+        @media (min-width: 960px) {
+            .hero-inner {
+                grid-template-columns: minmax(0, 0.95fr) minmax(300px, 390px);
+                align-items: center;
+                gap: clamp(48px, 7vw, 92px);
+            }
+
+            .hero-content {
+                width: min(680px, 100%);
+            }
+
+            .hero-media {
+                display: block;
+                justify-self: end;
+                width: min(34vw, 390px);
+            }
+        }
+
         @media (max-width: 899px) {
             .hero {
                 padding: 58px 18px 36px;
@@ -763,6 +798,9 @@
                         </a>
                     </div>
                 </div>
+                <figure class="hero-media">
+                    <img class="hero-photo" src="/assets/palmer-lake.jpeg" alt="Palmer Gill at a lake" decoding="async" fetchpriority="high">
+                </figure>
             </div>
         </header>
 
