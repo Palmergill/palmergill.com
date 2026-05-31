@@ -1,0 +1,347 @@
+================================================================================
+                  TEXAS HOLD'EM - COMPLETE RULES REFERENCE
+================================================================================
+
+Texas Hold'em is the most popular variant of poker. It is a community-card
+game in which each player combines two private cards with five shared cards to
+make the best possible five-card poker hand. This document covers the full
+rules: setup, the order of play, betting, the showdown, hand rankings, and the
+common procedural rules that govern real games.
+
+
+--------------------------------------------------------------------------------
+1. OBJECTIVE
+--------------------------------------------------------------------------------
+
+The goal is to win chips. There are two ways to win a hand:
+
+  (a) Have the best five-card poker hand at showdown, OR
+  (b) Force every other player to fold before showdown.
+
+Both are equally legitimate. The winner takes the pot - all the chips wagered
+by all players during the hand.
+
+
+--------------------------------------------------------------------------------
+2. EQUIPMENT AND TABLE
+--------------------------------------------------------------------------------
+
+  - A standard 52-card deck (no jokers).
+  - Typically 2 to 10 players per table.
+  - Poker chips for betting.
+  - A "dealer button" (a marker) that indicates the nominal dealer position.
+    It rotates one seat clockwise after every hand.
+
+A game with only two players is called "heads-up" and has special blind rules
+(see Section 11).
+
+
+--------------------------------------------------------------------------------
+3. KEY TERMS
+--------------------------------------------------------------------------------
+
+  Hole cards   - The two private cards dealt face-down to each player.
+  Community    - The five shared cards dealt face-up in the middle (the
+  cards          "board"). Every player may use them.
+  The Button   - The marker showing the dealer position; it determines the
+                 order of blinds and action.
+  Blinds       - Forced bets posted before cards are dealt, used to seed the
+                 pot and create action.
+  Small Blind  - The smaller forced bet, posted by the player to the immediate
+                 left (clockwise) of the button.
+  Big Blind    - The larger forced bet (usually double the small blind),
+                 posted by the player to the left of the small blind.
+  The Pot      - The total chips wagered, awarded to the winner(s).
+  Street       - A betting round (pre-flop, flop, turn, river).
+  Showdown     - The reveal of hands at the end to determine the winner.
+  Muck         - The discard pile; a folded or discarded hand is "mucked"
+                 and is dead.
+
+
+--------------------------------------------------------------------------------
+4. THE FOUR BETTING ROUNDS (ORDER OF PLAY)
+--------------------------------------------------------------------------------
+
+A hand of Texas Hold'em proceeds through four betting rounds:
+
+  PRE-FLOP -> FLOP -> TURN -> RIVER -> (SHOWDOWN)
+
+Step-by-step:
+
+  1. POST THE BLINDS
+     The small blind and big blind are posted before any cards are dealt.
+
+  2. DEAL HOLE CARDS
+     Each player is dealt two cards face-down, one at a time, starting with
+     the small blind and moving clockwise.
+
+  3. PRE-FLOP BETTING
+     The first betting round. Action begins with the player to the left of
+     the big blind ("under the gun") and proceeds clockwise. The big blind
+     acts last and has the "option" to raise even if no one raised before.
+
+  4. THE FLOP
+     The dealer "burns" one card (discards the top card face-down), then
+     deals three community cards face-up. A betting round follows, starting
+     with the first active player to the left of the button.
+
+  5. THE TURN (Fourth Street)
+     Burn one card, then deal the fourth community card face-up. Another
+     betting round follows, again starting left of the button.
+
+  6. THE RIVER (Fifth Street)
+     Burn one card, then deal the fifth and final community card face-up.
+     The final betting round follows.
+
+  7. SHOWDOWN
+     If two or more players remain after the river betting, hands are
+     revealed and the best hand wins (see Section 7).
+
+Note: On the flop, turn, and river, the first player still in the hand seated
+clockwise from the button acts first. (Pre-flop is the exception - action
+starts left of the big blind.)
+
+
+--------------------------------------------------------------------------------
+5. BETTING ACTIONS
+--------------------------------------------------------------------------------
+
+On your turn you may take one of the following actions:
+
+  CHECK   - Decline to bet while keeping your hand, passing the action to the
+            next player. Only allowed if no bet has been made in the current
+            round.
+
+  BET     - Put chips into the pot when no one has yet bet this round.
+
+  CALL    - Match the current bet to stay in the hand.
+
+  RAISE   - Increase the current bet. Other players must then call the new
+            amount, raise again, or fold.
+
+  FOLD    - Surrender your hand and forfeit any chips already committed. You
+            are out of the hand and cannot win the pot.
+
+All chips placed in the pot stay there until the hand is complete.
+
+
+--------------------------------------------------------------------------------
+6. BETTING LIMITS / GAME FORMATS
+--------------------------------------------------------------------------------
+
+Texas Hold'em is played in three main betting structures:
+
+  NO-LIMIT (NL)
+    The most common format (used in the WSOP Main Event). A player may bet
+    any amount up to all of their chips at any time ("all-in"). The minimum
+    raise must be at least the size of the previous bet or raise.
+
+  POT-LIMIT (PL)
+    The maximum bet or raise is the current size of the pot. The minimum
+    raise rules still apply.
+
+  FIXED-LIMIT (FL)
+    Bets and raises are capped at fixed increments. The "small bet" is used
+    pre-flop and on the flop; the "big bet" (double) is used on the turn and
+    river. Typically a maximum of one bet plus three raises per round.
+
+MINIMUM RAISE RULE (No-Limit / Pot-Limit):
+  A raise must be at least equal to the previous bet or raise on that street.
+  For example, if the bet is 10 and someone raises to 25 (a raise of 15), the
+  next raise must be to at least 25.
+
+  All-in exception: If a player goes all-in for less than the minimum raise,
+  it doesn’t reopen the action — players who already acted can’t re-raise unless
+  someone else makes a full raise.
+
+ALL-IN:
+  If a player does not have enough chips to call, they may go all-in for the
+  amount they have. A "side pot" is created for the remaining players who have
+  more chips to wager. A player can only win the portion of the pot they have
+  contributed to (the main pot); side pots are contested only by players who
+  put chips into them.
+
+
+--------------------------------------------------------------------------------
+7. THE SHOWDOWN
+--------------------------------------------------------------------------------
+
+If two or more players remain after the final (river) betting round, there is
+a showdown:
+
+  - The last player to bet or raise on the river must show their cards first.
+  - If there was no bet on the river (everyone checked), the first active
+    player clockwise from the button shows first.
+  - Players reveal their two hole cards; the dealer determines the best
+    five-card hand for each.
+
+MAKING YOUR HAND:
+  You make the best possible five-card hand using ANY combination of your two
+  hole cards and the five community cards. You may use:
+    - Both hole cards + three community cards,
+    - One hole card + four community cards, or
+    - Zero hole cards + all five community cards ("playing the board").
+
+The player with the best five-card hand wins the pot.
+
+TIES (SPLIT POT):
+  If two or more players have identical best hands, the pot is split equally
+  among them. All suits are equal in Hold'em - there is no suit ranking, so
+  suits never break a tie. Ties are broken by "kickers" (the highest unused
+  cards) when hands are otherwise equal in rank.
+
+After the pot is awarded, the button moves one seat clockwise and a new hand
+begins.
+
+
+--------------------------------------------------------------------------------
+8. HAND RANKINGS (HIGH TO LOW)
+--------------------------------------------------------------------------------
+
+From strongest to weakest:
+
+  1. ROYAL FLUSH
+     A, K, Q, J, 10, all of the same suit. The best possible hand.
+
+  2. STRAIGHT FLUSH
+     Five cards in sequence, all the same suit (e.g., 6-7-8-9-10 of hearts).
+
+  3. FOUR OF A KIND (Quads)
+     Four cards of the same rank (e.g., four Kings).
+
+  4. FULL HOUSE
+     Three of a kind plus a pair (e.g., three 9s and two 4s).
+
+  5. FLUSH
+     Five cards of the same suit, not in sequence.
+
+  6. STRAIGHT
+     Five cards in sequence, mixed suits (e.g., 5-6-7-8-9).
+
+  7. THREE OF A KIND (Trips / Set)
+     Three cards of the same rank.
+
+  8. TWO PAIR
+     Two cards of one rank plus two cards of another rank.
+
+  9. ONE PAIR
+     Two cards of the same rank.
+
+  10. HIGH CARD
+     None of the above; the hand is valued by its highest card.
+
+NOTES ON STRAIGHTS:
+  - The Ace can be high (10-J-Q-K-A) or low (A-2-3-4-5, the "wheel").
+  - The Ace cannot "wrap around" (e.g., Q-K-A-2-3 is NOT a straight).
+
+KICKERS:
+  When two players share the same hand rank, the highest side card(s) decide
+  the winner. Example: A-A-K-9-5 beats A-A-Q-J-10 because the King kicker
+  outranks the Queen.
+
+
+--------------------------------------------------------------------------------
+9. TABLE POSITIONS
+--------------------------------------------------------------------------------
+
+Position relative to the button matters because acting later gives you more
+information. Common labels:
+
+  Button (BTN)       - The dealer position; acts last post-flop. Best position.
+  Small Blind (SB)   - Immediately left of the button.
+  Big Blind (BB)     - Immediately left of the small blind.
+  Under the Gun (UTG)- First to act pre-flop, immediately left of the BB.
+  Middle Position    - Seats between early and late position.
+  Cutoff (CO)        - The seat to the right of the button.
+
+Acting later in the hand is an advantage, so late position (cutoff, button)
+is considered the strongest.
+
+
+--------------------------------------------------------------------------------
+10. THE DEALER BUTTON AND BLIND ROTATION
+--------------------------------------------------------------------------------
+
+  - The button marks the nominal dealer and rotates clockwise one seat after
+    each hand.
+  - The small blind and big blind rotate with it, so every player pays the
+    blinds in turn over time.
+  - In a casino, a house dealer physically deals all hands, but the button
+    still determines who acts and who posts the blinds.
+
+
+--------------------------------------------------------------------------------
+11. HEADS-UP (TWO-PLAYER) RULES
+--------------------------------------------------------------------------------
+
+When only two players remain (or in a heads-up game):
+
+  - The player on the button posts the SMALL blind; the other player posts the
+    big blind.
+  - Pre-flop, the button (small blind) acts FIRST.
+  - On all later streets (flop, turn, river), the button acts LAST.
+
+This is the reverse of the usual order and is a common point of confusion.
+
+
+--------------------------------------------------------------------------------
+12. COMMON PROCEDURAL RULES
+--------------------------------------------------------------------------------
+
+These govern what happens when play does not go smoothly:
+
+  BURN CARDS
+    Before the flop, turn, and river, the dealer burns (discards face-down)
+    the top card of the deck to help prevent cheating.
+
+  DEAD HAND
+    A hand can be declared dead if a player acts out of turn improperly, has
+    the wrong number of cards, or exposes their cards before the action is
+    complete (depending on house rules).
+
+  THE MUCK
+    A folded hand placed in the muck is dead and cannot be retrieved - even
+    if the player later realizes it would have won. At showdown, if cards
+    touch the muck before being read, the hand may be ruled dead (house
+    rules vary).
+
+  ACTING IN TURN
+    Players must act in clockwise order. Acting out of turn can bind you to
+    that action or be penalized, depending on house rules.
+
+  STRING BETS
+    A bet or raise must be made in a single motion or with a clear verbal
+    declaration of the amount. Reaching back to your stack for more chips
+    after placing some (a "string bet") is not allowed.
+
+  VERBAL DECLARATIONS
+    A clear verbal statement of action (e.g., "raise," "call," "fold") is
+    binding.
+
+  TABLE STAKES
+    You can only wager the chips you have on the table at the start of a
+    hand. You cannot add money mid-hand. This is why all-in and side pots
+    exist.
+
+  PROTECTING YOUR HAND
+    Players are generally responsible for protecting their own cards (often
+    by placing a chip on top). An unprotected hand fouled by the dealer or
+    another player may have limited recourse.
+
+
+--------------------------------------------------------------------------------
+13. QUICK SUMMARY OF A HAND
+--------------------------------------------------------------------------------
+
+  1. Post small and big blinds.
+  2. Deal two hole cards to each player.
+  3. Pre-flop betting (starts left of big blind).
+  4. Burn + deal the flop (3 cards); betting round.
+  5. Burn + deal the turn (1 card); betting round.
+  6. Burn + deal the river (1 card); betting round.
+  7. Showdown: best five-card hand wins; ties split the pot.
+  8. Move the button one seat clockwise; deal the next hand.
+
+================================================================================
+                              END OF RULES
+================================================================================

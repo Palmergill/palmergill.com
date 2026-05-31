@@ -1,0 +1,332 @@
+================================================================================
+           BLACKJACK - COMPLETE RULES, VEGAS ODDS & BASIC STRATEGY
+================================================================================
+
+Blackjack (also called "21") is a card game played against the dealer (the
+house). Your goal is to beat the dealer's hand without your total going over
+21. This document covers the full rules, card values, the flow of a hand, all
+player actions, dealer rules, the rule variations that change the odds,
+payouts and house edge, and a complete basic-strategy chart.
+
+Payouts and edges below reflect STANDARD Las Vegas rules. The exact house edge
+depends on the specific rule set at your table, so the key variations are
+flagged throughout. Always check the table placard before sitting down.
+
+
+--------------------------------------------------------------------------------
+1. OBJECTIVE
+--------------------------------------------------------------------------------
+
+Beat the dealer by doing one of the following:
+  - Having a hand total closer to 21 than the dealer, without exceeding 21.
+  - Having the dealer "bust" (exceed 21) while you do not.
+  - Drawing a "blackjack" (an Ace + a 10-value card on your first two cards)
+    when the dealer does not.
+
+IMPORTANT: You are NOT trying to get as close to 21 as possible for its own
+sake - you are trying to beat the DEALER. If you bust, you lose immediately,
+even if the dealer busts afterward. This "player acts first" rule is the main
+source of the house's advantage.
+
+
+--------------------------------------------------------------------------------
+2. CARD VALUES
+--------------------------------------------------------------------------------
+
+  - Number cards 2-10:   face value (a 7 is worth 7).
+  - Face cards (J, Q, K): worth 10 each.
+  - Ace:                 worth 1 OR 11, whichever helps the hand.
+
+  "HARD" vs "SOFT" hands:
+    - A SOFT hand contains an Ace counted as 11 (e.g., A-6 = "soft 17").
+      It cannot bust on the next card because the Ace can drop to 1.
+    - A HARD hand has no Ace, or an Ace forced to count as 1 (e.g., 10-6 =
+      "hard 16," or A-6-10 = hard 17).
+
+Suits do not matter in blackjack.
+
+
+--------------------------------------------------------------------------------
+3. THE TABLE AND DECKS
+--------------------------------------------------------------------------------
+
+  - Played with 1 to 8 decks. Cards are usually dealt from a "shoe."
+    Common configurations: single deck, double deck, and 6- or 8-deck shoes.
+  - A semicircular table seats up to 7 players, each with a betting spot.
+  - The dealer stands opposite the players and plays last.
+  - FEWER DECKS = slightly better for the player (single deck is ~0.15%
+    better than a 6-deck game, all else equal). But a single-deck game that
+    pays 6:5 is WORSE than a 6-deck game paying 3:2 - the payout matters more.
+
+  WATCH FOR: Continuous Shuffle Machines (CSMs) reshuffle after every hand and
+  prevent card counting; they don't change basic-strategy odds much but speed
+  up the game (more hands = more exposure to the edge).
+
+
+--------------------------------------------------------------------------------
+4. THE FLOW OF A HAND
+--------------------------------------------------------------------------------
+
+  1. Players place their bets in the betting circle.
+  2. The dealer deals two cards to each player (usually face-up) and two to
+     themselves - one face-up ("the upcard") and one face-down ("the hole
+     card").
+  3. If the dealer's upcard is an Ace (or sometimes a 10), they check for
+     blackjack / offer insurance (see Section 8).
+  4. Each player acts in turn (clockwise), choosing to hit, stand, double,
+     split, or surrender (see Section 5) until they stand or bust.
+  5. After all players act, the dealer reveals the hole card and plays their
+     hand by fixed rules (see Section 6).
+  6. Hands are settled: winners are paid, losers' bets are collected, ties
+     ("pushes") return the player's bet.
+
+
+--------------------------------------------------------------------------------
+5. PLAYER ACTIONS
+--------------------------------------------------------------------------------
+
+  HIT
+    Take another card. You can keep hitting until you stand or bust.
+    Hand signal: tap the table.
+
+  STAND
+    Take no more cards; end your turn.
+    Hand signal: wave a flat hand over your cards.
+
+  DOUBLE DOWN
+    Double your original bet in exchange for exactly ONE more card, then you
+    must stand. Best used on strong starting totals (9, 10, 11).
+    Hand signal: place an equal bet beside the original and point one finger.
+    - "Double After Split" (DAS) - whether you can double on a hand created by
+      splitting - is a rule that varies (DAS is player-friendly).
+
+  SPLIT
+    If your first two cards are a pair (e.g., two 8s), you may split them into
+    two separate hands, each with its own bet equal to the original. You then
+    play each hand independently.
+    - Most casinos allow re-splitting up to 3 or 4 total hands.
+    - SPLIT ACES are special: you usually get only ONE card per Ace and cannot
+      hit again, and a 10 on a split Ace counts as 21, NOT a blackjack (pays
+      1:1, not 3:2).
+    Hand signal: place a second equal bet and make a "V"/peace sign.
+
+  SURRENDER (not offered at every table)
+    Give up your hand and forfeit HALF your bet, keeping the other half.
+    - "Late surrender" (the common form): allowed only after the dealer checks
+      for blackjack.
+    - Correct surrender plays lower the house edge by ~0.07-0.10%.
+    Verbal: say "surrender" (and often draw a finger across the felt).
+
+
+--------------------------------------------------------------------------------
+6. DEALER RULES (FIXED - NO CHOICES)
+--------------------------------------------------------------------------------
+
+The dealer has no decisions; they follow set rules:
+
+  - The dealer must HIT until reaching a total of 17 or more.
+  - The dealer must STAND on 17 or higher.
+  - The critical variation is SOFT 17 (a 17 containing an Ace as 11, like A-6):
+        S17 - "Dealer Stands on Soft 17": better for the player.
+        H17 - "Dealer Hits Soft 17": adds about 0.2% to the house edge.
+    Look for "Dealer Stands on All 17s" on the table sign - it's the better
+    game.
+
+  - If the dealer busts, all remaining players (who haven't busted) win.
+  - The dealer cannot split, double, or surrender.
+
+
+--------------------------------------------------------------------------------
+7. BLACKJACK (A "NATURAL") AND PAYOUTS
+--------------------------------------------------------------------------------
+
+A "blackjack" or "natural" is an Ace plus any 10-value card as your first two
+cards. It beats any other 21 (e.g., a three-card 21).
+
+  STANDARD WIN (any winning hand): pays 1:1 (even money).
+  BLACKJACK: pays 3:2  (bet $10, win $15)  <- THE STANDARD VEGAS PAYOUT
+  PUSH (tie with the dealer): your bet is returned, no win or loss.
+
+  *** AVOID 6:5 TABLES ***
+  Some tables (often single-deck or low-limit) pay only 6:5 on blackjack
+  (bet $10, win $12). This single change adds roughly 1.3-1.4% to the house
+  edge and turns one of the best casino games into a bad one. Always look for
+  "BLACKJACK PAYS 3 TO 2." Avoid "pays 6 to 5" and "blackjack pays even money."
+
+
+--------------------------------------------------------------------------------
+8. INSURANCE AND EVEN MONEY
+--------------------------------------------------------------------------------
+
+  INSURANCE
+    Offered when the dealer's upcard is an Ace. You may make a side bet (up to
+    half your original bet) that the dealer has a 10 in the hole for a
+    blackjack. Insurance pays 2:1 if the dealer has blackjack.
+    - House edge on insurance is high (~7% in a 6-deck game).
+    - RECOMMENDATION: Skip insurance. It is a losing bet for basic-strategy
+      players (only profitable for card counters tracking a 10-rich deck).
+
+  EVEN MONEY
+    If YOU have a blackjack and the dealer shows an Ace, you may be offered
+    "even money" - a guaranteed 1:1 payout instead of risking a push.
+    - This is mathematically identical to taking insurance on your blackjack.
+    - RECOMMENDATION: Decline. Taking your 3:2 payout is worth more over time.
+
+
+--------------------------------------------------------------------------------
+9. HOUSE EDGE - HOW THE RULES STACK UP
+--------------------------------------------------------------------------------
+
+With perfect basic strategy, blackjack has one of the lowest house edges in
+the casino. The exact figure depends on the rule mix:
+
+  RULE SET                                                  APPROX. HOUSE EDGE
+  -------------------------------------------------------   ------------------
+  Single deck, S17, DAS, late surrender (best common case)        ~0.28%
+  6 decks, S17, DAS, surrender (favorable Strip rules)            ~0.43%
+  8 decks, H17, limited doubling (average casino rules)           ~0.65%
+  Any of the above but 6:5 blackjack instead of 3:2              +~1.3-1.4%
+
+RULE IMPACTS (each relative to a baseline game):
+  - Blackjack pays 6:5 instead of 3:2:        +~1.39%  (worst single change)
+  - Dealer hits soft 17 (H17):                +~0.20%
+  - No double after split (no DAS):           +~0.14%
+  - No surrender allowed:                     +~0.08%
+  - Restricting doubles to 10/11 only:        +~0.18%
+  - 8 decks vs 1 deck:                         +~0.15% (worse with more decks)
+  Player-friendly rules (3:2, S17, DAS, surrender) make these small edges add
+  up in YOUR favor.
+
+TYPICAL OUTCOME FREQUENCIES (6-deck, basic strategy):
+  - Player wins:  ~42% of hands
+  - Dealer wins:  ~49% of hands
+  - Pushes:       ~8-9% of hands
+  The 3:2 bonus on blackjacks (and doubles/splits) is what closes most of the
+  gap between winning 42% and breaking even.
+
+
+--------------------------------------------------------------------------------
+10. BASIC STRATEGY CHART
+--------------------------------------------------------------------------------
+
+Basic strategy is the mathematically optimal play for every hand. The chart
+below is for the common 4-8 DECK game, DEALER STANDS ON SOFT 17 (S17), DOUBLE
+AFTER SPLIT ALLOWED. Read your hand down the left, the dealer's upcard across
+the top.
+
+KEY:  H = Hit   S = Stand   D = Double (else Hit)   Ds = Double (else Stand)
+      P = Split   SU = Surrender (else Hit)
+
+------------------------------ HARD TOTALS ------------------------------------
+  Your        Dealer Upcard
+  Hand   2    3    4    5    6    7    8    9    10   A
+  ----  ---  ---  ---  ---  ---  ---  ---  ---  ---  ---
+   8     H    H    H    H    H    H    H    H    H    H
+   9     H    D    D    D    D    H    H    H    H    H
+  10     D    D    D    D    D    D    D    D    H    H
+  11     D    D    D    D    D    D    D    D    D    H
+  12     H    H    S    S    S    H    H    H    H    H
+  13     S    S    S    S    S    H    H    H    H    H
+  14     S    S    S    S    S    H    H    H    H    H
+  15     S    S    S    S    S    H    H    H   SU    H
+  16     S    S    S    S    S    H    H   SU   SU   SU
+  17+    S    S    S    S    S    S    S    S    S    S
+
+------------------------------ SOFT TOTALS ------------------------------------
+  Your        Dealer Upcard
+  Hand   2    3    4    5    6    7    8    9    10   A
+  ----  ---  ---  ---  ---  ---  ---  ---  ---  ---  ---
+  A,2    H    H    H    D    D    H    H    H    H    H
+  A,3    H    H    H    D    D    H    H    H    H    H
+  A,4    H    H    D    D    D    H    H    H    H    H
+  A,5    H    H    D    D    D    H    H    H    H    H
+  A,6    H    D    D    D    D    H    H    H    H    H
+  A,7    S   Ds   Ds   Ds   Ds    S    S    H    H    H
+  A,8    S    S    S    S    S    S    S    S    S    S
+  A,9    S    S    S    S    S    S    S    S    S    S
+
+--------------------------------- PAIRS ---------------------------------------
+  Your        Dealer Upcard
+  Pair   2    3    4    5    6    7    8    9    10   A
+  ----  ---  ---  ---  ---  ---  ---  ---  ---  ---  ---
+  2,2    P    P    P    P    P    P    H    H    H    H
+  3,3    P    P    P    P    P    P    H    H    H    H
+  4,4    H    H    H    P    P    H    H    H    H    H
+  5,5    D    D    D    D    D    D    D    D    H    H   (treat as a 10)
+  6,6    P    P    P    P    P    H    H    H    H    H
+  7,7    P    P    P    P    P    P    H    H    H    H
+  8,8    P    P    P    P    P    P    P    P    P    P   (always split)
+  9,9    P    P    P    P    P    S    P    P    S    S
+  10,10  S    S    S    S    S    S    S    S    S    S   (never split)
+  A,A    P    P    P    P    P    P    P    P    P    P   (always split)
+
+EASY-TO-REMEMBER RULES OF THUMB:
+  - Always split Aces and 8s; never split 10s or 5s.
+  - Stand on hard 17 or more, always.
+  - Double hard 11 (except vs Ace in S17); double 10 except vs 10/Ace.
+  - Hard 12-16 is the "stiff" zone: stand vs dealer 2-6, hit vs 7-Ace.
+  - With a soft 18 (A,7): stand vs 2/7/8, double vs 3-6, hit vs 9/10/A.
+  - Never take insurance.
+
+H17 DEVIATIONS (if the dealer HITS soft 17, change these):
+  - Hard 11 vs Ace:  Double (instead of Hit).
+  - Soft 19 (A,8) vs 6:  Double (instead of Stand).
+  - Hard 15 vs Ace:  Surrender.
+  - Hard 17 vs Ace:  Surrender.
+  - Pair 8,8 vs Ace: Surrender (if allowed) instead of Split.
+
+
+--------------------------------------------------------------------------------
+11. CARD COUNTING (BRIEF NOTE)
+--------------------------------------------------------------------------------
+
+Basic strategy minimizes the house edge but does not eliminate it. Card
+counting tracks the ratio of high cards (10s, Aces) to low cards remaining; a
+deck rich in high cards favors the player, who then raises bets and adjusts
+strategy. Done correctly it can flip the edge to the player by ~0.5-1.5%.
+
+  - Card counting is NOT illegal, but casinos are private businesses and may
+    bar or shuffle on players they suspect of counting.
+  - It does not work against Continuous Shuffle Machines.
+  - It requires significant practice, bankroll, and discipline to be
+    profitable; it is not a casual edge.
+
+
+--------------------------------------------------------------------------------
+12. TABLE ETIQUETTE
+--------------------------------------------------------------------------------
+
+  - Use HAND SIGNALS, not just words - cameras ("the eye in the sky") need to
+    see your decisions. Tap to hit, wave to stand.
+  - Don't touch your cards in a face-up shoe game; in a hand-held (single/
+    double deck) game, handle them with one hand only.
+  - Don't touch your chips once the cards are dealt and the bet is live.
+  - Place doubles/splits beside the original bet, not on top of it.
+  - Let the dealer make change; don't hand them cash directly - set it down.
+  - Joining mid-shoe is fine, but some players are superstitious about new
+    players "changing the flow"; ignore this - it has zero effect on odds.
+
+
+--------------------------------------------------------------------------------
+13. QUICK SUMMARY OF A HAND
+--------------------------------------------------------------------------------
+
+  1. Place your bet.
+  2. Receive two cards; dealer gets one up, one down.
+  3. If dealer shows an Ace, decline insurance.
+  4. Act on your hand using basic strategy: hit, stand, double, split, or
+     surrender. Bust = instant loss.
+  5. Dealer reveals hole card and draws to 17+ (hitting/standing on soft 17
+     per house rule).
+  6. Settle: closest to 21 without busting wins. Blackjack pays 3:2, other
+     wins pay 1:1, ties push.
+
+GOLDEN RULES FOR THE BEST ODDS:
+  - Play only 3:2 tables (never 6:5).
+  - Prefer "Dealer Stands on Soft 17," double-after-split, and surrender.
+  - Follow basic strategy on every hand.
+  - Never take insurance or even money.
+
+================================================================================
+                              END OF RULES
+================================================================================

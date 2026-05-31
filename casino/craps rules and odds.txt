@@ -1,0 +1,350 @@
+================================================================================
+            CRAPS - COMPLETE RULES & STANDARD VEGAS ODDS REFERENCE
+================================================================================
+
+Craps is a dice game played against the casino ("the house"). Players bet on
+the outcome of the roll of two six-sided dice. One player, the "shooter,"
+rolls the dice, but everyone at the table may bet. This document covers the
+full rules, the flow of a round, every standard bet with its Vegas payout and
+house edge, and a best-bets summary ranked by house edge.
+
+All payouts below reflect STANDARD Las Vegas / Nevada rules. Specific payouts
+(especially the Field and the odds multiple cap) vary by casino, so always
+check the table placard before playing.
+
+
+--------------------------------------------------------------------------------
+1. OBJECTIVE AND BASICS
+--------------------------------------------------------------------------------
+
+  - Two six-sided dice are rolled; the total of the two dice determines
+    outcomes.
+  - Players win or lose based on which bets they have placed and what is rolled.
+  - The shooter rolls the dice. The dice rotate clockwise to a new shooter
+    after the current shooter "sevens out."
+  - You do NOT have to be the shooter to bet, and you can bet for or against
+    the shooter.
+
+
+--------------------------------------------------------------------------------
+2. THE 36 DICE COMBINATIONS (THE MATH BEHIND EVERYTHING)
+--------------------------------------------------------------------------------
+
+Two dice produce 36 equally likely combinations. Every payout and house edge
+in craps comes from this table:
+
+  TOTAL   COMBINATIONS   WAYS   PROBABILITY
+  -----   ------------   ----   -----------
+    2     1-1              1      1/36  (2.78%)
+    3     1-2, 2-1         2      2/36  (5.56%)
+    4     1-3, 3-1, 2-2    3      3/36  (8.33%)
+    5     1-4,4-1,2-3,3-2  4      4/36  (11.11%)
+    6     5 ways           5      5/36  (13.89%)
+    7     6 ways           6      6/36  (16.67%)  <- most common
+    8     5 ways           5      5/36  (13.89%)
+    9     4 ways           4      4/36  (11.11%)
+   10     3 ways           3      3/36  (8.33%)
+   11     2 ways           2      2/36  (5.56%)
+   12     1 way            1      1/36  (2.78%)
+
+The 7 is the most likely roll. This is why it pays to win on it before a
+point on the come-out, and why it "kills" most bets once a point is set.
+
+
+--------------------------------------------------------------------------------
+3. THE FLOW OF A ROUND
+--------------------------------------------------------------------------------
+
+A round of craps has two phases:
+
+  COME-OUT ROLL (the first roll of a round):
+    - A roll of 7 or 11 is a "natural" -> Pass Line bets WIN.
+    - A roll of 2, 3, or 12 is "craps" -> Pass Line bets LOSE.
+    - Any other number (4, 5, 6, 8, 9, 10) becomes "THE POINT." A marker
+      ("the puck") is placed on that number, flipped to its white "ON" side.
+
+  POINT PHASE (after a point is established):
+    - The shooter keeps rolling.
+    - If the POINT is rolled again before a 7 -> Pass Line WINS.
+    - If a 7 is rolled before the point -> Pass Line LOSES. This is called
+      "sevening out," and the dice pass to the next shooter.
+    - Any other number just continues the round (roll again).
+
+When a new shooter starts, the puck is "OFF" (black side up) and the next roll
+is a come-out roll again.
+
+
+--------------------------------------------------------------------------------
+4. THE CASINO CREW AND TABLE
+--------------------------------------------------------------------------------
+
+A full craps table is run by up to four casino employees:
+
+  BOXMAN     - Sits in the center, supervises the game and the chips/bank.
+  STICKMAN   - Uses a stick to push the dice to the shooter; calls the rolls
+               and controls the center (proposition) bets.
+  DEALERS    - Two dealers (one on each side) handle bets and payouts for the
+               players in their section.
+
+The table layout is mirrored on both ends, with a shared center section for
+proposition bets. The "PASS LINE" runs along the edge nearest the players.
+
+
+--------------------------------------------------------------------------------
+5. THE LINE BETS (THE CORE BETS)
+--------------------------------------------------------------------------------
+
+These are the foundational bets with the lowest house edges.
+
+  PASS LINE
+    The most popular bet; you bet WITH the shooter.
+    - Come-out: wins on 7 or 11, loses on 2/3/12.
+    - Point phase: wins if the point repeats before a 7.
+    Payout: 1:1 (even money)
+    House Edge: 1.41%
+
+  DON'T PASS LINE ("the dark side")
+    The opposite of Pass; you bet AGAINST the shooter.
+    - Come-out: wins on 2 or 3, loses on 7 or 11, and 12 is a PUSH ("bar 12" -
+      a tie, you neither win nor lose). Some tables bar the 2 instead of 12.
+    - Point phase: wins if a 7 comes before the point repeats.
+    Payout: 1:1 (even money)
+    House Edge: 1.36%  (slightly better than Pass)
+
+  COME
+    Works exactly like a Pass Line bet but can be made AFTER the come-out,
+    once a point is established. The next roll acts as your personal
+    "come-out": 7/11 wins, 2/3/12 loses, any other number becomes your own
+    "come point."
+    Payout: 1:1
+    House Edge: 1.41%
+
+  DON'T COME
+    The opposite of Come, made after a point is established. Works like
+    Don't Pass on your personal come-out (wins 2/3, loses 7/11, bar 12).
+    Payout: 1:1
+    House Edge: 1.36%
+
+
+--------------------------------------------------------------------------------
+6. FREE ODDS - THE ONLY 0% HOUSE EDGE BET IN THE CASINO
+--------------------------------------------------------------------------------
+
+After a point (or come point) is established, you may back your line bet with
+an additional "Odds" bet. This bet pays TRUE ODDS - the house has NO edge on
+it at all. It is the best bet in the casino.
+
+  TAKING ODDS (behind Pass Line / Come - you want the point to hit):
+    Point 4 or 10  ->  pays 2:1
+    Point 5 or 9   ->  pays 3:2
+    Point 6 or 8   ->  pays 6:5
+    House Edge: 0%
+
+  LAYING ODDS (behind Don't Pass / Don't Come - you want the 7):
+    Because you are now the favorite, you lay (risk more to win less):
+    Against 4 or 10  ->  pays 1:2
+    Against 5 or 9   ->  pays 2:3
+    Against 6 or 8   ->  pays 5:6
+    House Edge: 0%
+
+ODDS LIMITS / MULTIPLES:
+  Casinos cap how much Odds you can take relative to your line bet:
+    - "3-4-5x" odds (the Strip standard): 3x on 4/10, 4x on 5/9, 5x on 6/8.
+      This is structured so the win is always the same multiple of your bet.
+    - Some downtown / locals casinos offer 10x, 20x, or even 100x odds.
+      (Examples that have offered high odds: El Cortez and Main Street Station
+      downtown.)
+
+WHY ODDS MATTER:
+  The Odds bet itself has 0% edge, so adding it DILUTES the line bet's edge
+  over your total wager:
+    - Pass Line alone:        1.41%
+    - Pass + 1x odds:         ~0.85%
+    - Pass + 2x odds:         ~0.61%
+    - Pass + 3-4-5x odds:     ~0.37%   (lowest practical combined edge)
+    - Don't Pass + 3-4-5x:    ~0.27%
+  Strategy: bet the table minimum on the line and put as much as allowed on
+  Odds to minimize the overall house edge.
+
+
+--------------------------------------------------------------------------------
+7. PLACE BETS
+--------------------------------------------------------------------------------
+
+You can "place" any of the six point numbers to bet it will roll before a 7,
+WITHOUT first having a line bet. These can be made or removed at any time, and
+are "off" during the come-out roll unless you tell the dealer otherwise.
+
+  Place 6 or 8   ->  pays 7:6    House Edge: 1.52%
+  Place 5 or 9   ->  pays 7:5    House Edge: 4.00%
+  Place 4 or 10  ->  pays 9:5    House Edge: 6.67%
+
+NOTES:
+  - Place bets should be made in the right multiple to get the full payout:
+    place 6/8 in multiples of $6; place 5/9 in multiples of $5.
+  - Placing the 6 and 8 (1.52% edge) is one of the better non-line bets.
+    Placing the 4 or 10 (6.67%) is poor - buy them instead (below).
+
+
+--------------------------------------------------------------------------------
+8. BUY BETS AND LAY BETS (COMMISSION BETS)
+--------------------------------------------------------------------------------
+
+  BUY BETS
+    A "buy" is like a place bet but paid at TRUE odds in exchange for a 5%
+    commission ("vig") on the bet. Worthwhile mainly on the 4 and 10:
+    Buy 4 or 10  ->  pays 2:1 (true), minus 5% commission.
+    House Edge: ~4.76% if vig is charged on every bet,
+                ~1.67% if vig is charged only on winners (better casinos).
+    (Buying the 5/9 or 6/8 is generally not worth the commission.)
+
+  LAY BETS
+    The reverse of a buy: you bet a number will NOT roll before a 7 (dark
+    side), paid at true odds minus a 5% commission on the amount won.
+    Lay against 4 or 10  ->  pays 1:2 (true)    House Edge: ~2.44%
+    Lay against 5 or 9   ->  pays 2:3 (true)    House Edge: ~3.23%
+    Lay against 6 or 8   ->  pays 5:6 (true)    House Edge: ~4.00%
+    (Edge figures assume the vig is charged on the win amount.)
+
+
+--------------------------------------------------------------------------------
+9. THE FIELD BET (ONE-ROLL)
+--------------------------------------------------------------------------------
+
+A one-roll bet on the next roll being 2, 3, 4, 9, 10, 11, or 12.
+Loses on 5, 6, 7, or 8.
+
+  Standard Vegas payout:
+    3, 4, 9, 10, 11  ->  1:1
+    2                ->  2:1
+    12               ->  2:1
+    House Edge: 5.56%
+
+  Better-paying tables:
+    Some pay 3:1 on the 12 (or on the 2). When one end pays triple, the
+    House Edge drops to 2.78%. Look for these tables if you bet the Field.
+
+
+--------------------------------------------------------------------------------
+10. BIG 6 / BIG 8
+--------------------------------------------------------------------------------
+
+A bet that the 6 (or 8) will roll before a 7. Pays only EVEN money, which
+makes it strictly worse than the equivalent Place bet.
+
+  Big 6 / Big 8  ->  pays 1:1    House Edge: 9.09%
+
+  AVOID: Place the 6 or 8 instead (7:6, only 1.52% edge) for the same outcome.
+
+
+--------------------------------------------------------------------------------
+11. HARDWAYS (STANDING / MULTI-ROLL BETS)
+--------------------------------------------------------------------------------
+
+A "hardway" bet wins if a number is rolled as a PAIR (e.g., hard 8 = 4-4)
+before it is rolled the "easy" way (any other combination) OR before a 7.
+
+  Hard 6 or Hard 8  ->  pays 9:1     House Edge: 9.09%
+  Hard 4 or Hard 10 ->  pays 7:1     House Edge: 11.11%
+
+  Example: Hard 8 (4-4) loses if an easy 8 (6-2, 5-3, etc.) or a 7 rolls.
+
+
+--------------------------------------------------------------------------------
+12. PROPOSITION / CENTER BETS (ONE-ROLL, HIGH HOUSE EDGE)
+--------------------------------------------------------------------------------
+
+These are the flashy one-roll bets in the center of the table, controlled by
+the stickman. They have the WORST house edges on the table - avoid them for
+serious play.
+
+  Any 7              ->  pays 4:1    House Edge: 16.67%  (worst bet in craps)
+  Any Craps (2,3,12) ->  pays 7:1    House Edge: 11.11%
+  2  (Snake Eyes)    ->  pays 30:1   House Edge: 13.89%
+  12 (Boxcars)       ->  pays 30:1   House Edge: 13.89%
+  3  (Ace-Deuce)     ->  pays 15:1   House Edge: 11.11%
+  11 (Yo / Eleven)   ->  pays 15:1   House Edge: 11.11%
+
+  COMBINATION BETS:
+    C & E       - Splits the bet between Any Craps and the Eleven.
+    Horn        - One bet split four ways across 2, 3, 11, and 12.
+                  House Edge: ~12.5%
+    Whirl/World - Horn plus the 7 (2,3,7,11,12).
+    Hop Bet     - A one-roll bet on a specific dice combination (e.g., "hop
+                  the 5-3"). Pays like the single number it represents.
+
+  Note: Some layouts post these as "for 1" instead of "to 1" (e.g., "30 for 1"
+  means you get 30 total, which equals 29:1). Read the table carefully.
+
+
+--------------------------------------------------------------------------------
+13. BEST BETS RANKED BY HOUSE EDGE (LOW = GOOD)
+--------------------------------------------------------------------------------
+
+  BET                              HOUSE EDGE
+  ------------------------------   ----------
+  Odds bet (free odds)              0.00%      <- always take/lay max odds
+  Don't Pass + 3-4-5x odds          ~0.27%
+  Pass Line + 3-4-5x odds           ~0.37%
+  Don't Pass / Don't Come           1.36%
+  Pass Line / Come                  1.41%
+  Place 6 or 8                      1.52%
+  Buy 4/10 (vig on win only)        ~1.67%
+  Lay 4 or 10                       ~2.44%
+  Field (with 3:1 on 12)            2.78%
+  Place 5 or 9                      4.00%
+  Lay 6 or 8                        4.00%
+  Buy 4/10 (vig always)             ~4.76%
+  Field (2:1 on both 2 and 12)      5.56%
+  Place 4 or 10                     6.67%
+  Big 6 / Big 8                     9.09%
+  Hard 6 / Hard 8                   9.09%
+  Any Craps / 3 / 11                11.11%
+  Hard 4 / Hard 10                  11.11%
+  Horn                              ~12.5%
+  Snake Eyes (2) / Boxcars (12)     13.89%
+  Any 7                             16.67%     <- avoid
+
+THE OPTIMAL STRATEGY (lowest cost):
+  Bet the table minimum on Pass Line (or Don't Pass), then take (or lay) the
+  maximum free Odds you can afford. Add Place bets on 6 and 8 if you want more
+  action. Stay away from the center proposition bets.
+
+
+--------------------------------------------------------------------------------
+14. TABLE ETIQUETTE AND PROCEDURE
+--------------------------------------------------------------------------------
+
+  - SHOOTING: The dice must hit the far wall to count. Throw with one hand;
+    don't take the dice off the table.
+  - HANDLING DICE: Only the shooter touches the dice, with one hand only.
+  - CASH/CHIPS: Don't hand money or chips directly to a dealer mid-roll; place
+    it on the layout and say "change only."
+  - LINE BETS: Pass/Don't Pass and Odds you usually place yourself. Place,
+    Buy, Lay, hardway, and proposition bets are placed by telling the dealer
+    or stickman; they position the chips.
+  - "SEVEN OUT": When the shooter rolls a 7 during the point phase, the round
+    ends and the dice move clockwise to the next player.
+  - KEEP HANDS CLEAR: Keep hands and drinks off the table when the dice are
+    out.
+  - SUPERSTITION: Saying "seven" out loud at the table is considered bad luck
+    and frowned upon during a point.
+
+
+--------------------------------------------------------------------------------
+15. QUICK SUMMARY OF A ROUND
+--------------------------------------------------------------------------------
+
+  1. Place a Pass or Don't Pass bet before the come-out roll.
+  2. COME-OUT ROLL:
+        Pass:       7/11 win, 2/3/12 lose, else point set.
+        Don't Pass: 2/3 win, 7/11 lose, 12 push, else point set.
+  3. If a point is set, take/lay Odds and optionally Place 6 & 8.
+  4. POINT PHASE: shooter rolls until the point repeats (Pass wins) or a 7
+     appears (Pass loses / sevens out).
+  5. On a seven-out, the dice pass clockwise to the next shooter and a new
+     come-out roll begins.
+
+================================================================================
+                              END OF RULES
+================================================================================
