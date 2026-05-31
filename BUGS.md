@@ -39,5 +39,3 @@ This file now tracks only the findings still open as of 2026-05-30. Items person
 1. The in-memory rate limit / session stores (#1) need a shared backend for any multi-instance deployment.
 2. Validate the craps round-down behavior (#3) against the in-app rules block, and document the house-edge implication if it stays.
 3. The poker engine carried multiple subtle correctness issues in the original audit (now fixed). Property-based tests around `_is_round_complete`, `_advance_phase`, side-pot splits, and tournament level transitions would guard against regressions.
-</content>
-</invoke>

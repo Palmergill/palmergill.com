@@ -86,7 +86,6 @@ function renderDie(dieId, value) {
 }
 
 // ── Submenus ──
-function openPlaceMenu() { document.getElementById('placeMenu').classList.add('active'); }
 function closePlaceMenu() { document.getElementById('placeMenu').classList.remove('active'); }
 function openCenterMenu() { document.getElementById('centerMenu').classList.add('active'); }
 function closeCenterMenu() { document.getElementById('centerMenu').classList.remove('active'); }
