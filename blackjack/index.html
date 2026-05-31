@@ -23,6 +23,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;700;900&family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/shared/casino-theme.css?v=1">
+    <link rel="stylesheet" href="/shared/rules-viewer.css?v=1">
     <link rel="manifest" href="./manifest.json">
     <link rel="stylesheet" href="./style.css?v=10">
     <script>
@@ -34,18 +35,22 @@
     </script>
 </head>
 <body>
-    <main class="blackjack-shell">
+    <main class="blackjack-shell" data-rules-app>
         <header class="game-header">
             <div>
                 <h1>Blackjack</h1>
             </div>
+            <nav class="rules-tab-list" aria-label="Blackjack views">
+                <button class="rules-tab" type="button" data-rules-tab="game" role="tab" aria-selected="true">Table</button>
+                <button class="rules-tab" type="button" data-rules-tab="rules" data-rules-open role="tab" aria-selected="false">Rules</button>
+            </nav>
             <div class="chip-ledger" aria-label="Chip balance">
                 <span>Bankroll</span>
                 <strong id="balance">$1000</strong>
             </div>
         </header>
 
-        <section class="session-stats" aria-label="Shoe stats">
+        <section class="session-stats" data-rules-game-panel aria-label="Shoe stats">
             <div class="session-tile"><span>Wins</span><strong id="statWins">0</strong></div>
             <div class="session-tile"><span>Losses</span><strong id="statLosses">0</strong></div>
             <div class="session-tile"><span>Pushes</span><strong id="statPushes">0</strong></div>
@@ -53,7 +58,7 @@
             <div class="session-tile session-tile-count" id="countTile" hidden><span>Hi-Lo count</span><strong id="statHiLo">0</strong></div>
         </section>
 
-        <section class="table" aria-label="Blackjack table">
+        <section class="table" data-rules-game-panel aria-label="Blackjack table">
             <div class="table-rail">
                 <div class="table-rules">
                     <span>Blackjack pays 3 to 2</span>
@@ -88,7 +93,7 @@
             </section>
         </section>
 
-        <aside class="control-panel" aria-label="Game controls">
+        <aside class="control-panel" data-rules-game-panel aria-label="Game controls">
             <div class="panel-title">
                 <h2>Table Controls</h2>
                 <span>$5 min · $500 max</span>
@@ -129,11 +134,22 @@
                 <button class="secondary-button" id="splitButton" type="button">Split</button>
             </div>
         </aside>
+
+        <section
+            class="rules-panel"
+            data-rules-panel
+            data-rules-source="/casino/blackjack%20rules%20and%20strategy.txt"
+            data-rules-label="Blackjack rules"
+            aria-label="Blackjack rules"
+            hidden>
+            <div data-rules-content></div>
+        </section>
     </main>
 
     <script src="./blackjackGame.js"></script>
     <script src="/shared/casino-profile.js?v=1"></script>
     <script src="/shared/analytics.js?v=1"></script>
+    <script src="/shared/rules-viewer.js?v=1"></script>
     <script src="./app.js?v=11"></script>
     <script src="/shared/site-nav.js?v=6"></script>
 </body>

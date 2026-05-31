@@ -1,0 +1,247 @@
+.rules-tab-list {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px;
+    border: 1px solid rgba(232, 199, 115, 0.32);
+    border-radius: 8px;
+    background: rgba(8, 15, 13, 0.5);
+}
+
+.rules-tab {
+    min-height: 38px;
+    padding: 0 14px;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    background: transparent;
+    color: rgba(255, 248, 223, 0.78);
+    cursor: pointer;
+    font: inherit;
+    font-size: 0.82rem;
+    font-weight: 900;
+    transition: background 180ms ease, border-color 180ms ease, color 180ms ease, transform 180ms ease;
+}
+
+.rules-tab:hover,
+.rules-tab:focus-visible {
+    border-color: rgba(232, 199, 115, 0.45);
+    color: #fff8df;
+    outline: none;
+    transform: translateY(-1px);
+}
+
+.rules-tab[aria-selected="true"] {
+    border-color: rgba(232, 199, 115, 0.74);
+    background: rgba(232, 199, 115, 0.16);
+    color: #fff8df;
+}
+
+.rules-visible [data-rules-game-panel] {
+    display: none !important;
+}
+
+.rules-panel {
+    grid-column: 1 / -1;
+    min-width: 0;
+}
+
+.rules-visible .screen[data-rules-panel] {
+    display: flex;
+    flex-direction: column;
+}
+
+.rules-document {
+    display: grid;
+    gap: 18px;
+    width: min(100%, 980px);
+    max-height: min(72vh, 820px);
+    overflow: auto;
+    margin: 0 auto;
+    padding: clamp(18px, 3vw, 30px);
+    border: 1px solid rgba(232, 199, 115, 0.28);
+    border-radius: 8px;
+    background:
+        linear-gradient(145deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.025)),
+        rgba(7, 14, 12, 0.88);
+    box-shadow: 0 24px 58px rgba(0, 0, 0, 0.32);
+    color: #fff8df;
+}
+
+.rules-document header {
+    display: grid;
+    gap: 10px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid rgba(232, 199, 115, 0.22);
+}
+
+.rules-kicker {
+    color: #e8c773;
+    font-size: 0.72rem;
+    font-weight: 950;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+}
+
+.rules-document h2,
+.rules-document h3,
+.rules-document p,
+.rules-document ul,
+.rules-document ol,
+.rules-document pre {
+    margin: 0;
+}
+
+.rules-document h2 {
+    color: #fff8df;
+    font-family: var(--font-display, inherit);
+    font-size: clamp(1.65rem, 3vw, 2.55rem);
+    font-weight: 700;
+    line-height: 1;
+}
+
+.rules-section {
+    display: grid;
+    gap: 12px;
+    padding: 16px;
+    border: 1px solid rgba(255, 236, 177, 0.2);
+    border-radius: 8px;
+    background: rgba(5, 31, 22, 0.34);
+}
+
+.rules-section h3 {
+    color: #e8c773;
+    font-size: 1rem;
+    font-weight: 950;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.rules-section p,
+.rules-section li {
+    color: #d6ead5;
+    font-size: 0.95rem;
+    line-height: 1.55;
+}
+
+.rules-section ul,
+.rules-section ol {
+    display: grid;
+    gap: 8px;
+    padding-left: 1.25rem;
+}
+
+.rules-section strong,
+.rules-section b {
+    color: #fff8df;
+}
+
+.rules-section pre {
+    max-width: 100%;
+    overflow-x: auto;
+    padding: 14px;
+    border: 1px solid rgba(232, 199, 115, 0.24);
+    border-radius: 8px;
+    background: rgba(8, 10, 13, 0.64);
+    color: #fff0bd;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    font-size: 0.82rem;
+    line-height: 1.5;
+    white-space: pre;
+}
+
+.rules-loading,
+.rules-error {
+    color: #d6ead5;
+    font-weight: 800;
+}
+
+.rules-error {
+    color: #fecaca;
+}
+
+.rules-screen {
+    justify-content: flex-start;
+    align-items: stretch;
+    overflow: auto;
+    padding: 24px;
+    background:
+        radial-gradient(circle at 10% 10%, rgba(232, 199, 115, 0.16), transparent 28%),
+        linear-gradient(135deg, #130d09 0%, #2f1a10 42%, #061711 100%);
+}
+
+.rules-screen-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    width: min(100%, 980px);
+    margin: 0 auto 16px;
+}
+
+.rules-screen-header h1 {
+    margin: 0;
+    color: #fff8df;
+    font-family: var(--font-display, inherit);
+    font-size: clamp(2rem, 5vw, 4rem);
+    line-height: 0.95;
+}
+
+#start-screen .rules-tab-list {
+    width: min(100%, 300px);
+    margin-bottom: 20px;
+}
+
+.poker-rules-button {
+    margin-left: auto;
+}
+
+@media (max-width: 760px) {
+    .blackjack-shell .game-header,
+    .craps-page .header {
+        flex-wrap: wrap;
+    }
+
+    .blackjack-shell .rules-tab-list,
+    .craps-page .rules-tab-list {
+        order: 3;
+        flex-basis: 100%;
+    }
+
+    .rules-tab-list {
+        width: 100%;
+    }
+
+    .rules-tab {
+        flex: 1;
+        min-height: 36px;
+        padding: 0 10px;
+        font-size: 0.78rem;
+    }
+
+    .rules-document {
+        max-height: none;
+        padding: 14px;
+    }
+
+    .rules-section {
+        padding: 13px;
+    }
+
+    .rules-section p,
+    .rules-section li {
+        font-size: 0.9rem;
+    }
+
+    .rules-section pre {
+        font-size: 0.74rem;
+    }
+
+    .rules-screen {
+        padding: calc(var(--site-nav-mobile-height, 56px) + 12px) 12px 16px;
+    }
+
+    .rules-screen-header {
+        align-items: stretch;
+        flex-direction: column;
+    }
+}

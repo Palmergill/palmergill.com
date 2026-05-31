@@ -22,6 +22,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;700;900&family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/shared/casino-theme.css?v=1">
+    <link rel="stylesheet" href="/shared/rules-viewer.css?v=1">
     <link rel="stylesheet" href="style.css?v=16">
     <link rel="manifest" href="manifest.json">
     <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'%3E%3Crect fill='%230a0a0f' width='192' height='192' rx='24'/%3E%3Ctext x='96' y='130' font-size='100' text-anchor='middle'%3E🃏%3C/text%3E%3C/svg%3E">
@@ -41,12 +42,16 @@
     </script>
 </head>
 <body>
-    <div id="app">
+    <div id="app" data-rules-app>
         <!-- Start Screen -->
-        <div id="start-screen" class="screen active">
+        <div id="start-screen" class="screen active" data-rules-game-panel>
             <div class="logo">♠♥♣♦</div>
             <h1>Texas Hold'em</h1>
             <p class="subtitle">No-Limit Poker</p>
+            <nav class="rules-tab-list" aria-label="Texas Hold'em views">
+                <button class="rules-tab" type="button" data-rules-tab="game" role="tab" aria-selected="true">Play</button>
+                <button class="rules-tab" type="button" data-rules-tab="rules" data-rules-open role="tab" aria-selected="false">Rules</button>
+            </nav>
             <div class="start-form">
                 <input type="text" id="player-name" placeholder="Your name" maxlength="12" value="Palmer">
                 <button id="start-btn" class="btn-primary">Play vs AI</button>
@@ -63,7 +68,7 @@
         </div>
 
         <!-- Join Game Screen -->
-        <div id="join-screen" class="screen">
+        <div id="join-screen" class="screen" data-rules-game-panel>
             <div class="logo">♠♥♣♦</div>
             <h1>Join Game</h1>
             <div class="start-form">
@@ -74,7 +79,7 @@
         </div>
 
         <!-- Lobby Screen -->
-        <div id="lobby-screen" class="screen">
+        <div id="lobby-screen" class="screen" data-rules-game-panel>
             <div class="logo">♠♥♣♦</div>
             <h1>Game Lobby</h1>
             <div class="start-form" style="text-align: center;">
@@ -90,13 +95,13 @@
         </div>
 
         <!-- Loading Overlay -->
-        <div id="loading-overlay" class="loading-overlay hidden">
+        <div id="loading-overlay" class="loading-overlay hidden" data-rules-game-panel>
             <div class="spinner"></div>
             <div class="loading-text">Loading...</div>
         </div>
 
         <!-- Game Screen -->
-        <div id="game-screen" class="screen theme-green card-deck-classic">
+        <div id="game-screen" class="screen theme-green card-deck-classic" data-rules-game-panel>
             <!-- Header -->
             <div class="game-header">
                 <h1>Texas Hold'em</h1>
@@ -104,6 +109,7 @@
                     <span class="hand-num">Hand #<span id="hand-number">1</span></span>
                     <span class="phase" id="phase" aria-live="polite">Pre-Flop</span>
                 </div>
+                <button class="rules-tab poker-rules-button" type="button" data-rules-open>Rules</button>
             </div>
             <div id="tournament-banner" class="tournament-banner" hidden aria-label="Tournament status">
                 <span class="tb-level">Level <strong id="tb-level">1</strong></span>
@@ -195,6 +201,24 @@
 
         </div>
 
+        <div
+            id="rules-screen"
+            class="screen rules-screen"
+            data-rules-panel
+            data-rules-source="/casino/texas%20holdem%20rules.txt"
+            data-rules-label="Texas Hold'em rules"
+            aria-label="Texas Hold'em rules"
+            hidden>
+            <header class="rules-screen-header">
+                <h1>Texas Hold'em Rules</h1>
+                <nav class="rules-tab-list" aria-label="Rules navigation">
+                    <button class="rules-tab" type="button" data-rules-tab="game" data-rules-close role="tab" aria-selected="true">Play</button>
+                    <button class="rules-tab" type="button" data-rules-tab="rules" role="tab" aria-selected="false">Rules</button>
+                </nav>
+            </header>
+            <div data-rules-content></div>
+        </div>
+
         <!-- Stats Modal -->
         <div id="stats-modal" class="overlay hidden">
             <div class="result-content" style="max-width: 320px;">
@@ -214,6 +238,7 @@
     <script src="/shared/site-nav.js?v=6"></script>
     <script src="/shared/analytics.js?v=1"></script>
     <script src="/shared/api-base.js?v=1"></script>
+    <script src="/shared/rules-viewer.js?v=1"></script>
     <script src="app.js?v=16"></script>
 </body>
 </html>

@@ -7,9 +7,12 @@ const STATIC_ASSETS = [
     '/craps/crapsRules.js?v=1',
     '/craps/manifest.json',
     '/shared/casino-theme.css?v=1',
+    '/shared/rules-viewer.css?v=1',
+    '/shared/rules-viewer.js?v=1',
     '/shared/casino-profile.js?v=1',
     '/shared/site-nav.css?v=6',
-    '/shared/site-nav.js?v=6'
+    '/shared/site-nav.js?v=6',
+    '/casino/craps%20rules%20and%20odds.txt'
 ];
 
 // Derive the cache name from the asset list so any ?v= bump invalidates

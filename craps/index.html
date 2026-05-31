@@ -24,6 +24,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;700;900&family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/shared/casino-theme.css?v=1">
+    <link rel="stylesheet" href="/shared/rules-viewer.css?v=1">
     <script>
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
@@ -2055,19 +2056,23 @@
     </style>
 </head>
 <body>
-    <div class="craps-page">
+    <div class="craps-page" data-rules-app>
         <header class="header">
             <div>
                 <p class="eyebrow">Dice table</p>
                 <h1>Craps</h1>
             </div>
+            <nav class="rules-tab-list" aria-label="Craps views">
+                <button class="rules-tab" type="button" data-rules-tab="game" role="tab" aria-selected="true">Table</button>
+                <button class="rules-tab" type="button" data-rules-tab="rules" data-rules-open role="tab" aria-selected="false">Rules</button>
+            </nav>
             <div class="balance-card" aria-label="Current bankroll">
                 <span class="balance-label">Bankroll</span>
                 <div class="balance" id="balance">$1,000</div>
             </div>
         </header>
 
-    <main class="table">
+    <main class="table" data-rules-game-panel>
         <div class="status-bar" id="gameStatus">Place bets & roll</div>
 
         <div class="main-bets" aria-label="Craps betting layout">
@@ -2158,6 +2163,15 @@
             <button class="roll-btn" id="rollButton" onclick="rollDice()">ROLL DICE</button>
         </div>
     </main>
+        <section
+            class="rules-panel"
+            data-rules-panel
+            data-rules-source="/casino/craps%20rules%20and%20odds.txt"
+            data-rules-label="Craps rules"
+            aria-label="Craps rules"
+            hidden>
+            <div data-rules-content></div>
+        </section>
     </div>
 
     <!-- Place Bets Submenu -->
@@ -2242,6 +2256,7 @@
     <script src="crapsRules.js?v=1"></script>
     <script src="/shared/casino-profile.js?v=1"></script>
     <script src="/shared/analytics.js?v=1"></script>
+    <script src="/shared/rules-viewer.js?v=1"></script>
     <script src="app.js?v=5"></script>
     <script src="/shared/site-nav.js?v=6"></script>
 </body>

@@ -7,10 +7,13 @@ const STATIC_ASSETS = [
     '/poker/app.js?v=16',
     '/poker/manifest.json',
     '/shared/casino-theme.css?v=1',
+    '/shared/rules-viewer.css?v=1',
+    '/shared/rules-viewer.js?v=1',
     '/shared/site-nav.css?v=6',
     '/shared/site-nav.js?v=6',
     '/shared/analytics.js?v=1',
-    '/shared/api-base.js?v=1'
+    '/shared/api-base.js?v=1',
+    '/casino/texas%20holdem%20rules.txt'
 ];
 
 // Derive the cache name from the asset list so any ?v= bump
