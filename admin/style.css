@@ -325,10 +325,6 @@ h1 {
     min-height: 240px;
 }
 
-.timeline-chart {
-    height: 220px;
-}
-
 .compact-list {
     display: grid;
     gap: 8px;

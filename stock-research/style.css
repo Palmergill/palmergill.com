@@ -413,68 +413,6 @@ form {
     margin: 0 auto;
 }
 
-.search-container {
-    position: relative;
-    flex: 1;
-}
-
-/* Input wrapper for underline animations */
-.input-wrapper {
-    position: relative;
-}
-
-.input-underline,
-.input-underline-focus {
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    height: 2px;
-    background: var(--bg-tertiary);
-    transition: all 0.3s ease;
-}
-
-.input-underline {
-    width: 100%;
-    border-radius: 0 0 8px 8px;
-}
-
-.input-underline-focus {
-    width: 0;
-    background: var(--accent-blue);
-    box-shadow: 0 0 10px rgba(59, 130, 246, 0.5);
-}
-
-.input-wrapper input:focus ~ .input-underline-focus {
-    width: 100%;
-}
-
-/* Input loading spinner */
-.input-spinner {
-    position: absolute;
-    right: 12px;
-    top: 50%;
-    transform: translateY(-50%);
-    width: 20px;
-    height: 20px;
-}
-
-.input-spinner.hidden {
-    display: none;
-}
-
-.spinner-ring {
-    width: 100%;
-    height: 100%;
-    border: 2px solid transparent;
-    border-top-color: var(--accent-blue);
-    border-radius: 50%;
-    animation: spin 0.8s linear infinite;
-}
-
-@keyframes spin {
-    to { transform: rotate(360deg); }
-}
-
 /* Button loading state */
 #searchBtn {
     position: relative;
@@ -1152,12 +1090,6 @@ button .ripple {
     }
 }
 
-.examples {
-    color: var(--text-muted);
-    font-size: 14px;
-    margin-top: 12px;
-}
-
 /* Cards */
 .card {
     background: linear-gradient(145deg, var(--bg-secondary) 0%, rgba(30, 41, 59, 0.8) 100%);
@@ -1276,138 +1208,6 @@ button .ripple {
     margin-bottom: 4px;
 }
 
-.company-price {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-end;
-    gap: 4px;
-    margin-left: auto;
-    margin-right: 16px;
-}
-
-.header-price {
-    font-size: 28px;
-    font-weight: 700;
-    color: var(--text-primary);
-    font-family: 'SF Mono', Monaco, monospace;
-}
-
-.header-change {
-    font-size: 14px;
-    font-weight: 600;
-    padding: 4px 10px;
-    border-radius: 6px;
-    font-family: 'SF Mono', Monaco, monospace;
-}
-
-.header-change.positive {
-    background: rgba(16, 185, 129, 0.15);
-    color: #10b981;
-}
-
-.header-change.negative {
-    background: rgba(239, 68, 68, 0.15);
-    color: #ef4444;
-}
-
-.refresh-btn {
-    padding: 8px 16px;
-    font-size: 14px;
-    font-weight: 600;
-    background: transparent;
-    border: 1px solid var(--accent-blue);
-    color: var(--accent-blue);
-    border-radius: 6px;
-    cursor: pointer;
-    transition: all 0.2s;
-    position: relative;
-    min-width: 90px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-}
-
-.refresh-btn:hover {
-    background: var(--accent-blue);
-    color: white;
-}
-
-.refresh-btn:disabled {
-    opacity: 0.7;
-    cursor: not-allowed;
-}
-
-.refresh-btn .refresh-icon,
-.refresh-btn .refresh-text {
-    transition: opacity 0.2s ease;
-}
-
-.refresh-btn .refresh-spinner {
-    position: absolute;
-    width: 16px;
-    height: 16px;
-}
-
-.refresh-btn .refresh-spinner.hidden {
-    display: none;
-}
-
-.refresh-btn.loading .refresh-icon,
-.refresh-btn.loading .refresh-text {
-    opacity: 0;
-}
-
-/* Tabs */
-.tabs {
-    display: flex;
-    gap: 8px;
-    margin-bottom: 24px;
-    padding: 4px;
-    background: var(--bg-secondary);
-    border-radius: 12px;
-    overflow-x: auto;
-    position: relative;
-}
-
-.tab-btn {
-    flex: 1;
-    min-width: 100px;
-    padding: 12px 20px;
-    font-size: 14px;
-    font-weight: 600;
-    border: none;
-    border-radius: 8px;
-    background: transparent;
-    color: var(--text-muted);
-    cursor: pointer;
-    transition: color 0.2s;
-    white-space: nowrap;
-    position: relative;
-    z-index: 2;
-}
-
-.tab-btn:hover {
-    color: var(--text-secondary);
-}
-
-.tab-btn.active {
-    color: white;
-}
-
-/* Sliding tab indicator */
-.tab-indicator {
-    position: absolute;
-    bottom: 4px;
-    left: 4px;
-    height: calc(100% - 8px);
-    background: var(--accent-blue);
-    border-radius: 8px;
-    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    z-index: 1;
-    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
-}
-
 /* Tab Content */
 .tab-content {
     opacity: 0;
@@ -1431,21 +1231,6 @@ button .ripple {
 .tab-content-container {
     position: relative;
     min-height: 400px;
-}
-
-/* Category Color Coding for Metric Sections */
-.metrics-key {
-    border-left: 3px solid var(--accent-blue);
-}
-
-.metrics-key h3 {
-    /* Key Metrics - Blue accent */
-    color: var(--accent-blue);
-}
-
-.metrics-key .metric:hover {
-    background: rgba(59, 130, 246, 0.08);
-    box-shadow: 0 0 20px rgba(59, 130, 246, 0.15);
 }
 
 .metrics-valuation {
@@ -1506,14 +1291,6 @@ button .ripple {
 
 /* Mobile adjustments */
 @media (max-width: 768px) {
-    .tab-indicator {
-        display: none; /* Hide sliding indicator on mobile, use default active state */
-    }
-    
-    .tab-btn.active {
-        background: var(--accent-blue);
-    }
-    
     /* Stack metrics vertically on mobile */
     .metrics-grid-compact {
         grid-template-columns: 1fr;
@@ -1573,25 +1350,6 @@ button .ripple {
     font-size: 20px;
 }
 
-/* Metrics Sections */
-.metrics-sections {
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-}
-
-.metrics-row {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-    gap: 16px;
-}
-
-.metric-item {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-}
-
 .card h3 {
     font-size: 14px;
     font-weight: 700;
@@ -1599,26 +1357,6 @@ button .ripple {
     margin-bottom: 20px;
     text-transform: uppercase;
     letter-spacing: 1.5px;
-}
-
-.card-header {
-    margin-bottom: 20px;
-    padding-bottom: 16px;
-    border-bottom: 1px solid var(--bg-tertiary);
-}
-
-.card-header h2 {
-    font-size: 24px;
-    font-weight: 700;
-    color: var(--text-primary);
-    margin-bottom: 4px;
-}
-
-.ticker {
-    font-size: 14px;
-    color: var(--text-muted);
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
 }
 
 /* Value change flash animations */
@@ -1683,34 +1421,6 @@ button .ripple {
     color: var(--accent-red);
 }
 
-/* Metrics */
-.metrics-section {
-    margin-bottom: 24px;
-    padding-bottom: 20px;
-    border-bottom: 1px solid var(--bg-tertiary);
-}
-
-.metrics-section:last-child {
-    border-bottom: none;
-    margin-bottom: 0;
-    padding-bottom: 0;
-}
-
-.metrics-section h4 {
-    font-size: 14px;
-    font-weight: 600;
-    color: var(--text-muted);
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    margin-bottom: 16px;
-}
-
-.metrics-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
-    gap: 16px;
-}
-
 .metric {
     display: flex;
     flex-direction: column;
@@ -1738,42 +1448,6 @@ button .ripple {
     color: var(--text-secondary);
 }
 
-.metric-value-container {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-
-.metric-value-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-}
-
-.sparkline {
-    width: 60px;
-    height: 20px;
-    opacity: 0;
-    transition: opacity 0.3s ease;
-}
-
-.metric:hover .sparkline {
-    opacity: 1;
-}
-
-.metric-trend {
-    font-size: 14px;
-    opacity: 0;
-    transform: translateX(-4px);
-    transition: opacity 0.2s ease, transform 0.2s ease;
-}
-
-.metric:hover .metric-trend {
-    opacity: 1;
-    transform: translateX(0);
-}
-
 .metric-change {
     font-size: 12px;
     font-weight: 600;
@@ -1793,21 +1467,6 @@ button .ripple {
     background: rgba(239, 68, 68, 0.1);
 }
 
-.metric[data-trend="up"] .metric-trend::before {
-    content: '↗';
-    color: var(--accent-green);
-}
-
-.metric[data-trend="down"] .metric-trend::before {
-    content: '↘';
-    color: var(--accent-red);
-}
-
-.metric[data-trend="neutral"] .metric-trend::before {
-    content: '→';
-    color: var(--text-muted);
-}
-
 .metric-value {
     font-size: 20px;
     font-weight: 700;
@@ -1823,10 +1482,6 @@ button .ripple {
 #peRatio,
 #revenueGrowth,
 #freeCashFlow,
-#debtToEquity,
-#roe,
-#profitMargin,
-#operatingMargin,
 #psRatio,
 #pbRatio,
 #evebitda,
@@ -1841,12 +1496,7 @@ button .ripple {
 #quickRatio,
 #interestCoverage,
 #cash,
-#workingCapital,
-#price52wHigh,
-#price52wLow,
-#price52wPosition,
-#beta,
-#avgVolume {
+#workingCapital {
     font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', 'Consolas', monospace;
     font-variant-numeric: tabular-nums;
 }
@@ -1881,389 +1531,11 @@ canvas {
     }
 }
 
-/* Chart Modal */
-.chart-modal {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    z-index: 1000;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    opacity: 1;
-    transition: opacity 0.3s ease;
-}
-
-.chart-modal.hidden {
-    display: none;
-}
-
-.chart-modal.closing {
-    opacity: 0;
-}
-
-.chart-modal-backdrop {
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0, 0, 0, 0.85);
-    cursor: pointer;
-    backdrop-filter: blur(0px);
-    -webkit-backdrop-filter: blur(0px);
-    transition: backdrop-filter 0.3s ease, -webkit-backdrop-filter 0.3s ease;
-}
-
-.chart-modal:not(.closing) .chart-modal-backdrop {
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-}
-
-.chart-modal-content {
-    position: relative;
-    background: var(--bg-secondary);
-    border-radius: 16px;
-    width: 95%;
-    max-width: 1400px;
-    max-height: 90vh;
-    display: flex;
-    flex-direction: column;
-    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
-    animation: modalSlideIn 0.4s var(--ease-spring);
-}
-
-.chart-modal.closing .chart-modal-content {
-    animation: modalSlideOut 0.2s ease-in forwards;
-}
-
-@keyframes modalSlideIn {
-    0% {
-        opacity: 0;
-        transform: scale(0.9) translateY(20px);
-    }
-    100% {
-        opacity: 1;
-        transform: scale(1) translateY(0);
-    }
-}
-
-@keyframes modalSlideOut {
-    0% {
-        opacity: 1;
-        transform: scale(1);
-    }
-    100% {
-        opacity: 0;
-        transform: scale(0.95);
-    }
-}
-
-/* Staggered content animation */
-.chart-modal-header {
-    animation: fadeSlideDown 0.3s var(--ease-out) 0.1s both;
-}
-
-.chart-modal-body {
-    animation: fadeSlideUp 0.3s var(--ease-out) 0.2s both;
-}
-
-.close-modal-btn {
-    animation: fadeIn 0.2s var(--ease-out) 0.3s both;
-}
-
-@keyframes fadeSlideDown {
-    from {
-        opacity: 0;
-        transform: translateY(-10px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
-@keyframes fadeSlideUp {
-    from {
-        opacity: 0;
-        transform: translateY(10px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
-@keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
-}
-
-.chart-modal-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 20px 24px;
-    border-bottom: 1px solid var(--bg-tertiary);
-}
-
-.chart-modal-header h2 {
-    font-size: 20px;
-    font-weight: 600;
-    color: var(--text-primary);
-}
-
-.close-modal-btn {
-    background: none;
-    border: none;
-    color: var(--text-muted);
-    font-size: 28px;
-    cursor: pointer;
-    padding: 0;
-    width: 36px;
-    height: 36px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 8px;
-    transition: all 0.2s;
-}
-
-.close-modal-btn:hover {
-    background: var(--bg-tertiary);
-    color: var(--text-primary);
-}
-
-.chart-modal-body {
-    padding: 24px;
-    overflow: auto;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-}
-
-.chart-modal-body canvas {
-    max-width: 80%;
-    max-height: 80%;
-    height: auto;
-}
-
 /* Price chart cursor */
 #priceChart {
     cursor: crosshair;
     touch-action: pan-y;
     -webkit-tap-highlight-color: transparent; /* Remove tap highlight on mobile */
-}
-
-/* Bottom Sheet Modal for Mobile */
-@media (max-width: 768px) {
-    .chart-modal.bottom-sheet .chart-modal-content {
-        position: fixed;
-        bottom: 0;
-        left: 0;
-        right: 0;
-        top: auto;
-        width: 100%;
-        max-width: 100%;
-        height: 85vh;
-        max-height: 85vh;
-        border-radius: 20px 20px 0 0;
-        animation: bottomSheetSlideUp 0.3s ease-out;
-    }
-    
-    .chart-modal.bottom-sheet.closing .chart-modal-content {
-        animation: bottomSheetSlideDown 0.3s ease-in forwards;
-    }
-    
-    .chart-modal.bottom-sheet .chart-modal-backdrop {
-        background: rgba(0, 0, 0, 0.6);
-    }
-    
-    /* Drag handle for bottom sheet */
-    .chart-modal.bottom-sheet .chart-modal-content::before {
-        content: '';
-        position: absolute;
-        top: 8px;
-        left: 50%;
-        transform: translateX(-50%);
-        width: 36px;
-        height: 4px;
-        background: rgba(255, 255, 255, 0.3);
-        border-radius: 2px;
-    }
-    
-    @keyframes bottomSheetSlideUp {
-        from {
-            transform: translateY(100%);
-        }
-        to {
-            transform: translateY(0);
-        }
-    }
-    
-    @keyframes bottomSheetSlideDown {
-        from {
-            transform: translateY(0);
-        }
-        to {
-            transform: translateY(100%);
-        }
-    }
-}
-
-/* Mobile optimizations for chart modal */
-@media (max-width: 768px) {
-    .chart-modal-content {
-        width: 100%;
-        height: 100%;
-        max-height: 100vh;
-        border-radius: 0;
-    }
-    
-    .chart-modal-header {
-        padding: 16px 20px;
-    }
-    
-    .chart-modal-header h2 {
-        font-size: 18px;
-    }
-    
-    .chart-modal-body {
-        padding: 16px;
-        flex: 1;
-    }
-    
-    .close-modal-btn {
-        width: 44px;
-        height: 44px;
-        font-size: 32px;
-    }
-    
-    /* Larger touch target for chart */
-    #priceChart {
-        min-height: 200px;
-    }
-}
-
-/* Portrait mode - landscape-oriented chart that fits on screen */
-@media (max-width: 768px) and (orientation: portrait) {
-    .chart-modal {
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-    }
-    
-    .chart-modal-content {
-        width: 90%;
-        max-width: 500px;
-        max-height: 90vh;
-        border-radius: 12px;
-        display: flex;
-        flex-direction: column;
-        margin: 20px;
-    }
-    
-    .chart-modal-header {
-        padding: 12px 16px;
-        height: 50px;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        flex-shrink: 0;
-    }
-    
-    .chart-modal-header h2 {
-        font-size: 16px;
-    }
-    
-    .close-modal-btn {
-        width: 36px;
-        height: 36px;
-        font-size: 24px;
-        background: var(--bg-tertiary);
-        border-radius: 8px;
-    }
-    
-    .chart-modal-body {
-        padding: 20px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        overflow: hidden;
-        min-height: 0;
-    }
-    
-    #fullScreenPriceChart {
-        max-width: 100%;
-        max-height: 100%;
-        width: auto;
-        height: auto;
-    }
-}
-
-/* Regular mobile landscape (device already in landscape) */
-@media (max-width: 768px) and (orientation: landscape) {
-    .chart-modal-content {
-        width: 100%;
-        height: 100%;
-        max-height: 100vh;
-        border-radius: 0;
-        display: flex;
-        flex-direction: column;
-    }
-    
-    .chart-modal-header {
-        padding: 12px 16px;
-        height: 50px;
-        flex-shrink: 0;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-    }
-    
-    .chart-modal-header h2 {
-        font-size: 16px;
-    }
-    
-    .close-modal-btn {
-        width: 40px;
-        height: 40px;
-        font-size: 28px;
-        background: var(--bg-tertiary);
-        border-radius: 8px;
-    }
-    
-    .chart-modal-body {
-        flex: 1;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        padding: 8px;
-        overflow: hidden;
-        min-height: 0;
-    }
-    
-    #fullScreenPriceChart {
-        max-width: 80%;
-        max-height: 80%;
-        width: auto;
-        height: auto;
-    }
-}
-
-/* When modal is open, lock body scroll */
-body.chart-modal-open {
-    overflow: hidden;
-    position: fixed;
-    width: 100%;
-    height: 100%;
 }
 
 /* Touch device optimizations */
@@ -2282,10 +1554,6 @@ body.chart-modal-open {
     #revenueChart,
     #fcfChart,
     #peChart {
-        cursor: default;
-    }
-    
-    .chart-modal-backdrop {
         cursor: default;
     }
 }
@@ -2322,57 +1590,6 @@ body.chart-modal-open {
     font-size: 16px;
     font-weight: 600;
     color: var(--text-primary);
-}
-
-/* Metric Card Flip Animation */
-.metric-card-flip {
-    position: relative;
-    transform-style: preserve-3d;
-    transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.metric-card-flip.flipped {
-    transform: rotateY(180deg);
-}
-
-.metric-card-front,
-.metric-card-back {
-    backface-visibility: hidden;
-    -webkit-backface-visibility: hidden;
-}
-
-.metric-card-back {
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    transform: rotateY(180deg);
-    background: var(--bg-secondary);
-    border-radius: 8px;
-    padding: 12px;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-}
-
-.metric-card-back .explanation {
-    font-size: 12px;
-    color: var(--text-secondary);
-    line-height: 1.5;
-}
-
-.metric-card-back .close-flip {
-    position: absolute;
-    top: 8px;
-    right: 8px;
-    background: none;
-    border: none;
-    color: var(--text-muted);
-    font-size: 16px;
-    cursor: pointer;
-    padding: 4px;
-    min-width: auto;
 }
 
 /* Flip hint indicator */
@@ -2519,26 +1736,6 @@ button,
     }
 }
 
-/* Pattern fills for accessibility (color blindness) */
-.pattern-stripe {
-    background-image: repeating-linear-gradient(
-        45deg,
-        transparent,
-        transparent 4px,
-        rgba(255, 255, 255, 0.1) 4px,
-        rgba(255, 255, 255, 0.1) 8px
-    );
-}
-
-.pattern-dot {
-    background-image: radial-gradient(
-        circle,
-        rgba(255, 255, 255, 0.2) 2px,
-        transparent 2px
-    );
-    background-size: 8px 8px;
-}
-
 /* Chart Background Gradients */
 .chart-wrapper {
     position: relative;
@@ -2560,46 +1757,6 @@ button,
     );
     pointer-events: none;
     z-index: 1;
-}
-
-/* Glow effect on positive areas */
-.chart-positive-glow {
-    filter: drop-shadow(0 0 8px rgba(16, 185, 129, 0.3));
-}
-
-/* Glow effect on negative areas */
-.chart-negative-glow {
-    filter: drop-shadow(0 0 8px rgba(239, 68, 68, 0.3));
-}
-
-/* Section Dividers */
-.section-divider {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    margin: 32px 0 24px;
-    opacity: 0;
-    animation: fadeSlideUp 0.5s var(--ease-out) 0.3s forwards;
-}
-
-.divider-line {
-    flex: 1;
-    height: 1px;
-    background: linear-gradient(
-        90deg,
-        transparent 0%,
-        rgba(148, 163, 184, 0.3) 50%,
-        transparent 100%
-    );
-}
-
-.divider-label {
-    font-size: 12px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 2px;
-    color: var(--text-muted);
-    white-space: nowrap;
 }
 
 /* Standardized chart heights */
@@ -2635,44 +1792,6 @@ button,
     #overview .chart-wrapper canvas {
         height: 280px;
     }
-}
-
-/* Metrics Row Styling */
-.metrics-row-header {
-    font-size: 11px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    color: var(--text-muted);
-    margin: 16px 0 12px;
-    padding-left: 4px;
-}
-
-.metrics-row-header:first-child {
-    margin-top: 0;
-}
-
-.metrics-row-divider {
-    height: 1px;
-    background: linear-gradient(90deg, transparent, rgba(148, 163, 184, 0.2), transparent);
-    margin: 16px 0;
-}
-
-.metrics-row {
-    background: rgba(255, 255, 255, 0.02);
-    border-radius: 8px;
-    padding: 12px;
-    margin: 0 -12px;
-}
-
-.metrics-key .metric {
-    background: rgba(59, 130, 246, 0.05);
-    border-radius: 6px;
-    padding: 12px;
-}
-
-.metrics-key .metric:hover {
-    background: rgba(59, 130, 246, 0.1);
 }
 
 /* Pull-to-refresh indicator styles */
@@ -3069,62 +2188,6 @@ button,
 
 .detail-value.link:hover {
     text-decoration: underline;
-}
-
-.executives-card {
-    padding: 24px;
-}
-
-.executives-list {
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-}
-
-.executive-item {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    padding: 16px;
-    background: rgba(255, 255, 255, 0.03);
-    border-radius: 10px;
-    border: 1px solid rgba(255, 255, 255, 0.05);
-}
-
-.executive-avatar {
-    width: 48px;
-    height: 48px;
-    border-radius: 50%;
-    background: linear-gradient(135deg, #3b82f6, #8b5cf6);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 18px;
-    font-weight: 600;
-    color: white;
-}
-
-.executive-info {
-    flex: 1;
-}
-
-.executive-name {
-    font-size: 15px;
-    font-weight: 600;
-    color: #f8fafc;
-    margin-bottom: 4px;
-}
-
-.executive-title {
-    font-size: 13px;
-    color: #94a3b8;
-}
-
-.placeholder-text {
-    color: #64748b;
-    font-style: italic;
-    text-align: center;
-    padding: 20px;
 }
 
 @media (max-width: 768px) {

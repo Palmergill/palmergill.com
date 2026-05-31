@@ -36,81 +36,6 @@ const APIRequest = {
     }
 };
 
-// Avatar Manager - Generates and manages player avatars
-const AvatarManager = {
-    // Emoji avatar sets for AI opponents
-    avatarSets: [
-        ['🤖', '👾', '🤡', '👽', '👻', '💀', '🎃'],
-        ['🐶', '🐱', '🐭', '🐹', '🐰', '🦊', '🐻'],
-        ['🦁', '🐯', '🐨', '🐼', '🐷', '🐸', '🐙'],
-        ['🦉', '🦇', '🐺', '🐗', '🐴', '🦄', '🐝'],
-        ['🐛', '🦋', '🐞', '🐢', '🐬', '🐠', '🦑'],
-        ['🔥', '⚡', '💎', '🌟', '🍀', '🌙', '☀️'],
-        ['🎸', '🎺', '🎻', '🎮', '🎯', '🎲', '🎳'],
-        ['🚀', '🛸', '🚁', '🛶', '⛵', '🚂', '🚲'],
-        ['🍎', '🍊', '🍋', '🍌', '🍉', '🍇', '🍓'],
-        ['⚽', '🏀', '🏈', '⚾', '🎾', '🏐', '🏉']
-    ],
-
-    // Background colors for avatars
-    bgColors: [
-        '#e74c3c', '#3498db', '#2ecc71', '#f39c12', '#9b59b6',
-        '#1abc9c', '#e67e22', '#34495e', '#16a085', '#c0392b'
-    ],
-
-    // Generate avatar for AI bot based on name
-    getBotAvatar(name) {
-        // Use name to deterministically select avatar
-        let hash = 0;
-        for (let i = 0; i < name.length; i++) {
-            hash = name.charCodeAt(i) + ((hash << 5) - hash);
-        }
-        const setIndex = Math.abs(hash) % this.avatarSets.length;
-        const avatarIndex = Math.abs(hash >> 4) % this.avatarSets[setIndex].length;
-        const colorIndex = Math.abs(hash >> 8) % this.bgColors.length;
-
-        return {
-            emoji: this.avatarSets[setIndex][avatarIndex],
-            bgColor: this.bgColors[colorIndex],
-            type: 'emoji'
-        };
-    },
-
-    // Get avatar for human player
-    getPlayerAvatar(name) {
-        const initials = name
-            .split(' ')
-            .map(n => n[0])
-            .join('')
-            .toUpperCase()
-            .slice(0, 2);
-
-        // Generate consistent color based on name
-        let hash = 0;
-        for (let i = 0; i < name.length; i++) {
-            hash = name.charCodeAt(i) + ((hash << 5) - hash);
-        }
-        const colorIndex = Math.abs(hash) % this.bgColors.length;
-
-        return {
-            initials,
-            bgColor: this.bgColors[colorIndex],
-            type: 'initials'
-        };
-    },
-
-    // Render avatar HTML
-    render(avatar, size = 'medium') {
-        const sizeClass = size === 'small' ? 'avatar-small' : size === 'large' ? 'avatar-large' : 'avatar-medium';
-
-        if (avatar.type === 'emoji') {
-            return `<div class="avatar ${sizeClass}" style="background-color: ${escapeHtml(avatar.bgColor)};">${escapeHtml(avatar.emoji)}</div>`;
-        } else {
-            return `<div class="avatar ${sizeClass}" style="background-color: ${escapeHtml(avatar.bgColor)};"><span class="avatar-initials">${escapeHtml(avatar.initials)}</span></div>`;
-        }
-    }
-};
-
 // Touch Gesture Manager - Handles mobile swipe/tap gestures
 const GestureManager = {
     touchStartX: 0,
@@ -760,24 +685,16 @@ const elements = {
     statsModal: document.getElementById('stats-modal'),
     statsContent: document.getElementById('stats-content'),
     btnCloseStats: document.getElementById('btn-close-stats'),
-    btnResetStats: document.getElementById('btn-reset-stats'),
-    buyBackOverlay: document.getElementById('buy-back-overlay'),
-    buyBackDetails: document.getElementById('buy-back-details'),
-    finalChipCount: document.getElementById('final-chip-count'),
-    btnBuyBack: document.getElementById('btn-buy-back'),
-    btnEndGame: document.getElementById('btn-end-game')
+    btnResetStats: document.getElementById('btn-reset-stats')
 };
 
 // Theme Manager
 const ThemeManager = {
     themes: ['theme-green', 'theme-blue', 'theme-red', 'theme-black', 'theme-purple'],
-    currentThemeIndex: 0,
 
     init() {
-        // Load saved theme from localStorage
         const savedTheme = localStorage.getItem('poker-theme');
         if (savedTheme && this.themes.includes(savedTheme)) {
-            this.currentThemeIndex = this.themes.indexOf(savedTheme);
             this.applyTheme(savedTheme);
         }
     },
@@ -785,25 +702,8 @@ const ThemeManager = {
     applyTheme(themeClass) {
         if (!elements.gameScreen) return;
         
-        // Remove all theme classes
         this.themes.forEach(t => elements.gameScreen.classList.remove(t));
-        
-        // Add new theme class
         elements.gameScreen.classList.add(themeClass);
-        
-        // Save to localStorage
-        localStorage.setItem('poker-theme', themeClass);
-    },
-
-    nextTheme() {
-        this.currentThemeIndex = (this.currentThemeIndex + 1) % this.themes.length;
-        const nextTheme = this.themes[this.currentThemeIndex];
-        this.applyTheme(nextTheme);
-        
-        // Provide haptic feedback if available
-        if (navigator.vibrate) {
-            navigator.vibrate(20);
-        }
     }
 };
 
@@ -812,7 +712,6 @@ const DarkModeManager = {
     isDarkMode: true,
 
     init() {
-        // Load saved preference from localStorage
         const savedMode = localStorage.getItem('poker-dark-mode');
         if (savedMode !== null) {
             this.isDarkMode = savedMode === 'true';
@@ -822,27 +721,10 @@ const DarkModeManager = {
 
     applyMode() {
         const body = document.body;
-        const modeIcon = document.getElementById('mode-icon');
-        
         if (this.isDarkMode) {
             body.classList.remove('light-mode');
-            if (modeIcon) modeIcon.textContent = '🌙';
         } else {
             body.classList.add('light-mode');
-            if (modeIcon) modeIcon.textContent = '☀️';
-        }
-        
-        // Save to localStorage
-        localStorage.setItem('poker-dark-mode', this.isDarkMode);
-    },
-
-    toggle() {
-        this.isDarkMode = !this.isDarkMode;
-        this.applyMode();
-        
-        // Provide haptic feedback if available
-        if (navigator.vibrate) {
-            navigator.vibrate(20);
         }
     }
 };
@@ -850,14 +732,10 @@ const DarkModeManager = {
 // Card Deck Theme Manager
 const CardDeckManager = {
     decks: ['card-deck-classic', 'card-deck-modern', 'card-deck-minimal', 'card-deck-vintage', 'card-deck-neon'],
-    deckLabels: ['Classic', 'Modern', 'Minimal', 'Vintage', 'Neon'],
-    currentDeckIndex: 0,
 
     init() {
-        // Load saved deck theme from localStorage
         const savedDeck = localStorage.getItem('poker-card-deck');
         if (savedDeck && this.decks.includes(savedDeck)) {
-            this.currentDeckIndex = this.decks.indexOf(savedDeck);
             this.applyDeck(savedDeck);
         }
     },
@@ -865,31 +743,8 @@ const CardDeckManager = {
     applyDeck(deckClass) {
         if (!elements.gameScreen) return;
         
-        // Remove all deck classes
         this.decks.forEach(d => elements.gameScreen.classList.remove(d));
-        
-        // Add new deck class
         elements.gameScreen.classList.add(deckClass);
-        
-        // Update label
-        const deckLabel = document.getElementById('deck-label');
-        if (deckLabel) {
-            deckLabel.textContent = this.deckLabels[this.currentDeckIndex];
-        }
-        
-        // Save to localStorage
-        localStorage.setItem('poker-card-deck', deckClass);
-    },
-
-    nextDeck() {
-        this.currentDeckIndex = (this.currentDeckIndex + 1) % this.decks.length;
-        const nextDeck = this.decks[this.currentDeckIndex];
-        this.applyDeck(nextDeck);
-        
-        // Provide haptic feedback if available
-        if (navigator.vibrate) {
-            navigator.vibrate(20);
-        }
     }
 };
 
@@ -1090,13 +945,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Buy-back button listeners
-    if (elements.btnBuyBack) {
-        elements.btnBuyBack.addEventListener('click', buyBackIn);
-    }
-    if (elements.btnEndGame) {
-        elements.btnEndGame.addEventListener('click', endGame);
-    }
 });
 
 function setRaiseAmount(amount) {
@@ -2214,26 +2062,6 @@ function hideHandResult() {
     }
 }
 
-function showBuyBackOverlay() {
-    const myPlayer = gameState.players.find(p => p.id === playerId);
-    if (elements.finalChipCount) {
-        elements.finalChipCount.textContent = `Final: ${myPlayer?.chips || 0} chips`;
-    }
-    
-    // Play loss sound
-    SoundManager.playLoss();
-    
-    if (elements.buyBackOverlay) {
-        elements.buyBackOverlay.classList.remove('hidden');
-    }
-}
-
-function hideBuyBackOverlay() {
-    if (elements.buyBackOverlay) {
-        elements.buyBackOverlay.classList.add('hidden');
-    }
-}
-
 async function buyBackIn() {
     if (isRequestPending || !gameId || !playerId) return;
 
@@ -2251,7 +2079,6 @@ async function buyBackIn() {
 
         const responseData = await response.json();
         updateGameState(responseData);
-        hideBuyBackOverlay();
         updateGameDisplay();
         showHandResult();
     } catch (error) {
@@ -2260,60 +2087,6 @@ async function buyBackIn() {
     } finally {
         isRequestPending = false;
     }
-}
-
-function endGame() {
-    hideBuyBackOverlay();
-    
-    // Show final stats
-    const stats = StatsManager.getFormattedStats();
-    const myPlayer = gameState.players.find(p => p.id === playerId);
-    const finalChips = myPlayer?.chips || 0;
-    
-    // Create end game summary
-    let summaryHTML = `
-        <div style="text-align: center; margin-bottom: 20px;">
-            <h3 style="color: #ffd700; margin-bottom: 10px;">🎮 Game Over</h3>
-            <p style="font-size: 1.2rem;">Final Chip Count: <span style="color: ${finalChips >= 1000 ? '#10b981' : '#ef4444'}; font-weight: 700;">${finalChips}</span></p>
-            <p style="font-size: 0.9rem; color: #94a3b8; margin-top: 5px;">Started with: 1000 chips</p>
-        </div>
-        <div class="stat-row">
-            <span class="stat-label">Hands Played</span>
-            <span class="stat-value">${stats.handsPlayed}</span>
-        </div>
-        <div class="stat-row">
-            <span class="stat-label">Hands Won</span>
-            <span class="stat-value gold">${stats.handsWon}</span>
-        </div>
-        <div class="stat-row">
-            <span class="stat-label">Win Rate</span>
-            <span class="stat-value gold">${stats.winRate}%</span>
-        </div>
-        <div class="stat-row">
-            <span class="stat-label">Biggest Pot Won</span>
-            <span class="stat-value gold">${stats.biggestPotWon} chips</span>
-        </div>
-        <div class="stat-row">
-            <span class="stat-label">Net Profit/Loss</span>
-            <span class="stat-value ${stats.netProfit >= 0 ? 'positive' : 'negative'}">${stats.netProfit >= 0 ? '+' : ''}${stats.netProfit} chips</span>
-        </div>
-        <div class="stat-row">
-            <span class="stat-label">Best Hand</span>
-            <span class="stat-value">${escapeHtml(stats.bestHand)}</span>
-        </div>
-    `;
-    
-    elements.statsContent.innerHTML = summaryHTML;
-    elements.statsModal.classList.remove('hidden');
-    
-    // Reset game state after showing stats
-    setTimeout(() => {
-        gameState = null;
-        playerId = null;
-        playerToken = null;
-        gameId = null;
-        switchScreen('start');
-    }, 100);
 }
 
 function showStats() {

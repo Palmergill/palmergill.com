@@ -160,19 +160,11 @@ body {
         padding: 8px;
     }
 
-    .theme-toggle {
-        top: 45px;
-        right: 32%;
-    }
 }
 
 /* Animation classes */
 .animate-in {
     animation: fadeInUp 0.3s ease-out;
-}
-
-.card-dealt {
-    animation: fadeInUp 0.2s ease-out;
 }
 
 /* Staggered card deal animations */
@@ -195,17 +187,6 @@ body {
         opacity: 1;
         transform: translateY(0) rotateY(0deg) scale(1);
     }
-}
-
-/* Card flip animation for reveals */
-.card-flip {
-    animation: cardFlip 0.5s ease-out;
-}
-
-@keyframes cardFlip {
-    0% { transform: rotateY(0deg); }
-    50% { transform: rotateY(90deg); }
-    100% { transform: rotateY(0deg); }
 }
 
 /* ========== CARD DECK THEMES ========== */
@@ -425,34 +406,6 @@ body {
     animation: feltPulse 6s ease-in-out infinite;
     pointer-events: none;
     z-index: 0;
-}
-
-/* Card Deck Toggle Button */
-.card-deck-toggle {
-    position: fixed;
-    top: 120px;
-    right: 15px;
-    background: rgba(0,0,0,0.6);
-    border: 1px solid rgba(255,255,255,0.2);
-    border-radius: 8px;
-    padding: 8px 12px;
-    color: #94a3b8;
-    font-size: 11px;
-    cursor: pointer;
-    z-index: 100;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    transition: all 0.2s ease;
-}
-
-.card-deck-toggle:hover {
-    background: rgba(255,255,255,0.1);
-    color: #fff;
-}
-
-.card-deck-toggle .deck-icon {
-    font-size: 12px;
 }
 
 /* Screen Management */
@@ -842,42 +795,6 @@ body {
         radial-gradient(ellipse at 50% 48%, rgba(255,255,255,0.12) 0%, transparent 42%),
         radial-gradient(ellipse at 50% 55%, #61287a 0%, #3f1950 54%, #19091f 100%);
 }
-
-/* Theme Toggle Button */
-.theme-toggle {
-    position: fixed;
-    top: 50px;
-    right: 15px;
-    background: rgba(0,0,0,0.6);
-    border: 1px solid rgba(255,255,255,0.2);
-    border-radius: 8px;
-    padding: 8px 12px;
-    color: #94a3b8;
-    font-size: 11px;
-    cursor: pointer;
-    z-index: 100;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    transition: all 0.2s ease;
-}
-
-.theme-toggle:hover {
-    background: rgba(255,255,255,0.1);
-    color: #fff;
-}
-
-.theme-toggle .color-dot {
-    width: 10px;
-    height: 10px;
-    border-radius: 50%;
-    background: #1a472a;
-}
-
-.theme-blue .theme-toggle .color-dot { background: #1a2d5a; }
-.theme-red .theme-toggle .color-dot { background: #5a1a2d; }
-.theme-black .theme-toggle .color-dot { background: #1a1a1a; }
-.theme-purple .theme-toggle .color-dot { background: #4a1a5a; }
 
 /* Header */
 .game-header {
