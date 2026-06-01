@@ -98,6 +98,7 @@
     function close(nav, toggle) {
         nav.classList.remove("is-open");
         toggle.setAttribute("aria-expanded", "false");
+        toggle.setAttribute("aria-label", "Open navigation");
     }
 
     function init() {

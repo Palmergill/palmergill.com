@@ -1226,36 +1226,12 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 50);
     }
 
-    // ============================================
-    // AUTO-LOAD TSLA ON HOMEPAGE
-    // ============================================
-    tickerInput.value = 'TSLA';
-    empty.classList.add('hidden');
-    loading.classList.remove('hidden');
-    
-    // Small delay to ensure everything is ready
-    setTimeout(async () => {
-        try {
-            await loadStock('TSLA');
-        } catch (err) {
-            console.error('Failed to load TSLA:', err);
-            loading.classList.add('hidden');
-            error.classList.remove('hidden');
-            if (errorMessage) {
-                errorMessage.textContent = err.message || 'Failed to load data';
-            }
-            // Show empty state again on error
-            empty.classList.remove('hidden');
-            
-            // Reset header to show logo
-            const headerLogo = document.getElementById('headerLogo');
-            const headerStockContent = document.getElementById('headerStockContent');
-            const searchIconBtnMain = document.getElementById('searchIconBtnMain');
-            if (headerLogo) headerLogo.classList.remove('hidden');
-            if (headerStockContent) headerStockContent.classList.add('hidden');
-            if (searchIconBtnMain) searchIconBtnMain.classList.remove('hidden');
-        }
-    }, 100);
+    // Load a ticker only when explicitly requested, keeping the discovery state usable by default.
+    const initialTicker = new URLSearchParams(window.location.search).get('ticker')?.trim().toUpperCase();
+    if (initialTicker) {
+        tickerInput.value = initialTicker;
+        setTimeout(() => loadStock(initialTicker), 100);
+    }
 
     // Fetch price history separately to avoid rate limits
     async function fetchPriceHistory(ticker) {

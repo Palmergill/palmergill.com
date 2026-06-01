@@ -54,15 +54,16 @@
         </div>
         
         <!-- Search Modal -->
-        <div id="searchModal" class="search-modal hidden">
-            <div class="search-modal-backdrop"></div>
+        <div id="searchModal" class="search-modal hidden" role="dialog" aria-modal="true" aria-label="Search stocks">
+            <div class="search-modal-backdrop" aria-hidden="true"></div>
             <div class="search-modal-content">
-                <form id="searchForm" class="search-modal-form">
+                <form id="searchForm" class="search-modal-form" role="search">
                     <div class="search-modal-input-wrapper">
                         <input 
                             type="text" 
                             id="tickerInput" 
                             placeholder="Search ticker or company name..." 
+                            aria-label="Ticker or company name"
                             autocomplete="off"
                             autofocus
                         >
@@ -70,7 +71,7 @@
                     </div>
                     <div id="searchSuggestions" class="suggestions hidden"></div>
                 </form>
-                <button id="closeSearchModal" class="close-search-modal">&times;</button>
+                <button id="closeSearchModal" class="close-search-modal" type="button" aria-label="Close search">&times;</button>
             </div>
         </div>
 
