@@ -656,6 +656,7 @@ const elements = {
     handStrength: document.getElementById('hand-strength'),
     aiActionIndicator: document.getElementById('ai-action-indicator'),
     yourName: document.getElementById('your-name'),
+    yourPositionChip: document.getElementById('your-position-chip'),
     yourChips: document.getElementById('your-chips'),
     actionButtons: document.getElementById('action-buttons'),
     btnFold: document.getElementById('btn-fold'),
@@ -1569,6 +1570,9 @@ function updateGameDisplay() {
     const myPlayer = gameState.players.find(p => p.id === playerId);
     if (myPlayer) {
         elements.yourChips.innerHTML = ChipStackVisualizer.render(myPlayer.chips, true, true);
+        if (elements.yourPositionChip) {
+            elements.yourPositionChip.innerHTML = renderPositionChip(myPlayer);
+        }
         document.querySelector('.your-avatar-container')?.remove();
         
         // Your cards with staggered animation (deal player cards first)
@@ -1660,6 +1664,22 @@ function getClockwiseOpponents(players, heroId) {
     }));
 }
 
+// Build the dealer button / blind chip for a seat. The dealer button is the
+// primary indicator of turn order; in heads-up the dealer also posts the small
+// blind, so dealer takes priority over the blind chips.
+function renderPositionChip(player) {
+    if (player.is_dealer) {
+        return `<span class="position-chip dealer" title="Dealer button" aria-label="Dealer">D</span>`;
+    }
+    if (player.is_small_blind) {
+        return `<span class="position-chip small-blind" title="Small blind" aria-label="Small blind">SB</span>`;
+    }
+    if (player.is_big_blind) {
+        return `<span class="position-chip big-blind" title="Big blind" aria-label="Big blind">BB</span>`;
+    }
+    return '';
+}
+
 function renderOpponent(player, seatClass = 'seat-1') {
     const isCurrent = gameState.phase !== 'showdown' && gameState.current_player === player.id;
     const isShowdown = gameState.phase === 'showdown';
@@ -1671,6 +1691,7 @@ function renderOpponent(player, seatClass = 'seat-1') {
 
     return `
         <div class="opponent ${seatClass} ${recentActionClass} ${player.folded ? 'folded' : ''} ${isCurrent ? 'active-turn' : ''} ${isWinner ? 'winner' : ''}">
+            ${renderPositionChip(player)}
             <div class="opponent-cards">
                 ${showCards
                     ? player.hand.map(c => renderCard(c)).join('')

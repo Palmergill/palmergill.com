@@ -566,8 +566,8 @@ function repeatLastBets() {
 // ── Display Updates ──
 function updateAllDisplays() {
     // Main bet buttons
-    updateMainBetBtn('passLine', 'passLineBtn', 'passLineInfo', 'passLineOddsChip');
-    updateMainBetBtn('dontPass', 'dontPassBtn', 'dontPassInfo', 'dontPassOddsChip');
+    updateMainBetBtn('passLine', 'passLineBtn', 'passLineInfo');
+    updateMainBetBtn('dontPass', 'dontPassBtn', 'dontPassInfo');
 
     // Come/Don't Come enabled state
     const comeBtn = document.getElementById('comeBtn');
@@ -584,50 +584,32 @@ function updateAllDisplays() {
         dcBtn.disabled = false;
     }
 
-    // Come bet button display
+    // Come bet button display (odds render as gold chips on the number boards)
     const comeInfoEl = document.getElementById('comeInfo');
-    const comeOddsChip = document.getElementById('comeOddsChip');
     if (comeBets.length > 0) {
         const totalAmt = comeBets.reduce((s, b) => s + b.amount, 0);
-        const totalOdds = comeBets.reduce((s, b) => s + b.odds, 0);
         const pts = comeBets.filter(b => b.point).map(b => b.point);
         let text = '$' + totalAmt;
         if (pts.length > 0) text += ' \u2022 ' + pts.join(',');
         const waiting = comeBets.filter(b => !b.point).length;
         if (waiting > 0) text += ' \u2022 ' + waiting + ' new';
         comeInfoEl.textContent = text;
-        if (totalOdds > 0) {
-            comeOddsChip.textContent = '+$' + totalOdds + ' odds';
-            comeOddsChip.classList.add('visible');
-        } else {
-            comeOddsChip.classList.remove('visible');
-        }
     } else {
         comeInfoEl.textContent = 'Tap to bet';
-        comeOddsChip.classList.remove('visible');
     }
 
-    // Don't Come bet button display
+    // Don't Come bet button display (odds render as gold chips on the number boards)
     const dcInfoEl = document.getElementById('dontComeInfo');
-    const dcOddsChip = document.getElementById('dontComeOddsChip');
     if (dontComeBets.length > 0) {
         const totalAmt = dontComeBets.reduce((s, b) => s + b.amount, 0);
-        const totalOdds = dontComeBets.reduce((s, b) => s + b.odds, 0);
         const pts = dontComeBets.filter(b => b.point).map(b => b.point);
         let text = '$' + totalAmt;
         if (pts.length > 0) text += ' \u2022 ' + pts.join(',');
         const waiting = dontComeBets.filter(b => !b.point).length;
         if (waiting > 0) text += ' \u2022 ' + waiting + ' new';
         dcInfoEl.textContent = text;
-        if (totalOdds > 0) {
-            dcOddsChip.textContent = '+$' + totalOdds + ' odds';
-            dcOddsChip.classList.add('visible');
-        } else {
-            dcOddsChip.classList.remove('visible');
-        }
     } else {
         dcInfoEl.textContent = 'Tap to bet';
-        dcOddsChip.classList.remove('visible');
     }
 
     // Place bet buttons
@@ -702,10 +684,9 @@ function updateAllDisplays() {
     updateRollButton();
 }
 
-function updateMainBetBtn(bt, btnId, infoId, oddsChipId) {
+function updateMainBetBtn(bt, btnId, infoId) {
     const btn = document.getElementById(btnId);
     const info = document.getElementById(infoId);
-    const chip = document.getElementById(oddsChipId);
     if (bets[bt] > 0) {
         info.textContent = '$' + bets[bt];
         if (btn) btn.classList.add('has-bet');
@@ -713,14 +694,7 @@ function updateMainBetBtn(bt, btnId, infoId, oddsChipId) {
         info.textContent = 'Tap to bet';
         if (btn) btn.classList.remove('has-bet');
     }
-    if (chip) {
-        if (oddsBets[bt] > 0) {
-            chip.textContent = '+$' + oddsBets[bt] + ' odds';
-            chip.classList.add('visible');
-        } else {
-            chip.classList.remove('visible');
-        }
-    }
+    // Odds render as gold chips on the board (see updateBoardChips)
 }
 
 function formatChipAmount(amount) {
@@ -736,6 +710,21 @@ function getChipStyle(amount, kind = 'base') {
     return { color: '#b91c1c', text: '#ffffff' };
 }
 
+function buildChipPile(amount, style) {
+    const pile = document.createElement('span');
+    pile.className = 'chip-pile';
+    const chipCount = Math.min(3, Math.max(1, Math.ceil(amount / 25)));
+    for (let i = 0; i < chipCount; i++) {
+        const chip = document.createElement('span');
+        chip.className = 'casino-chip';
+        chip.style.setProperty('--chip-color', style.color);
+        chip.style.setProperty('--chip-text', style.text);
+        chip.setAttribute('data-amount', i === chipCount - 1 ? formatChipAmount(amount) : '');
+        pile.appendChild(chip);
+    }
+    return pile;
+}
+
 function addBoardChip(zoneId, amount, options = {}) {
     const zone = document.getElementById(zoneId);
     if (!zone || amount <= 0) return;
@@ -745,22 +734,19 @@ function addBoardChip(zoneId, amount, options = {}) {
     if (options.variant) stack.classList.add('stack-' + options.variant);
     stack.setAttribute('aria-hidden', 'true');
 
-    const chipCount = Math.min(3, Math.max(1, Math.ceil(amount / 25)));
-    const style = getChipStyle(amount, options.kind);
-    for (let i = 0; i < chipCount; i++) {
-        const chip = document.createElement('span');
-        chip.className = 'casino-chip';
-        chip.style.setProperty('--chip-color', style.color);
-        chip.style.setProperty('--chip-text', style.text);
-        chip.setAttribute('data-amount', i === chipCount - 1 ? formatChipAmount(amount) : '');
-        stack.appendChild(chip);
+    stack.appendChild(buildChipPile(amount, getChipStyle(amount, options.kind)));
+
+    if (options.odds > 0) {
+        const oddsPile = buildChipPile(options.odds, getChipStyle(options.odds, 'odds'));
+        oddsPile.classList.add('odds-pile');
+        oddsPile.setAttribute('data-label', 'odds');
+        stack.appendChild(oddsPile);
     }
 
-    const noteText = options.note || (options.odds > 0 ? '+' + formatChipAmount(options.odds) + ' odds' : '');
-    if (noteText) {
+    if (options.note) {
         const note = document.createElement('span');
         note.className = 'chip-note';
-        note.textContent = noteText;
+        note.textContent = options.note;
         stack.appendChild(note);
     }
 
@@ -787,7 +773,7 @@ function updateBoardChips() {
             addBoardChip('boardPlace' + num + 'Btn', bet.amount, {
                 variant: 'come',
                 odds: bet.odds,
-                note: bet.odds > 0 ? 'Come +' + formatChipAmount(bet.odds) : 'Come'
+                note: 'Come'
             });
         });
 
@@ -797,7 +783,7 @@ function updateBoardChips() {
                 variant: 'dont-come',
                 kind: 'dont',
                 odds: bet.odds,
-                note: bet.odds > 0 ? 'DC +' + formatChipAmount(bet.odds) : 'DC'
+                note: 'DC'
             });
         });
     });

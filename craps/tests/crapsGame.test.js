@@ -359,9 +359,14 @@ describe('craps game regressions', () => {
     window.updateAllDisplays();
 
     expect(window.document.querySelectorAll('.board-chip-stack')).toHaveLength(9);
-    expect(window.document.querySelector('#passLineBtn .chip-note').textContent).toBe('+$30 odds');
-    expect(window.document.querySelector('#boardPlace6Btn .stack-come .chip-note').textContent).toBe('Come +$20');
-    expect(window.document.querySelector('#boardPlace8Btn .stack-dont-come .chip-note').textContent).toBe('DC +$10');
+    // Odds render as their own gold chip pile, not as text
+    const passOddsPile = window.document.querySelector('#passLineBtn .odds-pile');
+    expect(passOddsPile).not.toBeNull();
+    expect(passOddsPile.querySelector('.casino-chip[data-amount="$30"]')).not.toBeNull();
+    expect(window.document.querySelector('#boardPlace6Btn .stack-come .chip-note').textContent).toBe('Come');
+    expect(window.document.querySelector('#boardPlace6Btn .stack-come .odds-pile .casino-chip[data-amount="$20"]')).not.toBeNull();
+    expect(window.document.querySelector('#boardPlace8Btn .stack-dont-come .chip-note').textContent).toBe('DC');
+    expect(window.document.querySelector('#boardPlace8Btn .stack-dont-come .odds-pile .casino-chip[data-amount="$10"]')).not.toBeNull();
     expect(window.document.querySelector('#centerBoardBtn .chip-note').textContent).toBe('2 bets');
   });
 

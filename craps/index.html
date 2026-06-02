@@ -284,24 +284,6 @@
         .place { --accent: var(--gold); }
         .center { --accent: var(--teal); }
 
-        .odds-chip {
-            position: absolute;
-            top: 10px;
-            right: 10px;
-            z-index: 2;
-            display: none;
-            padding: 4px 8px;
-            border: 1px solid rgba(232, 199, 115, 0.48);
-            border-radius: 999px;
-            background: rgba(232, 199, 115, 0.16);
-            color: var(--gold);
-            font-size: 0.62rem;
-            font-weight: 850;
-            letter-spacing: 0.04em;
-        }
-
-        .odds-chip.visible { display: block; }
-
         .quick-actions,
         .active-bets-strip {
             position: relative;
@@ -1524,10 +1506,31 @@
             display: flex;
             align-items: center;
             justify-content: center;
+            gap: 7px;
             min-width: 48px;
             min-height: 42px;
             pointer-events: none;
             transform: translate(-50%, -50%);
+        }
+
+        .chip-pile {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+
+        .odds-pile::after {
+            content: attr(data-label);
+            position: absolute;
+            left: 50%;
+            top: calc(100% - 2px);
+            color: #f4c96a;
+            font-size: 0.5rem;
+            font-weight: 900;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+            transform: translateX(-50%);
         }
 
         .number-zone .board-chip-stack {
@@ -1646,8 +1649,7 @@
             gap: 8px;
         }
 
-        .bet-chip,
-        .odds-chip {
+        .bet-chip {
             border: 1px solid rgba(232, 199, 115, 0.34);
             border-radius: 999px;
             background: rgba(232, 199, 115, 0.1);
@@ -2123,25 +2125,21 @@
             <button type="button" class="bet-btn come disabled" id="comeBtn" onclick="openBetModal('come')" disabled>
                 <span class="label">COME</span>
                 <span class="amt" id="comeInfo">Tap to bet</span>
-                <span class="odds-chip" id="comeOddsChip"></span>
             </button>
 
             <button type="button" class="bet-btn dont-come disabled" id="dontComeBtn" onclick="openBetModal('dontCome')" disabled>
                 <span class="label">DON'T COME</span>
                 <span class="amt" id="dontComeInfo">Tap to bet</span>
-                <span class="odds-chip" id="dontComeOddsChip"></span>
             </button>
 
             <button type="button" class="bet-btn dont" id="dontPassBtn" onclick="openBetModal('dontPass')">
                 <span class="label">DON'T PASS</span>
                 <span class="amt" id="dontPassInfo">Tap to bet</span>
-                <span class="odds-chip" id="dontPassOddsChip"></span>
             </button>
 
             <button type="button" class="bet-btn pass" id="passLineBtn" onclick="openBetModal('passLine')">
                 <span class="label">PASS LINE</span>
                 <span class="amt" id="passLineInfo">Tap to bet</span>
-                <span class="odds-chip" id="passLineOddsChip"></span>
             </button>
         </div>
 

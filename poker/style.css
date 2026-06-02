@@ -1030,6 +1030,56 @@ body {
     }
 }
 
+/* Dealer button / blind chips marking turn order */
+.position-chip {
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    z-index: 8;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 4px;
+    border-radius: 999px;
+    font-size: clamp(9px, 2.4vw, 11px);
+    font-weight: 900;
+    line-height: 1;
+    letter-spacing: 0.02em;
+    box-shadow: 0 3px 8px rgba(0,0,0,0.45);
+    pointer-events: none;
+}
+
+.position-chip.dealer {
+    background: radial-gradient(circle at 35% 30%, #ffffff 0%, #e6e6e6 60%, #c2c2c2 100%);
+    color: #1f1700;
+    border: 2px dashed rgba(120, 90, 0, 0.55);
+}
+
+.position-chip.small-blind {
+    background: radial-gradient(circle at 35% 30%, #6fb6ff 0%, #2f7fd6 70%, #1c5aa0 100%);
+    color: #ffffff;
+    border: 2px solid rgba(255,255,255,0.65);
+}
+
+.position-chip.big-blind {
+    background: radial-gradient(circle at 35% 30%, #ff8a8a 0%, #e23b3b 70%, #a51f1f 100%);
+    color: #ffffff;
+    border: 2px solid rgba(255,255,255,0.65);
+}
+
+/* Hero seat reuses the same chip, sitting inline next to the name */
+.your-position-chip:empty {
+    display: none;
+}
+
+.your-position-chip .position-chip {
+    position: static;
+    margin-left: 8px;
+    vertical-align: middle;
+}
+
 .opponent-action-badge {
     display: inline-block;
     max-width: 100%;
