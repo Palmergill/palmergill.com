@@ -88,8 +88,8 @@
         },
         soft: {
             20: "S S S S S S S S S S".split(" "),
-            19: "S S S S S S S S S S".split(" "),
-            18: "S D D D D S S H H H".split(" "),
+            19: "S S S S DS S S S S S".split(" "),
+            18: "DS DS DS DS DS S S H H H".split(" "),
             17: "H D D D D H H H H H".split(" "),
             16: "H H D D D H H H H H".split(" "),
             15: "H H D D D H H H H H".split(" "),
@@ -103,7 +103,7 @@
             14: "S S S S S H H H H H".split(" "),
             13: "S S S S S H H H H H".split(" "),
             12: "H H S S S H H H H H".split(" "),
-            11: "D D D D D D D D D H".split(" "),
+            11: "D D D D D D D D D D".split(" "),
             10: "D D D D D D D D H H".split(" "),
             9:  "H D D D D H H H H H".split(" "),
             8:  "H H H H H H H H H H".split(" "),
@@ -135,6 +135,7 @@
             const row = BASIC_STRATEGY.soft[value.total];
             if (row) {
                 const code = row[idx];
+                if (code === "DS") return canDoubleHand ? "double" : "stand";
                 if (code === "D") return canDoubleHand ? "double" : (value.total === 18 && idx <= 1 ? "stand" : "hit");
                 if (code === "S") return "stand";
                 return "hit";
@@ -147,6 +148,7 @@
         if (!row) return null;
         const code = row[idx];
         if (code === "D") return canDoubleHand ? "double" : "hit";
+        if (code === "DS") return canDoubleHand ? "double" : "stand";
         if (code === "S") return "stand";
         return "hit";
     }
