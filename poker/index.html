@@ -23,7 +23,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;700;900&family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/shared/casino-theme.css?v=1">
     <link rel="stylesheet" href="/shared/rules-viewer.css?v=1">
-    <link rel="stylesheet" href="style.css?v=16">
+    <link rel="stylesheet" href="style.css?v=17">
     <link rel="manifest" href="manifest.json">
     <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'%3E%3Crect fill='%230a0a0f' width='192' height='192' rx='24'/%3E%3Ctext x='96' y='130' font-size='100' text-anchor='middle'%3E🃏%3C/text%3E%3C/svg%3E">
     <script>
@@ -45,7 +45,7 @@
     <div id="app" data-rules-app>
         <!-- Start Screen -->
         <div id="start-screen" class="screen active" data-rules-game-panel>
-            <div class="logo">♠♥♣♦</div>
+            <div class="logo"><span class="suit-black">♠</span> <span class="suit-red">♥</span> <span class="suit-black">♣</span> <span class="suit-red">♦</span></div>
             <h1>Texas Hold'em</h1>
             <p class="subtitle">No-Limit Poker</p>
             <nav class="rules-tab-list" aria-label="Texas Hold'em views">
@@ -60,9 +60,9 @@
                 <button id="join-multiplayer-btn" class="btn-secondary" style="margin-top: 10px;">Join Multiplayer Game</button>
             </div>
             <div class="game-info">
-                <p>• 5 AI Opponents</p>
-                <p>• 1000 Starting Chips</p>
-                <p>• Blinds 10/20</p>
+                <p>5 AI Opponents</p>
+                <p>1000 Starting Chips</p>
+                <p>Blinds 10/20</p>
             </div>
             <button id="stats-btn" class="btn-secondary" style="margin-top: 30px; max-width: 200px;">Statistics</button>
         </div>

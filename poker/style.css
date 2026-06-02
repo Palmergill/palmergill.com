@@ -4481,3 +4481,106 @@ button:disabled {
         animation: none;
     }
 }
+
+/* ===========================================================================
+   MODERN CASINO LUXE — refined start / join / lobby screens (v17)
+   Deeper green felt · glassy panel · metallic gold · colored suits
+   =========================================================================== */
+
+/* Deep felt backdrop with a soft gold spotlight at the top */
+#start-screen,
+#join-screen,
+#lobby-screen {
+    background:
+        radial-gradient(120% 70% at 50% -8%, rgba(232, 199, 115, 0.12), transparent 55%),
+        radial-gradient(90% 60% at 50% 120%, rgba(7, 30, 22, 0.6), transparent 60%),
+        linear-gradient(180deg, #0c1712 0%, #0a1b14 48%, #07110c 100%) !important;
+}
+
+/* Colored pips on the suit row */
+.logo {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.32em;
+}
+.logo .suit-black {
+    color: #f3ecd6;
+    text-shadow: 0 2px 0 rgba(0, 0, 0, 0.3);
+}
+.logo .suit-red {
+    color: #e0635f;
+    text-shadow: 0 2px 0 rgba(0, 0, 0, 0.3);
+}
+
+/* Glassy card panel */
+.start-form {
+    gap: 11px;
+    padding: 20px;
+    border: 1px solid rgba(232, 199, 115, 0.22);
+    border-radius: 18px;
+    background:
+        linear-gradient(150deg, rgba(255, 255, 255, 0.075), rgba(255, 255, 255, 0.02)),
+        rgba(10, 18, 14, 0.82) !important;
+    box-shadow:
+        0 24px 50px -24px rgba(0, 0, 0, 0.85),
+        inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    -webkit-backdrop-filter: blur(16px);
+    backdrop-filter: blur(16px);
+}
+
+.start-form input {
+    min-height: 50px;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.14) !important;
+    background: rgba(8, 12, 10, 0.6) !important;
+    text-align: center;
+    letter-spacing: 0.01em;
+}
+.start-form input:focus {
+    border-color: rgba(232, 199, 115, 0.6) !important;
+    background: rgba(8, 12, 10, 0.78) !important;
+}
+
+/* Metallic gold primary button */
+.start-form .btn-primary {
+    border-radius: 12px;
+    border: 1px solid rgba(232, 199, 115, 0.5) !important;
+    background: linear-gradient(180deg, #f3d898 0%, #e2b85a 52%, #cf9f44 100%) !important;
+    color: #211803 !important;
+    box-shadow:
+        0 10px 26px -10px rgba(226, 184, 90, 0.6),
+        inset 0 1px 0 rgba(255, 255, 255, 0.5);
+}
+
+/* Ghost secondary buttons inside the panel */
+.start-form .btn-secondary {
+    border-radius: 12px;
+    border: 1px solid rgba(255, 248, 223, 0.14) !important;
+    background: rgba(255, 255, 255, 0.055) !important;
+    color: var(--text) !important;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+.start-form .btn-secondary:hover {
+    background: rgba(255, 255, 255, 0.1) !important;
+    border-color: rgba(232, 199, 115, 0.32) !important;
+}
+
+/* Chip-pill info row */
+.game-info {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px;
+    margin-top: 20px;
+}
+.game-info p {
+    margin: 0;
+    padding: 0 14px;
+    min-height: 32px;
+    border: 1px solid rgba(232, 199, 115, 0.26);
+    background: rgba(232, 199, 115, 0.08);
+    color: #f1dca0;
+    text-transform: none;
+    letter-spacing: 0.03em;
+}
