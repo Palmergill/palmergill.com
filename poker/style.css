@@ -3007,27 +3007,16 @@ input {
     border-top-color: var(--gold);
 }
 
-@media (min-width: 900px) {
-    body.has-site-nav #app::before {
-        left: calc(var(--site-nav-width) + clamp(24px, 3vw, 46px));
-    }
+body.has-site-nav #app::before {
+    top: calc(var(--site-nav-height) + clamp(18px, 3vw, 32px));
+}
 
-    body.has-site-nav .screen {
-        left: var(--site-nav-width);
-        width: calc(100vw - var(--site-nav-width));
-    }
+body.has-site-nav .screen {
+    top: var(--site-nav-height);
+    height: calc(100dvh - var(--site-nav-height));
 }
 
 @media (max-width: 899px) {
-    body.has-site-nav #app::before {
-        top: calc(var(--site-nav-mobile-height) + clamp(18px, 3vw, 32px));
-    }
-
-    body.has-site-nav .screen {
-        top: var(--site-nav-mobile-height);
-        height: calc(100dvh - var(--site-nav-mobile-height));
-    }
-
     #start-screen,
     #join-screen,
     #lobby-screen {
@@ -3639,19 +3628,7 @@ button:disabled {
     font-weight: 900;
 }
 
-@media (min-width: 900px) {
-    body.has-site-nav .screen {
-        left: var(--site-nav-width);
-        width: calc(100vw - var(--site-nav-width));
-    }
-}
-
 @media (max-width: 899px) {
-    body.has-site-nav .screen {
-        top: var(--site-nav-mobile-height);
-        height: calc(100dvh - var(--site-nav-mobile-height));
-    }
-
     #game-screen {
         padding: 8px 10px 10px;
         gap: 8px;
