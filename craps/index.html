@@ -22,7 +22,7 @@
     <link rel="stylesheet" href="/shared/site-nav.css?v=7">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;700;900&family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,500;1,600&family=Playfair+Display:wght@500;700;900&family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/shared/casino-theme.css?v=1">
     <link rel="stylesheet" href="/shared/rules-viewer.css?v=1">
     <script>
@@ -1119,32 +1119,37 @@
         /* Casino table theme — warm felt + wood. Brand gold and fonts come
            from /shared/casino-theme.css; only craps-specific tokens here. */
         :root {
-            --ink: #130d09;
-            --panel: rgba(7, 14, 12, 0.84);
+            --ink: #0a0805;
+            --felt-deep: #052a1a;
+            --felt: #0a4429;
+            --felt-light: #115c39;
+            --gold-bright: #f6e3a6;
+            --gold-shadow: #7c5e1c;
+            --serif: "Cormorant Garamond", Georgia, "Times New Roman", serif;
+            --panel: rgba(0, 0, 0, 0.24);
             --panel-soft: rgba(255, 255, 255, 0.045);
-            --line: rgba(232, 199, 115, 0.24);
-            --line-strong: rgba(232, 199, 115, 0.4);
-            --text: #fff8df;
-            --muted: #d6ead5;
-            --quiet: rgba(214, 234, 213, 0.72);
+            --line: rgba(232, 199, 115, 0.4);
+            --line-strong: rgba(232, 199, 115, 0.55);
+            --text: #f5ebd8;
+            --muted: rgba(245, 235, 216, 0.74);
+            --quiet: rgba(245, 235, 216, 0.5);
             --teal: #58d3ad;
             --blue: #72a9ff;
             --coral: #ff7a6e;
             --danger: #ff6f7d;
-            --radius: 8px;
+            --radius: 9px;
             --max: 1180px;
-            --shadow: 0 24px 58px rgba(0, 0, 0, 0.35);
+            --shadow: 0 28px 80px rgba(0, 0, 0, 0.55);
         }
 
         html {
-            background: #130d09;
+            background: #0a0805;
         }
 
         body {
             min-height: 100vh;
             background:
-                radial-gradient(circle at 10% 10%, rgba(232, 199, 115, 0.16), transparent 28%),
-                linear-gradient(135deg, #130d09 0%, #2f1a10 42%, #061711 100%);
+                radial-gradient(circle at 50% -12%, #18120a 0%, #0a0805 62%);
             color: var(--text);
             font-family: var(--font-body);
             line-height: 1.4;
@@ -1192,15 +1197,20 @@
         .bet-modal h3,
         .point-popup .point-number {
             color: var(--text);
-            font-family: inherit;
-            font-weight: 800;
-            letter-spacing: 0;
-            text-shadow: 0 3px 0 rgba(0, 0, 0, 0.24);
+            font-family: var(--font-display);
+            font-weight: 700;
+            letter-spacing: 0.01em;
+            text-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
         }
 
         .header h1 {
             font-size: clamp(2.45rem, 5vw, 5.1rem);
             line-height: 0.88;
+            background: linear-gradient(180deg, var(--gold-bright), var(--gold) 55%, var(--gold-deep));
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: none;
         }
 
         .balance-card {
@@ -1255,14 +1265,15 @@
             gap: 16px;
             min-height: 636px;
             overflow: hidden;
-            padding: 18px;
-            border: 10px solid #5a301c;
-            border-radius: var(--radius);
+            padding: 22px;
+            border: 13px solid transparent;
+            border-radius: 18px;
             background:
-                radial-gradient(ellipse at 50% 38%, rgba(43, 143, 86, 0.94) 0%, rgba(20, 94, 58, 0.98) 56%, #08271b 100%);
+                radial-gradient(ellipse 110% 100% at 50% 35%, var(--felt-light), var(--felt) 50%, var(--felt-deep) 100%) padding-box,
+                linear-gradient(165deg, var(--gold-bright), var(--gold) 30%, var(--gold-deep) 62%, var(--gold-shadow)) border-box;
             box-shadow:
-                inset 0 0 0 2px #d6a64b,
-                inset 0 0 86px rgba(0, 0, 0, 0.42),
+                inset 0 0 0 1px rgba(0, 0, 0, 0.45),
+                inset 0 0 90px rgba(0, 0, 0, 0.5),
                 var(--shadow);
             backdrop-filter: none;
             -webkit-backdrop-filter: none;
@@ -1270,25 +1281,31 @@
         }
 
         .table::before {
-            inset: 0;
-            border-radius: 0;
+            inset: 7px;
+            border: 1px solid rgba(232, 199, 115, 0.3);
+            border-radius: 11px;
             background:
-                linear-gradient(90deg, rgba(255, 255, 255, 0.028) 1px, transparent 1px),
-                linear-gradient(180deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
-            background-size: 30px 30px;
+                repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.02) 0 2px, transparent 2px 9px);
             opacity: 1;
         }
 
         .status-bar {
             grid-column: 1 / -1;
-            min-height: 58px;
-            padding: 12px;
-            border: 1px solid rgba(232, 199, 115, 0.35);
+            justify-content: center;
+            min-height: 56px;
+            padding: 12px 16px;
+            border: 1px solid var(--line);
             border-radius: var(--radius);
-            background: rgba(232, 199, 115, 0.11);
-            color: #fff0bd;
-            font-size: 0.88rem;
-            line-height: 1.35;
+            background: rgba(0, 0, 0, 0.22);
+            color: var(--gold-bright);
+            font-family: var(--serif);
+            font-style: italic;
+            font-weight: 600;
+            font-size: 1.12rem;
+            letter-spacing: 0.01em;
+            line-height: 1.3;
+            text-align: center;
+            text-transform: none;
         }
 
         .main-bets {
@@ -1320,21 +1337,30 @@
         .layout-section-heading {
             display: flex;
             align-items: center;
-            justify-content: space-between;
-            gap: 10px;
-            margin-bottom: 8px;
-            color: var(--muted);
-            font-size: 0.68rem;
-            font-weight: 900;
-            letter-spacing: 0.06em;
+            justify-content: center;
+            gap: 12px;
+            margin-bottom: 10px;
+            color: var(--gold);
+            font-family: var(--serif);
+            font-size: 0.95rem;
+            font-weight: 700;
+            letter-spacing: 0.24em;
             text-transform: uppercase;
         }
 
+        .layout-section-heading::before,
+        .layout-section-heading::after {
+            content: "\2666";
+            color: var(--gold-deep);
+            font-size: 0.7rem;
+        }
+
         .layout-section-heading span:last-child {
-            color: #fff0bd;
-            font-size: 0.66rem;
-            letter-spacing: 0;
-            text-align: right;
+            color: var(--muted);
+            font-family: var(--serif);
+            font-size: 0.85rem;
+            font-weight: 600;
+            letter-spacing: 0.06em;
         }
 
         .place-number-row {
@@ -1349,11 +1375,11 @@
             place-items: center;
             padding: 10px 6px 8px;
             overflow: hidden;
-            border: 1px solid rgba(255, 236, 177, 0.32);
+            border: 1px solid var(--line);
             border-radius: var(--radius);
             background:
-                linear-gradient(180deg, rgba(255, 248, 223, 0.07), rgba(255, 248, 223, 0.015)),
-                rgba(3, 26, 18, 0.54);
+                linear-gradient(180deg, rgba(232, 199, 115, 0.08), rgba(0, 0, 0, 0.2));
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
             color: var(--text);
             cursor: pointer;
             font: inherit;
@@ -1368,24 +1394,25 @@
         }
 
         .number-zone.has-bet {
-            border-color: rgba(232, 199, 115, 0.9);
+            border-color: var(--gold-bright);
             background:
-                linear-gradient(180deg, rgba(232, 199, 115, 0.18), rgba(255, 248, 223, 0.025)),
-                rgba(3, 26, 18, 0.66);
-            box-shadow: 0 0 0 2px rgba(232, 199, 115, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+                linear-gradient(180deg, rgba(232, 199, 115, 0.22), rgba(0, 0, 0, 0.1));
+            box-shadow: 0 0 0 1px var(--gold), 0 0 22px rgba(232, 199, 115, 0.3);
         }
 
         .number-zone .num {
-            color: var(--text);
+            color: var(--cream);
+            font-family: var(--font-display);
             font-size: clamp(1.8rem, 4vw, 3rem);
-            font-weight: 950;
+            font-weight: 700;
             line-height: 0.9;
         }
 
         .number-zone .payout {
-            color: var(--muted);
-            font-size: 0.62rem;
-            font-weight: 900;
+            color: var(--gold);
+            font-family: var(--serif);
+            font-size: 0.78rem;
+            font-weight: 700;
             letter-spacing: 0.06em;
             text-transform: uppercase;
         }
@@ -1425,9 +1452,10 @@
             z-index: 1;
             display: block;
             margin-top: 8px;
-            color: #fff0bd;
+            color: var(--gold-bright);
+            font-family: var(--font-display);
             font-size: clamp(1rem, 3vw, 1.55rem);
-            font-weight: 950;
+            font-weight: 700;
             letter-spacing: 0.08em;
             line-height: 1;
         }
@@ -1435,10 +1463,10 @@
         .bet-btn {
             min-height: 116px;
             padding: 14px;
-            border: 1px solid rgba(255, 236, 177, 0.42);
+            border: 1px solid var(--line);
             border-radius: var(--radius);
-            background: rgba(5, 31, 22, 0.4);
-            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 12px 28px rgba(0, 0, 0, 0.18);
+            background: linear-gradient(180deg, rgba(232, 199, 115, 0.08), rgba(0, 0, 0, 0.2));
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 12px 28px rgba(0, 0, 0, 0.18);
             transition: transform 140ms ease, filter 140ms ease, box-shadow 140ms ease, border-color 140ms ease;
         }
 
@@ -1473,21 +1501,29 @@
         .bet-btn.has-bet,
         .number-btn.has-bet,
         .center-btn-tile.has-bet {
-            border-color: rgba(232, 199, 115, 0.9);
-            background: rgba(232, 199, 115, 0.14);
-            box-shadow: 0 0 0 2px rgba(232, 199, 115, 0.2), 0 0 22px rgba(232, 199, 115, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+            border-color: var(--gold-bright);
+            background: linear-gradient(180deg, rgba(232, 199, 115, 0.22), rgba(0, 0, 0, 0.1));
+            box-shadow: 0 0 0 1px var(--gold), 0 0 24px rgba(232, 199, 115, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.06);
         }
 
         .bet-btn .label,
-        .number-btn .num,
         .center-btn-tile .label {
-            color: var(--text);
-            font-family: inherit;
+            color: var(--cream);
+            font-family: var(--serif);
+            font-weight: 600;
+            letter-spacing: 0.1em;
+            text-shadow: none;
+        }
+
+        .number-btn .num {
+            color: var(--cream);
+            font-family: var(--font-display);
+            font-weight: 700;
             text-shadow: none;
         }
 
         .bet-btn .label {
-            font-size: 0.82rem;
+            font-size: 1.02rem;
         }
 
         .bet-btn .amt,
@@ -1495,7 +1531,8 @@
         .number-btn .bet-info,
         .center-btn-tile .payout,
         .center-btn-tile .bet-info {
-            color: var(--muted);
+            color: var(--gold);
+            font-family: var(--serif);
         }
 
         .board-chip-stack {
@@ -1675,13 +1712,13 @@
             width: clamp(74px, 8.5vw, 96px);
             height: clamp(74px, 8.5vw, 96px);
             border: 0;
-            border-radius: var(--radius);
-            background: #fffdf5;
-            box-shadow: 0 12px 25px rgba(0, 0, 0, 0.32);
+            border-radius: 14px;
+            background: linear-gradient(150deg, #fdf8ea, #ddd2b6);
+            box-shadow: 0 0 0 1px var(--gold-deep), 0 10px 22px rgba(0, 0, 0, 0.5);
         }
 
         .die-dot {
-            background: #111827;
+            background: #0a4429;
         }
 
         .point-display {
@@ -1693,20 +1730,20 @@
         .modal-btn.confirm,
         .odds-btn.max-btn {
             min-height: 46px;
-            border: 1px solid transparent;
+            border: 1px solid var(--gold-bright);
             border-radius: var(--radius);
-            background: linear-gradient(180deg, #e8c773, #c89e4a);
-            color: #161b10;
-            font-weight: 900;
-            letter-spacing: 0;
-            text-transform: none;
-            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28);
+            background: linear-gradient(180deg, var(--gold-bright), var(--gold-deep));
+            color: #2a1d05;
+            font-family: var(--serif);
+            font-weight: 700;
+            letter-spacing: 0.16em;
+            text-transform: uppercase;
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4);
         }
 
         .submenu {
             background:
-                radial-gradient(circle at 10% 10%, rgba(232, 199, 115, 0.16), transparent 28%),
-                linear-gradient(135deg, #130d09 0%, #2f1a10 42%, #061711 100%);
+                radial-gradient(circle at 50% -12%, #18120a 0%, #0a0805 62%);
         }
 
         .menu-header {
