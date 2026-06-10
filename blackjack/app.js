@@ -418,10 +418,6 @@
             status: statusText
         };
 
-        if (window.lucide?.createIcons) {
-            window.lucide.createIcons();
-        }
-
         previousCardSlots = currentCardSlots;
     }
 

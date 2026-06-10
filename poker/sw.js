@@ -3,8 +3,8 @@ const CACHE_PREFIX = 'poker-app-';
 const STATIC_ASSETS = [
     '/poker/',
     '/poker/index.html',
-    '/poker/style.css?v=16',
-    '/poker/app.js?v=16',
+    '/poker/style.css?v=20',
+    '/poker/app.js?v=17',
     '/poker/manifest.json',
     '/shared/casino-theme.css?v=1',
     '/shared/rules-viewer.css?v=1',

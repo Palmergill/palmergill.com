@@ -1400,6 +1400,28 @@
             box-shadow: 0 0 0 1px var(--gold), 0 0 22px rgba(232, 199, 115, 0.3);
         }
 
+        .number-zone.point-on {
+            border-color: var(--cream);
+        }
+
+        .number-zone.point-on::after {
+            content: "ON";
+            position: absolute;
+            top: 3px;
+            right: 3px;
+            display: grid;
+            place-items: center;
+            width: clamp(17px, 4.6vw, 24px);
+            height: clamp(17px, 4.6vw, 24px);
+            border-radius: 50%;
+            background: radial-gradient(circle at 35% 30%, #fffdf5, #ece2c8);
+            color: #1a1208;
+            font-size: clamp(0.4rem, 1.2vw, 0.56rem);
+            font-weight: 900;
+            letter-spacing: 0.05em;
+            box-shadow: 0 0 0 2px rgba(26, 18, 8, 0.55), 0 4px 10px rgba(0, 0, 0, 0.45);
+        }
+
         .number-zone .num {
             color: var(--cream);
             font-family: var(--font-display);
@@ -2292,7 +2314,7 @@
     <script src="/shared/casino-profile.js?v=1"></script>
     <script src="/shared/analytics.js?v=1"></script>
     <script src="/shared/rules-viewer.js?v=1"></script>
-    <script src="app.js?v=5"></script>
+    <script src="app.js?v=6"></script>
     <script src="/shared/site-nav.js?v=7"></script>
 </body>
 </html>

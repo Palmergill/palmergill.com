@@ -983,9 +983,15 @@ async function getErrorMessage(response, fallback) {
         payload = await response.text().catch(() => null);
     }
 
-    const detail = typeof payload === 'string'
+    let detail = typeof payload === 'string'
         ? payload
         : payload?.detail || payload?.message || payload?.error;
+
+    // Non-JSON failures (proxy/static-server error pages) come back as HTML —
+    // surface a readable message instead of dumping markup into the toast.
+    if (typeof detail === 'string' && /<[a-z][\s\S]*>/i.test(detail)) {
+        detail = `Server error (${response.status})`;
+    }
 
     if (response.status === 404 && /Application not found/i.test(detail || '')) {
         return 'Poker API is unavailable. The production API backend is not responding.';

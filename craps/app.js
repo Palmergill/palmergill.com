@@ -766,6 +766,9 @@ function updateBoardChips() {
     addBoardChip('centerBoardBtn', centerTotal, { note: centerCount + ' bet' + (centerCount === 1 ? '' : 's') });
 
     [4, 5, 6, 8, 9, 10].forEach(num => {
+        const zone = document.getElementById('boardPlace' + num + 'Btn');
+        if (zone) zone.classList.toggle('point-on', point === num);
+
         addBoardChip('boardPlace' + num + 'Btn', bets['place' + num], { variant: 'place' });
 
         const comeAtPoint = comeBets.filter(bet => bet.point === num);
