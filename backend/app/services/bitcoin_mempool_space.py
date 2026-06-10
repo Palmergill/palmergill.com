@@ -47,6 +47,9 @@ class MempoolSpaceClient:
     def get_recommended_fees(self) -> Dict[str, Any]:
         return self.get_json("/v1/fees/recommended")
 
+    def get_prices(self) -> Dict[str, Any]:
+        return self.get_json("/v1/prices")
+
     def get_transaction(self, txid: str) -> Dict[str, Any]:
         return self.get_json(f"/tx/{urllib.parse.quote(txid)}")
 

@@ -24,6 +24,7 @@ class BitcoinChatRequest(BaseModel):
     message: str = Field(..., min_length=1, max_length=1000)
     session_id: Optional[str] = None
     timezone: Optional[str] = None
+    level: Optional[str] = Field(None, pattern="^(new|curious|technical)$")
 
 
 class BitcoinChatResponse(BaseModel):
@@ -101,6 +102,15 @@ async def address(
         raise HTTPException(status_code=400, detail=str(exc))
 
 
+@router.get("/price")
+async def price(request: Request):
+    return (
+        bitcoin_tools.get_demo_price()
+        if is_demo_request(request)
+        else bitcoin_tools.get_price()
+    )
+
+
 @router.get("/mempool/summary")
 async def mempool_summary(request: Request):
     return (
@@ -117,9 +127,9 @@ async def bitcoin_chat(http_request: Request, request: BitcoinChatRequest):
     session_id = http_request.cookies.get(BITCOIN_SESSION_COOKIE) or request.session_id
 
     if is_demo_request(http_request):
-        result = bitcoin_ai.answer_demo_chat(request.message, session_id, request.timezone)
+        result = bitcoin_ai.answer_demo_chat(request.message, session_id, request.timezone, request.level)
     else:
-        result = bitcoin_ai.answer_chat(request.message, session_id, request.timezone)
+        result = bitcoin_ai.answer_chat(request.message, session_id, request.timezone, request.level)
 
     cookie_session_id = result["session_id"]
     body = {key: value for key, value in result.items() if key != "session_id"}

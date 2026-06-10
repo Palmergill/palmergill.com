@@ -87,6 +87,15 @@ def get_demo_mempool_summary() -> Dict[str, Any]:
     }
 
 
+def get_demo_price() -> Dict[str, Any]:
+    return {
+        "source": "demo",
+        "usd": 67250.0,
+        "time": iso_from_unix(int(time.time())),
+        "warnings": [DEMO_WARNING],
+    }
+
+
 def get_demo_fee_estimate(confirmation_target_blocks: int) -> Dict[str, Any]:
     if confirmation_target_blocks < 1 or confirmation_target_blocks > 1008:
         raise ValueError("Confirmation target must be between 1 and 1008 blocks")
@@ -329,6 +338,26 @@ def get_mempool_summary() -> Dict[str, Any]:
     }
 
 
+def get_price() -> Dict[str, Any]:
+    # A node has no exchange-rate RPC, so mempool.space is the only live
+    # price source regardless of the configured chain-data provider.
+    if not mempool_space_client.configured:
+        return get_demo_price()
+
+    try:
+        prices = mempool_space_client.get_prices()
+    except MempoolSpaceError as exc:
+        return _api_error_response(exc)
+
+    price_time = prices.get("time")
+    return {
+        "source": "mempool.space",
+        "usd": prices.get("USD"),
+        "time": iso_from_unix(price_time) if price_time else None,
+        "warnings": [],
+    }
+
+
 def estimate_fee(confirmation_target_blocks: int) -> Dict[str, Any]:
     if confirmation_target_blocks < 1 or confirmation_target_blocks > 1008:
         raise ValueError("Confirmation target must be between 1 and 1008 blocks")
@@ -555,6 +584,7 @@ def safe_demo_tool_call(name: str, *args: Any, **kwargs: Any) -> Dict[str, Any]:
         "get_transaction": get_demo_transaction,
         "get_address": get_demo_address,
         "get_mempool_summary": get_demo_mempool_summary,
+        "get_price": get_demo_price,
         "estimate_fee": get_demo_fee_estimate,
         "get_mined_stats": get_demo_mined_stats,
     }

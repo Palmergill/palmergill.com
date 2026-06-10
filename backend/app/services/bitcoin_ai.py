@@ -127,6 +127,32 @@ Hard boundaries:
 - If the user asks for wallet actions, refuse briefly and offer read-only alternatives.
 """
 
+DEFAULT_EXPLANATION_LEVEL = "curious"
+LEVEL_INSTRUCTIONS = {
+    "new": (
+        "\nAudience: someone brand new to Bitcoin.\n"
+        "- Use plain English and everyday analogies; define every technical term the first time it appears.\n"
+        "- Lead with the one-sentence takeaway, then a short explanation.\n"
+        "- Translate units into familiar terms: convert fees to approximate USD with the get_price tool when relevant, and express waits in minutes.\n"
+        "- Keep answers short, warm, and jargon-free; end with one natural follow-up question they might wonder about next."
+    ),
+    "curious": (
+        "\nAudience: someone who knows the basics and wants substance.\n"
+        "- Explain mechanisms, not just facts, but keep terms accessible and define the rare deep-protocol term.\n"
+        "- Use concrete numbers from live data where they sharpen the answer."
+    ),
+    "technical": (
+        "\nAudience: technically fluent; do not simplify.\n"
+        "- Use precise protocol terminology (vBytes, sat/vB, UTXOs, sigops, descriptors) without defining it.\n"
+        "- Prefer exact figures, edge cases, and protocol-level mechanics over analogies."
+    ),
+}
+
+
+def _normalize_level(level: str | None) -> str:
+    value = (level or DEFAULT_EXPLANATION_LEVEL).strip().lower()
+    return value if value in LEVEL_INSTRUCTIONS else DEFAULT_EXPLANATION_LEVEL
+
 TOOL_SCHEMAS = [
     {
         "type": "function",
@@ -223,6 +249,18 @@ TOOL_SCHEMAS = [
     },
     {
         "type": "function",
+        "name": "get_price",
+        "description": "Get the current BTC/USD exchange rate. Use to convert fees or amounts into approximate dollar terms, never for price predictions or financial advice.",
+        "strict": True,
+        "parameters": {
+            "type": "object",
+            "properties": {},
+            "required": [],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "type": "function",
         "name": "estimate_fee",
         "description": "Estimate a fee rate for a target confirmation window in blocks. Use for fee-rate questions, not financial advice.",
         "strict": True,
@@ -270,13 +308,20 @@ TOOL_HANDLERS = {
     "get_transaction": bitcoin_tools.get_transaction,
     "get_address": bitcoin_tools.get_address,
     "get_mempool_summary": bitcoin_tools.get_mempool_summary,
+    "get_price": bitcoin_tools.get_price,
     "estimate_fee": bitcoin_tools.estimate_fee,
     "get_mined_stats": bitcoin_tools.get_mined_stats,
 }
 
 
-def answer_chat(message: str, session_id: str | None = None, timezone_name: str | None = None) -> Dict[str, Any]:
+def answer_chat(
+    message: str,
+    session_id: str | None = None,
+    timezone_name: str | None = None,
+    level: str | None = None,
+) -> Dict[str, Any]:
     session_id = session_id or str(uuid.uuid4())
+    level = _normalize_level(level)
     if _is_unsafe_wallet_request(message):
         return _response(
             "I can only inspect public blockchain data. I cannot send bitcoin, sign transactions, broadcast transactions, or handle wallet secrets.",
@@ -291,7 +336,7 @@ def answer_chat(message: str, session_id: str | None = None, timezone_name: str 
 
     if os.getenv("OPENAI_API_KEY"):
         try:
-            return _answer_with_model(message, session_id, timezone_name)
+            return _answer_with_model(message, session_id, timezone_name, level)
         except OpenAIModelError as exc:
             fallback = _answer_with_local_router(message, session_id, timezone_name)
             fallback["warnings"] = [f"Model response unavailable: {exc}"] + fallback.get("warnings", [])
@@ -305,7 +350,14 @@ def answer_chat(message: str, session_id: str | None = None, timezone_name: str 
     return fallback
 
 
-def answer_demo_chat(message: str, session_id: str | None = None, timezone_name: str | None = None) -> Dict[str, Any]:
+def answer_demo_chat(
+    message: str,
+    session_id: str | None = None,
+    timezone_name: str | None = None,
+    level: str | None = None,
+) -> Dict[str, Any]:
+    # The demo path answers from local templates, so the explanation level is
+    # accepted for API symmetry but only shapes model-backed answers.
     session_id = session_id or str(uuid.uuid4())
     if _is_unsafe_wallet_request(message):
         return _response(
@@ -324,7 +376,12 @@ def answer_demo_chat(message: str, session_id: str | None = None, timezone_name:
     return response
 
 
-def _answer_with_model(message: str, session_id: str, timezone_name: str | None) -> Dict[str, Any]:
+def _answer_with_model(
+    message: str,
+    session_id: str,
+    timezone_name: str | None,
+    level: str = DEFAULT_EXPLANATION_LEVEL,
+) -> Dict[str, Any]:
     history = _SESSION_MESSAGES.get(session_id, [])
     input_items: List[Dict[str, Any]] = [
         {"role": item["role"], "content": item["content"]} for item in history
@@ -336,7 +393,7 @@ def _answer_with_model(message: str, session_id: str, timezone_name: str | None)
         }
     )
 
-    response = _openai_response(input_items)
+    response = _openai_response(input_items, level)
     tools_used: List[str] = []
     tool_results: List[Dict[str, Any]] = []
     warnings: List[str] = []
@@ -366,7 +423,7 @@ def _answer_with_model(message: str, session_id: str, timezone_name: str | None)
                 }
             )
 
-        response = _openai_response(input_items)
+        response = _openai_response(input_items, level)
 
     raise OpenAIModelError("The model used too many tool calls for one chat turn.")
 
@@ -443,10 +500,10 @@ def _local_tool_call(demo: bool, name: str, *args: Any, **kwargs: Any) -> Dict[s
     return bitcoin_tools.safe_tool_call(name, *args, **kwargs)
 
 
-def _openai_response(input_items: List[Dict[str, Any]]) -> Dict[str, Any]:
+def _openai_response(input_items: List[Dict[str, Any]], level: str = DEFAULT_EXPLANATION_LEVEL) -> Dict[str, Any]:
     payload = {
         "model": DEFAULT_MODEL,
-        "instructions": SYSTEM_PROMPT,
+        "instructions": SYSTEM_PROMPT + LEVEL_INSTRUCTIONS[_normalize_level(level)],
         "input": input_items,
         "tools": TOOL_SCHEMAS,
         "reasoning": {"effort": os.getenv("BITCOIN_CHAT_REASONING_EFFORT", "low")},

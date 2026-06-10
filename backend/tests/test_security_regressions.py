@@ -220,7 +220,7 @@ def test_poker_serialization_preserves_ai_personality_metadata():
 def test_bitcoin_chat_session_cookie_is_not_exposed_to_browser(monkeypatch):
     seen_sessions = []
 
-    def fake_demo_answer(message, session_id=None, timezone_name=None):
+    def fake_demo_answer(message, session_id=None, timezone_name=None, level=None):
         seen_sessions.append(session_id)
         return {
             "answer": "demo answer",

@@ -9,19 +9,26 @@ const messagesEl = document.getElementById('messages');
 const chatForm = document.getElementById('chatForm');
 const messageInput = document.getElementById('messageInput');
 const nodeStatus = document.getElementById('nodeStatus');
-const heightPill = document.getElementById('heightPill');
-const syncPill = document.getElementById('syncPill');
-const chainPill = document.getElementById('chainPill');
 const demoNotice = document.getElementById('demoNotice');
+const levelSwitch = document.getElementById('levelSwitch');
+const learnPaths = document.getElementById('learnPaths');
+const lookupToggle = document.getElementById('lookupToggle');
+const tiles = {
+    chainValue: document.getElementById('chainTileValue'),
+    chainCaption: document.getElementById('chainTileCaption'),
+    feeValue: document.getElementById('feeTileValue'),
+    feeCaption: document.getElementById('feeTileCaption'),
+    mempoolValue: document.getElementById('mempoolTileValue'),
+    mempoolCaption: document.getElementById('mempoolTileCaption'),
+    supplyValue: document.getElementById('supplyTileValue'),
+    supplyCaption: document.getElementById('supplyTileCaption'),
+};
 const explorerEls = {
-    panel: document.querySelector('.explorer-panel'),
+    drawer: document.getElementById('explorerDrawer'),
     form: document.getElementById('explorerSearchForm'),
     input: document.getElementById('explorerInput'),
     type: document.getElementById('explorerType'),
     status: document.getElementById('explorerStatus'),
-    refresh: document.getElementById('refreshExplorerBtn'),
-    latestCard: document.getElementById('latestBlockCard'),
-    mempoolCard: document.getElementById('mempoolCard'),
     result: document.getElementById('explorerResult'),
 };
 
@@ -30,21 +37,40 @@ const explorerEls = {
 // cookie automatically.
 // Clean up any session id left in localStorage from before the cookie cutover.
 try { localStorage.removeItem('bitcoinChatSessionId'); } catch (_) { /* ignore */ }
+
+const LEVELS = ['new', 'curious', 'technical'];
+const LEVEL_STORAGE_KEY = 'bitcoinChatLevel';
+// A simple 1-input, 2-output segwit payment is ~140 vB; used to translate
+// fee rates into an approximate dollar cost in the fee tile.
+const TYPICAL_TX_VBYTES = 140;
+const HALVING_INTERVAL = 210000;
+const TOTAL_SUPPLY_BTC = 21000000;
+
+let explanationLevel = readStoredLevel();
 const explorerState = {
-    latestBlock: null,
-    mempool: null,
     lastResult: null,
 };
 const BITCOIN_ADDRESS_RE = /^(?:bc1[ac-hj-np-z02-9]{11,71}|[13][a-km-zA-HJ-NP-Z1-9]{25,34})$/i;
 
 const starterMessage = {
     role: 'assistant',
-    text: 'Ask anything Bitcoin. Public visitors get a protected demo; authenticated sessions can use live Bitcoin data when needed.',
+    text: 'Welcome — this is a live window into the Bitcoin network, and I\'ll explain anything you see in plain English. The numbers above update with the real chain. Pick a starting point below, or just ask whatever you\'re wondering.',
 };
 
 function addMessage({ role, text, data, warnings, toolsUsed, loading = false, error = false }) {
+    const row = document.createElement('div');
+    row.className = `msg-row ${role}`;
+
+    if (role === 'assistant') {
+        const avatar = document.createElement('span');
+        avatar.className = 'avatar';
+        avatar.setAttribute('aria-hidden', 'true');
+        avatar.textContent = '₿';
+        row.appendChild(avatar);
+    }
+
     const el = document.createElement('article');
-    el.className = `message ${role}${loading ? ' loading' : ''}${error ? ' error' : ''}`;
+    el.className = `message${loading ? ' loading' : ''}${error ? ' error' : ''}`;
     if (loading) {
         const loadingText = document.createElement('span');
         loadingText.textContent = text;
@@ -63,9 +89,10 @@ function addMessage({ role, text, data, warnings, toolsUsed, loading = false, er
         appendSourceSummary(el, { data, warnings, toolsUsed });
     }
 
-    messagesEl.appendChild(el);
+    row.appendChild(el);
+    messagesEl.appendChild(row);
     messagesEl.scrollTop = messagesEl.scrollHeight;
-    return el;
+    return row;
 }
 
 function appendInline(parent, text) {
@@ -250,7 +277,7 @@ function appendSourceSummary(parent, { data, toolsUsed, warnings } = {}) {
 
     const heading = document.createElement('div');
     heading.className = 'source-heading';
-    heading.textContent = hasTools || hasData ? 'Live Bitcoin context' : 'Note';
+    heading.textContent = hasTools || hasData ? 'live bitcoin context' : 'note';
     source.appendChild(heading);
 
     const items = document.createElement('div');
@@ -258,7 +285,7 @@ function appendSourceSummary(parent, { data, toolsUsed, warnings } = {}) {
 
     if (hasTools) {
         const item = document.createElement('span');
-        item.textContent = `Tool: ${toolsUsed.map(formatToolName).join(', ')}`;
+        item.textContent = `tool: ${toolsUsed.map(formatToolName).join(', ')}`;
         items.appendChild(item);
     }
 
@@ -314,15 +341,6 @@ function formatSignedBtc(value) {
     return `${sign}${Math.abs(n).toFixed(Math.abs(n) < 0.01 ? 8 : 4)} BTC`;
 }
 
-function formatBytes(value) {
-    const n = Number(value);
-    if (!Number.isFinite(n)) return '--';
-    if (n >= 1e9) return `${(n / 1e9).toFixed(2)} GB`;
-    if (n >= 1e6) return `${(n / 1e6).toFixed(2)} MB`;
-    if (n >= 1e3) return `${(n / 1e3).toFixed(1)} KB`;
-    return `${n} B`;
-}
-
 function formatTimestamp(value) {
     if (!value) return '--';
     const date = new Date(value);
@@ -336,11 +354,113 @@ function formatTimestamp(value) {
     });
 }
 
+function relativeMinutes(value) {
+    if (!value) return null;
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return null;
+    const minutes = Math.round((Date.now() - date.getTime()) / 60000);
+    if (minutes < 1) return 'just now';
+    if (minutes < 60) return `${minutes} min ago`;
+    const hours = Math.round(minutes / 60);
+    return `${hours}h ago`;
+}
+
 function shortHash(value, left = 10, right = 8) {
     if (!value) return '--';
     const text = String(value);
     if (text.length <= left + right + 3) return text;
     return `${text.slice(0, left)}...${text.slice(-right)}`;
+}
+
+// Cumulative coins issued after `height` blocks, walking the halving
+// schedule (50 BTC, then 25, then 12.5, ...).
+function issuedSupplyBtc(height) {
+    if (!Number.isFinite(height) || height < 0) return null;
+    let supply = 0;
+    let subsidy = 50;
+    let remaining = height + 1;
+    while (remaining > 0 && subsidy > 1e-9) {
+        const blocksInEpoch = Math.min(remaining, HALVING_INTERVAL);
+        supply += blocksInEpoch * subsidy;
+        remaining -= blocksInEpoch;
+        subsidy /= 2;
+    }
+    return supply;
+}
+
+function feeBusynessLabel(satsVb) {
+    if (satsVb < 5) return 'a very cheap moment to transact';
+    if (satsVb < 20) return 'a cheap day to transact';
+    if (satsVb < 80) return 'a typical day to transact';
+    return 'a busy, expensive day to transact';
+}
+
+function renderChainTile(block) {
+    if (!block || block.error) {
+        tiles.chainValue.textContent = '--';
+        tiles.chainCaption.textContent = 'chain data unavailable right now';
+        return;
+    }
+    tiles.chainValue.textContent = formatInteger(block.height);
+    const mined = relativeMinutes(block.time);
+    tiles.chainCaption.textContent = mined
+        ? `blocks ever mined — the last one ${mined}`
+        : 'blocks ever mined — a new one ~every 10 min';
+}
+
+function renderFeeTile(mempool, price) {
+    const fast = Number(mempool?.fee_estimates_sats_vb?.['2']);
+    if (!mempool || mempool.error || !Number.isFinite(fast)) {
+        tiles.feeValue.textContent = '--';
+        tiles.feeCaption.textContent = 'fee data unavailable right now';
+        return;
+    }
+    const usd = Number(price?.usd);
+    if (Number.isFinite(usd) && usd > 0) {
+        const dollars = (fast * TYPICAL_TX_VBYTES * usd) / 1e8;
+        tiles.feeValue.textContent = dollars < 10 ? `~$${dollars.toFixed(2)}` : `~$${Math.round(dollars)}`;
+        tiles.feeCaption.textContent = `${fast.toFixed(fast < 10 ? 1 : 0)} sat/vB — ${feeBusynessLabel(fast)}`;
+    } else {
+        tiles.feeValue.textContent = `${fast.toFixed(fast < 10 ? 1 : 0)} sat/vB`;
+        tiles.feeCaption.textContent = `the going rate to confirm within ~20 minutes`;
+    }
+}
+
+function renderMempoolTile(mempool) {
+    if (!mempool || mempool.error) {
+        tiles.mempoolValue.textContent = '--';
+        tiles.mempoolCaption.textContent = 'mempool data unavailable right now';
+        return;
+    }
+    tiles.mempoolValue.textContent = formatInteger(mempool.tx_count);
+    tiles.mempoolCaption.textContent = 'payments queued for the next blocks';
+}
+
+function renderSupplyTile(block) {
+    const height = Number(block?.height);
+    const supply = issuedSupplyBtc(height);
+    if (!block || block.error || supply === null) {
+        tiles.supplyValue.textContent = '--';
+        tiles.supplyCaption.textContent = 'of all 21M bitcoin already exist';
+        return;
+    }
+    tiles.supplyValue.textContent = `${((supply / TOTAL_SUPPLY_BTC) * 100).toFixed(1)}%`;
+    tiles.supplyCaption.textContent = `of all 21M bitcoin already exist (${(supply / 1e6).toFixed(2)}M BTC)`;
+}
+
+async function refreshTiles() {
+    const [blockResult, mempoolResult, priceResult] = await Promise.allSettled([
+        fetchJson(`${API_BASE}/block/latest`),
+        fetchJson(`${API_BASE}/mempool/summary`),
+        fetchJson(`${API_BASE}/price`),
+    ]);
+    const block = blockResult.status === 'fulfilled' ? blockResult.value : null;
+    const mempool = mempoolResult.status === 'fulfilled' ? mempoolResult.value : null;
+    const price = priceResult.status === 'fulfilled' ? priceResult.value : null;
+    renderChainTile(block);
+    renderFeeTile(mempool, price);
+    renderMempoolTile(mempool);
+    renderSupplyTile(block);
 }
 
 function explorerSetStatus(message, isError = false) {
@@ -372,74 +492,6 @@ function appendWarnings(parent, warnings) {
     parent.appendChild(list);
 }
 
-function cardBody(card) {
-    const body = card?.querySelector('.card-body');
-    if (!body) return null;
-    body.classList.remove('muted');
-    body.replaceChildren();
-    return body;
-}
-
-function renderCardError(card, message) {
-    const body = cardBody(card);
-    if (!body) return;
-    body.classList.add('muted');
-    body.textContent = message;
-}
-
-function renderLatestBlock(data) {
-    if (!data || data.error) {
-        renderCardError(explorerEls.latestCard, data?.error || 'Latest block unavailable.');
-        return;
-    }
-    explorerState.latestBlock = data;
-    const body = cardBody(explorerEls.latestCard);
-    if (!body) return;
-    body.append(
-        statRow('Height', formatInteger(data.height)),
-        statRow('Tx count', formatInteger(data.tx_count)),
-        statRow('Mined', formatTimestamp(data.time)),
-        statRow('Hash', shortHash(data.hash)),
-        statRow('Source', data.source || '--')
-    );
-    appendWarnings(body, data.warnings);
-}
-
-function renderMempool(data) {
-    if (!data || data.error) {
-        renderCardError(explorerEls.mempoolCard, data?.error || 'Mempool unavailable.');
-        return;
-    }
-    explorerState.mempool = data;
-    const body = cardBody(explorerEls.mempoolCard);
-    if (!body) return;
-    const fees = data.fee_estimates_sats_vb || {};
-    const feeRow = document.createElement('div');
-    feeRow.className = 'fee-row';
-    [
-        ['Fast', fees['2']],
-        ['Hour', fees['6']],
-        ['Economy', fees['12']],
-    ].forEach(([label, value]) => {
-        const chip = document.createElement('div');
-        chip.className = 'fee-chip';
-        const labelEl = document.createElement('span');
-        labelEl.textContent = label;
-        const valueEl = document.createElement('strong');
-        valueEl.textContent = value === null || value === undefined ? '--' : `${Number(value).toFixed(1)} sats/vB`;
-        chip.append(labelEl, valueEl);
-        feeRow.appendChild(chip);
-    });
-    body.append(
-        statRow('Transactions', formatInteger(data.tx_count)),
-        statRow('Virtual size', formatBytes(data.virtual_size_vb)),
-        statRow('Total fees', formatBtc(data.total_fees_btc)),
-        feeRow,
-        statRow('Source', data.source || '--')
-    );
-    appendWarnings(body, data.warnings);
-}
-
 function renderExplorerResult(kind, data) {
     if (!explorerEls.result) return;
     explorerState.lastResult = { kind, data };
@@ -454,7 +506,7 @@ function renderExplorerResult(kind, data) {
     ask.type = 'button';
     ask.className = 'card-action';
     ask.dataset.ask = 'result';
-    ask.textContent = 'Ask';
+    ask.textContent = 'Explain this';
     heading.append(title, ask);
 
     const body = document.createElement('div');
@@ -530,13 +582,6 @@ function promptForExplorer(kind, data) {
     if (!data || data.error) {
         return 'Explain why this Bitcoin explorer lookup failed and what I should try next.';
     }
-    if (kind === 'latest') {
-        return `Explain the latest Bitcoin block at height ${data.height}, hash ${data.hash}, with ${data.tx_count} transactions.`;
-    }
-    if (kind === 'mempool') {
-        const fees = data.fee_estimates_sats_vb || {};
-        return `Explain the current Bitcoin mempool: ${data.tx_count} transactions, ${formatBtc(data.total_fees_btc)} total fees, and fee estimates of ${fees['2'] ?? '--'}, ${fees['6'] ?? '--'}, and ${fees['12'] ?? '--'} sats/vB.`;
-    }
     if (kind === 'tx') {
         return `Explain this Bitcoin transaction: ${data.txid}. Include confirmation status, fee rate, input/output counts, and what can and cannot be inferred.`;
     }
@@ -551,23 +596,6 @@ function askChat(prompt) {
     messageInput.value = prompt;
     messageInput.dispatchEvent(new Event('input'));
     chatForm.requestSubmit();
-}
-
-async function refreshExplorer() {
-    explorerSetStatus('Refreshing chain summaries...');
-    try {
-        const [latest, mempool] = await Promise.all([
-            fetchJson(`${API_BASE}/block/latest`),
-            fetchJson(`${API_BASE}/mempool/summary`),
-        ]);
-        renderLatestBlock(latest);
-        renderMempool(mempool);
-        explorerSetStatus(`Explorer updated ${new Date().toLocaleTimeString()}`);
-    } catch (error) {
-        explorerSetStatus(`Explorer refresh failed: ${error.message}`, true);
-        renderCardError(explorerEls.latestCard, 'Latest block unavailable.');
-        renderCardError(explorerEls.mempoolCard, 'Mempool unavailable.');
-    }
 }
 
 function inferLookupType(value, selected) {
@@ -612,25 +640,66 @@ async function lookupExplorer(value, selectedType) {
     }
 }
 
+function setDrawerOpen(open) {
+    if (!explorerEls.drawer) return;
+    explorerEls.drawer.hidden = !open;
+    lookupToggle?.setAttribute('aria-expanded', String(open));
+    if (open) {
+        explorerEls.input?.focus();
+    }
+}
+
 function wireExplorer() {
-    if (!explorerEls.panel) return;
-    explorerEls.refresh?.addEventListener('click', () => {
-        window.pgAnalytics?.track?.('bitcoin_explorer_refreshed');
-        refreshExplorer();
+    if (!explorerEls.drawer) return;
+    lookupToggle?.addEventListener('click', () => {
+        setDrawerOpen(explorerEls.drawer.hidden);
+    });
+    document.addEventListener('keydown', (event) => {
+        if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+            event.preventDefault();
+            setDrawerOpen(explorerEls.drawer.hidden);
+        } else if (event.key === 'Escape' && !explorerEls.drawer.hidden) {
+            setDrawerOpen(false);
+        }
     });
     explorerEls.form?.addEventListener('submit', (event) => {
         event.preventDefault();
         lookupExplorer(explorerEls.input?.value || '', explorerEls.type?.value || 'auto');
     });
-    explorerEls.panel.addEventListener('click', (event) => {
+    explorerEls.drawer.addEventListener('click', (event) => {
         const button = event.target.closest('[data-ask]');
         if (!button) return;
-        const askType = button.getAttribute('data-ask');
-        if (askType === 'latest') askChat(promptForExplorer('latest', explorerState.latestBlock));
-        else if (askType === 'mempool') askChat(promptForExplorer('mempool', explorerState.mempool));
-        else if (askType === 'result' && explorerState.lastResult) {
+        if (button.getAttribute('data-ask') === 'result' && explorerState.lastResult) {
             askChat(promptForExplorer(explorerState.lastResult.kind, explorerState.lastResult.data));
         }
+    });
+}
+
+function readStoredLevel() {
+    try {
+        const stored = localStorage.getItem(LEVEL_STORAGE_KEY);
+        if (stored && LEVELS.includes(stored)) return stored;
+    } catch (_) { /* ignore */ }
+    return 'new';
+}
+
+function setLevel(level) {
+    if (!LEVELS.includes(level)) return;
+    explanationLevel = level;
+    try { localStorage.setItem(LEVEL_STORAGE_KEY, level); } catch (_) { /* ignore */ }
+    levelSwitch?.querySelectorAll('button[data-level]').forEach((button) => {
+        button.setAttribute('aria-pressed', String(button.dataset.level === level));
+    });
+}
+
+function wireLevelSwitch() {
+    if (!levelSwitch) return;
+    setLevel(explanationLevel);
+    levelSwitch.addEventListener('click', (event) => {
+        const button = event.target.closest('button[data-level]');
+        if (!button) return;
+        setLevel(button.dataset.level);
+        window.pgAnalytics?.track?.('bitcoin_chat_level', { level: button.dataset.level });
     });
 }
 
@@ -641,20 +710,16 @@ async function refreshStatus() {
         if (demoNotice) {
             demoNotice.hidden = status.source !== 'demo';
         }
+        const chain = status.chain || 'mainnet';
+        const sync = status.initial_block_download ? 'syncing' : 'synced';
         const source = status.source === 'node'
-            ? 'Node connected'
+            ? 'node online'
             : status.source === 'mempool.space'
-                ? 'mempool.space connected'
-                : 'Demo mode';
-        setNodeStatus(source, liveSource);
-        heightPill.textContent = `Height ${status.blocks ?? '--'}`;
-        syncPill.textContent = status.initial_block_download ? 'Syncing' : 'Synced';
-        chainPill.textContent = status.chain || 'Mainnet';
+                ? 'mempool.space online'
+                : 'demo mode';
+        setNodeStatus(`${source} · ${chain} · ${sync}`, liveSource);
     } catch (error) {
-        setNodeStatus('Node unavailable', false);
-        heightPill.textContent = 'Height --';
-        syncPill.textContent = 'Sync --';
-        chainPill.textContent = 'Chain --';
+        setNodeStatus('bitcoin data unavailable', false);
     }
 }
 
@@ -667,6 +732,7 @@ async function sendMessage(text) {
         const payload = {
             message: text,
             timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+            level: explanationLevel,
         };
         const result = await fetchJson(`${API_BASE}/chat`, {
             method: 'POST',
@@ -725,23 +791,29 @@ chatForm.addEventListener('submit', async (event) => {
     await sendMessage(text);
 });
 
+// The starter message should sit above the learning-path cards, so render
+// it first and then move the (static) cards back to the end of the thread.
 addMessage(starterMessage);
-
-const promptChipsContainer = document.getElementById('promptChips');
-if (promptChipsContainer) {
-    promptChipsContainer.querySelectorAll('.prompt-chip').forEach((chip) => {
-        chip.addEventListener('click', () => {
-            const prompt = chip.getAttribute('data-prompt');
-            if (!prompt) return;
-            messageInput.value = prompt;
-            messageInput.dispatchEvent(new Event('input'));
-            chatForm.requestSubmit();
+if (learnPaths) {
+    messagesEl.appendChild(learnPaths);
+    learnPaths.querySelectorAll('.learn-card').forEach((card) => {
+        card.addEventListener('click', () => {
+            askChat(card.getAttribute('data-prompt'));
         });
     });
     chatForm.addEventListener('submit', () => {
-        promptChipsContainer.hidden = true;
+        learnPaths.hidden = true;
     }, { once: true });
 }
+
+document.querySelectorAll('.tile-question[data-prompt]').forEach((button) => {
+    button.addEventListener('click', () => {
+        askChat(button.getAttribute('data-prompt'));
+    });
+});
+
+wireLevelSwitch();
 wireExplorer();
 refreshStatus();
-refreshExplorer();
+refreshTiles();
+setInterval(refreshTiles, 120000);
