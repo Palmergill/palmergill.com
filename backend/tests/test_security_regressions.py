@@ -540,3 +540,67 @@ def test_bitcoin_mined_yesterday_uses_yesterday_window(monkeypatch):
     assert end.date() == expected_day
     assert end.hour == 23 and end.minute == 59 and end.second == 59
     assert "yesterday" in response["answer"].lower()
+
+
+def test_session_token_signed_with_dedicated_secret_not_password(monkeypatch):
+    """A leaked session token must not be a verifiable oracle for the password."""
+    from app.main import valid_app_session_cookie, session_signing_secret
+
+    monkeypatch.setenv("APP_AUTH_USERNAME", "palmer")
+    monkeypatch.setenv("APP_AUTH_PASSWORD", "secret")
+    monkeypatch.setenv("APP_SESSION_SECRET", "an-independent-signing-secret")
+
+    # Signing secret is decoupled from the password.
+    assert session_signing_secret("secret") == "an-independent-signing-secret"
+
+    token = create_app_session_token("palmer", "secret")
+    auth_client = TestClient(app)
+    auth_client.cookies.set(SESSION_COOKIE_NAME, token)
+    assert auth_client.get("/api/unknown").status_code == 404
+
+    # A token forged by signing with the password (the old scheme) is rejected
+    # once a separate session secret is configured.
+    from app.main import _base64url_encode, _session_signature
+    import time as _time
+
+    payload = _base64url_encode(
+        json.dumps({"u": "palmer", "exp": int(_time.time()) + 3600}, separators=(",", ":")).encode()
+    )
+    forged = f"{payload}.{_session_signature('secret', payload)}"
+    forged_client = TestClient(app)
+    forged_client.cookies.set(SESSION_COOKIE_NAME, forged)
+    assert forged_client.get("/api/unknown").status_code == 401
+
+
+def test_csv_export_neutralizes_formula_injection():
+    """Attacker-controlled fields must not execute as spreadsheet formulas."""
+    from app.routers.admin import _csv_safe
+
+    assert _csv_safe("=1+1") == "'=1+1"
+    assert _csv_safe("+cmd") == "'+cmd"
+    assert _csv_safe("-2") == "'-2"
+    assert _csv_safe("@SUM(A1)") == "'@SUM(A1)"
+    assert _csv_safe("\t=danger") == "'\t=danger"
+    # Benign values pass through untouched.
+    assert _csv_safe("/admin") == "/admin"
+    assert _csv_safe("Mozilla/5.0") == "Mozilla/5.0"
+    assert _csv_safe(200) == 200
+    assert _csv_safe(None) is None
+
+
+def test_client_ip_uses_rightmost_proxy_hop(monkeypatch):
+    """Rate-limit keys must use the proxy-appended hop, not the spoofable left entry."""
+    from app.main import client_ip
+    import app.main as main_module
+
+    monkeypatch.setattr(main_module, "TRUST_PROXY_HEADERS", True)
+    monkeypatch.setattr(main_module, "TRUSTED_PROXY_HOPS", 1)
+
+    class _Req:
+        def __init__(self, xff):
+            self.headers = {"x-forwarded-for": xff}
+            self.client = None
+
+    # Client forges a fake leftmost IP; we must read the trusted rightmost hop.
+    assert client_ip(_Req("1.2.3.4, 9.9.9.9")) == "9.9.9.9"
+    assert client_ip(_Req("203.0.113.7")) == "203.0.113.7"

@@ -131,6 +131,19 @@ def _referrer_host(referrer: str | None) -> str:
         return referrer
 
 
+def _csv_safe(value):
+    """Neutralize CSV/spreadsheet formula injection.
+
+    Fields like user_agent, referrer and event_name are attacker-controllable
+    (any anonymous visitor can set them via POST /api/analytics/events). A value
+    beginning with =, +, -, @, or a leading tab/CR is treated as a formula by
+    Excel/Sheets, so prefix those with a single quote to force literal text.
+    """
+    if isinstance(value, str) and value and value[0] in ("=", "+", "-", "@", "\t", "\r"):
+        return f"'{value}"
+    return value
+
+
 def _csv_response(filename: str, headers: list[str], rows) -> StreamingResponse:
     """Stream CSV rows row-by-row so we never materialize the full payload.
 
@@ -146,7 +159,7 @@ def _csv_response(filename: str, headers: list[str], rows) -> StreamingResponse:
         buffer.seek(0)
         buffer.truncate()
         for row in rows:
-            writer.writerow(row)
+            writer.writerow([_csv_safe(cell) for cell in row])
             yield buffer.getvalue()
             buffer.seek(0)
             buffer.truncate()

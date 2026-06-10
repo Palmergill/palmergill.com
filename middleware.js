@@ -60,12 +60,20 @@ async function signSessionValue(secret, value) {
   return base64UrlEncode(new Uint8Array(signature));
 }
 
+// Sign session tokens with a dedicated secret so a leaked token can't be used
+// as an offline oracle to brute-force the account password. Falls back to the
+// password to preserve existing deployments; set APP_SESSION_SECRET to decouple
+// them and allow rotating sessions without changing the password.
+function sessionSigningSecret(password) {
+  return process.env.APP_SESSION_SECRET || password;
+}
+
 async function createSessionToken(username, password) {
   const payload = base64UrlEncode(JSON.stringify({
     u: username,
     exp: Math.floor(Date.now() / 1000) + SESSION_TTL_SECONDS,
   }));
-  const signature = await signSessionValue(password, payload);
+  const signature = await signSessionValue(sessionSigningSecret(password), payload);
   return `${payload}.${signature}`;
 }
 
@@ -91,7 +99,7 @@ async function validSessionCookie(request, username, password) {
   const [payload, signature, extra] = token.split('.');
   if (!payload || !signature || extra) return false;
 
-  const expectedSignature = await signSessionValue(password, payload);
+  const expectedSignature = await signSessionValue(sessionSigningSecret(password), payload);
   if (!timingSafeEqual(signature, expectedSignature)) return false;
 
   try {
@@ -171,11 +179,19 @@ function jsonResponse(body, status = 200, headers = {}) {
   });
 }
 
+// The real client IP is the hop the trusted edge proxy appended, counting from
+// the right of X-Forwarded-For. Entries to its left are client-supplied and
+// spoofable, so keying rate limits on the leftmost entry lets an attacker
+// rotate fake IPs to evade them.
+const TRUSTED_PROXY_HOPS = Math.max(1, Number(process.env.TRUSTED_PROXY_HOPS || 1));
+
 function clientIp(request) {
   const forwardedFor = request.headers.get('x-forwarded-for');
   if (forwardedFor) {
-    const firstIp = forwardedFor.split(',', 1)[0].trim();
-    if (firstIp) return firstIp;
+    const hops = forwardedFor.split(',').map((hop) => hop.trim()).filter(Boolean);
+    if (hops.length) {
+      return hops[hops.length - Math.min(TRUSTED_PROXY_HOPS, hops.length)];
+    }
   }
 
   return request.headers.get('cf-connecting-ip') ||

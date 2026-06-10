@@ -175,6 +175,8 @@ async def create_event(
     if _analytics_rate_limited(request):
         raise HTTPException(status_code=429, detail="Too many analytics events. Try again later.")
 
+    from app.main import client_ip
+
     path = payload.path or request.headers.get("x-analytics-path") or request.url.path
     is_admin = path == "/admin" or path.startswith("/admin/") or path.startswith("/api/admin")
     event = record_analytics_event(
@@ -187,7 +189,7 @@ async def create_event(
         status_code=None,
         referrer=payload.referrer or request.headers.get("referer"),
         user_agent=request.headers.get("user-agent"),
-        ip_address=request.client.host if request.client else None,
+        ip_address=client_ip(request),
         visitor_id=payload.visitor_id,
         session_id=payload.session_id,
         is_authenticated=bool(getattr(request.state, "app_auth_authenticated", False)),

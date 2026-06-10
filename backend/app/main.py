@@ -158,6 +158,10 @@ TRUST_PROXY_HEADERS = os.getenv("TRUST_PROXY_HEADERS", "false").strip().lower() 
     "yes",
     "on",
 }
+# Number of trusted reverse proxies in front of the app (e.g. Railway/Vercel
+# edge). The real client IP is the entry X-Forwarded-For positions in from the
+# right — anything to its left was supplied by the client and is spoofable.
+TRUSTED_PROXY_HOPS = max(1, int(os.getenv("TRUSTED_PROXY_HOPS", "1")))
 # Best-effort, per-process auth-failure tracking. On serverless / multi-worker
 # deployments each instance has its own dict, so MAX_ATTEMPTS is enforced per
 # instance rather than globally. For a hard lockout, back this with Redis or
@@ -194,6 +198,16 @@ def app_auth_config():
     }
 
 
+def session_signing_secret(password: str) -> str:
+    # Sign session tokens with a dedicated secret so a leaked token is not an
+    # offline oracle for the account password (a token is value.HMAC(secret,
+    # value); if secret == password an attacker can brute-force it offline).
+    # Falls back to the password when unset to preserve existing deployments,
+    # but setting APP_SESSION_SECRET decouples the two and enables rotating
+    # sessions without a password change.
+    return os.getenv("APP_SESSION_SECRET") or password
+
+
 def basic_auth_credentials(authorization: str | None):
     if not authorization or not authorization.startswith("Basic "):
         return None
@@ -210,9 +224,12 @@ def client_ip(request: Request) -> str:
     if TRUST_PROXY_HEADERS:
         forwarded_for = request.headers.get("x-forwarded-for")
         if forwarded_for:
-            first_ip = forwarded_for.split(",", 1)[0].strip()
-            if first_ip:
-                return first_ip
+            # Take the hop the trusted proxy appended (counting from the right),
+            # not the leftmost entry which the client controls and can forge.
+            hops = [hop.strip() for hop in forwarded_for.split(",") if hop.strip()]
+            if hops:
+                index = min(TRUSTED_PROXY_HOPS, len(hops))
+                return hops[-index]
 
         for header in ("cf-connecting-ip", "x-real-ip"):
             value = request.headers.get(header)
@@ -309,7 +326,7 @@ def create_app_session_token(username: str, password: str, now: int | None = Non
             separators=(",", ":"),
         ).encode("utf-8")
     )
-    return f"{payload}.{_session_signature(password, payload)}"
+    return f"{payload}.{_session_signature(session_signing_secret(password), payload)}"
 
 
 def valid_app_session_cookie(request: Request) -> bool:
@@ -326,7 +343,7 @@ def valid_app_session_cookie(request: Request) -> bool:
     except ValueError:
         return False
 
-    expected_signature = _session_signature(config["password"], payload)
+    expected_signature = _session_signature(session_signing_secret(config["password"]), payload)
     if not secrets.compare_digest(signature, expected_signature):
         return False
 
@@ -431,6 +448,22 @@ async def record_request_analytics(request: Request, call_next):
                 "username": _analytics_username(request),
                 "duration_ms": (time.perf_counter() - started) * 1000,
             })
+
+
+SECURITY_HEADERS = {
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+    "Referrer-Policy": "strict-origin-when-cross-origin",
+    "Strict-Transport-Security": "max-age=63072000; includeSubDomains",
+}
+
+
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next):
+    response = await call_next(request)
+    for header, value in SECURITY_HEADERS.items():
+        response.headers.setdefault(header, value)
+    return response
 
 
 @app.middleware("http")
