@@ -57,6 +57,10 @@ button {
     height: 100dvh;
     min-height: 0;
     display: grid;
+    /* minmax(0, …) keeps the chart canvas's stamped pixel width from
+       inflating the track (and the whole page) on narrow viewports. */
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
     place-items: stretch;
     padding: clamp(0px, 2vw, 24px);
 }
@@ -501,6 +505,10 @@ button {
 .chart-wrap {
     position: relative;
     height: clamp(220px, 32vh, 320px);
+}
+
+.chart-wrap canvas {
+    max-width: 100%;
 }
 
 .chart-note {
@@ -1112,6 +1120,11 @@ textarea::placeholder {
 }
 
 @media (max-width: 920px) {
+    html,
+    body {
+        background: var(--paper);
+    }
+
     body {
         overflow: auto;
     }
@@ -1125,20 +1138,24 @@ textarea::placeholder {
 
     .terminal {
         display: block;
-        min-height: calc(100vh - var(--site-nav-mobile-height, 0px));
-        min-height: calc(100dvh - var(--site-nav-mobile-height, 0px));
+        min-height: 0;
         overflow: visible;
     }
 
     .term-titlebar {
         flex-wrap: wrap;
-        row-gap: 8px;
+        row-gap: 6px;
+        padding: 12px 14px;
     }
 
     .term-status {
         order: 5;
         flex-basis: 100%;
         margin-left: 0;
+    }
+
+    .term-button kbd {
+        display: none;
     }
 
     .layout {
@@ -1156,12 +1173,12 @@ textarea::placeholder {
     }
 
     .messages {
-        min-height: 300px;
+        min-height: 160px;
         max-height: 420px;
     }
 
     .chart-wrap {
-        height: 240px;
+        height: 230px;
     }
 }
 
@@ -1170,28 +1187,76 @@ textarea::placeholder {
         max-width: 100%;
     }
 
+    .price-hero {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 10px;
+        margin-bottom: 6px;
+    }
+
+    .price-value {
+        font-size: 32px;
+    }
+
+    .range-switch {
+        max-width: 100%;
+        overflow-x: auto;
+        scrollbar-width: none;
+    }
+
+    .range-switch::-webkit-scrollbar {
+        display: none;
+    }
+
+    /* Metrics become an editorial list: label left, value right,
+       caption underneath, hairline rules between rows. */
     .metric-grid {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        row-gap: 10px;
+        grid-template-columns: 1fr;
+        gap: 0;
+        border-top: 1px solid var(--line-soft);
+        margin-bottom: 16px;
     }
 
     .stat-tile {
-        padding-left: 0;
-        padding-right: 10px;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        grid-template-areas:
+            "label value"
+            "caption caption";
+        align-items: baseline;
+        column-gap: 12px;
+        border-right: 0;
+        border-bottom: 1px solid var(--line-soft);
+        padding: 11px 2px;
     }
 
-    .stat-tile:nth-child(even) {
-        border-right: 0;
-        padding-left: 12px;
+    .tile-label {
+        grid-area: label;
+        font-size: 12px;
+        color: var(--muted);
+    }
+
+    .tile-value {
+        grid-area: value;
+        margin-top: 0;
+        font-size: 16px;
+    }
+
+    .tile-caption {
+        grid-area: caption;
+        margin-top: 3px;
+    }
+
+    .block-card {
+        min-width: 116px;
     }
 
     .explorer-search {
         grid-template-columns: 1fr;
     }
 
-    .price-hero {
-        align-items: flex-start;
-        flex-direction: column;
+    .chat-header {
+        padding: 10px 12px;
     }
 }
 

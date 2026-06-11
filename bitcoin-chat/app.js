@@ -526,7 +526,7 @@ function renderChart(payload) {
                     ticks: {
                         color: '#a39a87',
                         font: { family: MONO_STACK, size: 10 },
-                        maxTicksLimit: 6,
+                        maxTicksLimit: (canvas.parentElement.clientWidth || 600) < 500 ? 4 : 6,
                         maxRotation: 0,
                         autoSkip: true,
                     },
@@ -897,6 +897,11 @@ function askChat(prompt) {
     messageInput.value = prompt;
     messageInput.dispatchEvent(new Event('input'));
     chatForm.requestSubmit();
+    // On stacked (mobile) layouts the chat lives below the fold — bring it
+    // into view so the question doesn't appear to vanish.
+    if (window.matchMedia('(max-width: 920px)').matches) {
+        document.getElementById('chatPanel')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
 }
 
 function inferLookupType(value, selected) {
