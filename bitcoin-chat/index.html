@@ -19,7 +19,7 @@
     <meta name="twitter:image" content="https://palmergill.com/assets/palmer-gill-logo.png">
     <link rel="icon" type="image/png" href="/assets/palmer-gill-logo-small.png">
     <link rel="stylesheet" href="/shared/site-nav.css?v=7">
-    <link rel="stylesheet" href="style.css?v=2">
+    <link rel="stylesheet" href="style.css?v=3">
 </head>
 <body>
     <main class="app-shell">
@@ -30,47 +30,40 @@
                 <span class="term-dot" aria-hidden="true"></span>
                 <span class="term-dot" aria-hidden="true"></span>
                 <span class="term-path">palmer@gill:~/bitcoin-chat</span>
+                <p id="nodeStatus" class="term-status"><span class="status-dot" aria-hidden="true"></span>Checking Bitcoin data...</p>
                 <div class="level-switch" role="group" aria-label="Explanation level" id="levelSwitch">
                     <span class="level-label" aria-hidden="true">explain it:</span>
                     <button type="button" data-level="new" aria-pressed="true">new to this</button>
                     <button type="button" data-level="curious" aria-pressed="false">curious</button>
                     <button type="button" data-level="technical" aria-pressed="false">technical</button>
                 </div>
-            </header>
-
-            <div class="status-line">
-                <p id="nodeStatus"><span class="status-dot" aria-hidden="true"></span>Checking Bitcoin data...</p>
                 <button type="button" id="lookupToggle" class="lookup-toggle" aria-expanded="false" aria-controls="explorerDrawer">
                     <span aria-hidden="true">⌕</span> lookup <kbd>⌘K</kbd>
                 </button>
-            </div>
+            </header>
             <p id="demoNotice" class="demo-notice" hidden>Public demo mode uses sample Bitcoin data and local answers. Live node and OpenAI calls stay protected.</p>
 
             <div class="stat-tiles" aria-label="Live Bitcoin stats">
-                <article class="stat-tile" id="chainTile">
-                    <p class="tile-label">The chain right now</p>
-                    <p class="tile-value mono" id="chainTileValue">—</p>
-                    <p class="tile-caption" id="chainTileCaption">blocks ever mined — a new one ~every 10 min</p>
-                    <button type="button" class="tile-question" data-prompt="What is a block, in simple terms?">what's a block? →</button>
-                </article>
-                <article class="stat-tile stat-tile--accent" id="feeTile">
-                    <p class="tile-label">Cost to send</p>
-                    <p class="tile-value mono accent" id="feeTileValue">—</p>
-                    <p class="tile-caption" id="feeTileCaption">checking today's fees…</p>
-                    <button type="button" class="tile-question tile-question--accent" data-prompt="Why do Bitcoin transaction fees change from day to day?">why do fees change? →</button>
-                </article>
-                <article class="stat-tile" id="mempoolTile">
-                    <p class="tile-label">Waiting room</p>
-                    <p class="tile-value mono" id="mempoolTileValue">—</p>
-                    <p class="tile-caption" id="mempoolTileCaption">payments queued for the next blocks</p>
-                    <button type="button" class="tile-question" data-prompt="What is the mempool and why do transactions wait there?">what's the mempool? →</button>
-                </article>
-                <article class="stat-tile" id="supplyTile">
-                    <p class="tile-label">Supply released</p>
-                    <p class="tile-value mono" id="supplyTileValue">—</p>
-                    <p class="tile-caption" id="supplyTileCaption">of all 21M bitcoin already exist</p>
-                    <button type="button" class="tile-question" data-prompt="Why will there only ever be 21 million bitcoin, and what happens when they have all been mined?">why only 21 million? →</button>
-                </article>
+                <button type="button" class="stat-tile" id="chainTile" data-prompt="What is a block, in simple terms?" title="Ask: what's a block?">
+                    <span class="tile-label">The chain right now</span>
+                    <span class="tile-value mono" id="chainTileValue">—</span>
+                    <span class="tile-caption" id="chainTileCaption">blocks ever mined — a new one ~every 10 min</span>
+                </button>
+                <button type="button" class="stat-tile" id="feeTile" data-prompt="Why do Bitcoin transaction fees change from day to day?" title="Ask: why do fees change?">
+                    <span class="tile-label">Cost to send</span>
+                    <span class="tile-value mono accent" id="feeTileValue">—</span>
+                    <span class="tile-caption" id="feeTileCaption">checking today's fees…</span>
+                </button>
+                <button type="button" class="stat-tile" id="mempoolTile" data-prompt="What is the mempool and why do transactions wait there?" title="Ask: what's the mempool?">
+                    <span class="tile-label">Waiting room</span>
+                    <span class="tile-value mono" id="mempoolTileValue">—</span>
+                    <span class="tile-caption" id="mempoolTileCaption">payments queued for the next blocks</span>
+                </button>
+                <button type="button" class="stat-tile" id="supplyTile" data-prompt="Why will there only ever be 21 million bitcoin, and what happens when they have all been mined?" title="Ask: why only 21 million?">
+                    <span class="tile-label">Supply released</span>
+                    <span class="tile-value mono" id="supplyTileValue">—</span>
+                    <span class="tile-caption" id="supplyTileCaption">of all 21M bitcoin already exist</span>
+                </button>
             </div>
 
             <section class="explorer-drawer" id="explorerDrawer" aria-label="Chain lookup" hidden>
@@ -91,18 +84,9 @@
 
             <div id="messages" class="messages" aria-live="polite">
                 <div class="learn-paths" id="learnPaths" aria-label="Starting points">
-                    <button type="button" class="learn-card" data-prompt="I'm completely new to this. What is Bitcoin, actually? Explain it without jargon.">
-                        <span class="learn-card-title"><span class="learn-icon" aria-hidden="true">●</span>Start from zero</span>
-                        <span class="learn-card-sub">What is Bitcoin, actually? No jargon, 2 minutes.</span>
-                    </button>
-                    <button type="button" class="learn-card" data-prompt="How does Bitcoin mining work? Who adds new blocks, and why do they bother?">
-                        <span class="learn-card-title"><span class="learn-icon learn-icon--orange" aria-hidden="true">◆</span>How mining works</span>
-                        <span class="learn-card-sub">Who adds blocks, and why they bother.</span>
-                    </button>
-                    <button type="button" class="learn-card" data-prompt="Walk me through what happens to a Bitcoin payment from the moment it is sent until it is fully settled, using the latest real block as an example.">
-                        <span class="learn-card-title"><span class="learn-icon learn-icon--blue" aria-hidden="true">➤</span>Follow a payment</span>
-                        <span class="learn-card-sub">Trace a transaction from sent to settled.</span>
-                    </button>
+                    <button type="button" class="learn-chip" data-prompt="I'm completely new to this. What is Bitcoin, actually? Explain it without jargon.">Start from zero</button>
+                    <button type="button" class="learn-chip" data-prompt="How does Bitcoin mining work? Who adds new blocks, and why do they bother?">How mining works</button>
+                    <button type="button" class="learn-chip" data-prompt="Walk me through what happens to a Bitcoin payment from the moment it is sent until it is fully settled, using the latest real block as an example.">Follow a payment</button>
                 </div>
             </div>
 
@@ -117,6 +101,6 @@
     <script src="/shared/site-nav.js?v=7"></script>
     <script src="/shared/analytics.js?v=1"></script>
     <script src="/shared/api-base.js?v=1"></script>
-    <script src="app.js?v=2"></script>
+    <script src="app.js?v=3"></script>
 </body>
 </html>

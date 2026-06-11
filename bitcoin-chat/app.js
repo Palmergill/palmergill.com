@@ -54,7 +54,7 @@ const BITCOIN_ADDRESS_RE = /^(?:bc1[ac-hj-np-z02-9]{11,71}|[13][a-km-zA-HJ-NP-Z1
 
 const starterMessage = {
     role: 'assistant',
-    text: 'Welcome — this is a live window into the Bitcoin network, and I\'ll explain anything you see in plain English. The numbers above update with the real chain. Pick a starting point below, or just ask whatever you\'re wondering.',
+    text: 'Ask me anything about Bitcoin — I\'ll explain it in plain English. The numbers above are live from the real network; click any of them to learn what they mean.',
 };
 
 function addMessage({ role, text, data, warnings, toolsUsed, loading = false, error = false }) {
@@ -445,7 +445,7 @@ function renderSupplyTile(block) {
         return;
     }
     tiles.supplyValue.textContent = `${((supply / TOTAL_SUPPLY_BTC) * 100).toFixed(1)}%`;
-    tiles.supplyCaption.textContent = `of all 21M bitcoin already exist (${(supply / 1e6).toFixed(2)}M BTC)`;
+    tiles.supplyCaption.textContent = 'of all 21M bitcoin already exist';
 }
 
 async function refreshTiles() {
@@ -796,7 +796,7 @@ chatForm.addEventListener('submit', async (event) => {
 addMessage(starterMessage);
 if (learnPaths) {
     messagesEl.appendChild(learnPaths);
-    learnPaths.querySelectorAll('.learn-card').forEach((card) => {
+    learnPaths.querySelectorAll('.learn-chip').forEach((card) => {
         card.addEventListener('click', () => {
             askChat(card.getAttribute('data-prompt'));
         });
@@ -806,7 +806,7 @@ if (learnPaths) {
     }, { once: true });
 }
 
-document.querySelectorAll('.tile-question[data-prompt]').forEach((button) => {
+document.querySelectorAll('.stat-tile[data-prompt]').forEach((button) => {
     button.addEventListener('click', () => {
         askChat(button.getAttribute('data-prompt'));
     });
