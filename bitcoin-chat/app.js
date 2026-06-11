@@ -13,6 +13,14 @@ const demoNotice = document.getElementById('demoNotice');
 const levelSwitch = document.getElementById('levelSwitch');
 const learnPaths = document.getElementById('learnPaths');
 const lookupToggle = document.getElementById('lookupToggle');
+const chatToggle = document.getElementById('chatToggle');
+const layoutEl = document.getElementById('layout');
+const rangeSwitch = document.getElementById('rangeSwitch');
+const priceValueEl = document.getElementById('priceValue');
+const priceChangeEl = document.getElementById('priceChange');
+const priceRangeMetaEl = document.getElementById('priceRangeMeta');
+const chartNoteEl = document.getElementById('chartNote');
+const blocksStrip = document.getElementById('blocksStrip');
 const tiles = {
     chainValue: document.getElementById('chainTileValue'),
     chainCaption: document.getElementById('chainTileCaption'),
@@ -22,6 +30,8 @@ const tiles = {
     mempoolCaption: document.getElementById('mempoolTileCaption'),
     supplyValue: document.getElementById('supplyTileValue'),
     supplyCaption: document.getElementById('supplyTileCaption'),
+    difficultyValue: document.getElementById('difficultyTileValue'),
+    difficultyCaption: document.getElementById('difficultyTileCaption'),
 };
 const explorerEls = {
     drawer: document.getElementById('explorerDrawer'),
@@ -40,13 +50,29 @@ try { localStorage.removeItem('bitcoinChatSessionId'); } catch (_) { /* ignore *
 
 const LEVELS = ['new', 'curious', 'technical'];
 const LEVEL_STORAGE_KEY = 'bitcoinChatLevel';
+const RANGE_STORAGE_KEY = 'bitcoinDashRange';
+const CHAT_HIDDEN_STORAGE_KEY = 'bitcoinDashChatHidden';
 // A simple 1-input, 2-output segwit payment is ~140 vB; used to translate
 // fee rates into an approximate dollar cost in the fee tile.
 const TYPICAL_TX_VBYTES = 140;
 const HALVING_INTERVAL = 210000;
 const TOTAL_SUPPLY_BTC = 21000000;
+const RANGES = ['1d', '1w', '1m', '3m', '1y', '5y'];
+const RANGE_LABELS = {
+    '1d': 'past 24h',
+    '1w': 'past week',
+    '1m': 'past month',
+    '3m': 'past 3 months',
+    '1y': 'past year',
+    '5y': 'past 5 years',
+};
+const MONO_STACK = '"SFMono-Regular", ui-monospace, Menlo, Consolas, monospace';
 
 let explanationLevel = readStoredLevel();
+let activeRange = readStoredRange();
+let priceChartInstance = null;
+let livePriceUsd = null;
+const chartCache = {};
 const explorerState = {
     lastResult: null,
 };
@@ -54,7 +80,7 @@ const BITCOIN_ADDRESS_RE = /^(?:bc1[ac-hj-np-z02-9]{11,71}|[13][a-km-zA-HJ-NP-Z1
 
 const starterMessage = {
     role: 'assistant',
-    text: 'Ask me anything about Bitcoin — I\'ll explain it in plain English. The numbers above are live from the real network; click any of them to learn what they mean.',
+    text: 'I\'m the helper for this dashboard — ask about anything you see here, or anything Bitcoin. Clicking any metric also sends me a question about it.',
 };
 
 function addMessage({ role, text, data, warnings, toolsUsed, loading = false, error = false }) {
@@ -325,6 +351,15 @@ function formatInteger(value) {
     return Number.isFinite(n) ? n.toLocaleString() : String(value);
 }
 
+function formatUsd(value, { compact = false } = {}) {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return '--';
+    if (compact && Math.abs(n) >= 1000) {
+        return `$${(n / 1000).toFixed(Math.abs(n) < 10000 ? 1 : 0)}k`;
+    }
+    return `$${n.toLocaleString('en-US', { maximumFractionDigits: n < 10 ? 2 : 0 })}`;
+}
+
 function formatBtc(value) {
     if (value === null || value === undefined || value === '') return '--';
     const n = Number(value);
@@ -395,6 +430,199 @@ function feeBusynessLabel(satsVb) {
     return 'a busy, expensive day to transact';
 }
 
+/* ---------------- Price chart ---------------- */
+
+function readStoredRange() {
+    try {
+        const stored = localStorage.getItem(RANGE_STORAGE_KEY);
+        if (stored && RANGES.includes(stored)) return stored;
+    } catch (_) { /* ignore */ }
+    return '1m';
+}
+
+function formatChartLabel(unixSeconds, range) {
+    const date = new Date(unixSeconds * 1000);
+    if (range === '1d') {
+        return date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+    }
+    if (range === '1w' || range === '1m' || range === '3m') {
+        return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+    }
+    return date.toLocaleDateString(undefined, { month: 'short', year: 'numeric' });
+}
+
+function formatTooltipTime(unixSeconds, range) {
+    const date = new Date(unixSeconds * 1000);
+    if (range === '1d' || range === '1w' || range === '1m') {
+        return date.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+    }
+    return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+function renderChart(payload) {
+    const canvas = document.getElementById('priceChart');
+    if (!canvas) return;
+    if (typeof Chart === 'undefined') {
+        chartNoteEl.textContent = 'chart library failed to load';
+        return;
+    }
+
+    const points = payload.points || [];
+    const labels = points.map((point) => formatChartLabel(point[0], payload.range));
+    const prices = points.map((point) => point[1]);
+    const ctx = canvas.getContext('2d');
+
+    if (priceChartInstance) {
+        priceChartInstance.destroy();
+    }
+
+    const gradient = ctx.createLinearGradient(0, 0, 0, canvas.parentElement.clientHeight || 300);
+    gradient.addColorStop(0, 'rgba(247, 147, 26, 0.22)');
+    gradient.addColorStop(1, 'rgba(247, 147, 26, 0)');
+
+    priceChartInstance = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels,
+            datasets: [{
+                data: prices,
+                borderColor: '#f7931a',
+                backgroundColor: gradient,
+                borderWidth: 2,
+                fill: true,
+                tension: 0.25,
+                pointRadius: 0,
+                pointHoverRadius: 4,
+                pointHoverBackgroundColor: '#f7931a',
+                pointHoverBorderColor: '#1c1003',
+            }],
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: false,
+            interaction: { intersect: false, mode: 'index' },
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    backgroundColor: 'rgba(5, 7, 5, 0.94)',
+                    borderColor: '#22302a',
+                    borderWidth: 1,
+                    titleColor: '#7f9389',
+                    bodyColor: '#f4efe6',
+                    titleFont: { family: MONO_STACK, size: 11 },
+                    bodyFont: { family: MONO_STACK, size: 13 },
+                    displayColors: false,
+                    callbacks: {
+                        title: (items) => formatTooltipTime(points[items[0].dataIndex][0], payload.range),
+                        label: (item) => `$${Number(item.parsed.y).toLocaleString('en-US', { maximumFractionDigits: 2 })}`,
+                    },
+                },
+            },
+            scales: {
+                x: {
+                    grid: { display: false },
+                    border: { color: '#14201a' },
+                    ticks: {
+                        color: '#5a6a5c',
+                        font: { family: MONO_STACK, size: 10 },
+                        maxTicksLimit: 6,
+                        maxRotation: 0,
+                        autoSkip: true,
+                    },
+                },
+                y: {
+                    position: 'right',
+                    grid: { color: 'rgba(20, 32, 26, 0.6)' },
+                    border: { display: false },
+                    ticks: {
+                        color: '#5a6a5c',
+                        font: { family: MONO_STACK, size: 10 },
+                        maxTicksLimit: 5,
+                        callback: (value) => formatUsd(value, { compact: true }),
+                    },
+                },
+            },
+        },
+    });
+}
+
+function renderPriceHero(payload) {
+    if (livePriceUsd === null && Number.isFinite(Number(payload.last))) {
+        priceValueEl.textContent = formatUsd(payload.last);
+    }
+    const pct = Number(payload.change_pct);
+    if (Number.isFinite(pct)) {
+        priceChangeEl.textContent = `${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%`;
+        priceChangeEl.classList.toggle('up', pct >= 0);
+        priceChangeEl.classList.toggle('down', pct < 0);
+    } else {
+        priceChangeEl.textContent = '—';
+        priceChangeEl.classList.remove('up', 'down');
+    }
+    priceRangeMetaEl.textContent =
+        `${RANGE_LABELS[payload.range]} · low ${formatUsd(payload.low)} · high ${formatUsd(payload.high)}`;
+    chartNoteEl.textContent = payload.source === 'demo'
+        ? 'sample data — log in for live prices'
+        : '';
+}
+
+function setActiveRange(range) {
+    activeRange = range;
+    try { localStorage.setItem(RANGE_STORAGE_KEY, range); } catch (_) { /* ignore */ }
+    rangeSwitch?.querySelectorAll('button[data-range]').forEach((button) => {
+        button.setAttribute('aria-pressed', String(button.dataset.range === range));
+    });
+}
+
+async function loadChart(range) {
+    setActiveRange(range);
+    const ttlMs = range === '1d' ? 120000 : 600000;
+    const cached = chartCache[range];
+    let payload = cached && Date.now() - cached.at < ttlMs ? cached.payload : null;
+
+    if (!payload) {
+        try {
+            payload = await fetchJson(`${API_BASE}/price/history?range=${range}`);
+        } catch (error) {
+            chartNoteEl.textContent = `price history unavailable: ${error.message}`;
+            return;
+        }
+        if (payload.error || !payload.points?.length) {
+            chartNoteEl.textContent = payload.error || 'price history unavailable right now';
+            return;
+        }
+        chartCache[range] = { at: Date.now(), payload };
+    }
+
+    // Ignore stale responses if the user switched ranges mid-flight.
+    if (activeRange !== range) return;
+    renderChart(payload);
+    renderPriceHero(payload);
+}
+
+function wireRangeSwitch() {
+    rangeSwitch?.addEventListener('click', (event) => {
+        const button = event.target.closest('button[data-range]');
+        if (!button || button.dataset.range === activeRange) return;
+        loadChart(button.dataset.range);
+        window.pgAnalytics?.track?.('bitcoin_chart_range', { range: button.dataset.range });
+    });
+}
+
+async function refreshPrice() {
+    try {
+        const price = await fetchJson(`${API_BASE}/price`);
+        const usd = Number(price?.usd);
+        if (Number.isFinite(usd) && usd > 0) {
+            livePriceUsd = usd;
+            priceValueEl.textContent = formatUsd(usd);
+        }
+    } catch (_) { /* hero falls back to the chart's last point */ }
+}
+
+/* ---------------- Metric tiles ---------------- */
+
 function renderChainTile(block) {
     if (!block || block.error) {
         tiles.chainValue.textContent = '--';
@@ -422,7 +650,7 @@ function renderFeeTile(mempool, price) {
         tiles.feeCaption.textContent = `${fast.toFixed(fast < 10 ? 1 : 0)} sat/vB — ${feeBusynessLabel(fast)}`;
     } else {
         tiles.feeValue.textContent = `${fast.toFixed(fast < 10 ? 1 : 0)} sat/vB`;
-        tiles.feeCaption.textContent = `the going rate to confirm within ~20 minutes`;
+        tiles.feeCaption.textContent = 'the going rate to confirm within ~20 minutes';
     }
 }
 
@@ -433,7 +661,10 @@ function renderMempoolTile(mempool) {
         return;
     }
     tiles.mempoolValue.textContent = formatInteger(mempool.tx_count);
-    tiles.mempoolCaption.textContent = 'payments queued for the next blocks';
+    const vsize = Number(mempool.virtual_size_vb);
+    tiles.mempoolCaption.textContent = Number.isFinite(vsize) && vsize > 0
+        ? `payments queued · ~${Math.round(vsize / 1e6)} vMB waiting`
+        : 'payments queued for the next blocks';
 }
 
 function renderSupplyTile(block) {
@@ -445,23 +676,92 @@ function renderSupplyTile(block) {
         return;
     }
     tiles.supplyValue.textContent = `${((supply / TOTAL_SUPPLY_BTC) * 100).toFixed(1)}%`;
-    tiles.supplyCaption.textContent = 'of all 21M bitcoin already exist';
+    const nextHalving = (Math.floor(height / HALVING_INTERVAL) + 1) * HALVING_INTERVAL;
+    const remainingDays = Math.round(((nextHalving - height) * 600) / 86400);
+    tiles.supplyCaption.textContent =
+        `of 21M exist · next halving in ~${remainingDays.toLocaleString()} days`;
 }
 
-async function refreshTiles() {
-    const [blockResult, mempoolResult, priceResult] = await Promise.allSettled([
+function renderDifficultyTile(diff) {
+    const change = Number(diff?.difficulty_change_percent);
+    if (!diff || diff.error || !Number.isFinite(change)) {
+        tiles.difficultyValue.textContent = '--';
+        tiles.difficultyValue.classList.remove('up', 'down');
+        tiles.difficultyCaption.textContent = 'difficulty data unavailable right now';
+        return;
+    }
+    tiles.difficultyValue.textContent = `${change >= 0 ? '+' : ''}${change.toFixed(1)}%`;
+    tiles.difficultyValue.classList.toggle('up', change >= 0);
+    tiles.difficultyValue.classList.toggle('down', change < 0);
+    const progress = Number(diff.progress_percent);
+    tiles.difficultyCaption.textContent = Number.isFinite(progress)
+        ? `${Math.round(progress)}% of the way to the next retarget`
+        : 'the network self-tunes every 2,016 blocks';
+}
+
+function renderBlocksStrip(payload) {
+    if (!blocksStrip) return;
+    if (!payload || payload.error || !payload.blocks?.length) {
+        const empty = document.createElement('p');
+        empty.className = 'blocks-empty';
+        empty.textContent = 'recent blocks unavailable right now';
+        blocksStrip.replaceChildren(empty);
+        return;
+    }
+
+    blocksStrip.replaceChildren(...payload.blocks.map((block) => {
+        const card = document.createElement('button');
+        card.type = 'button';
+        card.className = 'block-card';
+        card.title = `Inspect block ${block.height}`;
+
+        const height = document.createElement('span');
+        height.className = 'block-height';
+        height.textContent = `#${formatInteger(block.height)}`;
+
+        const meta = document.createElement('span');
+        meta.className = 'block-meta';
+        meta.textContent = `${relativeMinutes(block.time) || '--'} · ${formatInteger(block.tx_count)} tx`;
+
+        const meta2 = document.createElement('span');
+        meta2.className = 'block-meta';
+        const fee = Number(block.median_fee_sats_vb);
+        const feeText = Number.isFinite(fee) ? `~${fee.toFixed(fee < 10 ? 1 : 0)} sat/vB` : '';
+        meta2.textContent = [feeText, block.pool].filter(Boolean).join(' · ') || ' ';
+
+        card.append(height, meta, meta2);
+        card.addEventListener('click', () => {
+            setDrawerOpen(true);
+            if (explorerEls.input) explorerEls.input.value = String(block.height);
+            if (explorerEls.type) explorerEls.type.value = 'block';
+            lookupExplorer(String(block.height), 'block');
+        });
+        return card;
+    }));
+}
+
+async function refreshDashboard() {
+    const [blockResult, mempoolResult, priceResult, difficultyResult, blocksResult] = await Promise.allSettled([
         fetchJson(`${API_BASE}/block/latest`),
         fetchJson(`${API_BASE}/mempool/summary`),
         fetchJson(`${API_BASE}/price`),
+        fetchJson(`${API_BASE}/difficulty`),
+        fetchJson(`${API_BASE}/blocks/recent?limit=10`),
     ]);
     const block = blockResult.status === 'fulfilled' ? blockResult.value : null;
     const mempool = mempoolResult.status === 'fulfilled' ? mempoolResult.value : null;
     const price = priceResult.status === 'fulfilled' ? priceResult.value : null;
+    const difficulty = difficultyResult.status === 'fulfilled' ? difficultyResult.value : null;
+    const blocks = blocksResult.status === 'fulfilled' ? blocksResult.value : null;
     renderChainTile(block);
     renderFeeTile(mempool, price);
     renderMempoolTile(mempool);
     renderSupplyTile(block);
+    renderDifficultyTile(difficulty);
+    renderBlocksStrip(blocks);
 }
+
+/* ---------------- Explorer ---------------- */
 
 function explorerSetStatus(message, isError = false) {
     if (!explorerEls.status) return;
@@ -593,6 +893,7 @@ function promptForExplorer(kind, data) {
 
 function askChat(prompt) {
     if (!prompt) return;
+    setChatOpen(true);
     messageInput.value = prompt;
     messageInput.dispatchEvent(new Event('input'));
     chatForm.requestSubmit();
@@ -675,6 +976,8 @@ function wireExplorer() {
     });
 }
 
+/* ---------------- Chat panel ---------------- */
+
 function readStoredLevel() {
     try {
         const stored = localStorage.getItem(LEVEL_STORAGE_KEY);
@@ -700,6 +1003,21 @@ function wireLevelSwitch() {
         if (!button) return;
         setLevel(button.dataset.level);
         window.pgAnalytics?.track?.('bitcoin_chat_level', { level: button.dataset.level });
+    });
+}
+
+function setChatOpen(open) {
+    layoutEl?.classList.toggle('chat-hidden', !open);
+    chatToggle?.setAttribute('aria-expanded', String(open));
+    try { localStorage.setItem(CHAT_HIDDEN_STORAGE_KEY, String(!open)); } catch (_) { /* ignore */ }
+}
+
+function wireChatToggle() {
+    let hidden = false;
+    try { hidden = localStorage.getItem(CHAT_HIDDEN_STORAGE_KEY) === 'true'; } catch (_) { /* ignore */ }
+    setChatOpen(!hidden);
+    chatToggle?.addEventListener('click', () => {
+        setChatOpen(layoutEl.classList.contains('chat-hidden'));
     });
 }
 
@@ -791,8 +1109,8 @@ chatForm.addEventListener('submit', async (event) => {
     await sendMessage(text);
 });
 
-// The starter message should sit above the learning-path cards, so render
-// it first and then move the (static) cards back to the end of the thread.
+// The starter message should sit above the learning-path chips, so render
+// it first and then move the (static) chips back to the end of the thread.
 addMessage(starterMessage);
 if (learnPaths) {
     messagesEl.appendChild(learnPaths);
@@ -813,7 +1131,12 @@ document.querySelectorAll('.stat-tile[data-prompt]').forEach((button) => {
 });
 
 wireLevelSwitch();
+wireChatToggle();
+wireRangeSwitch();
 wireExplorer();
 refreshStatus();
-refreshTiles();
-setInterval(refreshTiles, 120000);
+refreshPrice();
+loadChart(activeRange);
+refreshDashboard();
+setInterval(refreshDashboard, 120000);
+setInterval(refreshPrice, 60000);

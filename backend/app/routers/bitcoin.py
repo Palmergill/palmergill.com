@@ -111,6 +111,37 @@ async def price(request: Request):
     )
 
 
+@router.get("/price/history")
+async def price_history(
+    request: Request,
+    range_key: str = Query("1m", alias="range", pattern="^(1d|1w|1m|3m|1y|5y)$"),
+):
+    try:
+        if is_demo_request(request):
+            return bitcoin_tools.get_demo_price_history(range_key)
+        return bitcoin_tools.get_price_history(range_key)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@router.get("/blocks/recent")
+async def recent_blocks(request: Request, limit: int = Query(8, ge=1, le=15)):
+    return (
+        bitcoin_tools.get_demo_recent_blocks(limit)
+        if is_demo_request(request)
+        else bitcoin_tools.get_recent_blocks(limit)
+    )
+
+
+@router.get("/difficulty")
+async def difficulty_adjustment(request: Request):
+    return (
+        bitcoin_tools.get_demo_difficulty_adjustment()
+        if is_demo_request(request)
+        else bitcoin_tools.get_difficulty_adjustment()
+    )
+
+
 @router.get("/mempool/summary")
 async def mempool_summary(request: Request):
     return (

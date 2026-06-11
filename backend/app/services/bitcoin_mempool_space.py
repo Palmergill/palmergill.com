@@ -41,6 +41,12 @@ class MempoolSpaceClient:
     def get_blocks(self, start_height: int) -> List[Dict[str, Any]]:
         return self.get_json(f"/v1/blocks/{start_height}")
 
+    def get_recent_blocks(self) -> List[Dict[str, Any]]:
+        return self.get_json("/v1/blocks")
+
+    def get_difficulty_adjustment(self) -> Dict[str, Any]:
+        return self.get_json("/v1/difficulty-adjustment")
+
     def get_mempool(self) -> Dict[str, Any]:
         return self.get_json("/mempool")
 

@@ -37,8 +37,8 @@
             icon: "badge-dollar-sign"
         },
         {
-            label: "Bitcoin Chat",
-            hint: "Node console",
+            label: "Bitcoin",
+            hint: "Live dashboard",
             href: "/bitcoin-chat/",
             icon: "bitcoin"
         },

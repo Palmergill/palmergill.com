@@ -1,3 +1,4 @@
+import math
 import os
 import re
 import time
@@ -5,6 +6,7 @@ from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Any, Dict, List
 
+from app.services.bitcoin_coingecko import CoinGeckoError, coingecko_client
 from app.services.bitcoin_formatting import block_subsidy_btc, btc_to_sats, fee_rate_sats_vb, iso_from_unix, sats_to_btc
 from app.services.bitcoin_mempool_space import MempoolSpaceError, mempool_space_client
 from app.services.bitcoin_rpc import BitcoinRPCError, bitcoin_rpc_client
@@ -354,6 +356,188 @@ def get_price() -> Dict[str, Any]:
         "source": "mempool.space",
         "usd": prices.get("USD"),
         "time": iso_from_unix(price_time) if price_time else None,
+        "warnings": [],
+    }
+
+
+PRICE_HISTORY_RANGES: Dict[str, int] = {"1d": 1, "1w": 7, "1m": 30, "3m": 90, "1y": 365, "5y": 1825}
+PRICE_HISTORY_MAX_POINTS = 400
+_price_history_cache: Dict[str, Any] = {}
+
+
+def _price_history_days(range_key: str) -> int:
+    days = PRICE_HISTORY_RANGES.get(str(range_key or "").lower())
+    if days is None:
+        raise ValueError(f"Range must be one of: {', '.join(PRICE_HISTORY_RANGES)}")
+    return days
+
+
+def _price_history_ttl_seconds(range_key: str) -> int:
+    return 300 if range_key == "1d" else 1800
+
+
+def _downsample_points(points: List[List[float]], max_points: int = PRICE_HISTORY_MAX_POINTS) -> List[List[float]]:
+    if len(points) <= max_points:
+        return points
+    stride = -(-len(points) // max_points)
+    sampled = points[::stride]
+    if sampled[-1] != points[-1]:
+        sampled.append(points[-1])
+    return sampled
+
+
+def _price_history_payload(range_key: str, points: List[List[float]], source: str, warnings: List[str]) -> Dict[str, Any]:
+    prices = [point[1] for point in points]
+    first, last = prices[0], prices[-1]
+    return {
+        "source": source,
+        "range": range_key,
+        "currency": "usd",
+        "points": points,
+        "first": first,
+        "last": last,
+        "low": min(prices),
+        "high": max(prices),
+        "change_pct": round((last - first) / first * 100, 2) if first else None,
+        "warnings": warnings,
+    }
+
+
+def get_demo_price_history(range_key: str) -> Dict[str, Any]:
+    days = _price_history_days(range_key)
+    range_key = range_key.lower()
+    base = 67250.0
+    count = 200
+    now = int(time.time())
+    step = max(1, days * 86400 // count)
+    points: List[List[float]] = []
+    for i in range(count + 1):
+        progress = i / count
+        wave = (
+            math.sin(progress * math.pi * 6 + days) * 0.05
+            + math.sin(progress * math.pi * 23 + days * 2) * 0.02
+        )
+        trend = (progress - 1) * (0.35 if days >= 365 else 0.06)
+        price = base if i == count else base * (1 + trend + wave)
+        points.append([now - (count - i) * step, round(price, 2)])
+    return _price_history_payload(range_key, points, "demo", [DEMO_WARNING])
+
+
+def get_price_history(range_key: str) -> Dict[str, Any]:
+    days = _price_history_days(range_key)
+    range_key = range_key.lower()
+
+    cached = _price_history_cache.get(range_key)
+    if cached and time.time() - cached[0] < _price_history_ttl_seconds(range_key):
+        return cached[1]
+
+    if not coingecko_client.configured:
+        return get_demo_price_history(range_key)
+
+    try:
+        raw = coingecko_client.get_market_chart(days)
+    except CoinGeckoError as exc:
+        if cached:
+            return cached[1]
+        return {
+            "source": "error",
+            "range": range_key,
+            "error": str(exc),
+            "warnings": ["I cannot reach the price history service right now."],
+        }
+
+    points = [
+        [int(timestamp_ms / 1000), round(float(price), 2)]
+        for timestamp_ms, price in (raw.get("prices") or [])
+        if price is not None
+    ]
+    if not points:
+        return {
+            "source": "error",
+            "range": range_key,
+            "error": "CoinGecko returned no price points",
+            "warnings": ["The price history service returned no data."],
+        }
+
+    payload = _price_history_payload(range_key, _downsample_points(points), "coingecko", [])
+    _price_history_cache[range_key] = (time.time(), payload)
+    return payload
+
+
+def get_demo_recent_blocks(limit: int = 8) -> Dict[str, Any]:
+    now = int(time.time())
+    blocks = []
+    for i in range(limit):
+        blocks.append({
+            "height": 840000 - i,
+            "hash": f"00000000000000000003{i:04d}3a032748cef8227873ff4872689bf23f1cda83a5"[:64],
+            "time": iso_from_unix(now - 600 * (i + 1)),
+            "tx_count": 3050 - (i * 137) % 900,
+            "size": 1847392 - (i * 52021) % 600000,
+            "median_fee_sats_vb": round(12 + (i * 3.7) % 9, 1),
+            "pool": "Demo Pool",
+        })
+    return {"source": "demo", "blocks": blocks, "warnings": [DEMO_WARNING]}
+
+
+def get_recent_blocks(limit: int = 8) -> Dict[str, Any]:
+    # Like get_price: a node has no cheap recent-blocks summary, so
+    # mempool.space serves this regardless of the chain-data provider.
+    if not mempool_space_client.configured:
+        return get_demo_recent_blocks(limit)
+
+    try:
+        raw = mempool_space_client.get_recent_blocks()
+    except MempoolSpaceError as exc:
+        return _api_error_response(exc)
+
+    blocks = []
+    for block in raw[:limit]:
+        extras = block.get("extras") or {}
+        timestamp = block.get("timestamp")
+        blocks.append({
+            "height": block.get("height"),
+            "hash": block.get("id"),
+            "time": iso_from_unix(timestamp) if timestamp else None,
+            "tx_count": block.get("tx_count"),
+            "size": block.get("size"),
+            "median_fee_sats_vb": extras.get("medianFee"),
+            "pool": (extras.get("pool") or {}).get("name"),
+        })
+    return {"source": "mempool.space", "blocks": blocks, "warnings": []}
+
+
+def get_demo_difficulty_adjustment() -> Dict[str, Any]:
+    now = int(time.time())
+    remaining_blocks = 578
+    return {
+        "source": "demo",
+        "progress_percent": 71.3,
+        "remaining_blocks": remaining_blocks,
+        "estimated_retarget_date": iso_from_unix(now + remaining_blocks * 600),
+        "difficulty_change_percent": 2.4,
+        "warnings": [DEMO_WARNING],
+    }
+
+
+def get_difficulty_adjustment() -> Dict[str, Any]:
+    if not mempool_space_client.configured:
+        return get_demo_difficulty_adjustment()
+
+    try:
+        raw = mempool_space_client.get_difficulty_adjustment()
+    except MempoolSpaceError as exc:
+        return _api_error_response(exc)
+
+    retarget_ms = raw.get("estimatedRetargetDate")
+    progress = raw.get("progressPercent")
+    change = raw.get("difficultyChange")
+    return {
+        "source": "mempool.space",
+        "progress_percent": round(progress, 1) if isinstance(progress, (int, float)) else progress,
+        "remaining_blocks": raw.get("remainingBlocks"),
+        "estimated_retarget_date": iso_from_unix(int(retarget_ms / 1000)) if retarget_ms else None,
+        "difficulty_change_percent": round(change, 2) if isinstance(change, (int, float)) else change,
         "warnings": [],
     }
 

@@ -3,68 +3,40 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bitcoin Chat & Explorer</title>
-    <meta name="description" content="A friendly place to learn Bitcoin — live chain data explained in plain English, with an explorer for blocks, transactions, fees, and addresses. By Palmer Gill.">
+    <title>Bitcoin Dashboard</title>
+    <meta name="description" content="Live Bitcoin dashboard — BTC-USD price chart, fees, mempool, blocks, and supply, with a plain-English chat helper. By Palmer Gill.">
     <meta name="theme-color" content="#070a08">
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://palmergill.com/bitcoin-chat/">
-    <meta property="og:title" content="Bitcoin Chat & Explorer — Palmer Gill">
-    <meta property="og:description" content="A friendly place to learn Bitcoin — live chain data explained in plain English, with an explorer for blocks, transactions, fees, and addresses.">
+    <meta property="og:title" content="Bitcoin Dashboard — Palmer Gill">
+    <meta property="og:description" content="Live Bitcoin dashboard — BTC-USD price chart, fees, mempool, blocks, and supply, with a plain-English chat helper.">
     <meta property="og:image" content="https://palmergill.com/assets/palmer-gill-logo.png">
     <meta property="og:image:width" content="960">
     <meta property="og:image:height" content="960">
     <meta name="twitter:card" content="summary">
-    <meta name="twitter:title" content="Bitcoin Chat & Explorer — Palmer Gill">
-    <meta name="twitter:description" content="A friendly place to learn Bitcoin — live chain data explained in plain English, with an explorer for blocks, transactions, fees, and addresses.">
+    <meta name="twitter:title" content="Bitcoin Dashboard — Palmer Gill">
+    <meta name="twitter:description" content="Live Bitcoin dashboard — BTC-USD price chart, fees, mempool, blocks, and supply, with a plain-English chat helper.">
     <meta name="twitter:image" content="https://palmergill.com/assets/palmer-gill-logo.png">
     <link rel="icon" type="image/png" href="/assets/palmer-gill-logo-small.png">
     <link rel="stylesheet" href="/shared/site-nav.css?v=7">
-    <link rel="stylesheet" href="style.css?v=3">
+    <link rel="stylesheet" href="style.css?v=4">
 </head>
 <body>
     <main class="app-shell">
-        <h1 class="sr-only">Bitcoin Chat &amp; Explorer</h1>
-        <section class="terminal" aria-label="Bitcoin chat">
+        <h1 class="sr-only">Bitcoin Dashboard</h1>
+        <section class="terminal" aria-label="Bitcoin dashboard">
             <header class="term-titlebar">
                 <span class="term-dot" aria-hidden="true"></span>
                 <span class="term-dot" aria-hidden="true"></span>
                 <span class="term-dot" aria-hidden="true"></span>
-                <span class="term-path">palmer@gill:~/bitcoin-chat</span>
+                <span class="term-path">palmer@gill:~/bitcoin</span>
                 <p id="nodeStatus" class="term-status"><span class="status-dot" aria-hidden="true"></span>Checking Bitcoin data...</p>
-                <div class="level-switch" role="group" aria-label="Explanation level" id="levelSwitch">
-                    <span class="level-label" aria-hidden="true">explain it:</span>
-                    <button type="button" data-level="new" aria-pressed="true">new to this</button>
-                    <button type="button" data-level="curious" aria-pressed="false">curious</button>
-                    <button type="button" data-level="technical" aria-pressed="false">technical</button>
-                </div>
-                <button type="button" id="lookupToggle" class="lookup-toggle" aria-expanded="false" aria-controls="explorerDrawer">
+                <button type="button" id="lookupToggle" class="term-button" aria-expanded="false" aria-controls="explorerDrawer">
                     <span aria-hidden="true">⌕</span> lookup <kbd>⌘K</kbd>
                 </button>
+                <button type="button" id="chatToggle" class="term-button" aria-expanded="true" aria-controls="chatPanel">chat</button>
             </header>
             <p id="demoNotice" class="demo-notice" hidden>Public demo mode uses sample Bitcoin data and local answers. Live node and OpenAI calls stay protected.</p>
-
-            <div class="stat-tiles" aria-label="Live Bitcoin stats">
-                <button type="button" class="stat-tile" id="chainTile" data-prompt="What is a block, in simple terms?" title="Ask: what's a block?">
-                    <span class="tile-label">The chain right now</span>
-                    <span class="tile-value mono" id="chainTileValue">—</span>
-                    <span class="tile-caption" id="chainTileCaption">blocks ever mined — a new one ~every 10 min</span>
-                </button>
-                <button type="button" class="stat-tile" id="feeTile" data-prompt="Why do Bitcoin transaction fees change from day to day?" title="Ask: why do fees change?">
-                    <span class="tile-label">Cost to send</span>
-                    <span class="tile-value mono accent" id="feeTileValue">—</span>
-                    <span class="tile-caption" id="feeTileCaption">checking today's fees…</span>
-                </button>
-                <button type="button" class="stat-tile" id="mempoolTile" data-prompt="What is the mempool and why do transactions wait there?" title="Ask: what's the mempool?">
-                    <span class="tile-label">Waiting room</span>
-                    <span class="tile-value mono" id="mempoolTileValue">—</span>
-                    <span class="tile-caption" id="mempoolTileCaption">payments queued for the next blocks</span>
-                </button>
-                <button type="button" class="stat-tile" id="supplyTile" data-prompt="Why will there only ever be 21 million bitcoin, and what happens when they have all been mined?" title="Ask: why only 21 million?">
-                    <span class="tile-label">Supply released</span>
-                    <span class="tile-value mono" id="supplyTileValue">—</span>
-                    <span class="tile-caption" id="supplyTileCaption">of all 21M bitcoin already exist</span>
-                </button>
-            </div>
 
             <section class="explorer-drawer" id="explorerDrawer" aria-label="Chain lookup" hidden>
                 <form id="explorerSearchForm" class="explorer-search">
@@ -82,25 +54,101 @@
                 <section class="explorer-result" id="explorerResult" aria-live="polite" hidden></section>
             </section>
 
-            <div id="messages" class="messages" aria-live="polite">
-                <div class="learn-paths" id="learnPaths" aria-label="Starting points">
-                    <button type="button" class="learn-chip" data-prompt="I'm completely new to this. What is Bitcoin, actually? Explain it without jargon.">Start from zero</button>
-                    <button type="button" class="learn-chip" data-prompt="How does Bitcoin mining work? Who adds new blocks, and why do they bother?">How mining works</button>
-                    <button type="button" class="learn-chip" data-prompt="Walk me through what happens to a Bitcoin payment from the moment it is sent until it is fully settled, using the latest real block as an example.">Follow a payment</button>
-                </div>
-            </div>
+            <div class="layout" id="layout">
+                <div class="dashboard">
+                    <section class="price-hero" aria-label="Bitcoin price">
+                        <div class="price-main">
+                            <p class="price-label">BTC / USD</p>
+                            <p class="price-value mono" id="priceValue">—</p>
+                            <p class="price-meta">
+                                <span class="price-change mono" id="priceChange">—</span>
+                                <span class="price-range-meta" id="priceRangeMeta"></span>
+                            </p>
+                        </div>
+                        <div class="range-switch" role="group" aria-label="Chart timeframe" id="rangeSwitch">
+                            <button type="button" data-range="1d" aria-pressed="false">1D</button>
+                            <button type="button" data-range="1w" aria-pressed="false">1W</button>
+                            <button type="button" data-range="1m" aria-pressed="true">1M</button>
+                            <button type="button" data-range="3m" aria-pressed="false">3M</button>
+                            <button type="button" data-range="1y" aria-pressed="false">1Y</button>
+                            <button type="button" data-range="5y" aria-pressed="false">5Y</button>
+                        </div>
+                    </section>
 
-            <form id="chatForm" class="composer">
-                <span class="composer-prompt mono" aria-hidden="true">$</span>
-                <label class="sr-only" for="messageInput">Ask anything about Bitcoin</label>
-                <textarea id="messageInput" rows="1" placeholder="Ask anything — no jargon required" maxlength="1000" required></textarea>
-                <button type="submit" aria-label="Send message">↑</button>
-            </form>
+                    <section class="chart-card" aria-label="BTC-USD price chart">
+                        <div class="chart-wrap"><canvas id="priceChart"></canvas></div>
+                        <p class="chart-note" id="chartNote" role="status"></p>
+                    </section>
+
+                    <section class="metric-grid" aria-label="Live chain metrics">
+                        <button type="button" class="stat-tile" id="chainTile" data-prompt="What is a block, in simple terms?" title="Ask: what's a block?">
+                            <span class="tile-label">The chain right now</span>
+                            <span class="tile-value mono" id="chainTileValue">—</span>
+                            <span class="tile-caption" id="chainTileCaption">blocks ever mined</span>
+                        </button>
+                        <button type="button" class="stat-tile" id="feeTile" data-prompt="Why do Bitcoin transaction fees change from day to day?" title="Ask: why do fees change?">
+                            <span class="tile-label">Cost to send</span>
+                            <span class="tile-value mono accent" id="feeTileValue">—</span>
+                            <span class="tile-caption" id="feeTileCaption">checking today's fees…</span>
+                        </button>
+                        <button type="button" class="stat-tile" id="mempoolTile" data-prompt="What is the mempool and why do transactions wait there?" title="Ask: what's the mempool?">
+                            <span class="tile-label">Waiting room</span>
+                            <span class="tile-value mono" id="mempoolTileValue">—</span>
+                            <span class="tile-caption" id="mempoolTileCaption">payments queued for the next blocks</span>
+                        </button>
+                        <button type="button" class="stat-tile" id="supplyTile" data-prompt="Why will there only ever be 21 million bitcoin, and what is the halving?" title="Ask: why only 21 million?">
+                            <span class="tile-label">Supply released</span>
+                            <span class="tile-value mono" id="supplyTileValue">—</span>
+                            <span class="tile-caption" id="supplyTileCaption">of all 21M bitcoin already exist</span>
+                        </button>
+                        <button type="button" class="stat-tile" id="difficultyTile" data-prompt="What is the Bitcoin difficulty adjustment and why does it exist?" title="Ask: what's the difficulty adjustment?">
+                            <span class="tile-label">Next difficulty change</span>
+                            <span class="tile-value mono" id="difficultyTileValue">—</span>
+                            <span class="tile-caption" id="difficultyTileCaption">the network self-tunes every 2,016 blocks</span>
+                        </button>
+                    </section>
+
+                    <section class="blocks-section" aria-label="Recent blocks">
+                        <div class="section-heading">
+                            <h2>Recent blocks</h2>
+                            <span class="section-note">newest first · click a block to inspect it</span>
+                        </div>
+                        <div class="blocks-strip" id="blocksStrip">
+                            <p class="blocks-empty">Loading recent blocks…</p>
+                        </div>
+                    </section>
+                </div>
+
+                <aside class="chat-panel" id="chatPanel" aria-label="Bitcoin chat helper">
+                    <div class="chat-header">
+                        <span class="chat-title mono">$ ask-bitcoin</span>
+                        <div class="level-switch" role="group" aria-label="Explanation level" id="levelSwitch">
+                            <button type="button" data-level="new" aria-pressed="true">new to this</button>
+                            <button type="button" data-level="curious" aria-pressed="false">curious</button>
+                            <button type="button" data-level="technical" aria-pressed="false">technical</button>
+                        </div>
+                    </div>
+                    <div id="messages" class="messages" aria-live="polite">
+                        <div class="learn-paths" id="learnPaths" aria-label="Starting points">
+                            <button type="button" class="learn-chip" data-prompt="I'm completely new to this. What is Bitcoin, actually? Explain it without jargon.">Start from zero</button>
+                            <button type="button" class="learn-chip" data-prompt="How does Bitcoin mining work? Who adds new blocks, and why do they bother?">How mining works</button>
+                            <button type="button" class="learn-chip" data-prompt="Walk me through what happens to a Bitcoin payment from the moment it is sent until it is fully settled, using the latest real block as an example.">Follow a payment</button>
+                        </div>
+                    </div>
+                    <form id="chatForm" class="composer">
+                        <span class="composer-prompt mono" aria-hidden="true">$</span>
+                        <label class="sr-only" for="messageInput">Ask anything about Bitcoin</label>
+                        <textarea id="messageInput" rows="1" placeholder="Ask about anything you see" maxlength="1000" required></textarea>
+                        <button type="submit" aria-label="Send message">↑</button>
+                    </form>
+                </aside>
+            </div>
         </section>
     </main>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <script src="/shared/site-nav.js?v=7"></script>
     <script src="/shared/analytics.js?v=1"></script>
     <script src="/shared/api-base.js?v=1"></script>
-    <script src="app.js?v=3"></script>
+    <script src="app.js?v=4"></script>
 </body>
 </html>
