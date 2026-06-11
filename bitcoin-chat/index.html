@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Bitcoin Dashboard</title>
     <meta name="description" content="Live Bitcoin dashboard — BTC-USD price chart, fees, mempool, blocks, and supply, with a plain-English chat helper. By Palmer Gill.">
-    <meta name="theme-color" content="#070a08">
+    <meta name="theme-color" content="#faf7f1">
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://palmergill.com/bitcoin-chat/">
     <meta property="og:title" content="Bitcoin Dashboard — Palmer Gill">
@@ -19,17 +19,14 @@
     <meta name="twitter:image" content="https://palmergill.com/assets/palmer-gill-logo.png">
     <link rel="icon" type="image/png" href="/assets/palmer-gill-logo-small.png">
     <link rel="stylesheet" href="/shared/site-nav.css?v=7">
-    <link rel="stylesheet" href="style.css?v=4">
+    <link rel="stylesheet" href="style.css?v=5">
 </head>
 <body>
     <main class="app-shell">
         <h1 class="sr-only">Bitcoin Dashboard</h1>
         <section class="terminal" aria-label="Bitcoin dashboard">
             <header class="term-titlebar">
-                <span class="term-dot" aria-hidden="true"></span>
-                <span class="term-dot" aria-hidden="true"></span>
-                <span class="term-dot" aria-hidden="true"></span>
-                <span class="term-path">palmer@gill:~/bitcoin</span>
+                <span class="brand">Bitcoin <em>— the dashboard</em></span>
                 <p id="nodeStatus" class="term-status"><span class="status-dot" aria-hidden="true"></span>Checking Bitcoin data...</p>
                 <button type="button" id="lookupToggle" class="term-button" aria-expanded="false" aria-controls="explorerDrawer">
                     <span aria-hidden="true">⌕</span> lookup <kbd>⌘K</kbd>
@@ -59,7 +56,7 @@
                     <section class="price-hero" aria-label="Bitcoin price">
                         <div class="price-main">
                             <p class="price-label">BTC / USD</p>
-                            <p class="price-value mono" id="priceValue">—</p>
+                            <p class="price-value" id="priceValue">—</p>
                             <p class="price-meta">
                                 <span class="price-change mono" id="priceChange">—</span>
                                 <span class="price-range-meta" id="priceRangeMeta"></span>
@@ -121,7 +118,7 @@
 
                 <aside class="chat-panel" id="chatPanel" aria-label="Bitcoin chat helper">
                     <div class="chat-header">
-                        <span class="chat-title mono">$ ask-bitcoin</span>
+                        <span class="chat-title">The explainer</span>
                         <div class="level-switch" role="group" aria-label="Explanation level" id="levelSwitch">
                             <button type="button" data-level="new" aria-pressed="true">new to this</button>
                             <button type="button" data-level="curious" aria-pressed="false">curious</button>
@@ -136,9 +133,8 @@
                         </div>
                     </div>
                     <form id="chatForm" class="composer">
-                        <span class="composer-prompt mono" aria-hidden="true">$</span>
                         <label class="sr-only" for="messageInput">Ask anything about Bitcoin</label>
-                        <textarea id="messageInput" rows="1" placeholder="Ask about anything you see" maxlength="1000" required></textarea>
+                        <textarea id="messageInput" rows="1" placeholder="Ask about anything you see…" maxlength="1000" required></textarea>
                         <button type="submit" aria-label="Send message">↑</button>
                     </form>
                 </aside>
@@ -149,6 +145,6 @@
     <script src="/shared/site-nav.js?v=7"></script>
     <script src="/shared/analytics.js?v=1"></script>
     <script src="/shared/api-base.js?v=1"></script>
-    <script src="app.js?v=4"></script>
+    <script src="app.js?v=5"></script>
 </body>
 </html>

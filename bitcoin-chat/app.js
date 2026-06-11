@@ -477,8 +477,8 @@ function renderChart(payload) {
     }
 
     const gradient = ctx.createLinearGradient(0, 0, 0, canvas.parentElement.clientHeight || 300);
-    gradient.addColorStop(0, 'rgba(247, 147, 26, 0.22)');
-    gradient.addColorStop(1, 'rgba(247, 147, 26, 0)');
+    gradient.addColorStop(0, 'rgba(224, 124, 0, 0.12)');
+    gradient.addColorStop(1, 'rgba(224, 124, 0, 0)');
 
     priceChartInstance = new Chart(ctx, {
         type: 'line',
@@ -486,15 +486,15 @@ function renderChart(payload) {
             labels,
             datasets: [{
                 data: prices,
-                borderColor: '#f7931a',
+                borderColor: '#e07c00',
                 backgroundColor: gradient,
                 borderWidth: 2,
                 fill: true,
                 tension: 0.25,
                 pointRadius: 0,
                 pointHoverRadius: 4,
-                pointHoverBackgroundColor: '#f7931a',
-                pointHoverBorderColor: '#1c1003',
+                pointHoverBackgroundColor: '#e07c00',
+                pointHoverBorderColor: '#fffdf8',
             }],
         },
         options: {
@@ -505,11 +505,11 @@ function renderChart(payload) {
             plugins: {
                 legend: { display: false },
                 tooltip: {
-                    backgroundColor: 'rgba(5, 7, 5, 0.94)',
-                    borderColor: '#22302a',
+                    backgroundColor: 'rgba(255, 253, 248, 0.97)',
+                    borderColor: '#e3dccd',
                     borderWidth: 1,
-                    titleColor: '#7f9389',
-                    bodyColor: '#f4efe6',
+                    titleColor: '#a39a87',
+                    bodyColor: '#1f1a12',
                     titleFont: { family: MONO_STACK, size: 11 },
                     bodyFont: { family: MONO_STACK, size: 13 },
                     displayColors: false,
@@ -522,9 +522,9 @@ function renderChart(payload) {
             scales: {
                 x: {
                     grid: { display: false },
-                    border: { color: '#14201a' },
+                    border: { color: '#d9d1bf' },
                     ticks: {
-                        color: '#5a6a5c',
+                        color: '#a39a87',
                         font: { family: MONO_STACK, size: 10 },
                         maxTicksLimit: 6,
                         maxRotation: 0,
@@ -533,10 +533,10 @@ function renderChart(payload) {
                 },
                 y: {
                     position: 'right',
-                    grid: { color: 'rgba(20, 32, 26, 0.6)' },
+                    grid: { color: '#eee8da' },
                     border: { display: false },
                     ticks: {
-                        color: '#5a6a5c',
+                        color: '#a39a87',
                         font: { family: MONO_STACK, size: 10 },
                         maxTicksLimit: 5,
                         callback: (value) => formatUsd(value, { compact: true }),
