@@ -644,7 +644,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (points.length > 5) {
                     const last = points[points.length - 1];
                     ctx.shadowBlur = 30;
-                    ctx.fillStyle = '#fff';
+                    ctx.fillStyle = '#3b82f6';
                     ctx.beginPath();
                     ctx.arc(last.x, last.y, 6, 0, Math.PI * 2);
                     ctx.fill();
@@ -1305,7 +1305,7 @@ function drawEPSChart(data) {
         ...convertedData.map(d => d.fcf)
     ].filter(v => v != null);
     if (allValues.length === 0) {
-        ctx.fillStyle = '#94a3b8';
+        ctx.fillStyle = '#6e6555';
         ctx.font = '14px sans-serif';
         ctx.textAlign = 'center';
         ctx.fillText('No earnings data available', 400, 150);
@@ -1316,7 +1316,7 @@ function drawEPSChart(data) {
     const minVal = Math.min(...allValues) * 0.9;
     
     // Draw grid
-    ctx.strokeStyle = '#334155';
+    ctx.strokeStyle = '#ece4d8';
     ctx.lineWidth = 1;
     ctx.setLineDash([5, 5]);
     
@@ -1329,7 +1329,7 @@ function drawEPSChart(data) {
         
         // Y-axis labels (in billions)
         const val = maxVal - (maxVal - minVal) * i / 5;
-        ctx.fillStyle = '#94a3b8';
+        ctx.fillStyle = '#6e6555';
         ctx.font = '12px sans-serif';
         ctx.textAlign = 'right';
         ctx.fillText(`$${val.toFixed(1)}B`, padding.left - 10, y + 4);
@@ -1382,7 +1382,7 @@ function drawEPSChart(data) {
             ctx.beginPath();
             ctx.rect(groupX, earningsY, barWidth, earningsHeight);
             ctx.clip();
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+            ctx.strokeStyle = 'rgba(60, 50, 35, 0.25)';
             ctx.lineWidth = 2;
             for (let si = -earningsHeight; si < barWidth; si += 6) {
                 ctx.beginPath();
@@ -1397,7 +1397,7 @@ function drawEPSChart(data) {
             ctx.beginPath();
             ctx.rect(groupX, earningsY, barWidth, earningsHeight);
             ctx.clip();
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+            ctx.fillStyle = 'rgba(60, 50, 35, 0.25)';
             for (let dx = 4; dx < barWidth; dx += 8) {
                 for (let dy = 4; dy < earningsHeight; dy += 8) {
                     ctx.beginPath();
@@ -1436,7 +1436,7 @@ function drawEPSChart(data) {
         }
         
         // X label (centered under the group)
-        ctx.fillStyle = '#94a3b8';
+        ctx.fillStyle = '#6e6555';
         ctx.font = '11px sans-serif';
         ctx.textAlign = 'center';
         ctx.fillText(formatQuarterLabel(d), groupX + groupWidth / 2, padding.top + chartHeight + 20);
@@ -1504,7 +1504,7 @@ function drawEPSChart(data) {
                 ctx.globalAlpha = 1;
             }
             
-            ctx.fillStyle = '#e2e8f0';
+            ctx.fillStyle = '#5d574e';
             ctx.font = '12px sans-serif';
             ctx.textAlign = 'left';
             ctx.globalAlpha = alpha;
@@ -1576,7 +1576,7 @@ function drawRevenueChart(data) {
     
     const revenues = data.map(d => d.revenue / 1e9).filter(v => v > 0);
     if (revenues.length === 0) {
-        ctx.fillStyle = '#94a3b8';
+        ctx.fillStyle = '#6e6555';
         ctx.font = '14px sans-serif';
         ctx.textAlign = 'center';
         ctx.fillText('No revenue data available', 400, 125);
@@ -1586,7 +1586,7 @@ function drawRevenueChart(data) {
     const maxRev = Math.max(...revenues) * 1.1;
     
     // Grid
-    ctx.strokeStyle = '#334155';
+    ctx.strokeStyle = '#ece4d8';
     ctx.lineWidth = 1;
     ctx.setLineDash([5, 5]);
     
@@ -1598,7 +1598,7 @@ function drawRevenueChart(data) {
         ctx.stroke();
         
         const val = maxRev - maxRev * i / 5;
-        ctx.fillStyle = '#94a3b8';
+        ctx.fillStyle = '#6e6555';
         ctx.font = '12px sans-serif';
         ctx.textAlign = 'right';
         ctx.fillText(`$${val.toFixed(0)}B`, padding.left - 10, y + 4);
@@ -1618,7 +1618,7 @@ function drawRevenueChart(data) {
         ctx.fillStyle = '#10b981';
         ctx.fillRect(x, y, barWidth, barHeight);
         
-        ctx.fillStyle = '#94a3b8';
+        ctx.fillStyle = '#6e6555';
         ctx.font = '11px sans-serif';
         ctx.textAlign = 'center';
         ctx.fillText(formatQuarterLabel(d), x + barWidth / 2, padding.top + chartHeight + 20);
@@ -1646,7 +1646,7 @@ function drawFCFChart(data) {
     
     const fcfs = data.map(d => d.free_cash_flow / 1e9).filter(v => v > 0);
     if (fcfs.length === 0) {
-        ctx.fillStyle = '#94a3b8';
+        ctx.fillStyle = '#6e6555';
         ctx.font = '14px sans-serif';
         ctx.textAlign = 'center';
         ctx.fillText('No free cash flow data available', 400, 125);
@@ -1656,7 +1656,7 @@ function drawFCFChart(data) {
     const maxFCF = Math.max(...fcfs) * 1.1;
     
     // Grid
-    ctx.strokeStyle = '#334155';
+    ctx.strokeStyle = '#ece4d8';
     ctx.setLineDash([5, 5]);
     
     for (let i = 0; i <= 5; i++) {
@@ -1667,7 +1667,7 @@ function drawFCFChart(data) {
         ctx.stroke();
         
         const val = maxFCF - maxFCF * i / 5;
-        ctx.fillStyle = '#94a3b8';
+        ctx.fillStyle = '#6e6555';
         ctx.font = '12px sans-serif';
         ctx.textAlign = 'right';
         ctx.fillText(`$${val.toFixed(0)}B`, padding.left - 10, y + 4);
@@ -1687,7 +1687,7 @@ function drawFCFChart(data) {
         ctx.fillStyle = '#06b6d4';
         ctx.fillRect(x, y, barWidth, barHeight);
         
-        ctx.fillStyle = '#94a3b8';
+        ctx.fillStyle = '#6e6555';
         ctx.font = '11px sans-serif';
         ctx.textAlign = 'center';
         ctx.fillText(formatQuarterLabel(d), x + barWidth / 2, padding.top + chartHeight + 20);
@@ -1696,7 +1696,7 @@ function drawFCFChart(data) {
     // Legend
     ctx.fillStyle = '#06b6d4';
     ctx.fillRect(padding.left, 10, 15, 15);
-    ctx.fillStyle = '#e2e8f0';
+    ctx.fillStyle = '#5d574e';
     ctx.font = '12px sans-serif';
     ctx.textAlign = 'left';
     ctx.fillText('Free Cash Flow', padding.left + 20, 22);
@@ -1779,7 +1779,7 @@ function drawPEChart(data, priceHistory = null) {
     const pes = peData.map(d => d.pe_ratio).filter(v => v != null && !isNaN(v));
     
     if (pes.length === 0) {
-        ctx.fillStyle = '#94a3b8';
+        ctx.fillStyle = '#6e6555';
         ctx.font = '14px sans-serif';
         ctx.textAlign = 'center';
         ctx.fillText('No P/E data available', 400, 125);
@@ -1811,7 +1811,7 @@ function drawPEChart(data, priceHistory = null) {
     }
     
     // Grid
-    ctx.strokeStyle = '#334155';
+    ctx.strokeStyle = '#ece4d8';
     ctx.setLineDash([5, 5]);
     
     for (let i = 0; i <= 5; i++) {
@@ -1822,7 +1822,7 @@ function drawPEChart(data, priceHistory = null) {
         ctx.stroke();
         
         const val = maxPE - (maxPE - minPE) * i / 5;
-        ctx.fillStyle = '#94a3b8';
+        ctx.fillStyle = '#6e6555';
         ctx.font = '12px sans-serif';
         ctx.textAlign = 'right';
         ctx.fillText(`${val.toFixed(0)}x`, padding.left - 10, y + 4);
@@ -1874,7 +1874,7 @@ function drawPEChart(data, priceHistory = null) {
     // X labels
     peData.forEach((d, i) => {
         const x = padding.left + spacing * i;
-        ctx.fillStyle = '#94a3b8';
+        ctx.fillStyle = '#6e6555';
         ctx.font = '11px sans-serif';
         ctx.textAlign = 'center';
         ctx.fillText(formatQuarterLabel(d), x, padding.top + chartHeight + 20);
@@ -2033,7 +2033,7 @@ function drawPriceChart(data) {
                 },
                 tooltip: {
                     backgroundColor: 'rgba(15, 23, 42, 0.95)',
-                    titleColor: '#94a3b8',
+                    titleColor: '#cbd5e1',
                     bodyColor: '#f8fafc',
                     borderColor: 'rgba(59, 130, 246, 0.3)',
                     borderWidth: 1,
@@ -2058,7 +2058,7 @@ function drawPriceChart(data) {
                         drawBorder: false
                     },
                     ticks: {
-                        color: '#64748b',
+                        color: '#6e6555',
                         autoSkip: true,
                         maxTicksLimit: 12,
                         callback: function(value) {
@@ -2072,11 +2072,11 @@ function drawPriceChart(data) {
                 },
                 y: {
                     grid: {
-                        color: 'rgba(51, 65, 85, 0.5)',
+                        color: 'rgba(60, 50, 35, 0.12)',
                         drawBorder: false
                     },
                     ticks: {
-                        color: '#64748b',
+                        color: '#6e6555',
                         callback: function(value) {
                             return '$' + value.toFixed(0);
                         },

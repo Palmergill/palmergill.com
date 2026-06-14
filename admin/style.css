@@ -5,9 +5,9 @@
 }
 
 body {
-    font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    background: linear-gradient(135deg, #080a0d 0%, #111722 100%);
-    color: #f8fafc;
+    font-family: "Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: #faf6f0;
+    color: #23201c;
     min-height: 100vh;
     line-height: 1.5;
 }
@@ -20,7 +20,7 @@ body {
 
 header {
     padding: 16px 0 24px;
-    border-bottom: 1px solid rgba(255,255,255,0.1);
+    border-bottom: 1px solid #ece4d8;
     margin-bottom: 24px;
 }
 
@@ -42,7 +42,7 @@ h1 {
 }
 
 .subtitle {
-    color: #94a3b8;
+    color: #928a7d;
     font-size: 0.95rem;
 }
 
@@ -53,7 +53,7 @@ h1 {
 }
 
 .header-actions label {
-    color: #94a3b8;
+    color: #928a7d;
     font-size: 0.78rem;
     font-weight: 700;
     letter-spacing: 0.06em;
@@ -61,9 +61,9 @@ h1 {
 }
 
 .header-actions select {
-    background: #0f172a;
-    color: #f8fafc;
-    border: 1px solid rgba(255,255,255,0.15);
+    background: #faf6f0;
+    color: #23201c;
+    border: 1px solid #d8cdba;
     border-radius: 6px;
     padding: 8px 10px;
 }
@@ -72,7 +72,7 @@ h1 {
     display: flex;
     gap: 8px;
     margin-bottom: 16px;
-    border-bottom: 1px solid rgba(255,255,255,0.1);
+    border-bottom: 1px solid #ece4d8;
 }
 
 .tabs.compact {
@@ -82,7 +82,7 @@ h1 {
 .tab-btn {
     background: transparent;
     border: none;
-    color: #94a3b8;
+    color: #928a7d;
     padding: 10px 16px;
     cursor: pointer;
     font-size: 0.95rem;
@@ -92,7 +92,7 @@ h1 {
 }
 
 .tab-btn:hover {
-    color: #f8fafc;
+    color: #23201c;
 }
 
 .tab-btn.active {
@@ -107,9 +107,9 @@ h1 {
     align-items: flex-end;
     margin-bottom: 16px;
     padding: 16px;
-    background: rgba(255,255,255,0.04);
+    background: #ffffff;
     border-radius: 8px;
-    border: 1px solid rgba(255,255,255,0.08);
+    border: 1px solid #ece4d8;
 }
 
 .control-group {
@@ -125,7 +125,7 @@ h1 {
 
 .control-group label {
     font-size: 0.8rem;
-    color: #94a3b8;
+    color: #928a7d;
     text-transform: uppercase;
     letter-spacing: 0.05em;
 }
@@ -138,16 +138,16 @@ h1 {
     text-transform: none !important;
     letter-spacing: normal !important;
     font-size: 0.9rem !important;
-    color: #f8fafc !important;
+    color: #23201c !important;
     padding-top: 18px;
 }
 
 .controls input[type="text"],
 .controls input[type="number"],
 .controls select {
-    background: #0f172a;
-    color: #f8fafc;
-    border: 1px solid rgba(255,255,255,0.15);
+    background: #faf6f0;
+    color: #23201c;
+    border: 1px solid #d8cdba;
     border-radius: 6px;
     padding: 8px 10px;
     font-size: 0.9rem;
@@ -185,7 +185,7 @@ h1 {
 }
 
 .status {
-    color: #94a3b8;
+    color: #928a7d;
     font-size: 0.85rem;
     margin-bottom: 8px;
     min-height: 1.2em;
@@ -214,13 +214,13 @@ h1 {
     flex-direction: column;
     justify-content: space-between;
     padding: 16px;
-    background: rgba(255,255,255,0.045);
-    border: 1px solid rgba(255,255,255,0.09);
+    background: #ffffff;
+    border: 1px solid #ece4d8;
     border-radius: 8px;
 }
 
 .metric-card span {
-    color: #94a3b8;
+    color: #928a7d;
     font-size: 0.78rem;
     font-weight: 700;
     letter-spacing: 0.06em;
@@ -228,7 +228,7 @@ h1 {
 }
 
 .metric-card strong {
-    color: #f8fafc;
+    color: #23201c;
     font-size: 2rem;
     line-height: 1;
 }
@@ -250,8 +250,8 @@ h1 {
 .casino-panel {
     margin-bottom: 16px;
     padding: 16px;
-    background: rgba(255,255,255,0.035);
-    border: 1px solid rgba(255,255,255,0.08);
+    background: #ffffff;
+    border: 1px solid #ece4d8;
     border-radius: 8px;
 }
 .casino-grid {
@@ -261,9 +261,9 @@ h1 {
 }
 .casino-card {
     padding: 14px 16px;
-    border: 1px solid rgba(255,255,255,0.1);
+    border: 1px solid #ece4d8;
     border-radius: 8px;
-    background: rgba(0,0,0,0.32);
+    background: rgba(60, 50, 35, 0.12);
 }
 .casino-card-total {
     background: rgba(214, 178, 94, 0.08);
@@ -271,7 +271,7 @@ h1 {
 }
 .casino-label {
     display: block;
-    color: #94a3b8;
+    color: #928a7d;
     font-size: 0.72rem;
     font-weight: 800;
     letter-spacing: 0.08em;
@@ -280,7 +280,7 @@ h1 {
 .casino-card strong {
     display: block;
     margin-top: 4px;
-    color: #f7f3ea;
+    color: #23201c;
     font-size: 1.8rem;
     font-weight: 700;
     line-height: 1.1;
@@ -288,7 +288,7 @@ h1 {
 .casino-sub {
     display: block;
     margin-top: 4px;
-    color: #94a3b8;
+    color: #928a7d;
     font-size: 0.74rem;
 }
 @media (max-width: 760px) {
@@ -297,15 +297,15 @@ h1 {
 
 .panel {
     padding: 16px;
-    background: rgba(255,255,255,0.035);
-    border: 1px solid rgba(255,255,255,0.08);
+    background: #ffffff;
+    border: 1px solid #ece4d8;
     border-radius: 8px;
     min-width: 0;
 }
 
 .panel h2 {
     margin-bottom: 12px;
-    color: #e2e8f0;
+    color: #5d574e;
     font-size: 0.95rem;
 }
 
@@ -338,7 +338,7 @@ h1 {
     padding: 8px 0;
     background: transparent;
     border: 0;
-    border-bottom: 1px solid rgba(255,255,255,0.07);
+    border-bottom: 1px solid #ece4d8;
     color: inherit;
     font: inherit;
     text-align: left;
@@ -350,7 +350,7 @@ h1 {
 }
 
 .compact-row.is-clickable:hover span {
-    color: #f8fafc;
+    color: #23201c;
     text-decoration: underline;
     text-decoration-color: rgba(59,130,246,0.8);
     text-underline-offset: 3px;
@@ -363,13 +363,13 @@ h1 {
 .compact-row span {
     min-width: 0;
     overflow: hidden;
-    color: #cbd5e1;
+    color: #5d574e;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
 
 .compact-row strong {
-    color: #f8fafc;
+    color: #23201c;
 }
 
 .compact-row.stacked {
@@ -380,7 +380,7 @@ h1 {
 .col-msg small {
     display: block;
     margin-top: 3px;
-    color: #94a3b8;
+    color: #928a7d;
     font-size: 0.75rem;
 }
 
@@ -391,36 +391,36 @@ h1 {
 .logs-table {
     width: 100%;
     border-collapse: collapse;
-    background: rgba(255,255,255,0.03);
+    background: #ffffff;
     border-radius: 8px;
     overflow: hidden;
-    border: 1px solid rgba(255,255,255,0.08);
+    border: 1px solid #ece4d8;
     font-size: 0.875rem;
 }
 
 .logs-table thead {
-    background: rgba(255,255,255,0.06);
+    background: #ece4d8;
 }
 
 .logs-table th {
     text-align: left;
     padding: 10px 12px;
     font-weight: 600;
-    color: #94a3b8;
+    color: #928a7d;
     font-size: 0.8rem;
     text-transform: uppercase;
     letter-spacing: 0.05em;
-    border-bottom: 1px solid rgba(255,255,255,0.08);
+    border-bottom: 1px solid #ece4d8;
 }
 
 .logs-table td {
     padding: 8px 12px;
-    border-bottom: 1px solid rgba(255,255,255,0.04);
+    border-bottom: 1px solid #ece4d8;
     vertical-align: top;
 }
 
 .logs-table tbody tr:hover {
-    background: rgba(255,255,255,0.03);
+    background: #ffffff;
 }
 
 .logs-table tbody tr.expandable-row {
@@ -429,12 +429,12 @@ h1 {
 
 .detail-row td {
     padding: 0;
-    background: rgba(15, 23, 42, 0.58);
+    background: rgba(250, 246, 240, 0.85);
 }
 
 .detail-panel {
     padding: 14px 16px;
-    border-top: 1px solid rgba(255,255,255,0.07);
+    border-top: 1px solid #ece4d8;
 }
 
 .detail-grid {
@@ -451,7 +451,7 @@ h1 {
 .detail-grid span {
     display: block;
     margin-bottom: 2px;
-    color: #94a3b8;
+    color: #928a7d;
     font-size: 0.72rem;
     font-weight: 700;
     letter-spacing: 0.06em;
@@ -460,7 +460,7 @@ h1 {
 
 .detail-grid strong {
     display: block;
-    color: #e2e8f0;
+    color: #5d574e;
     font-family: ui-monospace, 'SF Mono', Menlo, monospace;
     font-size: 0.78rem;
     font-weight: 500;
@@ -471,10 +471,10 @@ h1 {
     max-height: 260px;
     overflow: auto;
     padding: 10px;
-    background: #080d18;
-    border: 1px solid rgba(255,255,255,0.08);
+    background: #f3eee4;
+    border: 1px solid #ece4d8;
     border-radius: 6px;
-    color: #cbd5e1;
+    color: #5d574e;
     font-family: ui-monospace, 'SF Mono', Menlo, monospace;
     font-size: 0.78rem;
     line-height: 1.45;
@@ -482,10 +482,10 @@ h1 {
     overflow-wrap: anywhere;
 }
 
-.col-time { width: 170px; white-space: nowrap; color: #94a3b8; font-family: ui-monospace, monospace; font-size: 0.8rem; }
+.col-time { width: 170px; white-space: nowrap; color: #928a7d; font-family: ui-monospace, monospace; font-size: 0.8rem; }
 .col-level { width: 90px; }
-.col-logger { width: 200px; color: #94a3b8; font-family: ui-monospace, monospace; font-size: 0.8rem; }
-.col-path { max-width: 220px; color: #cbd5e1; font-family: ui-monospace, monospace; font-size: 0.8rem; overflow-wrap: anywhere; }
+.col-logger { width: 200px; color: #928a7d; font-family: ui-monospace, monospace; font-size: 0.8rem; }
+.col-path { max-width: 220px; color: #5d574e; font-family: ui-monospace, monospace; font-size: 0.8rem; overflow-wrap: anywhere; }
 .col-msg { word-break: break-word; font-family: ui-monospace, monospace; font-size: 0.825rem; }
 
 .level-badge {
@@ -497,28 +497,28 @@ h1 {
     letter-spacing: 0.03em;
 }
 
-.level-DEBUG    { background: #475569; color: #e2e8f0; }
+.level-DEBUG    { background: #928a7d; color: #5d574e; }
 .level-INFO     { background: #1e40af; color: #bfdbfe; }
-.level-WARNING  { background: #78350f; color: #fde68a; }
-.level-ERROR    { background: #7f1d1d; color: #fecaca; }
-.level-CRITICAL { background: #831843; color: #fbcfe8; }
-.outcome-success { background: #14532d; color: #bbf7d0; }
-.outcome-warning { background: #78350f; color: #fde68a; }
-.outcome-error { background: #7f1d1d; color: #fecaca; }
+.level-WARNING  { background: #f8ecd8; color: #854f0b; }
+.level-ERROR    { background: #fbe7e5; color: #791f1f; }
+.level-CRITICAL { background: #f8e3ee; color: #72243e; }
+.outcome-success { background: #e7f0df; color: #27500a; }
+.outcome-warning { background: #f8ecd8; color: #854f0b; }
+.outcome-error { background: #fbe7e5; color: #791f1f; }
 
 .empty {
     text-align: center;
-    color: #64748b;
+    color: #928a7d;
     padding: 24px !important;
     font-style: italic;
 }
 
 .file-logs {
-    background: #0b1120;
-    border: 1px solid rgba(255,255,255,0.08);
+    background: #faf6f0;
+    border: 1px solid #ece4d8;
     border-radius: 8px;
     padding: 16px;
-    color: #cbd5e1;
+    color: #5d574e;
     font-family: ui-monospace, 'SF Mono', Menlo, monospace;
     font-size: 0.8rem;
     line-height: 1.5;

@@ -347,3 +347,81 @@ body.has-site-nav .app-shell {
         pointer-events: auto;
     }
 }
+
+/* ---- warm light theme (opt-in per page via body.theme-warm) ---- */
+body.theme-warm {
+    --site-nav-bg: rgba(250, 246, 240, 0.88);
+    --site-nav-line: #ece4d8;
+    --site-nav-line-strong: #d8cdba;
+    --site-nav-green: #5b7152;
+    --site-nav-green-dim: #927d5b;
+    --site-nav-text: #5d574e;
+    --site-nav-muted: #928a7d;
+    --site-nav-mono: "Plus Jakarta Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+body.theme-warm .site-nav {
+    color: var(--ink, #23201c);
+}
+
+body.theme-warm .site-nav__brand { color: var(--ink, #23201c); }
+body.theme-warm .site-nav__brand:hover,
+body.theme-warm .site-nav__brand:focus-visible { color: var(--site-nav-green); }
+body.theme-warm .site-nav__brand-logo { box-shadow: none; }
+body.theme-warm .site-nav__brand-name::before { content: ""; }
+
+body.theme-warm .site-nav__link:hover,
+body.theme-warm .site-nav__link:focus-visible {
+    color: var(--site-nav-green);
+    background: #e7eee2;
+    border-color: #cfddc6;
+}
+
+body.theme-warm .site-nav__link[aria-current="page"] {
+    color: var(--site-nav-green);
+    background: #e7eee2;
+    border-color: #cfddc6;
+}
+
+body.theme-warm .site-nav__utility .site-nav__link {
+    border-color: var(--site-nav-line);
+    color: var(--site-nav-green);
+}
+
+body.theme-warm .site-nav__utility .site-nav__link:hover,
+body.theme-warm .site-nav__utility .site-nav__link:focus-visible {
+    background: #e7eee2;
+    border-color: var(--site-nav-line-strong);
+}
+
+@media (max-width: 979px) {
+    body.theme-warm .site-nav {
+        background: #faf6f0;
+    }
+
+    body.theme-warm .site-nav__toggle {
+        border-color: var(--site-nav-line);
+        background: #e7eee2;
+        color: var(--site-nav-green);
+    }
+
+    body.theme-warm .site-nav__mobile-title { color: var(--ink, #23201c); }
+    body.theme-warm .site-nav__mobile-title::before { content: ""; }
+
+    body.theme-warm .site-nav__panel {
+        background: #faf6f0;
+        border-right: 1px solid var(--site-nav-line);
+        box-shadow: 24px 0 80px rgba(60, 50, 35, 0.22);
+    }
+
+    body.theme-warm .site-nav__brand {
+        border-color: var(--site-nav-line);
+        background: #ffffff;
+    }
+
+    body.theme-warm .site-nav__utility { border-top-color: var(--site-nav-line); }
+
+    body.theme-warm .site-nav__backdrop {
+        background: rgba(60, 50, 35, 0.32);
+    }
+}
