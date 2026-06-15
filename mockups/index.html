@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Design Mockups — Palmer Gill</title>
+    <meta name="description" content="Interactive design studies and frontend mockups by Palmer Gill.">
+    <meta name="theme-color" content="#faf6f0">
+    <link rel="icon" type="image/png" href="/assets/palmer-gill-logo-small.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/shared/site-nav.css?v=8">
+    <style>
+        :root {
+            --bg: #faf6f0;
+            --card: #ffffff;
+            --ink: #23201c;
+            --soft: #5d574e;
+            --muted: #928a7d;
+            --line: #e7ddd0;
+            --sage: #5b7152;
+            --felt: #164d31;
+            --gold: #e8c773;
+            --sans: "Plus Jakarta Sans", system-ui, sans-serif;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            min-height: 100vh;
+            margin: 0;
+            background: var(--bg);
+            color: var(--ink);
+            font-family: var(--sans);
+        }
+
+        .shell {
+            width: min(1040px, calc(100% - 40px));
+            margin: 0 auto;
+            padding: clamp(48px, 9vw, 92px) 0;
+        }
+
+        .eyebrow {
+            margin: 0 0 10px;
+            color: var(--sage);
+            font-size: 0.75rem;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+
+        h1 {
+            max-width: 680px;
+            margin: 0;
+            font-size: clamp(2.3rem, 7vw, 4.8rem);
+            letter-spacing: -0.045em;
+            line-height: 1.02;
+        }
+
+        .intro {
+            max-width: 620px;
+            margin: 18px 0 42px;
+            color: var(--soft);
+            font-size: 1rem;
+            line-height: 1.7;
+        }
+
+        .mockup-card {
+            display: grid;
+            grid-template-columns: minmax(0, 1.2fr) minmax(270px, 0.8fr);
+            overflow: hidden;
+            border: 1px solid var(--line);
+            border-radius: 18px;
+            background: var(--card);
+            box-shadow: 0 24px 70px rgba(60, 50, 35, 0.1);
+        }
+
+        .preview {
+            position: relative;
+            display: grid;
+            min-height: 390px;
+            place-items: center;
+            overflow: hidden;
+            padding: 34px;
+            background:
+                radial-gradient(circle at 50% 34%, rgba(42, 122, 74, 0.98), var(--felt) 62%, #082a1b);
+        }
+
+        .preview::before {
+            position: absolute;
+            inset: 18px;
+            border: 6px solid #6b3d22;
+            border-radius: 14px;
+            box-shadow: inset 0 0 0 2px var(--gold);
+            content: "";
+        }
+
+        .cards {
+            position: relative;
+            z-index: 1;
+            display: flex;
+        }
+
+        .playing-card {
+            display: grid;
+            width: clamp(92px, 14vw, 126px);
+            aspect-ratio: 5 / 7;
+            place-items: center;
+            border-radius: 8px;
+            background: #fffdf5;
+            color: #171b18;
+            box-shadow: 0 16px 30px rgba(0, 0, 0, 0.35);
+            font-family: Georgia, serif;
+            font-size: 2.6rem;
+            font-weight: 700;
+            transform: rotate(-5deg);
+        }
+
+        .playing-card + .playing-card {
+            margin-left: -18px;
+            color: #ae1f24;
+            transform: translateY(12px) rotate(5deg);
+        }
+
+        .card-copy {
+            display: grid;
+            align-content: center;
+            gap: 13px;
+            padding: clamp(28px, 5vw, 52px);
+        }
+
+        .card-copy span {
+            color: var(--sage);
+            font-size: 0.72rem;
+            font-weight: 700;
+            letter-spacing: 0.07em;
+            text-transform: uppercase;
+        }
+
+        .card-copy h2 {
+            margin: 0;
+            font-size: clamp(1.6rem, 4vw, 2.35rem);
+            letter-spacing: -0.03em;
+        }
+
+        .card-copy p {
+            margin: 0;
+            color: var(--soft);
+            font-size: 0.92rem;
+            line-height: 1.65;
+        }
+
+        .card-copy a {
+            display: inline-flex;
+            width: fit-content;
+            min-height: 46px;
+            align-items: center;
+            margin-top: 8px;
+            padding: 0 18px;
+            border-radius: 10px;
+            background: var(--sage);
+            color: #fff;
+            font-size: 0.86rem;
+            font-weight: 700;
+            text-decoration: none;
+        }
+
+        .back-link {
+            display: inline-block;
+            margin-top: 28px;
+            color: var(--soft);
+            font-size: 0.86rem;
+            font-weight: 600;
+            text-decoration: none;
+        }
+
+        @media (max-width: 720px) {
+            .shell { width: min(100% - 24px, 1040px); padding-top: 34px; }
+            .mockup-card { grid-template-columns: 1fr; }
+            .preview { min-height: 280px; }
+        }
+    </style>
+</head>
+<body class="theme-warm">
+    <main class="shell">
+        <p class="eyebrow">Work in progress</p>
+        <h1>Interactive design mockups</h1>
+        <p class="intro">Frontend layout studies kept separate from the live apps. Open a study to compare concepts across mobile and desktop before choosing a direction.</p>
+
+        <article class="mockup-card">
+            <div class="preview" aria-hidden="true">
+                <div class="cards">
+                    <div class="playing-card">K♣</div>
+                    <div class="playing-card">6♥</div>
+                </div>
+            </div>
+            <div class="card-copy">
+                <span>Casino · Three concepts</span>
+                <h2>Blackjack card-first layouts</h2>
+                <p>Mobile-first table concepts focused on your cards, the dealer's cards, nearby balance visibility, and thumb-friendly actions.</p>
+                <a href="/blackjack-mockups/">Open blackjack mockups →</a>
+            </div>
+        </article>
+
+        <a class="back-link" href="/">← Back to projects</a>
+    </main>
+
+    <script src="/shared/site-nav.js?v=8"></script>
+    <script src="/shared/analytics.js?v=1"></script>
+</body>
+</html>
