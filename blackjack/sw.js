@@ -5,14 +5,14 @@ const STATIC_ASSETS = [
     '/blackjack/index.html',
     '/blackjack/app.js?v=13',
     '/blackjack/blackjackGame.js',
-    '/blackjack/style.css?v=11',
+    '/blackjack/style.css?v=12',
     '/blackjack/manifest.json',
     '/shared/casino-theme.css?v=1',
     '/shared/rules-viewer.css?v=1',
     '/shared/rules-viewer.js?v=1',
     '/shared/casino-profile.js?v=1',
-    '/shared/site-nav.css?v=6',
-    '/shared/site-nav.js?v=6',
+    '/shared/site-nav.css?v=8',
+    '/shared/site-nav.js?v=7',
     '/casino/blackjack%20rules%20and%20strategy.txt'
 ];
 
