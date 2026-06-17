@@ -336,8 +336,11 @@ function appendSourceSummary(parent, { data, toolsUsed, warnings } = {}) {
     parent.appendChild(source);
 }
 
-async function fetchJson(url, options) {
-    const response = await fetch(url, options);
+async function fetchJson(url, options = {}) {
+    const response = await fetch(url, {
+        credentials: 'include',
+        ...options,
+    });
     if (!response.ok) {
         const body = await response.json().catch(() => ({}));
         throw new Error(body.detail || `Request failed with ${response.status}`);
