@@ -53,8 +53,8 @@
     const utilityItems = [
         {
             label: "Login",
-            hint: "Admin access",
-            href: "/login/?next=/admin/",
+            hint: "Protected access",
+            href: loginHref,
             icon: "log-in"
         }
     ];
@@ -87,12 +87,24 @@
     }
 
     function isCurrent(href) {
+        if (typeof href === "function") return false;
         const path = window.location.pathname;
         const itemPath = new URL(href, window.location.origin).pathname;
         if (itemPath === "/") {
             return path === "/" || path === "/index.html";
         }
         return path === itemPath || path.startsWith(itemPath);
+    }
+
+    function loginHref() {
+        if (window.location.pathname === "/login/" || window.location.pathname === "/login") {
+            const params = new URLSearchParams(window.location.search);
+            const next = params.get("next") || "/";
+            return `/login/?next=${encodeURIComponent(next)}`;
+        }
+
+        const next = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+        return `/login/?next=${encodeURIComponent(next || "/")}`;
     }
 
     function close(nav, toggle) {
@@ -111,9 +123,10 @@
         nav.setAttribute("aria-label", "Site navigation");
 
         const renderLinks = (navItems) => navItems.map((item) => {
-            const current = isCurrent(item.href) ? ' aria-current="page"' : "";
+            const href = typeof item.href === "function" ? item.href() : item.href;
+            const current = isCurrent(href) ? ' aria-current="page"' : "";
             return [
-                `<a class="site-nav__link" href="${item.href}" title="${item.label}"${current}>`,
+                `<a class="site-nav__link" href="${href}" title="${item.label}"${current}>`,
                 `<span class="site-nav__icon">${iconSvg(item.icon)}</span>`,
                 '<span>',
                 `<span class="site-nav__label">${item.label}</span>`,
@@ -130,10 +143,10 @@
             '<button class="site-nav__toggle" type="button" aria-label="Open navigation" aria-expanded="false">',
             iconSvg("menu"),
             '</button>',
-            '<a class="site-nav__mobile-brand" href="/" aria-label="palmergill.com home"><img class="site-nav__mobile-logo" src="/assets/palmer-gill-logo-small.png" alt="" aria-hidden="true"><span><span class="site-nav__mobile-title">palmer@gill</span><span class="site-nav__mobile-subtitle">Projects and tools</span></span></a>',
+            '<a class="site-nav__mobile-brand" href="/" aria-label="palmergill.com home"><img class="site-nav__mobile-logo" src="/assets/palmer-gill-logo-small.png" alt="" aria-hidden="true"><span><span class="site-nav__mobile-title">Palmergill.com</span><span class="site-nav__mobile-subtitle">Projects and tools</span></span></a>',
             '<div class="site-nav__backdrop" aria-hidden="true"></div>',
             '<div class="site-nav__panel">',
-            '<a class="site-nav__brand" href="/" title="palmergill.com home"><img class="site-nav__brand-logo" src="/assets/palmer-gill-logo-small.png" alt="" aria-hidden="true"><span class="site-nav__brand-name">palmer@gill</span></a>',
+            '<a class="site-nav__brand" href="/" title="palmergill.com home"><img class="site-nav__brand-logo" src="/assets/palmer-gill-logo-small.png" alt="" aria-hidden="true"><span class="site-nav__brand-name">Palmergill.com</span></a>',
             `<div class="site-nav__items">${links}</div>`,
             `<div class="site-nav__utility">${utilityLinks}</div>`,
             '</div>'
