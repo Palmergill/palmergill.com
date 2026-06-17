@@ -53,7 +53,9 @@
         if (cache.has(t)) return cache.get(t);
         const base = (window.API_ORIGIN || '') + '/api/stocks';
         try {
-            const res = await fetch(`${base}/${encodeURIComponent(t)}?refresh=false`);
+            const res = await fetch(`${base}/${encodeURIComponent(t)}?refresh=false`, {
+                credentials: 'include',
+            });
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             const data = await res.json();
             const summary = data.summary || {};

@@ -377,7 +377,9 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         try {
-            const response = await fetch(`${API_BASE}/stocks/search?q=${encodeURIComponent(query)}&limit=10`);
+            const response = await fetch(`${API_BASE}/stocks/search?q=${encodeURIComponent(query)}&limit=10`, {
+                credentials: 'include',
+            });
             if (response.ok) {
                 const data = await response.json();
                 currentSuggestions = data.results || [];
@@ -861,7 +863,9 @@ document.addEventListener('DOMContentLoaded', () => {
         console.log('Fetching URL:', url);
         
         try {
-            const response = await fetch(url);
+            const response = await fetch(url, {
+                credentials: 'include',
+            });
             console.log('Response status:', response.status);
             
             if (!response.ok) {
@@ -1237,7 +1241,9 @@ document.addEventListener('DOMContentLoaded', () => {
     async function fetchPriceHistory(ticker) {
         try {
             console.log(`Fetching price history for ${ticker}...`);
-            const response = await fetch(`${API_BASE}/stocks/${ticker}/prices?days=365`);
+            const response = await fetch(`${API_BASE}/stocks/${ticker}/prices?days=365`, {
+                credentials: 'include',
+            });
             
             if (!response.ok) {
                 console.log('Price history not available (rate limit or error)');
