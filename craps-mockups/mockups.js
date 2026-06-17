@@ -1,12 +1,12 @@
 (function () {
     const notes = {
         rail: {
-            label: "01 - Rail Stack",
-            copy: "Physical chip stacks stay on the board. The flat bet and odds bet are paired side by side, with gold reserved for odds so the pass line and come points read the same way."
+            label: "01 - Focus Table",
+            copy: "A tighter mobile table that moves placed bets into large working tickets. Pass line and come bets share the same flat-plus-odds chip pair, so odds are obvious without tiny board overlays."
         },
         badges: {
-            label: "02 - Bet Badges",
-            copy: "Each placed bet becomes a compact labeled badge. This is the most readable mobile option when multiple come bets are working at different numbers."
+            label: "02 - Bet Drawer",
+            copy: "A bigger structural change: the board becomes compact and the placed bets live in a bottom drawer. It gives pass line and come odds more room and puts management targets near the thumb."
         },
         track: {
             label: "03 - Odds Track",
