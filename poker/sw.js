@@ -10,7 +10,7 @@ const STATIC_ASSETS = [
     '/shared/rules-viewer.css?v=1',
     '/shared/rules-viewer.js?v=1',
     '/shared/site-nav.css?v=6',
-    '/shared/site-nav.js?v=6',
+    '/shared/site-nav.js?v=9',
     '/shared/analytics.js?v=1',
     '/shared/api-base.js?v=1',
     '/casino/texas%20holdem%20rules.txt'

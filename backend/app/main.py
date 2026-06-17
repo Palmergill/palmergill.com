@@ -8,7 +8,7 @@ import logging
 import secrets
 import time
 from contextlib import asynccontextmanager, suppress
-from urllib.parse import quote
+from urllib.parse import quote, urlsplit
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -391,6 +391,28 @@ def missing_auth_config():
     return PlainTextResponse("App authentication is not configured", status_code=503)
 
 
+def safe_next_path(value: object, fallback: str = "/") -> str:
+    if not isinstance(value, str) or not value:
+        return fallback
+
+    try:
+        parsed = urlsplit(value)
+    except ValueError:
+        return fallback
+
+    if parsed.scheme or parsed.netloc or not parsed.path.startswith("/"):
+        return fallback
+    if parsed.path in {"/login", "/login/"}:
+        return fallback
+
+    next_path = parsed.path
+    if parsed.query:
+        next_path = f"{next_path}?{parsed.query}"
+    if parsed.fragment:
+        next_path = f"{next_path}#{parsed.fragment}"
+    return next_path
+
+
 def _should_record_request_analytics(path: str) -> bool:
     ignored_prefixes = (
         "/api/analytics",
@@ -515,6 +537,7 @@ async def login_session(request: Request):
 
     username = str(body.get("username", ""))
     password = str(body.get("password", ""))
+    redirect = safe_next_path(body.get("next"))
     if not (
         secrets.compare_digest(username, config["username"])
         and secrets.compare_digest(password, config["password"])
@@ -523,7 +546,7 @@ async def login_session(request: Request):
         return JSONResponse({"error": "Invalid username or password"}, status_code=401)
 
     clear_auth_failures(request)
-    response = JSONResponse({"ok": True, "redirect": "/admin/"})
+    response = JSONResponse({"ok": True, "redirect": redirect})
     response.set_cookie(
         SESSION_COOKIE_NAME,
         create_app_session_token(config["username"], config["password"]),

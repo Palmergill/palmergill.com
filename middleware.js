@@ -179,6 +179,21 @@ function jsonResponse(body, status = 200, headers = {}) {
   });
 }
 
+function safeNextPath(value, fallback = '/') {
+  if (!value || typeof value !== 'string') return fallback;
+
+  let url;
+  try {
+    url = new URL(value, 'https://palmergill.local');
+  } catch {
+    return fallback;
+  }
+
+  if (url.origin !== 'https://palmergill.local') return fallback;
+  if (url.pathname === '/login' || url.pathname === '/login/') return fallback;
+  return `${url.pathname}${url.search}${url.hash}`;
+}
+
 // The real client IP is the hop the trusted edge proxy appended, counting from
 // the right of X-Forwarded-For. Entries to its left are client-supplied and
 // spoofable, so keying rate limits on the leftmost entry lets an attacker
@@ -262,6 +277,7 @@ async function handleLoginSession(request, username, password) {
 
   const submittedUsername = String(body?.username || '');
   const submittedPassword = String(body?.password || '');
+  const redirect = safeNextPath(body?.next);
   if (
     !timingSafeEqual(submittedUsername, username) ||
     !timingSafeEqual(submittedPassword, password)
@@ -273,7 +289,7 @@ async function handleLoginSession(request, username, password) {
   clearAuthFailures(request);
   const token = await createSessionToken(username, password);
   return jsonResponse(
-    { ok: true, redirect: '/admin/' },
+    { ok: true, redirect },
     200,
     { 'Set-Cookie': sessionCookie(token, request) },
   );

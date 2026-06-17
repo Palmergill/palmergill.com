@@ -7,15 +7,18 @@
 
     function safeNextPath() {
         const params = new URLSearchParams(window.location.search);
-        const next = params.get("next") || "/admin/";
+        const next = params.get("next") || "/";
         try {
             const url = new URL(next, window.location.origin);
             if (url.origin !== window.location.origin) {
-                return "/admin/";
+                return "/";
+            }
+            if (url.pathname === "/login" || url.pathname === "/login/") {
+                return "/";
             }
             return `${url.pathname}${url.search}${url.hash}`;
         } catch {
-            return "/admin/";
+            return "/";
         }
     }
 
@@ -52,6 +55,7 @@
                 body: JSON.stringify({
                     username: userValue,
                     password: passwordValue,
+                    next: safeNextPath(),
                 }),
             });
 
@@ -62,8 +66,8 @@
             }
 
             window.pgAnalytics?.track?.("login_success");
-            setStatus("Signed in. Opening admin.", true);
-            window.location.assign(safeNextPath());
+            setStatus("Signed in. Opening page.", true);
+            window.location.assign(data.redirect || safeNextPath());
         } catch (error) {
             setStatus(error.message || "Unable to sign in.");
             password.select();

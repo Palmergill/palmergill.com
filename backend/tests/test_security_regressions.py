@@ -8,6 +8,7 @@ from app.main import (
     _auth_failure_store,
     app,
     create_app_session_token,
+    safe_next_path,
 )
 from app.routers import analytics as analytics_router
 from app.routers.admin import cleanup_old_logs
@@ -417,6 +418,27 @@ def test_login_session_sets_signed_session_cookie(monkeypatch):
 
     protected_response = auth_client.get("/api/unknown")
     assert protected_response.status_code == 404
+
+
+def test_login_session_redirects_to_safe_next_path(monkeypatch):
+    monkeypatch.setenv("APP_AUTH_USERNAME", "palmer")
+    monkeypatch.setenv("APP_AUTH_PASSWORD", "secret")
+    auth_client = TestClient(app)
+
+    response = auth_client.post(
+        "/login/session",
+        json={"username": "palmer", "password": "secret", "next": "/bitcoin-chat/?range=1m"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["redirect"] == "/bitcoin-chat/?range=1m"
+
+
+def test_safe_next_path_rejects_external_and_login_targets():
+    assert safe_next_path("https://example.com/admin/") == "/"
+    assert safe_next_path("//example.com/admin/") == "/"
+    assert safe_next_path("/login/?next=/bitcoin-chat/") == "/"
+    assert safe_next_path("/admin/?tab=logs#latest") == "/admin/?tab=logs#latest"
 
 
 def test_signed_session_cookie_allows_protected_api_without_basic_auth(monkeypatch):
