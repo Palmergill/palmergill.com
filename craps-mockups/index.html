@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Craps Mobile Chip Mockups</title>
-    <meta name="description" content="Mobile craps chip placement mockups for pass line, come bets, and odds bets.">
+    <title>Craps Mobile Design Mockups</title>
+    <meta name="description" content="Mobile craps table mockups focused on pass line, come, and odds bet visibility.">
     <meta name="theme-color" content="#061711">
     <link rel="icon" type="image/png" href="/assets/palmer-gill-logo-small.png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -16,28 +16,28 @@
 <body>
     <header class="mockup-toolbar">
         <div class="mockup-title">
-            <span>Craps mobile study</span>
-            <strong>Placed chip treatments</strong>
+            <span>Craps mobile redesign</span>
+            <strong>Pass, come, and odds visibility</strong>
         </div>
 
-        <nav class="concept-tabs" aria-label="Choose a chip concept">
-            <button class="concept-tab is-active" type="button" data-concept="rail">01 Focus Table</button>
-            <button class="concept-tab" type="button" data-concept="badges">02 Bet Drawer</button>
-            <button class="concept-tab" type="button" data-concept="track">03 Odds Track</button>
+        <nav class="concept-tabs" aria-label="Choose a mobile craps concept">
+            <button class="concept-tab is-active" type="button" data-concept="rail">01 Rail Table</button>
+            <button class="concept-tab" type="button" data-concept="lanes">02 Number Lanes</button>
+            <button class="concept-tab" type="button" data-concept="tray">03 Dealer Tray</button>
         </nav>
     </header>
 
     <main class="preview-layout">
         <section class="phone-shell" aria-label="Mobile craps mockup preview">
-            <article class="game-screen concept-focus is-active" data-concept-panel="rail">
-                <header class="game-topbar focus-topbar">
-                    <div class="brand-lockup">
-                        <span>Point on</span>
+            <article class="game-screen concept-rail is-active" data-concept-panel="rail">
+                <header class="game-topbar">
+                    <div class="game-title">
+                        <span>Point</span>
                         <strong>6</strong>
                     </div>
-                    <div class="roll-callout">
-                        <span>Last roll</span>
-                        <strong>8</strong>
+                    <div class="dice-pair" aria-hidden="true">
+                        <i data-pips="3"></i>
+                        <i data-pips="5"></i>
                     </div>
                     <div class="bankroll">
                         <span>Balance</span>
@@ -45,67 +45,68 @@
                     </div>
                 </header>
 
-                <section class="focus-board" aria-label="Focused mobile craps table">
-                    <div class="focus-number-strip">
-                        <button type="button">4</button>
-                        <button type="button">5</button>
-                        <button class="is-point" type="button">6</button>
-                        <button class="has-come" type="button">8</button>
-                        <button type="button">9</button>
-                        <button type="button">10</button>
+                <section class="rail-table" aria-label="Authentic rail table concept">
+                    <div class="number-boxes">
+                        <button type="button" class="number-box">
+                            <span>4</span>
+                            <small>Place 9:5</small>
+                        </button>
+                        <button type="button" class="number-box">
+                            <span>5</span>
+                            <small>Place 7:5</small>
+                        </button>
+                        <button type="button" class="number-box is-point has-come">
+                            <span>6</span>
+                            <small>Point</small>
+                            <span class="table-chip-set come-six">
+                                <span class="chip chip-red">$15</span>
+                                <span class="chip chip-gold odds-chip">$30</span>
+                            </span>
+                        </button>
+                        <button type="button" class="number-box has-come">
+                            <span>8</span>
+                            <small>Come</small>
+                            <span class="table-chip-set come-eight">
+                                <span class="chip chip-red">$10</span>
+                                <span class="chip chip-gold odds-chip">$20</span>
+                            </span>
+                        </button>
+                        <button type="button" class="number-box">
+                            <span>9</span>
+                            <small>Place 7:5</small>
+                        </button>
+                        <button type="button" class="number-box">
+                            <span>10</span>
+                            <small>Place 9:5</small>
+                        </button>
                     </div>
 
-                    <div class="focus-bet-grid">
-                        <button class="focus-cell prop-cell" type="button">
+                    <div class="rail-body">
+                        <button class="prop-panel" type="button">
                             <span>Center</span>
                             <small>Props + hardways</small>
                         </button>
-                        <button class="focus-cell field-cell" type="button">
+                        <button class="come-panel live" type="button">
+                            <span>Come</span>
+                            <small>$10 waiting</small>
+                        </button>
+                        <button class="field-panel" type="button">
                             <span>Field</span>
                             <small>2 3 4 9 10 11 12</small>
                         </button>
-                        <button class="focus-cell come-cell live" type="button">
-                            <span>Come</span>
-                            <small>Next roll sets point</small>
-                            <b class="waiting-chip">$10 waiting</b>
-                        </button>
                     </div>
 
-                    <div class="focus-active-bets" aria-label="Working bets">
-                        <button class="bet-ticket pass-ticket" type="button">
-                            <span class="ticket-copy">
-                                <b>Pass Line</b>
-                                <small>Point 6</small>
-                            </span>
-                            <span class="ticket-chips">
-                                <i class="flat-chip">$25</i>
-                                <i class="odds-chip-token">$50</i>
-                            </span>
-                        </button>
-                        <button class="bet-ticket come-ticket" type="button">
-                            <span class="ticket-copy">
-                                <b>Come 6</b>
-                                <small>Working</small>
-                            </span>
-                            <span class="ticket-chips">
-                                <i class="flat-chip">$15</i>
-                                <i class="odds-chip-token">$30</i>
-                            </span>
-                        </button>
-                        <button class="bet-ticket come-ticket" type="button">
-                            <span class="ticket-copy">
-                                <b>Come 8</b>
-                                <small>Working</small>
-                            </span>
-                            <span class="ticket-chips">
-                                <i class="flat-chip">$10</i>
-                                <i class="odds-chip-token">$20</i>
-                            </span>
-                        </button>
-                    </div>
+                    <button class="dont-pass-rail" type="button">Don't Pass Bar</button>
+                    <button class="pass-rail live" type="button">
+                        <span>Pass Line</span>
+                        <span class="table-chip-set pass-set">
+                            <span class="chip chip-red">$25</span>
+                            <span class="chip chip-gold odds-chip">$50</span>
+                        </span>
+                    </button>
                 </section>
 
-                <footer class="play-dock focus-dock">
+                <footer class="action-dock">
                     <button type="button">Pass</button>
                     <button type="button">Come</button>
                     <button type="button">Odds</button>
@@ -113,149 +114,164 @@
                 </footer>
             </article>
 
-            <article class="game-screen concept-drawer" data-concept-panel="badges">
-                <header class="drawer-hero">
-                    <div>
-                        <span>Point</span>
-                        <strong>6</strong>
-                    </div>
-                    <div class="drawer-dice" aria-hidden="true"><i></i><i></i></div>
-                    <div>
-                        <span>Balance</span>
-                        <strong>$865</strong>
-                    </div>
-                </header>
-
-                <section class="drawer-table" aria-label="Compact craps board">
-                    <div class="drawer-numbers">
-                        <button type="button">4</button>
-                        <button type="button">5</button>
-                        <button class="is-point" type="button">6</button>
-                        <button class="has-bet" type="button">8</button>
-                        <button type="button">9</button>
-                        <button type="button">10</button>
-                    </div>
-                    <div class="drawer-zones">
-                        <button type="button">Field</button>
-                        <button class="live" type="button">Come</button>
-                        <button type="button">Don't Come</button>
-                    </div>
-                </section>
-
-                <section class="bet-drawer" aria-label="Placed bets drawer">
-                    <header>
-                        <span>On the table</span>
-                        <strong>$150</strong>
-                    </header>
-                    <button class="drawer-bet pass-ticket" type="button">
-                        <span class="drawer-bet-main">
-                            <b>Pass Line</b>
-                            <small>Locked until 6 or 7</small>
-                        </span>
-                        <span class="drawer-chip-pair">
-                            <i class="flat-chip">$25</i>
-                            <i class="odds-chip-token">$50</i>
-                        </span>
-                    </button>
-                    <button class="drawer-bet come-ticket" type="button">
-                        <span class="drawer-bet-main">
-                            <b>Come 6</b>
-                            <small>Tap to manage odds</small>
-                        </span>
-                        <span class="drawer-chip-pair">
-                            <i class="flat-chip">$15</i>
-                            <i class="odds-chip-token">$30</i>
-                        </span>
-                    </button>
-                    <button class="drawer-bet come-ticket" type="button">
-                        <span class="drawer-bet-main">
-                            <b>Come 8</b>
-                            <small>Tap to manage odds</small>
-                        </span>
-                        <span class="drawer-chip-pair">
-                            <i class="flat-chip">$10</i>
-                            <i class="odds-chip-token">$20</i>
-                        </span>
-                    </button>
-                </section>
-
-                <footer class="play-dock drawer-dock">
-                    <button type="button">Repeat</button>
-                    <button type="button">Max Odds</button>
-                    <button class="roll-button" type="button">Roll</button>
-                </footer>
-            </article>
-
-            <article class="game-screen concept-track" data-concept-panel="track">
-                <header class="game-topbar">
-                    <div class="brand-lockup">
+            <article class="game-screen concept-lanes" data-concept-panel="lanes">
+                <header class="game-topbar lanes-topbar">
+                    <div class="game-title">
                         <span>Point on</span>
                         <strong>6</strong>
                     </div>
-                    <div class="dice-readout">
-                        <i></i><i></i>
-                    </div>
+                    <div class="phase-pill">Working bets</div>
                     <div class="bankroll">
                         <span>On table</span>
                         <strong>$150</strong>
                     </div>
                 </header>
 
-                <section class="felt-board track-board">
-                    <div class="track-number-grid">
-                        <button class="track-number" type="button"><span>4</span></button>
-                        <button class="track-number" type="button"><span>5</span></button>
-                        <button class="track-number point" type="button">
-                            <span>6</span>
-                            <strong class="track-marker">ON</strong>
+                <section class="lane-board" aria-label="Number lanes concept">
+                    <div class="lane-grid">
+                        <button class="lane-card" type="button">
+                            <span>4</span>
+                            <small>No bet</small>
                         </button>
-                        <button class="track-number" type="button"><span>8</span></button>
-                        <button class="track-number" type="button"><span>9</span></button>
-                        <button class="track-number" type="button"><span>10</span></button>
+                        <button class="lane-card" type="button">
+                            <span>5</span>
+                            <small>No bet</small>
+                        </button>
+                        <button class="lane-card is-point active-lane" type="button">
+                            <span>6</span>
+                            <small>Come point</small>
+                            <b class="lane-marker">ON</b>
+                            <span class="lane-chip-row">
+                                <i class="chip chip-red">$15</i>
+                                <i class="chip chip-gold odds-chip">$30</i>
+                            </span>
+                        </button>
+                        <button class="lane-card active-lane" type="button">
+                            <span>8</span>
+                            <small>Come point</small>
+                            <span class="lane-chip-row">
+                                <i class="chip chip-red">$10</i>
+                                <i class="chip chip-gold odds-chip">$20</i>
+                            </span>
+                        </button>
+                        <button class="lane-card" type="button">
+                            <span>9</span>
+                            <small>No bet</small>
+                        </button>
+                        <button class="lane-card" type="button">
+                            <span>10</span>
+                            <small>No bet</small>
+                        </button>
                     </div>
 
-                    <div class="odds-track">
-                        <div class="track-row">
-                            <span class="track-label">Pass Line</span>
-                            <span class="track-chips">
-                                <i class="flat-chip">$25</i>
-                                <i class="odds-chip-token">$50</i>
-                            </span>
-                            <strong>Odds set</strong>
-                        </div>
-                        <div class="track-row">
-                            <span class="track-label">Come 6</span>
-                            <span class="track-chips">
-                                <i class="flat-chip">$15</i>
-                                <i class="odds-chip-token">$30</i>
-                            </span>
-                            <strong>Working</strong>
-                        </div>
-                        <div class="track-row">
-                            <span class="track-label">Come 8</span>
-                            <span class="track-chips">
-                                <i class="flat-chip">$10</i>
-                                <i class="odds-chip-token">$20</i>
-                            </span>
-                            <strong>Working</strong>
-                        </div>
+                    <div class="lane-pass-card">
+                        <span>
+                            <b>Pass Line</b>
+                            <small>Flat bet locked behind point 6</small>
+                        </span>
+                        <span class="lane-chip-row">
+                            <i class="chip chip-red">$25</i>
+                            <i class="chip chip-gold odds-chip">$50</i>
+                        </span>
                     </div>
 
-                    <button class="rail-pass-zone" type="button">PASS LINE</button>
-                    <button class="rail-come-zone" type="button">COME</button>
+                    <div class="lane-command-grid">
+                        <button type="button">Field</button>
+                        <button type="button">Come</button>
+                        <button type="button">Center</button>
+                    </div>
                 </section>
 
-                <footer class="play-dock track-dock">
-                    <button type="button">Clear</button>
+                <footer class="action-dock">
+                    <button type="button">Repeat</button>
                     <button type="button">Max Odds</button>
-                    <button class="roll-button" type="button">Roll</button>
+                    <button class="roll-button wide-roll" type="button">Roll Dice</button>
+                </footer>
+            </article>
+
+            <article class="game-screen concept-tray" data-concept-panel="tray">
+                <header class="game-topbar">
+                    <div class="game-title">
+                        <span>Craps</span>
+                        <strong>Point 6</strong>
+                    </div>
+                    <div class="dice-pair" aria-hidden="true">
+                        <i data-pips="2"></i>
+                        <i data-pips="4"></i>
+                    </div>
+                    <div class="bankroll">
+                        <span>Balance</span>
+                        <strong>$865</strong>
+                    </div>
+                </header>
+
+                <section class="tray-board" aria-label="Dealer tray concept">
+                    <div class="mini-table">
+                        <div class="mini-number-row">
+                            <button type="button">4</button>
+                            <button type="button">5</button>
+                            <button class="is-point" type="button">6</button>
+                            <button class="has-dot" type="button">8</button>
+                            <button type="button">9</button>
+                            <button type="button">10</button>
+                        </div>
+                        <div class="mini-center">
+                            <button type="button">Come</button>
+                            <button type="button">Field</button>
+                            <button type="button">Center</button>
+                        </div>
+                        <button class="mini-pass" type="button">Pass Line</button>
+                    </div>
+
+                    <div class="dealer-tray" aria-label="Active bets">
+                        <header>
+                            <span>Your bets</span>
+                            <strong>$150</strong>
+                        </header>
+                        <button class="tray-ticket" type="button">
+                            <span class="ticket-copy">
+                                <b>Pass Line</b>
+                                <small>Point 6</small>
+                            </span>
+                            <span class="tray-chip-pair">
+                                <i class="chip chip-red">$25</i>
+                                <i class="chip chip-gold odds-chip">$50</i>
+                            </span>
+                        </button>
+                        <button class="tray-ticket" type="button">
+                            <span class="ticket-copy">
+                                <b>Come 6</b>
+                                <small>Odds working</small>
+                            </span>
+                            <span class="tray-chip-pair">
+                                <i class="chip chip-red">$15</i>
+                                <i class="chip chip-gold odds-chip">$30</i>
+                            </span>
+                        </button>
+                        <button class="tray-ticket" type="button">
+                            <span class="ticket-copy">
+                                <b>Come 8</b>
+                                <small>Odds working</small>
+                            </span>
+                            <span class="tray-chip-pair">
+                                <i class="chip chip-red">$10</i>
+                                <i class="chip chip-gold odds-chip">$20</i>
+                            </span>
+                        </button>
+                    </div>
+                </section>
+
+                <footer class="action-dock">
+                    <button type="button">Clear</button>
+                    <button type="button">Odds</button>
+                    <button class="roll-button wide-roll" type="button">Roll Dice</button>
                 </footer>
             </article>
         </section>
 
         <aside class="concept-note" id="conceptNote">
-            <span>01 - Focus Table</span>
-            <p>A tighter mobile table that moves placed bets into large working tickets. Pass line and come bets share the same flat-plus-odds chip pair, so odds are obvious without tiny board overlays.</p>
+            <span>01 - Rail Table</span>
+            <p>Most faithful to a real table: pass stays on the outside rail, come bets sit on their point numbers, and the gold odds chip sits behind the flat chip instead of becoming text.</p>
         </aside>
     </main>
 

@@ -1,16 +1,16 @@
 (function () {
     const notes = {
         rail: {
-            label: "01 - Focus Table",
-            copy: "A tighter mobile table that moves placed bets into large working tickets. Pass line and come bets share the same flat-plus-odds chip pair, so odds are obvious without tiny board overlays."
+            label: "01 - Rail Table",
+            copy: "Most faithful to a real table: pass stays on the outside rail, come bets sit on their point numbers, and the gold odds chip sits behind the flat chip instead of becoming text."
         },
-        badges: {
-            label: "02 - Bet Drawer",
-            copy: "A bigger structural change: the board becomes compact and the placed bets live in a bottom drawer. It gives pass line and come odds more room and puts management targets near the thumb."
+        lanes: {
+            label: "02 - Number Lanes",
+            copy: "A portrait-native layout. The point numbers become large lanes with room for chips, while the pass line becomes a persistent bet card above the action buttons."
         },
-        track: {
-            label: "03 - Odds Track",
-            copy: "The board stays cleaner by moving bet detail into a low odds track. Chips remain visible, but the user can scan every flat bet and odds bet in one thumb-zone list."
+        tray: {
+            label: "03 - Dealer Tray",
+            copy: "Best for managing several active bets. The table stays compact, and the bottom tray gives every Pass/Come bet a clear flat chip plus odds chip pair."
         }
     };
 
