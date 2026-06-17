@@ -29,6 +29,11 @@ const PROTECTED_PREFIXES = [
   '/api',
 ];
 
+const OPTIONAL_AUTH_API_PREFIXES = [
+  '/api/stocks',
+  '/api/bitcoin',
+];
+
 const REALM = 'Palmer Gill Apps';
 
 function base64UrlEncode(value) {
@@ -124,6 +129,22 @@ function isProtectedPath(pathname) {
   return PROTECTED_PREFIXES.some((prefix) => (
     pathname === prefix || pathname.startsWith(`${prefix}/`)
   ));
+}
+
+function isOptionalAuthApiPath(pathname) {
+  return OPTIONAL_AUTH_API_PREFIXES.some((prefix) => (
+    pathname === prefix || pathname.startsWith(`${prefix}/`)
+  ));
+}
+
+function withOriginAuth(request, username, password) {
+  if (!new URL(request.url).pathname.startsWith('/api/')) {
+    return next();
+  }
+
+  const headers = new Headers(request.headers);
+  headers.set('authorization', `Basic ${btoa(`${username}:${password}`)}`);
+  return next({ request: { headers } });
 }
 
 function shouldRedirectToLogin(request) {
@@ -352,6 +373,15 @@ export default async function middleware(request) {
     return handleLogout(request);
   }
 
+  if (
+    isOptionalAuthApiPath(url.pathname) &&
+    password &&
+    await validSessionCookie(request, username, password)
+  ) {
+    clearAuthFailures(request);
+    return withOriginAuth(request, username, password);
+  }
+
   if (!isProtectedPath(url.pathname)) {
     return next();
   }
@@ -362,7 +392,7 @@ export default async function middleware(request) {
 
   if (await validSessionCookie(request, username, password)) {
     clearAuthFailures(request);
-    return next();
+    return withOriginAuth(request, username, password);
   }
 
   if (request.headers.get('authorization') && authRateLimited(request)) {
@@ -382,7 +412,7 @@ export default async function middleware(request) {
   }
 
   clearAuthFailures(request);
-  return next();
+  return withOriginAuth(request, username, password);
 }
 
 export const config = {
