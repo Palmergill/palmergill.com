@@ -10,8 +10,8 @@ const STATIC_ASSETS = [
     '/shared/rules-viewer.css?v=1',
     '/shared/rules-viewer.js?v=1',
     '/shared/casino-profile.js?v=1',
-    '/shared/site-nav.css?v=6',
-    '/shared/site-nav.js?v=9',
+    '/shared/site-nav.css?v=9',
+    '/shared/site-nav.js?v=10',
     '/casino/craps%20rules%20and%20odds.txt'
 ];
 

@@ -45,6 +45,7 @@ body.has-site-nav .app-shell {
 
 .site-nav__toggle,
 .site-nav__mobile-brand,
+.site-nav__top-login,
 .site-nav__backdrop {
     display: none;
 }
@@ -200,7 +201,7 @@ body.has-site-nav .app-shell {
         top: 0;
         bottom: 0;
         left: calc(max(10px, env(safe-area-inset-left)) + 50px);
-        right: max(12px, env(safe-area-inset-right));
+        right: calc(max(12px, env(safe-area-inset-right)) + 88px);
         z-index: calc(var(--site-nav-z) + 2);
         display: flex;
         height: 38px;
@@ -214,6 +215,47 @@ body.has-site-nav .app-shell {
     }
 
     .site-nav.is-open .site-nav__mobile-brand {
+        opacity: 0;
+        pointer-events: none;
+    }
+
+    .site-nav__top-login {
+        position: absolute;
+        top: 0;
+        right: max(10px, env(safe-area-inset-right));
+        bottom: 0;
+        z-index: calc(var(--site-nav-z) + 2);
+        display: inline-flex;
+        height: 38px;
+        margin: auto 0;
+        align-items: center;
+        gap: 7px;
+        padding: 0 10px;
+        border: 1px solid var(--site-nav-line);
+        border-radius: 7px;
+        background: rgba(90, 242, 142, 0.06);
+        color: var(--site-nav-green);
+        font-size: 0.82rem;
+        font-weight: 700;
+        line-height: 1;
+        text-decoration: none;
+        white-space: nowrap;
+    }
+
+    .site-nav__top-login:hover,
+    .site-nav__top-login:focus-visible {
+        background: rgba(90, 242, 142, 0.12);
+        border-color: var(--site-nav-line-strong);
+        outline: none;
+    }
+
+    .site-nav__top-login svg {
+        width: 16px;
+        height: 16px;
+        stroke: currentColor;
+    }
+
+    .site-nav.is-open .site-nav__top-login {
         opacity: 0;
         pointer-events: none;
     }
@@ -403,6 +445,18 @@ body.theme-warm .site-nav__utility .site-nav__link:focus-visible {
         border-color: var(--site-nav-line);
         background: #e7eee2;
         color: var(--site-nav-green);
+    }
+
+    body.theme-warm .site-nav__top-login {
+        border-color: var(--site-nav-line);
+        background: #e7eee2;
+        color: var(--site-nav-green);
+    }
+
+    body.theme-warm .site-nav__top-login:hover,
+    body.theme-warm .site-nav__top-login:focus-visible {
+        background: #dfe9d8;
+        border-color: var(--site-nav-line-strong);
     }
 
     body.theme-warm .site-nav__mobile-title { color: var(--ink, #23201c); }
