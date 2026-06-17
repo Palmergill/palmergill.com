@@ -3,7 +3,7 @@ const CACHE_PREFIX = 'craps-app-';
 const STATIC_ASSETS = [
     '/craps/',
     '/craps/index.html',
-    '/craps/app.js?v=6',
+    '/craps/app.js?v=7',
     '/craps/crapsRules.js?v=1',
     '/craps/manifest.json',
     '/shared/casino-theme.css?v=1',

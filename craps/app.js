@@ -1013,7 +1013,6 @@ function resolveRoll(d1, d2) {
     let comePopupDelay = 500;
     const comeBetsToRemove = [];
     comeBets.forEach((bet, i) => {
-        if (wasComeOutRoll && bet.point) return;
         if (!bet.point) {
             // Come bet "come out" roll
             if (total === 7 || total === 11) {
@@ -1041,15 +1040,24 @@ function resolveRoll(d1, d2) {
                 resolvedStake += bet.amount + bet.odds;
                 winnings += bet.amount * 2;
                 if (bet.odds > 0) {
-                    const ow = Math.floor(bet.odds * getOddsPayout(bet.point, true));
-                    winnings += bet.odds + ow;
-                    messages.push('Come ' + bet.point + ' wins +$' + (bet.amount + ow) + '!');
+                    if (wasComeOutRoll) {
+                        winnings += bet.odds;
+                        messages.push('Come ' + bet.point + ' wins! Odds returned.');
+                    } else {
+                        const ow = Math.floor(bet.odds * getOddsPayout(bet.point, true));
+                        winnings += bet.odds + ow;
+                        messages.push('Come ' + bet.point + ' wins +$' + (bet.amount + ow) + '!');
+                    }
                 } else {
                     messages.push('Come ' + bet.point + ' wins!');
                 }
                 comeBetsToRemove.push(i);
             } else if (total === 7) {
                 resolvedStake += bet.amount + bet.odds;
+                if (wasComeOutRoll && bet.odds > 0) {
+                    winnings += bet.odds;
+                    messages.push('Come ' + bet.point + ' loses; odds returned');
+                }
                 comeBetsToRemove.push(i);
             }
         }
@@ -1063,7 +1071,6 @@ function resolveRoll(d1, d2) {
     let dcPopupDelay = 600;
     const dontComeBetsToRemove = [];
     dontComeBets.forEach((bet, i) => {
-        if (wasComeOutRoll && bet.point) return;
         if (!bet.point) {
             // Don't Come bet "come out" roll
             if (total === 2 || total === 3) {

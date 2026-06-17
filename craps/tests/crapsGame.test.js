@@ -45,27 +45,68 @@ function readState(window) {
 }
 
 describe('craps game regressions', () => {
-  test("established Come and Don't Come bets survive pass-line come-out naturals", () => {
+  test('established Come flat bets work on shooter come-out, with odds returned', () => {
     const window = loadGame();
     window.__setGameState({
-      balance: 970,
+      balance: 975,
       point: null,
       isComeOutRoll: true,
       bets: { passLine: 10 },
       comeBets: [{ id: 1, point: 6, amount: 10, odds: 5 }],
-      dontComeBets: [{ id: 2, point: 8, amount: 10, odds: 5 }],
-      nextComeBetId: 3,
+      nextComeBetId: 2,
     });
 
     window.resolveRoll(3, 4);
     const state = readState(window);
 
-    expect(state.balance).toBe(990);
+    expect(state.balance).toBe(1000);
     expect(state.point).toBeNull();
     expect(state.isComeOutRoll).toBe(true);
     expect(state.passLine).toBe(0);
-    expect(state.comeBets).toEqual([{ id: 1, point: 6, amount: 10, odds: 5 }]);
-    expect(state.dontComeBets).toEqual([{ id: 2, point: 8, amount: 10, odds: 5 }]);
+    expect(state.comeBets).toEqual([]);
+    expect(state.status).toContain('Come 6 loses; odds returned');
+  });
+
+  test('established Come point hits on shooter come-out pay flat only and return odds', () => {
+    const window = loadGame();
+    window.__setGameState({
+      balance: 975,
+      point: null,
+      isComeOutRoll: true,
+      bets: { passLine: 10 },
+      comeBets: [{ id: 1, point: 6, amount: 10, odds: 5 }],
+      nextComeBetId: 2,
+    });
+
+    window.resolveRoll(3, 3);
+    const state = readState(window);
+
+    expect(state.balance).toBe(1000);
+    expect(state.point).toBe(6);
+    expect(state.isComeOutRoll).toBe(false);
+    expect(state.passLine).toBe(10);
+    expect(state.comeBets).toEqual([]);
+    expect(state.status).toContain('Come 6 wins! Odds returned.');
+  });
+
+  test("established Don't Come bets and odds work on shooter come-out", () => {
+    const window = loadGame();
+    window.__setGameState({
+      balance: 984,
+      point: null,
+      isComeOutRoll: true,
+      dontComeBets: [{ id: 1, point: 8, amount: 10, odds: 6 }],
+      nextComeBetId: 2,
+    });
+
+    window.resolveRoll(3, 4);
+    const state = readState(window);
+
+    expect(state.balance).toBe(1015);
+    expect(state.point).toBeNull();
+    expect(state.isComeOutRoll).toBe(true);
+    expect(state.dontComeBets).toEqual([]);
+    expect(state.status).toContain('DC 8 wins +$15!');
   });
 
   test('point popup odds are capped at the remaining max odds', () => {
