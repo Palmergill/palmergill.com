@@ -10,7 +10,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;650;750;850;900&family=Roboto+Condensed:wght@500;700;900&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/craps-mockups/style.css?v=6">
+    <link rel="stylesheet" href="/craps-mockups/style.css?v=7">
 </head>
 <body>
     <main class="craps-app" aria-label="Mobile craps table prototype">
@@ -38,48 +38,36 @@
                     <small>9:5</small>
                     <em>6.67%</em>
                     <i class="chip-stack place-stack" data-stack="place4"></i>
-                    <i class="chip-stack come-point-stack" data-stack="come4"></i>
-                    <i class="chip-stack odds-stack come-odds-stack" data-stack="come4Odds"></i>
                 </button>
                 <button class="box-zone" type="button" data-bet="place5" aria-label="Place 5">
                     <span>5</span>
                     <small>7:5</small>
                     <em>4.00%</em>
                     <i class="chip-stack place-stack" data-stack="place5"></i>
-                    <i class="chip-stack come-point-stack" data-stack="come5"></i>
-                    <i class="chip-stack odds-stack come-odds-stack" data-stack="come5Odds"></i>
                 </button>
                 <button class="box-zone" type="button" data-bet="place6" aria-label="Place six">
                     <span>SIX</span>
                     <small>7:6</small>
                     <em>1.52%</em>
                     <i class="chip-stack place-stack" data-stack="place6"></i>
-                    <i class="chip-stack come-point-stack" data-stack="come6"></i>
-                    <i class="chip-stack odds-stack come-odds-stack" data-stack="come6Odds"></i>
                 </button>
                 <button class="box-zone" type="button" data-bet="place8" aria-label="Place 8">
                     <span>8</span>
                     <small>7:6</small>
                     <em>1.52%</em>
                     <i class="chip-stack place-stack" data-stack="place8"></i>
-                    <i class="chip-stack come-point-stack" data-stack="come8"></i>
-                    <i class="chip-stack odds-stack come-odds-stack" data-stack="come8Odds"></i>
                 </button>
                 <button class="box-zone" type="button" data-bet="place9" aria-label="Place nine">
                     <span>NINE</span>
                     <small>7:5</small>
                     <em>4.00%</em>
                     <i class="chip-stack place-stack" data-stack="place9"></i>
-                    <i class="chip-stack come-point-stack" data-stack="come9"></i>
-                    <i class="chip-stack odds-stack come-odds-stack" data-stack="come9Odds"></i>
                 </button>
                 <button class="box-zone" type="button" data-bet="place10" aria-label="Place 10">
                     <span>10</span>
                     <small>9:5</small>
                     <em>6.67%</em>
                     <i class="chip-stack place-stack" data-stack="place10"></i>
-                    <i class="chip-stack come-point-stack" data-stack="come10"></i>
-                    <i class="chip-stack odds-stack come-odds-stack" data-stack="come10Odds"></i>
                 </button>
             </div>
 
@@ -114,7 +102,6 @@
                     <span>PASS LINE</span>
                     <em>1.41%</em>
                     <i class="chip-stack" data-stack="passLine"></i>
-                    <i class="chip-stack odds-stack" data-stack="passOdds"></i>
                 </button>
             </section>
 
@@ -170,8 +157,29 @@
                 <button type="button" data-bet="ce">C &amp; E <small>Split</small></button>
             </div>
         </section>
+
+        <section class="breakdown-sheet" id="breakdownSheet" aria-label="Bet breakdown" aria-hidden="true">
+            <header>
+                <strong id="breakdownTitle">Bet breakdown</strong>
+                <button type="button" id="closeBreakdown">Done</button>
+            </header>
+            <dl>
+                <div>
+                    <dt>Base bet</dt>
+                    <dd id="breakdownBase">$0</dd>
+                </div>
+                <div>
+                    <dt>Odds</dt>
+                    <dd id="breakdownOdds">$0</dd>
+                </div>
+                <div>
+                    <dt>Total on felt</dt>
+                    <dd id="breakdownTotal">$0</dd>
+                </div>
+            </dl>
+        </section>
     </main>
 
-    <script src="/craps-mockups/mockups.js?v=6"></script>
+    <script src="/craps-mockups/mockups.js?v=7"></script>
 </body>
 </html>

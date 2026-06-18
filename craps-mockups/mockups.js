@@ -44,6 +44,11 @@
     const dice = document.querySelector(".dice");
     const propsSheet = document.getElementById("propsSheet");
     const propsButton = document.getElementById("propsButton");
+    const breakdownSheet = document.getElementById("breakdownSheet");
+    const breakdownTitle = document.getElementById("breakdownTitle");
+    const breakdownBase = document.getElementById("breakdownBase");
+    const breakdownOdds = document.getElementById("breakdownOdds");
+    const breakdownTotal = document.getElementById("breakdownTotal");
 
     function money(value) {
         return "$" + value.toLocaleString();
@@ -83,22 +88,54 @@
         return chipColors[1];
     }
 
-    function renderStack(key, amount, odds) {
+    function renderStack(key, amount, details = {}) {
         const stack = document.querySelector(`[data-stack="${key}"]`);
         if (!stack) return;
         stack.classList.remove("has-chip");
         stack.removeAttribute("data-amount");
         stack.removeAttribute("data-count");
+        stack.removeAttribute("data-label");
+        stack.removeAttribute("data-base");
+        stack.removeAttribute("data-odds");
+        stack.removeAttribute("role");
+        stack.removeAttribute("tabindex");
+        stack.removeAttribute("aria-label");
         stack.style.removeProperty("--chip-color");
         stack.style.removeProperty("--chip-text");
 
         if (amount <= 0) return;
-        const [color, text] = odds ? ["#c9a24b", "#161006"] : getChipStyle(amount);
+        const [color, text] = getChipStyle(amount);
         stack.classList.add("has-chip");
         stack.dataset.amount = money(amount);
         stack.dataset.count = String(Math.min(3, Math.max(1, Math.ceil(amount / 25))));
+        stack.dataset.label = details.label || labelFor(key);
+        stack.dataset.base = String(details.base ?? amount);
+        stack.dataset.odds = String(details.odds ?? 0);
+        stack.setAttribute("role", "button");
+        stack.setAttribute("tabindex", "0");
+        stack.setAttribute("aria-label", `${stack.dataset.label}: ${money(details.base ?? amount)} base, ${money(details.odds ?? 0)} odds`);
         stack.style.setProperty("--chip-color", color);
         stack.style.setProperty("--chip-text", text);
+    }
+
+    function openBreakdown(stack) {
+        propsSheet.classList.remove("open");
+        propsSheet.setAttribute("aria-hidden", "true");
+        propsButton.setAttribute("aria-expanded", "false");
+        const base = Number(stack.dataset.base || 0);
+        const odds = Number(stack.dataset.odds || 0);
+        const total = base + odds;
+        breakdownTitle.textContent = stack.dataset.label || "Bet breakdown";
+        breakdownBase.textContent = money(base);
+        breakdownOdds.textContent = money(odds);
+        breakdownTotal.textContent = money(total);
+        breakdownSheet.classList.add("open");
+        breakdownSheet.setAttribute("aria-hidden", "false");
+    }
+
+    function closeBreakdown() {
+        breakdownSheet.classList.remove("open");
+        breakdownSheet.setAttribute("aria-hidden", "true");
     }
 
     function updatePhase() {
@@ -123,12 +160,31 @@
 
     function updateStacks() {
         Object.entries(state.bets).forEach(([key, amount]) => {
-            renderStack(key, amount, key.toLowerCase().includes("odds"));
+            if (key === "passOdds") return;
+            if (key === "passLine") {
+                renderStack("passLine", amount + state.bets.passOdds, {
+                    label: "Pass Line",
+                    base: amount,
+                    odds: state.bets.passOdds
+                });
+                return;
+            }
+            renderStack(key, amount, { label: labelFor(key), base: amount, odds: 0 });
         });
         boxNumbers.forEach((num) => {
             const come = state.comePoints[num] || { amount: 0, odds: 0 };
-            renderStack("come" + num, come.amount, false);
-            renderStack("come" + num + "Odds", come.odds, true);
+            renderStack("place" + num, state.bets["place" + num], {
+                label: "Place " + num,
+                base: state.bets["place" + num],
+                odds: 0
+            });
+            if (come.amount || come.odds) {
+                renderStack("place" + num, come.amount + come.odds, {
+                    label: "Come " + num,
+                    base: come.amount,
+                    odds: come.odds
+                });
+            }
         });
     }
 
@@ -398,6 +454,22 @@
         button.addEventListener("click", () => placeBet(button.dataset.bet));
     });
 
+    document.querySelectorAll(".chip-stack").forEach((stack) => {
+        stack.addEventListener("click", (event) => {
+            if (!stack.classList.contains("has-chip")) return;
+            event.stopPropagation();
+            openBreakdown(stack);
+        });
+        stack.addEventListener("keydown", (event) => {
+            if (!stack.classList.contains("has-chip")) return;
+            if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                event.stopPropagation();
+                openBreakdown(stack);
+            }
+        });
+    });
+
     document.getElementById("edgeToggle").addEventListener("click", (event) => {
         const pressed = event.currentTarget.getAttribute("aria-pressed") === "true";
         event.currentTarget.setAttribute("aria-pressed", String(!pressed));
@@ -416,6 +488,7 @@
         propsSheet.setAttribute("aria-hidden", "true");
         propsButton.setAttribute("aria-expanded", "false");
     });
+    document.getElementById("closeBreakdown").addEventListener("click", closeBreakdown);
 
     document.getElementById("rollButton").addEventListener("click", roll);
     document.getElementById("undoButton").addEventListener("click", undo);
@@ -423,6 +496,6 @@
     document.getElementById("repeatButton").addEventListener("click", repeatLast);
     document.getElementById("oddsButton").addEventListener("click", addOdds);
 
-    setMessage("Preview: Pass Line has $25 plus $50 odds. Come 8 has $10 plus $20 odds.");
+    setMessage("Preview: Pass and Come stacks show totals. Tap a stack for base vs odds.");
     update();
 }());

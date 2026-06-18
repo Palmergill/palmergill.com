@@ -350,7 +350,19 @@ button:focus-visible {
     display: flex;
     min-width: 0;
     min-height: 0;
+    cursor: pointer;
     transform: translateX(-50%);
+}
+
+.chip-stack.has-chip {
+    min-width: 31px;
+    min-height: 31px;
+}
+
+.chip-stack.has-chip:focus-visible {
+    outline: 2px solid var(--brass);
+    outline-offset: 5px;
+    border-radius: 999px;
 }
 
 .chip-stack.has-chip::before,
@@ -381,17 +393,6 @@ button:focus-visible {
 
 .chip-stack.has-chip[data-count="1"]::after {
     display: none;
-}
-
-.odds-stack {
-    bottom: auto;
-    top: 7px;
-}
-
-.odds-stack.has-chip::before,
-.odds-stack.has-chip::after {
-    --chip-color: var(--brass);
-    --chip-text: #161006;
 }
 
 .control-deck {
@@ -516,6 +517,80 @@ button:focus-visible {
     box-shadow: 0 -22px 60px rgba(0, 0, 0, 0.45);
     transform: translateY(calc(100% + 160px));
     transition: transform 220ms ease;
+}
+
+.breakdown-sheet {
+    position: absolute;
+    left: 10px;
+    right: 10px;
+    bottom: calc(128px + env(safe-area-inset-bottom));
+    z-index: 9;
+    display: grid;
+    gap: 10px;
+    padding: 12px;
+    border: 1px solid rgba(201, 162, 75, 0.48);
+    border-radius: 18px;
+    background: rgba(8, 16, 12, 0.98);
+    box-shadow: 0 -22px 60px rgba(0, 0, 0, 0.45);
+    transform: translateY(calc(100% + 160px));
+    transition: transform 220ms ease;
+}
+
+.breakdown-sheet.open {
+    transform: translateY(0);
+}
+
+.breakdown-sheet header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.breakdown-sheet header strong {
+    color: var(--brass);
+    font-family: var(--font-display);
+    font-size: 1.25rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.breakdown-sheet header button {
+    min-height: 40px;
+    padding: 0 14px;
+    border: 1px solid var(--line-soft);
+    border-radius: 12px;
+    color: var(--brass);
+    font-weight: 900;
+}
+
+.breakdown-sheet dl {
+    display: grid;
+    gap: 7px;
+    margin: 0;
+}
+
+.breakdown-sheet dl div {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    min-height: 42px;
+    padding: 0 10px;
+    border: 1px solid rgba(233, 228, 208, 0.12);
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.045);
+}
+
+.breakdown-sheet dt {
+    color: var(--muted);
+    font-size: 0.78rem;
+    font-weight: 850;
+}
+
+.breakdown-sheet dd {
+    margin: 0;
+    color: var(--cream);
+    font-weight: 950;
 }
 
 .props-sheet.open {
