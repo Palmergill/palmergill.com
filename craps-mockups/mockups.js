@@ -93,7 +93,6 @@
         if (!stack) return;
         stack.classList.remove("has-chip");
         stack.removeAttribute("data-amount");
-        stack.removeAttribute("data-count");
         stack.removeAttribute("data-label");
         stack.removeAttribute("data-base");
         stack.removeAttribute("data-odds");
@@ -107,7 +106,6 @@
         const [color, text] = getChipStyle(amount);
         stack.classList.add("has-chip");
         stack.dataset.amount = money(amount);
-        stack.dataset.count = String(Math.min(3, Math.max(1, Math.ceil(amount / 25))));
         stack.dataset.label = details.label || labelFor(key);
         stack.dataset.base = String(details.base ?? amount);
         stack.dataset.odds = String(details.odds ?? 0);

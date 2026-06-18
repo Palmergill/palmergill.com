@@ -365,34 +365,23 @@ button:focus-visible {
     border-radius: 999px;
 }
 
-.chip-stack.has-chip::before,
-.chip-stack.has-chip::after {
+.chip-stack.has-chip::before {
     display: grid;
-    width: 31px;
-    height: 31px;
+    width: 39px;
+    height: 39px;
     place-items: center;
     border: 2px dashed rgba(255, 255, 255, 0.9);
     border-radius: 50%;
     background: var(--chip-color, #b91c1c);
     color: var(--chip-text, #fff);
     content: attr(data-amount);
-    font-size: 0.48rem;
+    font-size: 0.56rem;
     font-style: normal;
     font-weight: 950;
     box-shadow:
-        inset 0 0 0 3px rgba(255,255,255,0.82),
-        inset 0 0 0 7px rgba(0,0,0,0.22),
-        0 8px 14px rgba(0,0,0,0.32);
-}
-
-.chip-stack.has-chip[data-count="2"]::after,
-.chip-stack.has-chip[data-count="3"]::after {
-    margin-left: -12px;
-    transform: translateY(-4px);
-}
-
-.chip-stack.has-chip[data-count="1"]::after {
-    display: none;
+        inset 0 0 0 4px rgba(255,255,255,0.82),
+        inset 0 0 0 9px rgba(0,0,0,0.22),
+        0 9px 16px rgba(0,0,0,0.34);
 }
 
 .control-deck {
@@ -704,11 +693,10 @@ button:focus-visible {
         font-size: 1.35rem;
     }
 
-    .chip-stack.has-chip::before,
-    .chip-stack.has-chip::after {
-        width: 27px;
-        height: 27px;
-        font-size: 0.42rem;
+    .chip-stack.has-chip::before {
+        width: 34px;
+        height: 34px;
+        font-size: 0.5rem;
     }
 }
 
