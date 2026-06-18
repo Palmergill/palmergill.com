@@ -9,15 +9,15 @@
     };
 
     const state = {
-        balance: 1000,
+        balance: 915,
         selectedChip: 5,
-        phase: "COME_OUT",
-        point: null,
+        phase: "POINT",
+        point: 6,
         lastAction: null,
         lastBetSet: null,
         bets: {
-            passLine: 0,
-            passOdds: 0,
+            passLine: 25,
+            passOdds: 50,
             dontPass: 0,
             come: 0,
             dontCome: 0,
@@ -29,7 +29,9 @@
             place9: 0,
             place10: 0
         },
-        comePoints: {}
+        comePoints: {
+            8: { amount: 10, odds: 20 }
+        }
     };
 
     const bankroll = document.getElementById("bankroll");
@@ -84,7 +86,7 @@
     function renderStack(key, amount, odds) {
         const stack = document.querySelector(`[data-stack="${key}"]`);
         if (!stack) return;
-        stack.className = "chip-stack";
+        stack.classList.remove("has-chip");
         stack.removeAttribute("data-amount");
         stack.removeAttribute("data-count");
         stack.style.removeProperty("--chip-color");
@@ -124,10 +126,9 @@
             renderStack(key, amount, key.toLowerCase().includes("odds"));
         });
         boxNumbers.forEach((num) => {
-            const come = state.comePoints[num];
-            if (come) {
-                renderStack("place" + num, come.amount + come.odds, come.odds > 0);
-            }
+            const come = state.comePoints[num] || { amount: 0, odds: 0 };
+            renderStack("come" + num, come.amount, false);
+            renderStack("come" + num + "Odds", come.odds, true);
         });
     }
 
@@ -289,6 +290,24 @@
         return 0;
     }
 
+    function resolveComePoints(total) {
+        let payout = 0;
+        Object.entries(state.comePoints).forEach(([point, bet]) => {
+            const pointNumber = Number(point);
+            if (total === 7 && state.phase !== "COME_OUT") {
+                delete state.comePoints[point];
+                return;
+            }
+            if (total === pointNumber) {
+                payout += bet.amount * 2;
+                payout += bet.odds + Math.floor(bet.odds * oddsMultiplier(pointNumber));
+                delete state.comePoints[point];
+                setMessage("Come " + pointNumber + " wins with odds.");
+            }
+        });
+        return payout;
+    }
+
     function resolveLine(total) {
         let payout = 0;
         if (state.phase === "COME_OUT") {
@@ -354,6 +373,7 @@
         let payout = 0;
         payout += placeFieldOutcome(total);
         payout += resolvePlace(total);
+        payout += resolveComePoints(total);
         payout += moveComeBets(total);
         payout += resolveLine(total);
         if (payout > 0) addBalance(payout);
@@ -403,5 +423,6 @@
     document.getElementById("repeatButton").addEventListener("click", repeatLast);
     document.getElementById("oddsButton").addEventListener("click", addOdds);
 
+    setMessage("Preview: Pass Line has $25 plus $50 odds. Come 8 has $10 plus $20 odds.");
     update();
 }());
