@@ -1310,7 +1310,7 @@
 
         .main-bets {
             grid-template-columns: repeat(6, minmax(0, 1fr));
-            grid-template-rows: auto minmax(104px, auto) minmax(96px, auto) minmax(70px, auto) minmax(86px, auto);
+            grid-template-rows: auto minmax(104px, auto) minmax(72px, auto) minmax(70px, auto) minmax(86px, auto);
             gap: 8px;
             min-width: 0;
         }
@@ -1441,7 +1441,7 @@
 
         .center-zone {
             grid-column: 1 / 3;
-            grid-row: 2 / 4;
+            grid-row: 2;
         }
 
         .field-zone {
@@ -1450,13 +1450,15 @@
         }
 
         .come {
-            grid-column: 3 / 5;
+            grid-column: 1 / 4;
             grid-row: 3;
+            min-height: 72px;
         }
 
         .dont-come {
-            grid-column: 5 / -1;
+            grid-column: 4 / -1;
             grid-row: 3;
+            min-height: 72px;
         }
 
         .dont {
@@ -1490,6 +1492,11 @@
             background: linear-gradient(180deg, rgba(232, 199, 115, 0.08), rgba(0, 0, 0, 0.2));
             box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 12px 28px rgba(0, 0, 0, 0.18);
             transition: transform 140ms ease, filter 140ms ease, box-shadow 140ms ease, border-color 140ms ease;
+        }
+
+        .come,
+        .dont-come {
+            min-height: 72px;
         }
 
         .bet-btn::before {
@@ -1945,7 +1952,7 @@
 
             .main-bets {
                 grid-template-columns: repeat(6, minmax(0, 1fr));
-                grid-template-rows: auto minmax(92px, auto) minmax(82px, auto) minmax(58px, auto) minmax(70px, auto);
+                grid-template-rows: auto minmax(82px, auto) minmax(58px, auto) minmax(58px, auto) minmax(70px, auto);
                 gap: 6px;
             }
 
@@ -1987,7 +1994,7 @@
 
             .center-zone {
                 grid-column: 1 / 3;
-                grid-row: 2 / 4;
+                grid-row: 2;
             }
 
             .field-zone {
@@ -1996,13 +2003,15 @@
             }
 
             .come {
-                grid-column: 3 / 5;
+                grid-column: 1 / 4;
                 grid-row: 3;
+                min-height: 58px;
             }
 
             .dont-come {
-                grid-column: 5 / -1;
+                grid-column: 4 / -1;
                 grid-row: 3;
+                min-height: 58px;
             }
 
             .dont {
