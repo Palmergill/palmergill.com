@@ -12,6 +12,7 @@ let currentOddsTarget = null;
 let nextComeBetId = 1;
 let isRolling = false;
 let rollResultTimer = null;
+let selectedChip = 5;
 
 // Multiple Come/Don't Come bets: array of { id, point: null|number, amount: number, odds: number }
 let comeBets = [];
@@ -38,11 +39,16 @@ const dicePatterns = {
 // ── UI: Balance ──
 function updateBalance() {
     document.getElementById('balance').textContent = '$' + balance.toLocaleString();
+    const balanceEl = document.getElementById('balance');
+    if (balanceEl) {
+        balanceEl.classList.remove('win-flash', 'loss-flash');
+    }
     if (casinoProfile) casinoProfile.setBankroll(balance);
 }
 
 function setStatus(message) {
-    document.getElementById('gameStatus').textContent = message;
+    const status = document.getElementById('gameStatus');
+    if (status) status.textContent = message;
 }
 
 function showRollResultAnimation(amount) {
@@ -85,10 +91,94 @@ function renderDie(dieId, value) {
     }
 }
 
+function updatePhaseDisplay() {
+    const phaseText = document.getElementById('phaseText');
+    const phaseHint = document.getElementById('phaseHint');
+    const puck = document.getElementById('puck');
+    const pointDisplay = document.getElementById('pointDisplay');
+    if (isComeOutRoll) {
+        if (phaseText) phaseText.textContent = 'COME-OUT';
+        if (phaseHint) phaseHint.textContent = 'Puck off';
+        if (puck) {
+            puck.textContent = 'OFF';
+            puck.className = 'puck off';
+        }
+        if (pointDisplay) pointDisplay.textContent = '';
+    } else {
+        if (phaseText) phaseText.textContent = 'POINT ' + point;
+        if (phaseHint) phaseHint.textContent = 'Puck on ' + point;
+        if (puck) {
+            puck.textContent = 'ON';
+            puck.className = 'puck on';
+        }
+        if (pointDisplay) pointDisplay.textContent = 'POINT: ' + point;
+    }
+}
+
 // ── Submenus ──
 function closePlaceMenu() { document.getElementById('placeMenu').classList.remove('active'); }
-function openCenterMenu() { document.getElementById('centerMenu').classList.add('active'); }
-function closeCenterMenu() { document.getElementById('centerMenu').classList.remove('active'); }
+function openCenterMenu() {
+    const menu = document.getElementById('centerMenu');
+    const trigger = document.getElementById('centerBoardBtn');
+    menu.classList.add('active', 'open');
+    menu.setAttribute('aria-hidden', 'false');
+    if (trigger) trigger.setAttribute('aria-expanded', 'true');
+}
+function closeCenterMenu() {
+    const menu = document.getElementById('centerMenu');
+    const trigger = document.getElementById('centerBoardBtn');
+    menu.classList.remove('active', 'open');
+    menu.setAttribute('aria-hidden', 'true');
+    if (trigger) trigger.setAttribute('aria-expanded', 'false');
+}
+
+function selectChip(amount) {
+    selectedChip = Number(amount);
+    document.querySelectorAll('.tray-chip').forEach((chip) => {
+        const isSelected = Number(chip.dataset.chip) === selectedChip;
+        chip.classList.toggle('selected', isSelected);
+        chip.setAttribute('aria-checked', isSelected ? 'true' : 'false');
+    });
+}
+
+function applyFlatBet(betType, amount) {
+    if (betType === 'come') {
+        comeBets.push({ id: nextComeBetId++, point: null, amount: amount, odds: 0 });
+    } else if (betType === 'dontCome') {
+        dontComeBets.push({ id: nextComeBetId++, point: null, amount: amount, odds: 0 });
+    } else {
+        bets[betType] += amount;
+    }
+    balance -= amount;
+    updateBalance();
+    updateAllDisplays();
+    setStatus('Placed $' + amount + ' on ' + (betNames[betType] || (betType === 'come' ? 'Come' : "Don't Come")));
+}
+
+function placeSelectedChip(betType) {
+    if ((betType === 'come' || betType === 'dontCome') && isComeOutRoll) {
+        setStatus('Come bets open after a point is set.');
+        return;
+    }
+    if ((betType === 'passLine' || betType === 'dontPass') &&
+            bets[betType] > 0 && canManageOdds(betType)) {
+        openOddsModal(betType);
+        return;
+    }
+    if (!canAddBet(betType)) {
+        setStatus('Contract bets stay until resolved');
+        return;
+    }
+    const validationError = getBetValidationError(betType, selectedChip);
+    if (validationError) {
+        setStatus(validationError);
+        openBetModal(betType);
+        document.getElementById('betInput').value = selectedChip;
+        document.getElementById('modalCurrentBet').textContent = validationError;
+        return;
+    }
+    applyFlatBet(betType, selectedChip);
+}
 
 // ── Bet Modal ──
 function openBetModal(betType) {
@@ -565,6 +655,8 @@ function repeatLastBets() {
 
 // ── Display Updates ──
 function updateAllDisplays() {
+    updatePhaseDisplay();
+
     // Main bet buttons
     updateMainBetBtn('passLine', 'passLineBtn', 'passLineInfo');
     updateMainBetBtn('dontPass', 'dontPassBtn', 'dontPassInfo');
@@ -933,6 +1025,7 @@ function rollDice() {
     isRolling = true;
     updateRollButton();
     setStatus('Rolling...');
+    document.querySelector('.dice')?.classList.add('rolling');
 
     let rolls = 0;
     const interval = setInterval(() => {
@@ -948,6 +1041,7 @@ function finalizeRoll() {
     const d2 = Math.floor(Math.random() * 6) + 1;
     renderDie('die1', d1);
     renderDie('die2', d2);
+    document.querySelector('.dice')?.classList.remove('rolling');
     resolveRoll(d1, d2);
     isRolling = false;
     updateRollButton();
@@ -1388,13 +1482,15 @@ function __setGameState(state) {
 }
 
 // ── Initialize ──
+selectChip(selectedChip);
 updateBalance();
 updateAllDisplays();
 
 // Tag every bet button with a native-tooltip explainer so desktop hover surfaces
 // the rule + house edge without needing to open the modal.
-document.querySelectorAll('[onclick^="openBetModal"]').forEach((btn) => {
-    const match = btn.getAttribute('onclick').match(/openBetModal\('([^']+)'\)/);
+document.querySelectorAll('[onclick*="openBetModal"], [onclick*="placeSelectedChip"]').forEach((btn) => {
+    const onclick = btn.getAttribute('onclick') || '';
+    const match = onclick.match(/(?:openBetModal|placeSelectedChip)\('([^']+)'\)/);
     if (!match) return;
     const info = BET_INFO[match[1]];
     if (!info) return;
