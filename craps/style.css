@@ -420,6 +420,7 @@ footer {
 .pass-line-band {
     grid-row: 2;
     min-height: 64px;
+    overflow: visible;
     border-color: var(--felt-line);
     border-radius: 0 0 24px 24px;
     background: rgba(5, 25, 18, 0.52);
@@ -758,7 +759,7 @@ button:disabled {
     font-weight: 850;
 }
 
-.board-chip-stack {
+.felt .board-chip-stack {
     position: absolute;
     left: 50%;
     bottom: 10px;
@@ -767,8 +768,10 @@ button:disabled {
     align-items: center;
     justify-content: center;
     gap: 6px;
-    min-width: 31px;
-    min-height: 31px;
+    min-width: 39px;
+    min-height: 47px;
+    width: 39px;
+    height: 47px;
     pointer-events: none;
     transform: translateX(-50%);
 }
@@ -784,8 +787,14 @@ button:disabled {
 .drawer-trigger .board-chip-stack {
     left: auto;
     right: 10px;
-    bottom: 7px;
+    bottom: 6px;
     transform: none;
+}
+
+.pass-line-band .board-chip-stack {
+    right: 14px;
+    top: 8px;
+    bottom: auto;
 }
 
 .number-zone .stack-place {
@@ -800,13 +809,15 @@ button:disabled {
     left: 76%;
 }
 
-.chip-pile {
+.felt .chip-pile {
     position: relative;
-    display: flex;
-    align-items: center;
+    display: grid;
+    width: 39px;
+    height: 47px;
+    place-items: end center;
 }
 
-.casino-chip {
+.felt .casino-chip {
     display: grid;
     width: 39px;
     height: 39px;
@@ -825,9 +836,20 @@ button:disabled {
         0 9px 16px rgba(0,0,0,0.34);
 }
 
-.casino-chip + .casino-chip {
-    margin-left: -16px;
-    transform: translateY(-3px);
+.felt .chip-pile .casino-chip {
+    grid-area: 1 / 1;
+}
+
+.felt .casino-chip:nth-child(1) {
+    transform: translateY(0);
+}
+
+.felt .casino-chip:nth-child(2) {
+    transform: translateY(-5px);
+}
+
+.felt .casino-chip:nth-child(3) {
+    transform: translateY(-10px);
 }
 
 .odds-pile::after {
