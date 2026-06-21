@@ -41,6 +41,9 @@ function readState(window) {
     rollDisabled: window.document.getElementById('rollButton').disabled,
     resultText: window.document.getElementById('rollResultBurst').textContent,
     resultClass: window.document.getElementById('rollResultBurst').className,
+    phaseText: window.document.getElementById('phaseText').textContent,
+    phaseHint: window.document.getElementById('phaseHint').textContent,
+    pointDisplay: window.document.getElementById('pointDisplay').textContent,
   };
 }
 
@@ -171,6 +174,21 @@ describe('craps game regressions', () => {
 
     expect(state.balance).toBe(970);
     expect(state.passLineOdds).toBe(30);
+  });
+
+  test('point phase copy avoids repeating the point number', () => {
+    const window = loadGame();
+    window.__setGameState({
+      point: 6,
+      isComeOutRoll: false,
+    });
+    window.updateAllDisplays();
+
+    expect(readState(window)).toMatchObject({
+      phaseText: 'POINT',
+      phaseHint: 'Puck on',
+      pointDisplay: '',
+    });
   });
 
   test('Pass Line odds can be added and removed after the point is established', () => {
@@ -400,14 +418,15 @@ describe('craps game regressions', () => {
     window.updateAllDisplays();
 
     expect(window.document.querySelectorAll('.board-chip-stack')).toHaveLength(9);
-    // Odds render as their own gold chip pile, not as text
-    const passOddsPile = window.document.querySelector('#passLineBtn .odds-pile');
-    expect(passOddsPile).not.toBeNull();
-    expect(passOddsPile.querySelector('.casino-chip[data-amount="$30"]')).not.toBeNull();
+    // Odds combine into the same visible stack as the base bet.
+    expect(window.document.querySelectorAll('#passLineBtn .chip-pile')).toHaveLength(1);
+    expect(window.document.querySelector('#passLineBtn .casino-chip[data-amount="$45"]')).not.toBeNull();
     expect(window.document.querySelector('#boardPlace6Btn .stack-come .chip-note').textContent).toBe('Come');
-    expect(window.document.querySelector('#boardPlace6Btn .stack-come .odds-pile .casino-chip[data-amount="$20"]')).not.toBeNull();
+    expect(window.document.querySelectorAll('#boardPlace6Btn .stack-come .chip-pile')).toHaveLength(1);
+    expect(window.document.querySelector('#boardPlace6Btn .stack-come .casino-chip[data-amount="$30"]')).not.toBeNull();
     expect(window.document.querySelector('#boardPlace8Btn .stack-dont-come .chip-note').textContent).toBe('DC');
-    expect(window.document.querySelector('#boardPlace8Btn .stack-dont-come .odds-pile .casino-chip[data-amount="$10"]')).not.toBeNull();
+    expect(window.document.querySelectorAll('#boardPlace8Btn .stack-dont-come .chip-pile')).toHaveLength(1);
+    expect(window.document.querySelector('#boardPlace8Btn .stack-dont-come .casino-chip[data-amount="$20"]')).not.toBeNull();
     expect(window.document.querySelector('#centerBoardBtn .chip-note').textContent).toBe('2 bets');
   });
 

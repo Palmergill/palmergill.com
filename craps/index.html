@@ -2124,19 +2124,17 @@
             }
         }
     </style>
-    <link rel="stylesheet" href="style.css?v=1">
+    <link rel="stylesheet" href="style.css?v=2">
 </head>
 <body>
     <div class="craps-page" data-rules-app>
         <main class="craps-app table" data-rules-game-panel aria-label="Craps table">
             <header class="hud">
-                <a class="icon-btn" href="/casino/" aria-label="Back to casino">Menu</a>
                 <div class="bankroll-block balance-card" aria-live="polite" aria-label="Current bankroll">
                     <span class="balance-label">Bankroll</span>
                     <strong class="balance" id="balance">$1,000</strong>
                 </div>
                 <nav class="hud-actions rules-tab-list" aria-label="Craps views">
-                    <button class="icon-btn rules-tab" type="button" data-rules-tab="game" role="tab" aria-selected="true">Table</button>
                     <button class="icon-btn rules-tab" type="button" data-rules-tab="rules" data-rules-open role="tab" aria-selected="false">Rules</button>
                 </nav>
                 <div class="phase-strip">
@@ -2260,6 +2258,7 @@
             data-rules-label="Craps rules"
             aria-label="Craps rules"
             hidden>
+            <button class="rules-back-btn" type="button" data-rules-close>Table</button>
             <div data-rules-content></div>
         </section>
     </div>
@@ -2347,7 +2346,7 @@
     <script src="/shared/casino-profile.js?v=1"></script>
     <script src="/shared/analytics.js?v=1"></script>
     <script src="/shared/rules-viewer.js?v=1"></script>
-    <script src="app.js?v=8"></script>
+    <script src="app.js?v=9"></script>
     <script src="/shared/site-nav.js?v=10"></script>
 </body>
 </html>

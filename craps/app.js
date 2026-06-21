@@ -105,13 +105,13 @@ function updatePhaseDisplay() {
         }
         if (pointDisplay) pointDisplay.textContent = '';
     } else {
-        if (phaseText) phaseText.textContent = 'POINT ' + point;
-        if (phaseHint) phaseHint.textContent = 'Puck on ' + point;
+        if (phaseText) phaseText.textContent = 'POINT';
+        if (phaseHint) phaseHint.textContent = 'Puck on';
         if (puck) {
             puck.textContent = 'ON';
             puck.className = 'puck on';
         }
-        if (pointDisplay) pointDisplay.textContent = 'POINT: ' + point;
+        if (pointDisplay) pointDisplay.textContent = '';
     }
 }
 
@@ -819,21 +819,21 @@ function buildChipPile(amount, style) {
 
 function addBoardChip(zoneId, amount, options = {}) {
     const zone = document.getElementById(zoneId);
-    if (!zone || amount <= 0) return;
+    const totalAmount = amount + (options.odds || 0);
+    if (!zone || totalAmount <= 0) return;
 
     const stack = document.createElement('span');
     stack.className = 'board-chip-stack';
     if (options.variant) stack.classList.add('stack-' + options.variant);
+    if (options.odds > 0) stack.classList.add('stack-with-odds');
     stack.setAttribute('aria-hidden', 'true');
 
-    stack.appendChild(buildChipPile(amount, getChipStyle(amount, options.kind)));
-
+    const pile = buildChipPile(totalAmount, getChipStyle(totalAmount, options.kind));
     if (options.odds > 0) {
-        const oddsPile = buildChipPile(options.odds, getChipStyle(options.odds, 'odds'));
-        oddsPile.classList.add('odds-pile');
-        oddsPile.setAttribute('data-label', 'odds');
-        stack.appendChild(oddsPile);
+        pile.classList.add('odds-pile');
+        pile.setAttribute('data-label', 'base + odds');
     }
+    stack.appendChild(pile);
 
     if (options.note) {
         const note = document.createElement('span');
@@ -1091,7 +1091,7 @@ function resolveRoll(d1, d2) {
             point = total;
             isComeOutRoll = false;
             justEstablishedPoint = true;
-            document.getElementById('pointDisplay').textContent = 'POINT: ' + point;
+            document.getElementById('pointDisplay').textContent = '';
             messages.push('Point is ' + point);
             // Show point popup if there's a pass line or don't pass bet without odds
             if (bets.passLine > 0 && oddsBets.passLine === 0) {
