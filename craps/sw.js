@@ -3,15 +3,15 @@ const CACHE_PREFIX = 'craps-app-';
 const STATIC_ASSETS = [
     '/craps/',
     '/craps/index.html',
-    '/craps/app.js?v=9',
-    '/craps/style.css?v=7',
+    '/craps/app.js?v=15',
+    '/craps/style.css?v=18',
     '/craps/crapsRules.js?v=1',
     '/craps/manifest.json',
     '/shared/casino-theme.css?v=1',
     '/shared/rules-viewer.css?v=1',
     '/shared/rules-viewer.js?v=1',
     '/shared/casino-profile.js?v=1',
-    '/shared/site-nav.css?v=9',
+    '/shared/site-nav.css?v=10',
     '/shared/site-nav.js?v=10',
     '/casino/craps%20rules%20and%20odds.txt'
 ];

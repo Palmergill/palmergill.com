@@ -479,3 +479,40 @@ body.theme-warm .site-nav__utility .site-nav__link:focus-visible {
         background: rgba(60, 50, 35, 0.32);
     }
 }
+
+/* ---- dark casino theme (opt-in per page via body.theme-casino) ---- */
+body.theme-casino {
+    --site-nav-bg: rgba(8, 16, 12, 0.96);
+    --site-nav-line: rgba(201, 162, 75, 0.30);
+    --site-nav-line-strong: rgba(201, 162, 75, 0.52);
+    --site-nav-green: #d7b65d;
+    --site-nav-green-dim: #c9a24b;
+    --site-nav-text: #f3ecd8;
+    --site-nav-muted: rgba(243, 236, 216, 0.62);
+    --site-nav-mono: "Roboto Condensed", Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+body.theme-casino .site-nav__brand { color: var(--site-nav-green); }
+body.theme-casino .site-nav__brand-logo { box-shadow: none; }
+body.theme-casino .site-nav__brand-name::before { content: ""; }
+
+@media (max-width: 979px) {
+    body.theme-casino .site-nav { background: #0a120e; }
+
+    body.theme-casino .site-nav__toggle,
+    body.theme-casino .site-nav__top-login {
+        background: rgba(201, 162, 75, 0.08);
+    }
+
+    body.theme-casino .site-nav__top-login:hover,
+    body.theme-casino .site-nav__top-login:focus-visible {
+        background: rgba(201, 162, 75, 0.16);
+        border-color: var(--site-nav-line-strong);
+    }
+
+    body.theme-casino .site-nav__mobile-logo { box-shadow: none; }
+    body.theme-casino .site-nav__mobile-title::before { content: ""; }
+
+    body.theme-casino .site-nav__panel { background: #0a120e; }
+    body.theme-casino .site-nav__brand { background: rgba(201, 162, 75, 0.06); }
+}

@@ -57,8 +57,8 @@ a:focus-visible {
 .craps-page {
     display: grid;
     width: min(100vw, 430px);
-    min-height: 100vh;
-    min-height: 100dvh;
+    min-height: calc(100vh - var(--site-nav-height, 52px));
+    min-height: calc(100dvh - var(--site-nav-height, 52px));
     margin: 0 auto;
     padding: 0;
     background:
@@ -79,8 +79,8 @@ footer {
     grid-template-rows: auto auto auto;
     align-content: start;
     gap: 0;
-    min-height: 100vh;
-    min-height: 100dvh;
+    min-height: calc(100vh - var(--site-nav-height, 52px));
+    min-height: calc(100dvh - var(--site-nav-height, 52px));
     overflow: hidden;
     padding: 0;
     border: 0;
@@ -223,9 +223,10 @@ footer {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     grid-template-rows: auto 56px 88px auto 48px;
     align-content: start;
-    gap: 8px;
+    gap: 5px;
     min-width: 0;
     padding: 10px;
+    padding-bottom: 5px;
     overflow: hidden;
     border: 10px solid var(--rail);
     border-top-width: 8px;
@@ -502,8 +503,8 @@ footer {
     display: grid;
     grid-column: 1 / -1;
     grid-row: 5;
-    grid-template-columns: 1fr 1fr;
-    gap: 8px;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 7px;
 }
 
 .drawer-row .center-zone {
@@ -516,11 +517,14 @@ footer {
     display: grid;
     min-height: 48px;
     place-items: center;
+    padding: 0 4px;
     border: 1px solid rgba(201, 162, 75, 0.42);
     border-radius: 14px;
     background: rgba(8, 16, 12, 0.76);
     color: var(--brass);
+    font-size: 0.92rem;
     font-weight: 900;
+    line-height: 1.05;
     text-align: center;
 }
 
@@ -549,17 +553,7 @@ button:disabled {
 }
 
 .dice-result {
-    position: relative;
-    display: grid;
-    grid-template-columns: auto minmax(0, 1fr);
-    align-items: center;
-    gap: 10px;
-    min-height: 42px;
-    padding: 0;
-    border: 0;
-    border-radius: 0;
-    background: transparent;
-    box-shadow: none;
+    display: none;
 }
 
 .dice-result::before {
@@ -602,6 +596,49 @@ button:disabled {
 
 .dice.rolling .die {
     animation: tumble 520ms ease;
+}
+
+/* Dice thrown onto the felt: tumble across the table, then settle on the number. */
+.dice-stage {
+    position: absolute;
+    inset: 0;
+    z-index: 6;
+    display: grid;
+    place-items: end center;
+    padding-bottom: 150px;
+    pointer-events: none;
+    opacity: 1;
+}
+
+.dice-stage .felt-dice {
+    display: flex;
+    gap: 14px;
+}
+
+.dice-stage .die {
+    width: 52px;
+    height: 52px;
+    padding: 7px;
+    border-radius: 12px;
+    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.55), inset 0 2px 0 rgba(255, 255, 255, 0.6);
+}
+
+.dice-stage .die-dot {
+    width: 8px;
+    height: 8px;
+}
+
+.dice-stage.settle .die {
+    animation: dieSettle 360ms ease;
+}
+
+/* The tumble path is generated per-roll in JS (animateFeltDiceThrow) so each
+   throw is different; CSS only handles the settle pop below. */
+
+@keyframes dieSettle {
+    0%   { transform: scale(1.16); }
+    55%  { transform: scale(0.94); }
+    100% { transform: scale(1); }
 }
 
 .status-bar {
@@ -671,7 +708,7 @@ button:disabled {
 
 .action-bar {
     display: grid;
-    grid-template-columns: 0.82fr 0.92fr 0.82fr 1.36fr;
+    grid-template-columns: 0.85fr 0.85fr 1.5fr;
     gap: 8px;
 }
 
@@ -844,10 +881,33 @@ button:disabled {
     transform: translateX(-50%);
 }
 
-.field-band .board-chip-stack,
 .come-band .board-chip-stack,
 .dont-come-band .board-chip-stack {
     bottom: 8px;
+}
+
+/* Field has a wide centered label; drop the chip to the right of FIELD (clear of
+   the word and the "12 Pays Double" marker) rather than on top of it. */
+.field-band .board-chip-stack {
+    left: 71%;
+    right: auto;
+    bottom: 12px;
+    transform: translateX(-50%);
+    width: 32px;
+    min-width: 32px;
+    height: 38px;
+    min-height: 38px;
+}
+
+.felt .field-band .chip-pile {
+    width: 32px;
+    height: 38px;
+}
+
+.felt .field-band .casino-chip {
+    width: 32px;
+    height: 32px;
+    font-size: 0.48rem;
 }
 
 .dont-pass-band .board-chip-stack,
@@ -1074,8 +1134,9 @@ button:disabled {
 
     .felt {
         grid-template-rows: auto 52px 88px auto 46px;
-        gap: 6px;
+        gap: 5px;
         padding: 8px;
+        padding-bottom: 5px;
         border-width: 8px;
     }
 

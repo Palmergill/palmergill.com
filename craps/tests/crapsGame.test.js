@@ -149,6 +149,7 @@ describe('craps game regressions', () => {
     });
 
     window.resolveRoll(3, 3);
+    window.openCustomOdds();
     expect(readState(window).currentPopupBetId).toBe(2);
 
     window.takeOddsFromPopup(1);

@@ -527,6 +527,29 @@ function takeMaxOddsAll() {
     dontComeBets.forEach((bet, i) => { if (bet.point) takeMaxOddsComeBet(i, true); });
 }
 
+// Every line/come bet that currently has a point and can still take odds.
+function getOddsEligibleBets() {
+    const list = [];
+    ['passLine', 'dontPass'].forEach((bt) => {
+        const ctx = getOddsContext(bt);
+        if (ctx) list.push({ betType: bt, betId: null, point: ctx.point });
+    });
+    comeBets.forEach((b) => { if (b.point && b.amount > 0) list.push({ betType: 'come', betId: b.id, point: b.point }); });
+    dontComeBets.forEach((b) => { if (b.point && b.amount > 0) list.push({ betType: 'dontCome', betId: b.id, point: b.point }); });
+    return list;
+}
+
+// Custom odds: open the multiplier picker for each eligible bet, one at a time.
+function openCustomOdds() {
+    const targets = getOddsEligibleBets();
+    if (targets.length === 0) {
+        setStatus('Odds are available after a point is set');
+        return;
+    }
+    clearPendingPointPopups();
+    targets.forEach((t) => showPointPopup(t.point, t.betType, t.betId));
+}
+
 // ── Clear Bets ──
 function canClearBet(bt) {
     return !(bt === 'passLine' && !isComeOutRoll && bets.passLine > 0);
@@ -687,7 +710,7 @@ function updateAllDisplays() {
         if (waiting > 0) text += ' \u2022 ' + waiting + ' new';
         comeInfoEl.textContent = text;
     } else {
-        comeInfoEl.textContent = 'Tap to bet';
+        comeInfoEl.textContent = '';
     }
 
     // Don't Come bet button display (odds render as gold chips on the number boards)
@@ -701,7 +724,7 @@ function updateAllDisplays() {
         if (waiting > 0) text += ' \u2022 ' + waiting + ' new';
         dcInfoEl.textContent = text;
     } else {
-        dcInfoEl.textContent = 'Tap to bet';
+        dcInfoEl.textContent = '';
     }
 
     // Place bet buttons
@@ -783,7 +806,7 @@ function updateMainBetBtn(bt, btnId, infoId) {
         info.textContent = '$' + bets[bt];
         if (btn) btn.classList.add('has-bet');
     } else {
-        info.textContent = 'Tap to bet';
+        info.textContent = '';
         if (btn) btn.classList.remove('has-bet');
     }
     // Odds render as gold chips on the board (see updateBoardChips)
@@ -989,7 +1012,10 @@ function updateMaxOddsButton() {
         (bets.dontPass > 0 && point) ||
         comeBets.some(b => b.point && b.amount > 0) ||
         dontComeBets.some(b => b.point && b.amount > 0);
-    document.getElementById('maxOddsBtn').disabled = !hasOddsTarget || balance < 5;
+    const disabled = !hasOddsTarget || balance < 5;
+    document.getElementById('maxOddsBtn').disabled = disabled;
+    const customBtn = document.getElementById('customOddsBtn');
+    if (customBtn) customBtn.disabled = disabled;
 }
 
 function hasPendingPointPopup() {
@@ -1003,6 +1029,36 @@ function updateRollButton() {
 }
 
 // ── Roll Dice ──
+// Throw the felt dice along a fresh random path each roll: random entry point,
+// 2–3 bounces, random spin direction/speed. Ends upright and centered (rotation
+// a multiple of 360) so the resting state matches the dice's base transform.
+function animateFeltDiceThrow() {
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const rnd = (min, max) => min + Math.random() * (max - min);
+    ['feltDie1', 'feltDie2'].forEach((id) => {
+        const die = document.getElementById(id);
+        if (!die || typeof die.animate !== 'function') return;
+        const dir = Math.random() < 0.5 ? 1 : -1;
+        const frames = [{ x: rnd(-130, 130), y: rnd(-178, -120), r: rnd(-50, 50), s: 0.88 }];
+        let rot = frames[0].r;
+        const bounces = 2 + Math.floor(Math.random() * 2); // 2 or 3
+        for (let i = 0; i < bounces; i++) {
+            rot += dir * rnd(150, 290);
+            frames.push({ x: rnd(-120, 120), y: rnd(-110, 78), r: rot, s: rnd(0.98, 1.08) });
+        }
+        rot += dir * rnd(120, 240);
+        frames.push({ x: 0, y: 0, r: Math.round(rot / 360) * 360, s: 1 });
+        const keyframes = frames.map((f) => ({
+            transform: `translate(${Math.round(f.x)}px, ${Math.round(f.y)}px) rotate(${Math.round(f.r)}deg) scale(${f.s.toFixed(2)})`
+        }));
+        die.animate(keyframes, {
+            duration: 760 + Math.round(rnd(0, 150)),
+            easing: 'cubic-bezier(0.2, 0.68, 0.16, 1)',
+            fill: 'none'
+        });
+    });
+}
+
 function rollDice() {
     if (isRolling || hasPendingPointPopup()) return;
     const totalBets = Object.values(bets).reduce((a, b) => a + b, 0) +
@@ -1025,12 +1081,19 @@ function rollDice() {
     isRolling = true;
     updateRollButton();
     setStatus('Rolling...');
-    document.querySelector('.dice')?.classList.add('rolling');
+    const stage = document.getElementById('diceStage');
+    if (stage) {
+        stage.classList.remove('settle');
+        stage.classList.add('show', 'rolling');
+        animateFeltDiceThrow();
+    }
 
     let rolls = 0;
     const interval = setInterval(() => {
-        renderDie('die1', Math.floor(Math.random() * 6) + 1);
-        renderDie('die2', Math.floor(Math.random() * 6) + 1);
+        const a = Math.floor(Math.random() * 6) + 1;
+        const b = Math.floor(Math.random() * 6) + 1;
+        renderDie('feltDie1', a);
+        renderDie('feltDie2', b);
         rolls++;
         if (rolls >= 12) { clearInterval(interval); finalizeRoll(); }
     }, 70);
@@ -1039,9 +1102,14 @@ function rollDice() {
 function finalizeRoll() {
     const d1 = Math.floor(Math.random() * 6) + 1;
     const d2 = Math.floor(Math.random() * 6) + 1;
-    renderDie('die1', d1);
-    renderDie('die2', d2);
-    document.querySelector('.dice')?.classList.remove('rolling');
+    renderDie('feltDie1', d1);
+    renderDie('feltDie2', d2);
+    const stage = document.getElementById('diceStage');
+    if (stage) {
+        stage.classList.remove('rolling');
+        stage.classList.add('settle');
+        // Dice stay on the table showing the result until the next roll.
+    }
     resolveRoll(d1, d2);
     isRolling = false;
     updateRollButton();
@@ -1093,18 +1161,10 @@ function resolveRoll(d1, d2) {
             justEstablishedPoint = true;
             document.getElementById('pointDisplay').textContent = '';
             messages.push('Point is ' + point);
-            // Show point popup if there's a pass line or don't pass bet without odds
-            if (bets.passLine > 0 && oddsBets.passLine === 0) {
-                schedulePointPopup(point, 'passLine', null, 500);
-            }
-            if (bets.dontPass > 0 && oddsBets.dontPass === 0) {
-                schedulePointPopup(point, 'dontPass', null, 600);
-            }
         }
     }
 
     // ── Come Bets (resolve on every roll, independent of Pass Line) ──
-    let comePopupDelay = 500;
     const comeBetsToRemove = [];
     comeBets.forEach((bet, i) => {
         if (!bet.point) {
@@ -1120,13 +1180,6 @@ function resolveRoll(d1, d2) {
             } else {
                 bet.point = total;
                 messages.push('Come point: ' + total);
-                // Show point popup for this come bet
-                if (bet.odds === 0) {
-                    const id = bet.id;
-                    const pt = total;
-                    schedulePointPopup(pt, 'come', id, comePopupDelay);
-                    comePopupDelay += 100;
-                }
             }
         } else {
             // Come bet point phase
@@ -1162,7 +1215,6 @@ function resolveRoll(d1, d2) {
     }
 
     // ── Don't Come Bets (resolve on every roll, independent of Pass Line) ──
-    let dcPopupDelay = 600;
     const dontComeBetsToRemove = [];
     dontComeBets.forEach((bet, i) => {
         if (!bet.point) {
@@ -1181,13 +1233,6 @@ function resolveRoll(d1, d2) {
             } else {
                 bet.point = total;
                 messages.push("DC point: " + total);
-                // Show point popup for this don't come bet
-                if (bet.odds === 0) {
-                    const id = bet.id;
-                    const pt = total;
-                    schedulePointPopup(pt, 'dontCome', id, dcPopupDelay);
-                    dcPopupDelay += 100;
-                }
             }
         } else {
             // Don't Come bet point phase
@@ -1376,7 +1421,6 @@ function showNextPointPopup() {
     const popup = document.getElementById('pointPopup');
     const pointNum = document.getElementById('popupPointNumber');
     const popupText = document.getElementById('popupText');
-    const timerBar = document.getElementById('popupTimer');
 
     currentPopupBetType = next.betType;
     currentPopupBetId = next.betId;
@@ -1393,17 +1437,19 @@ function showNextPointPopup() {
         popupText.textContent = 'Take odds on your Pass Line bet?';
     }
 
-    timerBar.style.animation = 'none';
-    timerBar.offsetHeight;
-    timerBar.style.animation = 'timerCountdown 10s linear forwards';
+    // Offer multipliers up to the max allowed for this point (3-4-5x odds):
+    // 4/10 -> 3x, 5/9 -> 4x, 6/8 -> 5x.
+    const maxMult = rules.ODDS_MULTIPLIERS[next.point] || 0;
+    const btnWrap = document.getElementById('popupOddsButtons');
+    let html = '';
+    for (let m = 1; m <= maxMult; m++) {
+        html += '<button class="odds-btn" onclick="takeOddsFromPopup(' + m + ')">' + m + 'x</button>';
+    }
+    btnWrap.innerHTML = html;
+    btnWrap.dataset.count = String(maxMult);
 
     popup.classList.add('active');
     updateRollButton();
-
-    if (pointPopupTimer) clearTimeout(pointPopupTimer);
-    pointPopupTimer = setTimeout(() => {
-        closePointPopup();
-    }, 10000);
 }
 
 function closePointPopup() {
