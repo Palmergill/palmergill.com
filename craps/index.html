@@ -2124,7 +2124,7 @@
             }
         }
     </style>
-    <link rel="stylesheet" href="style.css?v=5">
+    <link rel="stylesheet" href="style.css?v=6">
 </head>
 <body>
     <div class="craps-page" data-rules-app>
@@ -2192,9 +2192,16 @@
                 </button>
 
                 <button type="button" class="field-band bet-btn field-zone" id="fieldBoardBtn" onclick="placeSelectedChip('field')" aria-label="Field bet">
-                    <span class="field-numbers">2 3 4</span>
+                    <span class="field-double field-double-left">
+                        <span class="field-double-number">2</span>
+                        <small>Pays Double</small>
+                    </span>
+                    <span class="field-numbers">3 · 4 · 9 · 10 · 11</span>
+                    <span class="field-double field-double-right">
+                        <span class="field-double-number">12</span>
+                        <small>Pays Double</small>
+                    </span>
                     <strong class="label">FIELD</strong>
-                    <span class="field-numbers">9 10 11 12</span>
                     <em>5.56%</em>
                     <small class="amt" id="fieldBoardInfo">One-roll bet</small>
                 </button>

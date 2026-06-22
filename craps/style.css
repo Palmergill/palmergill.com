@@ -374,23 +374,80 @@ footer {
 .field-band {
     grid-column: 1 / -1;
     grid-row: 3;
-    grid-template-columns: auto minmax(0, 1fr) auto;
-    gap: 8px;
-    min-height: 68px;
-    padding-inline: 10px;
+    grid-template-columns: 54px minmax(0, 1fr) 54px;
+    grid-template-rows: auto auto;
+    column-gap: 8px;
+    row-gap: 1px;
+    min-height: 88px;
+    align-content: center;
+    padding: 7px 10px;
 }
 
 .field-band.bet-btn strong {
+    grid-column: 2;
+    grid-row: 2;
     justify-self: center;
     font-size: 1.75rem;
     letter-spacing: 0.16em;
 }
 
 .field-numbers {
+    grid-column: 2;
+    grid-row: 1;
+    align-self: end;
+    justify-self: center;
     color: rgba(233, 228, 208, 0.78);
-    font-size: 0.76rem;
+    font-family: var(--font-display);
+    font-size: 0.92rem;
     font-weight: 900;
+    letter-spacing: 0.08em;
     white-space: nowrap;
+}
+
+.field-double {
+    display: grid;
+    grid-row: 1 / span 2;
+    align-content: center;
+    justify-items: center;
+    gap: 2px;
+    min-width: 0;
+    color: var(--brass);
+}
+
+.field-double-left {
+    grid-column: 1;
+}
+
+.field-double-right {
+    grid-column: 3;
+}
+
+.field-double-number {
+    display: grid;
+    width: 34px;
+    height: 34px;
+    place-items: center;
+    border: 2px solid var(--brass);
+    border-radius: 50%;
+    color: var(--brass);
+    font-family: var(--font-display);
+    font-size: 1.25rem;
+    font-weight: 900;
+    line-height: 1;
+}
+
+.field-double small {
+    color: var(--brass);
+    font-size: 0.46rem;
+    font-weight: 950;
+    letter-spacing: 0.05em;
+    line-height: 1;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+.field-band .amt {
+    display: none;
 }
 
 .line-zone {
@@ -1016,7 +1073,7 @@ button:disabled {
     }
 
     .felt {
-        grid-template-rows: auto 52px 68px auto 46px;
+        grid-template-rows: auto 52px 88px auto 46px;
         gap: 6px;
         padding: 8px;
         border-width: 8px;
@@ -1036,6 +1093,28 @@ button:disabled {
 
     .field-band.bet-btn strong {
         font-size: 1.48rem;
+        letter-spacing: 0.12em;
+    }
+
+    .field-band {
+        grid-template-columns: 47px minmax(0, 1fr) 47px;
+        column-gap: 5px;
+        padding-inline: 7px;
+    }
+
+    .field-numbers {
+        font-size: 0.72rem;
+        letter-spacing: 0.04em;
+    }
+
+    .field-double-number {
+        width: 30px;
+        height: 30px;
+        font-size: 1.08rem;
+    }
+
+    .field-double small {
+        font-size: 0.4rem;
     }
 
     .dont-pass-band.bet-btn .label {
