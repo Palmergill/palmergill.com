@@ -221,7 +221,7 @@ footer {
     align-self: start;
     height: max-content;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    grid-template-rows: auto 56px 62px auto 48px;
+    grid-template-rows: auto 56px 88px auto 48px;
     align-content: start;
     gap: 8px;
     min-width: 0;
