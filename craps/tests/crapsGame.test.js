@@ -363,23 +363,23 @@ describe('craps game regressions', () => {
     expect(state.comeBets).toEqual([{ id: 1, point: 8, amount: 10, odds: 0 }]);
   });
 
-  test('place 6 bets require exact payout increments', () => {
+  test('place 6 accepts $5 chip units and rejects odd amounts', () => {
     const window = loadGame();
 
     window.openBetModal('place6');
-    window.document.getElementById('betInput').value = '5';
+    window.document.getElementById('betInput').value = '7';
     window.confirmBet();
     expect(readState(window)).toMatchObject({
       balance: 1000,
       place6: 0,
-      status: 'Minimum bet is $6',
+      status: 'Bet must be in $5 increments',
     });
 
-    window.document.getElementById('betInput').value = '6';
+    window.document.getElementById('betInput').value = '25';
     window.confirmBet();
     expect(readState(window)).toMatchObject({
-      balance: 994,
-      place6: 6,
+      balance: 975,
+      place6: 25,
     });
   });
 

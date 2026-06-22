@@ -1,16 +1,17 @@
 const rules = require('../crapsRules');
 
 describe('craps rules helpers', () => {
-  test('uses table minimum units for place 6 and place 8', () => {
+  test('uses $5 units for all numbers so chips can be placed', () => {
     expect(rules.getBetUnit('passLine')).toBe(5);
-    expect(rules.getBetUnit('place6')).toBe(6);
-    expect(rules.getBetUnit('place8')).toBe(6);
+    expect(rules.getBetUnit('place6')).toBe(5);
+    expect(rules.getBetUnit('place8')).toBe(5);
   });
 
   test('validates minimums, increments, and balance', () => {
     expect(rules.validateBetAmount('passLine', 5, 100)).toBe('');
     expect(rules.validateBetAmount('passLine', 4, 100)).toBe('Minimum bet is $5');
-    expect(rules.validateBetAmount('place6', 10, 100)).toBe('Bet must be in $6 increments');
+    expect(rules.validateBetAmount('place6', 25, 100)).toBe('');
+    expect(rules.validateBetAmount('place6', 7, 100)).toBe('Bet must be in $5 increments');
     expect(rules.validateBetAmount('passLine', 105, 100)).toBe('Not enough balance');
   });
 

@@ -840,10 +840,9 @@ function buildChipPile(amount, style) {
     return pile;
 }
 
-function addBoardChip(zoneId, amount, options = {}) {
-    const zone = document.getElementById(zoneId);
+function buildBoardChip(amount, options = {}) {
     const totalAmount = amount + (options.odds || 0);
-    if (!zone || totalAmount <= 0) return;
+    if (totalAmount <= 0) return null;
 
     const stack = document.createElement('span');
     stack.className = 'board-chip-stack';
@@ -865,11 +864,18 @@ function addBoardChip(zoneId, amount, options = {}) {
         stack.appendChild(note);
     }
 
-    zone.appendChild(stack);
+    return stack;
+}
+
+function addBoardChip(zoneId, amount, options = {}) {
+    const zone = document.getElementById(zoneId);
+    if (!zone) return;
+    const stack = buildBoardChip(amount, options);
+    if (stack) zone.appendChild(stack);
 }
 
 function updateBoardChips() {
-    document.querySelectorAll('.board-chip-stack').forEach(chip => chip.remove());
+    document.querySelectorAll('.board-chip-stack, .board-chip-row').forEach(el => el.remove());
 
     addBoardChip('passLineBtn', bets.passLine, { odds: oddsBets.passLine });
     addBoardChip('dontPassBtn', bets.dontPass, { odds: oddsBets.dontPass, kind: 'dont' });
@@ -884,26 +890,28 @@ function updateBoardChips() {
         const zone = document.getElementById('boardPlace' + num + 'Btn');
         if (zone) zone.classList.toggle('point-on', point === num);
 
-        addBoardChip('boardPlace' + num + 'Btn', bets['place' + num], { variant: 'place' });
-
-        const comeAtPoint = comeBets.filter(bet => bet.point === num);
-        comeAtPoint.forEach(bet => {
-            addBoardChip('boardPlace' + num + 'Btn', bet.amount, {
-                variant: 'come',
-                odds: bet.odds,
-                note: 'Come'
-            });
+        // Gather every bet riding on this number and lay them out in a row so
+        // place / come / don't-come are each visible side by side, not stacked.
+        const numberChips = [];
+        if (bets['place' + num] > 0) {
+            numberChips.push({ amount: bets['place' + num], options: { variant: 'place', note: 'Place' } });
+        }
+        comeBets.filter(bet => bet.point === num).forEach(bet => {
+            numberChips.push({ amount: bet.amount, options: { variant: 'come', odds: bet.odds, note: 'Come' } });
+        });
+        dontComeBets.filter(bet => bet.point === num).forEach(bet => {
+            numberChips.push({ amount: bet.amount, options: { variant: 'dont-come', kind: 'dont', odds: bet.odds, note: 'DC' } });
         });
 
-        const dontComeAtPoint = dontComeBets.filter(bet => bet.point === num);
-        dontComeAtPoint.forEach(bet => {
-            addBoardChip('boardPlace' + num + 'Btn', bet.amount, {
-                variant: 'dont-come',
-                kind: 'dont',
-                odds: bet.odds,
-                note: 'DC'
+        if (numberChips.length && zone) {
+            const row = document.createElement('span');
+            row.className = 'board-chip-row chips-' + Math.min(numberChips.length, 4);
+            numberChips.forEach(chip => {
+                const el = buildBoardChip(chip.amount, chip.options);
+                if (el) row.appendChild(el);
             });
-        });
+            zone.appendChild(row);
+        }
     });
 
     const waitingCome = comeBets

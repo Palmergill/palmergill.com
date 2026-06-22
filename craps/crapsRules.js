@@ -83,8 +83,11 @@
         place10: { total: 10, numerator: 9, denominator: 5, message: "Place 10 wins!" }
     });
 
-    function getBetUnit(betType) {
-        return betType === "place6" || betType === "place8" ? 6 : 5;
+    // All numbers use $5 units so the standard chips ($5/$25/$100/$500) can be
+    // placed by tapping. Place 6/8 still pay 7:6, rounded down for non-$6
+    // amounts (handled in resolvePlaceBetWins).
+    function getBetUnit() {
+        return 5;
     }
 
     function validateBetAmount(betType, amount, balance) {

@@ -867,6 +867,7 @@ button:disabled {
 .felt .board-chip-stack {
     position: absolute;
     left: 50%;
+    top: auto;
     bottom: 10px;
     z-index: 4;
     display: flex;
@@ -910,11 +911,11 @@ button:disabled {
     font-size: 0.48rem;
 }
 
-.dont-pass-band .board-chip-stack,
 .pass-line-band .board-chip-stack,
 .drawer-trigger .board-chip-stack {
     left: auto;
     right: 10px;
+    top: auto;
     bottom: 6px;
     transform: none;
 }
@@ -925,16 +926,108 @@ button:disabled {
     bottom: auto;
 }
 
-.number-zone .stack-place {
-    left: 28%;
+/* The Don't Pass bar is a short band; use a smaller chip centered within it,
+   sitting just left of the "Bar 12" box so it stays inside the line. */
+.dont-pass-band .board-chip-stack {
+    left: auto;
+    right: 62px;
+    top: 50%;
+    bottom: auto;
+    transform: translateY(-50%);
+    width: 32px;
+    min-width: 32px;
+    height: 36px;
+    min-height: 36px;
 }
 
-.number-zone .stack-come {
-    left: 52%;
+.felt .dont-pass-band .chip-pile {
+    width: 32px;
+    height: 36px;
 }
 
-.number-zone .stack-dont-come {
-    left: 76%;
+.felt .dont-pass-band .casino-chip {
+    width: 32px;
+    height: 32px;
+    font-size: 0.48rem;
+}
+
+/* The box is only ~52px wide, so use a smaller chip and keep the three bet
+   positions tucked inside it (place left, come centre, don't-come right). */
+.number-zone .board-chip-stack {
+    width: 32px;
+    min-width: 32px;
+}
+
+.felt .number-zone .chip-pile {
+    width: 32px;
+}
+
+.felt .number-zone .casino-chip {
+    width: 32px;
+    height: 32px;
+    font-size: 0.48rem;
+}
+
+/* Multiple bets on one number are laid out in a centered row so place / come /
+   don't-come each stay visible side by side instead of stacked. */
+.number-zone .board-chip-row {
+    position: absolute;
+    left: 2px;
+    right: 2px;
+    bottom: 7px;
+    z-index: 4;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    gap: 3px;
+    pointer-events: none;
+}
+
+.number-zone .board-chip-row .board-chip-stack {
+    position: relative;
+    left: auto;
+    right: auto;
+    top: auto;
+    bottom: auto;
+    width: auto;
+    min-width: 0;
+    height: auto;
+    min-height: 0;
+    transform: none;
+}
+
+/* Two chips: side by side. Three+: smaller still. */
+.felt .number-zone .chips-2 .chip-pile,
+.felt .number-zone .chips-2 .casino-chip {
+    width: 22px;
+    height: 22px;
+}
+
+.felt .number-zone .chips-2 .casino-chip {
+    font-size: 0.38rem;
+}
+
+.felt .number-zone .chips-3 .chip-pile,
+.felt .number-zone .chips-3 .casino-chip,
+.felt .number-zone .chips-4 .chip-pile,
+.felt .number-zone .chips-4 .casino-chip {
+    width: 15px;
+    height: 15px;
+    font-size: 0.32rem;
+}
+
+.number-zone .board-chip-row .chip-pile {
+    height: auto;
+}
+
+.number-zone .board-chip-row .chip-note {
+    position: absolute;
+    left: 50%;
+    top: calc(100% - 1px);
+    transform: translateX(-50%);
+    font-size: 0.38rem;
+    padding: 0 2px;
+    letter-spacing: 0;
 }
 
 .felt .chip-pile {
