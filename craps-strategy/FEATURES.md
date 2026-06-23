@@ -76,16 +76,18 @@ reproducibly (per-trial RNG seeded from `baseSeed`).
 3. **Casino card artwork.** The new "Strategy Lab" card reuses `craps.png` as a
    placeholder screenshot. Want a real screenshot of the simulator captured for
    `assets/project-screenshots/`?
-4. **Hardway lifecycle.** `crapsRules.resolveHardwayBets` takes a hardway *down* on a win;
-   my engine re-arms it on the next placement, so it effectively stays working. Is
-   "hardways stay working until they 7-out" the behavior you want, or should a winning
-   hardway be collected and left off?
+4. **Hardway lifecycle.** ~~`crapsRules.resolveHardwayBets` takes a hardway *down* on a
+   win; my engine re-arms it on the next placement.~~ **Resolved 2026-06-23:** hardways now
+   resolve on *every* roll (matching their default `when: "always"`), so hardway-only
+   strategies work and a winner is re-armed next placement. Open sub-question: should a
+   hardway with `when: "pointOn"` be turned *off* on the come-out? Currently hardways
+   always work regardless of `when`.
 5. **Press legality.** A `press` progression can grow a place-6/8 bet to a non-$6-legal
    amount (e.g. $26) because I don't re-snap on press. Acceptable for a sim, or should
    pressed amounts re-snap to legal increments?
-6. **Come-bet odds on come-out.** Odds on established come points are left *off* on the
-   come-out roll (table convention). `workingOnComeOut` currently only governs place/hard
-   working state, not come odds. Want a separate control, or is the convention fine?
+6. **Come-bet odds on come-out.** **Resolved 2026-06-23:** odds on established come/don't-come
+   points are now *off and returned* on the shooter's come-out (the flat still resolves),
+   matching standard table convention. No separate control exposed — flag if you want one.
 
 ## Decisions log
 
@@ -111,6 +113,14 @@ reproducibly (per-trial RNG seeded from `baseSeed`).
     dict in `backend/app/main.py` (line ~616) or local verification can't load the page.
 
 ## Changelog
+
+- **2026-06-23** — Review fixes (3): (P1) come/don't-come odds are now off and returned on
+  the shooter come-out instead of lost on a 7 (`settleComeOdds` in engine.js); (P1)
+  hardways resolve every roll so hardway-only strategies work (split `resolveHardways`
+  from place resolution); (P2) duplicate bet types are rejected in both `strategy.js`
+  `validateIntent` and the backend Pydantic model. 4 regression tests added; suite green
+  at 101.
+
 
 - **2026-06-23** — `strategy.js` (intent schema, validation, `normalize`, seed hash,
   presets) + `engine.js` (mulberry32 RNG, cash-only accounting via `onFelt`, lifecycle

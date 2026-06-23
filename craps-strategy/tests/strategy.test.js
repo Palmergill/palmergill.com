@@ -44,6 +44,17 @@ describe("validateIntent", () => {
         expect(Strategy.validateIntent({ bets: [] }).valid).toBe(false);
     });
 
+    test("rejects duplicate bet types", () => {
+        const res = Strategy.validateIntent({
+            bets: [
+                { type: "place6", units: 1 },
+                { type: "place6", units: 2 }
+            ]
+        });
+        expect(res.valid).toBe(false);
+        expect(res.errors.join(" ")).toMatch(/more than once/);
+    });
+
     test("treats null optional fields as absent (LLM/JSON often emits null)", () => {
         const res = Strategy.validateIntent({
             name: "Come strat",

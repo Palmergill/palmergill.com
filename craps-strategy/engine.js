@@ -25,8 +25,7 @@
         calculateOddsToAdd,
         resolveOneRollBets,
         resolveHardwayBets,
-        resolvePlaceBetWins,
-        resolvePlaceBetsOnSeven
+        resolvePlaceBetWins
     } = CrapsRules;
 
     const PLACE_NUMBERS = [4, 5, 6, 8, 9, 10];
@@ -197,8 +196,9 @@
         });
     }
 
-    function resolvePlaceAndHard(state, total, isHard, o) {
-        // place wins (bet stays on felt -> add PROFIT only)
+    // Place bets that hit (bet stays on felt -> add PROFIT only). Only called
+    // while place bets are working (off on the come-out by default).
+    function resolvePlaceWins(state, total, o) {
         const winRes = resolvePlaceBetWins({ ...placeAsBets(state) }, total);
         if (winRes.winnings > 0 && PLACE_NUMBERS.includes(total) && state.place[total]) {
             const stake = state.place[total];
@@ -207,7 +207,13 @@
             state.wagered += stake;
             recordWin(o, "place" + total, profit);
         }
-        // hardways (helper takes a winner down; we re-arm next placement)
+    }
+
+    // Hardways resolve on EVERY roll (their default `when` is "always"): a hard
+    // hit pays, a 7 or the easy way clears them. So a hardway-only strategy
+    // resolves even when no point is ever established. The helper takes a winner
+    // down; we re-arm it on the next placement.
+    function resolveHardways(state, total, isHard, o) {
         const hardRes = resolveHardwayBets({ ...state.hard }, total, isHard);
         Object.keys(state.hard).forEach((type) => {
             const stake = state.hard[type];
@@ -237,22 +243,14 @@
         return single.winnings; // stake + profit
     }
 
-    function sevenOutPlaceHard(state, o) {
-        const placeRes = resolvePlaceBetsOnSeven({ ...placeAsBets(state) });
+    // Place bets all lose on a seven-out. Hardways are handled separately by
+    // resolveHardways (which already loses them on any 7), every roll.
+    function sevenOutPlace(state, o) {
         PLACE_NUMBERS.forEach((n) => {
             if (state.place[n]) {
                 recordLoss(o, "place" + n, state.place[n]);
                 settle(state, state.place[n], 0);
                 state.place[n] = 0;
-            }
-        });
-        void placeRes;
-        // hardways all lose on a 7
-        Object.keys(state.hard).forEach((type) => {
-            if (state.hard[type]) {
-                recordLoss(o, type, state.hard[type]);
-                settle(state, state.hard[type], 0);
-                state.hard[type] = 0;
             }
         });
     }
@@ -264,7 +262,7 @@
         let sevenOut = false;
 
         // --- established come / don't-come points (resolve before line) ------
-        resolveComePoints(state, total, o);
+        resolveComePoints(state, total, o, isComeOut);
 
         if (isComeOut) {
             // pass line
@@ -359,23 +357,39 @@
         }
     }
 
-    function resolveComePoints(state, total, o) {
+    // Come/don't-come odds are OFF on the shooter's come-out roll (the main
+    // point is off): they neither win nor lose, the stake is returned. Only the
+    // flat portion of an established come bet stays in action on the come-out.
+    function settleComeOdds(state, odds, working, point, isPass, won) {
+        if (odds <= 0) return;
+        if (!working) {                 // off on come-out -> return the stake (push)
+            state.onFelt -= odds;
+            state.balance += odds;
+            return;
+        }
+        if (won) {
+            const profit = Math.floor(odds * getOddsPayout(point, isPass));
+            settle(state, odds, odds + profit);
+        } else {
+            settle(state, odds, 0);
+        }
+    }
+
+    function resolveComePoints(state, total, o, isComeOut) {
+        const oddsWorking = !isComeOut;
         if (total === 7) {
-            // all come points lose, all don't-come points win
+            // all come points lose (flat), all don't-come points win (flat)
             Object.keys(state.comePoints).forEach((n) => {
                 const cp = state.comePoints[n];
                 recordLoss(o, "come", cp.amount);
-                settle(state, cp.amount + cp.odds, 0);
+                settle(state, cp.amount, 0);
+                settleComeOdds(state, cp.odds, oddsWorking, Number(n), true, false);
                 delete state.comePoints[n];
             });
             Object.keys(state.dontComePoints).forEach((n) => {
                 const dp = state.dontComePoints[n];
-                const num = Number(n);
                 settle(state, dp.amount, dp.amount * 2);
-                if (dp.odds > 0) {
-                    const profit = Math.floor(dp.odds * getOddsPayout(num, false));
-                    settle(state, dp.odds, dp.odds + profit);
-                }
+                settleComeOdds(state, dp.odds, oddsWorking, Number(n), false, true);
                 recordWin(o, "dontCome", dp.amount);
                 delete state.dontComePoints[n];
             });
@@ -384,17 +398,15 @@
         if (state.comePoints[total]) {
             const cp = state.comePoints[total];
             settle(state, cp.amount, cp.amount * 2);
-            if (cp.odds > 0) {
-                const profit = Math.floor(cp.odds * getOddsPayout(total, true));
-                settle(state, cp.odds, cp.odds + profit);
-            }
+            settleComeOdds(state, cp.odds, oddsWorking, total, true, true);
             recordWin(o, "come", cp.amount);
             delete state.comePoints[total];
         }
         if (state.dontComePoints[total]) {
             const dp = state.dontComePoints[total];
             recordLoss(o, "dontCome", dp.amount);
-            settle(state, dp.amount + dp.odds, 0);
+            settle(state, dp.amount, 0);
+            settleComeOdds(state, dp.odds, oddsWorking, total, false, false);
             delete state.dontComePoints[total];
         }
     }
@@ -507,23 +519,24 @@
         };
     }
 
-    // place/hard resolution wrapper that also handles the seven-out clear.
-    function resolvePlaceAndHardForRoll(state, total, isHard, o) {
-        if (total === 7 && state.point !== null) {
-            sevenOutPlaceHard(state, o);
-        } else {
-            resolvePlaceAndHard(state, total, isHard, o);
-        }
-    }
-
     // Resolve a single roll against an existing state (placement already done).
-    // Order: one-roll bets, place/hard (only while working), line, progressions.
-    // Returns { sevenOut, outcomes }. Exported for deterministic EV tests.
+    // Order: one-roll bets, hardways (always working), place bets (working only),
+    // line, progressions. Returns { sevenOut, outcomes }. Exported for
+    // deterministic EV tests.
     function resolveRollFor(state, spec, total, isHard) {
         const o = newOutcomes();
         resolveOneRoll(state, total, o);
-        const working = state.point !== null || spec.workingOnComeOut;
-        if (working) resolvePlaceAndHardForRoll(state, total, isHard, o);
+
+        // Hardways are working on every roll (default `when` is "always").
+        resolveHardways(state, total, isHard, o);
+
+        // Place bets are off on the come-out roll unless the spec works them.
+        const placeWorking = state.point !== null || spec.workingOnComeOut;
+        if (placeWorking) {
+            if (total === 7 && state.point !== null) sevenOutPlace(state, o);
+            else resolvePlaceWins(state, total, o);
+        }
+
         const sevenOut = resolveLine(state, spec, total, o);
         applyProgressions(state, spec, o, sevenOut);
         return { sevenOut, outcomes: o };

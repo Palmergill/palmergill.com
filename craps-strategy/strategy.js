@@ -106,6 +106,9 @@
         } else if (intent.bets.length > MAX_BETS) {
             errors.push(`Too many bets (max ${MAX_BETS})`);
         } else {
+            // The engine keys all state (sizes, active bets) by bet type, so a
+            // type may appear at most once — duplicates would silently collapse.
+            const seenTypes = new Set();
             intent.bets.forEach((bet, i) => {
                 if (!isPlainObject(bet)) {
                     errors.push(`bets[${i}] must be an object`);
@@ -113,6 +116,10 @@
                 }
                 if (!BET_TYPES.includes(bet.type)) {
                     errors.push(`bets[${i}].type "${bet.type}" is not a known bet`);
+                } else if (seenTypes.has(bet.type)) {
+                    errors.push(`bets[${i}].type "${bet.type}" is listed more than once`);
+                } else {
+                    seenTypes.add(bet.type);
                 }
                 // `!= null` treats both undefined and null as "not provided" —
                 // LLM/JSON output routinely carries null for unset fields.

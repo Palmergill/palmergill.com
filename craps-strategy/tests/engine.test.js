@@ -86,6 +86,58 @@ describe("hardway hit", () => {
         play(st, s, 3, 3); // hard 6
         expect(Engine.totalValue(st)).toBe(345); // +$45 on $5
     });
+
+    test("hardway-only strategy resolves with no point established (wagered > 0)", () => {
+        // No line bet -> point is never set; hardways must still resolve every roll.
+        const s = spec({ bets: [{ type: "hard8", units: 1 }] });
+        const trial = Engine.runTrial(s, 0, 200);
+        expect(trial.wagered).toBeGreaterThan(0);
+        expect(s.workingOnComeOut).toBe(false);
+    });
+
+    test("hard 8 resolves on the come-out roll", () => {
+        const s = spec({ bets: [{ type: "hard8", units: 1 }] });
+        const st = Engine.createState(s);
+        play(st, s, 4, 4); // hard 8 on come-out (point still null)
+        expect(st.point).toBeNull();
+        expect(Engine.totalValue(st)).toBe(345); // +$45 on $5 hard 8
+        expect(st.wagered).toBe(5);
+    });
+});
+
+describe("come odds are off on the shooter come-out", () => {
+    // Pass + come, both max odds. Establish a come point, make the pass point so
+    // the next roll is a come-out, then seven on the come-out: the come flat
+    // loses but its odds are returned (not lost).
+    function setup() {
+        const s = spec({
+            bets: [
+                { type: "passLine", units: 2, when: "comeOut" },
+                { type: "come", units: 2, when: "pointOn", maxActive: 1 }
+            ],
+            odds: { passLine: "max", come: "max" }
+        });
+        return s;
+    }
+
+    test("come-point odds returned on a come-out seven", () => {
+        const s = setup();
+        const st = Engine.createState(s);
+        play(st, s, 2, 2);  // point 4 (pass), pass odds go up
+        play(st, s, 3, 3);  // total 6: come flat travels to 6, gets come odds
+        const comeOddsOnFelt = st.comePoints[6] ? st.comePoints[6].odds : 0;
+        expect(comeOddsOnFelt).toBeGreaterThan(0);
+        play(st, s, 2, 2);  // make the 4 -> pass wins, next roll is a come-out
+        expect(st.point).toBeNull();
+        const before = Engine.totalValue(st);
+        play(st, s, 3, 4);  // come-out seven
+        const after = Engine.totalValue(st);
+        // On this come-out seven: the come flat ($20) loses, the freshly re-armed
+        // pass line wins the natural ($20), and the come ODDS ($100) are returned
+        // because they're off on the come-out. Net change is exactly $0. If the
+        // odds were wrongly lost (the bug), `after` would be `before - 100`.
+        expect(after).toBe(before);
+    });
 });
 
 describe("field bet", () => {

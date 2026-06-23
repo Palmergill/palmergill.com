@@ -69,6 +69,17 @@ class StrategyIntent(BaseModel):
                 raise ValueError(f'odds.{key} must be "max" or an integer 1..100')
         return value
 
+    @field_validator("bets")
+    @classmethod
+    def _no_duplicate_bet_types(cls, value: list[BetIntent]) -> list[BetIntent]:
+        # The engine keys state by bet type, so each type may appear only once.
+        seen: set[str] = set()
+        for bet in value:
+            if bet.type in seen:
+                raise ValueError(f'bet type "{bet.type}" is listed more than once')
+            seen.add(bet.type)
+        return value
+
 
 def _rate_limited(request: Request, now: float | None = None) -> bool:
     now = time.time() if now is None else now
