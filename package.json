@@ -19,13 +19,16 @@
     "roots": [
       "poker/tests",
       "craps/tests",
-      "blackjack/tests"
+      "blackjack/tests",
+      "craps-strategy/tests"
     ],
     "testMatch": [
       "**/*.test.js"
     ],
     "collectCoverageFrom": [
       "poker/**/*.js",
+      "craps-strategy/**/*.js",
+      "!craps-strategy/tests/**",
       "!poker/tests/**",
       "!**/node_modules/**"
     ]

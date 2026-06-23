@@ -1,0 +1,174 @@
+/* Craps Strategy Simulator — layout on top of /shared/casino-theme.css tokens. */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { background: var(--ink); color-scheme: dark; }
+
+body {
+    min-width: 320px;
+    min-height: 100vh;
+    background:
+        radial-gradient(circle at 78% 6%, rgba(var(--gold-rgb), 0.10), transparent 30%),
+        radial-gradient(circle at 10% 80%, rgba(42, 122, 74, 0.22), transparent 32%),
+        linear-gradient(180deg, #081a0f 0%, #0a2114 50%, #081710 100%);
+    color: var(--text);
+    font-family: var(--font-body);
+    line-height: 1.55;
+    -webkit-tap-highlight-color: transparent;
+}
+
+button, input, select, textarea { font: inherit; color: inherit; }
+
+.wrap {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: clamp(1.25rem, 3vw, 2.5rem) clamp(1rem, 3vw, 2rem) 4rem;
+}
+
+/* ---- Header ---- */
+.page-head { margin: 0.5rem 0 1.75rem; }
+.eyebrow {
+    font-family: var(--font-display);
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    font-size: 0.72rem;
+    color: var(--gold);
+    margin-bottom: 0.4rem;
+}
+h1 {
+    font-family: var(--font-display);
+    font-weight: 900;
+    font-size: clamp(1.8rem, 5vw, 2.9rem);
+    line-height: 1.05;
+    letter-spacing: -0.01em;
+}
+.lede { color: var(--muted); max-width: 60ch; margin-top: 0.75rem; }
+.lede strong { color: var(--cream); }
+
+/* ---- Panels ---- */
+.panel {
+    background: rgba(8, 26, 16, 0.62);
+    border: 1px solid rgba(var(--gold-rgb), 0.18);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: clamp(1rem, 2.4vw, 1.6rem);
+    margin-bottom: 1.25rem;
+    backdrop-filter: blur(3px);
+}
+.panel-title {
+    font-family: var(--font-display);
+    font-size: 1.15rem;
+    font-weight: 700;
+    margin-bottom: 1rem;
+    color: var(--cream);
+}
+
+/* ---- Fields ---- */
+.field { display: flex; flex-direction: column; gap: 0.35rem; }
+.field-label {
+    font-family: "Roboto Condensed", var(--font-body);
+    font-size: 0.78rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--quiet);
+}
+.hint { text-transform: none; letter-spacing: 0; color: var(--quiet); }
+textarea, input, select {
+    background: rgba(4, 14, 9, 0.8);
+    border: 1px solid rgba(var(--gold-rgb), 0.22);
+    border-radius: 8px;
+    padding: 0.6rem 0.7rem;
+    color: var(--text);
+    width: 100%;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+textarea { resize: vertical; min-height: 3.2rem; }
+textarea:focus, input:focus, select:focus {
+    outline: none;
+    border-color: var(--gold);
+    box-shadow: 0 0 0 3px rgba(var(--gold-rgb), 0.15);
+}
+
+.row { display: flex; gap: 0.9rem; flex-wrap: wrap; margin-top: 0.9rem; }
+.row .field { flex: 1 1 9rem; }
+.row.actions { align-items: flex-end; }
+.grow { flex: 1 1 14rem; }
+
+/* ---- Buttons ---- */
+.btn {
+    border: 1px solid rgba(var(--gold-rgb), 0.4);
+    background: rgba(var(--gold-rgb), 0.08);
+    color: var(--cream);
+    border-radius: 8px;
+    padding: 0.65rem 1.2rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background 0.15s ease, transform 0.05s ease;
+    white-space: nowrap;
+}
+.btn:hover { background: rgba(var(--gold-rgb), 0.16); }
+.btn:active { transform: translateY(1px); }
+.btn-primary {
+    background: linear-gradient(180deg, var(--gold) 0%, var(--gold-deep) 100%);
+    color: #1a1206;
+    border-color: var(--gold-deep);
+}
+.btn[disabled] { opacity: 0.5; cursor: not-allowed; }
+
+.status { margin-top: 0.85rem; font-size: 0.9rem; min-height: 1.2em; color: var(--muted); }
+.status.error { color: #ff9d8f; }
+.status.ok { color: #7fe0b4; }
+
+/* ---- Strategy summary / bet list ---- */
+.summary { color: var(--muted); margin-bottom: 1rem; }
+.bet-list { display: flex; flex-direction: column; gap: 0.5rem; }
+.bet-row {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 0.75rem;
+    background: rgba(4, 14, 9, 0.55);
+    border: 1px solid rgba(var(--gold-rgb), 0.14);
+    border-radius: 8px;
+    padding: 0.5rem 0.75rem;
+}
+.bet-row .bet-name { font-weight: 600; }
+.bet-row .bet-meta { color: var(--quiet); font-size: 0.82rem; }
+.bet-row .bet-amount { display: flex; align-items: center; gap: 0.3rem; }
+.bet-row .bet-amount span { color: var(--quiet); }
+.bet-row input { width: 6.5rem; text-align: right; }
+.fineprint { color: var(--quiet); font-size: 0.78rem; margin: 0.9rem 0; }
+
+/* ---- Stats ---- */
+.stat-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr));
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
+}
+.stat {
+    background: rgba(4, 14, 9, 0.55);
+    border: 1px solid rgba(var(--gold-rgb), 0.14);
+    border-radius: 8px;
+    padding: 0.7rem 0.85rem;
+}
+.stat .stat-value { font-family: var(--font-display); font-size: 1.4rem; font-weight: 700; }
+.stat .stat-value.good { color: #7fe0b4; }
+.stat .stat-value.bad { color: #ff9d8f; }
+.stat .stat-label {
+    font-family: "Roboto Condensed", var(--font-body);
+    text-transform: uppercase; letter-spacing: 0.04em;
+    font-size: 0.72rem; color: var(--quiet); margin-top: 0.15rem;
+}
+
+/* ---- Charts ---- */
+.chart-block { margin-top: 1.25rem; }
+.chart-title { font-size: 1rem; font-weight: 700; margin-bottom: 0.6rem; color: var(--cream); }
+.chart-holder { position: relative; height: 340px; }
+.legend-note { font-size: 0.8rem; color: var(--quiet); margin-top: 0.5rem; }
+.swatch { display: inline-block; width: 0.9rem; height: 0.55rem; border-radius: 2px; vertical-align: middle; margin-right: 0.15rem; }
+.swatch.win { background: #58d3ad; }
+.swatch.bust { background: #ff7a6e; }
+.swatch.ref { background: var(--gold); }
+
+@media (max-width: 560px) {
+    .chart-holder { height: 280px; }
+    .row .field { flex: 1 1 100%; }
+}

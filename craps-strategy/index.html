@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Craps Strategy Simulator - Palmer Gill</title>
+    <meta name="description" content="Describe a craps betting strategy in plain English, set your bankroll, and Monte-Carlo simulate it over 100 trials — by Palmer Gill.">
+    <meta name="theme-color" content="#0a1f12">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://palmergill.com/craps-strategy/">
+    <meta property="og:title" content="Craps Strategy Simulator — Palmer Gill">
+    <meta property="og:description" content="Describe a craps strategy in plain English and watch 100 simulated bankrolls play out.">
+    <meta property="og:image" content="https://palmergill.com/assets/palmer-gill-logo.png">
+    <meta name="twitter:card" content="summary">
+    <link rel="icon" type="image/png" href="/assets/palmer-gill-logo-small.png">
+    <link rel="manifest" href="./manifest.json">
+    <link rel="stylesheet" href="/shared/site-nav.css?v=10">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;700;900&family=Inter:wght@400;500;600;700;800&family=Roboto+Condensed:wght@500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/shared/casino-theme.css?v=1">
+    <link rel="stylesheet" href="./style.css?v=1">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/craps-strategy/sw.js', { scope: '/craps-strategy/' }).catch(() => {});
+            });
+        }
+    </script>
+</head>
+<body>
+    <main class="wrap">
+        <header class="page-head">
+            <p class="eyebrow">Monte-Carlo Lab</p>
+            <h1>Craps Strategy Simulator</h1>
+            <p class="lede">Describe a betting strategy in plain English. We translate it into a
+                repeatable rule set, then deal <strong>100 bankrolls</strong> through up to
+                <strong>1,000 rolls</strong> each and chart every one.</p>
+        </header>
+
+        <section class="panel" aria-labelledby="setup-h">
+            <h2 id="setup-h" class="panel-title">1 &middot; Describe your strategy</h2>
+
+            <label class="field">
+                <span class="field-label">Strategy, in plain English</span>
+                <textarea id="description" rows="3"
+                    placeholder="e.g. Pass line with full odds, then place the 6 and 8 and press them after a win."></textarea>
+            </label>
+
+            <div class="row">
+                <label class="field">
+                    <span class="field-label">Buy-in ($)</span>
+                    <input id="buyIn" type="number" min="1" step="5" value="300">
+                </label>
+                <label class="field">
+                    <span class="field-label">Base unit ($)</span>
+                    <input id="baseUnit" type="number" min="1" step="1" value="10">
+                </label>
+                <label class="field">
+                    <span class="field-label">Seed <span class="hint">(blank = auto)</span></span>
+                    <input id="seed" type="number" min="0" step="1" placeholder="auto">
+                </label>
+            </div>
+
+            <div class="row actions">
+                <button id="translateBtn" class="btn btn-primary" type="button">Translate with AI</button>
+                <label class="field grow">
+                    <span class="field-label">…or pick a preset</span>
+                    <select id="preset">
+                        <option value="">— choose a preset —</option>
+                        <option value="passOdds">Pass Line + Odds</option>
+                        <option value="ironCross">Iron Cross</option>
+                        <option value="threePointMolly">3-Point Molly</option>
+                        <option value="dontPassOdds">Don't Pass + Odds</option>
+                    </select>
+                </label>
+            </div>
+            <p id="status" class="status" role="status" aria-live="polite"></p>
+        </section>
+
+        <section class="panel" id="strategyPanel" aria-labelledby="strategy-h" hidden>
+            <h2 id="strategy-h" class="panel-title">2 &middot; Confirm bets &amp; sizes</h2>
+            <p id="strategySummary" class="summary"></p>
+            <div id="betList" class="bet-list"></div>
+            <p class="fineprint">Amounts are snapped to legal table increments (place 6/8 in $6, odds rounded
+                to whole-dollar payouts). Edit any amount to override the AI's sizing.</p>
+            <div class="row actions">
+                <button id="runBtn" class="btn btn-primary" type="button">Run 100 simulations</button>
+            </div>
+        </section>
+
+        <section class="panel" id="resultsPanel" aria-labelledby="results-h" hidden>
+            <h2 id="results-h" class="panel-title">3 &middot; Results</h2>
+            <div id="statGrid" class="stat-grid"></div>
+
+            <div class="chart-block">
+                <h3 class="chart-title">Bankroll across 1,000 rolls — 100 trials</h3>
+                <div class="chart-holder"><canvas id="lineChart"></canvas></div>
+                <p class="legend-note"><span class="swatch win"></span> survived &nbsp;
+                    <span class="swatch bust"></span> busted &nbsp;
+                    <span class="swatch ref"></span> buy-in</p>
+            </div>
+
+            <div class="chart-block">
+                <h3 class="chart-title">Where the 100 bankrolls ended up</h3>
+                <div class="chart-holder"><canvas id="histChart"></canvas></div>
+            </div>
+        </section>
+    </main>
+
+    <script src="/craps/crapsRules.js?v=2"></script>
+    <script src="./strategy.js?v=1"></script>
+    <script src="./engine.js?v=1"></script>
+    <script src="/shared/api-base.js?v=1"></script>
+    <script src="./app.js?v=1"></script>
+    <script src="/shared/analytics.js?v=1"></script>
+    <script src="/shared/site-nav.js?v=10"></script>
+</body>
+</html>

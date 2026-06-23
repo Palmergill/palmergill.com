@@ -1,0 +1,27 @@
+{
+  "name": "Craps Strategy Simulator",
+  "short_name": "Craps Sim",
+  "description": "Describe a craps strategy in plain English and Monte-Carlo simulate it over 100 trials.",
+  "start_url": "/craps-strategy/",
+  "display": "standalone",
+  "background_color": "#0a1f12",
+  "theme_color": "#0a1f12",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'%3E%3Crect fill='%230a3d24' width='192' height='192' rx='24'/%3E%3Ctext x='96' y='130' font-size='100' text-anchor='middle'%3E🎲%3C/text%3E%3C/svg%3E",
+      "sizes": "192x192",
+      "type": "image/svg+xml"
+    },
+    {
+      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect fill='%230a3d24' width='512' height='512' rx='48'/%3E%3Ctext x='256' y='340' font-size='280' text-anchor='middle'%3E🎲%3C/text%3E%3C/svg%3E",
+      "sizes": "512x512",
+      "type": "image/svg+xml"
+    }
+  ],
+  "categories": ["games", "entertainment", "utilities"],
+  "lang": "en",
+  "dir": "ltr",
+  "scope": "/craps-strategy/",
+  "screenshots": []
+}

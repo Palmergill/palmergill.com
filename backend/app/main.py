@@ -17,7 +17,7 @@ from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, Red
 from app.database import SessionLocal
 from app.database_migration import init_db_with_migration
 from app.log_handler import install_db_logging
-from app.routers import admin, analytics, bitcoin, stocks, poker
+from app.routers import admin, analytics, bitcoin, stocks, poker, craps
 from app.routers.analytics import cleanup_old_analytics, record_analytics_event
 import os
 
@@ -170,8 +170,10 @@ _auth_failure_store: dict[str, list[float]] = {}
 PUBLIC_PATH_PREFIXES = (
     "/api/analytics",
     "/api/poker",
+    "/api/craps",
     "/poker",
     "/craps",
+    "/craps-strategy",
     "/login",
 )
 DEMO_PATH_PREFIXES = (
@@ -599,6 +601,7 @@ else:
 app.include_router(stocks.router)
 app.include_router(poker.router)
 app.include_router(bitcoin.router)
+app.include_router(craps.router)
 app.include_router(analytics.router)
 app.include_router(admin.router)
 
@@ -620,6 +623,7 @@ if local_site_root_enabled:
         "/stock-research": "stock-research",
         "/poker": "poker",
         "/craps": "craps",
+        "/craps-strategy": "craps-strategy",
         "/blackjack": "blackjack",
         "/bitcoin-chat": "bitcoin-chat",
         "/casino": "casino",
