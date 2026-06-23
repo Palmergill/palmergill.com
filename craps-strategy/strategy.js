@@ -114,19 +114,21 @@
                 if (!BET_TYPES.includes(bet.type)) {
                     errors.push(`bets[${i}].type "${bet.type}" is not a known bet`);
                 }
-                if (bet.units !== undefined && !isPositiveInt(bet.units)) {
+                // `!= null` treats both undefined and null as "not provided" —
+                // LLM/JSON output routinely carries null for unset fields.
+                if (bet.units != null && !isPositiveInt(bet.units)) {
                     errors.push(`bets[${i}].units must be a positive integer`);
                 }
-                if (bet.when !== undefined && !WHEN_VALUES.includes(bet.when)) {
+                if (bet.when != null && !WHEN_VALUES.includes(bet.when)) {
                     errors.push(`bets[${i}].when "${bet.when}" is invalid`);
                 }
-                if (bet.maxActive !== undefined && !isPositiveInt(bet.maxActive)) {
+                if (bet.maxActive != null && !isPositiveInt(bet.maxActive)) {
                     errors.push(`bets[${i}].maxActive must be a positive integer`);
                 }
             });
         }
 
-        if (intent.odds !== undefined) {
+        if (intent.odds != null) {
             if (!isPlainObject(intent.odds)) {
                 errors.push("odds must be an object");
             } else {
@@ -143,21 +145,21 @@
             }
         }
 
-        if (intent.progression !== undefined) {
+        if (intent.progression != null) {
             const p = intent.progression;
             if (!isPlainObject(p)) {
                 errors.push("progression must be an object");
             } else {
-                if (p.onWin !== undefined && !ON_WIN_VALUES.includes(p.onWin)) {
+                if (p.onWin != null && !ON_WIN_VALUES.includes(p.onWin)) {
                     errors.push(`progression.onWin must be one of ${ON_WIN_VALUES.join(", ")}`);
                 }
-                if (p.onLoss !== undefined && !ON_LOSS_VALUES.includes(p.onLoss)) {
+                if (p.onLoss != null && !ON_LOSS_VALUES.includes(p.onLoss)) {
                     errors.push(`progression.onLoss must be one of ${ON_LOSS_VALUES.join(", ")}`);
                 }
-                if (p.resetOnSevenOut !== undefined && typeof p.resetOnSevenOut !== "boolean") {
+                if (p.resetOnSevenOut != null && typeof p.resetOnSevenOut !== "boolean") {
                     errors.push("progression.resetOnSevenOut must be a boolean");
                 }
-                if (p.appliesTo !== undefined) {
+                if (p.appliesTo != null) {
                     if (!Array.isArray(p.appliesTo)) {
                         errors.push("progression.appliesTo must be an array");
                     } else {
@@ -233,7 +235,7 @@
                 type: bet.type,
                 amount,
                 when: bet.when || meta.defaultWhen,
-                everyRoll: bet.everyRoll !== undefined ? !!bet.everyRoll : !!meta.everyRoll,
+                everyRoll: bet.everyRoll != null ? !!bet.everyRoll : !!meta.everyRoll,
                 lifecycle: meta.lifecycle,
                 maxActive: meta.lifecycle === "travels"
                     ? (bet.maxActive || 1)

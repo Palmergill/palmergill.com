@@ -87,7 +87,7 @@ def _rate_limited(request: Request, now: float | None = None) -> bool:
     return False
 
 
-@router.post("/translate", response_model=StrategyIntent)
+@router.post("/translate", response_model=StrategyIntent, response_model_exclude_none=True)
 async def translate(payload: TranslateRequest, request: Request) -> StrategyIntent:
     if _rate_limited(request):
         raise HTTPException(status_code=429, detail="Too many requests. Try again shortly.")

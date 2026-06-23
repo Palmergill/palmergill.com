@@ -43,6 +43,20 @@ describe("validateIntent", () => {
     test("rejects empty bet list", () => {
         expect(Strategy.validateIntent({ bets: [] }).valid).toBe(false);
     });
+
+    test("treats null optional fields as absent (LLM/JSON often emits null)", () => {
+        const res = Strategy.validateIntent({
+            name: "Come strat",
+            bets: [
+                { type: "passLine", units: 1, when: "comeOut", everyRoll: null, maxActive: null },
+                { type: "come", units: 1, when: "pointOn", maxActive: 2 }
+            ],
+            odds: { passLine: "max", come: "max" },
+            progression: null
+        });
+        expect(res.valid).toBe(true);
+        expect(res.errors).toEqual([]);
+    });
 });
 
 describe("normalize", () => {
