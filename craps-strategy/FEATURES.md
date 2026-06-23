@@ -114,6 +114,14 @@ reproducibly (per-trial RNG seeded from `baseSeed`).
 
 ## Changelog
 
+- **2026-06-23** — Bumped the run to **1,000 trials** (from 100) for more stable stats.
+  The simulation of up to 1M rolls runs in ~0.5s. To keep the line chart fast and
+  readable, it plots a representative **250-path sample** (stride-sampled), each thinned
+  to ≤200 points on a linear x-axis; stats and the histogram still use all 1,000 trials.
+  Chart title notes "N sample paths of 1,000 trials". Bumped app.js to ?v=4. UI copy
+  updated to "1,000".
+
+
 - **2026-06-23** — Reworked the edge stats. Replaced the noisy, easy-to-misread
   "Realized house edge" with two clearer stats: **Expected house edge** (the
   wager-weighted theoretical edge — stable, e.g. pass-line 1.41%, dropping to 0.33% with

@@ -5,7 +5,7 @@ const CACHE_PREFIX = 'craps-strategy-';
 const STATIC_ASSETS = [
     '/craps-strategy/',
     '/craps-strategy/index.html',
-    '/craps-strategy/app.js?v=3',
+    '/craps-strategy/app.js?v=4',
     '/craps-strategy/style.css?v=1',
     '/craps-strategy/strategy.js?v=2',
     '/craps-strategy/engine.js?v=3',

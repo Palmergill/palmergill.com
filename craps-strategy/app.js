@@ -12,7 +12,7 @@
     const Strategy = window.CrapsStrategy;
     const Engine = window.CrapsEngine;
     const API_BASE = (window.API_ORIGIN || '') + '/api/craps';
-    const TRIALS = 100;
+    const TRIALS = 1000;
     const MAX_ROLLS = 1000;
 
     // Human labels for bet types (CrapsRules covers most; add come/don't-come).
@@ -231,32 +231,68 @@
         dom.resultsPanel.hidden = false;
     }
 
+    // Keep the line chart responsive: with 1,000 trials it would otherwise draw
+    // ~1M points. Stats and the histogram use every trial; only the line chart
+    // is down-sampled — at most MAX_PLOT_LINES paths, each thinned to MAX_POINTS
+    // points. The curve shape is unchanged at this density.
+    const MAX_PLOT_LINES = 250;
+    const MAX_POINTS = 200;
+
+    // Thin a balances array to <= MAX_POINTS {x,y} points, always keeping the
+    // last roll so the ending is exact.
+    function thin(balances) {
+        const len = balances.length;
+        const step = Math.max(1, Math.ceil(len / MAX_POINTS));
+        const pts = [];
+        for (let i = 0; i < len; i += step) pts.push({ x: i + 1, y: balances[i] });
+        if (pts.length && pts[pts.length - 1].x !== len) pts.push({ x: len, y: balances[len - 1] });
+        return pts;
+    }
+
     function drawLineChart(spec, trials) {
         const maxLen = trials.reduce((m, t) => Math.max(m, t.balances.length), 1);
-        const labels = Array.from({ length: maxLen }, (_, i) => i + 1);
 
-        const datasets = trials.map((t) => ({
-            data: t.balances,
-            borderColor: t.busted ? 'rgba(255,122,110,0.30)' : 'rgba(88,211,173,0.30)',
-            borderWidth: 0.7,
+        // Evenly stride-sample the trials so the sample spans the whole run.
+        const stride = Math.ceil(trials.length / MAX_PLOT_LINES);
+        const plotted = trials.filter((_, i) => i % stride === 0);
+        const alpha = plotted.length > 150 ? 0.16 : 0.3;
+
+        const datasets = plotted.map((t) => ({
+            data: thin(t.balances),
+            borderColor: t.busted ? `rgba(255,122,110,${alpha})` : `rgba(88,211,173,${alpha})`,
+            borderWidth: 0.6,
             pointRadius: 0,
-            tension: 0,
-            spanGaps: false
+            tension: 0
         }));
+
+        // Note how many paths are shown vs simulated.
+        const titleEl = document.getElementById('lineChartTitle');
+        if (titleEl) {
+            titleEl.textContent = plotted.length < trials.length
+                ? `Bankroll across 1,000 rolls — ${plotted.length} sample paths of ${trials.length.toLocaleString()} trials`
+                : `Bankroll across 1,000 rolls — ${trials.length.toLocaleString()} trials`;
+        }
+
         // Buy-in reference line.
         datasets.push({
-            data: labels.map(() => spec.buyIn),
+            data: [{ x: 1, y: spec.buyIn }, { x: maxLen, y: spec.buyIn }],
             borderColor: 'rgba(232,199,115,0.85)',
             borderWidth: 1.4,
             borderDash: [6, 5],
             pointRadius: 0
         });
 
+        const options = baseChartOptions('Roll number', 'Bankroll ($)');
+        options.parsing = false;          // data is already {x, y}
+        options.scales.x.type = 'linear';
+        options.scales.x.min = 1;
+        options.scales.x.max = maxLen;
+
         if (lineChart) lineChart.destroy();
         lineChart = new Chart(dom.lineChart.getContext('2d'), {
             type: 'line',
-            data: { labels, datasets },
-            options: baseChartOptions('Roll number', 'Bankroll ($)')
+            data: { datasets },
+            options
         });
     }
 

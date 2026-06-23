@@ -4,12 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Craps Strategy Simulator - Palmer Gill</title>
-    <meta name="description" content="Describe a craps betting strategy in plain English, set your bankroll, and Monte-Carlo simulate it over 100 trials — by Palmer Gill.">
+    <meta name="description" content="Describe a craps betting strategy in plain English, set your bankroll, and Monte-Carlo simulate it over 1,000 trials — by Palmer Gill.">
     <meta name="theme-color" content="#0a1f12">
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://palmergill.com/craps-strategy/">
     <meta property="og:title" content="Craps Strategy Simulator — Palmer Gill">
-    <meta property="og:description" content="Describe a craps strategy in plain English and watch 100 simulated bankrolls play out.">
+    <meta property="og:description" content="Describe a craps strategy in plain English and watch 1,000 simulated bankrolls play out.">
     <meta property="og:image" content="https://palmergill.com/assets/palmer-gill-logo.png">
     <meta name="twitter:card" content="summary">
     <link rel="icon" type="image/png" href="/assets/palmer-gill-logo-small.png">
@@ -35,7 +35,7 @@
             <p class="eyebrow">Monte-Carlo Lab</p>
             <h1>Craps Strategy Simulator</h1>
             <p class="lede">Describe a betting strategy in plain English. We translate it into a
-                repeatable rule set, then deal <strong>100 bankrolls</strong> through up to
+                repeatable rule set, then deal <strong>1,000 bankrolls</strong> through up to
                 <strong>1,000 rolls</strong> each and chart every one.</p>
         </header>
 
@@ -102,7 +102,7 @@
                 to whole-dollar payouts). Edit any amount to override the AI's sizing. The odds selector
                 takes a uniform multiple of each line bet's flat when a point is on.</p>
             <div class="row actions">
-                <button id="runBtn" class="btn btn-primary" type="button">Run 100 simulations</button>
+                <button id="runBtn" class="btn btn-primary" type="button">Run 1,000 simulations</button>
             </div>
         </section>
 
@@ -111,7 +111,7 @@
             <div id="statGrid" class="stat-grid"></div>
 
             <div class="chart-block">
-                <h3 class="chart-title">Bankroll across 1,000 rolls — 100 trials</h3>
+                <h3 class="chart-title" id="lineChartTitle">Bankroll across 1,000 rolls — 1,000 trials</h3>
                 <div class="chart-holder"><canvas id="lineChart"></canvas></div>
                 <p class="legend-note"><span class="swatch win"></span> survived &nbsp;
                     <span class="swatch bust"></span> busted &nbsp;
@@ -119,7 +119,7 @@
             </div>
 
             <div class="chart-block">
-                <h3 class="chart-title">Where the 100 bankrolls ended up</h3>
+                <h3 class="chart-title">Where the 1,000 bankrolls ended up</h3>
                 <div class="chart-holder"><canvas id="histChart"></canvas></div>
             </div>
         </section>
@@ -129,7 +129,7 @@
     <script src="/craps-strategy/strategy.js?v=2"></script>
     <script src="/craps-strategy/engine.js?v=3"></script>
     <script src="/shared/api-base.js?v=1"></script>
-    <script src="/craps-strategy/app.js?v=3"></script>
+    <script src="/craps-strategy/app.js?v=4"></script>
     <script src="/shared/analytics.js?v=1"></script>
     <script src="/shared/site-nav.js?v=10"></script>
 </body>
