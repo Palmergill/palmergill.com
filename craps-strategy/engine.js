@@ -31,6 +31,24 @@
 
     const PLACE_NUMBERS = [4, 5, 6, 8, 9, 10];
 
+    // Per-bet house edge (fraction of each dollar wagered the house keeps on
+    // average). Odds bets carry zero edge and are intentionally absent (treated
+    // as 0). Used to compute the strategy's expected edge by weighting these by
+    // the dollars actually wagered on each bet type.
+    const HOUSE_EDGE = Object.freeze({
+        passLine: 0.01414, dontPass: 0.01364,
+        come: 0.01414, dontCome: 0.01364,
+        place4: 0.06667, place10: 0.06667,
+        place5: 0.04, place9: 0.04,
+        place6: 0.01515, place8: 0.01515,
+        field: 0.05556,
+        hard4: 0.11111, hard10: 0.11111,
+        hard6: 0.09091, hard8: 0.09091,
+        any7: 0.16667, anyCraps: 0.11111,
+        yo11: 0.11111, craps3: 0.11111,
+        craps2: 0.13889, craps12: 0.13889
+    });
+
     // ---- RNG ----------------------------------------------------------------
     // mulberry32: tiny, fast, good enough for dice. Seeded per trial.
     function mulberry32(seed) {
@@ -81,7 +99,8 @@
             dontComeFlat: 0,
             comePoints: {},         // number -> { amount, odds }
             dontComePoints: {},     // number -> { amount, odds }
-            wagered: 0
+            wagered: 0,
+            expectedLoss: 0         // Σ stake × house edge, for expected-edge stat
         };
     }
 
@@ -103,11 +122,13 @@
     }
 
     // A stake leaves the felt (resolved). `payout` is the gross returned to cash
-    // (stake + profit on a win, 0 on a loss).
-    function settle(state, stake, payout) {
+    // (stake + profit on a win, 0 on a loss). `kind` attributes the wager to a
+    // bet type for the expected-edge calc; omit it for zero-edge odds bets.
+    function settle(state, stake, payout, kind) {
         state.onFelt -= stake;
         state.balance += payout;
         state.wagered += stake;
+        if (kind) state.expectedLoss += stake * (HOUSE_EDGE[kind] || 0);
     }
 
     // ---- Placement ----------------------------------------------------------
@@ -205,7 +226,7 @@
             if (!stake) return;
             const single = resolveOneRollBets({ [type]: stake }, total);
             const won = single.winnings > 0;
-            settle(state, stake, won ? single.winnings : 0); // winnings include stake
+            settle(state, stake, won ? single.winnings : 0, type); // winnings include stake
             if (won) recordWin(o, type, single.winnings - stake); else recordLoss(o, type, stake);
             state.oneRoll[type] = 0;
         });
@@ -220,6 +241,7 @@
             const profit = winRes.winnings - stake; // helper returns stake+profit
             state.balance += profit;                // stake stays working on felt
             state.wagered += stake;
+            state.expectedLoss += stake * (HOUSE_EDGE["place" + total] || 0);
             recordWin(o, "place" + total, profit);
         }
     }
@@ -236,7 +258,7 @@
             if (hardRes.bets[type] === 0) { // resolved (won or lost)
                 const won = wonHard(type, total, isHard);
                 const payout = won ? hardPayout(type, stake) : 0;
-                settle(state, stake, payout);
+                settle(state, stake, payout, type);
                 if (won) recordWin(o, type, payout - stake); else recordLoss(o, type, stake);
                 state.hard[type] = 0;
             }
@@ -264,7 +286,7 @@
         PLACE_NUMBERS.forEach((n) => {
             if (state.place[n]) {
                 recordLoss(o, "place" + n, state.place[n]);
-                settle(state, state.place[n], 0);
+                settle(state, state.place[n], 0, "place" + n);
                 state.place[n] = 0;
             }
         });
@@ -283,12 +305,12 @@
             // pass line
             if (state.pass > 0) {
                 if (total === 7 || total === 11) {
-                    settle(state, state.pass, state.pass * 2);
+                    settle(state, state.pass, state.pass * 2, "passLine");
                     recordWin(o, "passLine", state.pass);
                     state.pass = 0;
                 } else if (total === 2 || total === 3 || total === 12) {
                     recordLoss(o, "passLine", state.pass);
-                    settle(state, state.pass, 0);
+                    settle(state, state.pass, 0, "passLine");
                     state.pass = 0;
                 } else {
                     state.point = total; // point established; flat stays
@@ -297,12 +319,12 @@
             // don't pass
             if (state.dontPass > 0) {
                 if (total === 2 || total === 3) {
-                    settle(state, state.dontPass, state.dontPass * 2);
+                    settle(state, state.dontPass, state.dontPass * 2, "dontPass");
                     recordWin(o, "dontPass", state.dontPass);
                     state.dontPass = 0;
                 } else if (total === 7 || total === 11) {
                     recordLoss(o, "dontPass", state.dontPass);
-                    settle(state, state.dontPass, 0);
+                    settle(state, state.dontPass, 0, "dontPass");
                     state.dontPass = 0;
                 } else if (total === 12) {
                     // push (bar 12): bet stays for the next come-out
@@ -317,7 +339,7 @@
             if (total === point) {
                 // pass wins, don't loses
                 if (state.pass > 0) {
-                    settle(state, state.pass, state.pass * 2);
+                    settle(state, state.pass, state.pass * 2, "passLine");
                     recordWin(o, "passLine", state.pass);
                     if (state.passOdds > 0) {
                         const profit = Math.floor(state.passOdds * getOddsPayout(point, true));
@@ -328,7 +350,7 @@
                 }
                 if (state.dontPass > 0) {
                     recordLoss(o, "dontPass", state.dontPass);
-                    settle(state, state.dontPass, 0);
+                    settle(state, state.dontPass, 0, "dontPass");
                     if (state.dontPassOdds > 0) { settle(state, state.dontPassOdds, 0); state.dontPassOdds = 0; }
                     state.dontPass = 0;
                 }
@@ -337,12 +359,12 @@
                 sevenOut = true;
                 if (state.pass > 0) {
                     recordLoss(o, "passLine", state.pass);
-                    settle(state, state.pass, 0);
+                    settle(state, state.pass, 0, "passLine");
                     if (state.passOdds > 0) { settle(state, state.passOdds, 0); state.passOdds = 0; }
                     state.pass = 0;
                 }
                 if (state.dontPass > 0) {
-                    settle(state, state.dontPass, state.dontPass * 2);
+                    settle(state, state.dontPass, state.dontPass * 2, "dontPass");
                     recordWin(o, "dontPass", state.dontPass);
                     if (state.dontPassOdds > 0) {
                         const profit = Math.floor(state.dontPassOdds * getOddsPayout(point, false));
@@ -397,13 +419,13 @@
             Object.keys(state.comePoints).forEach((n) => {
                 const cp = state.comePoints[n];
                 recordLoss(o, "come", cp.amount);
-                settle(state, cp.amount, 0);
+                settle(state, cp.amount, 0, "come");
                 settleComeOdds(state, cp.odds, oddsWorking, Number(n), true, false);
                 delete state.comePoints[n];
             });
             Object.keys(state.dontComePoints).forEach((n) => {
                 const dp = state.dontComePoints[n];
-                settle(state, dp.amount, dp.amount * 2);
+                settle(state, dp.amount, dp.amount * 2, "dontCome");
                 settleComeOdds(state, dp.odds, oddsWorking, Number(n), false, true);
                 recordWin(o, "dontCome", dp.amount);
                 delete state.dontComePoints[n];
@@ -412,7 +434,7 @@
         }
         if (state.comePoints[total]) {
             const cp = state.comePoints[total];
-            settle(state, cp.amount, cp.amount * 2);
+            settle(state, cp.amount, cp.amount * 2, "come");
             settleComeOdds(state, cp.odds, oddsWorking, total, true, true);
             recordWin(o, "come", cp.amount);
             delete state.comePoints[total];
@@ -420,7 +442,7 @@
         if (state.dontComePoints[total]) {
             const dp = state.dontComePoints[total];
             recordLoss(o, "dontCome", dp.amount);
-            settle(state, dp.amount, 0);
+            settle(state, dp.amount, 0, "dontCome");
             settleComeOdds(state, dp.odds, oddsWorking, total, false, false);
             delete state.dontComePoints[total];
         }
@@ -429,12 +451,12 @@
     function resolveComeFlats(state, spec, total, o) {
         if (state.comeFlat > 0) {
             if (total === 7 || total === 11) {
-                settle(state, state.comeFlat, state.comeFlat * 2);
+                settle(state, state.comeFlat, state.comeFlat * 2, "come");
                 recordWin(o, "come", state.comeFlat);
                 state.comeFlat = 0;
             } else if (total === 2 || total === 3 || total === 12) {
                 recordLoss(o, "come", state.comeFlat);
-                settle(state, state.comeFlat, 0);
+                settle(state, state.comeFlat, 0, "come");
                 state.comeFlat = 0;
             } else {
                 const odds = spec.odds.come
@@ -446,12 +468,12 @@
         }
         if (state.dontComeFlat > 0) {
             if (total === 2 || total === 3) {
-                settle(state, state.dontComeFlat, state.dontComeFlat * 2);
+                settle(state, state.dontComeFlat, state.dontComeFlat * 2, "dontCome");
                 recordWin(o, "dontCome", state.dontComeFlat);
                 state.dontComeFlat = 0;
             } else if (total === 7 || total === 11) {
                 recordLoss(o, "dontCome", state.dontComeFlat);
-                settle(state, state.dontComeFlat, 0);
+                settle(state, state.dontComeFlat, 0, "dontCome");
                 state.dontComeFlat = 0;
             } else if (total === 12) {
                 // bar 12 push: stays as a flat for next roll
@@ -530,6 +552,7 @@
             busted,
             rolls,
             wagered: state.wagered,
+            expectedLoss: state.expectedLoss,
             endValue: balances.length ? balances[balances.length - 1] : spec.buyIn
         };
     }
@@ -577,16 +600,18 @@
     }
 
     function computeStats(results, spec) {
+        const n = results.length;
         const ends = results.map((t) => t.endValue);
         const survived = results.filter((t) => !t.busted).length;
         const totalWagered = results.reduce((s, t) => s + t.wagered, 0);
+        const totalExpectedLoss = results.reduce((s, t) => s + t.expectedLoss, 0);
         const netProfit = results.reduce((s, t) => s + (t.endValue - spec.buyIn), 0);
         const bustedRolls = results.filter((t) => t.busted).map((t) => t.rolls);
 
         return {
-            trials: results.length,
+            trials: n,
             buyIn: spec.buyIn,
-            survivalRate: results.length ? survived / results.length : 0,
+            survivalRate: n ? survived / n : 0,
             survivors: survived,
             meanEnd: ends.length ? ends.reduce((s, v) => s + v, 0) / ends.length : 0,
             medianEnd: median(ends),
@@ -597,8 +622,14 @@
                 : null,
             totalWagered,
             netProfit,
-            // Realized house edge: how much of every wagered dollar the house
-            // kept, on average. Positive = house ahead.
+            // Expected (theoretical) edge: the wager-weighted average house edge
+            // of this strategy's action. Stable, low-variance — this is what the
+            // realized result converges to. Odds count as 0% and pull it down.
+            expectedEdge: totalWagered ? totalExpectedLoss / totalWagered : 0,
+            // Realized profit/loss in dollars, averaged across the runs (the
+            // actual outcome, which swings with variance).
+            avgProfit: n ? netProfit / n : 0,
+            // Kept for callers/tests; not shown in the UI (confusing as a stat).
             realizedHouseEdge: totalWagered ? -netProfit / totalWagered : 0
         };
     }

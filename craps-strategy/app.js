@@ -213,8 +213,10 @@
             { v: money(stats.meanEnd), l: 'Mean ending', cls: stats.meanEnd >= spec.buyIn ? 'good' : 'bad' },
             { v: money(stats.bestEnd), l: 'Best run', cls: 'good' },
             { v: money(stats.worstEnd), l: 'Worst run', cls: 'bad' },
-            { v: (stats.realizedHouseEdge * 100).toFixed(2) + '%', l: 'Realized house edge',
-              cls: stats.realizedHouseEdge > 0 ? 'bad' : 'good' },
+            { v: (stats.expectedEdge * 100).toFixed(2) + '%', l: 'Expected house edge',
+              cls: stats.expectedEdge > 0 ? 'bad' : 'good' },
+            { v: money(stats.avgProfit), l: 'Avg profit / loss per run',
+              cls: stats.avgProfit >= 0 ? 'good' : 'bad' },
             { v: stats.meanRollsBeforeBust ? Math.round(stats.meanRollsBeforeBust) : '—',
               l: 'Avg rolls to bust', cls: '' },
             { v: String(spec.baseSeed), l: 'Seed', cls: '' }

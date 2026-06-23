@@ -114,6 +114,15 @@ reproducibly (per-trial RNG seeded from `baseSeed`).
 
 ## Changelog
 
+- **2026-06-23** — Reworked the edge stats. Replaced the noisy, easy-to-misread
+  "Realized house edge" with two clearer stats: **Expected house edge** (the
+  wager-weighted theoretical edge — stable, e.g. pass-line 1.41%, dropping to 0.33% with
+  5× odds) and **Avg profit/loss per run** (the realized dollar outcome). Engine now
+  tracks `expectedLoss` per resolution via a per-bet `HOUSE_EDGE` table and a `kind` tag
+  on `settle`; odds count as 0% edge so they correctly dilute the blended edge. Bumped
+  engine.js/app.js to ?v=3. Suite green at 105.
+
+
 - **2026-06-23** — Review fixes (3): (P1) come/don't-come odds are now off and returned on
   the shooter come-out instead of lost on a 7 (`settleComeOdds` in engine.js); (P1)
   hardways resolve every roll so hardway-only strategies work (split `resolveHardways`

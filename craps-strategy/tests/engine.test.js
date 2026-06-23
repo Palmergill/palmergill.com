@@ -128,6 +128,35 @@ describe("uniform Nx odds (not capped by the 3-4-5x table)", () => {
     });
 });
 
+describe("expected (theoretical) house edge", () => {
+    test("pass-line-only expected edge is exactly 1.41% (odds dilute it)", () => {
+        const passOnly = Strategy.normalize(
+            { name: "p", bets: [{ type: "passLine", units: 1, when: "comeOut" }] },
+            { buyIn: 1000000, baseUnit: 10 });
+        const withOdds = Strategy.normalize(
+            { name: "p", bets: [{ type: "passLine", units: 1, when: "comeOut" }] },
+            { buyIn: 1000000, baseUnit: 10, oddsMultiplier: 5 });
+
+        const a = Engine.runSimulation(passOnly, { trials: 50, maxRolls: 500 }).stats;
+        const b = Engine.runSimulation(withOdds, { trials: 50, maxRolls: 500 }).stats;
+
+        // Only passLine is wagered -> weighted edge equals the passLine edge.
+        expect(a.expectedEdge).toBeCloseTo(0.01414, 4);
+        // Adding 5x odds (zero edge) pulls the blended edge well down.
+        expect(b.expectedEdge).toBeLessThan(a.expectedEdge);
+        expect(b.expectedEdge).toBeLessThan(0.006);
+    });
+
+    test("expected edge is stable across seeds (low variance)", () => {
+        const mk = (seed) => Strategy.normalize(
+            { name: "p", bets: [{ type: "passLine", units: 1, when: "comeOut" }] },
+            { buyIn: 1000000, baseUnit: 10, oddsMultiplier: 3, seed });
+        const e1 = Engine.runSimulation(mk(1), { trials: 50, maxRolls: 500 }).stats.expectedEdge;
+        const e2 = Engine.runSimulation(mk(2), { trials: 50, maxRolls: 500 }).stats.expectedEdge;
+        expect(Math.abs(e1 - e2)).toBeLessThan(0.001); // far tighter than realized edge
+    });
+});
+
 describe("come odds are off on the shooter come-out", () => {
     // Pass + come, both max odds. Establish a come point, make the pass point so
     // the next roll is a come-out, then seven on the come-out: the come flat
