@@ -5,10 +5,10 @@ const CACHE_PREFIX = 'craps-strategy-';
 const STATIC_ASSETS = [
     '/craps-strategy/',
     '/craps-strategy/index.html',
-    '/craps-strategy/app.js?v=1',
+    '/craps-strategy/app.js?v=2',
     '/craps-strategy/style.css?v=1',
-    '/craps-strategy/strategy.js?v=1',
-    '/craps-strategy/engine.js?v=1',
+    '/craps-strategy/strategy.js?v=2',
+    '/craps-strategy/engine.js?v=2',
     '/craps-strategy/manifest.json',
     '/craps/crapsRules.js?v=2',
     '/shared/casino-theme.css?v=1',

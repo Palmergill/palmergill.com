@@ -28,6 +28,7 @@
         seed: el('seed'), translateBtn: el('translateBtn'), preset: el('preset'),
         status: el('status'), strategyPanel: el('strategyPanel'),
         strategySummary: el('strategySummary'), betList: el('betList'),
+        oddsMult: el('oddsMult'),
         runBtn: el('runBtn'), resultsPanel: el('resultsPanel'), statGrid: el('statGrid'),
         lineChart: el('lineChart'), histChart: el('histChart')
     };
@@ -51,6 +52,12 @@
         };
         if (seedRaw !== '' && Number.isInteger(+seedRaw) && +seedRaw >= 0) {
             form.seed = +seedRaw;
+        }
+        // Global odds override: '' keeps the strategy's own odds; otherwise a
+        // uniform multiple (or 'none'/'max') on every line bet.
+        const oddsVal = dom.oddsMult ? dom.oddsMult.value : '';
+        if (oddsVal !== '') {
+            form.oddsMultiplier = (oddsVal === 'max' || oddsVal === 'none') ? oddsVal : parseInt(oddsVal, 10);
         }
         if (withOverrides) {
             const overrides = {};
@@ -312,4 +319,11 @@
     dom.translateBtn.addEventListener('click', translate);
     dom.preset.addEventListener('change', (e) => usePreset(e.target.value));
     dom.runBtn.addEventListener('click', run);
+    // Re-render the confirm view (and its odds line) when the odds selector
+    // changes, preserving any edited bet amounts.
+    dom.oddsMult.addEventListener('change', () => {
+        if (!currentIntent) return;
+        const spec = buildSpec(true);
+        if (spec) renderStrategy(spec);
+    });
 })();

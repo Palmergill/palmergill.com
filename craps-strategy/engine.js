@@ -23,6 +23,7 @@
     const {
         getOddsPayout,
         calculateOddsToAdd,
+        legalOddsAmount,
         resolveOneRollBets,
         resolveHardwayBets,
         resolvePlaceBetWins
@@ -118,12 +119,26 @@
 
     function oddsToAdd(state, flat, point, multiplier, isPass) {
         if (!multiplier || !point) return 0;
-        return calculateOddsToAdd({
+        // "max" means the table maximum (the 3-4-5x scheme in crapsRules).
+        if (multiplier === "max") {
+            return calculateOddsToAdd({
+                point,
+                amount: flat,
+                odds: 0,
+                balance: state.balance,
+                multiplier: "max",
+                isPass
+            });
+        }
+        // A numeric multiplier is a true N× of the flat (uniform 1x..5x odds),
+        // snapped to a legal whole-dollar increment and capped only by balance —
+        // NOT by the 3-4-5x table, so 5x on the 4/10 really is 5x.
+        const requested = flat * multiplier;
+        return legalOddsAmount({
             point,
-            amount: flat,
-            odds: 0,
+            requested,
+            remaining: requested,
             balance: state.balance,
-            multiplier,
             isPass
         });
     }

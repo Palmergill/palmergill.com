@@ -105,6 +105,29 @@ describe("hardway hit", () => {
     });
 });
 
+describe("uniform Nx odds (not capped by the 3-4-5x table)", () => {
+    test("5x odds on the point-4 takes 5x the flat and pays true 2:1", () => {
+        // $10 pass flat, 5x odds via the global odds override.
+        const s = spec({ bets: [{ type: "passLine", units: 1, when: "comeOut" }] },
+            { buyIn: 1000, baseUnit: 10, oddsMultiplier: 5 });
+        expect(s.odds.passLine).toBe(5);
+        const st = Engine.createState(s);
+        play(st, s, 1, 3);            // point 4 -> odds go up
+        expect(st.passOdds).toBe(50); // 5 x $10, NOT capped at 3x=$30
+        play(st, s, 2, 2);            // make the 4
+        // flat wins $10, odds $50 pay 2:1 = $100 -> +$110 total
+        expect(Engine.totalValue(st)).toBe(1110);
+    });
+
+    test('"max" still uses the 3-4-5x table (3x on the 4)', () => {
+        const s = spec({ bets: [{ type: "passLine", units: 1, when: "comeOut" }] },
+            { buyIn: 1000, baseUnit: 10, oddsMultiplier: "max" });
+        const st = Engine.createState(s);
+        play(st, s, 1, 3);            // point 4
+        expect(st.passOdds).toBe(30); // table max on the 4 is 3x
+    });
+});
+
 describe("come odds are off on the shooter come-out", () => {
     // Pass + come, both max odds. Establish a come point, make the pass point so
     // the next roll is a come-out, then seven on the come-out: the come flat

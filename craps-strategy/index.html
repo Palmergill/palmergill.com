@@ -83,8 +83,24 @@
             <h2 id="strategy-h" class="panel-title">2 &middot; Confirm bets &amp; sizes</h2>
             <p id="strategySummary" class="summary"></p>
             <div id="betList" class="bet-list"></div>
+            <div class="row">
+                <label class="field">
+                    <span class="field-label">Odds on line bets</span>
+                    <select id="oddsMult">
+                        <option value="">Use strategy's odds</option>
+                        <option value="none">No odds</option>
+                        <option value="1">1× odds</option>
+                        <option value="2">2× odds</option>
+                        <option value="3">3× odds</option>
+                        <option value="4">4× odds</option>
+                        <option value="5">5× odds</option>
+                        <option value="max">Max (3-4-5×)</option>
+                    </select>
+                </label>
+            </div>
             <p class="fineprint">Amounts are snapped to legal table increments (place 6/8 in $6, odds rounded
-                to whole-dollar payouts). Edit any amount to override the AI's sizing.</p>
+                to whole-dollar payouts). Edit any amount to override the AI's sizing. The odds selector
+                takes a uniform multiple of each line bet's flat when a point is on.</p>
             <div class="row actions">
                 <button id="runBtn" class="btn btn-primary" type="button">Run 100 simulations</button>
             </div>
@@ -110,10 +126,10 @@
     </main>
 
     <script src="/craps/crapsRules.js?v=2"></script>
-    <script src="/craps-strategy/strategy.js?v=1"></script>
-    <script src="/craps-strategy/engine.js?v=1"></script>
+    <script src="/craps-strategy/strategy.js?v=2"></script>
+    <script src="/craps-strategy/engine.js?v=2"></script>
     <script src="/shared/api-base.js?v=1"></script>
-    <script src="/craps-strategy/app.js?v=1"></script>
+    <script src="/craps-strategy/app.js?v=2"></script>
     <script src="/shared/analytics.js?v=1"></script>
     <script src="/shared/site-nav.js?v=10"></script>
 </body>

@@ -261,6 +261,19 @@
             });
         }
 
+        // Optional global odds override from the form: take a uniform multiple
+        // ("max", 1..N, or "none") on every line bet in the strategy. Lets a user
+        // dial 1x..5x odds without re-describing the strategy. When unset, the
+        // strategy's own per-bet odds are kept.
+        const om = form && form.oddsMultiplier;
+        if (om != null && om !== "") {
+            Object.keys(odds).forEach((k) => delete odds[k]);
+            if (om !== "none" && om !== 0) {
+                const mult = om === "max" ? "max" : Math.min(MAX_ODDS_MULTIPLIER, om);
+                bets.forEach((b) => { if (isLineBet(b.type)) odds[b.type] = mult; });
+            }
+        }
+
         const pIn = isPlainObject(intent.progression) ? intent.progression : {};
         const progression = {
             appliesTo: Array.isArray(pIn.appliesTo) ? pIn.appliesTo.slice() : [],
