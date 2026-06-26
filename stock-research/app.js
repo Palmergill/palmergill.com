@@ -84,8 +84,8 @@ function calculateAndDisplayTrends(earnings) {
     updateMetricTrend('revenueGrowth', revenueTrend);
     
     // Calculate EPS trend
-    const recentEPS = recent.reduce((sum, e) => sum + (e.basic_eps || 0), 0) / recent.length;
-    const olderEPS = older.length > 0 ? older.reduce((sum, e) => sum + (e.basic_eps || 0), 0) / older.length : recentEPS;
+    const recentEPS = recent.reduce((sum, e) => sum + (e.reported_eps || 0), 0) / recent.length;
+    const olderEPS = older.length > 0 ? older.reduce((sum, e) => sum + (e.reported_eps || 0), 0) / older.length : recentEPS;
     const epsTrend = recentEPS > olderEPS * 1.1 ? 'up' : recentEPS < olderEPS * 0.9 ? 'down' : 'neutral';
     updateMetricTrend('peRatio', epsTrend); // P/E trend based on EPS direction
     

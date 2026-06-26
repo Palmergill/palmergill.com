@@ -168,7 +168,11 @@ class FinnhubEstimatesClient:
             
             # Try to determine year-quarter for this Polygon record
             year_q = None
-            if date_key and len(date_key) >= 4:
+            fy = poly.get("fiscal_year")
+            fq = poly.get("fiscal_quarter")
+            if fy and fq:
+                year_q = f"{fy}-Q{str(fq).upper().removeprefix('Q')}"
+            elif date_key and len(date_key) >= 4:
                 year = date_key[:4]
                 if period and period.startswith("Q"):
                     # Use the period directly

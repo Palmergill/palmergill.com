@@ -371,7 +371,7 @@ class PolygonClient:
                         revenue = rev_data.get("value")
                     elif rev_data is not None:
                         revenue = rev_data
-                    if revenue:
+                    if revenue is not None:
                         break
                 
                 # Get EPS directly from income statement (Polygon provides this!)
@@ -382,14 +382,21 @@ class PolygonClient:
                         eps = eps_data.get("value")
                     elif eps_data is not None:
                         eps = eps_data
-                    if eps:
+                    if eps is not None:
                         break
                 
                 fcf = self._calculate_free_cash_flow(financials_data)
                 
+                fiscal_period = fin.get("fiscal_period") or fin.get("period")
+                fiscal_quarter = None
+                if isinstance(fiscal_period, str) and fiscal_period.upper().startswith("Q"):
+                    fiscal_quarter = fiscal_period.upper().removeprefix("Q")
+
                 earnings.append({
                     "fiscal_date": fiscal_date,
-                    "period": self._get_quarter_from_date(fiscal_date),
+                    "period": fiscal_period.upper() if fiscal_quarter else self._get_quarter_from_date(fiscal_date),
+                    "fiscal_year": fin.get("fiscal_year"),
+                    "fiscal_quarter": fiscal_quarter,
                     "reported_eps": eps,
                     "estimated_eps": None,
                     "surprise_pct": None,

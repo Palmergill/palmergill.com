@@ -5,6 +5,7 @@
 
     const STORAGE_KEY = 'stock-compare-tickers';
     const MAX = 4;
+    const DAY_CHANGE_LOOKBACK_DAYS = 5;
     // Module-private cache of fetched ticker data. Cleared between renders so the
     // table reflects current input.
     const cache = new Map();
@@ -53,13 +54,19 @@
         if (cache.has(t)) return cache.get(t);
         const base = (window.API_ORIGIN || '') + '/api/stocks';
         try {
-            const res = await fetch(`${base}/${encodeURIComponent(t)}?refresh=false`, {
-                credentials: 'include',
-            });
-            if (!res.ok) throw new Error(`HTTP ${res.status}`);
-            const data = await res.json();
+            const encoded = encodeURIComponent(t);
+            const [summaryRes, pricesRes] = await Promise.all([
+                fetch(`${base}/${encoded}?refresh=false`, { credentials: 'include' }),
+                fetch(`${base}/${encoded}/prices?days=${DAY_CHANGE_LOOKBACK_DAYS}`, { credentials: 'include' })
+            ]);
+            if (!summaryRes.ok) throw new Error(`HTTP ${summaryRes.status}`);
+            const data = await summaryRes.json();
+            let priceData = null;
+            if (pricesRes.ok) {
+                priceData = await pricesRes.json().catch(() => null);
+            }
             const summary = data.summary || {};
-            const history = data.price_history || data.priceHistory || [];
+            const history = (priceData && (priceData.prices || priceData.price_history || priceData.priceHistory)) || [];
             let changePct = null;
             if (Array.isArray(history) && history.length >= 2) {
                 const prices = history.map((d) => d.close ?? d.price).filter((v) => v != null);

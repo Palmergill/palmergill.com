@@ -826,15 +826,23 @@ async def game_ws(websocket: WebSocket, game_id: str):
     pull the latest state — this keeps a single serializer in play and lets
     the existing polling code be a fallback when WS is unavailable.
 
-    Auth note: the WS is read-only (server -> client) and only emits a
-    notification; the actual state payload still requires the player token
-    via the GET endpoint, so eavesdropping on the WS leaks nothing more than
-    "this game changed."
+    The socket is read-only (server -> client), but subscribers still present
+    their per-player token as the first message so arbitrary clients cannot
+    observe game activity timing for guessed game ids.
     """
     await websocket.accept()
-    bucket = _game_subscribers[game_id]
-    bucket.add(websocket)
+    bucket = None
     try:
+        auth_message = json.loads(await websocket.receive_text())
+        player_id = str(auth_message.get("player_id", ""))
+        player_token = str(auth_message.get("player_token", ""))
+        if not load_game_state(game_id):
+            await websocket.close(code=1008)
+            return
+        require_player_token(game_id, player_id, player_token)
+
+        bucket = _game_subscribers[game_id]
+        bucket.add(websocket)
         # Greet with one ping so the client can immediately fetch the latest
         # state without waiting for the next mutation.
         await websocket.send_json({"type": "hello", "game_id": game_id})
@@ -844,9 +852,15 @@ async def game_ws(websocket: WebSocket, game_id: str):
             await websocket.receive_text()
     except WebSocketDisconnect:
         pass
+    except (HTTPException, json.JSONDecodeError):
+        try:
+            await websocket.close(code=1008)
+        except RuntimeError:
+            pass
     except Exception:
         pass
     finally:
-        bucket.discard(websocket)
-        if not bucket:
+        if bucket is not None:
+            bucket.discard(websocket)
+        if bucket is not None and not bucket:
             _game_subscribers.pop(game_id, None)

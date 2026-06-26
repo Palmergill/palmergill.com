@@ -504,6 +504,7 @@
                     <li>Static hosting serves the repo root and active app directories.</li>
                     <li>Vercel rewrites <code>/api/*</code> to the Railway backend.</li>
                     <li>Railway builds from the root <code>Dockerfile</code> and runs <code>backend/app/main.py</code>.</li>
+                    <li><code>/api/poker/*</code>, <code>/api/craps/*</code>, <code>/api/stocks/*</code>, <code>/api/bitcoin/*</code>, and <code>/api/analytics/*</code> are public API prefixes; stock and Bitcoin use demo mode without auth.</li>
                 </ul>
                 <p>The Railway runtime command is:</p>
                 <pre><code>uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}</code></pre>

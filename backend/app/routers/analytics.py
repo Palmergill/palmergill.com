@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.orm import Session
 
 from app.database import AnalyticsEvent, get_db, utc_now
@@ -27,6 +27,32 @@ _SENSITIVE_QUERY_RE = re.compile(
     r"([?&](?:player_token|token|password|api_key|apikey|secret|authorization|cookie|session)=)([^&#\s\"]+)",
     re.IGNORECASE,
 )
+MAX_METADATA_JSON_BYTES = int(os.getenv("ANALYTICS_MAX_METADATA_JSON_BYTES", "8192"))
+MAX_METADATA_DEPTH = int(os.getenv("ANALYTICS_MAX_METADATA_DEPTH", "6"))
+MAX_METADATA_KEYS = int(os.getenv("ANALYTICS_MAX_METADATA_KEYS", "100"))
+MAX_METADATA_LIST_ITEMS = int(os.getenv("ANALYTICS_MAX_METADATA_LIST_ITEMS", "50"))
+MAX_METADATA_STRING_LENGTH = int(os.getenv("ANALYTICS_MAX_METADATA_STRING_LENGTH", "1000"))
+
+
+def _validate_metadata_shape(value: Any, depth: int = 0) -> None:
+    if depth > MAX_METADATA_DEPTH:
+        raise ValueError(f"metadata is nested deeper than {MAX_METADATA_DEPTH} levels")
+    if isinstance(value, dict):
+        if len(value) > MAX_METADATA_KEYS:
+            raise ValueError(f"metadata has more than {MAX_METADATA_KEYS} keys")
+        for key, entry in value.items():
+            if len(str(key)) > 120:
+                raise ValueError("metadata keys must be 120 characters or fewer")
+            _validate_metadata_shape(entry, depth + 1)
+        return
+    if isinstance(value, list):
+        if len(value) > MAX_METADATA_LIST_ITEMS:
+            raise ValueError(f"metadata lists may include at most {MAX_METADATA_LIST_ITEMS} items")
+        for entry in value:
+            _validate_metadata_shape(entry, depth + 1)
+        return
+    if isinstance(value, str) and len(value) > MAX_METADATA_STRING_LENGTH:
+        raise ValueError(f"metadata strings must be {MAX_METADATA_STRING_LENGTH} characters or fewer")
 
 
 class AnalyticsEventIn(BaseModel):
@@ -38,6 +64,17 @@ class AnalyticsEventIn(BaseModel):
     visitor_id: Optional[str] = Field(default=None, max_length=120)
     session_id: Optional[str] = Field(default=None, max_length=120)
     metadata: Optional[dict[str, Any]] = None
+
+    @field_validator("metadata")
+    @classmethod
+    def validate_metadata(cls, value: Optional[dict[str, Any]]) -> Optional[dict[str, Any]]:
+        if value is None:
+            return value
+        _validate_metadata_shape(value)
+        encoded = json.dumps(value, separators=(",", ":"), default=str).encode("utf-8")
+        if len(encoded) > MAX_METADATA_JSON_BYTES:
+            raise ValueError(f"metadata JSON must be {MAX_METADATA_JSON_BYTES} bytes or fewer")
+        return value
 
 
 def classify_outcome(status_code: int | None, level: str | None = None) -> str:

@@ -1,3 +1,4 @@
+import asyncio
 from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, HTTPException, Query, Request
@@ -20,6 +21,11 @@ def is_demo_request(request: Request) -> bool:
     return bool(getattr(request.state, "demo_mode", False))
 
 
+async def run_blocking(func, *args, **kwargs):
+    """Run sync provider/model work off the event loop."""
+    return await asyncio.to_thread(func, *args, **kwargs)
+
+
 class BitcoinChatRequest(BaseModel):
     message: str = Field(..., min_length=1, max_length=1000)
     session_id: Optional[str] = None
@@ -39,7 +45,7 @@ async def bitcoin_health(request: Request):
     status = (
         bitcoin_tools.get_demo_node_status()
         if is_demo_request(request)
-        else bitcoin_tools.get_node_status()
+        else await run_blocking(bitcoin_tools.get_node_status)
     )
     return {
         "status": "ok" if not status.get("error") else "degraded",
@@ -55,7 +61,7 @@ async def bitcoin_status(request: Request):
     return (
         bitcoin_tools.get_demo_node_status()
         if is_demo_request(request)
-        else bitcoin_tools.get_node_status()
+        else await run_blocking(bitcoin_tools.get_node_status)
     )
 
 
@@ -64,7 +70,7 @@ async def latest_block(request: Request):
     return (
         bitcoin_tools.get_demo_latest_block()
         if is_demo_request(request)
-        else bitcoin_tools.get_latest_block()
+        else await run_blocking(bitcoin_tools.get_latest_block)
     )
 
 
@@ -73,7 +79,7 @@ async def block(request: Request, height_or_hash: str):
     try:
         if is_demo_request(request):
             return bitcoin_tools.get_demo_block(height_or_hash)
-        return bitcoin_tools.get_block(height_or_hash)
+        return await run_blocking(bitcoin_tools.get_block, height_or_hash)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
 
@@ -83,7 +89,7 @@ async def transaction(request: Request, txid: str):
     try:
         if is_demo_request(request):
             return bitcoin_tools.get_demo_transaction(txid)
-        return bitcoin_tools.get_transaction(txid)
+        return await run_blocking(bitcoin_tools.get_transaction, txid)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
 
@@ -97,7 +103,7 @@ async def address(
     try:
         if is_demo_request(request):
             return bitcoin_tools.get_demo_address(address, utxo_limit)
-        return bitcoin_tools.get_address(address, utxo_limit)
+        return await run_blocking(bitcoin_tools.get_address, address, utxo_limit)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
 
@@ -107,7 +113,7 @@ async def price(request: Request):
     return (
         bitcoin_tools.get_demo_price()
         if is_demo_request(request)
-        else bitcoin_tools.get_price()
+        else await run_blocking(bitcoin_tools.get_price)
     )
 
 
@@ -119,7 +125,7 @@ async def price_history(
     try:
         if is_demo_request(request):
             return bitcoin_tools.get_demo_price_history(range_key)
-        return bitcoin_tools.get_price_history(range_key)
+        return await run_blocking(bitcoin_tools.get_price_history, range_key)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
 
@@ -129,7 +135,7 @@ async def recent_blocks(request: Request, limit: int = Query(8, ge=1, le=15)):
     return (
         bitcoin_tools.get_demo_recent_blocks(limit)
         if is_demo_request(request)
-        else bitcoin_tools.get_recent_blocks(limit)
+        else await run_blocking(bitcoin_tools.get_recent_blocks, limit)
     )
 
 
@@ -138,7 +144,7 @@ async def difficulty_adjustment(request: Request):
     return (
         bitcoin_tools.get_demo_difficulty_adjustment()
         if is_demo_request(request)
-        else bitcoin_tools.get_difficulty_adjustment()
+        else await run_blocking(bitcoin_tools.get_difficulty_adjustment)
     )
 
 
@@ -147,7 +153,7 @@ async def mempool_summary(request: Request):
     return (
         bitcoin_tools.get_demo_mempool_summary()
         if is_demo_request(request)
-        else bitcoin_tools.get_mempool_summary()
+        else await run_blocking(bitcoin_tools.get_mempool_summary)
     )
 
 
@@ -160,7 +166,13 @@ async def bitcoin_chat(http_request: Request, request: BitcoinChatRequest):
     if is_demo_request(http_request):
         result = bitcoin_ai.answer_demo_chat(request.message, session_id, request.timezone, request.level)
     else:
-        result = bitcoin_ai.answer_chat(request.message, session_id, request.timezone, request.level)
+        result = await run_blocking(
+            bitcoin_ai.answer_chat,
+            request.message,
+            session_id,
+            request.timezone,
+            request.level,
+        )
 
     cookie_session_id = result["session_id"]
     body = {key: value for key, value in result.items() if key != "session_id"}

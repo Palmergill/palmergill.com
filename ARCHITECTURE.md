@@ -43,6 +43,7 @@ Important routes:
 
 - `/api/stocks/*`
 - `/api/poker/*` (includes the `GET /api/poker/games/{game_id}/ws` WebSocket push channel)
+- `/api/craps/*`
 - `/api/bitcoin/*`
 - `/api/analytics/*` (public client analytics ingest)
 - `/api/admin/*`
@@ -76,4 +77,4 @@ logs/backend.log
 - Static site hosting serves the root static files and project directories.
 - Vercel rewrites `/api/*` to the Railway API.
 - Railway runs the Dockerized FastAPI backend from `backend/`.
-- `/`, `/docs/`, `/login/`, `/casino/`, `/poker/`, `/craps/`, `/blackjack/`, `/api/poker/*`, `/stock-research/`, `/bitcoin-chat/`, `/api/stocks/*`, `/api/bitcoin/*`, and `/api/analytics/*` are public. Stock and Bitcoin routes serve demo data when unauthenticated; valid app credentials unlock live provider-backed data. Admin, FastAPI docs/OpenAPI JSON, and other API routes require authentication. Protected backend routes return `503` when `APP_AUTH_PASSWORD` is missing.
+- `/`, `/docs/`, `/login/`, `/casino/`, `/poker/`, `/craps/`, `/craps-strategy/`, `/blackjack/`, `/api/poker/*`, `/api/craps/*`, `/stock-research/`, `/bitcoin-chat/`, `/api/stocks/*`, `/api/bitcoin/*`, and `/api/analytics/*` are public. Stock and Bitcoin routes serve demo data when unauthenticated; valid app credentials unlock live provider-backed data. Admin, FastAPI docs/OpenAPI JSON, and other API routes require authentication. Protected backend routes return `503` when `APP_AUTH_PASSWORD` is missing.

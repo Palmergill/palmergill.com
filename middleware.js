@@ -13,8 +13,10 @@ const authFailureStore = new Map();
 
 const PUBLIC_PREFIXES = [
   '/api/analytics',
+  '/api/craps',
   '/poker',
   '/craps',
+  '/craps-strategy',
   '/api/poker',
   '/login/session',
   '/login/logout',

@@ -14,6 +14,7 @@ The active static site lives at the repo root:
 - `casino/`
 - `poker/`
 - `craps/`
+- `craps-strategy/`
 - `blackjack/`
 - `bitcoin-chat/`
 - `admin/`
@@ -23,9 +24,9 @@ Production static hosting should serve those files directly. `vercel.json` rewri
 Vercel middleware keeps `/` public and requires Basic Auth for:
 
 - `/admin/*`
-- `/api/*`, except `/api/poker/*`, `/api/stocks/*`, `/api/bitcoin/*`, and `/api/analytics/*`
+- `/api/*`, except `/api/poker/*`, `/api/craps/*`, `/api/stocks/*`, `/api/bitcoin/*`, and `/api/analytics/*`
 
-`/docs/*`, `/login/*`, `/stock-research/*`, `/bitcoin-chat/*`, `/poker/*`, `/craps/*`, `/blackjack/*`, `/api/poker/*`, `/api/stocks/*`, `/api/bitcoin/*`, and `/api/analytics/*` are public. Unauthenticated stock and Bitcoin API requests run in demo mode; valid app credentials unlock the live provider-backed paths. The login page posts to `/login/session`, which sets a signed HttpOnly session cookie for `/admin/*` and protected API requests. Basic Auth remains supported for direct scripted access.
+`/docs/*`, `/login/*`, `/stock-research/*`, `/bitcoin-chat/*`, `/poker/*`, `/craps/*`, `/craps-strategy/*`, `/blackjack/*`, `/api/poker/*`, `/api/craps/*`, `/api/stocks/*`, `/api/bitcoin/*`, and `/api/analytics/*` are public. Unauthenticated stock and Bitcoin API requests run in demo mode; valid app credentials unlock the live provider-backed paths. The login page posts to `/login/session`, which sets a signed HttpOnly session cookie for `/admin/*` and protected API requests. Basic Auth remains supported for direct scripted access.
 
 Configure these environment variables in Vercel:
 
@@ -50,7 +51,7 @@ Health check:
 /health
 ```
 
-The backend mirrors the same auth model for protected API docs, `/api/*` routes, and locally served app folders. Poker, craps, blackjack, login, `/api/poker/*`, and `/api/analytics/*` remain public in the backend. Stock research, Bitcoin chat, `/api/stocks/*`, and `/api/bitcoin/*` allow unauthenticated demo-mode responses and use live providers only after valid app credentials are supplied. Admin, FastAPI docs/OpenAPI JSON, and other `/api/*` routes are protected. Protected routes return `503` if `APP_AUTH_PASSWORD` is missing, so set the same `APP_AUTH_USERNAME` and `APP_AUTH_PASSWORD` values in Railway to keep direct backend access usable and protected.
+The backend mirrors the same auth model for protected API docs, `/api/*` routes, and locally served app folders. Poker, craps, craps-strategy, blackjack, login, `/api/poker/*`, `/api/craps/*`, and `/api/analytics/*` remain public in the backend. Stock research, Bitcoin chat, `/api/stocks/*`, and `/api/bitcoin/*` allow unauthenticated demo-mode responses and use live providers only after valid app credentials are supplied. Admin, FastAPI docs/OpenAPI JSON, and other `/api/*` routes are protected. Protected routes return `503` if `APP_AUTH_PASSWORD` is missing, so set the same `APP_AUTH_USERNAME` and `APP_AUTH_PASSWORD` values in Railway to keep direct backend access usable and protected.
 
 The root Railway deployment uses the root `Dockerfile`, which copies only `backend/`.
 

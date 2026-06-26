@@ -636,6 +636,15 @@ function playerAuthHeaders(headers = {}) {
         : { ...headers };
 }
 
+function calculateRaiseSizeForRequest(totalCommitment, currentBet, playerBet) {
+    const toCall = Math.max(0, (Number(currentBet) || 0) - (Number(playerBet) || 0));
+    return Math.max(0, (Number(totalCommitment) || 0) - toCall);
+}
+
+if (typeof window !== 'undefined') {
+    window.PokerRaiseMath = { calculateRaiseSizeForRequest };
+}
+
 // DOM Elements
 const screens = {
     start: document.getElementById('start-screen'),
@@ -1292,7 +1301,10 @@ function connectGameWs(gid) {
     try {
         const ws = new WebSocket(buildGameWsUrl(gid));
         gameWs = ws;
-        ws.onopen = () => { gameWsReconnectAttempts = 0; };
+        ws.onopen = () => {
+            gameWsReconnectAttempts = 0;
+            ws.send(JSON.stringify({ player_id: playerId, player_token: playerToken }));
+        };
         ws.onmessage = (event) => {
             try {
                 const msg = JSON.parse(event.data);
@@ -1360,7 +1372,7 @@ async function playerAction(action) {
     
     let amount = null;
     if (action === 'raise') {
-        amount = raiseAmount;
+        amount = getRaiseSizeForRequest(raiseAmount);
     }
     
     isRequestPending = true;
@@ -1403,6 +1415,11 @@ async function playerAction(action) {
     } finally {
         isRequestPending = false;
     }
+}
+
+function getRaiseSizeForRequest(totalCommitment) {
+    const myPlayer = gameState?.players?.find(p => p.id === playerId);
+    return calculateRaiseSizeForRequest(totalCommitment, gameState?.current_bet, myPlayer?.bet);
 }
 
 function showRaiseControls() {
@@ -2038,10 +2055,11 @@ function showHandResult() {
                 board
             });
         } else if (myPlayer) {
-            StatsManager.recordHandLoss(myPlayer.bet || 0);
+            const amountLost = myPlayer.total_bet || myPlayer.bet || 0;
+            StatsManager.recordHandLoss(amountLost);
             StatsManager.recordHand({
                 result: 'loss',
-                amount: -(myPlayer.bet || 0),
+                amount: -amountLost,
                 handName,
                 holeCards,
                 board

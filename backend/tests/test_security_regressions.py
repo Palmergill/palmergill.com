@@ -11,6 +11,7 @@ from app.main import (
     safe_next_path,
 )
 from app.routers import analytics as analytics_router
+from app.routers import bitcoin as bitcoin_router
 from app.routers.admin import cleanup_old_logs
 from app.routers.analytics import cleanup_old_analytics, record_analytics_event, safe_json
 from app.routers import poker
@@ -18,6 +19,7 @@ from app.routers.bitcoin import BITCOIN_SESSION_COOKIE
 from app.services import bitcoin_ai, bitcoin_tools
 from app.poker_ai import AIManager
 from app.poker_game import PokerGame
+from app.services.polygon_client import polygon_client
 from datetime import datetime, timedelta, timezone
 import asyncio
 import json
@@ -266,6 +268,26 @@ def test_bitcoin_address_lookup_returns_demo_utxos_without_auth():
     assert body["utxos"][0]["value_sats"] == 125000
 
 
+def test_bitcoin_live_status_runs_blocking_provider_off_loop(monkeypatch):
+    monkeypatch.setenv("APP_AUTH_USERNAME", "palmer")
+    monkeypatch.setenv("APP_AUTH_PASSWORD", "secret")
+    auth_client = TestClient(app)
+    auth_client.cookies.set(SESSION_COOKIE_NAME, create_app_session_token("palmer", "secret"))
+    calls = []
+
+    async def fake_run_blocking(func, *args, **kwargs):
+        calls.append((func.__name__, args, kwargs))
+        return {"source": "node", "blocks": 840000}
+
+    monkeypatch.setattr(bitcoin_router, "run_blocking", fake_run_blocking)
+
+    response = auth_client.get("/api/bitcoin/status")
+
+    assert response.status_code == 200
+    assert response.json()["source"] == "node"
+    assert calls == [("get_node_status", (), {})]
+
+
 def test_demo_bitcoin_address_lookup_normalizes_address_and_uses_hex_hash():
     address = "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kygt080"
     body = bitcoin_tools.get_demo_address(f"  {address}  ", utxo_limit=1)
@@ -292,6 +314,27 @@ def test_stock_price_history_rejects_unbounded_day_ranges():
     assert response.status_code == 422
 
 
+def test_polygon_earnings_preserves_zero_values_and_fiscal_metadata():
+    earnings = polygon_client._build_earnings_from_financials([
+        {
+            "filing_date": "2025-01-31",
+            "fiscal_year": "2025",
+            "fiscal_period": "Q4",
+            "financials": {
+                "income_statement": {
+                    "revenues": {"value": 0},
+                    "basic_earnings_per_share": {"value": 0},
+                }
+            },
+        }
+    ])
+
+    assert earnings[0]["revenue"] == 0
+    assert earnings[0]["reported_eps"] == 0
+    assert earnings[0]["fiscal_year"] == "2025"
+    assert earnings[0]["fiscal_quarter"] == "4"
+
+
 def test_log_redaction_removes_sensitive_query_values():
     message = '127.0.0.1 - "GET /api/poker/games/abc?player_id=p0&player_token=secret123 HTTP/1.1" 200'
 
@@ -316,6 +359,34 @@ def test_analytics_redacts_sensitive_metadata_values():
     assert "secret\"" not in payload
     assert '"api_key":"abc"' not in payload
     assert "[REDACTED]" in payload
+
+
+def test_public_analytics_rejects_oversized_metadata():
+    payload = {
+        "event_type": "app_event",
+        "event_name": "too_large",
+        "app": "test",
+        "path": "/test",
+        "metadata": {"blob": "x" * 9000},
+    }
+
+    response = client.post("/api/analytics/events", json=payload)
+
+    assert response.status_code == 422
+
+
+def test_public_analytics_rejects_deep_metadata():
+    payload = {
+        "event_type": "app_event",
+        "event_name": "too_deep",
+        "app": "test",
+        "path": "/test",
+        "metadata": {"a": {"b": {"c": {"d": {"e": {"f": {"g": "too deep"}}}}}}},
+    }
+
+    response = client.post("/api/analytics/events", json=payload)
+
+    assert response.status_code == 422
 
 
 def test_analytics_and_log_retention_prune_old_rows():
