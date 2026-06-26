@@ -12,6 +12,7 @@ let currentOddsTarget = null;
 let nextComeBetId = 1;
 let isRolling = false;
 let rollResultTimer = null;
+let outcomeAnimationTimer = null;
 let selectedChip = 5;
 
 // Multiple Come/Don't Come bets: array of { id, point: null|number, amount: number, odds: number }
@@ -70,6 +71,36 @@ function showRollResultAnimation(amount) {
         burst.classList.remove('active');
         rollResultTimer = null;
     }, 1200);
+}
+
+function showOutcomeAnimation(amount) {
+    const app = document.querySelector('.craps-app');
+    const splash = document.getElementById('outcomeSplash');
+    const text = document.getElementById('outcomeSplashText');
+    if (outcomeAnimationTimer) clearTimeout(outcomeAnimationTimer);
+    if (!app || !splash || !text) return;
+
+    app.classList.remove('roll-win', 'roll-loss');
+    splash.className = 'outcome-splash';
+    text.textContent = '';
+
+    if (amount === 0) {
+        outcomeAnimationTimer = null;
+        return;
+    }
+
+    const isWin = amount > 0;
+    const kind = isWin ? 'win' : 'loss';
+    text.textContent = (isWin ? 'WIN +$' : 'LOSS -$') + Math.abs(amount).toLocaleString();
+    splash.offsetHeight;
+    app.classList.add('roll-' + kind);
+    splash.classList.add(kind, 'active');
+
+    outcomeAnimationTimer = setTimeout(() => {
+        app.classList.remove('roll-win', 'roll-loss');
+        splash.classList.remove('active');
+        outcomeAnimationTimer = null;
+    }, 1500);
 }
 
 // ── UI: Dice ──
@@ -1322,6 +1353,7 @@ function resolveRoll(d1, d2) {
     setStatus(statusMsg);
     const netRoll = winnings - resolvedStake;
     showRollResultAnimation(netRoll);
+    showOutcomeAnimation(netRoll);
     if (casinoProfile && resolvedStake > 0) {
         casinoProfile.recordSession('craps', {
             handsPlayed: 1,

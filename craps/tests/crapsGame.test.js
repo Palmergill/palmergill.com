@@ -41,6 +41,9 @@ function readState(window) {
     rollDisabled: window.document.getElementById('rollButton').disabled,
     resultText: window.document.getElementById('rollResultBurst').textContent,
     resultClass: window.document.getElementById('rollResultBurst').className,
+    outcomeText: window.document.getElementById('outcomeSplashText').textContent,
+    outcomeClass: window.document.getElementById('outcomeSplash').className,
+    appClass: window.document.querySelector('.craps-app').className,
     phaseText: window.document.getElementById('phaseText').textContent,
     phaseHint: window.document.getElementById('phaseHint').textContent,
     pointDisplay: window.document.getElementById('pointDisplay').textContent,
@@ -443,6 +446,10 @@ describe('craps game regressions', () => {
     expect(state.resultText).toBe('-$5');
     expect(state.resultClass).toContain('loss');
     expect(state.resultClass).toContain('active');
+    expect(state.outcomeText).toBe('LOSS -$5');
+    expect(state.outcomeClass).toContain('loss');
+    expect(state.outcomeClass).toContain('active');
+    expect(state.appClass).toContain('roll-loss');
   });
 
   test('winning rolls show a net win animation', () => {
@@ -456,6 +463,10 @@ describe('craps game regressions', () => {
     expect(state.resultText).toBe('+$10');
     expect(state.resultClass).toContain('win');
     expect(state.resultClass).toContain('active');
+    expect(state.outcomeText).toBe('WIN +$10');
+    expect(state.outcomeClass).toContain('win');
+    expect(state.outcomeClass).toContain('active');
+    expect(state.appClass).toContain('roll-win');
   });
 
   test('pushes do not show a win or loss animation', () => {
@@ -468,6 +479,10 @@ describe('craps game regressions', () => {
     expect(state.balance).toBe(1000);
     expect(state.resultText).toBe('');
     expect(state.resultClass).toBe('roll-result-burst');
+    expect(state.outcomeText).toBe('');
+    expect(state.outcomeClass).toBe('outcome-splash');
+    expect(state.appClass).not.toContain('roll-win');
+    expect(state.appClass).not.toContain('roll-loss');
   });
 });
 

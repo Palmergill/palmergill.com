@@ -1164,6 +1164,100 @@ button:disabled {
     color: var(--loss);
 }
 
+.outcome-splash {
+    position: absolute;
+    inset: 0;
+    z-index: 7;
+    display: grid;
+    place-items: center;
+    opacity: 0;
+    overflow: hidden;
+    pointer-events: none;
+}
+
+.outcome-splash::before,
+.outcome-splash::after {
+    content: "";
+    position: absolute;
+    width: 12px;
+    height: 12px;
+    border-radius: 999px;
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.6);
+}
+
+.outcome-splash span {
+    position: relative;
+    z-index: 1;
+    display: inline-grid;
+    min-width: 168px;
+    place-items: center;
+    padding: 12px 18px;
+    border: 2px solid currentColor;
+    border-radius: 999px;
+    background: rgba(8, 16, 12, 0.92);
+    box-shadow: 0 22px 46px rgba(0, 0, 0, 0.46), inset 0 1px 0 rgba(255, 255, 255, 0.18);
+    font-family: var(--font-display);
+    font-size: 1.45rem;
+    font-weight: 950;
+    line-height: 1;
+    text-align: center;
+}
+
+.outcome-splash.win {
+    color: var(--win);
+}
+
+.outcome-splash.loss {
+    color: var(--loss);
+}
+
+.outcome-splash.win.active {
+    animation: outcomeWinSplash 1.5s ease-out forwards;
+}
+
+.outcome-splash.loss.active {
+    animation: outcomeLossSplash 1.5s ease-out forwards;
+}
+
+.outcome-splash.win.active span {
+    animation: outcomeWinText 1.5s cubic-bezier(0.18, 0.8, 0.22, 1) forwards;
+}
+
+.outcome-splash.loss.active span {
+    animation: outcomeLossText 1.5s ease-out forwards;
+}
+
+.outcome-splash.win.active::before,
+.outcome-splash.win.active::after {
+    opacity: 1;
+    animation: winChipScatter 1.05s ease-out forwards;
+    box-shadow:
+        -108px -58px 0 0 var(--brass),
+        -62px 76px 0 1px #f7f1df,
+        78px -70px 0 0 var(--brass),
+        116px 42px 0 1px var(--win),
+        28px 94px 0 0 #f7f1df;
+}
+
+.outcome-splash.win.active::after {
+    animation-delay: 90ms;
+    box-shadow:
+        -126px 32px 0 0 #f7f1df,
+        -34px -96px 0 1px var(--win),
+        42px 82px 0 0 var(--brass),
+        104px -24px 0 1px #f7f1df,
+        132px 76px 0 0 var(--brass);
+}
+
+.craps-app.roll-win .felt {
+    animation: tableWinGlow 1.5s ease-out;
+}
+
+.craps-app.roll-loss .felt {
+    animation: tableLossJolt 420ms ease-out, tableLossFade 1.5s ease-out;
+}
+
 .rules-panel {
     position: relative;
     width: min(100%, 430px);
@@ -1205,6 +1299,58 @@ button:disabled {
 @keyframes lossPulse {
     0%, 100% { opacity: 1; }
     50% { opacity: 0.45; box-shadow: inset 0 0 0 3px rgba(216, 97, 90, 0.62); }
+}
+
+@keyframes outcomeWinSplash {
+    0% { opacity: 0; }
+    12%, 72% { opacity: 1; }
+    100% { opacity: 0; }
+}
+
+@keyframes outcomeLossSplash {
+    0% { opacity: 0; background: rgba(216, 97, 90, 0); }
+    16% { opacity: 1; background: rgba(216, 97, 90, 0.12); }
+    70% { opacity: 1; background: rgba(216, 97, 90, 0.04); }
+    100% { opacity: 0; background: rgba(216, 97, 90, 0); }
+}
+
+@keyframes outcomeWinText {
+    0% { transform: translateY(12px) scale(0.72); filter: brightness(1); }
+    22% { transform: translateY(0) scale(1.16); filter: brightness(1.35); }
+    44% { transform: scale(0.98); }
+    100% { transform: translateY(-18px) scale(0.96); filter: brightness(1); }
+}
+
+@keyframes outcomeLossText {
+    0% { transform: translateX(0) scale(0.94); }
+    12% { transform: translateX(-9px) scale(1.04); }
+    24% { transform: translateX(8px) scale(1.02); }
+    36% { transform: translateX(-5px) scale(1); }
+    54% { transform: translateX(0) scale(1); }
+    100% { transform: translateY(14px) scale(0.94); }
+}
+
+@keyframes winChipScatter {
+    0% { transform: translate(-50%, -50%) scale(0.45) rotate(0deg); opacity: 0; }
+    16% { opacity: 1; }
+    100% { transform: translate(-50%, -50%) scale(1.4) rotate(32deg); opacity: 0; }
+}
+
+@keyframes tableWinGlow {
+    0%, 100% { box-shadow: inset 0 0 0 2px rgba(201, 162, 75, 0.35), inset 0 22px 60px rgba(255, 255, 255, 0.04), inset 0 -38px 80px rgba(0, 0, 0, 0.28); }
+    28% { box-shadow: inset 0 0 0 3px rgba(70, 194, 142, 0.74), inset 0 0 56px rgba(70, 194, 142, 0.34), 0 0 34px rgba(70, 194, 142, 0.22); }
+}
+
+@keyframes tableLossJolt {
+    0%, 100% { transform: translateX(0); }
+    22% { transform: translateX(-4px); }
+    44% { transform: translateX(4px); }
+    66% { transform: translateX(-2px); }
+}
+
+@keyframes tableLossFade {
+    0%, 100% { filter: none; }
+    28% { filter: saturate(0.72) brightness(0.78); }
 }
 
 .win-flash {
