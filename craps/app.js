@@ -200,15 +200,16 @@ function placeSelectedChip(betType) {
         setStatus('Contract bets stay until resolved');
         return;
     }
-    const validationError = getBetValidationError(betType, selectedChip);
+    const chipAmount = getChipBetAmount(betType, selectedChip);
+    const validationError = getBetValidationError(betType, chipAmount);
     if (validationError) {
         setStatus(validationError);
         openBetModal(betType);
-        document.getElementById('betInput').value = selectedChip;
+        document.getElementById('betInput').value = chipAmount;
         document.getElementById('modalCurrentBet').textContent = validationError;
         return;
     }
-    applyFlatBet(betType, selectedChip);
+    applyFlatBet(betType, chipAmount);
 }
 
 // ── Bet Modal ──
@@ -291,7 +292,9 @@ function openBetModal(betType) {
     setTimeout(() => document.getElementById('betInput').focus(), 100);
 }
 
-function setModalAmt(amt) { document.getElementById('betInput').value = amt; }
+function setModalAmt(amt) {
+    document.getElementById('betInput').value = currentModalBet ? getChipBetAmount(currentModalBet, Number(amt)) : amt;
+}
 
 function closeBetModal() {
     document.getElementById('betModal').classList.remove('active');
@@ -301,6 +304,12 @@ function closeBetModal() {
 
 function getBetUnit(betType) {
     return rules.getBetUnit(betType);
+}
+
+function getChipBetAmount(betType, chipAmount) {
+    const unit = getBetUnit(betType);
+    if (chipAmount < unit) return chipAmount === 5 ? unit : chipAmount;
+    return Math.floor(chipAmount / unit) * unit;
 }
 
 function getBetValidationError(betType, amount) {
@@ -1169,7 +1178,7 @@ function resolveRoll(d1, d2) {
     resolvedStake += oneRollResult.resolvedStake;
     messages.push(...oneRollResult.messages);
 
-    const hardwayResult = rules.resolveHardwayBets(bets, total, isHard);
+    const hardwayResult = rules.resolveHardwayBets(bets, total, isHard, wasComeOutRoll);
     Object.assign(bets, hardwayResult.bets);
     winnings += hardwayResult.winnings;
     resolvedStake += hardwayResult.resolvedStake;

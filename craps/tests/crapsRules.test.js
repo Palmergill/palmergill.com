@@ -1,17 +1,19 @@
 const rules = require('../crapsRules');
 
 describe('craps rules helpers', () => {
-  test('uses $5 units for all numbers so chips can be placed', () => {
+  test('uses full-payout units for place 6 and 8', () => {
     expect(rules.getBetUnit('passLine')).toBe(5);
-    expect(rules.getBetUnit('place6')).toBe(5);
-    expect(rules.getBetUnit('place8')).toBe(5);
+    expect(rules.getBetUnit('place5')).toBe(5);
+    expect(rules.getBetUnit('place6')).toBe(6);
+    expect(rules.getBetUnit('place8')).toBe(6);
+    expect(rules.getBetUnit('place9')).toBe(5);
   });
 
   test('validates minimums, increments, and balance', () => {
     expect(rules.validateBetAmount('passLine', 5, 100)).toBe('');
     expect(rules.validateBetAmount('passLine', 4, 100)).toBe('Minimum bet is $5');
-    expect(rules.validateBetAmount('place6', 25, 100)).toBe('');
-    expect(rules.validateBetAmount('place6', 7, 100)).toBe('Bet must be in $5 increments');
+    expect(rules.validateBetAmount('place6', 24, 100)).toBe('');
+    expect(rules.validateBetAmount('place6', 25, 100)).toBe('Bet must be in $6 increments');
     expect(rules.validateBetAmount('passLine', 105, 100)).toBe('Not enough balance');
   });
 
@@ -99,6 +101,15 @@ describe('craps rules helpers', () => {
     });
     expect(sevenOut.bets.hard4).toBe(0);
     expect(sevenOut.bets.hard10).toBe(0);
+
+    const comeOutSeven = rules.resolveHardwayBets({ hard4: 5, hard10: 5 }, 7, false, true);
+    expect(comeOutSeven).toMatchObject({
+      winnings: 0,
+      resolvedStake: 0,
+      messages: []
+    });
+    expect(comeOutSeven.bets.hard4).toBe(5);
+    expect(comeOutSeven.bets.hard10).toBe(5);
   });
 
   test('pays place bets on their number without clearing them', () => {
@@ -110,7 +121,7 @@ describe('craps rules helpers', () => {
       passLine: 25
     }, 6);
 
-    expect(result.winnings).toBe(13);
+    expect(result.winnings).toBe(7);
     expect(result.resolvedStake).toBe(0);
     expect(result.messages).toEqual(['Place 6 wins!']);
     expect(result.bets.place6).toBe(6);

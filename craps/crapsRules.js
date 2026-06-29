@@ -83,10 +83,8 @@
         place10: { total: 10, numerator: 9, denominator: 5, message: "Place 10 wins!" }
     });
 
-    // All numbers use $5 units so the standard chips ($5/$25/$100/$500) can be
-    // placed by tapping. Place 6/8 still pay 7:6, rounded down for non-$6
-    // amounts (handled in resolvePlaceBetWins).
-    function getBetUnit() {
+    function getBetUnit(betType) {
+        if (betType === "place6" || betType === "place8") return 6;
         return 5;
     }
 
@@ -181,8 +179,9 @@
         return result;
     }
 
-    function resolveHardwayBets(bets, total, isHard) {
+    function resolveHardwayBets(bets, total, isHard, isComeOutRoll = false) {
         const result = emptyResolution(bets);
+        if (isComeOutRoll) return result;
         Object.entries(HARDWAY_BETS).forEach(([betType, config]) => {
             const amount = Number(bets[betType] || 0);
             if (amount <= 0) return;
@@ -206,7 +205,7 @@
             const amount = Number(bets[betType] || 0);
             if (amount <= 0 || total !== config.total) return;
 
-            result.winnings += Math.floor(amount * config.numerator / config.denominator) + amount;
+            result.winnings += Math.floor(amount * config.numerator / config.denominator);
             result.messages.push(config.message);
         });
         return result;
