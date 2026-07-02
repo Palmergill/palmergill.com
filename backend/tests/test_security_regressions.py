@@ -18,7 +18,7 @@ from app.routers import poker
 from app.routers.bitcoin import BITCOIN_SESSION_COOKIE
 from app.services import bitcoin_ai, bitcoin_tools
 from app.poker_ai import AIManager
-from app.poker_game import PokerGame
+from app.poker_game import Card, PokerGame, Rank, Suit
 from app.services.polygon_client import polygon_client
 from datetime import datetime, timedelta, timezone
 import asyncio
@@ -80,6 +80,26 @@ def test_poker_state_requires_player_token_header_not_query_string():
     assert header_token_response.status_code == 200
 
 
+def test_get_game_state_does_not_write_a_snapshot():
+    # GET is documented as read-only, but used to call save_game_state_deferred
+    # on every poll — a full-payload DB write per client per poll interval for
+    # zero benefit, since nothing in the handler mutates state.
+    data = create_single_player_game()
+    game_id = data["game_id"]
+    version_after_create = poker._game_save_versions.get(game_id, 0)
+    assert version_after_create > 0
+
+    for _ in range(3):
+        response = client.get(
+            f"/api/poker/games/{game_id}",
+            params={"player_id": data["player_id"]},
+            headers={"X-Player-Token": data["player_token"]},
+        )
+        assert response.status_code == 200
+
+    assert poker._game_save_versions.get(game_id, 0) == version_after_create
+
+
 def test_buy_back_uses_server_defined_amount_for_busted_players():
     data = create_single_player_game()
     game = poker.games[data["game_id"]]
@@ -99,6 +119,114 @@ def test_buy_back_uses_server_defined_amount_for_busted_players():
 
     assert response.status_code == 200
     assert game._get_player(data["player_id"]).chips == poker.BUY_BACK_AMOUNT
+
+
+def test_bitcoin_chat_session_history_evicts_least_recently_used():
+    # _SESSION_MESSAGES is a per-process dict keyed by chat session id with no
+    # prior eviction policy, so it grew for the life of the process. Confirm
+    # the LRU cap actually bounds it and evicts the oldest session once full.
+    original_messages = dict(bitcoin_ai._SESSION_MESSAGES)
+    original_max = bitcoin_ai.MAX_SESSIONS
+    bitcoin_ai._SESSION_MESSAGES.clear()
+    bitcoin_ai.MAX_SESSIONS = 3
+    try:
+        for i in range(3):
+            bitcoin_ai._remember(f"session-{i}", "hi", "hello")
+        assert list(bitcoin_ai._SESSION_MESSAGES.keys()) == ["session-0", "session-1", "session-2"]
+
+        bitcoin_ai._remember("session-3", "hi", "hello")
+        # session-0 was least-recently-used and gets evicted to stay at cap.
+        assert list(bitcoin_ai._SESSION_MESSAGES.keys()) == ["session-1", "session-2", "session-3"]
+
+        # Touching an existing session moves it to the back of the LRU order,
+        # so the next eviction takes the new least-recently-used session.
+        bitcoin_ai._remember("session-1", "again", "again")
+        bitcoin_ai._remember("session-4", "hi", "hello")
+        assert list(bitcoin_ai._SESSION_MESSAGES.keys()) == ["session-3", "session-1", "session-4"]
+    finally:
+        bitcoin_ai.MAX_SESSIONS = original_max
+        bitcoin_ai._SESSION_MESSAGES.clear()
+        bitcoin_ai._SESSION_MESSAGES.update(original_messages)
+
+
+def test_cash_game_start_hand_skips_busted_players():
+    # Non-tournament start_hand used to deal cards to every seat regardless of
+    # chip count and only excluded zero-chip players in tournaments. A busted
+    # cash-game player would get dealt in, occasionally get force-posted a $0
+    # blind and marked all-in, and otherwise sit at the table indefinitely
+    # looking like a live participant until they bought back.
+    game = PokerGame("cash1")
+    for name in ["Hero", "Busted", "Villain"]:
+        game.add_player(name, is_human=False)
+    busted = game.players[1]
+    busted.chips = 0
+    game.dealer_index = 1  # button sits on the busted seat
+
+    assert game.start_hand() is True
+
+    assert busted.hand == []
+    assert busted.folded is True
+    assert busted.is_all_in is True
+    assert game.dealer_index != 1
+
+    for player in (game.players[0], game.players[2]):
+        assert len(player.hand) == 2
+        assert player.folded is False
+
+
+def test_cash_game_start_hand_declines_with_fewer_than_two_funded_players():
+    game = PokerGame("cash2")
+    for name in ["Hero", "Busted"]:
+        game.add_player(name, is_human=False)
+    game.players[1].chips = 0
+
+    assert game.start_hand() is False
+    assert game.phase == "showdown"
+
+
+def test_showdown_does_not_reveal_folded_hands():
+    # At showdown, to_dict used to reveal every player's hole cards, including
+    # players who folded pre-flop — leaking real strategic information (what
+    # an opponent folded) to anyone polling the state endpoint.
+    game = PokerGame("g1")
+    hero = game.add_player("Hero", is_human=True)
+    villain = game.add_player("Villain", is_human=True)
+    hero.hand = [Card(Suit.HEARTS, Rank.ACE), Card(Suit.HEARTS, Rank.KING)]
+    villain.hand = [Card(Suit.CLUBS, Rank.TWO), Card(Suit.CLUBS, Rank.THREE)]
+    villain.folded = True
+    game.phase = "showdown"
+
+    state = game.to_dict(for_player=hero.id)
+    players_by_id = {p["id"]: p for p in state["players"]}
+
+    assert players_by_id[hero.id]["hand"] != []
+    assert players_by_id[villain.id]["hand"] == []
+
+
+def test_buy_back_is_rejected_in_tournaments():
+    # A busted tournament player must stay eliminated — buy-back is a cash-game
+    # feature only. Without a tournament guard, a busted player could rebuy and
+    # `tournament_standings()` would then list them twice (once as a survivor,
+    # once in the eliminated tail), corrupting every rank below them.
+    response = client.post(
+        "/api/poker/games",
+        json={"player_name": "Hero", "game_type": "tournament"},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    game = poker.games[data["game_id"]]
+    player = game._get_player(data["player_id"])
+    player.chips = 0
+    player.is_all_in = True
+    game.phase = "showdown"
+
+    response = client.post(
+        f"/api/poker/games/{data['game_id']}/buy-back",
+        json={"player_id": data["player_id"], "player_token": data["player_token"]},
+    )
+
+    assert response.status_code == 400
+    assert game._get_player(data["player_id"]).chips == 0
 
 
 def test_tournament_next_hand_skips_eliminated_players():
@@ -420,6 +548,98 @@ def test_analytics_and_log_retention_prune_old_rows():
         db.close()
 
 
+def test_analytics_summary_and_timeseries_use_sql_aggregation(monkeypatch):
+    # analytics_summary/timeseries used to pull every row in the window into
+    # Python and build several Counters/dict-buckets by hand. They were
+    # rewritten to grouped SQL queries; this seeds a small, fully-determined
+    # dataset and checks the aggregates come back exactly right.
+    monkeypatch.setenv("APP_AUTH_USERNAME", "palmer")
+    monkeypatch.setenv("APP_AUTH_PASSWORD", "secret")
+    auth_client = TestClient(app)
+    auth_client.cookies.set(SESSION_COOKIE_NAME, create_app_session_token("palmer", "secret"))
+
+    db = SessionLocal()
+    try:
+        record_analytics_event(
+            db, event_type="page_view", app="craps-strategy", path="/craps-strategy/",
+            referrer="https://www.google.com/search?q=x", visitor_id="v1", session_id="s1",
+        )
+        record_analytics_event(
+            db, event_type="page_view", app="craps-strategy", path="/craps-strategy/",
+            referrer="https://www.google.com/search?q=y", visitor_id="v1", session_id="s1",
+        )
+        record_analytics_event(
+            db, event_type="page_view", app="poker", path="/poker/",
+            referrer="https://www.bing.com/search?q=z", visitor_id="v2", session_id="s2",
+        )
+        record_analytics_event(
+            db, event_type="request", app="api:stocks", path="/api/stocks/AAPL",
+            status_code=200, duration_ms=100, visitor_id="v1", session_id="s1",
+        )
+        record_analytics_event(
+            db, event_type="request", app="api:stocks", path="/api/stocks/MSFT",
+            status_code=500, duration_ms=300, visitor_id="v2", session_id="s2", is_admin=True,
+        )
+        record_analytics_event(
+            db, event_type="request", app="api:craps", path="/api/craps/translate",
+            status_code=404, duration_ms=200, visitor_id="v1", session_id="s1", is_authenticated=True,
+        )
+        record_analytics_event(
+            db, event_type="app_event", app="craps", event_name="craps_strategy_simulated",
+            visitor_id="v1", session_id="s1",
+        )
+        record_analytics_event(
+            db, event_type="app_event", app="craps", event_name="craps_strategy_simulated",
+            visitor_id="v2", session_id="s2",
+        )
+        record_analytics_event(
+            db, event_type="app_event", app="blackjack", event_name="blackjack_win",
+            visitor_id="v1", session_id="s1",
+        )
+    finally:
+        db.close()
+
+    summary = auth_client.get("/api/admin/analytics/summary").json()
+    assert summary["total"] == 9
+    assert summary["page_views"] == 3
+    assert summary["requests"] == 3
+    assert summary["app_events"] == 3
+    assert summary["unique_visitors"] == 2
+    assert summary["sessions"] == 2
+    assert summary["success"] == 7
+    assert summary["warning"] == 1
+    assert summary["error"] == 1
+    assert summary["authenticated"] == 1
+    assert summary["admin"] == 1
+    assert summary["public"] == 8
+    assert summary["avg_duration_ms"] == 200.0
+
+    def by_name(entries):
+        return {entry["name"]: entry["count"] for entry in entries}
+
+    assert by_name(summary["top_pages"]) == {"/craps-strategy/": 2, "/poker/": 1}
+    assert by_name(summary["top_apps"]) == {
+        "craps-strategy": 2, "poker": 1, "api:stocks": 2, "api:craps": 1, "craps": 2, "blackjack": 1,
+    }
+    assert by_name(summary["casino_app_events"]) == {"craps": 2, "blackjack": 1}
+    assert by_name(summary["top_events"]) == {"craps_strategy_simulated": 2, "blackjack_win": 1}
+    assert by_name(summary["top_referrers"]) == {"www.google.com": 2, "www.bing.com": 1}
+
+    assert len(summary["recent_errors"]) == 1
+    assert summary["recent_errors"][0]["path"] == "/api/stocks/MSFT"
+    assert summary["recent_errors"][0]["status_code"] == 500
+
+    timeseries = auth_client.get("/api/admin/analytics/timeseries").json()
+    assert len(timeseries["points"]) == 1  # all seeded events land in the current hour
+    point = timeseries["points"][0]
+    assert point["success"] == 7
+    assert point["warning"] == 1
+    assert point["error"] == 1
+    assert point["page_views"] == 3
+    assert point["requests"] == 3
+    assert point["timestamp"].endswith("Z")
+
+
 def test_admin_debug_and_export_endpoints(monkeypatch):
     monkeypatch.setenv("APP_AUTH_USERNAME", "palmer")
     monkeypatch.setenv("APP_AUTH_PASSWORD", "secret")
@@ -491,6 +711,21 @@ def test_login_session_sets_signed_session_cookie(monkeypatch):
     assert protected_response.status_code == 404
 
 
+def test_logout_rejects_get_and_only_clears_session_via_post():
+    # A GET endpoint that clears the session cookie is a CSRF vector — any
+    # third-party page can trigger it with a plain <img src="/login/logout">.
+    # Nothing in the app ever links to it as a GET, so only POST should work.
+    auth_client = TestClient(app, follow_redirects=False)
+    auth_client.cookies.set(SESSION_COOKIE_NAME, create_app_session_token("palmer", "secret"))
+
+    get_response = auth_client.get("/login/logout")
+    assert get_response.status_code == 405
+
+    post_response = auth_client.post("/login/logout")
+    assert post_response.status_code == 200
+    assert f"{SESSION_COOKIE_NAME}=" in post_response.headers["set-cookie"]
+
+
 def test_login_session_redirects_to_safe_next_path(monkeypatch):
     monkeypatch.setenv("APP_AUTH_USERNAME", "palmer")
     monkeypatch.setenv("APP_AUTH_PASSWORD", "secret")
@@ -510,6 +745,16 @@ def test_safe_next_path_rejects_external_and_login_targets():
     assert safe_next_path("//example.com/admin/") == "/"
     assert safe_next_path("/login/?next=/bitcoin-chat/") == "/"
     assert safe_next_path("/admin/?tab=logs#latest") == "/admin/?tab=logs#latest"
+
+
+def test_safe_next_path_rejects_backslash_scheme_bypass():
+    # urlsplit does not treat "\" as a path separator, but browsers do — so
+    # "/\evil.com" parses with an empty netloc/scheme and a path starting
+    # with "/" (passing urlsplit-based checks), yet window.location.assign()
+    # navigates to https://evil.com. Reject any "next" containing a backslash.
+    assert safe_next_path("/\\evil.com") == "/"
+    assert safe_next_path("\\\\evil.com") == "/"
+    assert safe_next_path("/admin/\\@evil.com") == "/"
 
 
 def test_signed_session_cookie_allows_protected_api_without_basic_auth(monkeypatch):
@@ -697,3 +942,31 @@ def test_client_ip_uses_rightmost_proxy_hop(monkeypatch):
     # Client forges a fake leftmost IP; we must read the trusted rightmost hop.
     assert client_ip(_Req("1.2.3.4, 9.9.9.9")) == "9.9.9.9"
     assert client_ip(_Req("203.0.113.7")) == "203.0.113.7"
+
+
+def test_poker_rate_limit_uses_shared_rightmost_hop_helper(monkeypatch):
+    # poker.py used to keep its own _client_ip that read the leftmost (client-
+    # forgeable) X-Forwarded-For entry. An attacker could rotate a fake
+    # leftmost IP on every request to spread load across buckets and dodge
+    # the 60 req/min cap. It must key off the same trusted rightmost hop as
+    # every other rate limiter in the app.
+    import app.main as main_module
+
+    monkeypatch.setattr(main_module, "TRUST_PROXY_HEADERS", True)
+    monkeypatch.setattr(main_module, "TRUSTED_PROXY_HOPS", 1)
+    poker._rate_limit_store.clear()
+
+    last_status = None
+    for i in range(poker._RATE_LIMIT_MAX + 1):
+        response = client.post(
+            "/api/poker/games",
+            json={"player_name": "Spoofer", "game_type": "single"},
+            headers={"X-Forwarded-For": f"10.0.0.{i}, 9.9.9.9"},
+        )
+        last_status = response.status_code
+
+    # All requests shared one bucket (the real, rightmost hop "9.9.9.9")
+    # despite a different forged leftmost entry every time, so the limit
+    # still trips.
+    assert last_status == 429
+    assert list(poker._rate_limit_store.keys()) == ["9.9.9.9"]

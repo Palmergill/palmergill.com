@@ -231,14 +231,14 @@ class PokerGame:
         ]
 
     def _eligible_player_indices(self) -> List[int]:
-        if not self.tournament:
-            return list(range(len(self.players)))
+        # A zero-chip player (busted in a cash game, eliminated in a
+        # tournament) can't post a blind or make a decision that means
+        # anything, so they sit out until they buy back — in every game
+        # mode, not just tournaments.
         return [idx for idx, player in enumerate(self.players) if player.chips > 0]
 
-    def _normalize_tournament_dealer(self, eligible_indices: List[int]) -> None:
-        if not self.tournament or self.dealer_index in eligible_indices:
-            return
-        if not eligible_indices:
+    def _normalize_dealer(self, eligible_indices: List[int]) -> None:
+        if self.dealer_index in eligible_indices or not eligible_indices:
             return
         for offset in range(1, len(self.players) + 1):
             idx = (self.dealer_index + offset) % len(self.players)
@@ -263,7 +263,7 @@ class PokerGame:
             self.winners = self.tournament_standings()[:1] if self.tournament else []
             return False
 
-        self._normalize_tournament_dealer(eligible_indices)
+        self._normalize_dealer(eligible_indices)
 
         self.hand_number += 1
         if self.tournament:
@@ -283,7 +283,7 @@ class PokerGame:
             player.hand = []
             player.bet = 0
             player.total_bet = 0
-            if self.tournament and idx not in eligible_set:
+            if idx not in eligible_set:
                 player.folded = True
                 player.is_all_in = True
             else:
@@ -785,7 +785,10 @@ class PokerGame:
             'pot': self.pot,
             'current_bet': self.current_bet,
             'community_cards': [c.to_dict() for c in self.community_cards],
-            'players': [p.to_dict(show_cards=for_player == p.id or self.phase == 'showdown') for p in self.players],
+            'players': [
+                p.to_dict(show_cards=for_player == p.id or (self.phase == 'showdown' and not p.folded))
+                for p in self.players
+            ],
             'current_player': current.id if current else None,
             'dealer_index': self.dealer_index,
             'winners': self.winners,

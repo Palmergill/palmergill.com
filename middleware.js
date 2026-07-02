@@ -319,14 +319,17 @@ async function handleLoginSession(request, username, password) {
 }
 
 function handleLogout(request) {
-  const url = new URL('/login/', request.url);
-  return new Response(null, {
-    status: 302,
-    headers: {
-      Location: url.toString(),
-      'Set-Cookie': clearSessionCookie(request),
-    },
-  });
+  // POST-only: a GET endpoint that clears the session is a CSRF vector — any
+  // third-party page can trigger it with a plain <img> tag. Nothing in this
+  // app links to /login/logout as a GET, so there is no compatibility cost.
+  if (request.method !== 'POST') {
+    return jsonResponse({ error: 'Method not allowed' }, 405, { Allow: 'POST' });
+  }
+  return jsonResponse(
+    { ok: true },
+    200,
+    { 'Set-Cookie': clearSessionCookie(request) },
+  );
 }
 
 function timingSafeEqual(a, b) {

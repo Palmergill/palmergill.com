@@ -151,6 +151,24 @@ def _analytics_rate_limited(request: Request, now: float | None = None) -> bool:
     return False
 
 
+def sweep_analytics_rate_limit_store(now: float | None = None) -> int:
+    """Drop keys with no attempts left in the window.
+
+    `_analytics_rate_limited` only re-filters the key it was called with, so
+    a visitor IP that posts once and never returns leaves a stale entry
+    behind forever. Called periodically (see app.main) to bound memory on
+    this public, unauthenticated endpoint.
+    """
+    now = time.time() if now is None else now
+    cutoff = now - ANALYTICS_RATE_LIMIT_WINDOW_SECONDS
+    stale_keys = [
+        key for key, attempts in _analytics_rate_limit_store.items() if not any(t > cutoff for t in attempts)
+    ]
+    for key in stale_keys:
+        del _analytics_rate_limit_store[key]
+    return len(stale_keys)
+
+
 def record_analytics_event(
     db: Session,
     *,

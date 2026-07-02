@@ -31,7 +31,20 @@ describe('craps rules helpers', () => {
     expect(rules.calculateOddsToAdd({ point: 4, amount: 10, odds: 0, balance: 100, multiplier: 'max' })).toBe(30);
     expect(rules.calculateOddsToAdd({ point: 4, amount: 10, odds: 20, balance: 100, multiplier: 'max' })).toBe(10);
     expect(rules.calculateOddsToAdd({ point: 4, amount: 10, odds: 0, balance: 12, multiplier: 'max' })).toBe(12);
-    expect(rules.calculateOddsToAdd({ point: 4, amount: 10, odds: 28, balance: 100, multiplier: 'max' })).toBe(0);
+    // Only $2 of room left under max (30 - 28); point 4/10 pays 2:1 so any
+    // whole dollar is a legal increment — top it off rather than rejecting
+    // outright just because the remainder is small.
+    expect(rules.calculateOddsToAdd({ point: 4, amount: 10, odds: 28, balance: 100, multiplier: 'max' })).toBe(2);
+  });
+
+  test('legalOddsAmount allows small whole-dollar amounts below the old $5 floor', () => {
+    // $5 flat, 1x odds on point 5/9 (3:2, increment $2) requests $5, which
+    // floors to $4 — a fully legal, whole-dollar-paying odds bet.
+    expect(rules.legalOddsAmount({ point: 5, requested: 5, remaining: 5, balance: 100, isPass: true })).toBe(4);
+    // $1 of room left is still enough for a $1 odds bet on 4/10 (2:1).
+    expect(rules.legalOddsAmount({ point: 4, requested: 1, remaining: 1, balance: 100, isPass: true })).toBe(1);
+    // Below one increment (point 6/8 needs $5 units) legitimately returns 0.
+    expect(rules.legalOddsAmount({ point: 6, requested: 4, remaining: 4, balance: 100, isPass: true })).toBe(0);
   });
 
   test('resolves one-roll center bets and clears them', () => {

@@ -9,8 +9,8 @@ from __future__ import annotations
 import os
 import csv
 import io
-from collections import Counter, defaultdict
-from datetime import timedelta
+from collections import Counter
+from datetime import datetime, timedelta
 from urllib.parse import urlparse
 from typing import List, Optional
 
@@ -18,9 +18,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy.orm import Session
-from sqlalchemy import desc, or_
+from sqlalchemy import case, desc, func, or_
 
-from app.database import AnalyticsEvent, LogEntry, get_db, utc_now
+from app.database import AnalyticsEvent, LogEntry, get_db, is_postgres, utc_now
 from app.routers.analytics import RETENTION_DAYS, cleanup_old_analytics, classify_outcome
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
@@ -379,33 +379,122 @@ def read_log_file(
     )
 
 
+def _grouped_top(db: Session, column, cutoff, *extra_filters, limit: int = 8):
+    """SELECT column, COUNT(*) ... GROUP BY column ORDER BY COUNT(*) DESC LIMIT.
+
+    Lets the database do the counting and top-N cutoff instead of pulling
+    every row of the window into Python to build a Counter over it.
+    """
+    rows = (
+        db.query(column, func.count())
+        .filter(AnalyticsEvent.timestamp >= cutoff, *extra_filters)
+        .group_by(column)
+        .order_by(desc(func.count()))
+        .limit(limit)
+        .all()
+    )
+    return [{"name": name, "count": count} for name, count in rows]
+
+
 @router.get("/analytics/summary")
 def analytics_summary(
     hours: int = Query(24, ge=1, le=2160),
     db: Session = Depends(get_db),
 ):
-    """Return dashboard-ready analytics aggregates."""
+    """Return dashboard-ready analytics aggregates.
+
+    Each aggregate is its own indexed GROUP BY / COUNT query rather than one
+    `.all()` that pulls the whole window's rows into Python and scans them
+    ~8 times to build Counters — the row count here is unbounded by traffic,
+    while every query below returns at most a handful of rows.
+    """
     cutoff = _cutoff(hours)
-    rows = db.query(AnalyticsEvent).filter(AnalyticsEvent.timestamp >= cutoff).all()
+    window_filter = AnalyticsEvent.timestamp >= cutoff
 
-    outcome_counts = Counter(row.outcome or "success" for row in rows)
-    event_type_counts = Counter(row.event_type or "unknown" for row in rows)
-    top_pages = Counter(row.path for row in rows if row.event_type == "page_view" and row.path)
-    top_apps = Counter(row.app for row in rows if row.app)
-    casino_app_events = Counter(
-        row.app
-        for row in rows
-        if row.event_type == "app_event" and row.app in {"poker", "craps", "blackjack"}
+    total = db.query(func.count()).filter(window_filter).scalar() or 0
+    authenticated = (
+        db.query(func.count()).filter(window_filter, AnalyticsEvent.is_authenticated.is_(True)).scalar() or 0
     )
-    top_events = Counter(row.event_name for row in rows if row.event_type == "app_event" and row.event_name)
-    top_referrers = Counter(_referrer_host(row.referrer) for row in rows if row.event_type == "page_view")
-    authenticated = sum(1 for row in rows if row.is_authenticated)
-    admin = sum(1 for row in rows if row.is_admin)
-    visitors = {row.visitor_id for row in rows if row.visitor_id}
-    sessions = {row.session_id for row in rows if row.session_id}
-    avg_duration_values = [row.duration_ms for row in rows if row.duration_ms is not None and row.event_type == "request"]
-    avg_duration_ms = sum(avg_duration_values) / len(avg_duration_values) if avg_duration_values else 0
+    admin_count = db.query(func.count()).filter(window_filter, AnalyticsEvent.is_admin.is_(True)).scalar() or 0
 
+    event_type_counts = dict(
+        db.query(func.coalesce(AnalyticsEvent.event_type, "unknown"), func.count())
+        .filter(window_filter)
+        .group_by(func.coalesce(AnalyticsEvent.event_type, "unknown"))
+        .all()
+    )
+    outcome_counts = dict(
+        db.query(func.coalesce(AnalyticsEvent.outcome, "success"), func.count())
+        .filter(window_filter)
+        .group_by(func.coalesce(AnalyticsEvent.outcome, "success"))
+        .all()
+    )
+
+    unique_visitors = (
+        db.query(func.count(func.distinct(AnalyticsEvent.visitor_id)))
+        .filter(window_filter, AnalyticsEvent.visitor_id.isnot(None), AnalyticsEvent.visitor_id != "")
+        .scalar()
+        or 0
+    )
+    unique_sessions = (
+        db.query(func.count(func.distinct(AnalyticsEvent.session_id)))
+        .filter(window_filter, AnalyticsEvent.session_id.isnot(None), AnalyticsEvent.session_id != "")
+        .scalar()
+        or 0
+    )
+
+    avg_duration_ms = (
+        db.query(func.avg(AnalyticsEvent.duration_ms))
+        .filter(window_filter, AnalyticsEvent.event_type == "request", AnalyticsEvent.duration_ms.isnot(None))
+        .scalar()
+        or 0
+    )
+
+    top_pages = _grouped_top(
+        db,
+        AnalyticsEvent.path,
+        cutoff,
+        AnalyticsEvent.event_type == "page_view",
+        AnalyticsEvent.path.isnot(None),
+        AnalyticsEvent.path != "",
+    )
+    top_apps = _grouped_top(
+        db, AnalyticsEvent.app, cutoff, AnalyticsEvent.app.isnot(None), AnalyticsEvent.app != ""
+    )
+    casino_app_events = _grouped_top(
+        db,
+        AnalyticsEvent.app,
+        cutoff,
+        AnalyticsEvent.event_type == "app_event",
+        AnalyticsEvent.app.in_(["poker", "craps", "blackjack"]),
+    )
+    top_events = _grouped_top(
+        db,
+        AnalyticsEvent.event_name,
+        cutoff,
+        AnalyticsEvent.event_type == "app_event",
+        AnalyticsEvent.event_name.isnot(None),
+        AnalyticsEvent.event_name != "",
+    )
+
+    # Referrer hostnames need Python-side URL parsing (_referrer_host), so
+    # this one still leaves the database as raw values — but only the single
+    # `referrer` column for page views, not full rows for the whole window.
+    referrer_values = [
+        row[0]
+        for row in db.query(AnalyticsEvent.referrer)
+        .filter(window_filter, AnalyticsEvent.event_type == "page_view")
+        .all()
+    ]
+    top_referrers = _top(Counter(_referrer_host(value) for value in referrer_values))
+
+    recent_error_rows = (
+        db.query(AnalyticsEvent)
+        .filter(window_filter, AnalyticsEvent.outcome == "error")
+        .order_by(desc(AnalyticsEvent.timestamp))
+        .limit(8)
+        .all()
+    )
     recent_errors = [
         {
             "id": row.id,
@@ -416,35 +505,49 @@ def analytics_summary(
             "status_code": row.status_code,
             "duration_ms": row.duration_ms,
         }
-        for row in sorted(
-            (r for r in rows if r.outcome == "error"),
-            key=lambda item: item.timestamp,
-            reverse=True,
-        )[:8]
+        for row in recent_error_rows
     ]
 
     return {
         "window_hours": hours,
-        "total": len(rows),
-        "page_views": event_type_counts["page_view"],
-        "requests": event_type_counts["request"],
-        "app_events": event_type_counts["app_event"],
-        "unique_visitors": len(visitors),
-        "sessions": len(sessions),
-        "success": outcome_counts["success"],
-        "warning": outcome_counts["warning"],
-        "error": outcome_counts["error"],
+        "total": total,
+        "page_views": event_type_counts.get("page_view", 0),
+        "requests": event_type_counts.get("request", 0),
+        "app_events": event_type_counts.get("app_event", 0),
+        "unique_visitors": unique_visitors,
+        "sessions": unique_sessions,
+        "success": outcome_counts.get("success", 0),
+        "warning": outcome_counts.get("warning", 0),
+        "error": outcome_counts.get("error", 0),
         "authenticated": authenticated,
-        "public": len(rows) - authenticated,
-        "admin": admin,
+        "public": total - authenticated,
+        "admin": admin_count,
         "avg_duration_ms": round(avg_duration_ms, 1),
-        "top_pages": _top(top_pages),
-        "top_apps": _top(top_apps),
-        "casino_app_events": _top(casino_app_events),
-        "top_events": _top(top_events),
-        "top_referrers": _top(top_referrers),
+        "top_pages": top_pages,
+        "top_apps": top_apps,
+        "casino_app_events": casino_app_events,
+        "top_events": top_events,
+        "top_referrers": top_referrers,
         "recent_errors": recent_errors,
     }
+
+
+def _hour_bucket_expr():
+    """An hour-truncated expression over AnalyticsEvent.timestamp.
+
+    SQLite and Postgres have no shared date-trunc function, so this branches
+    once on the configured dialect (mirroring the same is_postgres branch
+    already used for column types in database_migration.py).
+    """
+    if is_postgres:
+        return func.date_trunc("hour", AnalyticsEvent.timestamp)
+    return func.strftime("%Y-%m-%d %H:00:00", AnalyticsEvent.timestamp)
+
+
+def _parse_hour_bucket(value):
+    if isinstance(value, str):
+        return datetime.strptime(value, "%Y-%m-%d %H:00:00")
+    return value.replace(minute=0, second=0, microsecond=0, tzinfo=None)
 
 
 @router.get("/analytics/timeseries")
@@ -452,26 +555,45 @@ def analytics_timeseries(
     hours: int = Query(24, ge=1, le=2160),
     db: Session = Depends(get_db),
 ):
-    """Return hourly success/warning/error buckets for the selected window."""
-    cutoff = _cutoff(hours)
-    rows = db.query(AnalyticsEvent).filter(AnalyticsEvent.timestamp >= cutoff).all()
-    buckets = defaultdict(lambda: {"success": 0, "warning": 0, "error": 0, "page_views": 0, "requests": 0})
+    """Return hourly success/warning/error buckets for the selected window.
 
-    for row in rows:
-        if not row.timestamp:
-            continue
-        bucket_time = row.timestamp.replace(minute=0, second=0, microsecond=0)
-        bucket = buckets[bucket_time]
-        bucket[row.outcome or "success"] += 1
-        if row.event_type == "page_view":
-            bucket["page_views"] += 1
-        if row.event_type == "request":
-            bucket["requests"] += 1
+    A single grouped query does the hourly bucketing and conditional counts
+    in the database, returning one row per hour instead of pulling every
+    event row in the window into Python to bucket by hand.
+    """
+    cutoff = _cutoff(hours)
+    bucket = _hour_bucket_expr()
+    outcome = func.coalesce(AnalyticsEvent.outcome, "success")
+
+    def count_when(condition):
+        return func.sum(case((condition, 1), else_=0))
+
+    rows = (
+        db.query(
+            bucket.label("bucket"),
+            count_when(outcome == "success"),
+            count_when(outcome == "warning"),
+            count_when(outcome == "error"),
+            count_when(AnalyticsEvent.event_type == "page_view"),
+            count_when(AnalyticsEvent.event_type == "request"),
+        )
+        .filter(AnalyticsEvent.timestamp >= cutoff)
+        .group_by(bucket)
+        .order_by(bucket)
+        .all()
+    )
 
     return {
         "points": [
-            {"timestamp": _iso(timestamp), **values}
-            for timestamp, values in sorted(buckets.items())
+            {
+                "timestamp": _iso(_parse_hour_bucket(bucket_value)),
+                "success": success or 0,
+                "warning": warning or 0,
+                "error": error or 0,
+                "page_views": page_views or 0,
+                "requests": requests or 0,
+            }
+            for bucket_value, success, warning, error, page_views, requests in rows
         ]
     }
 

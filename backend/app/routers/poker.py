@@ -8,7 +8,6 @@ from typing import Optional, Dict, List, Tuple
 import asyncio
 import json
 import uuid
-import os
 import secrets
 import time
 from collections import defaultdict
@@ -107,7 +106,6 @@ AI_TURN_MIN_INTERVAL_SECONDS = 1.5
 # Simple sliding-window rate limiter: max 60 requests per minute per IP
 _RATE_LIMIT_WINDOW = 60
 _RATE_LIMIT_MAX = 60
-_TRUST_PROXY_HEADERS = os.getenv("TRUST_PROXY_HEADERS", "false").strip().lower() in {"1", "true", "yes", "on"}
 _rate_limit_store: Dict[str, List[float]] = defaultdict(list)
 BUY_BACK_AMOUNT = 1000
 BOT_AGGRESSION_BY_NAME = {
@@ -128,21 +126,6 @@ BOT_AGGRESSION_BY_NAME = {
 def utc_now():
     return datetime.now(timezone.utc).replace(tzinfo=None)
 
-def _client_ip(request: Request) -> str:
-    if _TRUST_PROXY_HEADERS:
-        forwarded_for = request.headers.get("x-forwarded-for")
-        if forwarded_for:
-            first_ip = forwarded_for.split(",", 1)[0].strip()
-            if first_ip:
-                return first_ip
-
-        for header in ("cf-connecting-ip", "x-real-ip"):
-            value = request.headers.get(header)
-            if value:
-                return value.strip()
-
-    return request.client.host if request.client else "unknown"
-
 def _check_rate_limit(client_ip: str) -> bool:
     now = time.time()
     cutoff = now - _RATE_LIMIT_WINDOW
@@ -153,8 +136,28 @@ def _check_rate_limit(client_ip: str) -> bool:
     _rate_limit_store[client_ip].append(now)
     return True
 
+def sweep_rate_limit_store(now: float | None = None) -> int:
+    """Drop keys with no attempts left in the window.
+
+    `_check_rate_limit` only re-filters the key it was called with, so an IP
+    that hits the API once and never returns leaves a stale entry behind
+    forever. Called periodically (see app.main) to bound memory on these
+    public, unauthenticated endpoints.
+    """
+    now = time.time() if now is None else now
+    cutoff = now - _RATE_LIMIT_WINDOW
+    stale_keys = [key for key, attempts in _rate_limit_store.items() if not any(t > cutoff for t in attempts)]
+    for key in stale_keys:
+        del _rate_limit_store[key]
+    return len(stale_keys)
+
 def _require_rate_limit(request: Request) -> None:
-    if not _check_rate_limit(_client_ip(request)):
+    # Reuse the shared helper so this respects TRUST_PROXY_HEADERS and takes
+    # the trusted-proxy-appended (rightmost) X-Forwarded-For hop, not the
+    # leftmost entry a client can forge to evade the limit.
+    from app.main import client_ip
+
+    if not _check_rate_limit(client_ip(request)):
         raise HTTPException(status_code=429, detail="Too many requests")
 
 
@@ -688,12 +691,13 @@ async def get_game_state(
         game = games[game_id]
         require_player_token(game_id, player_id, player_token)
         update_game_access(game_id)
-        deferred = save_game_state_deferred(game_id, broadcast=False)
         # The process_ai query parameter is retained for old clients, but GET is
         # intentionally read-only. Use POST /process-ai to advance a bot turn.
+        # Nothing here mutates game state, so there is no snapshot to persist —
+        # writing one on every poll was a full-payload DB write per client per
+        # poll interval for zero benefit.
         result = game.to_dict(for_player=player_id)
 
-    await flush_game_state(game_id, deferred)
     return result
 
 
@@ -768,6 +772,9 @@ async def buy_back(game_id: str, http_request: Request, request: PlayerAuthReque
         player = game._get_player(request.player_id)
         if not player:
             raise HTTPException(status_code=404, detail="Player not found")
+
+        if getattr(game, 'tournament', None):
+            raise HTTPException(status_code=400, detail="Buy-back is not available in tournaments")
 
         if game.phase not in ('showdown', 'waiting'):
             raise HTTPException(status_code=400, detail="Buy-back is only available between hands")

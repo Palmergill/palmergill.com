@@ -41,18 +41,22 @@ async def lifespan(app: FastAPI):
     cleanup_task = asyncio.create_task(_periodic_game_cleanup())
     analytics_cleanup_task = asyncio.create_task(_periodic_retention_cleanup())
     analytics_writer_task = asyncio.create_task(_analytics_writer())
+    rate_limit_sweep_task = asyncio.create_task(_periodic_rate_limit_sweep())
     try:
         yield
     finally:
         cleanup_task.cancel()
         analytics_cleanup_task.cancel()
         analytics_writer_task.cancel()
+        rate_limit_sweep_task.cancel()
         with suppress(asyncio.CancelledError):
             await cleanup_task
         with suppress(asyncio.CancelledError):
             await analytics_cleanup_task
         with suppress(asyncio.CancelledError):
             await analytics_writer_task
+        with suppress(asyncio.CancelledError):
+            await rate_limit_sweep_task
 
 
 async def _analytics_writer() -> None:
@@ -120,6 +124,31 @@ async def _periodic_game_cleanup(interval: int = 300) -> None:
         removed = await _run_with_timeout("poker game cleanup", poker.cleanup_old_games)
         if removed:
             logger.info("Cleaned up %d stale poker game(s)", removed)
+
+
+async def _periodic_rate_limit_sweep(interval: int = 10 * 60) -> None:
+    """Evict per-IP rate-limit store keys with no attempts left in their window.
+
+    Each store re-filters a key's own timestamps only when that key is
+    accessed again, so an IP that hits a public endpoint once and never
+    returns (e.g. a botnet scan) leaves a stale entry behind forever. This
+    sweep bounds memory for the unauthenticated poker/craps/analytics APIs
+    and the auth-failure tracker.
+    """
+
+    def _sweep() -> int:
+        return (
+            sweep_auth_failure_store()
+            + craps.sweep_rate_limit_store()
+            + analytics.sweep_analytics_rate_limit_store()
+            + poker.sweep_rate_limit_store()
+        )
+
+    while True:
+        await asyncio.sleep(interval)
+        removed = await _run_with_timeout("rate limit sweep", _sweep)
+        if removed:
+            logger.info("Rate limit sweep evicted %d stale key(s)", removed)
 
 
 async def _periodic_retention_cleanup(interval: int = 6 * 60 * 60) -> None:
@@ -271,6 +300,21 @@ def clear_auth_failures(request: Request) -> None:
     _auth_failure_store.pop(_auth_rate_limit_key(request), None)
 
 
+def sweep_auth_failure_store(now: float | None = None) -> int:
+    """Drop keys with no attempts left in the window.
+
+    `_recent_auth_failures` only re-filters the key it was called with, so an
+    IP that fails once and never returns leaves a stale entry behind forever.
+    Called periodically to bound memory on this public surface.
+    """
+    now = time.time() if now is None else now
+    cutoff = now - AUTH_RATE_LIMIT_WINDOW_SECONDS
+    stale_keys = [key for key, attempts in _auth_failure_store.items() if not any(t > cutoff for t in attempts)]
+    for key in stale_keys:
+        del _auth_failure_store[key]
+    return len(stale_keys)
+
+
 def auth_rate_limit_response():
     return JSONResponse(
         {"error": "Too many sign-in attempts. Try again later."},
@@ -395,6 +439,13 @@ def missing_auth_config():
 
 def safe_next_path(value: object, fallback: str = "/") -> str:
     if not isinstance(value, str) or not value:
+        return fallback
+
+    # Browsers treat backslashes as forward slashes when resolving a URL, but
+    # urlsplit does not — "/\\evil.com" parses with an empty netloc and a
+    # path starting with "/", passing the checks below, yet a browser
+    # navigates to https://evil.com. Reject backslashes outright.
+    if "\\" in value:
         return fallback
 
     try:
@@ -561,12 +612,12 @@ async def login_session(request: Request):
     return response
 
 
-@app.api_route("/login/logout", methods=["GET", "POST"])
+@app.post("/login/logout")
 async def login_logout(request: Request):
-    if request.method == "GET":
-        response = RedirectResponse("/login/", status_code=302)
-    else:
-        response = JSONResponse({"ok": True})
+    # POST-only: a GET endpoint that clears the session is a CSRF vector — any
+    # third-party page can trigger it with a plain <img> tag. Nothing in this
+    # app links to /login/logout as a GET, so there is no compatibility cost.
+    response = JSONResponse({"ok": True})
     response.delete_cookie(
         SESSION_COOKIE_NAME,
         secure=request.url.scheme == "https",

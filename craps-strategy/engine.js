@@ -15,11 +15,11 @@
 // leave the bet on the felt), so each is wrapped to the model above.
 (function (root, factory) {
     if (typeof module === "object" && module.exports) {
-        module.exports = factory(require("../craps/crapsRules.js"));
+        module.exports = factory(require("../craps/crapsRules.js"), require("./strategy.js"));
     } else {
-        root.CrapsEngine = factory(root.CrapsRules);
+        root.CrapsEngine = factory(root.CrapsRules, root.CrapsStrategy);
     }
-})(typeof self !== "undefined" ? self : this, function (CrapsRules) {
+})(typeof self !== "undefined" ? self : this, function (CrapsRules, CrapsStrategy) {
     const {
         getOddsPayout,
         calculateOddsToAdd,
@@ -91,6 +91,7 @@
             place: {},              // number -> amount on felt
             hard: {},               // type -> amount on felt
             oneRoll: {},            // type -> amount on felt (resolves each roll)
+            oneRollPlaced: {},      // type -> true once a non-everyRoll one-roll bet has fired
             pass: 0,
             passOdds: 0,
             dontPass: 0,
@@ -201,8 +202,19 @@
                     }
                     break;
                 case "oneRoll":
-                    if (bet.everyRoll || !state.oneRoll[bet.type]) {
+                    // everyRoll bets re-fund every time they resolve to 0.
+                    // Non-everyRoll bets fire exactly once ever — tracked in
+                    // oneRollPlaced, since the live stake in state.oneRoll is
+                    // zeroed on every resolution and can't tell "never
+                    // placed" from "already resolved" on its own.
+                    if (bet.everyRoll) {
                         if (!state.oneRoll[bet.type]) state.oneRoll[bet.type] = fund(state, size);
+                    } else if (!state.oneRollPlaced[bet.type]) {
+                        const placed = fund(state, size);
+                        if (placed) {
+                            state.oneRoll[bet.type] = placed;
+                            state.oneRollPlaced[bet.type] = true;
+                        }
                     }
                     break;
                 default:
@@ -496,13 +508,20 @@
             const base = baseSizeFor(spec, type);
             if (o.wins[type]) {
                 if (prog.onWin === "press") {
-                    state.sizes[type] = state.sizes[type] + Math.max(base, Math.round(o.wins[type]));
+                    // Snap to the bet's legal increment (e.g. $6 units on
+                    // place 6/8) — a raw press-by-profit amount routinely
+                    // lands off-increment, which a real table could never
+                    // accept and which resolvePlaceBetWins would floor into
+                    // a different effective size than what's displayed.
+                    const raw = state.sizes[type] + Math.max(base, Math.round(o.wins[type]));
+                    state.sizes[type] = CrapsStrategy.snapAmount(type, raw, spec.baseUnit) || base;
                 } else if (prog.onWin === "regress") {
                     state.sizes[type] = base;
                 }
             } else if (o.losses[type]) {
                 if (prog.onLoss === "double") {
-                    state.sizes[type] = state.sizes[type] * 2;
+                    const raw = state.sizes[type] * 2;
+                    state.sizes[type] = CrapsStrategy.snapAmount(type, raw, spec.baseUnit) || base;
                 }
             }
         });

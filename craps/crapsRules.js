@@ -135,10 +135,14 @@
     function legalOddsAmount({ point, requested, remaining, balance = 0, isPass = true }) {
         if (!point || requested <= 0 || remaining <= 0) return 0;
         const available = Math.min(requested, remaining, balance);
-        if (available < 5) return 0;
+        if (available <= 0) return 0;
+        // Floor to the increment that produces a whole-dollar payout — not to
+        // an arbitrary $5 minimum. A $2 odds bet on 4/10 (2:1) or $4 on 5/9
+        // (3:2) is perfectly legal and shouldn't be rejected outright just
+        // because it's a small amount.
         const increment = oddsIncrement(point, isPass);
         const legal = Math.floor(available / increment) * increment;
-        return legal >= 5 ? legal : 0;
+        return legal > 0 ? legal : 0;
     }
 
     function calculateOddsToAdd({ point, amount, odds = 0, balance = 0, multiplier, isPass = true }) {

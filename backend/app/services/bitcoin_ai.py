@@ -4,6 +4,7 @@ import re
 import uuid
 import urllib.error
 import urllib.request
+from collections import OrderedDict
 from datetime import datetime, time, timedelta, timezone
 from typing import Any, Dict, List
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -106,7 +107,12 @@ OUT_OF_SCOPE_ANSWER = (
     "Try asking about blocks, transactions, mempool fees, provider status, mining, difficulty, UTXOs, or other Bitcoin concepts."
 )
 
-_SESSION_MESSAGES: Dict[str, List[Dict[str, str]]] = {}
+MAX_SESSIONS = int(os.getenv("BITCOIN_CHAT_MAX_SESSIONS", "5000"))
+# LRU by insertion/move-to-end order — chat history is per-process only, and
+# a session is only added to here on a real model-backed reply, so this dict
+# would otherwise grow forever over the life of the process. Capped at
+# MAX_SESSIONS, evicting the least-recently-used session once full.
+_SESSION_MESSAGES: "OrderedDict[str, List[Dict[str, str]]]" = OrderedDict()
 
 SYSTEM_PROMPT = """You are Palmer's Bitcoin AI: a precise, practical Bitcoin expert grounded in live read-only Bitcoin data.
 
@@ -572,6 +578,7 @@ def _extract_output_text(response: Dict[str, Any]) -> str:
 
 def _remember(session_id: str, user_message: str, assistant_message: str) -> None:
     messages = _SESSION_MESSAGES.setdefault(session_id, [])
+    _SESSION_MESSAGES.move_to_end(session_id)
     messages.extend(
         [
             {"role": "user", "content": user_message},
@@ -580,6 +587,8 @@ def _remember(session_id: str, user_message: str, assistant_message: str) -> Non
     )
     if len(messages) > MAX_SESSION_MESSAGES:
         del messages[:-MAX_SESSION_MESSAGES]
+    while len(_SESSION_MESSAGES) > MAX_SESSIONS:
+        _SESSION_MESSAGES.popitem(last=False)
 
 
 def _pack_tool_data(tool_results: List[Dict[str, Any]]) -> Dict[str, Any]:

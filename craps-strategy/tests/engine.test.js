@@ -210,6 +210,21 @@ describe("field bet", () => {
         play(st, s, 2, 3); // total 5
         expect(Engine.totalValue(st)).toBe(295);
     });
+
+    // Regression: everyRoll: false previously had no effect — the live stake
+    // in state.oneRoll is zeroed on every resolution, so "already resolved"
+    // and "never placed" looked identical and the bet was refunded anyway.
+    test("everyRoll: false places the bet exactly once", () => {
+        const s = spec({ bets: [{ type: "field", units: 1, everyRoll: false }] });
+        const st = Engine.createState(s);
+
+        play(st, s, 3, 3); // total 6: not a field number, bet loses and resolves
+        expect(Engine.totalValue(st)).toBe(295);
+
+        play(st, s, 3, 3); // total 6 again: field must NOT be re-placed
+        expect(Engine.totalValue(st)).toBe(295);
+        expect(st.oneRoll.field).toBeFalsy();
+    });
 });
 
 describe("progressions", () => {
@@ -237,6 +252,29 @@ describe("progressions", () => {
         expect(st.sizes.place6).toBeGreaterThan(12);
         play(st, s, 3, 4); // seven-out -> reset
         expect(st.sizes.place6).toBe(12);
+    });
+
+    // Regression: a press-by-profit can land off the bet's legal increment
+    // (place 4/5/9/10 must be $5 units, place 6/8 must be $6 units). Before
+    // the fix, `state.sizes.place5` could end up at $108 — a size the table
+    // would never accept and that resolvePlaceBetWins would floor
+    // differently than what's displayed.
+    test("press snaps the new size to the bet's legal increment", () => {
+        const s = spec({
+            bets: [{ type: "place5", units: 1, when: "pointOn" }],
+            progression: { appliesTo: ["place5"], onWin: "press", onLoss: "none", resetOnSevenOut: false }
+        });
+        const st = Engine.createState(s);
+        st.point = 6; // point on, so place bets are working
+        st.sizes.place5 = 45;
+        st.place[5] = 45;
+        st.balance -= 45;
+        st.onFelt += 45;
+
+        Engine.resolveRollFor(st, s, 5, false); // place 5 hits: profit = floor(45*7/5) = 63
+
+        expect(st.sizes.place5 % 5).toBe(0);
+        expect(st.sizes.place5).toBe(110); // 45 + 63 = 108, snapped up to the nearest $5
     });
 });
 

@@ -110,6 +110,22 @@ def _rate_limited(request: Request, now: float | None = None) -> bool:
     return False
 
 
+def sweep_rate_limit_store(now: float | None = None) -> int:
+    """Drop keys with no attempts left in the window.
+
+    `_rate_limited` only re-filters the key it was called with, so an IP that
+    hits the endpoint once and never returns leaves a stale entry behind
+    forever. This is called periodically (see app.main) to bound memory on
+    this public, unauthenticated endpoint.
+    """
+    now = time.time() if now is None else now
+    cutoff = now - TRANSLATE_RATE_LIMIT_WINDOW_SECONDS
+    stale_keys = [key for key, attempts in _rate_limit_store.items() if not any(t > cutoff for t in attempts)]
+    for key in stale_keys:
+        del _rate_limit_store[key]
+    return len(stale_keys)
+
+
 @router.post("/translate", response_model=StrategyIntent, response_model_exclude_none=True)
 async def translate(payload: TranslateRequest, request: Request) -> StrategyIntent:
     if _rate_limited(request):
