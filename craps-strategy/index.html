@@ -19,7 +19,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;700;900&family=Inter:wght@400;500;600;700;800&family=Roboto+Condensed:wght@500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/shared/casino-theme.css?v=1">
-    <link rel="stylesheet" href="/craps-strategy/style.css?v=1">
+    <link rel="stylesheet" href="/craps-strategy/style.css?v=2">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <script>
         if ('serviceWorker' in navigator) {
@@ -60,6 +60,25 @@
                 <label class="field">
                     <span class="field-label">Seed <span class="hint">(blank = auto)</span></span>
                     <input id="seed" type="number" min="0" step="1" placeholder="auto">
+                </label>
+            </div>
+
+            <div class="row cash-out-row">
+                <label class="field">
+                    <span class="field-label">Cash-out strategy</span>
+                    <select id="cashOutMode">
+                        <option value="none">No cash-out target</option>
+                        <option value="amount">Cash out at a dollar amount</option>
+                        <option value="multiplier">Cash out at a buy-in multiple</option>
+                    </select>
+                </label>
+                <label class="field">
+                    <span class="field-label">Cash-out amount ($)</span>
+                    <input id="cashOutAmount" type="number" min="1" step="5" placeholder="600">
+                </label>
+                <label class="field">
+                    <span class="field-label">Buy-in multiple</span>
+                    <input id="cashOutMultiplier" type="number" min="1.01" step="0.1" placeholder="2">
                 </label>
             </div>
 
@@ -115,6 +134,7 @@
                 <div class="chart-holder"><canvas id="lineChart"></canvas></div>
                 <p class="legend-note"><span class="swatch win"></span> survived &nbsp;
                     <span class="swatch bust"></span> busted &nbsp;
+                    <span class="swatch cashout"></span> cashed out &nbsp;
                     <span class="swatch ref"></span> buy-in</p>
             </div>
 
@@ -126,10 +146,10 @@
     </main>
 
     <script src="/craps/crapsRules.js?v=2"></script>
-    <script src="/craps-strategy/strategy.js?v=2"></script>
-    <script src="/craps-strategy/engine.js?v=3"></script>
+    <script src="/craps-strategy/strategy.js?v=3"></script>
+    <script src="/craps-strategy/engine.js?v=4"></script>
     <script src="/shared/api-base.js?v=1"></script>
-    <script src="/craps-strategy/app.js?v=4"></script>
+    <script src="/craps-strategy/app.js?v=5"></script>
     <script src="/shared/analytics.js?v=1"></script>
     <script src="/shared/site-nav.js?v=10"></script>
 </body>

@@ -68,6 +68,20 @@ describe("validateIntent", () => {
         expect(res.valid).toBe(true);
         expect(res.errors).toEqual([]);
     });
+
+    test("accepts one cash-out target and rejects ambiguous targets", () => {
+        expect(Strategy.validateIntent({
+            bets: [{ type: "passLine", units: 1 }],
+            cashOut: { multiplier: 2 }
+        }).valid).toBe(true);
+
+        const res = Strategy.validateIntent({
+            bets: [{ type: "passLine", units: 1 }],
+            cashOut: { amount: 600, multiplier: 2 }
+        });
+        expect(res.valid).toBe(false);
+        expect(res.errors.join(" ")).toMatch(/exactly one/);
+    });
 });
 
 describe("normalize", () => {
@@ -122,6 +136,47 @@ describe("normalize", () => {
     test("explicit seed overrides the derived seed", () => {
         const spec = Strategy.normalize(intent, { buyIn: 300, baseUnit: 5, seed: 12345 });
         expect(spec.baseSeed).toBe(12345);
+    });
+
+    test("normalizes cash-out amount and multiplier targets", () => {
+        const byAmount = Strategy.normalize(
+            Object.assign({}, intent, { cashOut: { amount: 750 } }),
+            { buyIn: 300, baseUnit: 5 }
+        );
+        const byMultiplier = Strategy.normalize(
+            Object.assign({}, intent, { cashOut: { multiplier: 3 } }),
+            { buyIn: 300, baseUnit: 5 }
+        );
+        expect(byAmount.cashOut).toEqual({ mode: "amount", target: 750, amount: 750, multiplier: undefined });
+        expect(byMultiplier.cashOut).toEqual({ mode: "multiplier", target: 900, amount: undefined, multiplier: 3 });
+    });
+
+    test("form cash-out overrides intent cash-out and changes the derived seed", () => {
+        const cashOutIntent = Object.assign({}, intent, { cashOut: { multiplier: 2 } });
+        const a = Strategy.normalize(cashOutIntent, { buyIn: 300, baseUnit: 5 });
+        const b = Strategy.normalize(cashOutIntent, {
+            buyIn: 300,
+            baseUnit: 5,
+            cashOut: { mode: "amount", amount: 800 }
+        });
+        expect(a.cashOut.target).toBe(600);
+        expect(b.cashOut.target).toBe(800);
+        expect(a.baseSeed).not.toBe(b.baseSeed);
+    });
+
+    test("form cash-out mode none clears an intent cash-out", () => {
+        const spec = Strategy.normalize(
+            Object.assign({}, intent, { cashOut: { multiplier: 2 } }),
+            { buyIn: 300, baseUnit: 5, cashOut: { mode: "none" } }
+        );
+        expect(spec.cashOut).toBeNull();
+    });
+
+    test("rejects cash-out targets that do not exceed buy-in", () => {
+        expect(() => Strategy.normalize(
+            Object.assign({}, intent, { cashOut: { amount: 300 } }),
+            { buyIn: 300, baseUnit: 5 }
+        )).toThrow(/greater than the buy-in/);
     });
 
     test("attaches lifecycle metadata and maxActive for come bets", () => {

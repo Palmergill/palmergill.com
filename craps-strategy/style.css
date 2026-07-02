@@ -166,6 +166,7 @@ textarea:focus, input:focus, select:focus {
 .swatch { display: inline-block; width: 0.9rem; height: 0.55rem; border-radius: 2px; vertical-align: middle; margin-right: 0.15rem; }
 .swatch.win { background: #58d3ad; }
 .swatch.bust { background: #ff7a6e; }
+.swatch.cashout { background: #6fc6ff; }
 .swatch.ref { background: var(--gold); }
 
 @media (max-width: 560px) {

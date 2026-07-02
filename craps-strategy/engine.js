@@ -238,7 +238,7 @@
         const winRes = resolvePlaceBetWins({ ...placeAsBets(state) }, total);
         if (winRes.winnings > 0 && PLACE_NUMBERS.includes(total) && state.place[total]) {
             const stake = state.place[total];
-            const profit = winRes.winnings - stake; // helper returns stake+profit
+            const profit = winRes.winnings;          // helper returns profit only
             state.balance += profit;                // stake stays working on felt
             state.wagered += stake;
             state.expectedLoss += stake * (HOUSE_EDGE["place" + total] || 0);
@@ -525,6 +525,8 @@
         const minBet = smallestBet(spec);
         let rolls = 0;
         let busted = false;
+        let cashedOut = false;
+        const cashOutTarget = spec.cashOut && spec.cashOut.target;
 
         for (let r = 0; r < maxRolls; r++) {
             placeBets(state, spec);
@@ -545,11 +547,13 @@
             balances.push(value);
 
             if (value <= 0) { busted = true; break; }
+            if (cashOutTarget && value >= cashOutTarget) { cashedOut = true; break; }
         }
 
         return {
             balances,
             busted,
+            cashedOut,
             rolls,
             wagered: state.wagered,
             expectedLoss: state.expectedLoss,
@@ -603,22 +607,29 @@
         const n = results.length;
         const ends = results.map((t) => t.endValue);
         const survived = results.filter((t) => !t.busted).length;
+        const cashOuts = results.filter((t) => t.cashedOut).length;
         const totalWagered = results.reduce((s, t) => s + t.wagered, 0);
         const totalExpectedLoss = results.reduce((s, t) => s + t.expectedLoss, 0);
         const netProfit = results.reduce((s, t) => s + (t.endValue - spec.buyIn), 0);
         const bustedRolls = results.filter((t) => t.busted).map((t) => t.rolls);
+        const cashOutRolls = results.filter((t) => t.cashedOut).map((t) => t.rolls);
 
         return {
             trials: n,
             buyIn: spec.buyIn,
             survivalRate: n ? survived / n : 0,
             survivors: survived,
+            cashOutRate: n ? cashOuts / n : 0,
+            cashOuts,
             meanEnd: ends.length ? ends.reduce((s, v) => s + v, 0) / ends.length : 0,
             medianEnd: median(ends),
             bestEnd: ends.length ? Math.max(...ends) : 0,
             worstEnd: ends.length ? Math.min(...ends) : 0,
             meanRollsBeforeBust: bustedRolls.length
                 ? bustedRolls.reduce((s, v) => s + v, 0) / bustedRolls.length
+                : null,
+            meanRollsToCashOut: cashOutRolls.length
+                ? cashOutRolls.reduce((s, v) => s + v, 0) / cashOutRolls.length
                 : null,
             totalWagered,
             netProfit,

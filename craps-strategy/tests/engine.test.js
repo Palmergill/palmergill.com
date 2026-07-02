@@ -249,6 +249,31 @@ describe("bust path", () => {
     });
 });
 
+describe("cash-out target", () => {
+    test("stops a trial once total value reaches the target", () => {
+        const s = spec({
+            bets: [{ type: "hard6", units: 1 }],
+            cashOut: { amount: 340 }
+        }, { seed: 26 });
+        const trial = Engine.runTrial(s, 0, 1000);
+        expect(trial.cashedOut).toBe(true);
+        expect(trial.busted).toBe(false);
+        expect(trial.rolls).toBe(1);
+        expect(trial.endValue).toBeGreaterThanOrEqual(340);
+    });
+
+    test("stats report cash-out rate and rolls to target", () => {
+        const s = spec({
+            bets: [{ type: "hard6", units: 1 }],
+            cashOut: { amount: 340 }
+        }, { seed: 26 });
+        const { stats } = Engine.runSimulation(s, { trials: 1, maxRolls: 1000 });
+        expect(stats.cashOutRate).toBe(1);
+        expect(stats.cashOuts).toBe(1);
+        expect(stats.meanRollsToCashOut).toBe(1);
+    });
+});
+
 describe("statistical smoke test (wide band, not a convergence gate)", () => {
     test("flat pass-line realized house edge is sane", () => {
         const s = spec({ bets: [{ type: "passLine", units: 2, when: "comeOut" }] }, { buyIn: 100000 });

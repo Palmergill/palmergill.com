@@ -40,8 +40,8 @@ SYSTEM_PROMPT = (
     "You convert a plain-English craps betting strategy into a strict JSON "
     "StrategyIntent for a simulator. Rules:\n"
     "- Output ONLY bet intent: which bets and their RELATIVE size in `units` "
-    "(positive integers). Never output dollar amounts or a seed; the app sizes "
-    "bets from the user's base unit and bankroll.\n"
+    "(positive integers). Never output bet dollar amounts or a seed; the app "
+    "sizes bets from the user's base unit and bankroll.\n"
     "- Use only these bet types: " + ", ".join(BET_TYPES) + ".\n"
     "- `when` is one of comeOut, pointOn, always. Pass/Don't Pass are comeOut; "
     "come/don't-come and place bets are pointOn; field and prop bets are always "
@@ -51,6 +51,9 @@ SYSTEM_PROMPT = (
     "- come/dontCome may set `maxActive` (how many come points to keep working).\n"
     "- `progression` is optional: onWin in {press, regress, none}, onLoss in "
     "{double, none}, resetOnSevenOut boolean, appliesTo a list of bet types.\n"
+    "- `cashOut` is optional: use {\"amount\": N} only when the user gives a "
+    "specific dollar target, or {\"multiplier\": N} for requests like double "
+    "up, triple up, or cash out at 2x/3x the buy-in.\n"
     "- If the description is vague, choose a sensible, conservative interpretation.\n"
 )
 
@@ -104,6 +107,14 @@ STRATEGY_INTENT_SCHEMA: Dict[str, Any] = {
                 "onWin": {"type": "string", "enum": ["press", "regress", "none"]},
                 "onLoss": {"type": "string", "enum": ["double", "none"]},
                 "resetOnSevenOut": {"type": "boolean"},
+            },
+        },
+        "cashOut": {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "amount": {"type": "number", "exclusiveMinimum": 0},
+                "multiplier": {"type": "number", "exclusiveMinimum": 1},
             },
         },
     },

@@ -28,7 +28,8 @@
         seed: el('seed'), translateBtn: el('translateBtn'), preset: el('preset'),
         status: el('status'), strategyPanel: el('strategyPanel'),
         strategySummary: el('strategySummary'), betList: el('betList'),
-        oddsMult: el('oddsMult'),
+        oddsMult: el('oddsMult'), cashOutMode: el('cashOutMode'),
+        cashOutAmount: el('cashOutAmount'), cashOutMultiplier: el('cashOutMultiplier'),
         runBtn: el('runBtn'), resultsPanel: el('resultsPanel'), statGrid: el('statGrid'),
         lineChart: el('lineChart'), histChart: el('histChart')
     };
@@ -58,6 +59,16 @@
         const oddsVal = dom.oddsMult ? dom.oddsMult.value : '';
         if (oddsVal !== '') {
             form.oddsMultiplier = (oddsVal === 'max' || oddsVal === 'none') ? oddsVal : parseInt(oddsVal, 10);
+        }
+        const cashOutMode = dom.cashOutMode ? dom.cashOutMode.value : 'none';
+        if (cashOutMode === 'amount') {
+            const amount = parseInt(dom.cashOutAmount.value, 10);
+            if (amount > 0) form.cashOut = { mode: 'amount', amount };
+        } else if (cashOutMode === 'multiplier') {
+            const multiplier = parseFloat(dom.cashOutMultiplier.value);
+            if (multiplier > 1) form.cashOut = { mode: 'multiplier', multiplier };
+        } else if (dom.cashOutMode) {
+            form.cashOut = { mode: 'none' };
         }
         if (withOverrides) {
             const overrides = {};
@@ -102,10 +113,13 @@
                 p.resetOnSevenOut ? 'reset on seven-out' : ''
             ].filter(Boolean).join(', ') + (p.appliesTo.length ? ' (' + p.appliesTo.map(labelFor).join(', ') + ')' : '') + '.'
             : '';
+        const cashOutTxt = spec.cashOut
+            ? ' Cash out at ' + money(spec.cashOut.target) + '.'
+            : '';
 
         dom.strategySummary.innerHTML =
             '<strong>' + escapeHtml(spec.name) + '.</strong> ' +
-            escapeHtml(spec.summary || '') + escapeHtml(oddsTxt + progTxt);
+            escapeHtml(spec.summary || '') + escapeHtml(oddsTxt + progTxt + cashOutTxt);
 
         dom.betList.innerHTML = '';
         spec.bets.forEach((bet) => {
@@ -155,6 +169,7 @@
                 return;
             }
             currentIntent = await res.json();
+            applyIntentCashOutToControls(currentIntent);
             const spec = buildSpec(false);
             if (spec) { renderStrategy(spec); setStatus('Translated. Review the bets, then run.', 'ok'); }
         } catch (err) {
@@ -167,6 +182,7 @@
     function usePreset(key) {
         if (!key || !Strategy.PRESETS[key]) return;
         currentIntent = JSON.parse(JSON.stringify(Strategy.PRESETS[key]));
+        applyIntentCashOutToControls(currentIntent);
         if (!dom.description.value.trim()) dom.description.value = Strategy.PRESETS[key].summary;
         const spec = buildSpec(false);
         if (spec) { renderStrategy(spec); setStatus('Loaded preset “' + spec.name + '”. Review and run.', 'ok'); }
@@ -207,7 +223,7 @@
 
     function renderResults(spec, trials, stats) {
         const cards = [
-            { v: Math.round(stats.survivalRate * 100) + '%', l: 'Survived 1,000 rolls',
+            { v: Math.round(stats.survivalRate * 100) + '%', l: spec.cashOut ? 'Avoided bust' : 'Survived 1,000 rolls',
               cls: stats.survivalRate >= 0.5 ? 'good' : 'bad' },
             { v: money(stats.medianEnd), l: 'Median ending', cls: stats.medianEnd >= spec.buyIn ? 'good' : 'bad' },
             { v: money(stats.meanEnd), l: 'Mean ending', cls: stats.meanEnd >= spec.buyIn ? 'good' : 'bad' },
@@ -221,6 +237,13 @@
               l: 'Avg rolls to bust', cls: '' },
             { v: String(spec.baseSeed), l: 'Seed', cls: '' }
         ];
+        if (spec.cashOut) {
+            cards.splice(1, 0,
+                { v: Math.round(stats.cashOutRate * 100) + '%', l: 'Cashed out', cls: stats.cashOutRate >= 0.5 ? 'good' : '' },
+                { v: stats.meanRollsToCashOut ? Math.round(stats.meanRollsToCashOut) : '—',
+                  l: 'Avg rolls to cash out', cls: '' }
+            );
+        }
         dom.statGrid.innerHTML = cards.map((c) =>
             '<div class="stat"><div class="stat-value ' + c.cls + '">' + escapeHtml(c.v) +
             '</div><div class="stat-label">' + escapeHtml(c.l) + '</div></div>'
@@ -259,7 +282,9 @@
 
         const datasets = plotted.map((t) => ({
             data: thin(t.balances),
-            borderColor: t.busted ? `rgba(255,122,110,${alpha})` : `rgba(88,211,173,${alpha})`,
+            borderColor: t.busted
+                ? `rgba(255,122,110,${alpha})`
+                : (t.cashedOut ? `rgba(111,198,255,${alpha})` : `rgba(88,211,173,${alpha})`),
             borderWidth: 0.6,
             pointRadius: 0,
             tension: 0
@@ -281,6 +306,15 @@
             borderDash: [6, 5],
             pointRadius: 0
         });
+        if (spec.cashOut) {
+            datasets.push({
+                data: [{ x: 1, y: spec.cashOut.target }, { x: maxLen, y: spec.cashOut.target }],
+                borderColor: 'rgba(111,198,255,0.9)',
+                borderWidth: 1.4,
+                borderDash: [3, 4],
+                pointRadius: 0
+            });
+        }
 
         const options = baseChartOptions('Roll number', 'Bankroll ($)');
         options.parsing = false;          // data is already {x, y}
@@ -354,9 +388,43 @@
     }
 
     // ---- Wire up ------------------------------------------------------------
+    function updateCashOutFields() {
+        const mode = dom.cashOutMode ? dom.cashOutMode.value : 'none';
+        if (dom.cashOutAmount) dom.cashOutAmount.closest('.field').hidden = mode !== 'amount';
+        if (dom.cashOutMultiplier) dom.cashOutMultiplier.closest('.field').hidden = mode !== 'multiplier';
+    }
+
+    function applyIntentCashOutToControls(intent) {
+        if (!dom.cashOutMode) return;
+        const c = intent && intent.cashOut;
+        if (c && c.amount > 0) {
+            dom.cashOutMode.value = 'amount';
+            dom.cashOutAmount.value = Math.round(c.amount);
+        } else if (c && c.multiplier > 1) {
+            dom.cashOutMode.value = 'multiplier';
+            dom.cashOutMultiplier.value = c.multiplier;
+        } else {
+            dom.cashOutMode.value = 'none';
+        }
+        updateCashOutFields();
+    }
+
     dom.translateBtn.addEventListener('click', translate);
     dom.preset.addEventListener('change', (e) => usePreset(e.target.value));
     dom.runBtn.addEventListener('click', run);
+    dom.cashOutMode.addEventListener('change', () => {
+        updateCashOutFields();
+        if (!currentIntent) return;
+        const spec = buildSpec(true);
+        if (spec) renderStrategy(spec);
+    });
+    [dom.cashOutAmount, dom.cashOutMultiplier].forEach((input) => {
+        input.addEventListener('change', () => {
+            if (!currentIntent) return;
+            const spec = buildSpec(true);
+            if (spec) renderStrategy(spec);
+        });
+    });
     // Re-render the confirm view (and its odds line) when the odds selector
     // changes, preserving any edited bet amounts.
     dom.oddsMult.addEventListener('change', () => {
@@ -364,4 +432,5 @@
         const spec = buildSpec(true);
         if (spec) renderStrategy(spec);
     });
+    updateCashOutFields();
 })();

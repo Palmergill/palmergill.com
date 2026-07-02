@@ -56,6 +56,7 @@
     const MAX_BETS = 24;
     const MAX_ODDS_MULTIPLIER = 100;
     const MAX_AMOUNT = 100000;
+    const MAX_CASH_OUT_TARGET = 10000000;
 
     function lifecycleOf(type) {
         return BET_META[type] ? BET_META[type].lifecycle : null;
@@ -91,6 +92,10 @@
 
     function isPositiveInt(v) {
         return typeof v === "number" && Number.isInteger(v) && v > 0;
+    }
+
+    function isPositiveNumber(v) {
+        return typeof v === "number" && Number.isFinite(v) && v > 0;
     }
 
     // Returns { valid, errors }. Pure — never throws — so callers can surface a
@@ -176,6 +181,25 @@
                             }
                         });
                     }
+                }
+            }
+        }
+
+        if (intent.cashOut != null) {
+            const c = intent.cashOut;
+            if (!isPlainObject(c)) {
+                errors.push("cashOut must be an object");
+            } else {
+                const hasAmount = c.amount != null;
+                const hasMultiple = c.multiplier != null;
+                if (hasAmount === hasMultiple) {
+                    errors.push("cashOut must include exactly one of amount or multiplier");
+                }
+                if (hasAmount && (!isPositiveNumber(c.amount) || c.amount > MAX_CASH_OUT_TARGET)) {
+                    errors.push(`cashOut.amount must be a positive number no greater than ${MAX_CASH_OUT_TARGET}`);
+                }
+                if (hasMultiple && (!isPositiveNumber(c.multiplier) || c.multiplier <= 1 || c.multiplier > 1000)) {
+                    errors.push("cashOut.multiplier must be a number greater than 1 and no greater than 1000");
                 }
             }
         }
@@ -282,6 +306,8 @@
             resetOnSevenOut: !!pIn.resetOnSevenOut
         };
 
+        const cashOut = normalizeCashOut(intent.cashOut, form && form.cashOut, buyIn);
+
         const spec = {
             name: typeof intent.name === "string" ? intent.name : "Custom strategy",
             summary: typeof intent.summary === "string" ? intent.summary : "",
@@ -290,7 +316,8 @@
             workingOnComeOut: !!intent.workingOnComeOut,
             bets,
             odds,
-            progression
+            progression,
+            cashOut
         };
 
         // Seed: explicit form.seed wins (so a user can reproduce/vary a run);
@@ -300,6 +327,46 @@
             : hashCanonical(spec);
 
         return spec;
+    }
+
+    function normalizeCashOut(intentCashOut, formCashOut, buyIn) {
+        let source = null;
+        if (isPlainObject(formCashOut) && formCashOut.mode) {
+            if (formCashOut.mode === "none") return null;
+            source = formCashOut;
+        } else if (isPlainObject(intentCashOut)) {
+            source = intentCashOut;
+        }
+        if (!source) return null;
+
+        let mode = source.mode;
+        let target = 0;
+        const amount = Number(source.amount);
+        const multiplier = Number(source.multiplier);
+
+        if ((!mode || mode === "amount") && isPositiveNumber(amount)) {
+            mode = "amount";
+            target = Math.round(amount);
+        } else if ((!mode || mode === "multiplier" || mode === "multiple") && isPositiveNumber(multiplier)) {
+            mode = "multiplier";
+            target = Math.round(buyIn * multiplier);
+        } else {
+            return null;
+        }
+
+        if (target <= buyIn) {
+            throw new Error("Cash-out target must be greater than the buy-in");
+        }
+        if (target > MAX_CASH_OUT_TARGET) {
+            throw new Error(`Cash-out target must be ${MAX_CASH_OUT_TARGET} or less`);
+        }
+
+        return {
+            mode: mode === "amount" ? "amount" : "multiplier",
+            target,
+            amount: mode === "amount" ? target : undefined,
+            multiplier: mode === "amount" ? undefined : multiplier
+        };
     }
 
     // ---- Built-in presets (also the no-LLM fallback) -----------------------
@@ -346,6 +413,7 @@
         WHEN_VALUES,
         ON_WIN_VALUES,
         ON_LOSS_VALUES,
+        MAX_CASH_OUT_TARGET,
         PRESETS,
         lifecycleOf,
         isLineBet,

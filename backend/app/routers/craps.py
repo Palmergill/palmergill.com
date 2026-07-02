@@ -11,7 +11,7 @@ import time
 from typing import List, Literal, Optional
 
 from fastapi import APIRouter, HTTPException, Request
-from pydantic import BaseModel, Field, ValidationError, field_validator
+from pydantic import BaseModel, Field, ValidationError, field_validator, model_validator
 
 from app.services import craps_ai
 
@@ -51,6 +51,17 @@ class ProgressionIntent(BaseModel):
     resetOnSevenOut: bool = False
 
 
+class CashOutIntent(BaseModel):
+    amount: Optional[float] = Field(None, gt=0, le=10_000_000)
+    multiplier: Optional[float] = Field(None, gt=1, le=1000)
+
+    @model_validator(mode="after")
+    def _exactly_one_target(self) -> "CashOutIntent":
+        if (self.amount is None) == (self.multiplier is None):
+            raise ValueError("cashOut must include exactly one of amount or multiplier")
+        return self
+
+
 class StrategyIntent(BaseModel):
     name: str = Field("Custom strategy", max_length=120)
     summary: str = Field("", max_length=400)
@@ -58,6 +69,7 @@ class StrategyIntent(BaseModel):
     bets: List[BetIntent] = Field(..., min_length=1, max_length=24)
     odds: dict[str, object] = Field(default_factory=dict)
     progression: Optional[ProgressionIntent] = None
+    cashOut: Optional[CashOutIntent] = None
 
     @field_validator("odds")
     @classmethod
