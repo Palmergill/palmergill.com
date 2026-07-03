@@ -59,6 +59,28 @@ Logs are written to:
 logs/backend.log
 ```
 
+## Testing
+
+Backend (pytest, no network access, no live LLM/provider calls — external
+services are always monkeypatched):
+
+```bash
+cd backend
+source venv/bin/activate  # or: pip install -r requirements-dev.txt
+pytest
+```
+
+Frontend game suites (Jest, covers `poker/tests`, `craps/tests`,
+`blackjack/tests`, `craps-strategy/tests`):
+
+```bash
+npm install
+npm test
+```
+
+Both run automatically on every push/PR via
+`.github/workflows/ci-cd.yml`.
+
 ## Deployment Model
 
 - Static site: hosted from the repo root and project folders.

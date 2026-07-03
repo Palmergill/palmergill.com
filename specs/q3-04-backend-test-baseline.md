@@ -1,7 +1,7 @@
 # Spec 4 — Backend Test Baseline
 
 - **Quarter:** Q3 2026 (Jul–Sep)
-- **Status:** draft
+- **Status:** shipped
 - **Depends on:** Spec 3 (clean repo) for CI hygiene
 - **Areas:** `backend/` (new `backend/tests/`), GitHub Actions
 
@@ -14,10 +14,16 @@ frontend game tests on every push.
 
 ## Background / current state
 
+- Shipped 2026-07-03: discovered mid-implementation that a real test suite
+  already existed at `backend/tests/test_security_regressions.py` (973
+  lines, 251 tests) with `pytest.ini` already configured — a substantial
+  security/auth/analytics/poker regression suite the original spec draft
+  didn't know about. Rather than duplicate it, this pass filled the actual
+  gaps: hand evaluation, pot math, and craps translation had zero coverage.
 - The frontend games already have `tests/` directories (`blackjack/tests`,
-  `craps/tests`, `craps-strategy/tests`, `poker/tests`).
-- The backend (`backend/app`: 6 routers, 12 services, game logic in
-  `poker_game.py` / `poker_ai.py`) has no test suite.
+  `craps/tests`, `craps-strategy/tests`, `poker/tests`) run via Jest.
+- A CI workflow already existed at `.github/workflows/ci-cd.yml` running
+  backend pytest and frontend Jest on every push/PR — R8 was already done.
 - Git history shows repeated payout-bug fixes ("Fix craps payout and bet
   unit bugs", "Fix craps sim: come-out odds, hardway-only resolution,
   duplicate bets") — regressions in money math are the recurring failure
@@ -71,25 +77,43 @@ frontend game tests on every push.
 
 ## Technical design
 
-- Layout: `backend/tests/test_poker_engine.py`, `test_craps_translation.py`,
-  `test_poker_ai.py`, `test_api_contracts.py`, `test_analytics.py`,
-  `conftest.py` (app fixture with auth + demo-mode env vars, mock service
-  injection).
-- Known-correct payout values sourced from standard references and asserted
-  as literal expected numbers with the odds written in a comment
-  (e.g. hardway 8 pays 9:1) so a reviewer can check the math without running
-  anything.
-- CI: single workflow `.github/workflows/test.yml`, Python 3.12 + Node LTS
-  matrix not needed — one job each.
+- Actual layout shipped: `backend/tests/test_poker_hand_evaluation.py`
+  (R1, all 9 `HandRank` categories + kicker tiebreaks + best-of-seven),
+  `test_poker_pot_math.py` (R1, side pots, odd-remainder splits with folded
+  contributors, blind rotation incl. heads-up), `test_craps_translation.py`
+  (R2, `StrategyIntent` validation + the `/api/craps/translate` endpoint
+  with `craps_ai.translate_strategy` always monkeypatched), and
+  `test_poker_ai_legality.py` (R3, dispatches `make_decision` output
+  through the engine's own `action_*` methods across all 5 personalities ×
+  facing-a-bet / checked-to / short-stack-forced-all-in). R4/R5 (API
+  contracts, analytics bounds) turned out to already be substantially
+  covered by the pre-existing `test_security_regressions.py`; only the
+  stocks-router gap was added, in `test_api_contracts.py`.
+- `conftest.py` redirects `DATABASE_URL` to a fresh tmp SQLite file per test
+  run (module-level env var, set before `app.database` is ever imported)
+  and creates the schema once per session — this satisfies R9, which the
+  pre-existing suite didn't: it was writing to a persistent
+  `backend/stock_data.db` on every run.
+- Known-correct payout values are asserted as literal expected numbers with
+  the odds/ranking written in a comment so a reviewer can check the math
+  without running anything.
+- CI: the pre-existing `.github/workflows/ci-cd.yml` already runs backend
+  pytest and frontend Jest on push/PR — satisfies R8 as-is, no new workflow
+  needed.
 
 ## Acceptance criteria
 
-- [ ] `cd backend && pytest` passes locally in <30s with no network access
-      (verify by running with networking disabled).
-- [ ] Deliberately breaking a payout constant fails a test (mutation
-      spot-check on 3 constants).
-- [ ] CI runs on PRs and blocks merge on failure.
-- [ ] README documents how to run backend and frontend tests.
+- [x] `cd backend && pytest` passes locally in <30s with no network access
+      (328 tests in ~2.6s, verified with a bogus proxy that fails any real
+      outbound call).
+- [x] Deliberately breaking a payout constant fails a test (mutation
+      spot-check on 3 constants: `HandRank.FULL_HOUSE` ordinal, the craps
+      odds-multiplier upper bound, and the pot remainder-chip split — each
+      mutation was applied, confirmed to fail the relevant test, then
+      reverted).
+- [x] CI runs on PRs and blocks merge on failure (`.github/workflows/ci-cd.yml`,
+      pre-existing).
+- [x] README documents how to run backend and frontend tests.
 
 ## Risks
 

@@ -26,7 +26,7 @@ One spec per roadmap item. Status legend: `draft` → `accepted` → `in progres
 | 1 | [Warm retheme completion](q3-01-warm-retheme-completion.md) | shipped |
 | 2 | [Bitcoin dashboard redesign](q3-02-bitcoin-dashboard-redesign.md) | draft |
 | 3 | [Repo & tracker cleanup](q3-03-repo-cleanup.md) | shipped |
-| 4 | [Backend test baseline](q3-04-backend-test-baseline.md) | draft |
+| 4 | [Backend test baseline](q3-04-backend-test-baseline.md) | shipped |
 | 5 | [Casino shell unification](q4-05-casino-shell-unification.md) | draft — pulled forward from Q4 |
 
 ## Q4 2026 (Oct–Dec) — Casino as a coherent product
