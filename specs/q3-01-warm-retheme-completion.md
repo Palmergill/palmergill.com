@@ -23,6 +23,9 @@ content.
 - Started 2026-07-03: warm is now the shared nav default in
   `shared/site-nav.css`; the old `body.theme-warm` opt-in was removed from
   live pages and the nav cache key was bumped to `?v=11`.
+- Also verified with the FastAPI backend running: `stock-research/?ticker=AAPL`
+  rendered the detail charts in demo mode, and the authenticated `admin/`
+  dashboard rendered metrics/charts with warm panels.
 - Canonical warm tokens: bg `#faf6f0`, card `#ffffff`, surface `#f3eee4`,
   ink `#23201c`, soft `#5d574e`, muted `#928a7d`, line `#ece4d8`,
   line-strong `#d8cdba`, sage `#5b7152`/dim `#4c6044`, clay `#b96a4b`,
@@ -98,7 +101,7 @@ Each step is verified in the browser preview at desktop and mobile widths.
 
 ## Acceptance criteria
 
-- [ ] Stock-research detail and admin data views verified warm with live
+- [x] Stock-research detail and admin data views verified warm with live
       backend data.
 - [ ] Shared token stylesheet exists; per-app CSS uses variables for chrome
       colors (no restated warm hex values — grep).
