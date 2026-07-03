@@ -179,6 +179,29 @@
             }
         }
 
+        /* Wide screens: hero text and profile card share the first viewport
+           instead of stacking with dead space right of the lede. */
+        @media (min-width: 1000px) {
+            header {
+                display: grid;
+                grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+                gap: clamp(28px, 4vw, 48px);
+                align-items: center;
+            }
+
+            .profile { margin-top: clamp(36px, 5vw, 60px); }
+
+            .profile-grid {
+                grid-template-columns: minmax(0, 1fr);
+            }
+
+            .profile-photo {
+                max-width: 100%;
+                aspect-ratio: 16 / 10;
+                object-position: center 30%;
+            }
+        }
+
         /* ---- sections ---- */
         .section { padding: clamp(48px, 7vw, 76px) 0 0; }
         .sec-head { margin-bottom: 26px; }
@@ -599,7 +622,7 @@
         </footer>
     </div>
 
-    <script src="/shared/site-nav.js?v=10"></script>
+    <script src="/shared/site-nav.js?v=11"></script>
     <script src="/shared/analytics.js?v=1"></script>
     <script>
         (() => {
