@@ -3185,7 +3185,7 @@ body.has-site-nav .screen {
 }
 
 html {
-    background: #130d09;
+    background: #062315;
 }
 
 body {
@@ -3196,9 +3196,10 @@ body {
     min-height: 100vh;
     min-height: 100dvh;
     overflow: hidden;
+    /* Deep felt green to match the casino hub, warmed by the same gold wash. */
     background:
         radial-gradient(circle at 10% 10%, rgba(232, 199, 115, 0.16), transparent 28%),
-        linear-gradient(135deg, #130d09 0%, #2f1a10 42%, #061711 100%);
+        linear-gradient(135deg, #08281a 0%, #0d3b24 42%, #051a10 100%);
     color: var(--text);
     font-family: var(--font-body);
     line-height: 1.4;
@@ -4628,7 +4629,7 @@ body.has-site-nav #game-screen {
 /* ===========================================================================
    EMERALD LUXE (v19) — match the craps Emerald Luxe theme.
    Deep emerald felt inside a gilded gold frame, warm-dark salon background,
-   Playfair gold-gradient headings, and Cormorant Garamond serif lettering.
+   Playfair gold-gradient headings and Playfair serif lettering.
    This layer is applied last so it dresses every screen consistently.
    =========================================================================== */
 :root {
@@ -4638,7 +4639,7 @@ body.has-site-nav #game-screen {
     --felt-light: #115c39;
     --gold-bright: #f6e3a6;
     --gold-shadow: #7c5e1c;
-    --serif: "Cormorant Garamond", Georgia, "Times New Roman", serif;
+    --serif: "Playfair Display", Georgia, "Times New Roman", serif;
     --line: rgba(232, 199, 115, 0.4);
     --line-strong: rgba(232, 199, 115, 0.55);
     --text: #f5ebd8;
@@ -4648,10 +4649,11 @@ body.has-site-nav #game-screen {
     --shadow: 0 28px 80px rgba(0, 0, 0, 0.55);
 }
 
-html { background: #0a0805; }
+/* Deep felt-green salon to match the casino hub (was warm-dark brown). */
+html { background: #071b12; }
 
 body {
-    background: radial-gradient(circle at 50% -12%, #18120a 0%, #0a0805 62%) !important;
+    background: radial-gradient(circle at 50% -12%, #123724 0%, #071b12 62%) !important;
 }
 
 /* Warm-dark salon behind every screen */
