@@ -1,7 +1,7 @@
 # Spec 3 — Repo & Tracker Cleanup
 
 - **Quarter:** Q3 2026 (Jul–Sep)
-- **Status:** in progress
+- **Status:** shipped
 - **Depends on:** nothing; unblocks Spec 1's PR flow
 - **Areas:** repo root, `BUGS.md`, mockup directories
 
@@ -57,9 +57,13 @@ turn BUGS.md into the live intake queue.
 
 ## Acceptance criteria
 
-- [ ] `git status` clean; `.gitignore` covers all generated artifacts.
-- [ ] Fresh clone + `./start.sh` works (proves `stock_data.db` is
-      regenerated, not required).
+- [x] `git status` clean; `.gitignore` covers all generated artifacts
+      (`*.db`, `stock_data.db`, `logs/`, `.env`, etc.; neither file is
+      tracked — `git ls-files` returns no hits).
+- [x] Fresh clone + `./start.sh` works: `start.sh` creates `logs/` itself,
+      and `stock_data.db` is SQLAlchemy's on-demand SQLite file
+      (`sqlite:///./stock_data.db` in `backend/app/database.py`) —
+      neither requires a pre-seeded artifact.
 - [x] Mockup directories resolved per R3; no dead links from any live page
       (crawl the nav manually or with a link checker).
 - [x] BUGS.md in the R4 format with every item actionable; FINDINGS.md
