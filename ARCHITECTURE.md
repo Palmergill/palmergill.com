@@ -35,6 +35,10 @@ The active public site is static:
 - `/blackjack/` - blackjack app
 - `/admin/` - protected backend log dashboard
 
+Shared site chrome defaults to the warm light palette defined in
+`shared/site-nav.css`. Casino pages opt into `body.theme-casino` so their
+felt-table surfaces and navigation chrome keep the dark casino treatment.
+
 ## Backend
 
 The backend is a FastAPI service in `backend/app`.

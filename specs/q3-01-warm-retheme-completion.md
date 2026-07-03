@@ -1,7 +1,7 @@
 # Spec 1 — Warm Retheme Completion
 
 - **Quarter:** Q3 2026 (Jul–Sep)
-- **Status:** draft
+- **Status:** in progress
 - **Depends on:** nothing (already in flight)
 - **Areas:** all static pages, `shared/site-nav.css`, per-app `style.css`
 
@@ -18,10 +18,11 @@ content.
 - Converted and browser-verified warm: home, `about/`, `bitcoin-chat/`,
   `docs/` (chrome), `login/`, `stock-research/` (landing), `admin/` (chrome).
 - Casino suite decision (stands): felt/Emerald Luxe **play surfaces stay
-  dark by design**; only shared nav/chrome warmed via `body.theme-warm`.
-- Mechanism today: opt-in `theme-warm` body class warms the shared nav
-  (`shared/site-nav.css`, cache query at `?v=8`); each converted page also
-  had its own palette swapped in place.
+  dark by design**; casino pages use `body.theme-casino` for the dark table
+  chrome exemption.
+- Started 2026-07-03: warm is now the shared nav default in
+  `shared/site-nav.css`; the old `body.theme-warm` opt-in was removed from
+  live pages and the nav cache key was bumped to `?v=11`.
 - Canonical warm tokens: bg `#faf6f0`, card `#ffffff`, surface `#f3eee4`,
   ink `#23201c`, soft `#5d574e`, muted `#928a7d`, line `#ece4d8`,
   line-strong `#d8cdba`, sage `#5b7152`/dim `#4c6044`, clay `#b96a4b`,
@@ -32,8 +33,7 @@ content.
     with the FastAPI backend running.
   - `docs/` design-system *content* (prose + swatches) still documents the
     old dark theme.
-- The working tree has uncommitted theme-related edits across ~20 files —
-  land or split those first (see Spec 3).
+- The old working-tree note was stale; Spec 3 cleanup landed before this pass.
 
 ## Goals
 
@@ -104,10 +104,10 @@ Each step is verified in the browser preview at desktop and mobile widths.
       colors (no restated warm hex values — grep).
 - [ ] `theme-warm` mechanism removed; grep for legacy dark palette values
       and `theme-warm` is clean; casino play surfaces unchanged.
-- [ ] `docs/` design-system content documents the warm palette, not the old
+- [x] `docs/` design-system content documents the warm palette, not the old
       dark theme.
 - [ ] Mobile (375px) and desktop (1280px) screenshots captured per page.
-- [ ] `ARCHITECTURE.md`/README mention the single warm theme.
+- [x] `ARCHITECTURE.md`/README mention the single warm theme.
 
 ## Risks
 

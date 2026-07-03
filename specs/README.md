@@ -23,7 +23,7 @@ One spec per roadmap item. Status legend: `draft` → `accepted` → `in progres
 
 | # | Spec | Status |
 |---|------|--------|
-| 1 | [Warm retheme completion](q3-01-warm-retheme-completion.md) | draft |
+| 1 | [Warm retheme completion](q3-01-warm-retheme-completion.md) | in progress |
 | 2 | [Bitcoin dashboard redesign](q3-02-bitcoin-dashboard-redesign.md) | draft |
 | 3 | [Repo & tracker cleanup](q3-03-repo-cleanup.md) | in progress |
 | 4 | [Backend test baseline](q3-04-backend-test-baseline.md) | draft |

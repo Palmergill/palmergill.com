@@ -2,6 +2,10 @@
 
 Personal project site plus shared API backend.
 
+The public site uses a single warm light theme by default. Casino games keep
+their dark felt play surfaces and use a documented casino override for shared
+navigation chrome.
+
 ## Active Site Paths
 
 - `/` - project index

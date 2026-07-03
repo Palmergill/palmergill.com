@@ -1,16 +1,44 @@
 :root {
+    --bg: #faf6f0;
+    --card: #ffffff;
+    --surface: #f3eee4;
+    --ink: #23201c;
+    --soft: #5d574e;
+    --muted: #928a7d;
+    --line: #ece4d8;
+    --line-strong: #d8cdba;
+    --sage: #5b7152;
+    --sage-dim: #4c6044;
+    --sage-soft: #e7eee2;
+    --clay: #b96a4b;
+    --sky: #5a7794;
     --site-nav-height: 52px;
     /* kept for backward compat: pages subtract this in their own mobile rules */
     --site-nav-mobile-height: 52px;
     --site-nav-z: 10000;
-    --site-nav-bg: rgba(8, 13, 11, 0.9);
-    --site-nav-line: rgba(120, 255, 180, 0.16);
-    --site-nav-line-strong: rgba(120, 255, 180, 0.34);
-    --site-nav-green: #5af28e;
-    --site-nav-green-dim: #3aa866;
-    --site-nav-text: #c7d6cd;
-    --site-nav-muted: #7f9389;
-    --site-nav-mono: "SFMono-Regular", ui-monospace, "JetBrains Mono", "Fira Code", Menlo, Consolas, monospace;
+    --site-nav-bg: rgba(250, 246, 240, 0.88);
+    --site-nav-line: var(--line);
+    --site-nav-line-strong: var(--line-strong);
+    --site-nav-green: var(--sage);
+    --site-nav-green-dim: #927d5b;
+    --site-nav-text: var(--soft);
+    --site-nav-muted: var(--muted);
+    --site-nav-hover-bg: var(--sage-soft);
+    --site-nav-hover-line: #cfddc6;
+    --site-nav-active-bg: var(--sage-soft);
+    --site-nav-active-line: #cfddc6;
+    --site-nav-control-bg: var(--sage-soft);
+    --site-nav-control-hover-bg: #dfe9d8;
+    --site-nav-mobile-bg: var(--bg);
+    --site-nav-panel-bg: var(--bg);
+    --site-nav-panel-shadow: 24px 0 80px rgba(60, 50, 35, 0.22);
+    --site-nav-backdrop-bg: rgba(60, 50, 35, 0.32);
+    --site-nav-brand-color: var(--ink);
+    --site-nav-brand-hover-color: var(--site-nav-green);
+    --site-nav-brand-prefix: "";
+    --site-nav-brand-panel-bg: var(--card);
+    --site-nav-logo-shadow: none;
+    --site-nav-mono: "Plus Jakarta Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
 }
 
 body.has-site-nav {
@@ -64,7 +92,7 @@ body.has-site-nav .app-shell {
     gap: 9px;
     margin-right: 18px;
     padding: 6px 4px;
-    color: var(--site-nav-green);
+    color: var(--site-nav-brand-color);
     text-decoration: none;
     font-size: 0.9rem;
     font-weight: 700;
@@ -75,7 +103,7 @@ body.has-site-nav .app-shell {
 
 .site-nav__brand:hover,
 .site-nav__brand:focus-visible {
-    color: #ffffff;
+    color: var(--site-nav-brand-hover-color);
     outline: none;
 }
 
@@ -86,11 +114,11 @@ body.has-site-nav .app-shell {
     border-radius: 5px;
     object-fit: cover;
     object-position: center;
-    box-shadow: 0 0 14px rgba(90, 242, 142, 0.3);
+    box-shadow: var(--site-nav-logo-shadow);
 }
 
 .site-nav__brand-name::before {
-    content: "$ ";
+    content: var(--site-nav-brand-prefix);
     color: var(--site-nav-green-dim);
 }
 
@@ -128,15 +156,15 @@ body.has-site-nav .app-shell {
 .site-nav__link:hover,
 .site-nav__link:focus-visible {
     color: var(--site-nav-green);
-    background: rgba(90, 242, 142, 0.08);
-    border-color: rgba(90, 242, 142, 0.2);
+    background: var(--site-nav-hover-bg);
+    border-color: var(--site-nav-hover-line);
     outline: none;
 }
 
 .site-nav__link[aria-current="page"] {
     color: var(--site-nav-green);
-    background: rgba(90, 242, 142, 0.12);
-    border-color: rgba(90, 242, 142, 0.34);
+    background: var(--site-nav-active-bg);
+    border-color: var(--site-nav-active-line);
 }
 
 .site-nav__utility .site-nav__link {
@@ -146,7 +174,7 @@ body.has-site-nav .app-shell {
 
 .site-nav__utility .site-nav__link:hover,
 .site-nav__utility .site-nav__link:focus-visible {
-    background: rgba(90, 242, 142, 0.12);
+    background: var(--site-nav-active-bg);
     border-color: var(--site-nav-line-strong);
 }
 
@@ -167,7 +195,7 @@ body.has-site-nav .app-shell {
     .site-nav {
         /* No backdrop-filter on mobile: it would become the containing block
            for the fixed slide-over panel and clip it to the bar height. */
-        background: #0a0f0d;
+        background: var(--site-nav-mobile-bg);
         backdrop-filter: none;
         -webkit-backdrop-filter: none;
     }
@@ -185,7 +213,7 @@ body.has-site-nav .app-shell {
         place-items: center;
         border: 1px solid var(--site-nav-line);
         border-radius: 7px;
-        background: rgba(90, 242, 142, 0.06);
+        background: var(--site-nav-control-bg);
         color: var(--site-nav-green);
         cursor: pointer;
     }
@@ -233,7 +261,7 @@ body.has-site-nav .app-shell {
         padding: 0 10px;
         border: 1px solid var(--site-nav-line);
         border-radius: 7px;
-        background: rgba(90, 242, 142, 0.06);
+        background: var(--site-nav-control-bg);
         color: var(--site-nav-green);
         font-size: 0.82rem;
         font-weight: 700;
@@ -244,7 +272,7 @@ body.has-site-nav .app-shell {
 
     .site-nav__top-login:hover,
     .site-nav__top-login:focus-visible {
-        background: rgba(90, 242, 142, 0.12);
+        background: var(--site-nav-control-hover-bg);
         border-color: var(--site-nav-line-strong);
         outline: none;
     }
@@ -267,13 +295,13 @@ body.has-site-nav .app-shell {
         border-radius: 6px;
         object-fit: cover;
         object-position: center;
-        box-shadow: 0 0 14px rgba(90, 242, 142, 0.3);
+        box-shadow: var(--site-nav-logo-shadow);
     }
 
     .site-nav__mobile-title {
         display: block;
         overflow: hidden;
-        color: var(--site-nav-green);
+        color: var(--site-nav-brand-color);
         font-size: 0.9rem;
         font-weight: 700;
         line-height: 1;
@@ -282,7 +310,7 @@ body.has-site-nav .app-shell {
     }
 
     .site-nav__mobile-title::before {
-        content: "$ ";
+        content: var(--site-nav-brand-prefix);
         color: var(--site-nav-green-dim);
     }
 
@@ -302,9 +330,9 @@ body.has-site-nav .app-shell {
         align-items: stretch;
         gap: 6px;
         padding: max(64px, calc(var(--site-nav-height) + env(safe-area-inset-top) + 10px)) 14px 18px;
-        background: #0a0f0d;
+        background: var(--site-nav-panel-bg);
         border-right: 1px solid var(--site-nav-line);
-        box-shadow: 24px 0 80px rgba(0, 0, 0, 0.7);
+        box-shadow: var(--site-nav-panel-shadow);
         transform: translateX(-104%);
         transition: transform 180ms ease;
     }
@@ -318,7 +346,7 @@ body.has-site-nav .app-shell {
         padding: 8px 12px;
         border: 1px solid var(--site-nav-line);
         border-radius: 8px;
-        background: rgba(90, 242, 142, 0.05);
+        background: var(--site-nav-brand-panel-bg);
     }
 
     .site-nav__items {
@@ -376,7 +404,7 @@ body.has-site-nav .app-shell {
         inset: var(--site-nav-height) 0 0 0;
         z-index: var(--site-nav-z);
         display: block;
-        background: rgba(4, 8, 6, 0.62);
+        background: var(--site-nav-backdrop-bg);
         backdrop-filter: blur(2px);
         -webkit-backdrop-filter: blur(2px);
         opacity: 0;
@@ -390,97 +418,7 @@ body.has-site-nav .app-shell {
     }
 }
 
-/* ---- warm light theme (opt-in per page via body.theme-warm) ---- */
-body.theme-warm {
-    --site-nav-bg: rgba(250, 246, 240, 0.88);
-    --site-nav-line: #ece4d8;
-    --site-nav-line-strong: #d8cdba;
-    --site-nav-green: #5b7152;
-    --site-nav-green-dim: #927d5b;
-    --site-nav-text: #5d574e;
-    --site-nav-muted: #928a7d;
-    --site-nav-mono: "Plus Jakarta Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
-}
-
-body.theme-warm .site-nav {
-    color: var(--ink, #23201c);
-}
-
-body.theme-warm .site-nav__brand { color: var(--ink, #23201c); }
-body.theme-warm .site-nav__brand:hover,
-body.theme-warm .site-nav__brand:focus-visible { color: var(--site-nav-green); }
-body.theme-warm .site-nav__brand-logo { box-shadow: none; }
-body.theme-warm .site-nav__brand-name::before { content: ""; }
-
-body.theme-warm .site-nav__link:hover,
-body.theme-warm .site-nav__link:focus-visible {
-    color: var(--site-nav-green);
-    background: #e7eee2;
-    border-color: #cfddc6;
-}
-
-body.theme-warm .site-nav__link[aria-current="page"] {
-    color: var(--site-nav-green);
-    background: #e7eee2;
-    border-color: #cfddc6;
-}
-
-body.theme-warm .site-nav__utility .site-nav__link {
-    border-color: var(--site-nav-line);
-    color: var(--site-nav-green);
-}
-
-body.theme-warm .site-nav__utility .site-nav__link:hover,
-body.theme-warm .site-nav__utility .site-nav__link:focus-visible {
-    background: #e7eee2;
-    border-color: var(--site-nav-line-strong);
-}
-
-@media (max-width: 979px) {
-    body.theme-warm .site-nav {
-        background: #faf6f0;
-    }
-
-    body.theme-warm .site-nav__toggle {
-        border-color: var(--site-nav-line);
-        background: #e7eee2;
-        color: var(--site-nav-green);
-    }
-
-    body.theme-warm .site-nav__top-login {
-        border-color: var(--site-nav-line);
-        background: #e7eee2;
-        color: var(--site-nav-green);
-    }
-
-    body.theme-warm .site-nav__top-login:hover,
-    body.theme-warm .site-nav__top-login:focus-visible {
-        background: #dfe9d8;
-        border-color: var(--site-nav-line-strong);
-    }
-
-    body.theme-warm .site-nav__mobile-title { color: var(--ink, #23201c); }
-    body.theme-warm .site-nav__mobile-title::before { content: ""; }
-
-    body.theme-warm .site-nav__panel {
-        background: #faf6f0;
-        border-right: 1px solid var(--site-nav-line);
-        box-shadow: 24px 0 80px rgba(60, 50, 35, 0.22);
-    }
-
-    body.theme-warm .site-nav__brand {
-        border-color: var(--site-nav-line);
-        background: #ffffff;
-    }
-
-    body.theme-warm .site-nav__utility { border-top-color: var(--site-nav-line); }
-
-    body.theme-warm .site-nav__backdrop {
-        background: rgba(60, 50, 35, 0.32);
-    }
-}
-
-/* ---- dark casino theme (opt-in per page via body.theme-casino) ---- */
+/* Casino pages intentionally keep dark felt-table chrome and play surfaces. */
 body.theme-casino {
     --site-nav-bg: rgba(8, 16, 12, 0.96);
     --site-nav-line: rgba(201, 162, 75, 0.30);
@@ -489,30 +427,18 @@ body.theme-casino {
     --site-nav-green-dim: #c9a24b;
     --site-nav-text: #f3ecd8;
     --site-nav-muted: rgba(243, 236, 216, 0.62);
+    --site-nav-hover-bg: rgba(201, 162, 75, 0.08);
+    --site-nav-hover-line: rgba(201, 162, 75, 0.30);
+    --site-nav-active-bg: rgba(201, 162, 75, 0.14);
+    --site-nav-active-line: rgba(201, 162, 75, 0.52);
+    --site-nav-control-bg: rgba(201, 162, 75, 0.08);
+    --site-nav-control-hover-bg: rgba(201, 162, 75, 0.16);
+    --site-nav-mobile-bg: #0a120e;
+    --site-nav-panel-bg: #0a120e;
+    --site-nav-panel-shadow: 24px 0 80px rgba(0, 0, 0, 0.7);
+    --site-nav-backdrop-bg: rgba(4, 8, 6, 0.62);
+    --site-nav-brand-color: var(--site-nav-green);
+    --site-nav-brand-hover-color: #ffffff;
+    --site-nav-brand-panel-bg: rgba(201, 162, 75, 0.06);
     --site-nav-mono: "Roboto Condensed", Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
-}
-
-body.theme-casino .site-nav__brand { color: var(--site-nav-green); }
-body.theme-casino .site-nav__brand-logo { box-shadow: none; }
-body.theme-casino .site-nav__brand-name::before { content: ""; }
-
-@media (max-width: 979px) {
-    body.theme-casino .site-nav { background: #0a120e; }
-
-    body.theme-casino .site-nav__toggle,
-    body.theme-casino .site-nav__top-login {
-        background: rgba(201, 162, 75, 0.08);
-    }
-
-    body.theme-casino .site-nav__top-login:hover,
-    body.theme-casino .site-nav__top-login:focus-visible {
-        background: rgba(201, 162, 75, 0.16);
-        border-color: var(--site-nav-line-strong);
-    }
-
-    body.theme-casino .site-nav__mobile-logo { box-shadow: none; }
-    body.theme-casino .site-nav__mobile-title::before { content: ""; }
-
-    body.theme-casino .site-nav__panel { background: #0a120e; }
-    body.theme-casino .site-nav__brand { background: rgba(201, 162, 75, 0.06); }
 }

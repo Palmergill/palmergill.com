@@ -21,7 +21,6 @@ Closed items are trimmed quarterly.
 - [ ] (auth redirect) `safe_next_path` accepts backslash-schemed redirects against the FastAPI endpoint directly; reject any `next` value containing `\` before parsing. — found 2026-07-01
 - [ ] (craps strategy) `everyRoll: false` is inert for one-roll bets because resolved stakes are zeroed before the re-arm check; either remove the flag or track one-time placement separately. — found 2026-07-01
 - [ ] (craps) The `$5` floor in `legalOddsAmount` silently drops small odds bets that snap below the floor; allow one legal increment or surface that odds were not placed. — found 2026-07-01
-- [ ] (shared nav) Poker and blackjack still pin older `site-nav.css` cache versions than the rest of the casino pages; bump their HTML and service-worker cache entries together. — found 2026-07-01
 - [ ] (frontend security) Chart.js loads from jsDelivr without SRI and is not cached for offline PWA flows; add integrity/crossorigin or vendor the file. — found 2026-07-01
 - [ ] (poker API) `GET /api/poker/games/{game_id}` persists a DB snapshot on every poll even though it is read-only; skip persistence unless state changed. — found 2026-07-01
 - [ ] (bitcoin chat) `_SESSION_MESSAGES` trims messages per session but never evicts sessions; add an LRU cap or timestamped sweep. — found 2026-07-01
@@ -31,5 +30,6 @@ Closed items are trimmed quarterly.
 
 ## Closed
 
+- Shared nav cache version drift across poker and blackjack was resolved by bumping all shared nav stylesheet references to `?v=11`. — closed 2026-07-03
 - Original 2026-05-27 audit findings not listed above were resolved by the `Fix audit bugs`, `Fix bug audit regressions`, and `bugs` commits.
 - Follow-up review fixes through 2026-06-26 closed the Vercel `/api/craps/*` public-route drift, poker frontend raise-size contract bug, public analytics metadata validation, Bitcoin live-route event-loop blocking, stock compare day-change data fetching, EPS trend field drift, stale craps service-worker cache entries, Polygon zero-value earnings extraction, and poker WebSocket pre-subscribe authentication.
