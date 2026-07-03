@@ -1476,3 +1476,12 @@ button:disabled {
         transition-duration: 0.001ms !important;
     }
 }
+
+/* Table is tuned to fit exactly in the viewport at this width (own bankroll
+   card already covers the essentials); hide the shared casino header rather
+   than compress the felt below the mobile breakpoint. */
+@media (max-width: 480px) {
+    .casino-header {
+        display: none;
+    }
+}

@@ -1011,6 +1011,7 @@ async function getErrorMessage(response, fallback) {
 
 async function startGame(gameType = 'single') {
     const name = elements.playerName.value.trim() || 'Palmer';
+    window.CasinoProfile?.setDisplayName(name);
 
     // Clear seen cards and reset deal sequence for new game
     seenCards.clear();
@@ -1143,6 +1144,7 @@ function startLobbyPolling() {
 async function joinMultiplayerGame() {
     const gameIdInput = document.getElementById('join-game-id');
     const name = elements.playerName.value.trim() || 'Palmer';
+    window.CasinoProfile?.setDisplayName(name);
     const joinGameId = gameIdInput?.value?.trim();
     
     if (!joinGameId) {
@@ -1593,6 +1595,7 @@ function updateGameDisplay() {
     const myPlayer = gameState.players.find(p => p.id === playerId);
     if (myPlayer) {
         elements.yourChips.innerHTML = ChipStackVisualizer.render(myPlayer.chips, true, true);
+        window.pokerCasinoHeader?.setChips(myPlayer.chips);
         if (elements.yourPositionChip) {
             elements.yourPositionChip.innerHTML = renderPositionChip(myPlayer);
         }
@@ -2054,6 +2057,9 @@ function showHandResult() {
                 holeCards,
                 board
             });
+            window.CasinoProfile?.recordSession('poker', {
+                handsPlayed: 1, netProfit: myWin.amount, biggestWin: myWin.amount
+            });
         } else if (myPlayer) {
             const amountLost = myPlayer.total_bet || myPlayer.bet || 0;
             StatsManager.recordHandLoss(amountLost);
@@ -2063,6 +2069,9 @@ function showHandResult() {
                 handName,
                 holeCards,
                 board
+            });
+            window.CasinoProfile?.recordSession('poker', {
+                handsPlayed: 1, netProfit: -amountLost
             });
         }
     }

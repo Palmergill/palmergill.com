@@ -23,7 +23,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,500;0,700;0,900;1,500;1,700&family=Inter:wght@400;500;600;650;700;750;800;850;900&family=Roboto+Condensed:wght@500;700;900&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/shared/casino-theme.css?v=1">
+    <link rel="stylesheet" href="/shared/casino-theme.css?v=2">
     <link rel="stylesheet" href="/shared/rules-viewer.css?v=1">
     <script>
         if ('serviceWorker' in navigator) {
@@ -2124,9 +2124,10 @@
             }
         }
     </style>
-    <link rel="stylesheet" href="style.css?v=25">
+    <link rel="stylesheet" href="style.css?v=26">
 </head>
 <body class="theme-casino">
+    <div id="casino-header-mount"></div>
     <div class="craps-page" data-rules-app>
         <main class="craps-app table" data-rules-game-panel aria-label="Craps table">
             <header class="hud">
@@ -2354,7 +2355,11 @@
     </footer>
 
     <script src="crapsRules.js?v=2"></script>
-    <script src="/shared/casino-profile.js?v=1"></script>
+    <script src="/shared/casino-profile.js?v=2"></script>
+    <script src="/shared/casino-header.js?v=1"></script>
+    <script>
+        window.CasinoHeader?.mount({ game: 'craps', label: 'Craps', mount: '#casino-header-mount' });
+    </script>
     <script src="/shared/analytics.js?v=1"></script>
     <script src="/shared/rules-viewer.js?v=1"></script>
     <script src="app.js?v=18"></script>

@@ -20,7 +20,8 @@
       "poker/tests",
       "craps/tests",
       "blackjack/tests",
-      "craps-strategy/tests"
+      "craps-strategy/tests",
+      "shared/tests"
     ],
     "testMatch": [
       "**/*.test.js"
@@ -28,8 +29,10 @@
     "collectCoverageFrom": [
       "poker/**/*.js",
       "craps-strategy/**/*.js",
+      "shared/*.js",
       "!craps-strategy/tests/**",
       "!poker/tests/**",
+      "!shared/tests/**",
       "!**/node_modules/**"
     ]
   }

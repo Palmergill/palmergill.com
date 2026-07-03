@@ -4,15 +4,16 @@ const STATIC_ASSETS = [
     '/craps/',
     '/craps/index.html',
     '/craps/app.js?v=18',
-    '/craps/style.css?v=24',
+    '/craps/style.css?v=26',
     '/craps/crapsRules.js?v=2',
     '/craps/manifest.json',
-    '/shared/casino-theme.css?v=1',
+    '/shared/casino-theme.css?v=2',
     '/shared/rules-viewer.css?v=1',
     '/shared/rules-viewer.js?v=1',
-    '/shared/casino-profile.js?v=1',
+    '/shared/casino-profile.js?v=2',
+    '/shared/casino-header.js?v=1',
     '/shared/site-nav.css?v=11',
-    '/shared/site-nav.js?v=10',
+    '/shared/site-nav.js?v=11',
     '/casino/craps%20rules%20and%20odds.txt'
 ];
 

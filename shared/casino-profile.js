@@ -15,8 +15,22 @@
 //   profile.setDisplayName('Sam');
 //   profile.recordSession('blackjack', { handsPlayed: 12, netProfit: 240 });
 //   profile.getAggregateStats();    // -> { totalHands, netProfit, byGame }
+//   profile.onChange(() => { ... }); // -> unsubscribe fn; fires after any
+//                                        write (bankroll, name, stats)
 (function () {
     if (window.CasinoProfile) return;
+
+    const listeners = new Set();
+    function notify() {
+        listeners.forEach((fn) => {
+            try {
+                fn();
+            } catch (e) {
+                // a subscriber's own bug must not break other subscribers
+                // or the write that triggered this notification.
+            }
+        });
+    }
 
     const STORAGE_KEYS = {
         name: 'casino-profile-name',
@@ -104,6 +118,7 @@
             const trimmed = (typeof name === 'string' ? name : '').trim();
             const clipped = trimmed.slice(0, DEFAULTS.maxNameLength);
             safeWrite(STORAGE_KEYS.name, clipped);
+            notify();
             return clipped;
         },
 
@@ -117,6 +132,7 @@
         setBankroll(value) {
             const clamped = clampBankroll(value);
             safeWrite(STORAGE_KEYS.bankroll, String(clamped));
+            notify();
             return clamped;
         },
 
@@ -140,6 +156,7 @@
 
             stats[game] = current;
             writeStats(stats);
+            notify();
         },
 
         getGameStats(game) {
@@ -169,12 +186,23 @@
 
         resetStats() {
             writeStats({});
+            notify();
         },
 
         resetAll() {
             this.resetBankroll();
             this.resetStats();
             safeWrite(STORAGE_KEYS.name, '');
+            notify();
+        },
+
+        // Subscribe to any bankroll/name/stats write. Returns an unsubscribe
+        // function. Errors thrown by one listener don't prevent others from
+        // running or affect the write that triggered the notification.
+        onChange(fn) {
+            if (typeof fn !== 'function') return () => {};
+            listeners.add(fn);
+            return () => listeners.delete(fn);
         },
 
         KNOWN_GAMES: KNOWN_GAMES.slice(),

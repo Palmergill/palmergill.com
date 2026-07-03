@@ -1002,3 +1002,14 @@ button:disabled {
         transition-duration: 0.01ms !important;
     }
 }
+
+/* The table is tuned to fit exactly in the viewport at this width with the
+   deal/action row visible without scrolling — there is no slack to give the
+   shared casino header (own bankroll display already covers the essentials
+   here). Hide it below the felt-table breakpoint rather than compress the
+   table. */
+@media (max-width: 480px) {
+    .casino-header {
+        display: none;
+    }
+}

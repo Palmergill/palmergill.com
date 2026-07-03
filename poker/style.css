@@ -3058,12 +3058,24 @@ input {
 }
 
 body.has-site-nav #app::before {
-    top: calc(var(--site-nav-height) + clamp(18px, 3vw, 32px));
+    top: calc(var(--site-nav-height) + var(--casino-header-height, 0px) + clamp(18px, 3vw, 32px));
+}
+
+/* .screen panels are fixed, viewport-covering layers (see .screen above),
+   so the shared casino header — normally just a flow sibling — has to be
+   pinned on top of them and its height subtracted here, or it gets painted
+   over. */
+body.has-site-nav .casino-header {
+    position: fixed;
+    top: var(--site-nav-height, 52px);
+    left: 0;
+    right: 0;
+    z-index: 5;
 }
 
 body.has-site-nav .screen {
-    top: var(--site-nav-height);
-    height: calc(100dvh - var(--site-nav-height));
+    top: calc(var(--site-nav-height) + var(--casino-header-height, 0px));
+    height: calc(100dvh - var(--site-nav-height) - var(--casino-header-height, 0px));
 }
 
 @media (max-width: 899px) {
@@ -3775,11 +3787,12 @@ button:disabled {
     padding: clamp(14px, 2.2vh, 22px) clamp(16px, 3vw, 32px) clamp(10px, 1.5vh, 14px);
 }
 
-/* The shared site nav offsets the screen by --site-nav-height, so subtract it
-   from the fixed game-screen height or the bottom HUD clips offscreen. */
+/* The shared site nav (and, on desktop, the casino header above it) offset
+   the screen, so subtract both from the fixed game-screen height or the
+   bottom HUD clips offscreen. */
 body.has-site-nav #game-screen {
-    height: calc(100dvh - var(--site-nav-height, 0px));
-    max-height: calc(100dvh - var(--site-nav-height, 0px));
+    height: calc(100dvh - var(--site-nav-height, 0px) - var(--casino-header-height, 0px));
+    max-height: calc(100dvh - var(--site-nav-height, 0px) - var(--casino-header-height, 0px));
 }
 
 .game-header {
@@ -3958,6 +3971,14 @@ body.has-site-nav #game-screen {
     }
 
     body.poker-game-active .site-nav {
+        opacity: 0;
+        pointer-events: none;
+        transform: translateY(-100%);
+    }
+
+    /* Same treatment as the nav above: reclaim the casino header's space too
+       during phone gameplay so the table keeps the full viewport. */
+    body.poker-game-active .casino-header {
         opacity: 0;
         pointer-events: none;
         transform: translateY(-100%);
