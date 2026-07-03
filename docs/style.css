@@ -66,60 +66,7 @@ pre code {
 
 .docs-hero {
     border-bottom: 1px solid var(--line);
-    padding: 22px 24px 64px;
-}
-
-.top-nav {
-    display: flex;
-    max-width: 1180px;
-    align-items: center;
-    justify-content: space-between;
-    gap: 20px;
-    margin: 0 auto 72px;
-}
-
-.brand {
-    display: inline-grid;
-    width: 48px;
-    height: 48px;
-    place-items: center;
-    border: 1px solid var(--line-strong);
-    border-radius: 8px;
-    background: #ece4d8;
-    color: #23201c;
-    font-weight: 800;
-    text-decoration: none;
-}
-
-.brand img {
-    width: 30px;
-    height: 30px;
-    border-radius: 6px;
-    object-fit: cover;
-    object-position: center;
-    box-shadow: none;
-}
-
-.top-links {
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    gap: 6px;
-    flex-wrap: wrap;
-}
-
-.top-links a {
-    padding: 8px 10px;
-    border-radius: 8px;
-    color: #5d574e;
-    font-size: 0.9rem;
-    text-decoration: none;
-}
-
-.top-links a:hover,
-.top-links a:focus-visible {
-    background: #ece4d8;
-    outline: none;
+    padding: 56px 24px 64px;
 }
 
 .hero-grid {
@@ -710,16 +657,6 @@ tr:last-child td {
         grid-template-columns: 1fr;
     }
 
-    .top-nav {
-        align-items: flex-start;
-        flex-direction: column;
-        margin-bottom: 48px;
-    }
-
-    .top-links {
-        justify-content: flex-start;
-    }
-
     .toc {
         position: static;
     }
@@ -745,7 +682,7 @@ tr:last-child td {
 
 @media (max-width: 680px) {
     .docs-hero {
-        padding: 18px 16px 42px;
+        padding: 32px 16px 42px;
     }
 
     .docs-shell {
@@ -754,10 +691,6 @@ tr:last-child td {
 
     .doc-section {
         padding: 22px 18px;
-    }
-
-    .top-links a {
-        padding-left: 0;
     }
 
     .split-grid,
