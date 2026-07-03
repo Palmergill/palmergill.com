@@ -37,7 +37,7 @@ pre {
 }
 
 code {
-    border: 1px solid rgba(148, 163, 184, 0.26);
+    border: 1px solid var(--line);
     border-radius: 6px;
     background: var(--surface);
     color: var(--soft);

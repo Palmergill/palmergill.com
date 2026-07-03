@@ -107,12 +107,20 @@
         return typeof window.Chart !== 'undefined';
     }
 
+    function themeColor(name, fallback) {
+        return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
+    }
+
     function chartTextColor() {
-        return 'rgba(226, 232, 240, 0.82)';
+        return themeColor('--soft', '#5d574e');
     }
 
     function gridColor() {
-        return 'rgba(148, 163, 184, 0.16)';
+        return themeColor('--line', '#ece4d8');
+    }
+
+    function chartSurfaceColor() {
+        return themeColor('--card', '#ffffff');
     }
 
     function destroyChart(name) {
@@ -306,7 +314,7 @@
                 datasets: [{
                     data: values,
                     backgroundColor: ['#22c55e', '#f59e0b', '#ef4444'],
-                    borderColor: '#111722',
+                    borderColor: chartSurfaceColor(),
                     borderWidth: 2,
                 }],
             },

@@ -110,7 +110,7 @@ Each step is verified in the browser preview at desktop and mobile widths.
       backend data.
 - [x] Shared token stylesheet exists; per-app CSS uses variables for chrome
       colors (no restated warm hex values — grep).
-- [ ] `theme-warm` mechanism removed; grep for legacy dark palette values
+- [x] `theme-warm` mechanism removed; grep for legacy dark palette values
       and `theme-warm` is clean; casino play surfaces unchanged.
 - [x] `docs/` design-system content documents the warm palette, not the old
       dark theme.
