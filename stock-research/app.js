@@ -437,6 +437,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 tickerInput.value = ticker;
                 searchSuggestions.classList.remove('visible');
                 setTimeout(() => searchSuggestions.classList.add('hidden'), 200);
+                closeSearchModalFn();
                 loadStock(ticker);
             });
         });
