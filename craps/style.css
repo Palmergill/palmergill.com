@@ -14,6 +14,8 @@
     --line-soft: rgba(233, 228, 208, 0.22);
     --font-display: "Roboto Condensed", Impact, sans-serif;
     --font-ui: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    /* Table column width; widened on large screens so desktop doesn't feel like a phone app. */
+    --app-col: 430px;
 }
 
 html {
@@ -56,7 +58,7 @@ a:focus-visible {
 
 .craps-page {
     display: grid;
-    width: min(100vw, 430px);
+    width: min(100vw, var(--app-col));
     min-height: calc(100vh - var(--site-nav-height, 52px));
     min-height: calc(100dvh - var(--site-nav-height, 52px));
     margin: 0 auto;
@@ -605,7 +607,8 @@ button:disabled {
     z-index: 6;
     display: grid;
     place-items: end center;
-    padding-bottom: 150px;
+    /* Rest on the FIELD band, clear of the DON'T PASS / PASS LINE labels below. */
+    padding-bottom: 205px;
     pointer-events: none;
     opacity: 1;
 }
@@ -782,8 +785,8 @@ button:disabled {
 
 .props-sheet {
     position: fixed;
-    left: max(10px, calc((100vw - 430px) / 2 + 10px));
-    right: max(10px, calc((100vw - 430px) / 2 + 10px));
+    left: max(10px, calc((100vw - var(--app-col)) / 2 + 10px));
+    right: max(10px, calc((100vw - var(--app-col)) / 2 + 10px));
     bottom: calc(128px + env(safe-area-inset-bottom));
     z-index: 80;
     display: grid;
@@ -1260,7 +1263,7 @@ button:disabled {
 
 .rules-panel {
     position: relative;
-    width: min(100%, 430px);
+    width: min(100%, var(--app-col));
     min-height: 100vh;
     min-height: 100dvh;
     margin: 0 auto;
@@ -1445,6 +1448,22 @@ button:disabled {
 
     .craps-page {
         overflow: hidden;
+    }
+}
+
+/* Larger table on desktop so the game doesn't sit as a phone column in empty space. */
+@media (min-width: 1100px) and (min-height: 760px) {
+    :root {
+        --app-col: 540px;
+    }
+
+    .felt {
+        grid-template-rows: auto 62px 98px auto 54px;
+        gap: 6px;
+    }
+
+    .box-zone {
+        min-height: 100px;
     }
 }
 
