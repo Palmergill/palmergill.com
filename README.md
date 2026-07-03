@@ -14,8 +14,6 @@ Personal project site plus shared API backend.
 - `/poker/` - Texas Hold'em poker app
 - `/craps/` - craps app
 - `/blackjack/` - blackjack app
-- `/mockups/` - interactive frontend design studies
-- `/blackjack-mockups/` - blackjack card-first layout concepts
 - `/admin/` - protected backend log dashboard
 
 ## Active Backend Paths

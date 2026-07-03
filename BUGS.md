@@ -1,37 +1,35 @@
-# Codebase Bug Audit — Open Items
+# Bug Intake Queue
 
-Original audit date: 2026-05-27. Scope: full source tree (excluding `node_modules/`, `backend/venv/`, generated/test fixtures).
-
-The original audit listed 27 findings. The critical and high correctness bugs — plus most of the medium/low items — were resolved by the `Fix audit bugs`, `Fix bug audit regressions`, and `bugs` commits and verified against current code (e.g. the under-min all-in handling at `backend/app/poker_game.py:446`, the AI negative-raise guard at `backend/app/poker_ai.py:254`, queued analytics writes at `backend/app/main.py`, and timezone-stamped admin timestamps at `backend/app/routers/admin.py:114`).
-
-Follow-up review fixes through 2026-06-26 also closed the Vercel `/api/craps/*` public-route drift, the poker frontend raise-size contract bug, public analytics metadata size/depth validation, Bitcoin live-route event-loop blocking, stock compare day-change data fetching, EPS trend field drift, stale craps service-worker cache entries, Polygon zero-value earnings extraction, and poker WebSocket pre-subscribe authentication.
-
-This file now tracks only the findings still open as of 2026-06-26. Items personally verified by reading the code are marked **[verified]**; items surfaced by subagent scans that were not fully verified are marked **[unverified]**.
-
----
+Open items use the format `- [ ] (area) description — found YYYY-MM-DD`.
+Closed items are trimmed quarterly.
 
 ## High
 
-### 1. Shared rate limits are not global **[verified]**
-- Auth, analytics, poker, and craps translation rate limits are still best-effort local stores unless backed by a shared service. Auth paths document this directly in code; public API limits should use the same shared backend if these endpoints receive meaningful unauthenticated traffic.
-- Fix: back counters with Redis, Vercel KV, or a small database table with TTL cleanup.
-
----
+- [ ] (backend rate limits) Auth, analytics, poker, and craps translation rate limits are still best-effort local stores unless backed by a shared service; back counters with Redis, Vercel KV, or a database table with TTL cleanup. — found 2026-05-27
 
 ## Medium
 
-### 2. Railway database durability depends on deployment env **[unverified]**
-- The Docker image defaults to SQLite at `/data`, while docs list `DATABASE_URL` as a primary Railway variable. If Railway is not configured with Postgres or a durable volume, stock cache, analytics, logs, and poker snapshots are not durable across container replacement.
-- Fix: choose the production persistence policy. If Postgres is required, fail startup in production when `DATABASE_URL` is the Docker SQLite default.
+- [ ] (backend deploy) Railway persistence policy is unresolved; decide whether production must require Postgres or a durable volume instead of accepting the Docker SQLite `/data` fallback. — found 2026-05-27
+- [ ] (poker API) `backend/app/routers/poker.py` duplicates client-IP parsing and trusts the spoofable leftmost `X-Forwarded-For` hop when `TRUST_PROXY_HEADERS` is enabled; use the hardened shared helper from `backend/app/main.py`. — found 2026-07-01
+- [ ] (poker API) `POST /api/poker/games/{id}/buy-back` lacks a tournament guard, allowing eliminated tournament players to buy back into play and corrupt standings. — found 2026-07-01
+- [ ] (craps strategy) Progression bet sizing in `craps-strategy/engine.js` bypasses legal-increment snapping after wins/losses; snap the new size through the bet rules before simulation continues. — found 2026-07-01
+- [ ] (backend rate limits) Public per-IP rate-limit stores in craps, analytics, and poker prune timestamps but never evict expired IP keys, so many one-off IPs can grow memory for the life of the process. — found 2026-07-01
+- [ ] (poker API) Showdown serialization reveals folded players' hole cards to state polling clients; reveal only the requesting player's cards or non-folded showdown hands. — found 2026-07-01
 
 ## Low
 
-No low-severity open code findings are currently tracked here.
+- [ ] (auth redirect) `safe_next_path` accepts backslash-schemed redirects against the FastAPI endpoint directly; reject any `next` value containing `\` before parsing. — found 2026-07-01
+- [ ] (craps strategy) `everyRoll: false` is inert for one-roll bets because resolved stakes are zeroed before the re-arm check; either remove the flag or track one-time placement separately. — found 2026-07-01
+- [ ] (craps) The `$5` floor in `legalOddsAmount` silently drops small odds bets that snap below the floor; allow one legal increment or surface that odds were not placed. — found 2026-07-01
+- [ ] (shared nav) Poker and blackjack still pin older `site-nav.css` cache versions than the rest of the casino pages; bump their HTML and service-worker cache entries together. — found 2026-07-01
+- [ ] (frontend security) Chart.js loads from jsDelivr without SRI and is not cached for offline PWA flows; add integrity/crossorigin or vendor the file. — found 2026-07-01
+- [ ] (poker API) `GET /api/poker/games/{game_id}` persists a DB snapshot on every poll even though it is read-only; skip persistence unless state changed. — found 2026-07-01
+- [ ] (bitcoin chat) `_SESSION_MESSAGES` trims messages per session but never evicts sessions; add an LRU cap or timestamped sweep. — found 2026-07-01
+- [ ] (auth) `GET /login/logout` is CSRF-able and clears the session cookie; keep POST and make GET confirm or remove it. — found 2026-07-01
+- [ ] (admin analytics) Admin analytics summary endpoints load the full window into Python and aggregate in memory; move counts to SQL `GROUP BY` when traffic makes this slow. — found 2026-07-01
+- [ ] (poker engine) Busted cash-game players can be dealt in with zero chips and occupy a live seat; skip zero-chip players at deal time. — found 2026-07-01
 
----
+## Closed
 
-## Recommendations
-
-1. The in-memory rate limit / session stores need a shared backend for any multi-instance deployment.
-2. Decide whether Railway production must require Postgres rather than accepting the Docker SQLite fallback.
-3. The poker engine carried multiple subtle correctness issues in the original audit (now fixed). Property-based tests around `_is_round_complete`, `_advance_phase`, side-pot splits, and tournament level transitions would guard against regressions.
+- Original 2026-05-27 audit findings not listed above were resolved by the `Fix audit bugs`, `Fix bug audit regressions`, and `bugs` commits.
+- Follow-up review fixes through 2026-06-26 closed the Vercel `/api/craps/*` public-route drift, poker frontend raise-size contract bug, public analytics metadata validation, Bitcoin live-route event-loop blocking, stock compare day-change data fetching, EPS trend field drift, stale craps service-worker cache entries, Polygon zero-value earnings extraction, and poker WebSocket pre-subscribe authentication.

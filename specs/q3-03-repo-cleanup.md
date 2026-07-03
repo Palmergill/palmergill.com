@@ -1,35 +1,33 @@
 # Spec 3 — Repo & Tracker Cleanup
 
 - **Quarter:** Q3 2026 (Jul–Sep)
-- **Status:** draft
+- **Status:** in progress
 - **Depends on:** nothing; unblocks Spec 1's PR flow
-- **Areas:** repo root, `BUGS.md`, `FINDINGS.md`, mockup directories
+- **Areas:** repo root, `BUGS.md`, mockup directories
 
 ## Summary
 
-One cleanup sprint: land or discard the current uncommitted working tree,
-purge generated artifacts from version control, retire stale mockup
-directories, and turn BUGS.md/FINDINGS.md into a live intake queue.
+One cleanup sprint: land or discard any uncommitted working tree, purge
+generated artifacts from version control, retire stale mockup directories, and
+turn BUGS.md into the live intake queue.
 
 ## Background / current state
 
-- The working tree has ~20 modified files uncommitted (theme rollout
-  mid-flight).
-- `stock_data.db` (a runtime SQLite cache) and `logs/` sit in the repo root.
-- Three mockup directories exist: `mockups/`, `craps-mockups/`,
+- Started 2026-07-03: the working tree was clean before this cleanup pass, so
+  the old "20 modified files" note is stale.
+- `stock_data.db` (a runtime SQLite cache) and `logs/` sit in the repo root but
+  are already ignored and not tracked.
+- Three tracked mockup directories existed: `mockups/`, `craps-mockups/`,
   `blackjack-mockups/`. The craps and blackjack mockups have shipped as real
   implementations (see git history: "Implement mobile craps table design").
-- `BUGS.md` and `FINDINGS.md` exist at the root; recent commits ("bugs",
-  "Fix review findings") suggest they are being worked but their state is
-  unclear.
+- `FINDINGS.md` has been merged into `BUGS.md` as the single intake queue.
 
 ## Goals
 
 1. `git status` is clean and stays clean — generated files never show up.
 2. Shipped mockups are archived; the live `mockups/` design-studies page is
    either curated or removed from nav.
-3. BUGS.md/FINDINGS.md have a defined format and every open item is
-   actionable or closed.
+3. `BUGS.md` has a defined format and every open item is actionable or closed.
 
 ## Non-goals
 
@@ -62,11 +60,11 @@ directories, and turn BUGS.md/FINDINGS.md into a live intake queue.
 - [ ] `git status` clean; `.gitignore` covers all generated artifacts.
 - [ ] Fresh clone + `./start.sh` works (proves `stock_data.db` is
       regenerated, not required).
-- [ ] Mockup directories resolved per R3; no dead links from any live page
+- [x] Mockup directories resolved per R3; no dead links from any live page
       (crawl the nav manually or with a link checker).
-- [ ] BUGS.md in the R4 format with every item actionable; FINDINGS.md
+- [x] BUGS.md in the R4 format with every item actionable; FINDINGS.md
       merged or given a distinct charter.
-- [ ] README path list matches the actual directory layout.
+- [x] README path list matches the actual directory layout.
 
 ## Risks
 

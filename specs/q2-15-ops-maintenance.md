@@ -64,7 +64,7 @@ on a current, documented, restorable stack.
   out-of-doc knowledge gets written in.
 - **R7.** Update `ARCHITECTURE.md` and `docs/` for everything the year
   added (new endpoints, rate limits, `/projects/`, `/casino-math/`);
-  delete `BUGS.md`/`FINDINGS.md` closed-item backlog per the Spec 3 format.
+  trim the `BUGS.md` closed-item backlog per the Spec 3 format.
 
 ### Data & config hygiene
 
