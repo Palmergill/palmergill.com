@@ -1,7 +1,7 @@
 # Spec 1 — Warm Retheme Completion
 
 - **Quarter:** Q3 2026 (Jul–Sep)
-- **Status:** in progress
+- **Status:** shipped
 - **Depends on:** nothing (already in flight)
 - **Areas:** all static pages, `shared/site-nav.css`, per-app `style.css`
 
@@ -114,7 +114,7 @@ Each step is verified in the browser preview at desktop and mobile widths.
       and `theme-warm` is clean; casino play surfaces unchanged.
 - [x] `docs/` design-system content documents the warm palette, not the old
       dark theme.
-- [ ] Mobile (375px) and desktop (1280px) screenshots captured per page.
+- [x] Mobile (375px) and desktop (1280px) screenshots captured per page.
 - [x] `ARCHITECTURE.md`/README mention the single warm theme.
 
 ## Risks
