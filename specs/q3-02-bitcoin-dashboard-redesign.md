@@ -80,9 +80,9 @@ side helper. Light fintech-editorial visual style, copy written for beginners.
   renderer (the craps simulator already draws charts client-side — reuse the
   approach, or extract a tiny shared chart helper into `shared/` if both need
   it).
-- **URL:** stays at `/bitcoin-chat/` initially; add `/bitcoin/` as the
-  canonical path with a redirect in `vercel.json` once shipped, and update
-  nav labels to "Bitcoin Dashboard".
+- **URL (decided Jul 2026):** `/bitcoin/` becomes the canonical path with a
+  `vercel.json` redirect from `/bitcoin-chat/`, timed with this spec's ship;
+  nav labels update to "Bitcoin Dashboard".
 
 ## Acceptance criteria
 

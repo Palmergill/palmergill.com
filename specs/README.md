@@ -10,6 +10,9 @@ One spec per roadmap item. Status legend: `draft` → `accepted` → `in progres
 - **Dark theme: deleted.** Spec 1's delete-don't-toggle assumption is
   confirmed. A future dark mode would be a fresh `prefers-color-scheme`
   project, not a preserved legacy theme.
+- **Spec 5 pulled into Q3** (decided Jul 2026): the retheme close-out is
+  smaller than planned, and Q4's simulator/blackjack work then lands on the
+  unified casino shell instead of retrofitting it.
 - **Time budget: 15+ hrs/week.** The plan as written has slack. Stretch
   candidates if quarters finish early: dark mode via
   `prefers-color-scheme`, poker gameplay depth (tournaments, better AI),
@@ -24,12 +27,12 @@ One spec per roadmap item. Status legend: `draft` → `accepted` → `in progres
 | 2 | [Bitcoin dashboard redesign](q3-02-bitcoin-dashboard-redesign.md) | draft |
 | 3 | [Repo & tracker cleanup](q3-03-repo-cleanup.md) | draft |
 | 4 | [Backend test baseline](q3-04-backend-test-baseline.md) | draft |
+| 5 | [Casino shell unification](q4-05-casino-shell-unification.md) | draft — pulled forward from Q4 |
 
 ## Q4 2026 (Oct–Dec) — Casino as a coherent product
 
 | # | Spec | Status |
 |---|------|--------|
-| 5 | [Casino shell unification](q4-05-casino-shell-unification.md) | draft |
 | 6 | [Craps strategy simulator v2](q4-06-craps-simulator-v2.md) | draft |
 | 7 | [Blackjack strategy tools](q4-07-blackjack-strategy-tools.md) | draft |
 | 8 | [Session stats dashboard](q4-08-session-stats-dashboard.md) | draft |

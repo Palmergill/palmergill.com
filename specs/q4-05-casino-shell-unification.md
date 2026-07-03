@@ -1,6 +1,6 @@
 # Spec 5 — Casino Shell Unification
 
-- **Quarter:** Q4 2026 (Oct–Dec)
+- **Quarter:** Q3 2026 (Jul–Sep) — pulled forward from Q4 (decided Jul 2026; retheme close-out freed the time, and Q4's simulator/blackjack specs build on this)
 - **Status:** draft
 - **Depends on:** Spec 1 (warm chrome), Spec 4 (payout tests catch regressions)
 - **Areas:** `shared/casino-profile.js`, `shared/casino-theme.css`, `casino/`, `poker/`, `craps/`, `blackjack/`

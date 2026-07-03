@@ -45,14 +45,13 @@ directories, and turn BUGS.md/FINDINGS.md into a live intake queue.
 - **R2. Generated artifacts:** `git rm --cached stock_data.db logs/` and add
   to `.gitignore` alongside `backend/venv`, `__pycache__`, `node_modules`,
   `.DS_Store`. Verify the backend recreates `stock_data.db` on first run.
-- **R3. Mockups:** delete `craps-mockups/` and `blackjack-mockups/` (their
-  designs shipped; git history preserves them). Decide for `mockups/`:
-  keep it as a linked design-studies page only if it is referenced from
-  the home page or about page; otherwise delete.
-- **R4. Trackers:** adopt one format for `BUGS.md` and `FINDINGS.md`:
-  `- [ ] (area) description — found YYYY-MM-DD`, with a `## Closed` section
-  trimmed quarterly. Merge FINDINGS.md into BUGS.md if the distinction isn't
-  carrying weight (one intake queue is easier to burn down than two).
+- **R3. Mockups (decided Jul 2026):** delete all three — `craps-mockups/`,
+  `blackjack-mockups/` (designs shipped; git history preserves them), and
+  `mockups/`. Remove any links to them from live pages and nav.
+- **R4. Trackers (decided Jul 2026):** merge `FINDINGS.md` into `BUGS.md`
+  as one intake queue with the format
+  `- [ ] (area) description — found YYYY-MM-DD` and a `## Closed` section
+  trimmed quarterly.
 - **R5. Docs sync:** update `README.md`, `ARCHITECTURE.md`, and `docs/` to
   remove references to deleted paths.
 - **R6. Vercel config:** confirm `vercel.json` and `middleware.js` don't
