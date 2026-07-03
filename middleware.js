@@ -178,7 +178,38 @@ function unauthorized(request) {
   });
 }
 
-function missingConfig() {
+const MISSING_CONFIG_PAGE = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Temporarily unavailable — Palmer Gill</title>
+<style>
+  body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #faf6f0; color: #23201c; font-family: "Plus Jakarta Sans", system-ui, -apple-system, "Segoe UI", sans-serif; }
+  .card { max-width: 420px; margin: 24px; padding: 36px 32px; background: #ffffff; border: 1px solid #ece4d8; border-radius: 18px; text-align: center; box-shadow: 0 10px 30px rgba(60, 50, 35, 0.08); }
+  h1 { font-size: 1.25rem; margin: 0 0 8px; letter-spacing: -0.01em; }
+  p { color: #5d574e; margin: 0 0 22px; line-height: 1.55; font-size: 0.95rem; }
+  a { display: inline-block; padding: 10px 20px; border-radius: 999px; background: #5b7152; color: #ffffff; text-decoration: none; font-weight: 600; font-size: 0.9rem; }
+  a:hover { background: #4c6044; }
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>This section is temporarily unavailable</h1>
+  <p>Sign-in isn't configured on this deployment, so protected pages can't be shown right now.</p>
+  <a href="/">Back to projects</a>
+</div>
+</body>
+</html>`;
+
+function missingConfig(request) {
+  const accept = (request && request.headers.get('accept')) || '';
+  if (accept.includes('text/html')) {
+    return new Response(MISSING_CONFIG_PAGE, {
+      status: 503,
+      headers: { 'Content-Type': 'text/html; charset=utf-8' },
+    });
+  }
   return new Response('App authentication is not configured', {
     status: 503,
   });
@@ -392,7 +423,7 @@ export default async function middleware(request) {
   }
 
   if (!password) {
-    return process.env.VERCEL ? missingConfig() : next();
+    return process.env.VERCEL ? missingConfig(request) : next();
   }
 
   if (await validSessionCookie(request, username, password)) {
