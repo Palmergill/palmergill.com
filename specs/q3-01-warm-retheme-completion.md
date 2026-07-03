@@ -26,6 +26,11 @@ content.
 - Also verified with the FastAPI backend running: `stock-research/?ticker=AAPL`
   rendered the detail charts in demo mode, and the authenticated `admin/`
   dashboard rendered metrics/charts with warm panels.
+- Consolidated warm chrome tokens into `shared/site-nav.css`; home/about now
+  consume those variables directly, and docs/login/admin/stock/Bitcoin app CSS
+  alias their local token names to the shared palette. Remaining exact CSS
+  literals from the warm set are in the shared token source or casino card/play
+  surfaces.
 - Canonical warm tokens: bg `#faf6f0`, card `#ffffff`, surface `#f3eee4`,
   ink `#23201c`, soft `#5d574e`, muted `#928a7d`, line `#ece4d8`,
   line-strong `#d8cdba`, sage `#5b7152`/dim `#4c6044`, clay `#b96a4b`,
@@ -103,7 +108,7 @@ Each step is verified in the browser preview at desktop and mobile widths.
 
 - [x] Stock-research detail and admin data views verified warm with live
       backend data.
-- [ ] Shared token stylesheet exists; per-app CSS uses variables for chrome
+- [x] Shared token stylesheet exists; per-app CSS uses variables for chrome
       colors (no restated warm hex values — grep).
 - [ ] `theme-warm` mechanism removed; grep for legacy dark palette values
       and `theme-warm` is clean; casino play surfaces unchanged.

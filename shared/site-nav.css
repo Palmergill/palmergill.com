@@ -438,7 +438,7 @@ body.theme-casino {
     --site-nav-panel-shadow: 24px 0 80px rgba(0, 0, 0, 0.7);
     --site-nav-backdrop-bg: rgba(4, 8, 6, 0.62);
     --site-nav-brand-color: var(--site-nav-green);
-    --site-nav-brand-hover-color: #ffffff;
+    --site-nav-brand-hover-color: var(--site-nav-text);
     --site-nav-brand-panel-bg: rgba(201, 162, 75, 0.06);
     --site-nav-mono: "Roboto Condensed", Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
 }

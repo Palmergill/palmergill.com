@@ -1,21 +1,16 @@
 :root {
     color-scheme: light;
-    --bg: #faf6f0;
-    --paper: #ffffff;
-    --paper-2: #ffffff;
-    --paper-3: #f3eee4;
-    --line: #ece4d8;
+    --paper: var(--card);
+    --paper-2: var(--card);
+    --paper-3: var(--surface);
     --line-soft: #f0e9dd;
-    --line-strong: #d8cdba;
-    --ink: #23201c;
-    --ink-soft: #5d574e;
-    --muted: #928a7d;
+    --ink-soft: var(--soft);
     --muted-2: #b3ab9c;
-    --accent: #b96a4b;
+    --accent: var(--clay);
     --accent-deep: #8f4d31;
     --accent-line: #e0b9a6;
     --accent-tint: #f6eae3;
-    --green: #5b7152;
+    --green: var(--sage);
     --danger: #b3402f;
     --serif: "Plus Jakarta Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
     --sans: "Plus Jakarta Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
@@ -200,7 +195,7 @@ button {
     border: 1px solid var(--line);
     border-radius: 8px;
     outline: none;
-    background: #ffffff;
+    background: var(--card);
     color: var(--ink);
     font-family: var(--mono);
     font-size: 13px;
@@ -1014,7 +1009,7 @@ button {
     margin: 10px 12px 12px;
     border: 1px solid var(--line);
     border-radius: 10px;
-    background: #ffffff;
+    background: var(--card);
     padding: 7px 7px 7px 14px;
     transition: border-color 160ms ease, box-shadow 160ms ease;
 }

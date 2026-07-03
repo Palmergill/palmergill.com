@@ -1,13 +1,8 @@
 :root {
     color-scheme: light;
-    --ink: #23201c;
-    --soft: #5d574e;
-    --muted: #928a7d;
-    --line: #ece4d8;
-    --line-strong: #d8cdba;
     --panel: rgba(255, 253, 249, 0.92);
-    --accent: #5b7152;
-    --accent-strong: #b96a4b;
+    --accent: var(--sage);
+    --accent-strong: var(--clay);
     --danger: #b3402f;
 }
 
@@ -17,14 +12,14 @@
 
 html {
     min-height: 100%;
-    background: #faf6f0;
+    background: var(--bg);
 }
 
 body {
     min-height: 100vh;
     min-height: 100dvh;
     margin: 0;
-    background: #faf6f0;
+    background: var(--bg);
     color: var(--ink);
     font-family: "Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
@@ -125,7 +120,7 @@ h1 {
     min-height: 52px;
     border: 1px solid var(--line-strong);
     border-radius: 8px;
-    background: #ffffff;
+    background: var(--card);
     color: var(--ink);
     outline: none;
     padding: 0 15px;
@@ -134,7 +129,7 @@ h1 {
 
 .field input:focus {
     border-color: var(--accent);
-    background: #ffffff;
+    background: var(--card);
     box-shadow: 0 0 0 4px rgba(91, 113, 82, 0.16);
 }
 
@@ -159,7 +154,7 @@ h1 {
     border: 0;
     border-radius: 8px;
     background: var(--accent);
-    color: #ffffff;
+    color: var(--card);
     cursor: pointer;
     font-weight: 700;
     letter-spacing: 0;
@@ -173,7 +168,7 @@ h1 {
 
 .login-button:hover,
 .login-button:focus-visible {
-    background: #4c6044;
+    background: var(--sage-dim);
     box-shadow: 0 16px 34px rgba(60, 50, 35, 0.22);
     outline: none;
     transform: translateY(-1px);

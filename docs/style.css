@@ -4,17 +4,13 @@
 
 :root {
     color-scheme: light;
-    --bg: #faf6f0;
-    --panel: #23201c;
-    --panel-strong: #f3eee4;
-    --text: #23201c;
-    --muted: #928a7d;
-    --line: #ece4d8;
-    --line-strong: #d8cdba;
-    --accent: #5b7152;
-    --accent-strong: #5a7794;
-    --warning: #b96a4b;
-    --code: #f3eee4;
+    --panel: var(--ink);
+    --panel-strong: var(--surface);
+    --text: var(--ink);
+    --accent: var(--sage);
+    --accent-strong: var(--sky);
+    --warning: var(--clay);
+    --code: var(--surface);
     --shadow: 0 24px 70px rgba(60, 50, 35, 0.14);
 }
 
@@ -43,8 +39,8 @@ pre {
 code {
     border: 1px solid rgba(148, 163, 184, 0.26);
     border-radius: 6px;
-    background: #f3eee4;
-    color: #5d574e;
+    background: var(--surface);
+    color: var(--soft);
     font-size: 0.91em;
     padding: 0.12rem 0.34rem;
 }
@@ -100,14 +96,14 @@ h1 {
 .hero-copy {
     max-width: 720px;
     margin: 22px 0 0;
-    color: #5d574e;
+    color: var(--soft);
     font-size: 1.14rem;
 }
 
 .status-panel {
     border: 1px solid var(--line);
     border-radius: 8px;
-    background: #ffffff;
+    background: var(--card);
     box-shadow: var(--shadow);
     padding: 24px;
 }
@@ -138,7 +134,7 @@ h1 {
     align-self: start;
     border: 1px solid var(--line);
     border-radius: 8px;
-    background: #ffffff;
+    background: var(--card);
     padding: 18px;
 }
 
@@ -150,7 +146,7 @@ h1 {
 .toc a {
     display: block;
     padding: 7px 0;
-    border-top: 1px solid #ece4d8;
+    border-top: 1px solid var(--line);
     color: var(--muted);
     font-size: 0.92rem;
     text-decoration: none;
@@ -158,7 +154,7 @@ h1 {
 
 .toc a:hover,
 .toc a:focus-visible {
-    color: #23201c;
+    color: var(--ink);
     outline: none;
 }
 
@@ -170,7 +166,7 @@ h1 {
     margin-bottom: 28px;
     border: 1px solid var(--line);
     border-radius: 8px;
-    background: #ffffff;
+    background: var(--card);
     padding: 30px;
 }
 
@@ -187,7 +183,7 @@ h1 {
 
 .doc-section p {
     margin: 0 0 16px;
-    color: #5d574e;
+    color: var(--soft);
 }
 
 .doc-section p:last-child {
@@ -212,9 +208,9 @@ h1 {
 .panel,
 .api-list article,
 .project-docs article {
-    border: 1px solid #ece4d8;
+    border: 1px solid var(--line);
     border-radius: 8px;
-    background: #ffffff;
+    background: var(--card);
     padding: 18px;
 }
 
@@ -258,21 +254,21 @@ table {
 th,
 td {
     padding: 14px 16px;
-    border-bottom: 1px solid #ece4d8;
+    border-bottom: 1px solid var(--line);
     text-align: left;
     vertical-align: top;
 }
 
 th {
-    background: #f3eee4;
-    color: #23201c;
+    background: var(--surface);
+    color: var(--ink);
     font-size: 0.82rem;
     letter-spacing: 0.06em;
     text-transform: uppercase;
 }
 
 td {
-    color: #5d574e;
+    color: var(--soft);
 }
 
 tr:last-child td {
@@ -314,7 +310,7 @@ tr:last-child td {
 .panel ul {
     margin: 0;
     padding-left: 20px;
-    color: #5d574e;
+    color: var(--soft);
 }
 
 .check-list li,
@@ -339,7 +335,7 @@ tr:last-child td {
 .source-list a {
     display: inline-flex;
     margin-top: 14px;
-    color: #5a7794;
+    color: var(--sky);
     font-weight: 700;
     text-decoration: none;
 }
@@ -359,11 +355,11 @@ tr:last-child td {
 .repo-grid code,
 .repo-grid span {
     padding: 12px;
-    border-bottom: 1px solid #ece4d8;
+    border-bottom: 1px solid var(--line);
 }
 
 .repo-grid span {
-    color: #5d574e;
+    color: var(--soft);
 }
 
 .source-list {
@@ -376,12 +372,12 @@ tr:last-child td {
 .source-list a {
     margin: 0;
     padding: 10px 0;
-    border-bottom: 1px solid #ece4d8;
+    border-bottom: 1px solid var(--line);
 }
 
 .subsection-title {
     margin: 28px 0 14px;
-    color: #23201c;
+    color: var(--ink);
     font-size: 1.1rem;
 }
 
@@ -401,30 +397,30 @@ tr:last-child td {
     flex-direction: column;
     gap: 6px;
     padding: 14px;
-    border: 1px solid #ece4d8;
+    border: 1px solid var(--line);
     border-radius: 8px;
-    background: #ffffff;
+    background: var(--card);
 }
 
 .swatch-chip {
     width: 100%;
     height: 56px;
-    border: 1px solid #d8cdba;
+    border: 1px solid var(--line-strong);
     border-radius: 6px;
 }
 
 .swatch-chip.is-grid {
     background-image:
-        linear-gradient(45deg, #d8cdba 25%, transparent 25%),
-        linear-gradient(-45deg, #d8cdba 25%, transparent 25%),
-        linear-gradient(45deg, transparent 75%, #d8cdba 75%),
-        linear-gradient(-45deg, transparent 75%, #d8cdba 75%);
+        linear-gradient(45deg, var(--line-strong) 25%, transparent 25%),
+        linear-gradient(-45deg, var(--line-strong) 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, var(--line-strong) 75%),
+        linear-gradient(-45deg, transparent 75%, var(--line-strong) 75%);
     background-size: 14px 14px;
     background-position: 0 0, 0 7px, 7px -7px, -7px 0;
 }
 
 .swatch strong {
-    color: #23201c;
+    color: var(--ink);
     font-size: 0.9rem;
 }
 
@@ -452,9 +448,9 @@ tr:last-child td {
     gap: 18px;
     margin: 0;
     padding: 18px;
-    border: 1px solid #ece4d8;
+    border: 1px solid var(--line);
     border-radius: 8px;
-    background: #ffffff;
+    background: var(--card);
 }
 
 .type-sample dt {
@@ -478,17 +474,17 @@ tr:last-child td {
     font-weight: 600;
     line-height: 1;
     letter-spacing: -0.02em;
-    color: #23201c;
+    color: var(--ink);
 }
 
 .type-h2 {
     font-size: clamp(1.4rem, 2.4vw, 1.9rem);
     line-height: 1.1;
-    color: #23201c;
+    color: var(--ink);
 }
 
 .type-body {
-    color: #5d574e;
+    color: var(--soft);
     font-size: 1rem;
     line-height: 1.6;
 }
@@ -504,7 +500,7 @@ tr:last-child td {
 .type-mono {
     font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
     font-size: 0.9rem;
-    color: #5d574e;
+    color: var(--soft);
 }
 
 .component-row {
@@ -514,9 +510,9 @@ tr:last-child td {
     gap: 12px;
     margin-top: 18px;
     padding: 20px;
-    border: 1px solid #ece4d8;
+    border: 1px solid var(--line);
     border-radius: 8px;
-    background: #ffffff;
+    background: var(--card);
 }
 
 .sample-button {
@@ -525,10 +521,10 @@ tr:last-child td {
     align-items: center;
     gap: 8px;
     padding: 0 16px;
-    border: 1px solid #d8cdba;
+    border: 1px solid var(--line-strong);
     border-radius: 8px;
-    background: #f3eee4;
-    color: #23201c;
+    background: var(--surface);
+    color: var(--ink);
     font-size: 0.84rem;
     font-weight: 800;
     letter-spacing: 0.04em;
@@ -537,20 +533,20 @@ tr:last-child td {
 }
 
 .sample-button.is-primary {
-    background: #5b7152;
-    border-color: #5b7152;
-    color: #ffffff;
+    background: var(--sage);
+    border-color: var(--sage);
+    color: var(--card);
 }
 
 .sample-button.is-accent {
     border-color: rgba(56, 189, 248, 0.55);
     background: rgba(56, 189, 248, 0.16);
-    color: #23201c;
+    color: var(--ink);
 }
 
 .sample-button.is-ghost {
     background: transparent;
-    border-color: #d8cdba;
+    border-color: var(--line-strong);
     color: rgba(247, 243, 234, 0.78);
 }
 
@@ -558,9 +554,9 @@ tr:last-child td {
     display: inline-flex;
     align-items: center;
     padding: 4px 12px;
-    border: 1px solid #d8cdba;
+    border: 1px solid var(--line-strong);
     border-radius: 999px;
-    background: #ece4d8;
+    background: var(--line);
     color: rgba(247, 243, 234, 0.86);
     font-size: 0.78rem;
     font-weight: 700;
@@ -594,15 +590,15 @@ tr:last-child td {
 
 .token-card {
     padding: 14px;
-    border: 1px solid #ece4d8;
+    border: 1px solid var(--line);
     border-radius: 8px;
-    background: #ffffff;
+    background: var(--card);
 }
 
 .token-card strong {
     display: block;
     margin-bottom: 6px;
-    color: #23201c;
+    color: var(--ink);
     font-size: 0.92rem;
 }
 
@@ -621,7 +617,7 @@ tr:last-child td {
     width: 64px;
     height: 40px;
     margin-bottom: 10px;
-    border: 1px solid #d8cdba;
+    border: 1px solid var(--line-strong);
     background: rgba(56, 189, 248, 0.18);
 }
 
@@ -630,7 +626,7 @@ tr:last-child td {
     height: 56px;
     margin-bottom: 10px;
     border-radius: 8px;
-    background: #ece4d8;
+    background: var(--line);
     box-shadow: 0 24px 70px rgba(60, 50, 35, 0.14);
 }
 
