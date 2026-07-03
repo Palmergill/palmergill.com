@@ -555,7 +555,8 @@ async def record_request_analytics(request: Request, call_next):
 
 SECURITY_HEADERS = {
     "X-Content-Type-Options": "nosniff",
-    "X-Frame-Options": "DENY",
+    # SAMEORIGIN (not DENY): /about embeds /assets/Resume2026.pdf in an iframe.
+    "X-Frame-Options": "SAMEORIGIN",
     "Referrer-Policy": "strict-origin-when-cross-origin",
     "Strict-Transport-Security": "max-age=63072000; includeSubDomains",
 }
