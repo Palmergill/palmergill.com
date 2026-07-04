@@ -36,7 +36,7 @@ Protected local app routes, FastAPI docs/OpenAPI JSON, and protected API routes 
 APP_AUTH_USERNAME=palmer APP_AUTH_PASSWORD=your-password ./start.sh
 ```
 
-Poker, craps, blackjack, login, and `/api/poker/*` remain public. Stock research, Bitcoin chat, `/api/stocks/*`, and `/api/bitcoin/*` run in demo mode without credentials and use live provider-backed data with valid credentials. Admin, FastAPI docs, OpenAPI JSON, and other `/api/*` routes are protected. Protected routes return `503` if `APP_AUTH_PASSWORD` is missing.
+Poker, craps, craps strategy, blackjack, login, `/api/poker/*`, `/api/craps/*`, and `/api/analytics/*` remain public. Stock research, Bitcoin chat, `/api/stocks/*`, and `/api/bitcoin/*` run in demo mode without credentials and use live provider-backed data with valid credentials. Admin, FastAPI docs, OpenAPI JSON, and other `/api/*` routes are protected. Protected routes return `503` if `APP_AUTH_PASSWORD` is missing.
 
 ## Useful URLs
 
@@ -47,6 +47,7 @@ Poker, craps, blackjack, login, and `/api/poker/*` remain public. Stock research
 - `http://127.0.0.1:8000/casino/` - casino game launcher
 - `http://127.0.0.1:8000/poker/` - poker app
 - `http://127.0.0.1:8000/craps/` - craps app
+- `http://127.0.0.1:8000/craps-strategy/` - craps strategy simulator
 - `http://127.0.0.1:8000/blackjack/` - blackjack app
 - `http://127.0.0.1:8000/bitcoin-chat/` - Bitcoin chat app
 - `http://127.0.0.1:8000/admin/` - protected admin/log dashboard
@@ -57,6 +58,7 @@ Poker, craps, blackjack, login, and `/api/poker/*` remain public. Stock research
 
 - `/api/stocks/*` - stock lookup, summary, earnings, and price history.
 - `/api/poker/*` - active integrated poker game API plus the `GET /api/poker/games/{game_id}/ws` WebSocket push channel.
+- `/api/craps/*` - public craps strategy translation API.
 - `/api/bitcoin/*` - Bitcoin provider status, block/transaction/mempool lookups, and chat.
 - `/api/analytics/*` - public client analytics ingest (`POST /api/analytics/events`).
 - `/api/admin/*` - protected structured log and file-tail endpoints, including the analytics summary surfaced in the admin dashboard.

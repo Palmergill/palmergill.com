@@ -54,40 +54,40 @@ reproducibly (per-trial RNG seeded from `baseSeed`).
 | Step | Status | Notes |
 |------|--------|-------|
 | Backend: `curl POST /api/craps/translate` returns valid spec or 503 fallback | ◧ | Reaches handler: 503 (no key here) + 422 on bad input verified. **Live LLM path untested — no OPENAI_API_KEY in this env.** |
-| `npm test` — new suites green | ☑ | 96/96 tests pass (28 new) |
+| `npm test` — simulator + root suites green | ☑ | 139/139 tests pass as of 2026-07-04; simulator coverage remains in `craps-strategy/tests/` |
 | Preview: translate + run a strategy, screenshot charts + stats | ☑ | Preset → run → 100-line chart + histogram + stats; determinism confirmed |
 | Preview: console + network clean | ☑ | No console errors |
 | Preview: mobile-width layout holds | ☑ | 375px: fields stack, theme intact |
 
 ## Open questions (for Palmer to review)
 
-1. **Auth scope of the new routes.** I added `/api/craps` and `/craps-strategy` to
-   `PUBLIC_PATH_PREFIXES` in `backend/app/main.py` so the tool is fully open, like the
-   existing `/craps` game. Bitcoin Chat (the other OpenAI-backed tool) instead lives in
-   `DEMO_PATH_PREFIXES`. Do you want the simulator fully public, or gated like
-   bitcoin-chat (demo mode / behind app auth)? This affects whether it works on the live
-   site without login.
-2. **OpenAI model + verification.** `CRAPS_STRATEGY_MODEL` defaults to `gpt-5.5` (matching
+1. **OpenAI model + verification.** `CRAPS_STRATEGY_MODEL` defaults to `gpt-5.5` (matching
    bitcoin-chat). There was **no `OPENAI_API_KEY` in my environment**, so I could not run
    the real translate path end-to-end — only the graceful 503 fallback and input
    validation. Please run one live translation (or point me at a key) to confirm the
    `/v1/responses` `text.format` json_schema call shape and output parsing are right for
    the model you use.
-3. **Casino card artwork.** The new "Strategy Lab" card reuses `craps.png` as a
+2. **Casino card artwork.** The new "Strategy Lab" card reuses `craps.png` as a
    placeholder screenshot. Want a real screenshot of the simulator captured for
    `assets/project-screenshots/`?
-4. **Hardway lifecycle.** ~~`crapsRules.resolveHardwayBets` takes a hardway *down* on a
+3. **Hardway lifecycle.** ~~`crapsRules.resolveHardwayBets` takes a hardway *down* on a
    win; my engine re-arms it on the next placement.~~ **Resolved 2026-06-23:** hardways now
    resolve on *every* roll (matching their default `when: "always"`), so hardway-only
    strategies work and a winner is re-armed next placement. Open sub-question: should a
    hardway with `when: "pointOn"` be turned *off* on the come-out? Currently hardways
    always work regardless of `when`.
-5. **Press legality.** A `press` progression can grow a place-6/8 bet to a non-$6-legal
+4. **Press legality.** A `press` progression can grow a place-6/8 bet to a non-$6-legal
    amount (e.g. $26) because I don't re-snap on press. Acceptable for a sim, or should
    pressed amounts re-snap to legal increments?
-6. **Come-bet odds on come-out.** **Resolved 2026-06-23:** odds on established come/don't-come
+5. **Come-bet odds on come-out.** **Resolved 2026-06-23:** odds on established come/don't-come
    points are now *off and returned* on the shooter's come-out (the flat still resolves),
    matching standard table convention. No separate control exposed — flag if you want one.
+
+## Decisions
+
+- **2026-07-04** — Auth scope is intentionally public. `/craps-strategy/`
+  and `/api/craps/*` remain in the public route lists alongside the main
+  craps game; translation rate limiting is the guardrail.
 
 ## Decisions log
 

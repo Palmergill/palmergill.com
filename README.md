@@ -17,6 +17,7 @@ navigation chrome.
 - `/casino/` - landing page linking the casino games
 - `/poker/` - Texas Hold'em poker app
 - `/craps/` - craps app
+- `/craps-strategy/` - craps strategy simulator
 - `/blackjack/` - blackjack app
 - `/admin/` - protected backend log dashboard
 
@@ -45,7 +46,7 @@ Open:
 http://127.0.0.1:8000
 ```
 
-The local server runs FastAPI and, with `LOCAL_SITE_ROOT=true`, also serves the static root page plus `assets/`, `shared/`, `about/`, `login/`, `stock-research/`, `bitcoin-chat/`, `casino/`, `poker/`, `craps/`, `blackjack/`, and `admin/`. The local `/docs` path is reserved for FastAPI API docs; the static website docs page is served by production static hosting at `/docs/`.
+The local server runs FastAPI and, with `LOCAL_SITE_ROOT=true`, also serves the static root page plus `assets/`, `shared/`, `about/`, `login/`, `stock-research/`, `bitcoin-chat/`, `casino/`, `poker/`, `craps/`, `craps-strategy/`, `blackjack/`, and `admin/`. The local `/docs` path is reserved for FastAPI API docs; the static website docs page is served by production static hosting at `/docs/`.
 
 Protected local app routes, FastAPI docs/OpenAPI JSON, and protected API routes require Basic Auth. Stock and Bitcoin app/API routes run in demo mode without credentials and use live providers with valid credentials. Set:
 
@@ -103,6 +104,7 @@ bitcoin-chat/     Active Bitcoin chat frontend
 casino/           Casino landing page linking poker, craps, and blackjack
 poker/            Active poker frontend and supporting docs/tests
 craps/            Active craps frontend
+craps-strategy/   Active craps strategy simulator
 blackjack/        Active blackjack frontend and tests
 ```
 

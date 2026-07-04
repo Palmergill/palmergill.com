@@ -89,4 +89,4 @@ This runs the API and active static pages together at:
 http://127.0.0.1:8000
 ```
 
-`LOCAL_SITE_ROOT=true` currently mounts `assets/`, `shared/`, `about/`, `login/`, `stock-research/`, `poker/`, `craps/`, `blackjack/`, `bitcoin-chat/`, `casino/`, and `admin/` through FastAPI. The local `/docs` path is still FastAPI's generated API docs path; the static website docs page is served by production/static hosting at `/docs/`.
+`LOCAL_SITE_ROOT=true` currently mounts `assets/`, `shared/`, `about/`, `login/`, `stock-research/`, `poker/`, `craps/`, `craps-strategy/`, `blackjack/`, `bitcoin-chat/`, `casino/`, and `admin/` through FastAPI. The local `/docs` path is still FastAPI's generated API docs path; the static website docs page is served by production/static hosting at `/docs/`.

@@ -1,7 +1,7 @@
 # Spec 5 — Casino Shell Unification
 
 - **Quarter:** Q3 2026 (Jul–Sep) — pulled forward from Q4 (decided Jul 2026; retheme close-out freed the time, and Q4's simulator/blackjack specs build on this)
-- **Status:** in progress (R1/R2/R3/R8 shipped 2026-07-03; R4 partial; R6/R7 turned out to already be met; R5 deferred — see notes)
+- **Status:** in progress (R1/R2/R3/R8 shipped 2026-07-03; rebuy sync, craps mobile reset, and desktop header-height regressions fixed 2026-07-04; R4 partial; R6/R7 turned out to already be met; R5 deferred — see notes)
 - **Depends on:** Spec 1 (warm chrome), Spec 4 (payout tests catch regressions)
 - **Areas:** `shared/casino-profile.js`, `shared/casino-header.js` (new),
   `shared/casino-theme.css`, `casino/`, `poker/`, `craps/`, `blackjack/`
@@ -44,7 +44,8 @@ surfacing it, plus two real discoveries made along the way:
   no bridge to `CasinoProfile.recordSession`.
 - Craps had **no bankroll-recovery mechanism** — blackjack already had an
   always-visible "Reset bankroll" button, craps had nothing, so a busted
-  craps player was stuck with no way to continue.
+  craps player was stuck with no way to continue. Fixed 2026-07-04 by
+  adding an in-game reset button in the bankroll card.
 - All three games are PWAs (`manifest.json` + `sw.js`); shared-asset
   version bumps need matching cache-name bumps (`buildCacheName` hashes the
   `STATIC_ASSETS` list) or players get served stale JS/CSS after a deploy.
@@ -102,7 +103,11 @@ surfacing it, plus two real discoveries made along the way:
   blackjack/craps (never for poker/chips mode), calls
   `CasinoProfile.resetBankroll()` + records a `casino_rebuy` analytics
   event. Verified live in the browser: set bankroll to 0, button appeared,
-  click reset to 1000 and hid the button again.
+  click reset to 1000 and hid the button again. Follow-up fix 2026-07-04:
+  blackjack and craps subscribe to `CasinoProfile.onChange`, so an external
+  header rebuy updates the running game's in-memory balance instead of being
+  overwritten on the next game write. `setBankroll` now no-ops on unchanged
+  values while `resetBankroll()` still emits a change notification.
 
 ### Visual unification
 
@@ -138,6 +143,12 @@ surfacing it, plus two real discoveries made along the way:
   `.poker-game-active` mechanism (same treatment already applied to the
   site nav on phones) — the header only shows on poker's pre-game
   start/lobby/stats screens, which was already slack-tolerant.
+  Follow-up fix 2026-07-04: blackjack/craps desktop shells now also subtract
+  `--casino-header-height` from their viewport calculations, craps' active
+  stylesheet was cache-bumped, and blackjack's desktop table height is
+  capped responsively. Browser smoke at 1440×900 measured `0` document
+  overflow for both pages; 390×844 mobile checks kept the header hidden and
+  the play surfaces scroll-free.
 
 ### Lobby
 
@@ -152,7 +163,9 @@ surfacing it, plus two real discoveries made along the way:
   `{ setChips(n), destroy() }`.
 - `CasinoProfile.onChange(fn)`: additive pub/sub, returns an unsubscribe
   function, wraps `setBankroll`/`setDisplayName`/`recordSession`/
-  `resetStats`/`resetAll`.
+  `resetStats`/`resetAll`. As of 2026-07-04, unchanged bankroll writes do
+  not notify, but explicit `resetBankroll()` still notifies so visible reset
+  actions synchronize open game pages.
 - Poker also gained: `casino-profile.js` include (previously missing),
   `CasinoProfile.setDisplayName()` called from both `startGame()` call
   sites, `CasinoProfile.recordSession('poker', ...)` called alongside the
@@ -183,14 +196,16 @@ surfacing it, plus two real discoveries made along the way:
 - [x] Bankruptcy rebuy works in blackjack and craps. (Verified live in
       browser: set bankroll to 0, rebuy button appeared, click reset to
       1000, button hid again. Blackjack additionally keeps its pre-existing
-      always-visible manual reset button, unchanged.)
+      always-visible manual reset button, unchanged. Follow-up browser
+      check 2026-07-04: craps mobile reset button is visible at 390px and
+      tapping it restores `$1,000` plus the in-game status message.)
 - [x] 375px screenshots of all three games showing full play surfaces —
       captured for blackjack (betting + in-hand), craps, and poker (start
       screen + in-hand); all confirmed scroll-free with the mobile-hide
       fix applied.
 - [ ] No game-local chip/button CSS overriding the shared theme — **not
       attempted**; per-game chip/button CSS is unchanged (see R4).
-- [x] Existing game tests still pass (137 Jest + 328 pytest, all green);
+- [x] Existing game tests still pass (139 Jest + 328 pytest, all green);
       `recordSession` boundaries covered for the new/changed integration
       surface (20 new Jest tests in `shared/tests/casino-profile.test.js`
       and `casino-header.test.js` covering `recordSession` accumulation,
@@ -198,7 +213,8 @@ surfacing it, plus two real discoveries made along the way:
       blackjack/craps `recordSession` call sites were not newly
       unit-tested (they're unchanged, already-shipped code, not part of
       this session's diff) — noted as a real gap versus the letter of this
-      criterion, not silently marked done.
+      criterion, not silently marked done. Two additional profile tests now
+      cover unchanged bankroll writes and reset notifications.
 
 ## Risks
 

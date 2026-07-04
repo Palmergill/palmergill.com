@@ -15,6 +15,7 @@ FastAPI backend
   |
   +-- stock data clients and SQLite/Postgres cache
   +-- poker game APIs
+  +-- craps strategy translation API
   +-- Bitcoin chat APIs
   +-- admin/log APIs
 ```
@@ -32,6 +33,7 @@ The active public site is static:
 - `/casino/` - casino landing page linking poker, craps, and blackjack
 - `/poker/` - poker app
 - `/craps/` - craps app
+- `/craps-strategy/` - craps strategy simulator
 - `/blackjack/` - blackjack app
 - `/admin/` - protected backend log dashboard
 
