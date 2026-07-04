@@ -34,7 +34,8 @@ button {
     grid-template-columns: minmax(0, 1fr);
     gap: 12px;
     width: min(1180px, calc(100vw - 32px));
-    min-height: 100vh;
+    min-height: calc(100vh - var(--site-nav-height, 52px) - var(--casino-header-height, 0px));
+    min-height: calc(100dvh - var(--site-nav-height, 52px) - var(--casino-header-height, 0px));
     margin: 0 auto;
     padding: 18px 0 24px;
 }
@@ -168,7 +169,10 @@ h1 {
     display: grid;
     grid-template-rows: auto minmax(150px, 0.9fr) auto minmax(210px, 1.1fr);
     gap: 12px;
-    min-height: 590px;
+    min-height: clamp(470px, calc(100vh - var(--site-nav-height, 52px) - var(--casino-header-height, 0px) - 272px), 590px);
+    min-height: clamp(470px, calc(100dvh - var(--site-nav-height, 52px) - var(--casino-header-height, 0px) - 272px), 590px);
+    height: clamp(470px, calc(100vh - var(--site-nav-height, 52px) - var(--casino-header-height, 0px) - 272px), 590px);
+    height: clamp(470px, calc(100dvh - var(--site-nav-height, 52px) - var(--casino-header-height, 0px) - 272px), 590px);
     overflow: hidden;
     padding: 14px 18px 20px;
     border: 9px solid #5a301c;
@@ -753,6 +757,7 @@ button:disabled {
     .table {
         grid-template-rows: auto minmax(100px, 0.85fr) auto minmax(155px, 1.15fr);
         gap: 5px;
+        height: auto;
         min-height: 0;
         padding: 7px 8px 10px;
         border-width: 5px;

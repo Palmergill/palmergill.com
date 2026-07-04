@@ -153,6 +153,33 @@
             line-height: 1;
         }
 
+        .bankroll-reset-button {
+            display: inline-flex;
+            width: 100%;
+            min-height: 34px;
+            align-items: center;
+            justify-content: center;
+            margin-top: 12px;
+            border: 1px solid rgba(232, 199, 115, 0.42);
+            border-radius: 999px;
+            background: rgba(201, 162, 75, 0.12);
+            color: var(--gold-soft);
+            cursor: pointer;
+            font-size: 0.72rem;
+            font-weight: 850;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            transition: background 140ms ease, border-color 140ms ease, color 140ms ease;
+        }
+
+        .bankroll-reset-button:hover,
+        .bankroll-reset-button:focus-visible {
+            border-color: rgba(232, 199, 115, 0.7);
+            background: rgba(201, 162, 75, 0.2);
+            color: #fff8df;
+            outline: none;
+        }
+
         .table {
             position: relative;
             display: grid;
@@ -1161,7 +1188,8 @@
             grid-template-columns: minmax(0, 1fr);
             gap: 16px;
             width: min(1180px, calc(100vw - 32px));
-            min-height: 100vh;
+            min-height: calc(100vh - var(--site-nav-height, 52px) - var(--casino-header-height, 0px));
+            min-height: calc(100dvh - var(--site-nav-height, 52px) - var(--casino-header-height, 0px));
             margin: 0 auto;
             padding: 24px 0;
         }
@@ -2124,7 +2152,7 @@
             }
         }
     </style>
-    <link rel="stylesheet" href="style.css?v=26">
+    <link rel="stylesheet" href="style.css?v=27">
 </head>
 <body class="theme-casino">
     <div id="casino-header-mount"></div>
@@ -2134,6 +2162,7 @@
                 <div class="bankroll-block balance-card" aria-live="polite" aria-label="Current bankroll">
                     <span class="balance-label">Bankroll</span>
                     <strong class="balance" id="balance">$1,000</strong>
+                    <button class="bankroll-reset-button" id="resetBankrollBtn" type="button">Reset bankroll</button>
                 </div>
                 <nav class="hud-actions rules-tab-list" aria-label="Craps views">
                     <button class="icon-btn rules-tab" type="button" data-rules-tab="rules" data-rules-open role="tab" aria-selected="false">Rules</button>

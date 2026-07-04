@@ -105,6 +105,25 @@ describe('CasinoProfile', () => {
             expect(calls.length).toBe(3);
         });
 
+        test('does not fire for unchanged bankroll writes', () => {
+            const calls = [];
+            profile.setBankroll(500);
+            profile.onChange(() => calls.push('changed'));
+
+            profile.setBankroll(500);
+
+            expect(calls).toEqual([]);
+        });
+
+        test('resetBankroll fires even when bankroll is already default', () => {
+            const calls = [];
+            profile.onChange(() => calls.push('changed'));
+
+            profile.resetBankroll();
+
+            expect(calls).toEqual(['changed']);
+        });
+
         test('returns an unsubscribe function', () => {
             const calls = [];
             const unsubscribe = profile.onChange(() => calls.push('changed'));

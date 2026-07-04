@@ -9,7 +9,7 @@ import tempfile
 import pytest
 
 _TMP_DB_DIR = tempfile.mkdtemp(prefix="palmergill-backend-tests-")
-os.environ.setdefault("DATABASE_URL", f"sqlite:///{_TMP_DB_DIR}/test.db")
+os.environ["DATABASE_URL"] = f"sqlite:///{_TMP_DB_DIR}/test.db"
 
 
 @pytest.fixture(scope="session", autouse=True)

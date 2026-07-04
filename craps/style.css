@@ -59,8 +59,8 @@ a:focus-visible {
 .craps-page {
     display: grid;
     width: min(100vw, var(--app-col));
-    min-height: calc(100vh - var(--site-nav-height, 52px));
-    min-height: calc(100dvh - var(--site-nav-height, 52px));
+    min-height: calc(100vh - var(--site-nav-height, 52px) - var(--casino-header-height, 0px));
+    min-height: calc(100dvh - var(--site-nav-height, 52px) - var(--casino-header-height, 0px));
     margin: 0 auto;
     padding: 0;
     background:
@@ -81,8 +81,8 @@ footer {
     grid-template-rows: auto auto auto;
     align-content: start;
     gap: 0;
-    min-height: calc(100vh - var(--site-nav-height, 52px));
-    min-height: calc(100dvh - var(--site-nav-height, 52px));
+    min-height: calc(100vh - var(--site-nav-height, 52px) - var(--casino-header-height, 0px));
+    min-height: calc(100dvh - var(--site-nav-height, 52px) - var(--casino-header-height, 0px));
     overflow: hidden;
     padding: 0;
     border: 0;
@@ -1437,12 +1437,15 @@ button:disabled {
 
 @media (min-width: 700px) {
     body {
-        padding: 22px;
+        padding-right: 22px;
+        padding-bottom: 0;
+        padding-left: 22px;
     }
 
     .craps-page,
     .craps-app {
-        min-height: min(900px, calc(100vh - 44px));
+        min-height: min(900px, calc(100vh - var(--site-nav-height, 52px) - var(--casino-header-height, 0px)));
+        min-height: min(900px, calc(100dvh - var(--site-nav-height, 52px) - var(--casino-header-height, 0px)));
         border-radius: 22px;
     }
 

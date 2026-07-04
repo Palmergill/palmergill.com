@@ -129,15 +129,19 @@
             return Number.isFinite(n) && n >= 0 ? Math.floor(n) : DEFAULTS.bankroll;
         },
 
-        setBankroll(value) {
+        setBankroll(value, options = {}) {
             const clamped = clampBankroll(value);
+            if (clamped === this.getBankroll()) {
+                if (options.notify) notify();
+                return clamped;
+            }
             safeWrite(STORAGE_KEYS.bankroll, String(clamped));
             notify();
             return clamped;
         },
 
         resetBankroll() {
-            return this.setBankroll(DEFAULTS.bankroll);
+            return this.setBankroll(DEFAULTS.bankroll, { notify: true });
         },
 
         recordSession(game, summary = {}) {

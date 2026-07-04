@@ -47,6 +47,27 @@ function updateBalance() {
     if (casinoProfile) casinoProfile.setBankroll(balance);
 }
 
+function syncBalanceFromProfile() {
+    if (!casinoProfile) return;
+    const nextBalance = casinoProfile.getBankroll();
+    if (nextBalance === balance) return;
+    balance = nextBalance;
+    updateBalance();
+    updateAllDisplays();
+}
+
+function resetBankrollFromGame() {
+    if (casinoProfile) {
+        casinoProfile.resetBankroll();
+        syncBalanceFromProfile();
+    } else {
+        balance = 1000;
+        updateBalance();
+        updateAllDisplays();
+    }
+    setStatus('Bankroll reset to $1,000');
+}
+
 function setStatus(message) {
     const status = document.getElementById('gameStatus');
     if (status) status.textContent = message;
@@ -1580,6 +1601,11 @@ function __setGameState(state) {
 selectChip(selectedChip);
 updateBalance();
 updateAllDisplays();
+if (casinoProfile) casinoProfile.onChange(syncBalanceFromProfile);
+document.getElementById('resetBankrollBtn')?.addEventListener('click', () => {
+    resetBankrollFromGame();
+    window.pgAnalytics?.track?.('craps_bankroll_reset');
+});
 
 // Tag every bet button with a native-tooltip explainer so desktop hover surfaces
 // the rule + house edge without needing to open the modal.

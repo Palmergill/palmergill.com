@@ -523,6 +523,25 @@
         render();
     }
 
+    function syncBalanceFromProfile() {
+        if (!profile) return;
+        const nextBalance = profile.getBankroll();
+        if (nextBalance === state.balance) return;
+        cancelDealerAnimation();
+        state.balance = nextBalance;
+        if (state.status !== "playing") {
+            state.currentBet = Math.min(
+                state.rules.maxBet,
+                Math.max(state.rules.minBet, Math.min(state.currentBet, state.balance))
+            );
+            state.message = state.balance < state.rules.minBet
+                ? "Out of chips. Reset bankroll to play again."
+                : "Bankroll updated.";
+        }
+        balanceBeforeRound = state.balance;
+        render();
+    }
+
     document.querySelectorAll("[data-chip]").forEach((button) => {
         button.addEventListener("click", () => updateBet(Number(button.dataset.chip)));
     });
@@ -566,6 +585,8 @@
         resetShoeStats();
         render();
     });
+
+    if (profile) profile.onChange(syncBalanceFromProfile);
 
     if (els.countToggleButton) {
         els.countToggleButton.addEventListener("click", () => {

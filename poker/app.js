@@ -2049,6 +2049,8 @@ function showHandResult() {
         const holeCards = (myPlayer && myPlayer.hole_cards) || (myPlayer && myPlayer.cards) || null;
         const board = gameState.community_cards || gameState.board || null;
         if (isMe) {
+            const amountContributed = (myPlayer && (myPlayer.total_bet || myPlayer.bet)) || 0;
+            const netWin = myWin.amount - amountContributed;
             StatsManager.recordHandWin(myWin.amount, handName);
             StatsManager.recordHand({
                 result: isChop ? 'chop' : 'win',
@@ -2058,7 +2060,7 @@ function showHandResult() {
                 board
             });
             window.CasinoProfile?.recordSession('poker', {
-                handsPlayed: 1, netProfit: myWin.amount, biggestWin: myWin.amount
+                handsPlayed: 1, netProfit: netWin, biggestWin: Math.max(0, netWin)
             });
         } else if (myPlayer) {
             const amountLost = myPlayer.total_bet || myPlayer.bet || 0;
