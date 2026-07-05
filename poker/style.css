@@ -75,11 +75,6 @@ body {
     100% { background-position: 200% 0; }
 }
 
-@keyframes bounce {
-    0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(-5px); }
-}
-
 /* Landscape orientation support */
 @media (orientation: landscape) and (max-height: 500px) {
     #game-screen {

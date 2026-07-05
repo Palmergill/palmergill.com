@@ -12,12 +12,12 @@
             if (!raw) return [];
             const parsed = JSON.parse(raw);
             return Array.isArray(parsed) ? parsed : [];
-        } catch (e) { return []; }
+        } catch { return []; }
     }
 
     function write(list) {
         try { localStorage.setItem(STORAGE_KEY, JSON.stringify(list.slice(0, MAX))); }
-        catch (e) { /* quota or disabled */ }
+        catch { /* quota or disabled */ }
     }
 
     function findIndex(list, ticker) {

@@ -59,8 +59,6 @@
     let currentView = 'dashboard';
     let currentLogTab = 'db';
     let refreshTimer = null;
-    let lastAnalyticsEntries = [];
-    let lastLogEntries = [];
     const charts = {
         traffic: null,
         outcome: null,
@@ -213,7 +211,7 @@
             ]);
             if (slow) renderSlowRequests(slow.entries || []);
             if (groups) renderErrorGroups(groups.groups || []);
-        } catch (_) {
+        } catch {
             els.slowRequests.innerHTML = '<div class="empty compact-empty">Slow requests unavailable.</div>';
             els.errorGroups.innerHTML = '<div class="empty compact-empty">Error groups unavailable.</div>';
         }
@@ -382,7 +380,7 @@
                 { name: 'Expired logs', count: data.logs_expired },
             ];
             renderCompactList(els.retentionStatus, rows, 'No retention data yet');
-        } catch (_) {
+        } catch {
             els.retentionStatus.innerHTML = '<div class="empty compact-empty">Retention status unavailable.</div>';
         }
     }
@@ -459,7 +457,7 @@
                 .map((app) => `<option value="${escapeHtml(app)}">${escapeHtml(app)}</option>`)
                 .join('');
             els.appFilter.value = selected;
-        } catch (_) {
+        } catch {
             // App filter is helpful but non-critical.
         }
     }
@@ -523,7 +521,7 @@
         if (!value) return '';
         try {
             return JSON.stringify(JSON.parse(value), null, 2);
-        } catch (_) {
+        } catch {
             return value;
         }
     }

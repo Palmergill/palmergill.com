@@ -1294,16 +1294,6 @@ button:disabled {
     100% { transform: translateY(0) rotate(0deg); }
 }
 
-@keyframes winPulse {
-    0%, 100% { box-shadow: none; }
-    50% { box-shadow: inset 0 0 0 3px rgba(70, 194, 142, 0.68), 0 0 20px rgba(70, 194, 142, 0.42); }
-}
-
-@keyframes lossPulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.45; box-shadow: inset 0 0 0 3px rgba(216, 97, 90, 0.62); }
-}
-
 @keyframes outcomeWinSplash {
     0% { opacity: 0; }
     12%, 72% { opacity: 1; }
@@ -1354,14 +1344,6 @@ button:disabled {
 @keyframes tableLossFade {
     0%, 100% { filter: none; }
     28% { filter: saturate(0.72) brightness(0.78); }
-}
-
-.win-flash {
-    animation: winPulse 760ms ease;
-}
-
-.loss-flash {
-    animation: lossPulse 760ms ease;
 }
 
 @media (max-width: 374px) {

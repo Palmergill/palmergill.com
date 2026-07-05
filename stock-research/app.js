@@ -1488,7 +1488,7 @@ function drawEPSChart(data) {
         const state = JSON.parse(canvas.dataset.legendState || '[]');
         let xOffset = padding.left;
         
-        state.forEach((item, index) => {
+        state.forEach((item) => {
             const alpha = item.visible ? 1 : 0.3;
             
             if (item.type === 'bar') {

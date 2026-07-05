@@ -25,7 +25,7 @@
         listeners.forEach((fn) => {
             try {
                 fn();
-            } catch (e) {
+            } catch {
                 // a subscriber's own bug must not break other subscribers
                 // or the write that triggered this notification.
             }
@@ -48,7 +48,7 @@
     function safeRead(key) {
         try {
             return localStorage.getItem(key);
-        } catch (e) {
+        } catch {
             return null;
         }
     }
@@ -56,7 +56,7 @@
     function safeWrite(key, value) {
         try {
             localStorage.setItem(key, value);
-        } catch (e) {
+        } catch {
             // localStorage disabled / quota — silently ignore
         }
     }
@@ -78,7 +78,7 @@
         try {
             const parsed = JSON.parse(raw);
             return parsed && typeof parsed === 'object' ? parsed : {};
-        } catch (e) {
+        } catch {
             // Preserve the corrupt blob under a recovery key so the user can
             // pull it back manually, then block further writes for the rest
             // of the session.
@@ -86,7 +86,7 @@
                 if (!localStorage.getItem(`${STORAGE_KEYS.stats}-corrupt`)) {
                     localStorage.setItem(`${STORAGE_KEYS.stats}-corrupt`, raw);
                 }
-            } catch (_) {
+            } catch {
                 // ignore quota / disabled localStorage
             }
             statsBlocked = true;

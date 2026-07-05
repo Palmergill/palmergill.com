@@ -191,7 +191,7 @@
                 const text = await response.text();
                 content.replaceChildren(formatRules(text, label));
                 loaded = true;
-            } catch (error) {
+            } catch {
                 const message = document.createElement("p");
                 message.className = "rules-error";
                 message.textContent = "Rules could not be loaded. Try refreshing the page.";

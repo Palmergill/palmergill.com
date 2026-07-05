@@ -46,7 +46,7 @@ const explorerEls = {
 // JavaScript deliberately never receives or sends it; fetch attaches the
 // cookie automatically.
 // Clean up any session id left in localStorage from before the cookie cutover.
-try { localStorage.removeItem('bitcoinChatSessionId'); } catch (_) { /* ignore */ }
+try { localStorage.removeItem('bitcoinChatSessionId'); } catch { /* ignore */ }
 
 const LEVELS = ['new', 'curious', 'technical'];
 const LEVEL_STORAGE_KEY = 'bitcoinChatLevel';
@@ -439,7 +439,7 @@ function readStoredRange() {
     try {
         const stored = localStorage.getItem(RANGE_STORAGE_KEY);
         if (stored && RANGES.includes(stored)) return stored;
-    } catch (_) { /* ignore */ }
+    } catch { /* ignore */ }
     return '1m';
 }
 
@@ -572,7 +572,7 @@ function renderPriceHero(payload) {
 
 function setActiveRange(range) {
     activeRange = range;
-    try { localStorage.setItem(RANGE_STORAGE_KEY, range); } catch (_) { /* ignore */ }
+    try { localStorage.setItem(RANGE_STORAGE_KEY, range); } catch { /* ignore */ }
     rangeSwitch?.querySelectorAll('button[data-range]').forEach((button) => {
         button.setAttribute('aria-pressed', String(button.dataset.range === range));
     });
@@ -621,7 +621,7 @@ async function refreshPrice() {
             livePriceUsd = usd;
             priceValueEl.textContent = formatUsd(usd);
         }
-    } catch (_) { /* hero falls back to the chart's last point */ }
+    } catch { /* hero falls back to the chart's last point */ }
 }
 
 /* ---------------- Metric tiles ---------------- */
@@ -990,14 +990,14 @@ function readStoredLevel() {
     try {
         const stored = localStorage.getItem(LEVEL_STORAGE_KEY);
         if (stored && LEVELS.includes(stored)) return stored;
-    } catch (_) { /* ignore */ }
+    } catch { /* ignore */ }
     return 'new';
 }
 
 function setLevel(level) {
     if (!LEVELS.includes(level)) return;
     explanationLevel = level;
-    try { localStorage.setItem(LEVEL_STORAGE_KEY, level); } catch (_) { /* ignore */ }
+    try { localStorage.setItem(LEVEL_STORAGE_KEY, level); } catch { /* ignore */ }
     levelSwitch?.querySelectorAll('button[data-level]').forEach((button) => {
         button.setAttribute('aria-pressed', String(button.dataset.level === level));
     });
@@ -1017,12 +1017,12 @@ function wireLevelSwitch() {
 function setChatOpen(open) {
     layoutEl?.classList.toggle('chat-hidden', !open);
     chatToggle?.setAttribute('aria-expanded', String(open));
-    try { localStorage.setItem(CHAT_HIDDEN_STORAGE_KEY, String(!open)); } catch (_) { /* ignore */ }
+    try { localStorage.setItem(CHAT_HIDDEN_STORAGE_KEY, String(!open)); } catch { /* ignore */ }
 }
 
 function wireChatToggle() {
     let hidden = false;
-    try { hidden = localStorage.getItem(CHAT_HIDDEN_STORAGE_KEY) === 'true'; } catch (_) { /* ignore */ }
+    try { hidden = localStorage.getItem(CHAT_HIDDEN_STORAGE_KEY) === 'true'; } catch { /* ignore */ }
     setChatOpen(!hidden);
     chatToggle?.addEventListener('click', () => {
         setChatOpen(layoutEl.classList.contains('chat-hidden'));
@@ -1044,7 +1044,7 @@ async function refreshStatus() {
                 ? 'mempool.space online'
                 : 'demo mode';
         setNodeStatus(`${source} · ${chain} · ${sync}`, liveSource);
-    } catch (error) {
+    } catch {
         setNodeStatus('bitcoin data unavailable', false);
     }
 }

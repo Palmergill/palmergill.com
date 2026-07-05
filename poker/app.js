@@ -216,7 +216,7 @@ const StatsManager = {
             if (!raw) { this.history = []; return; }
             const parsed = JSON.parse(raw);
             this.history = Array.isArray(parsed) ? parsed.slice(0, this.HAND_HISTORY_MAX) : [];
-        } catch (e) { this.history = []; }
+        } catch { this.history = []; }
     },
 
     saveHistory() {
@@ -225,7 +225,7 @@ const StatsManager = {
                 this.HAND_HISTORY_KEY,
                 JSON.stringify(this.history.slice(0, this.HAND_HISTORY_MAX))
             );
-        } catch (e) {}
+        } catch {}
     },
 
     recordHand({ result, amount, handName, holeCards, board }) {
@@ -256,7 +256,7 @@ const StatsManager = {
             try {
                 const parsed = JSON.parse(saved);
                 this.stats = { ...this.stats, ...parsed };
-            } catch (e) {
+            } catch {
                 console.log('[Stats] Failed to load saved stats');
             }
         }
@@ -1013,9 +1013,8 @@ async function startGame(gameType = 'single') {
     const name = elements.playerName.value.trim() || 'Palmer';
     window.CasinoProfile?.setDisplayName(name);
 
-    // Clear seen cards and reset deal sequence for new game
+    // Clear seen cards for a new game so card deal animations can replay.
     seenCards.clear();
-    resetCardDealSequence();
 
     try {
         elements.startBtn.disabled = true;
@@ -1298,7 +1297,7 @@ function buildGameWsUrl(gid) {
 
 function connectGameWs(gid) {
     if (!gid || !('WebSocket' in window)) return;
-    if (gameWs) { try { gameWs.close(); } catch (e) {} gameWs = null; }
+    if (gameWs) { try { gameWs.close(); } catch {} gameWs = null; }
     if (Date.now() < gameWsBackoffUntil) return;
     try {
         const ws = new WebSocket(buildGameWsUrl(gid));
@@ -1314,7 +1313,7 @@ function connectGameWs(gid) {
                 if (msg.type === 'state_changed' || msg.type === 'hello') {
                     pollOnceNow();
                 }
-            } catch (e) { /* ignore malformed frames */ }
+            } catch { /* ignore malformed frames */ }
         };
         ws.onerror = () => { /* will surface in onclose */ };
         ws.onclose = () => {
@@ -1329,7 +1328,7 @@ function connectGameWs(gid) {
             const delayMs = Math.min(30_000, 1000 * Math.pow(2, gameWsReconnectAttempts));
             gameWsReconnectTimer = setTimeout(() => connectGameWs(gid), delayMs);
         };
-    } catch (e) {
+    } catch {
         // Backoff briefly so we don't tight-loop on misconfig
         gameWsBackoffUntil = Date.now() + 30_000;
     }
@@ -1337,7 +1336,7 @@ function connectGameWs(gid) {
 
 function disconnectGameWs() {
     if (gameWsReconnectTimer) { clearTimeout(gameWsReconnectTimer); gameWsReconnectTimer = null; }
-    if (gameWs) { try { gameWs.close(); } catch (e) {} gameWs = null; }
+    if (gameWs) { try { gameWs.close(); } catch {} gameWs = null; }
     gameWsReconnectAttempts = 0;
     gameWsBackoffUntil = 0;
 }
@@ -1356,7 +1355,7 @@ async function pollOnceNow() {
         const data = await response.json();
         gameState = data;
         updateGameDisplay();
-    } catch (e) { /* polling cycle will catch the next update */ }
+    } catch { /* polling cycle will catch the next update */ }
     finally { pollOnceInFlight = false; }
 }
 
@@ -1503,9 +1502,8 @@ async function nextHand() {
 
     isRequestPending = true;
 
-    // Clear seen cards and reset deal sequence for new hand (so they animate again)
+    // Clear seen cards for a new hand so card deal animations can replay.
     seenCards.clear();
-    resetCardDealSequence();
 
     try {
         elements.btnNextHand.disabled = true;
@@ -1602,7 +1600,7 @@ function updateGameDisplay() {
         document.querySelector('.your-avatar-container')?.remove();
         
         // Your cards with staggered animation (deal player cards first)
-        const cardsHTML = myPlayer.hand.map((card, index) => renderCard(card, true, index)).join('');
+        const cardsHTML = myPlayer.hand.map((card, index) => renderCard(card, index)).join('');
         elements.yourCards.innerHTML = cardsHTML;
         
         // Show hand strength (only update if changed to prevent re-animation)
@@ -1646,11 +1644,11 @@ function updateGameDisplay() {
     // Update community cards with staggered animation (offset by 2 for player cards)
     const community = gameState.community_cards;
     elements.communityCards.innerHTML = `
-        <div class="card-slot" id="flop-1">${community[0] ? renderCard(community[0], false, 2) : ''}</div>
-        <div class="card-slot" id="flop-2">${community[1] ? renderCard(community[1], false, 3) : ''}</div>
-        <div class="card-slot" id="flop-3">${community[2] ? renderCard(community[2], false, 4) : ''}</div>
-        <div class="card-slot" id="turn">${community[3] ? renderCard(community[3], false, 2) : ''}</div>
-        <div class="card-slot" id="river">${community[4] ? renderCard(community[4], false, 2) : ''}</div>
+        <div class="card-slot" id="flop-1">${community[0] ? renderCard(community[0], 2) : ''}</div>
+        <div class="card-slot" id="flop-2">${community[1] ? renderCard(community[1], 3) : ''}</div>
+        <div class="card-slot" id="flop-3">${community[2] ? renderCard(community[2], 4) : ''}</div>
+        <div class="card-slot" id="turn">${community[3] ? renderCard(community[3], 2) : ''}</div>
+        <div class="card-slot" id="river">${community[4] ? renderCard(community[4], 2) : ''}</div>
     `;
     
     // Update action buttons
@@ -1740,16 +1738,7 @@ function formatActionLabel(action) {
     return action.amount ? `${label} ${action.amount}` : label;
 }
 
-// Track card deal sequences for staggered animations
-let cardDealSequence = 0;
-let lastCommunityCount = 0;
-
-function resetCardDealSequence() {
-    cardDealSequence = 0;
-    lastCommunityCount = 0;
-}
-
-function renderCard(card, isPlayerCard = false, dealIndex = null) {
+function renderCard(card, dealIndex = null) {
     // Handle null/undefined cards
     if (!card || typeof card !== 'object') return '';
     
@@ -1836,8 +1825,8 @@ function evaluateHandStrength(playerCards, communityCards) {
     // Find the ranks with specific counts
     const getRanksWithCount = (n) => {
         return Object.entries(rankCounts)
-            .filter(([r, c]) => c === n)
-            .map(([r, c]) => parseInt(r))
+            .filter(([, c]) => c === n)
+            .map(([r]) => parseInt(r))
             .sort((a, b) => b - a);
     };
     
@@ -1928,8 +1917,8 @@ function getHandNameFrom5Cards(cards) {
     
     const getRanksWithCount = (n) => {
         return Object.entries(rankCounts)
-            .filter(([r, c]) => c === n)
-            .map(([r, c]) => parseInt(r))
+            .filter(([, c]) => c === n)
+            .map(([r]) => parseInt(r))
             .sort((a, b) => b - a);
     };
     

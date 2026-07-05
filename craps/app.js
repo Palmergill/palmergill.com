@@ -40,10 +40,6 @@ const dicePatterns = {
 // ── UI: Balance ──
 function updateBalance() {
     document.getElementById('balance').textContent = '$' + balance.toLocaleString();
-    const balanceEl = document.getElementById('balance');
-    if (balanceEl) {
-        balanceEl.classList.remove('win-flash', 'loss-flash');
-    }
     if (casinoProfile) casinoProfile.setBankroll(balance);
 }
 

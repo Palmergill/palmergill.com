@@ -22,7 +22,7 @@
                 storage.setItem(key, value);
             }
             return value;
-        } catch (_) {
+        } catch {
             return randomId(prefix);
         }
     }
@@ -38,7 +38,7 @@
                 sessionStorage.setItem(SESSION_STARTED_KEY, String(now));
             }
             return sessionId;
-        } catch (_) {
+        } catch {
             return randomId('sess');
         }
     }

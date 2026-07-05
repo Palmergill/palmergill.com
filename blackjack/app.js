@@ -154,7 +154,7 @@
     }
 
     let strategyVisible = false;
-    try { strategyVisible = localStorage.getItem("blackjack-strategy-visible") === "true"; } catch (e) {}
+    try { strategyVisible = localStorage.getItem("blackjack-strategy-visible") === "true"; } catch {}
 
     function clearRecommendation() {
         [els.hitButton, els.standButton, els.doubleButton, els.splitButton].forEach((b) => {
@@ -203,7 +203,7 @@
     }
 
     let countVisible = false;
-    try { countVisible = localStorage.getItem("blackjack-count-visible") === "true"; } catch (e) {}
+    try { countVisible = localStorage.getItem("blackjack-count-visible") === "true"; } catch {}
 
     function renderHiLo() {
         if (!els.countTile) return;
@@ -591,14 +591,14 @@
     if (els.countToggleButton) {
         els.countToggleButton.addEventListener("click", () => {
             countVisible = !countVisible;
-            try { localStorage.setItem("blackjack-count-visible", String(countVisible)); } catch (e) {}
+            try { localStorage.setItem("blackjack-count-visible", String(countVisible)); } catch {}
             renderHiLo();
         });
     }
     if (els.strategyToggleButton) {
         els.strategyToggleButton.addEventListener("click", () => {
             strategyVisible = !strategyVisible;
-            try { localStorage.setItem("blackjack-strategy-visible", String(strategyVisible)); } catch (e) {}
+            try { localStorage.setItem("blackjack-strategy-visible", String(strategyVisible)); } catch {}
             renderStrategyHint();
         });
     }

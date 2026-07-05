@@ -233,7 +233,8 @@
     }
 
     function hashCanonical(spec) {
-        const { baseSeed, ...rest } = spec; // exclude the seed itself
+        const rest = { ...spec };
+        delete rest.baseSeed;
         return fnv1a(canonicalize(rest));
     }
 

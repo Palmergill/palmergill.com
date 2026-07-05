@@ -16,12 +16,12 @@
             if (!raw) return [];
             const parsed = JSON.parse(raw);
             return Array.isArray(parsed) ? parsed.slice(0, MAX) : [];
-        } catch (e) { return []; }
+        } catch { return []; }
     }
 
     function writeTickers(list) {
         try { localStorage.setItem(STORAGE_KEY, JSON.stringify(list.slice(0, MAX))); }
-        catch (e) {}
+        catch {}
     }
 
     function fmtMoney(v) {
