@@ -243,6 +243,105 @@
         .social a svg { width: 16px; height: 16px; fill: currentColor; }
         .social a:hover, .social a:focus-visible { border-color: var(--sage); color: var(--sage); transform: translateY(-2px); outline: none; }
 
+        /* ---- welcome sequence ---- */
+        html.is-splashing { overflow: hidden; }
+
+        #welcome-splash {
+            position: fixed;
+            inset: 0;
+            z-index: calc(var(--site-nav-z) + 10);
+            display: none;
+            place-items: center;
+            background: var(--bg);
+            pointer-events: none;
+        }
+        .js-welcome #welcome-splash {
+            display: grid;
+            animation: splash-exit 1.1s cubic-bezier(0.65, 0, 0.35, 1) 1.6s forwards;
+        }
+        .splash-inner { display: flex; flex-direction: column; align-items: center; }
+        .splash-mark {
+            width: 88px;
+            height: 88px;
+            border-radius: 22px;
+            display: grid;
+            place-items: center;
+            background: var(--sage);
+            color: #fff;
+            font-size: 2rem;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+        }
+        .js-welcome .splash-mark { opacity: 0; animation: splash-pop 1s cubic-bezier(0.22, 1, 0.36, 1) 0.15s forwards; }
+        .splash-word { margin-top: 14px; color: var(--muted); font-size: 0.85rem; font-weight: 500; letter-spacing: 0.08em; }
+        .js-welcome .splash-word { opacity: 0; animation: w-fade 0.6s ease 0.55s forwards; }
+
+        /* ambient glows — transform-only drift, no layout impact */
+        .hero { position: relative; }
+        .hero-glow {
+            position: absolute;
+            z-index: -1;
+            border-radius: 50%;
+            pointer-events: none;
+        }
+        .hero-glow--sage {
+            width: clamp(320px, 46vw, 560px);
+            aspect-ratio: 1;
+            top: -18%;
+            left: -12%;
+            background: radial-gradient(circle, rgba(91, 113, 82, 0.18), transparent 65%);
+            animation: drift-a 9s ease-in-out infinite alternate;
+        }
+        .hero-glow--clay {
+            width: clamp(280px, 40vw, 500px);
+            aspect-ratio: 1;
+            top: 8%;
+            right: -10%;
+            background: radial-gradient(circle, rgba(185, 106, 75, 0.16), transparent 65%);
+            animation: drift-b 11s ease-in-out infinite alternate;
+        }
+        .js-welcome .hero-glow { opacity: 0; animation-name: none; }
+        .js-welcome .hero-glow--sage { animation: w-fade 1.5s ease 1.2s forwards, drift-a 9s ease-in-out infinite alternate; }
+        .js-welcome .hero-glow--clay { animation: w-fade 1.5s ease 1.2s forwards, drift-b 11s ease-in-out infinite alternate; }
+
+        /* name masks */
+        .name .mask {
+            display: inline-block;
+            overflow: hidden;
+            vertical-align: bottom; /* pin inline-block baseline shift */
+            padding-bottom: 0.12em; /* room for the "g" descender at line-height 1.02 */
+            margin-bottom: -0.12em;
+        }
+        .name .word { display: inline-block; }
+        .js-welcome .name .word {
+            transform: translateY(112%);
+            animation: word-up 0.7s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+        }
+        .js-welcome .name .mask:nth-child(1) .word { animation-delay: 1.75s; }
+        .js-welcome .name .mask:nth-child(2) .word { animation-delay: 1.9s; }
+
+        /* hero cascade */
+        .js-welcome .hero .role,
+        .js-welcome .hero .lede,
+        .js-welcome .hero .cta,
+        .js-welcome .hero .portrait {
+            opacity: 0;
+            animation: rise 0.65s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+        }
+        .js-welcome .hero .role { animation-delay: 2.05s; }
+        .js-welcome .hero .lede { animation-delay: 2.16s; }
+        .js-welcome .hero .cta { animation-delay: 2.27s; }
+        .js-welcome .hero .portrait { animation-delay: 2.38s; }
+        .js-welcome .site-nav { opacity: 0; animation: w-fade 0.5s ease 1.7s forwards; }
+
+        @keyframes splash-pop { from { opacity: 0; transform: scale(0.72); } to { opacity: 1; transform: scale(1); } }
+        @keyframes splash-exit { to { transform: translateY(-100%); } }
+        @keyframes w-fade { to { opacity: 1; } }
+        @keyframes word-up { to { transform: translateY(0); } }
+        @keyframes rise { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes drift-a { from { transform: translate3d(0, 0, 0); } to { transform: translate3d(4vw, 3vh, 0); } }
+        @keyframes drift-b { from { transform: translate3d(0, 0, 0); } to { transform: translate3d(-3vw, -2.5vh, 0); } }
+
         /* ---- reveal ---- */
         .cards.is-reveal-ready .card {
             opacity: 0;
@@ -266,16 +365,38 @@
             }
             .cards.is-reveal-ready .card,
             .cards.is-reveal-ready .card.is-visible { opacity: 1; transform: none; }
+            #welcome-splash { display: none !important; }
+            html.is-splashing { overflow: auto; }
+            .hero-glow { animation: none !important; opacity: 1 !important; }
+            .js-welcome .name .word,
+            .js-welcome .hero .role, .js-welcome .hero .lede,
+            .js-welcome .hero .cta, .js-welcome .hero .portrait,
+            .js-welcome .site-nav { opacity: 1 !important; transform: none !important; animation: none !important; }
         }
     </style>
+    <script>
+        (function () {
+            if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+                document.documentElement.classList.add('js-welcome', 'is-splashing');
+            }
+        })();
+    </script>
 </head>
 <body>
+    <div id="welcome-splash" aria-hidden="true">
+        <div class="splash-inner">
+            <div class="splash-mark">PG</div>
+            <div class="splash-word">palmergill.com</div>
+        </div>
+    </div>
     <div class="wrap">
         <header class="hero">
+            <div class="hero-glow hero-glow--sage" aria-hidden="true"></div>
+            <div class="hero-glow hero-glow--clay" aria-hidden="true"></div>
             <div>
-                <h1 class="name">Palmer Gill</h1>
+                <h1 class="name"><span class="mask"><span class="word">Palmer</span></span> <span class="mask"><span class="word">Gill</span></span></h1>
                 <p class="role">Full Stack Software Engineer</p>
-                <p class="lede">I work in <b>identity &amp; access management</b> at H-E-B, currently based in Austin, TX. Check out some of my side projects: real-time market research, a plain-English Bitcoin explorer, and browser table games including poker, craps, and blackjack.</p>
+                <p class="lede">I work in <b>identity &amp; access management</b> at H-E-B, based in Austin, TX. Take a look at some of my side projects: a <b>real-time market research tool</b>, a <b>Bitcoin explorer</b> for plain-English blockchain insights, and a suite of <b>browser-based table games</b> — poker, craps, and blackjack.</p>
                 <div class="cta">
                     <a class="btn solid" href="#work">See my work</a>
                     <a class="btn ghost" href="/about/">About me</a>
@@ -358,6 +479,24 @@
     <script>
         (() => {
             const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+            const splash = document.getElementById('welcome-splash');
+            const finishSplash = () => {
+                if (splash && splash.parentNode) splash.remove();
+                document.documentElement.classList.remove('is-splashing');
+            };
+            if (splash) {
+                if (document.documentElement.classList.contains('js-welcome')) {
+                    splash.addEventListener('animationend', (e) => {
+                        if (e.animationName === 'splash-exit') finishSplash();
+                    });
+                    setTimeout(finishSplash, 2900);
+                    window.addEventListener('pageshow', (e) => { if (e.persisted) finishSplash(); });
+                } else {
+                    finishSplash();
+                }
+            }
+
             const cards = document.querySelector('.cards');
             const targets = [...document.querySelectorAll('.cards > .card')];
             if (!cards || targets.length === 0 || reduceMotion) return;
