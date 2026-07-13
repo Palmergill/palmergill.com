@@ -19,38 +19,27 @@
             icon: "chart-candlestick"
         },
         {
-            label: "Poker",
-            hint: "Texas Hold'em",
-            href: "/poker/",
-            icon: "spade"
-        },
-        {
-            label: "Craps",
-            hint: "Dice table",
-            href: "/craps/",
-            icon: "dice-5"
-        },
-        {
-            label: "Blackjack",
-            hint: "Vegas table",
-            href: "/blackjack/",
-            icon: "diamond-suit"
-        },
-        {
             label: "Bitcoin",
             hint: "Live dashboard",
             href: "/bitcoin-chat/",
             icon: "bitcoin"
         },
         {
-            label: "Docs",
-            hint: "Site reference",
-            href: "/docs/",
-            icon: "book-open"
+            label: "Casino",
+            hint: "Poker, craps & blackjack",
+            href: "/casino/",
+            matches: ["/casino/", "/poker/", "/craps/", "/craps-strategy/", "/blackjack/"],
+            icon: "spade"
         }
     ];
 
     const utilityItems = [
+        {
+            label: "Docs",
+            hint: "Site reference",
+            href: "/docs/",
+            icon: "book-open"
+        },
         {
             label: "Login",
             hint: "Protected access",
@@ -86,9 +75,12 @@
         document.head.appendChild(icon);
     }
 
-    function isCurrent(href) {
+    function isCurrent(href, matches) {
         if (typeof href === "function") return false;
         const path = window.location.pathname;
+        if (matches && matches.some((prefix) => path === prefix || path.startsWith(prefix))) {
+            return true;
+        }
         const itemPath = new URL(href, window.location.origin).pathname;
         if (itemPath === "/") {
             return path === "/" || path === "/index.html";
@@ -124,7 +116,7 @@
 
         const renderLinks = (navItems) => navItems.map((item) => {
             const href = typeof item.href === "function" ? item.href() : item.href;
-            const current = isCurrent(href) ? ' aria-current="page"' : "";
+            const current = isCurrent(href, item.matches) ? ' aria-current="page"' : "";
             return [
                 `<a class="site-nav__link" href="${href}" title="${item.label}"${current}>`,
                 `<span class="site-nav__icon">${iconSvg(item.icon)}</span>`,

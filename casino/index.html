@@ -18,11 +18,11 @@
     <meta name="twitter:description" content="Browser-based casino games — Texas Hold'em poker, craps, and blackjack.">
     <meta name="twitter:image" content="https://palmergill.com/assets/palmer-gill-logo.png">
     <link rel="icon" type="image/png" href="/assets/palmer-gill-logo-small.png">
-    <link rel="stylesheet" href="/shared/site-nav.css?v=11">
+    <link rel="stylesheet" href="/shared/site-nav.css?v=12">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;700;900&family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/shared/casino-theme.css?v=2">
+    <link rel="stylesheet" href="/shared/casino-theme.css?v=3">
     <style>
         /* Brand tokens (palette, gold, fonts) live in /shared/casino-theme.css */
         * {
@@ -103,7 +103,7 @@
 
         .hero {
             position: relative;
-            padding: clamp(60px, 8vw, 100px) 24px clamp(36px, 5vw, 60px);
+            padding: clamp(42px, 6vw, 72px) 24px clamp(24px, 3vw, 38px);
             text-align: center;
         }
 
@@ -171,7 +171,7 @@
         .embossed-divider {
             display: block;
             max-width: 320px;
-            margin: 28px auto 0;
+            margin: 22px auto 0;
             border: none;
             height: 2px;
             background: linear-gradient(90deg, transparent, var(--gold), transparent);
@@ -229,7 +229,7 @@
         }
 
         .your-house {
-            margin-bottom: clamp(32px, 4vw, 48px);
+            margin: clamp(40px, 5vw, 58px) 0 0;
             padding: clamp(20px, 3vw, 32px);
             border: 1px solid rgba(232, 199, 115, 0.28);
             border-radius: 14px;
@@ -586,6 +586,10 @@
         }
 
         @media (max-width: 720px) {
+            .hero { padding: 40px 20px 24px; }
+            .suits-row { margin-bottom: 15px; }
+            .lede { margin-top: 16px; }
+            .embossed-divider { margin-top: 20px; }
             .game-card {
                 grid-column: 1 / -1;
                 min-height: 420px;
@@ -627,53 +631,14 @@
                     <span>♠</span><span>♥</span><span>♦</span><span>♣</span>
                 </div>
                 <p class="eyebrow">Browser games</p>
-                <h1>House <span class="amp">&amp;</span> Table</h1>
-                <p class="lede">Pull up a seat. Three single-player table games built for fast browser play — real Vegas math, mobile-friendly tables, and rule logic you can trust.</p>
+                <h1>Casino <span class="amp">Games</span></h1>
                 <hr class="embossed-divider">
-                <a class="back-link" href="/">
-                    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                        <path d="M19 12H5m6-6-6 6 6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                    </svg>
-                    Back to projects
-                </a>
             </div>
         </header>
 
         <main>
             <section class="section" aria-labelledby="games-title">
                 <h2 id="games-title" class="sr-only">Casino games</h2>
-
-                <aside class="your-house" id="yourHouse" aria-labelledby="yourHouseTitle" hidden>
-                    <div class="your-house-header">
-                        <h3 class="your-house-title" id="yourHouseTitle">Your House</h3>
-                        <label class="your-house-name">
-                            <span>Name</span>
-                            <input type="text" id="yourHouseName" maxlength="24" autocomplete="off" spellcheck="false" placeholder="Anonymous">
-                        </label>
-                    </div>
-                    <div class="your-house-grid">
-                        <div class="stat-tile">
-                            <div class="stat-label">Bankroll</div>
-                            <div class="stat-value" id="statBankroll">$0</div>
-                        </div>
-                        <div class="stat-tile">
-                            <div class="stat-label">Hands Played</div>
-                            <div class="stat-value" id="statHands">0</div>
-                        </div>
-                        <div class="stat-tile">
-                            <div class="stat-label">Net P/L</div>
-                            <div class="stat-value" id="statNet">$0</div>
-                        </div>
-                        <div class="stat-tile">
-                            <div class="stat-label">Biggest Win</div>
-                            <div class="stat-value" id="statBiggest">$0</div>
-                        </div>
-                    </div>
-                    <div class="your-house-foot">
-                        <span id="statBreakdown">No games played yet.</span>
-                        <button type="button" class="your-house-reset" id="yourHouseReset">Reset all</button>
-                    </div>
-                </aside>
 
                 <div class="games-grid">
                     <a href="/poker/" class="game-card" data-suit="spade">
@@ -764,6 +729,26 @@
                         </figure>
                     </a>
                 </div>
+
+                <aside class="your-house" id="yourHouse" aria-labelledby="yourHouseTitle" hidden>
+                    <div class="your-house-header">
+                        <h3 class="your-house-title" id="yourHouseTitle">Your House</h3>
+                        <label class="your-house-name">
+                            <span>Name</span>
+                            <input type="text" id="yourHouseName" maxlength="24" autocomplete="off" spellcheck="false" placeholder="Anonymous">
+                        </label>
+                    </div>
+                    <div class="your-house-grid">
+                        <div class="stat-tile"><div class="stat-label">Bankroll</div><div class="stat-value" id="statBankroll">$0</div></div>
+                        <div class="stat-tile"><div class="stat-label">Hands Played</div><div class="stat-value" id="statHands">0</div></div>
+                        <div class="stat-tile"><div class="stat-label">Net P/L</div><div class="stat-value" id="statNet">$0</div></div>
+                        <div class="stat-tile"><div class="stat-label">Biggest Win</div><div class="stat-value" id="statBiggest">$0</div></div>
+                    </div>
+                    <div class="your-house-foot">
+                        <span id="statBreakdown">No games played yet.</span>
+                        <button type="button" class="your-house-reset" id="yourHouseReset">Reset all</button>
+                    </div>
+                </aside>
             </section>
         </main>
 
@@ -772,7 +757,7 @@
         </footer>
     </div>
 
-    <script src="/shared/site-nav.js?v=11"></script>
+        <script src="/shared/site-nav.js?v=12"></script>
     <script src="/shared/analytics.js?v=1"></script>
     <script src="/shared/casino-profile.js?v=2"></script>
     <script>

@@ -588,7 +588,7 @@ async function loadChart(range) {
         try {
             payload = await fetchJson(`${API_BASE}/price/history?range=${range}`);
         } catch (error) {
-            chartNoteEl.textContent = `price history unavailable: ${error.message}`;
+            chartNoteEl.textContent = 'Live price history is taking a break. Try again shortly.';
             return;
         }
         if (payload.error || !payload.points?.length) {

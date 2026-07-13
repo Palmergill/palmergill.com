@@ -17,13 +17,13 @@
     <meta name="twitter:title" content="Texas Hold'em Poker — Palmer Gill">
     <meta name="twitter:description" content="Play Texas Hold'em poker against AI opponents or join a multiplayer table.">
     <meta name="twitter:image" content="https://palmergill.com/assets/palmer-gill-logo.png">
-    <link rel="stylesheet" href="/shared/site-nav.css?v=11">
+    <link rel="stylesheet" href="/shared/site-nav.css?v=12">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,500;0,700;0,900;1,500;1,700&family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/shared/casino-theme.css?v=2">
+    <link rel="stylesheet" href="/shared/casino-theme.css?v=3">
     <link rel="stylesheet" href="/shared/rules-viewer.css?v=1">
-    <link rel="stylesheet" href="style.css?v=22">
+    <link rel="stylesheet" href="style.css?v=23">
     <link rel="manifest" href="manifest.json">
     <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'%3E%3Crect fill='%230a0a0f' width='192' height='192' rx='24'/%3E%3Ctext x='96' y='130' font-size='100' text-anchor='middle'%3E🃏%3C/text%3E%3C/svg%3E">
     <script>
@@ -54,18 +54,22 @@
                 <button class="rules-tab" type="button" data-rules-tab="rules" data-rules-open role="tab" aria-selected="false">Rules</button>
             </nav>
             <div class="start-form">
+                <label class="start-field-label" for="player-name">Player name</label>
                 <input type="text" id="player-name" placeholder="Your name" maxlength="12" value="Palmer">
                 <button id="start-btn" class="btn-primary">Play vs AI</button>
-                <button id="start-tournament-btn" class="btn-secondary" style="margin-top: 10px;">Sit-and-Go Tournament</button>
-                <button id="create-multiplayer-btn" class="btn-secondary" style="margin-top: 10px;">Create Multiplayer Game</button>
-                <button id="join-multiplayer-btn" class="btn-secondary" style="margin-top: 10px;">Join Multiplayer Game</button>
+                <details class="secondary-modes">
+                    <summary>Other game modes</summary>
+                    <button id="start-tournament-btn" class="btn-secondary">Sit-and-Go Tournament</button>
+                    <button id="create-multiplayer-btn" class="btn-secondary">Create Multiplayer Game</button>
+                    <button id="join-multiplayer-btn" class="btn-secondary">Join Multiplayer Game</button>
+                </details>
             </div>
             <div class="game-info">
                 <p>5 AI Opponents</p>
                 <p>1000 Starting Chips</p>
                 <p>Blinds 10/20</p>
             </div>
-            <button id="stats-btn" class="btn-secondary" style="margin-top: 30px; max-width: 200px;">Statistics</button>
+            <button id="stats-btn" class="btn-secondary stats-entry">View statistics</button>
         </div>
 
         <!-- Join Game Screen -->
@@ -236,7 +240,7 @@
 
     </div>
 
-    <script src="/shared/site-nav.js?v=11"></script>
+    <script src="/shared/site-nav.js?v=12"></script>
     <script src="/shared/casino-profile.js?v=2"></script>
     <script src="/shared/casino-header.js?v=1"></script>
     <script>

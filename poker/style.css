@@ -4554,6 +4554,40 @@ body.has-site-nav #game-screen {
         linear-gradient(180deg, #0c1712 0%, #0a1b14 48%, #07110c 100%) !important;
 }
 
+.start-field-label {
+    color: var(--quiet);
+    font-family: var(--font-ui);
+    font-size: 0.68rem;
+    font-weight: 800;
+    letter-spacing: 0.12em;
+    text-align: left;
+    text-transform: uppercase;
+}
+
+.secondary-modes {
+    margin-top: 4px;
+    padding-top: 10px;
+    border-top: 1px solid rgba(232, 199, 115, 0.18);
+}
+
+.secondary-modes summary {
+    min-height: 42px;
+    display: grid;
+    place-items: center;
+    color: var(--gold-bright);
+    cursor: pointer;
+    font-family: var(--serif);
+    font-size: 0.82rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+}
+
+.secondary-modes[open] summary { margin-bottom: 8px; }
+.secondary-modes .btn-secondary { width: 100%; margin-top: 8px; }
+.secondary-modes summary:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+.stats-entry { margin-top: 18px; max-width: 200px; opacity: 0.82; }
+
 /* Colored pips on the suit row */
 .logo {
     display: flex;

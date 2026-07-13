@@ -1266,3 +1266,117 @@ textarea::placeholder {
         transition-duration: 1ms !important;
     }
 }
+
+/* Resilient dashboard states: failures read as a deliberate status instead of
+   a collection of unrelated dashes. */
+.term-titlebar:has(.status-dot.muted) {
+    border-bottom-color: rgba(179, 64, 47, 0.24);
+    background: linear-gradient(90deg, rgba(179, 64, 47, 0.055), var(--paper) 38%);
+}
+
+.term-titlebar:has(.status-dot.muted) .term-status {
+    color: #8f4135;
+    font-weight: 600;
+}
+
+body:has(.status-dot.muted) .metric-grid {
+    display: block;
+    margin: 0 0 18px;
+    padding: 14px 16px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: var(--paper-3);
+    color: var(--soft);
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+body:has(.status-dot.muted) .metric-grid::before {
+    content: "Network metrics will return automatically when the live data service reconnects.";
+}
+
+body:has(.status-dot.muted) .metric-grid .stat-tile {
+    display: none;
+}
+
+body:has(.status-dot.muted) .blocks-section {
+    padding: 14px 16px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+}
+
+.chart-card:has(.chart-note:not(:empty)) {
+    position: relative;
+    display: grid;
+    min-height: 210px;
+    place-items: center;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background:
+        linear-gradient(rgba(91, 113, 82, 0.035) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(91, 113, 82, 0.035) 1px, transparent 1px),
+        linear-gradient(145deg, var(--paper), var(--paper-3));
+    background-size: 32px 32px, 32px 32px, auto;
+    padding: 24px;
+}
+
+.chart-card:has(.chart-note:not(:empty)) .chart-wrap {
+    display: none;
+}
+
+.chart-card:has(.chart-note:not(:empty)) .chart-note {
+    max-width: 42ch;
+    margin: 0;
+    color: var(--soft);
+    font-family: var(--sans);
+    font-size: 13px;
+    font-style: normal;
+    line-height: 1.55;
+    text-align: center;
+}
+
+.stat-tile:has(.tile-value:is(:empty)) {
+    opacity: 0.72;
+}
+
+.range-switch button,
+.term-button,
+.learn-chip,
+.level-switch button {
+    min-height: 32px;
+}
+
+button:focus-visible,
+textarea:focus-visible,
+input:focus-visible,
+select:focus-visible {
+    outline: none;
+    box-shadow: var(--focus-ring);
+}
+
+@media (max-width: 560px) {
+    .term-button {
+        min-height: 36px;
+        padding-inline: 13px;
+    }
+
+    .range-switch {
+        width: 100%;
+    }
+
+    .range-switch button {
+        flex: 1;
+        min-width: 44px;
+        min-height: 36px;
+    }
+
+    .chart-card:has(.chart-note:not(:empty)) {
+        min-height: 150px;
+        padding: 20px;
+    }
+
+    .chat-panel {
+        margin-top: 4px;
+        box-shadow: 0 -16px 44px rgba(60, 50, 35, 0.08);
+    }
+}

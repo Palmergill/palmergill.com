@@ -176,11 +176,11 @@
     }
 
     .casino-header__name {
-        margin-left: 0;
-        order: 5;
+        display: none;
     }
 
     .casino-header__stat-label {
-        display: none;
+        display: block;
+        font-size: 0.5rem;
     }
 }

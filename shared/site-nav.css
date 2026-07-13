@@ -12,6 +12,7 @@
     --sage-soft: #e7eee2;
     --clay: #b96a4b;
     --sky: #5a7794;
+    --focus-ring: 0 0 0 3px rgba(91, 113, 82, 0.24);
     --site-nav-height: 52px;
     /* kept for backward compat: pages subtract this in their own mobile rules */
     --site-nav-mobile-height: 52px;
@@ -104,7 +105,8 @@ body.has-site-nav .app-shell {
 .site-nav__brand:hover,
 .site-nav__brand:focus-visible {
     color: var(--site-nav-brand-hover-color);
-    outline: none;
+    outline: 2px solid currentColor;
+    outline-offset: 3px;
 }
 
 .site-nav__brand-logo {
@@ -159,6 +161,10 @@ body.has-site-nav .app-shell {
     background: var(--site-nav-hover-bg);
     border-color: var(--site-nav-hover-line);
     outline: none;
+}
+
+.site-nav__link:focus-visible {
+    box-shadow: var(--focus-ring);
 }
 
 .site-nav__link[aria-current="page"] {
@@ -275,6 +281,7 @@ body.has-site-nav .app-shell {
         background: var(--site-nav-control-hover-bg);
         border-color: var(--site-nav-line-strong);
         outline: none;
+        box-shadow: var(--focus-ring);
     }
 
     .site-nav__top-login svg {

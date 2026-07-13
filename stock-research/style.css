@@ -1714,6 +1714,126 @@ button,
     }
 }
 
+/* 2026 landing refresh: use the available desktop canvas and make search the
+   clear first action while preserving the existing result views. */
+@media (min-width: 769px) {
+    .container {
+        max-width: 1120px;
+    }
+
+    .empty {
+        display: grid;
+        grid-template-columns: minmax(260px, 0.8fr) minmax(420px, 1.2fr);
+        grid-template-areas:
+            "art title"
+            "art description"
+            "art compare"
+            "trending trending"
+            "features features"
+            "source source";
+        align-items: center;
+        column-gap: clamp(44px, 7vw, 88px);
+        max-width: 980px;
+        padding: 72px 24px 36px;
+        text-align: left;
+    }
+
+    .empty-illustration {
+        grid-area: art;
+        width: min(100%, 260px);
+        height: auto;
+        aspect-ratio: 1;
+        margin: 0 auto;
+        padding: 42px;
+        border: 1px solid var(--line);
+        border-radius: 32px;
+        background: linear-gradient(145deg, var(--card), var(--sage-soft));
+        box-shadow: 0 24px 60px rgba(60, 50, 35, 0.08);
+    }
+
+    .empty-title { grid-area: title; margin-top: 0; font-size: 2rem; }
+    .empty-description { grid-area: description; max-width: 54ch; margin-bottom: 22px; }
+    .compare-section { grid-area: compare; width: 100%; }
+    .empty > .trending-stocks:not(.compare-section):not(.watchlist-section) { grid-area: trending; margin-top: 54px; }
+    .feature-callouts { grid-area: features; }
+    .data-source { grid-area: source; text-align: center; }
+
+    .trending-grid {
+        grid-template-columns: repeat(6, minmax(0, 1fr));
+        max-width: none;
+    }
+
+    .compare-form input,
+    .compare-add-btn {
+        height: 48px;
+    }
+}
+
+.compare-form input {
+    background: var(--card);
+}
+
+.feature-callouts {
+    width: 100%;
+    gap: 10px;
+}
+
+.feature-item {
+    flex: 1 1 140px;
+    min-width: 0;
+    flex-direction: row;
+    justify-content: flex-start;
+    text-align: left;
+}
+
+.feature-icon {
+    display: grid;
+    width: 30px;
+    height: 30px;
+    flex: 0 0 30px;
+    place-items: center;
+    border-radius: 8px;
+    background: var(--sage-soft);
+    color: var(--sage-dim);
+    font-size: 0;
+    font-weight: 700;
+}
+
+.feature-icon::before { font-size: 11px; }
+.feature-item:nth-child(1) .feature-icon::before { content: "01"; }
+.feature-item:nth-child(2) .feature-icon::before { content: "02"; }
+.feature-item:nth-child(3) .feature-icon::before { content: "03"; }
+.feature-item:nth-child(4) .feature-icon::before { content: "04"; }
+
+.trending-stock:focus-visible,
+.compare-add-btn:focus-visible,
+.search-icon-btn:focus-visible,
+.search-icon-btn-inline:focus-visible {
+    outline: none;
+    box-shadow: var(--focus-ring);
+}
+
+@media (max-width: 768px) {
+    .empty {
+        padding-top: 28px;
+    }
+
+    .empty-illustration {
+        width: 82px;
+        height: 82px;
+        margin-bottom: 16px;
+    }
+
+    .empty-description {
+        margin-bottom: 24px;
+    }
+
+    .feature-callouts {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+    }
+}
+
 /* Chart Background Gradients */
 .chart-wrapper {
     position: relative;

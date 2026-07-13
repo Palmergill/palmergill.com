@@ -56,6 +56,11 @@ a:focus-visible {
     outline-offset: 2px;
 }
 
+button:disabled {
+    cursor: not-allowed;
+    opacity: 0.54;
+}
+
 .craps-page {
     display: grid;
     width: min(100vw, var(--app-col));
@@ -1439,7 +1444,7 @@ button:disabled {
 /* Larger table on desktop so the game doesn't sit as a phone column in empty space. */
 @media (min-width: 1100px) and (min-height: 760px) {
     :root {
-        --app-col: 540px;
+        --app-col: 620px;
     }
 
     .felt {

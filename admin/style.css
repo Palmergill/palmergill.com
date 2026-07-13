@@ -35,7 +35,7 @@ header {
 h1 {
     font-size: 1.75rem;
     font-weight: 700;
-    background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+    background: linear-gradient(135deg, var(--sage) 0%, var(--clay) 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
@@ -96,8 +96,8 @@ h1 {
 }
 
 .tab-btn.active {
-    color: #3b82f6;
-    border-bottom-color: #3b82f6;
+    color: var(--sage);
+    border-bottom-color: var(--sage);
 }
 
 .controls {
@@ -157,11 +157,12 @@ h1 {
 .controls input:focus,
 .controls select:focus {
     outline: none;
-    border-color: #3b82f6;
+    border-color: var(--sage);
+    box-shadow: var(--focus-ring);
 }
 
 .btn {
-    background: #3b82f6;
+    background: var(--sage);
     color: white;
     border: none;
     border-radius: 6px;
@@ -173,7 +174,7 @@ h1 {
 }
 
 .btn:hover {
-    background: #2563eb;
+    background: var(--sage-dim);
 }
 
 .btn-danger {
@@ -192,7 +193,13 @@ h1 {
 }
 
 .status.is-error {
-    color: #fca5a5;
+    margin: 0 0 14px;
+    min-height: 0;
+    padding: 11px 13px;
+    border: 1px solid rgba(193, 79, 63, 0.25);
+    border-radius: 8px;
+    background: rgba(193, 79, 63, 0.07);
+    color: #9d3d32;
 }
 
 .hidden,
@@ -216,7 +223,8 @@ h1 {
     padding: 16px;
     background: var(--card);
     border: 1px solid var(--line);
-    border-radius: 8px;
+    border-radius: 12px;
+    box-shadow: 0 8px 24px rgba(60, 50, 35, 0.035);
 }
 
 .metric-card span {
@@ -231,6 +239,12 @@ h1 {
     color: var(--ink);
     font-size: 2rem;
     line-height: 1;
+}
+
+.metric-card:first-child,
+.metric-card:nth-child(2) {
+    border-color: #cfddc6;
+    background: linear-gradient(145deg, var(--card), rgba(231, 238, 226, 0.62));
 }
 
 .metric-card.warning strong {
@@ -301,6 +315,19 @@ h1 {
     border: 1px solid var(--line);
     border-radius: 8px;
     min-width: 0;
+}
+
+
+.panel,
+.casino-panel {
+    border-radius: 12px;
+}
+
+.btn:focus-visible,
+.tab-btn:focus-visible,
+.compact-row:focus-visible {
+    outline: none;
+    box-shadow: var(--focus-ring);
 }
 
 .panel h2 {

@@ -62,7 +62,7 @@ pre code {
 
 .docs-hero {
     border-bottom: 1px solid var(--line);
-    padding: 56px 24px 64px;
+    padding: 44px 24px 50px;
 }
 
 .hero-grid {
@@ -86,11 +86,11 @@ pre code {
 }
 
 h1 {
-    max-width: 790px;
+    max-width: 820px;
     margin: 0;
-    font-size: clamp(2.25rem, 5vw, 5rem);
-    line-height: 0.98;
-    letter-spacing: 0;
+    font-size: clamp(2.25rem, 4.2vw, 4.25rem);
+    line-height: 1.02;
+    letter-spacing: -0.025em;
 }
 
 .hero-copy {
@@ -130,7 +130,7 @@ h1 {
 
 .toc {
     position: sticky;
-    top: 20px;
+    top: calc(var(--site-nav-height) + 20px);
     align-self: start;
     border: 1px solid var(--line);
     border-radius: 8px;
@@ -156,6 +156,8 @@ h1 {
 .toc a:focus-visible {
     color: var(--ink);
     outline: none;
+    box-shadow: inset 3px 0 var(--sage);
+    padding-left: 10px;
 }
 
 .content {

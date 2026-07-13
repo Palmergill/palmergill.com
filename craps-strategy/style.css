@@ -93,6 +93,28 @@ textarea:focus, input:focus, select:focus {
 .row.actions { align-items: flex-end; }
 .grow { flex: 1 1 14rem; }
 
+.advanced-settings {
+    margin-top: 1rem;
+    border-top: 1px solid rgba(var(--gold-rgb), 0.16);
+    border-bottom: 1px solid rgba(var(--gold-rgb), 0.16);
+    padding: 0.8rem 0;
+}
+
+.advanced-settings summary {
+    color: var(--gold);
+    cursor: pointer;
+    font-family: "Roboto Condensed", var(--font-body);
+    font-size: 0.82rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+.advanced-settings summary:focus-visible {
+    outline: 2px solid var(--gold);
+    outline-offset: 4px;
+}
+
 /* ---- Buttons ---- */
 .btn {
     border: 1px solid rgba(var(--gold-rgb), 0.4);
@@ -172,4 +194,5 @@ textarea:focus, input:focus, select:focus {
 @media (max-width: 560px) {
     .chart-holder { height: 280px; }
     .row .field { flex: 1 1 100%; }
+    .row.actions .btn-primary { width: 100%; min-height: 50px; }
 }

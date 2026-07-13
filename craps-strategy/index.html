@@ -14,12 +14,12 @@
     <meta name="twitter:card" content="summary">
     <link rel="icon" type="image/png" href="/assets/palmer-gill-logo-small.png">
     <link rel="manifest" href="/craps-strategy/manifest.json">
-    <link rel="stylesheet" href="/shared/site-nav.css?v=11">
+    <link rel="stylesheet" href="/shared/site-nav.css?v=12">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;700;900&family=Inter:wght@400;500;600;700;800&family=Roboto+Condensed:wght@500;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/shared/casino-theme.css?v=2">
-    <link rel="stylesheet" href="/craps-strategy/style.css?v=2">
+    <link rel="stylesheet" href="/shared/casino-theme.css?v=3">
+    <link rel="stylesheet" href="/craps-strategy/style.css?v=3">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" integrity="sha384-9nhczxUqK87bcKHh20fSQcTGD4qq5GhayNYSYWqwBkINBhOfQLg/P5HG5lF1urn4" crossorigin="anonymous"></script>
     <script>
         if ('serviceWorker' in navigator) {
@@ -57,35 +57,38 @@
                     <span class="field-label">Base unit ($)</span>
                     <input id="baseUnit" type="number" min="1" step="1" value="10">
                 </label>
-                <label class="field">
-                    <span class="field-label">Seed <span class="hint">(blank = auto)</span></span>
-                    <input id="seed" type="number" min="0" step="1" placeholder="auto">
-                </label>
             </div>
 
-            <div class="row cash-out-row">
-                <label class="field">
-                    <span class="field-label">Cash-out strategy</span>
-                    <select id="cashOutMode">
-                        <option value="none">No cash-out target</option>
-                        <option value="amount">Cash out at a dollar amount</option>
-                        <option value="multiplier">Cash out at a buy-in multiple</option>
-                    </select>
-                </label>
-                <label class="field">
-                    <span class="field-label">Cash-out amount ($)</span>
-                    <input id="cashOutAmount" type="number" min="1" step="5" placeholder="600">
-                </label>
-                <label class="field">
-                    <span class="field-label">Buy-in multiple</span>
-                    <input id="cashOutMultiplier" type="number" min="1.01" step="0.1" placeholder="2">
-                </label>
-            </div>
+            <details class="advanced-settings">
+                <summary>Advanced simulation settings</summary>
+                <div class="row">
+                    <label class="field">
+                        <span class="field-label">Seed <span class="hint">(blank = auto)</span></span>
+                        <input id="seed" type="number" min="0" step="1" placeholder="auto">
+                    </label>
+                    <label class="field">
+                        <span class="field-label">Cash-out strategy</span>
+                        <select id="cashOutMode">
+                            <option value="none">No cash-out target</option>
+                            <option value="amount">Cash out at a dollar amount</option>
+                            <option value="multiplier">Cash out at a buy-in multiple</option>
+                        </select>
+                    </label>
+                    <label class="field">
+                        <span class="field-label">Cash-out amount ($)</span>
+                        <input id="cashOutAmount" type="number" min="1" step="5" placeholder="600">
+                    </label>
+                    <label class="field">
+                        <span class="field-label">Buy-in multiple</span>
+                        <input id="cashOutMultiplier" type="number" min="1.01" step="0.1" placeholder="2">
+                    </label>
+                </div>
+            </details>
 
             <div class="row actions">
                 <button id="translateBtn" class="btn btn-primary" type="button">Translate with AI</button>
                 <label class="field grow">
-                    <span class="field-label">…or pick a preset</span>
+                    <span class="field-label">Or start from a preset</span>
                     <select id="preset">
                         <option value="">— choose a preset —</option>
                         <option value="passOdds">Pass Line + Odds</option>
@@ -151,6 +154,6 @@
     <script src="/shared/api-base.js?v=1"></script>
     <script src="/craps-strategy/app.js?v=5"></script>
     <script src="/shared/analytics.js?v=1"></script>
-    <script src="/shared/site-nav.js?v=11"></script>
+    <script src="/shared/site-nav.js?v=12"></script>
 </body>
 </html>

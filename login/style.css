@@ -34,9 +34,7 @@ input {
     min-height: 100vh;
     min-height: 100dvh;
     grid-template-columns: minmax(360px, 0.9fr) minmax(420px, 1.1fr);
-    background:
-        linear-gradient(90deg, rgba(250, 246, 240, 0.98), rgba(250, 246, 240, 0.72) 48%, rgba(250, 246, 240, 0.28)),
-        url("/assets/palmer-lake.jpeg") center / cover no-repeat;
+    background: var(--bg);
 }
 
 .login-panel {
@@ -46,7 +44,7 @@ input {
     justify-content: center;
     gap: 34px;
     padding: clamp(32px, 7vw, 88px);
-    background: var(--panel);
+    background: var(--bg);
     border-right: 1px solid var(--line);
     backdrop-filter: blur(18px);
     -webkit-backdrop-filter: blur(18px);
@@ -187,6 +185,18 @@ h1 {
 .login-visual {
     position: relative;
     min-height: 100%;
+    overflow: hidden;
+    background:
+        linear-gradient(145deg, rgba(20, 35, 24, 0.12), rgba(20, 35, 24, 0.5)),
+        url("/assets/palmer-lake.jpeg") center / cover no-repeat;
+}
+
+.login-visual::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, var(--bg), transparent 16%);
+    pointer-events: none;
 }
 
 .visual-caption {
@@ -197,7 +207,7 @@ h1 {
     padding: 18px 20px;
     border: 1px solid rgba(255, 255, 255, 0.5);
     border-radius: 8px;
-    background: rgba(250, 246, 240, 0.82);
+    background: rgba(250, 246, 240, 0.9);
     backdrop-filter: blur(14px);
     -webkit-backdrop-filter: blur(14px);
 }
@@ -229,9 +239,7 @@ h1 {
 
     .login-shell {
         display: block;
-        background:
-            linear-gradient(180deg, rgba(250, 246, 240, 0.86), rgba(250, 246, 240, 0.96)),
-            url("/assets/palmer-lake.jpeg") center / cover no-repeat;
+        background: var(--bg);
     }
 
     .login-panel {
@@ -239,7 +247,7 @@ h1 {
         min-height: calc(100dvh - var(--site-nav-mobile-height, 56px));
         padding: 34px 22px;
         border-right: 0;
-        background: rgba(250, 246, 240, 0.9);
+        background: var(--bg);
     }
 
     .login-visual {
