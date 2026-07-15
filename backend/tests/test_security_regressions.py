@@ -436,6 +436,25 @@ def test_bitcoin_chat_routes_address_questions_to_address_tool():
     assert "does not prove who controls the address" in result["answer"]
 
 
+def test_bitcoin_chat_routes_explicit_block_questions_to_block_tools():
+    current = bitcoin_ai.answer_demo_chat("what is the current block?", session_id="demo-session")
+    numbered = bitcoin_ai.answer_demo_chat("what is block 800000?", session_id="demo-session")
+
+    assert current["tools_used"] == ["get_latest_block"]
+    assert numbered["tools_used"] == ["get_block"]
+    assert numbered["data"]["height"] == 800000
+
+
+def test_bitcoin_chat_keeps_mining_questions_on_conceptual_route():
+    result = bitcoin_ai.answer_demo_chat(
+        "How does mining work? Who adds new blocks?",
+        session_id="demo-session",
+    )
+
+    assert result["tools_used"] == []
+    assert result["answer"].startswith("**Mining**")
+
+
 def test_stock_price_history_rejects_unbounded_day_ranges():
     response = client.get("/api/stocks/AAPL/prices", params={"days": 100000000})
 

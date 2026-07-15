@@ -1025,7 +1025,13 @@ function wireChatToggle() {
     try { hidden = localStorage.getItem(CHAT_HIDDEN_STORAGE_KEY) === 'true'; } catch { /* ignore */ }
     setChatOpen(!hidden);
     chatToggle?.addEventListener('click', () => {
-        setChatOpen(layoutEl.classList.contains('chat-hidden'));
+        const opening = layoutEl.classList.contains('chat-hidden');
+        setChatOpen(opening);
+        // On stacked (mobile) layouts the chat lives below the fold —
+        // bring it into view so the toggle doesn't look like a no-op.
+        if (opening && window.matchMedia('(max-width: 920px)').matches) {
+            document.getElementById('chatPanel')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
     });
 }
 

@@ -2011,6 +2011,13 @@ body {
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.04em;
+    /* Own truncation box: the parent .opponent-name's ellipsis rule only
+       governs its own inline text, not this nested block child, so without
+       these it clips raw ("STANDARI") instead of showing an ellipsis. */
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .hand-history-empty {

@@ -173,9 +173,12 @@ document.addEventListener('DOMContentLoaded', () => {
     // memory and fired the ripple callback multiple times per click.
     document.addEventListener('click', createRipple);
     
-    // Magnetic button effect for primary buttons
+    // Magnetic button effect for primary buttons. Excludes .site-nav
+    // (shared header/hamburger) so its buttons don't visibly shift under
+    // the cursor — that chrome isn't owned by this page.
     function initMagneticButtons() {
-        const magneticButtons = document.querySelectorAll('button');
+        const magneticButtons = [...document.querySelectorAll('button')]
+            .filter((button) => !button.closest('.site-nav'));
         
         magneticButtons.forEach(button => {
             button.classList.add('magnetic');

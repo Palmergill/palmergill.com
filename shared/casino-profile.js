@@ -61,10 +61,14 @@
         }
     }
 
+    // Round (not floor) to the nearest cent: blackjack's 3:2 natural payout
+    // and craps' true-odds payouts routinely land on a half dollar (e.g. a
+    // $25 natural blackjack pays $37.50), and flooring to whole dollars
+    // silently discarded that $0.50 on every such win.
     function clampBankroll(value) {
         const n = Number(value);
         if (!Number.isFinite(n) || n < 0) return 0;
-        return Math.floor(n);
+        return Math.round(n * 100) / 100;
     }
 
     // Module-level flag: when the stored stats blob is unreadable, freeze
@@ -126,7 +130,7 @@
             const raw = safeRead(STORAGE_KEYS.bankroll);
             if (raw === null) return DEFAULTS.bankroll;
             const n = Number(raw);
-            return Number.isFinite(n) && n >= 0 ? Math.floor(n) : DEFAULTS.bankroll;
+            return Number.isFinite(n) && n >= 0 ? clampBankroll(n) : DEFAULTS.bankroll;
         },
 
         setBankroll(value, options = {}) {

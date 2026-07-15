@@ -474,8 +474,22 @@ def _answer_with_local_router(message: str, session_id: str, timezone_name: str 
         warnings.extend(data.get("warnings", []))
         return _response(_status_answer(data), session_id, tools_used, data, warnings)
 
-    if "block" in normalized or "latest" in normalized or "height" in normalized:
-        height_match = re.search(r"\b\d{1,7}\b", normalized)
+    height_match = re.search(r"\b\d{1,7}\b", normalized)
+    block_lookup_requested = "block" in normalized or "latest" in normalized or "height" in normalized
+    explicit_block_lookup = bool(
+        (height_match and ("block" in normalized or "height" in normalized))
+        or re.search(r"\b(?:latest|current)\s+(?:bitcoin\s+)?blocks?\b", normalized)
+        or "chain tip" in normalized
+        or "block height" in normalized
+    )
+
+    # Conceptual questions may mention blocks (for example, "how does mining
+    # add new blocks?"). Keep those on the explanation path, but preserve
+    # explicit current/numeric block requests as data lookups.
+    if not explicit_block_lookup and _looks_conceptual(message):
+        return _response(_conceptual_fallback_answer(message), session_id, [], {}, warnings)
+
+    if block_lookup_requested:
         if height_match and "latest" not in normalized:
             data = _local_tool_call(demo, "get_block", height_match.group(0))
             tools_used.append("get_block")
@@ -484,9 +498,6 @@ def _answer_with_local_router(message: str, session_id: str, timezone_name: str 
             tools_used.append("get_latest_block")
         warnings.extend(data.get("warnings", []))
         return _response(_block_answer(data), session_id, tools_used, data, warnings)
-
-    if _looks_conceptual(message):
-        return _response(_conceptual_fallback_answer(message), session_id, [], {}, warnings)
 
     data = _local_tool_call(demo, "get_latest_block")
     tools_used.append("get_latest_block")
@@ -648,9 +659,15 @@ def _is_bitcoin_related(message: str) -> bool:
 def _looks_conceptual(message: str) -> bool:
     normalized = message.strip().lower()
     if TXID_RE.search(message) or any(
-        term in normalized for term in ("latest", "block", "height", "mempool", "fee", "sync", "status", "node", "mined")
+        term in normalized for term in ("latest", "height", "mempool", "fee", "sync", "status", "node", "mined")
     ):
         return False
+    # "block"/"blocks" is deliberately not in the exclusion list above: a
+    # question like "how does mining work? who adds new blocks?" mentions
+    # blocks but is asking about the concept, not requesting a specific
+    # block's data — the plain block/latest/height lookup route in
+    # _answer_with_local_router only runs after this check, so a bare
+    # "show me the latest block" still resolves there as before.
     return any(term in normalized for term in ("explain", "how does", "why", "what is", "utxo", "mining", "difficulty"))
 
 

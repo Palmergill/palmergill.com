@@ -19,9 +19,18 @@ describe('CasinoProfile', () => {
 
     test('bankroll defaults to 1000 and clamps on write', () => {
         expect(profile.getBankroll()).toBe(1000);
-        expect(profile.setBankroll(1450.9)).toBe(1450);
-        expect(profile.getBankroll()).toBe(1450);
+        expect(profile.setBankroll(1450.9)).toBe(1450.9);
+        expect(profile.getBankroll()).toBe(1450.9);
         expect(profile.setBankroll(-50)).toBe(0);
+    });
+
+    test('bankroll rounds to the nearest cent instead of dropping it', () => {
+        // A $25 natural blackjack (3:2) pays $37.50 — the fractional
+        // dollar must survive a write/read round trip.
+        expect(profile.setBankroll(1037.5)).toBe(1037.5);
+        expect(profile.getBankroll()).toBe(1037.5);
+        // Floating-point noise beyond a cent still rounds sanely.
+        expect(profile.setBankroll(1037.5049999)).toBe(1037.5);
     });
 
     test('resetBankroll restores the default', () => {

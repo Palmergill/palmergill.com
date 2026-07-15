@@ -6,6 +6,12 @@
         initialBankroll !== undefined ? { bankroll: initialBankroll } : {}
     );
     let balanceBeforeRound = state.balance;
+    // True while this page is writing its own bankroll/session update to
+    // CasinoProfile. Profile writes notify listeners synchronously
+    // (including this page's own syncBalanceFromProfile), and without this
+    // guard that re-entrant call would read back the write-in-flight value
+    // and stomp the balance/message this same applyAction() just computed.
+    let isPersistingOwnBankroll = false;
     const shoeStats = { wins: 0, losses: 0, pushes: 0, dealerBusts: 0, rounds: 0 };
     let previousUi = {
         balance: null,
@@ -477,31 +483,36 @@
             balanceBeforeRound = previousState.balance;
         }
 
-        if (previousState.status !== "roundOver" && state.status === "roundOver") {
-            const delta = state.balance - balanceBeforeRound;
-            state.playerHands.forEach((hand) => {
-                if (hand.result === "win" || hand.result === "blackjack") shoeStats.wins++;
-                else if (hand.result === "lose") shoeStats.losses++;
-                else if (hand.result === "push") shoeStats.pushes++;
-            });
-            if (game.handValue(state.dealerHand).bust) shoeStats.dealerBusts++;
-            shoeStats.rounds++;
-            renderShoeStats();
-            if (profile) {
-                profile.recordSession("blackjack", {
-                    handsPlayed: state.playerHands.length || 1,
-                    netProfit: delta,
-                    biggestWin: Math.max(0, delta)
+        isPersistingOwnBankroll = true;
+        try {
+            if (profile) profile.setBankroll(state.balance);
+
+            if (previousState.status !== "roundOver" && state.status === "roundOver") {
+                const delta = state.balance - balanceBeforeRound;
+                state.playerHands.forEach((hand) => {
+                    if (hand.result === "win" || hand.result === "blackjack") shoeStats.wins++;
+                    else if (hand.result === "lose") shoeStats.losses++;
+                    else if (hand.result === "push") shoeStats.pushes++;
+                });
+                if (game.handValue(state.dealerHand).bust) shoeStats.dealerBusts++;
+                shoeStats.rounds++;
+                renderShoeStats();
+                if (profile) {
+                    profile.recordSession("blackjack", {
+                        handsPlayed: state.playerHands.length || 1,
+                        netProfit: delta,
+                        biggestWin: Math.max(0, delta)
+                    });
+                }
+                window.pgAnalytics?.track?.("blackjack_round_completed", {
+                    balance: state.balance,
+                    results: state.playerHands.map((hand) => hand.result || "unknown"),
+                    dealer_total: game.handValue(state.dealerHand).total,
                 });
             }
-            window.pgAnalytics?.track?.("blackjack_round_completed", {
-                balance: state.balance,
-                results: state.playerHands.map((hand) => hand.result || "unknown"),
-                dealer_total: game.handValue(state.dealerHand).total,
-            });
+        } finally {
+            isPersistingOwnBankroll = false;
         }
-
-        if (profile) profile.setBankroll(state.balance);
 
         if (shouldAnimateDealerTurn(previousState, state)) {
             // Catch rejections so a thrown animation step doesn't leave an
@@ -524,7 +535,7 @@
     }
 
     function syncBalanceFromProfile() {
-        if (!profile) return;
+        if (!profile || isPersistingOwnBankroll) return;
         const nextBalance = profile.getBankroll();
         if (nextBalance === state.balance) return;
         cancelDealerAnimation();
@@ -581,7 +592,12 @@
         cancelDealerAnimation();
         state = game.resetBankroll(state);
         balanceBeforeRound = state.balance;
-        if (profile) profile.setBankroll(state.balance);
+        isPersistingOwnBankroll = true;
+        try {
+            if (profile) profile.setBankroll(state.balance);
+        } finally {
+            isPersistingOwnBankroll = false;
+        }
         resetShoeStats();
         render();
     });
