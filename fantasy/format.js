@@ -105,6 +105,17 @@
         return n > 0 ? `+${n}` : String(n);
     }
 
+    // Article timestamp -> short display date ("Jul 10", or "Jul 10, 2025"
+    // when it isn't this year). Unparseable/missing -> "".
+    function formatArticleDate(iso) {
+        if (!iso) return "";
+        const date = new Date(iso);
+        if (Number.isNaN(date.getTime())) return "";
+        const options = { month: "short", day: "numeric" };
+        if (date.getFullYear() !== new Date().getFullYear()) options.year = "numeric";
+        return date.toLocaleDateString("en-US", options);
+    }
+
     // Signed movement, e.g. +0.5 / -1.0. 0 -> "0".
     function formatSigned(delta, digits) {
         if (delta === null || delta === undefined || Number.isNaN(Number(delta))) return "";
@@ -127,5 +138,6 @@
         americanOdds,
         formatSpread,
         formatSigned,
+        formatArticleDate,
     };
 });

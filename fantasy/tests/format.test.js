@@ -74,4 +74,12 @@ describe('FantasyFormat', () => {
         expect(FantasyFormat.formatSigned(0, 1)).toBe('0');
         expect(FantasyFormat.formatSigned(null)).toBe('');
     });
+
+    test('formatArticleDate shows month/day, adding the year when not current', () => {
+        const thisYear = new Date().getFullYear();
+        expect(FantasyFormat.formatArticleDate(`${thisYear}-07-10T12:00:00Z`)).toMatch(/^Jul \d{1,2}$/);
+        expect(FantasyFormat.formatArticleDate('2020-01-05T12:00:00Z')).toMatch(/^Jan \d{1,2}, 2020$/);
+        expect(FantasyFormat.formatArticleDate('not-a-date')).toBe('');
+        expect(FantasyFormat.formatArticleDate(null)).toBe('');
+    });
 });

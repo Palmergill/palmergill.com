@@ -498,6 +498,13 @@ body.drawer-open { overflow: hidden; }
 .sparkline { width: 100%; height: auto; display: block; }
 .sparkline-caption { margin: 8px 0 0; font-size: 0.78rem; color: var(--soft, #5d574e); }
 
+.news-list { list-style: none; margin: 0; padding: 0; }
+.news-item { display: flex; flex-direction: column; gap: 2px; padding: 8px 0; border-bottom: 1px solid var(--line, #ece4d8); }
+.news-item:last-child { border-bottom: none; padding-bottom: 0; }
+.news-item__title { font-size: 0.88rem; font-weight: 600; color: var(--ink, #23201c); text-decoration: none; line-height: 1.35; }
+.news-item__title:hover { text-decoration: underline; }
+.news-item__meta { font-size: 0.78rem; color: var(--muted, #928a7d); }
+
 .mini-table { width: 100%; border-collapse: collapse; font-size: 0.86rem; }
 .mini-table td { padding: 6px 4px; border-bottom: 1px solid var(--line, #ece4d8); }
 .mini-table tr:last-child td { border-bottom: none; }

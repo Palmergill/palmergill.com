@@ -12,6 +12,7 @@
         week: null,
         position: "ALL",
         scoring: "ppr",
+        drawerPlayerId: null,
     };
 
     const els = {
@@ -356,6 +357,7 @@
 
     async function openPlayer(playerId) {
         if (!playerId) return;
+        state.drawerPlayerId = playerId;
         els.drawer.hidden = false;
         document.body.classList.add("drawer-open");
         els.drawerName.textContent = "—";
@@ -366,11 +368,47 @@
 
         try {
             const player = await fetchJson(`${API_BASE}/players/${encodeURIComponent(playerId)}`);
+            if (state.drawerPlayerId !== playerId) return;
             renderPlayer(player);
         } catch (err) {
+            if (state.drawerPlayerId !== playerId) return;
             els.drawerBody.innerHTML = "";
             els.drawerBody.appendChild(el("p", "drawer__loading", "Could not load this player."));
+            return;
         }
+        loadPlayerNews(playerId);
+    }
+
+    // News is fetched separately so a slow (or failed) ESPN lookup never
+    // delays the projection/stats cards; the card just appears when ready.
+    async function loadPlayerNews(playerId) {
+        try {
+            const news = await fetchJson(`${API_BASE}/players/${encodeURIComponent(playerId)}/news`);
+            if (state.drawerPlayerId !== playerId || els.drawer.hidden) return;
+            const articles = news.articles || [];
+            if (articles.length === 0) return;
+
+            const card = el("div", "drawer-card");
+            card.appendChild(el("h3", "drawer-card__title", "Recent articles"));
+            const list = el("ul", "news-list");
+            articles.slice(0, 5).forEach((article) => {
+                if (!/^https?:\/\//.test(article.url || "")) return;
+                const item = el("li", "news-item");
+                const link = el("a", "news-item__title", article.headline || "Untitled");
+                link.href = article.url;
+                link.target = "_blank";
+                link.rel = "noopener noreferrer";
+                item.appendChild(link);
+                const meta = [F.formatArticleDate(article.published_at), article.byline]
+                    .filter(Boolean)
+                    .join(" · ");
+                if (meta) item.appendChild(el("span", "news-item__meta", meta));
+                list.appendChild(item);
+            });
+            if (!list.childElementCount) return;
+            card.appendChild(list);
+            els.drawerBody.appendChild(card);
+        } catch (err) { /* drawer works without news */ }
     }
 
     function renderPlayer(player) {

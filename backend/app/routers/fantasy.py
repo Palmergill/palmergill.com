@@ -14,7 +14,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.database import SessionLocal, get_db
-from app.services import fantasy_ai, fantasy_collector, fantasy_data
+from app.services import fantasy_ai, fantasy_collector, fantasy_data, fantasy_news
 
 router = APIRouter(prefix="/api/fantasy", tags=["fantasy"])
 
@@ -108,6 +108,15 @@ def player_detail(player_id: str, db: Session = Depends(get_db)) -> Dict[str, An
     if detail is None:
         raise HTTPException(status_code=404, detail="Unknown player")
     return detail
+
+
+@router.get("/players/{player_id}/news")
+async def player_news(player_id: str, db: Session = Depends(get_db)) -> Dict[str, Any]:
+    # May do one lazy ESPN fetch (then cached), so keep it off the event loop.
+    news = await run_blocking(fantasy_news.get_player_news, db, player_id)
+    if news is None:
+        raise HTTPException(status_code=404, detail="Unknown player")
+    return news
 
 
 @router.get("/trending")

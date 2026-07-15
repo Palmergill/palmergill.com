@@ -111,8 +111,10 @@ everything fetched is persisted as timestamped snapshots so history
   stamps sourced from the collection-run log.
 - **R11. Player detail:** clicking a player opens a panel with bio/team/
   injury status, current rank + projection with week-over-week and
-  intra-week movement (sparkline), last 5 games of actual stats, and any
-  collected props for them.
+  intra-week movement (sparkline), last 5 games of actual stats, any
+  collected props for them, and recent articles about them (ESPN player
+  news via the stored espn_id, fetched lazily on first view and cached
+  in ff_meta for 6h — never snapshotted wholesale).
 - **R12. Props & futures:** props board showing featured games with
   per-market tables (best line per market per book) and movement vs. the
   first snapshot of the week; futures table with top ~15 outcomes per

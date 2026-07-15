@@ -39,7 +39,7 @@ FF_MODELS = (
 )
 
 PLAYERS_DUMP = {
-    "100": {"full_name": "Patrick Mahomes", "position": "QB", "team": "KC", "gsis_id": "g100"},
+    "100": {"full_name": "Patrick Mahomes", "position": "QB", "team": "KC", "gsis_id": "g100", "espn_id": 3139477},
     "200": {"full_name": "Justin Jefferson", "position": "WR", "team": "MIN", "gsis_id": "g200"},
     "300": {"full_name": "Bijan Robinson", "position": "RB", "team": "ATL", "gsis_id": "g300"},
 }
@@ -181,6 +181,37 @@ def test_player_detail_known_and_unknown():
     detail = client.get("/api/fantasy/players/200").json()
     assert detail["name"] == "Justin Jefferson"
     assert detail["projection"]["pts_ppr"] == 21.0
+
+
+def test_player_news_endpoint(monkeypatch):
+    class FakeEspn:
+        def get_player_news(self, espn_id, limit=6):
+            assert espn_id == "3139477"
+            return [
+                {
+                    "headline": "Mahomes 2026 outlook",
+                    "description": None,
+                    "byline": "Staff",
+                    "url": "https://www.espn.com/story/1",
+                    "published_at": "2026-07-10T00:00:00Z",
+                    "premium": False,
+                }
+            ]
+
+    from app.services import fantasy_news
+
+    monkeypatch.setattr(fantasy_news, "espn_news_client", FakeEspn())
+
+    assert client.get("/api/fantasy/players/zzz/news").status_code == 404
+
+    body = client.get("/api/fantasy/players/100/news").json()
+    assert body["player_id"] == "100"
+    assert body["articles"][0]["headline"] == "Mahomes 2026 outlook"
+    assert body["as_of"] is not None
+
+    # Player without an espn_id -> empty articles, still 200.
+    no_espn = client.get("/api/fantasy/players/200/news").json()
+    assert no_espn["articles"] == []
 
 
 def test_dashboard_returns_top_by_position():
