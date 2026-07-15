@@ -201,8 +201,10 @@ everything fetched is persisted as timestamped snapshots so history
   `error` and falls through the adapter chain.
 - **Env additions** (`backend/.env.example`): `ODDS_API_KEY`,
   `ODDS_API_MONTHLY_BUDGET=450`, `FANTASYPROS_API_KEY` (optional),
-  `FANTASY_CHAT_MODEL`, `FANTASY_FEATURED_GAMES=4`,
-  `FANTASY_COLLECTOR_ENABLED=true` (so local dev doesn't hammer sources).
+  `FANTASY_CHAT_MODEL`, `FANTASY_FEATURED_GAMES=4`. The collector runs
+  unconditionally (decision 2026-07-15: no enable flag); per-job next-due
+  timestamps in `ff_meta` keep restarts and local dev from hammering
+  sources, and odds jobs self-skip without `ODDS_API_KEY`.
 
 ### API surface (`routers/fantasy.py`, prefix `/api/fantasy`)
 

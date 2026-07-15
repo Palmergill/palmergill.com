@@ -48,10 +48,7 @@ async def lifespan(app: FastAPI):
         analytics_writer_task,
         rate_limit_sweep_task,
     ]
-    # Opt-in so local dev / CI don't hit external sports data sources. Set
-    # FANTASY_COLLECTOR_ENABLED=true in the deployed environment.
-    if os.getenv("FANTASY_COLLECTOR_ENABLED", "false").strip().lower() in {"1", "true", "yes", "on"}:
-        background_tasks.append(asyncio.create_task(_periodic_fantasy_collection()))
+    background_tasks.append(asyncio.create_task(_periodic_fantasy_collection()))
     try:
         yield
     finally:
@@ -181,8 +178,11 @@ async def _periodic_fantasy_collection(interval: int = 15 * 60) -> None:
     """Run due fantasy data-collection jobs every `interval` seconds.
 
     The scheduler decides which jobs are due from cached NFL state and the
-    per-job next-due timestamps it persists, so this loop just ticks. Each
-    cycle is wrapped in the timeout guard and its own DB session.
+    per-job next-due timestamps it persists, so this loop just ticks. The
+    first cycle runs right away — next-due timestamps live in the DB, so on
+    an already-populated deployment it's a no-op, and on a fresh one it
+    seeds the data immediately instead of 15 minutes after boot. Each cycle
+    is wrapped in the timeout guard and its own DB session.
     """
 
     def _cycle():
@@ -195,10 +195,10 @@ async def _periodic_fantasy_collection(interval: int = 15 * 60) -> None:
             db.close()
 
     while True:
-        await asyncio.sleep(interval)
         summaries = await _run_with_timeout("fantasy collection", _cycle, timeout=600)
         if summaries:
             logger.info("Fantasy collection ran %d job(s)", len(summaries))
+        await asyncio.sleep(interval)
 
 
 app = FastAPI(title="Palmer Gill API", version="0.2.0-p5", lifespan=lifespan)
