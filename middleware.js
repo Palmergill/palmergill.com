@@ -24,6 +24,7 @@ const PUBLIC_PREFIXES = [
   '/bitcoin-chat',
   '/api/stocks',
   '/api/bitcoin',
+  '/api/fantasy',
 ];
 
 const PROTECTED_PREFIXES = [
@@ -34,6 +35,7 @@ const PROTECTED_PREFIXES = [
 const OPTIONAL_AUTH_API_PREFIXES = [
   '/api/stocks',
   '/api/bitcoin',
+  '/api/fantasy',
 ];
 
 const REALM = 'Palmer Gill Apps';

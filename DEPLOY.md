@@ -17,6 +17,7 @@ The active static site lives at the repo root:
 - `craps-strategy/`
 - `blackjack/`
 - `bitcoin-chat/`
+- `fantasy/`
 - `admin/`
 
 Production static hosting should serve those files directly. `vercel.json` rewrites `/api/*` requests to the Railway backend.
@@ -24,9 +25,9 @@ Production static hosting should serve those files directly. `vercel.json` rewri
 Vercel middleware keeps `/` public and requires Basic Auth for:
 
 - `/admin/*`
-- `/api/*`, except `/api/poker/*`, `/api/craps/*`, `/api/stocks/*`, `/api/bitcoin/*`, and `/api/analytics/*`
+- `/api/*`, except `/api/poker/*`, `/api/craps/*`, `/api/stocks/*`, `/api/bitcoin/*`, `/api/fantasy/*`, and `/api/analytics/*`
 
-`/docs/*`, `/login/*`, `/stock-research/*`, `/bitcoin-chat/*`, `/poker/*`, `/craps/*`, `/craps-strategy/*`, `/blackjack/*`, `/api/poker/*`, `/api/craps/*`, `/api/stocks/*`, `/api/bitcoin/*`, and `/api/analytics/*` are public. Unauthenticated stock and Bitcoin API requests run in demo mode; valid app credentials unlock the live provider-backed paths. The login page posts to `/login/session`, which sets a signed HttpOnly session cookie for `/admin/*` and protected API requests. Basic Auth remains supported for direct scripted access.
+`/docs/*`, `/login/*`, `/stock-research/*`, `/bitcoin-chat/*`, `/fantasy/*`, `/poker/*`, `/craps/*`, `/craps-strategy/*`, `/blackjack/*`, `/api/poker/*`, `/api/craps/*`, `/api/stocks/*`, `/api/bitcoin/*`, `/api/fantasy/*`, and `/api/analytics/*` are public. Unauthenticated stock, Bitcoin, and fantasy API requests run in demo mode; valid app credentials unlock the live provider-backed paths and the fantasy admin refresh. The login page posts to `/login/session`, which sets a signed HttpOnly session cookie for `/admin/*` and protected API requests. Basic Auth remains supported for direct scripted access.
 
 Configure these environment variables in Vercel:
 
@@ -51,7 +52,7 @@ Health check:
 /health
 ```
 
-The backend mirrors the same auth model for protected API docs, `/api/*` routes, and locally served app folders. Poker, craps, craps-strategy, blackjack, login, `/api/poker/*`, `/api/craps/*`, and `/api/analytics/*` remain public in the backend. Stock research, Bitcoin chat, `/api/stocks/*`, and `/api/bitcoin/*` allow unauthenticated demo-mode responses and use live providers only after valid app credentials are supplied. Admin, FastAPI docs/OpenAPI JSON, and other `/api/*` routes are protected. Protected routes return `503` if `APP_AUTH_PASSWORD` is missing, so set the same `APP_AUTH_USERNAME` and `APP_AUTH_PASSWORD` values in Railway to keep direct backend access usable and protected.
+The backend mirrors the same auth model for protected API docs, `/api/*` routes, and locally served app folders. Poker, craps, craps-strategy, blackjack, login, `/api/poker/*`, `/api/craps/*`, and `/api/analytics/*` remain public in the backend. Stock research, Bitcoin chat, the fantasy dashboard, `/api/stocks/*`, `/api/bitcoin/*`, and `/api/fantasy/*` allow unauthenticated demo-mode responses and use live providers only after valid app credentials are supplied. Admin, FastAPI docs/OpenAPI JSON, and other `/api/*` routes are protected. Protected routes return `503` if `APP_AUTH_PASSWORD` is missing, so set the same `APP_AUTH_USERNAME` and `APP_AUTH_PASSWORD` values in Railway to keep direct backend access usable and protected.
 
 The root Railway deployment uses the root `Dockerfile`, which copies only `backend/`.
 
@@ -89,4 +90,4 @@ This runs the API and active static pages together at:
 http://127.0.0.1:8000
 ```
 
-`LOCAL_SITE_ROOT=true` currently mounts `assets/`, `shared/`, `about/`, `login/`, `stock-research/`, `poker/`, `craps/`, `craps-strategy/`, `blackjack/`, `bitcoin-chat/`, `casino/`, and `admin/` through FastAPI. The local `/docs` path is still FastAPI's generated API docs path; the static website docs page is served by production/static hosting at `/docs/`.
+`LOCAL_SITE_ROOT=true` currently mounts `assets/`, `shared/`, `about/`, `login/`, `stock-research/`, `poker/`, `craps/`, `craps-strategy/`, `blackjack/`, `bitcoin-chat/`, `fantasy/`, `casino/`, and `admin/` through FastAPI. The local `/docs` path is still FastAPI's generated API docs path; the static website docs page is served by production/static hosting at `/docs/`.
