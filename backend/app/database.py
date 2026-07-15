@@ -134,6 +134,198 @@ class PokerGameState(Base):
     updated_at = Column(DateTime, default=utc_now, onupdate=utc_now, index=True)
 
 
+# ── Fantasy football (spec 16) ──────────────────────────────────────────
+#
+# All tables are prefixed `ff_`. The design keeps two shapes:
+#   * canonical/upsert tables (players, games, actual stats, meta) that
+#     hold the current best-known value, and
+#   * snapshot tables (projections, rankings, trending) whose rows are
+#     never overwritten — each collector run appends a fresh set so history
+#     (projection drift, rank changes) is a query over `fetched_at`.
+# "Latest" for a snapshot table = rows of the newest successful
+# FantasyCollectionRun for that (job, season, week). Betting/odds snapshot
+# tables are added in a later phase.
+
+
+class FantasyPlayer(Base):
+    __tablename__ = "ff_players"
+
+    # Sleeper's player_id is the canonical key site-wide; the other id
+    # columns are the free crosswalk to nflverse (gsis_id) and others.
+    player_id = Column(String, primary_key=True, index=True)
+    full_name = Column(String, index=True)
+    first_name = Column(String, nullable=True)
+    last_name = Column(String, nullable=True)
+    search_name = Column(String, index=True)  # normalized for name matching
+    team = Column(String, nullable=True, index=True)
+    position = Column(String, nullable=True, index=True)
+    status = Column(String, nullable=True)  # Active, Inactive, ...
+    injury_status = Column(String, nullable=True)
+    age = Column(Integer, nullable=True)
+    years_exp = Column(Integer, nullable=True)
+    gsis_id = Column(String, nullable=True, index=True)
+    espn_id = Column(String, nullable=True)
+    yahoo_id = Column(String, nullable=True)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
+
+
+class FantasyCollectionRun(Base):
+    __tablename__ = "ff_collection_runs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    job = Column(String, index=True)  # players|state|projections|rankings|...
+    source = Column(String, nullable=True)
+    season = Column(Integer, nullable=True)
+    week = Column(Integer, nullable=True)
+    started_at = Column(DateTime, default=utc_now, index=True)
+    finished_at = Column(DateTime, nullable=True)
+    status = Column(String, index=True)  # success|partial|error|skipped
+    rows_written = Column(Integer, default=0)
+    credits_used = Column(Integer, default=0)  # Odds API budget accounting
+    detail = Column(Text, nullable=True)
+
+
+class FantasyProjection(Base):
+    __tablename__ = "ff_projections"
+
+    id = Column(Integer, primary_key=True, index=True)
+    run_id = Column(Integer, index=True)
+    season = Column(Integer, index=True)
+    week = Column(Integer, index=True)
+    source = Column(String)  # sleeper|fantasypros|espn
+    player_id = Column(String, index=True)
+    pts_ppr = Column(Float, nullable=True)
+    pts_half_ppr = Column(Float, nullable=True)
+    pts_std = Column(Float, nullable=True)
+    stats_json = Column(Text, nullable=True)  # component stats (pass_yd, ...)
+    fetched_at = Column(DateTime, default=utc_now, index=True)
+
+
+class FantasyRanking(Base):
+    __tablename__ = "ff_rankings"
+
+    id = Column(Integer, primary_key=True, index=True)
+    run_id = Column(Integer, index=True)
+    season = Column(Integer, index=True)
+    week = Column(Integer, nullable=True, index=True)  # NULL = seasonal
+    source = Column(String)  # fantasypros|derived
+    scoring = Column(String)  # ppr|half|std
+    position = Column(String, index=True)  # QB..DST|FLEX|ALL
+    player_id = Column(String, index=True)
+    rank = Column(Integer)
+    ecr = Column(Float, nullable=True)  # expert consensus (FantasyPros)
+    rank_min = Column(Integer, nullable=True)
+    rank_max = Column(Integer, nullable=True)
+    tier = Column(Integer, nullable=True)
+    fetched_at = Column(DateTime, default=utc_now, index=True)
+
+
+class FantasyGame(Base):
+    __tablename__ = "ff_games"
+
+    game_id = Column(String, primary_key=True, index=True)  # nflverse game_id
+    season = Column(Integer, index=True)
+    week = Column(Integer, index=True)
+    game_type = Column(String, nullable=True)  # REG, POST, ...
+    kickoff = Column(DateTime, nullable=True)
+    home_team = Column(String, nullable=True)
+    away_team = Column(String, nullable=True)
+    home_score = Column(Integer, nullable=True)
+    away_score = Column(Integer, nullable=True)
+    odds_event_id = Column(String, nullable=True, index=True)  # The Odds API id
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
+
+
+class FantasyPlayerStat(Base):
+    __tablename__ = "ff_player_stats"
+
+    # Actuals — upsert (unique per season/week/player), not snapshotted.
+    id = Column(Integer, primary_key=True, index=True)
+    season = Column(Integer, index=True)
+    week = Column(Integer, index=True)
+    player_id = Column(String, index=True)
+    team = Column(String, nullable=True)
+    position = Column(String, nullable=True)
+    opponent = Column(String, nullable=True)
+    stats_json = Column(Text, nullable=True)
+    fantasy_points_ppr = Column(Float, nullable=True)
+    fantasy_points_half = Column(Float, nullable=True)
+    fantasy_points_std = Column(Float, nullable=True)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
+
+
+class FantasyTrendingSnapshot(Base):
+    __tablename__ = "ff_trending_snapshots"
+
+    id = Column(Integer, primary_key=True, index=True)
+    run_id = Column(Integer, index=True)
+    kind = Column(String, index=True)  # add|drop
+    player_id = Column(String, index=True)
+    count = Column(Integer, nullable=True)  # adds/drops in the lookback window
+    fetched_at = Column(DateTime, default=utc_now, index=True)
+
+
+class FantasyOddsSnapshot(Base):
+    __tablename__ = "ff_odds_snapshots"
+
+    # Game lines time series. One row per bookmaker/market/outcome per fetch,
+    # so line movement is a query ordered by fetched_at.
+    id = Column(Integer, primary_key=True, index=True)
+    run_id = Column(Integer, index=True)
+    fetched_at = Column(DateTime, default=utc_now, index=True)
+    event_id = Column(String, index=True)  # The Odds API event id
+    game_id = Column(String, nullable=True, index=True)  # matched ff_games
+    commence_time = Column(DateTime, nullable=True)
+    home_team = Column(String, nullable=True)  # abbr when mapped, else raw
+    away_team = Column(String, nullable=True)
+    bookmaker = Column(String)
+    market = Column(String)  # h2h|spreads|totals
+    outcome = Column(String)  # team or Over/Under
+    price = Column(Integer, nullable=True)  # American odds
+    point = Column(Float, nullable=True)
+
+
+class FantasyPropSnapshot(Base):
+    __tablename__ = "ff_prop_snapshots"
+
+    id = Column(Integer, primary_key=True, index=True)
+    run_id = Column(Integer, index=True)
+    fetched_at = Column(DateTime, default=utc_now, index=True)
+    event_id = Column(String, index=True)
+    game_id = Column(String, nullable=True, index=True)
+    # player_id is nullable: unmatched names are kept (with the raw name) so
+    # no collected data is dropped; an admin view can list the misses.
+    player_id = Column(String, nullable=True, index=True)
+    player_name_raw = Column(String)
+    bookmaker = Column(String)
+    market = Column(String)  # player_pass_yds|player_rush_yds|...
+    outcome = Column(String)  # Over|Under|Yes
+    price = Column(Integer, nullable=True)
+    point = Column(Float, nullable=True)
+
+
+class FantasyFutureSnapshot(Base):
+    __tablename__ = "ff_futures_snapshots"
+
+    id = Column(Integer, primary_key=True, index=True)
+    run_id = Column(Integer, index=True)
+    fetched_at = Column(DateTime, default=utc_now, index=True)
+    market_key = Column(String, index=True)  # ..._super_bowl_winner, etc.
+    bookmaker = Column(String)
+    outcome = Column(String)  # team name
+    price = Column(Integer, nullable=True)
+
+
+class FantasyMeta(Base):
+    __tablename__ = "ff_meta"
+
+    # Small key/value store: cached NFL state, per-job next-due schedule,
+    # Odds API x-requests-remaining, etc.
+    key = Column(String, primary_key=True)
+    value = Column(Text, nullable=True)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
+
+
 def get_db():
     db = SessionLocal()
     try:

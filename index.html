@@ -191,6 +191,8 @@
             object-fit: cover;
             object-position: top center;
         }
+        .card .thumb--ph { display: grid; place-items: center; background: linear-gradient(135deg, var(--surface), var(--bg)); }
+        .card .thumb-ph { font-size: 3.4rem; line-height: 1; filter: saturate(0.9); }
         .card .pad { padding: 20px 20px 22px; display: flex; flex-direction: column; flex: 1; }
         .card .ey {
             font-size: 0.74rem;
@@ -484,6 +486,19 @@
                             <p>Ask about block height, mempool, and fees in plain English — answers come back as structured cards from read-only Bitcoin Core RPC plus mempool.space context.</p>
                             <div class="card-meta"><span>Read-only RPC</span><span>Plain English</span></div>
                             <a class="go" href="/bitcoin-chat/">Open →</a>
+                        </div>
+                    </article>
+
+                    <article class="card" data-c="fantasy">
+                        <a class="thumb thumb--ph" href="/fantasy/" aria-label="Open Fantasy Football">
+                            <span class="thumb-ph" aria-hidden="true">🏈</span>
+                        </a>
+                        <div class="pad">
+                            <span class="ey">NFL fantasy</span>
+                            <h3>Fantasy Football</h3>
+                            <p>Weekly rankings and point projections by position, plus trending adds and drops — collected from free public data (Sleeper, nflverse) into the shared FastAPI backend.</p>
+                            <div class="card-meta"><span>Weekly rankings</span><span>Free data</span></div>
+                            <a class="go" href="/fantasy/">Open →</a>
                         </div>
                     </article>
 

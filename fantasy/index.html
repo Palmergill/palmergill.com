@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fantasy Football Dashboard</title>
+    <meta name="description" content="NFL fantasy football dashboard — weekly rankings and point projections by position, plus trending adds and drops. By Palmer Gill.">
+    <meta name="theme-color" content="#faf6f0">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://palmergill.com/fantasy/">
+    <meta property="og:title" content="Fantasy Football Dashboard — Palmer Gill">
+    <meta property="og:description" content="NFL fantasy football rankings, projections, and trends from free public data.">
+    <meta property="og:image" content="https://palmergill.com/assets/palmer-gill-logo.png">
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="Fantasy Football Dashboard — Palmer Gill">
+    <meta name="twitter:description" content="NFL fantasy football rankings, projections, and trends from free public data.">
+    <link rel="icon" type="image/png" href="/assets/palmer-gill-logo-small.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/shared/site-nav.css?v=12">
+    <link rel="stylesheet" href="style.css?v=2">
+</head>
+<body>
+    <main class="app-shell">
+        <header class="page-head">
+            <div class="page-head__titles">
+                <span class="eyebrow">NFL fantasy</span>
+                <h1>Fantasy Football Dashboard</h1>
+                <p class="lede">Weekly rankings and point projections by position, from free public data.</p>
+            </div>
+            <div class="week-badge" id="weekBadge" aria-live="polite">
+                <span class="week-badge__label">Week</span>
+                <span class="week-badge__value" id="weekValue">—</span>
+                <span class="week-badge__season" id="seasonValue"></span>
+            </div>
+        </header>
+
+        <p id="offseasonBanner" class="banner" hidden></p>
+        <p id="errorBanner" class="banner banner--error" hidden></p>
+
+        <section class="chat" aria-label="Fantasy assistant">
+            <div class="chat__head">
+                <h2>Ask the fantasy assistant</h2>
+                <span class="chat__note">Answers use only the data on this page.</span>
+            </div>
+            <div id="chatMessages" class="chat__messages" aria-live="polite">
+                <div class="chat__starts" id="chatStarts">
+                    <button type="button" class="chat-chip" data-prompt="Who are the top 10 PPR running backs this week?">Top 10 PPR RBs</button>
+                    <button type="button" class="chat-chip" data-prompt="Compare Josh Allen and Jalen Hurts.">Compare two QBs</button>
+                    <button type="button" class="chat-chip" data-prompt="Who's trending on waivers right now?">Waiver trends</button>
+                    <button type="button" class="chat-chip" data-prompt="What are the Super Bowl futures?">Super Bowl futures</button>
+                </div>
+            </div>
+            <form id="chatForm" class="chat__composer">
+                <label class="sr-only" for="chatInput">Ask a fantasy question</label>
+                <textarea id="chatInput" rows="1" maxlength="1000" placeholder="Ask about rankings, a player, props, or lines…" required></textarea>
+                <button type="submit" aria-label="Send message">↑</button>
+            </form>
+        </section>
+
+        <section class="board" aria-label="Rankings">
+            <div class="board__controls">
+                <div class="chip-row" id="positionChips" role="group" aria-label="Position"></div>
+                <div class="chip-row chip-row--scoring" id="scoringChips" role="group" aria-label="Scoring format"></div>
+            </div>
+            <div class="board__meta">
+                <span id="rankingsSource" class="board__source"></span>
+                <span id="rankingsAsOf" class="board__asof"></span>
+            </div>
+            <div class="table-wrap">
+                <table class="rank-table" id="rankTable">
+                    <thead>
+                        <tr>
+                            <th scope="col" class="col-rank">#</th>
+                            <th scope="col" class="col-player">Player</th>
+                            <th scope="col" class="col-pos">Pos</th>
+                            <th scope="col" class="col-team">Team</th>
+                            <th scope="col" class="col-proj">Proj</th>
+                        </tr>
+                    </thead>
+                    <tbody id="rankBody">
+                        <tr><td colspan="5" class="table-empty">Loading rankings…</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <section class="betting" id="gamesSection" aria-label="Game lines" hidden>
+            <div class="section-head">
+                <h2>Game lines</h2>
+                <span class="section-note" id="gamesAsOf"></span>
+            </div>
+            <div class="games-strip" id="gamesStrip"></div>
+            <p class="betting-disclaimer">Odds are shown for information only — not betting advice.</p>
+        </section>
+
+        <section class="betting" id="propsSection" aria-label="Player props" hidden>
+            <div class="section-head">
+                <h2>Player props</h2>
+                <span class="section-note" id="propsAsOf"></span>
+            </div>
+            <div class="chip-row" id="propGameTabs" role="group" aria-label="Featured game"></div>
+            <div id="propsBoard"></div>
+        </section>
+
+        <section class="betting" id="futuresSection" aria-label="Season futures" hidden>
+            <div class="section-head">
+                <h2>Season futures</h2>
+                <span class="section-note" id="futuresAsOf"></span>
+            </div>
+            <div class="chip-row" id="futuresTabs" role="group" aria-label="Futures market"></div>
+            <table class="rank-table futures-table">
+                <thead><tr><th class="col-rank">#</th><th>Outcome</th><th class="col-proj">Odds</th></tr></thead>
+                <tbody id="futuresBody"></tbody>
+            </table>
+        </section>
+
+        <section class="trending" aria-label="Trending players">
+            <div class="trending__col">
+                <h2 class="trending__title">📈 Trending adds</h2>
+                <ol class="trending__list" id="trendingAdd"><li class="trending__empty">—</li></ol>
+            </div>
+            <div class="trending__col">
+                <h2 class="trending__title">📉 Trending drops</h2>
+                <ol class="trending__list" id="trendingDrop"><li class="trending__empty">—</li></ol>
+            </div>
+        </section>
+    </main>
+
+    <!-- Player detail slide-over -->
+    <div class="drawer" id="playerDrawer" hidden>
+        <div class="drawer__backdrop" id="drawerBackdrop"></div>
+        <aside class="drawer__panel" role="dialog" aria-modal="true" aria-labelledby="drawerName">
+            <button type="button" class="drawer__close" id="drawerClose" aria-label="Close player details">×</button>
+            <header class="drawer__head">
+                <h2 id="drawerName">—</h2>
+                <p class="drawer__sub" id="drawerSub"></p>
+            </header>
+            <div class="drawer__body" id="drawerBody">
+                <p class="drawer__loading">Loading…</p>
+            </div>
+        </aside>
+    </div>
+
+    <script src="/shared/site-nav.js?v=12"></script>
+    <script src="/shared/analytics.js?v=1"></script>
+    <script src="/shared/api-base.js?v=1"></script>
+    <script src="format.js?v=2"></script>
+    <script src="chat.js?v=1"></script>
+    <script src="app.js?v=2"></script>
+</body>
+</html>

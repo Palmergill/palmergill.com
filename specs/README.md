@@ -18,6 +18,9 @@ One spec per roadmap item. Status legend: `draft` → `accepted` → `in progres
   `prefers-color-scheme`, poker gameplay depth (tournaments, better AI),
   extending the casino-math hub to games the site doesn't have yet
   (roulette math without building roulette).
+- **Spec 16 added Jul 2026:** fantasy football dashboard, a net-new app
+  spanning Q3→Q4 using the roadmap's stated slack. Timed to the NFL
+  season (kickoff early Sep).
 
 ## Q3 2026 (Jul–Sep) — Finish what's in flight, stabilize
 
@@ -28,6 +31,7 @@ One spec per roadmap item. Status legend: `draft` → `accepted` → `in progres
 | 3 | [Repo & tracker cleanup](q3-03-repo-cleanup.md) | shipped |
 | 4 | [Backend test baseline](q3-04-backend-test-baseline.md) | shipped |
 | 5 | [Casino shell unification](q4-05-casino-shell-unification.md) | in progress — header/lobby/rebuy/responsive fixes shipped, chip/card CSS consolidation remains |
+| 16 | [Fantasy football dashboard](q3-16-fantasy-football-dashboard.md) | in progress — P1–P4 built (data, UI, betting, chat); needs live OpenAI/Odds keys for prod verification |
 
 ## Q4 2026 (Oct–Dec) — Casino as a coherent product
 

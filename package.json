@@ -21,7 +21,8 @@
       "craps/tests",
       "blackjack/tests",
       "craps-strategy/tests",
-      "shared/tests"
+      "shared/tests",
+      "fantasy/tests"
     ],
     "testMatch": [
       "**/*.test.js"
@@ -30,9 +31,11 @@
       "poker/**/*.js",
       "craps-strategy/**/*.js",
       "shared/*.js",
+      "fantasy/*.js",
       "!craps-strategy/tests/**",
       "!poker/tests/**",
       "!shared/tests/**",
+      "!fantasy/tests/**",
       "!**/node_modules/**"
     ]
   }

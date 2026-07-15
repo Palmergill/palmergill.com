@@ -17,7 +17,7 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTex
 from app.database import SessionLocal
 from app.database_migration import init_db_with_migration
 from app.log_handler import install_db_logging
-from app.routers import admin, analytics, bitcoin, stocks, poker, craps
+from app.routers import admin, analytics, bitcoin, stocks, poker, craps, fantasy
 from app.routers.analytics import cleanup_old_analytics, record_analytics_event
 import os
 
@@ -42,21 +42,24 @@ async def lifespan(app: FastAPI):
     analytics_cleanup_task = asyncio.create_task(_periodic_retention_cleanup())
     analytics_writer_task = asyncio.create_task(_analytics_writer())
     rate_limit_sweep_task = asyncio.create_task(_periodic_rate_limit_sweep())
+    background_tasks = [
+        cleanup_task,
+        analytics_cleanup_task,
+        analytics_writer_task,
+        rate_limit_sweep_task,
+    ]
+    # Opt-in so local dev / CI don't hit external sports data sources. Set
+    # FANTASY_COLLECTOR_ENABLED=true in the deployed environment.
+    if os.getenv("FANTASY_COLLECTOR_ENABLED", "false").strip().lower() in {"1", "true", "yes", "on"}:
+        background_tasks.append(asyncio.create_task(_periodic_fantasy_collection()))
     try:
         yield
     finally:
-        cleanup_task.cancel()
-        analytics_cleanup_task.cancel()
-        analytics_writer_task.cancel()
-        rate_limit_sweep_task.cancel()
-        with suppress(asyncio.CancelledError):
-            await cleanup_task
-        with suppress(asyncio.CancelledError):
-            await analytics_cleanup_task
-        with suppress(asyncio.CancelledError):
-            await analytics_writer_task
-        with suppress(asyncio.CancelledError):
-            await rate_limit_sweep_task
+        for task in background_tasks:
+            task.cancel()
+        for task in background_tasks:
+            with suppress(asyncio.CancelledError):
+                await task
 
 
 async def _analytics_writer() -> None:
@@ -174,6 +177,30 @@ async def _periodic_retention_cleanup(interval: int = 6 * 60 * 60) -> None:
                 logs_removed,
             )
 
+async def _periodic_fantasy_collection(interval: int = 15 * 60) -> None:
+    """Run due fantasy data-collection jobs every `interval` seconds.
+
+    The scheduler decides which jobs are due from cached NFL state and the
+    per-job next-due timestamps it persists, so this loop just ticks. Each
+    cycle is wrapped in the timeout guard and its own DB session.
+    """
+
+    def _cycle():
+        from app.services import fantasy_collector
+
+        db = SessionLocal()
+        try:
+            return fantasy_collector.run_scheduled(db)
+        finally:
+            db.close()
+
+    while True:
+        await asyncio.sleep(interval)
+        summaries = await _run_with_timeout("fantasy collection", _cycle, timeout=600)
+        if summaries:
+            logger.info("Fantasy collection ran %d job(s)", len(summaries))
+
+
 app = FastAPI(title="Palmer Gill API", version="0.2.0-p5", lifespan=lifespan)
 
 AUTH_REALM = "Palmer Gill Apps"
@@ -208,8 +235,10 @@ PUBLIC_PATH_PREFIXES = (
 DEMO_PATH_PREFIXES = (
     "/api/stocks",
     "/api/bitcoin",
+    "/api/fantasy",
     "/stock-research",
     "/bitcoin-chat",
+    "/fantasy",
 )
 PROTECTED_PATH_PREFIXES = (
     "/docs",
@@ -684,6 +713,7 @@ app.include_router(bitcoin.router)
 app.include_router(craps.router)
 app.include_router(analytics.router)
 app.include_router(admin.router)
+app.include_router(fantasy.router)
 
 @app.get("/health")
 async def health():
@@ -706,6 +736,7 @@ if local_site_root_enabled:
         "/craps-strategy": "craps-strategy",
         "/blackjack": "blackjack",
         "/bitcoin-chat": "bitcoin-chat",
+        "/fantasy": "fantasy",
         "/casino": "casino",
         "/admin": "admin",
         "/login": "login",
