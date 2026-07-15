@@ -18,7 +18,7 @@ import urllib.parse
 import urllib.request
 from typing import Any, Dict, List, Optional
 
-from app.services.fantasy_common import coerce_float, coerce_int
+from app.services.fantasy_common import SKILL_POSITIONS, coerce_float, coerce_int
 
 
 class SleeperError(Exception):
@@ -68,6 +68,18 @@ class SleeperClient:
         """Weekly projections. Returns normalized rows (see parse_projection_rows)."""
         query = urllib.parse.urlencode({"season_type": season_type})
         data = self._request(f"{self.data_base}/projections/nfl/{season}/{week}?{query}")
+        return parse_projection_rows(data)
+
+    def get_season_projections(self, season: int, season_type: str = "regular") -> List[Dict[str, Any]]:
+        """Full-season projections (the no-week variant of the endpoint).
+
+        Sleeper publishes these for the upcoming season during the offseason;
+        stats hold season totals (e.g. pts_ppr ~350 for a top QB).
+        """
+        params = [("season_type", season_type), ("order_by", "pts_ppr")]
+        params += [("position[]", pos) for pos in SKILL_POSITIONS]
+        query = urllib.parse.urlencode(params)
+        data = self._request(f"{self.data_base}/projections/nfl/{season}?{query}")
         return parse_projection_rows(data)
 
     # ── transport ───────────────────────────────────────────────────────

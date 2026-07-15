@@ -15,6 +15,7 @@
     };
 
     const els = {
+        weekLabel: document.getElementById("weekLabel"),
         weekValue: document.getElementById("weekValue"),
         seasonValue: document.getElementById("seasonValue"),
         offseasonBanner: document.getElementById("offseasonBanner"),
@@ -123,8 +124,8 @@
             scoring: state.scoring,
             limit: "100",
         });
-        if (state.season) params.set("season", state.season);
-        if (state.week) params.set("week", state.week);
+        if (state.season != null) params.set("season", state.season);
+        if (state.week != null) params.set("week", state.week); // 0 = season-long
 
         try {
             const data = await fetchJson(`${API_BASE}/rankings?${params.toString()}`);
@@ -383,7 +384,8 @@
         if (player.projection) {
             const proj = player.projection;
             const card = el("div", "drawer-card");
-            card.appendChild(el("h3", "drawer-card__title", `Week ${proj.week} projection`));
+            const projTitle = proj.week === 0 ? `${proj.season} season projection` : `Week ${proj.week} projection`;
+            card.appendChild(el("h3", "drawer-card__title", projTitle));
             const grid = el("div", "proj-grid");
             grid.appendChild(statBlock("PPR", F.formatPoints(proj.pts_ppr)));
             grid.appendChild(statBlock("Half", F.formatPoints(proj.pts_half_ppr)));
@@ -484,16 +486,30 @@
     // ── header / state ──────────────────────────────────────────────────
 
     function renderHeader(data) {
-        state.season = data.default_season || data.season;
-        state.week = data.default_week || data.week;
-        els.weekValue.textContent = state.week != null ? state.week : "—";
-        els.seasonValue.textContent = state.season ? `${state.season} season` : "";
+        state.season = data.default_season != null ? data.default_season : data.season;
+        state.week = data.default_week != null ? data.default_week : data.week;
+        const seasonLong = state.week === 0;
+
+        if (seasonLong) {
+            els.weekLabel.textContent = "Season";
+            els.weekValue.textContent = state.season != null ? state.season : "—";
+            els.seasonValue.textContent = "season-long rankings";
+        } else {
+            els.weekLabel.textContent = "Week";
+            els.weekValue.textContent = state.week != null ? state.week : "—";
+            els.seasonValue.textContent = state.season ? `${state.season} season` : "";
+        }
 
         if (!data.in_season || data.is_fallback) {
-            const season = data.season || "";
-            const showing = state.season && state.week ? `Showing ${state.season} Week ${state.week} data.` : "";
-            els.offseasonBanner.textContent =
-                `It's the NFL offseason${season ? ` (${season})` : ""} — new-season games start in September. ${showing}`.trim();
+            let message;
+            if (seasonLong) {
+                message = `It's the NFL offseason — showing season-long rankings for the upcoming ${state.season} season. Weekly rankings start in September.`;
+            } else {
+                const season = data.season || "";
+                const showing = state.season && state.week ? `Showing ${state.season} Week ${state.week} data.` : "";
+                message = `It's the NFL offseason${season ? ` (${season})` : ""} — new-season games start in September. ${showing}`.trim();
+            }
+            els.offseasonBanner.textContent = message;
             els.offseasonBanner.hidden = false;
         }
     }

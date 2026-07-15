@@ -50,15 +50,28 @@ PROJECTIONS = [
 ]
 
 
+SEASON_PROJECTIONS = [
+    {"player_id": "100", "stats": {"pts_ppr": 360.0, "pts_half_ppr": 360.0, "pts_std": 360.0}},
+    {"player_id": "200", "stats": {"pts_ppr": 310.0, "pts_half_ppr": 290.0, "pts_std": 270.0}},
+    {"player_id": "300", "stats": {"pts_ppr": 280.0, "pts_half_ppr": 260.0, "pts_std": 240.0}},
+]
+
+
 class FakeSleeper:
+    def __init__(self, state=None):
+        self._state = state or {"season": "2025", "week": 3, "season_type": "regular"}
+
     def get_players(self):
         return PLAYERS_DUMP
 
     def get_state(self):
-        return {"season": "2025", "week": 3, "season_type": "regular"}
+        return self._state
 
     def get_projections(self, season, week, season_type="regular"):
         return parse_projection_rows(PROJECTIONS)
+
+    def get_season_projections(self, season, season_type="regular"):
+        return parse_projection_rows(SEASON_PROJECTIONS)
 
     def get_trending(self, kind, lookback_hours=24, limit=25):
         return [{"player_id": "300", "count": 500}] if kind == "add" else []
@@ -89,6 +102,57 @@ def test_state_reports_season_and_jobs():
     assert body["default_week"] == 3
     job_names = {j["job"] for j in body["jobs"]}
     assert {"players", "projections", "rankings"} <= job_names
+
+
+def _seed_offseason():
+    """Re-seed as the 2026 offseason: off state + week-0 season-long rankings."""
+    session = SessionLocal()
+    for model in FF_MODELS:
+        session.query(model).delete()
+    session.commit()
+    fake = FakeSleeper(state={"season": "2026", "week": 0, "season_type": "off", "display_week": 0})
+    fc.collect_state(session, client=fake)
+    fc.collect_players(session, client=fake)
+    fc.collect_projections(session, 2026, fc.SEASON_LONG_WEEK, client=fake)
+    fc.build_derived_rankings(session, 2026, fc.SEASON_LONG_WEEK)
+    session.close()
+
+
+def test_offseason_defaults_to_upcoming_season_long_rankings():
+    _seed_offseason()
+
+    state = client.get("/api/fantasy/state").json()
+    assert state["in_season"] is False
+    assert state["default_season"] == 2026
+    assert state["default_week"] == 0  # season-long view
+    assert state["is_fallback"] is False
+
+    rankings = client.get("/api/fantasy/rankings").json()
+    assert rankings["season"] == 2026
+    assert rankings["week"] == 0
+    assert [r["player_id"] for r in rankings["rankings"]] == ["100", "200", "300"]
+    # Season-long points, not weekly-sized numbers.
+    assert rankings["rankings"][0]["projected_points"] == 360.0
+
+    detail = client.get("/api/fantasy/players/100").json()
+    assert detail["projection"]["season"] == 2026
+    assert detail["projection"]["week"] == 0
+
+
+def test_offseason_without_season_long_snapshot_falls_back_to_last_season():
+    # Seeded 2025 wk3 data exists; flip the state to the 2026 offseason
+    # without collecting a season-long snapshot.
+    session = SessionLocal()
+    fc.collect_state(
+        session,
+        client=FakeSleeper(state={"season": "2026", "week": 0, "season_type": "off", "display_week": 0}),
+    )
+    session.close()
+
+    state = client.get("/api/fantasy/state").json()
+    assert state["default_season"] == 2025
+    assert state["default_week"] == 3
+    assert state["is_fallback"] is True
 
 
 def test_rankings_default_week_and_position_filter():

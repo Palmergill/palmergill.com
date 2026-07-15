@@ -118,9 +118,12 @@ everything fetched is persisted as timestamped snapshots so history
   first snapshot of the week; futures table with top ~15 outcomes per
   market and price history on demand.
 - **R13. Offseason behavior is explicit, not broken:** when `season_type`
-  is off/pre, the page defaults to the last completed season's data with a
-  banner ("2026 season starts Sep — showing 2025 data"), and futures (live
-  year-round) lead the page.
+  is off/pre, the page defaults to season-long rankings for the upcoming
+  season (Sleeper's full-year projections, stored as week 0) with a banner
+  ("showing season-long rankings for the upcoming 2026 season"), and
+  futures (live year-round) lead the page. If no season-long snapshot has
+  been collected yet, fall back to the most recent snapshot (e.g. the last
+  completed season's final week).
 
 ### Chat
 

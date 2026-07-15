@@ -65,6 +65,7 @@ Expected behavior:
 - Answer with concise Markdown: short paragraphs, bullets for grouped facts, bold labels for key values.
 - Use the tools for every factual claim. Never invent players, ranks, projections, or odds.
 - Attribute figures to their source and freshness, e.g. "Week 3 Sleeper projection (as of Sep 20)" or "DraftKings line". Rankings from the tools may be an expert consensus or derived from projections — say which (the tool tells you via `source`).
+- A week of 0 in tool results means season-long (full-year) data — the default during the offseason. Call it e.g. "2026 season-long projection", never "Week 0".
 - If the data is missing or stale, say so plainly instead of guessing.
 - Only answer NFL fantasy football questions (including the collected betting data). For anything else, refuse briefly and invite a fantasy question.
 
@@ -76,7 +77,7 @@ Hard boundaries:
 TOOL_SCHEMAS = [
     {
         "type": "function", "name": "get_nfl_state", "strict": True,
-        "description": "Get the current NFL season, week, and season type, and which season/week the collected data is showing.",
+        "description": "Get the current NFL season, week, and season type, and which season/week the collected data is showing (week 0 = season-long, the offseason default).",
         "parameters": {"type": "object", "properties": {}, "required": [], "additionalProperties": False},
     },
     {
@@ -99,7 +100,7 @@ TOOL_SCHEMAS = [
             "properties": {
                 "position": {"type": "string", "enum": ["ALL", "QB", "RB", "WR", "TE", "FLEX", "K", "DST"]},
                 "scoring": {"type": "string", "enum": ["ppr", "half", "std"]},
-                "week": {"type": ["integer", "null"], "description": "Week number, or null for the current/default week."},
+                "week": {"type": ["integer", "null"], "description": "Week number, 0 for season-long rankings, or null for the current/default view (season-long during the offseason)."},
                 "limit": {"type": "integer", "minimum": 1, "maximum": 25},
             },
             "required": ["position", "scoring", "week", "limit"], "additionalProperties": False,
@@ -370,7 +371,12 @@ def _rankings_answer(data: Dict[str, Any]) -> str:
     if not players:
         return "I don't have rankings collected for that yet."
     label = data.get("position", "ALL")
-    lines = [f"**Top {label} ({data.get('scoring', 'ppr').upper()}) — Week {data.get('week')}:**", ""]
+    when = (
+        f"{data.get('season')} season-long"
+        if data.get("week") == 0
+        else f"Week {data.get('week')}"
+    )
+    lines = [f"**Top {label} ({data.get('scoring', 'ppr').upper()}) — {when}:**", ""]
     for p in players:
         proj = p.get("proj")
         proj_text = f" — {proj:.1f} pts" if isinstance(proj, (int, float)) else ""
@@ -389,7 +395,8 @@ def _player_answer(data: Dict[str, Any]) -> str:
         lines.append(f"- Injury: {data['injury_status']}")
     proj = data.get("projection")
     if proj:
-        lines.append(f"- Week {proj.get('week')} projection: **{_fmt(proj.get('pts_ppr'))} PPR** / {_fmt(proj.get('pts_half_ppr'))} half / {_fmt(proj.get('pts_std'))} std")
+        when = f"{proj.get('season')} season" if proj.get("week") == 0 else f"Week {proj.get('week')}"
+        lines.append(f"- {when} projection: **{_fmt(proj.get('pts_ppr'))} PPR** / {_fmt(proj.get('pts_half_ppr'))} half / {_fmt(proj.get('pts_std'))} std")
     games = data.get("recent_games", [])
     if games:
         recent = ", ".join(f"{_fmt(g.get('fantasy_points_ppr'))}" for g in games)

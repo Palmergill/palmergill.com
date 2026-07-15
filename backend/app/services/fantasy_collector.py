@@ -74,6 +74,11 @@ JOB_INTERVALS_SECONDS = {
 _STATE_META_KEY = "nfl_state"
 _DUE_META_PREFIX = "due:"
 
+# Week sentinel for season-long (full-year) snapshots. During the offseason
+# the scheduler collects season-long projections for the upcoming season and
+# stores them under week 0; in-season snapshots use the real week number.
+SEASON_LONG_WEEK = 0
+
 
 # ── meta key/value helpers ──────────────────────────────────────────────
 
@@ -280,10 +285,14 @@ def collect_trending(db: Session, client=None) -> FantasyCollectionRun:
 def collect_projections(
     db: Session, season: int, week: int, client=None
 ) -> FantasyCollectionRun:
+    """Snapshot projections. week == SEASON_LONG_WEEK means full-season."""
     client = client or sleeper_client
     run = _start_run(db, "projections", "sleeper", season, week)
     try:
-        rows = client.get_projections(season, week)
+        if week == SEASON_LONG_WEEK:
+            rows = client.get_season_projections(season)
+        else:
+            rows = client.get_projections(season, week)
     except Exception as exc:
         logger.warning("Sleeper projections fetch failed (%s wk %s): %s", season, week, exc)
         return _finish_run(db, run, "error", detail=str(exc))
@@ -732,12 +741,16 @@ def run_scheduled(db: Session, now: Optional[datetime] = None) -> List[Dict[str,
         summaries.append(_summary(collect_trending(db)))
         _mark_next_due(db, "trending", now, in_season)
 
-    if season and week and _job_due(db, "projections", now):
-        proj_run = collect_projections(db, season, week)
+    # In-season: weekly projections for the current week. Offseason: Sleeper
+    # publishes full-season projections for the upcoming season instead, so
+    # collect those (stored as week 0) and the rankings UI shows season-long.
+    proj_week = week if in_season else SEASON_LONG_WEEK
+    if season and _job_due(db, "projections", now):
+        proj_run = collect_projections(db, season, proj_week)
         summaries.append(_summary(proj_run))
         _mark_next_due(db, "projections", now, in_season)
         # Rankings are derived from the snapshot we just took.
-        summaries.append(_summary(build_derived_rankings(db, season, week)))
+        summaries.append(_summary(build_derived_rankings(db, season, proj_week)))
 
     # Betting jobs. They self-skip when ODDS_API_KEY is unset or the monthly
     # budget is spent. Futures are live year-round; lines/props only in-season
@@ -759,6 +772,8 @@ def run_job(db: Session, job: str) -> FantasyCollectionRun:
     """Run a single named job on demand (admin refresh). Uses current state."""
     ctx = current_season_week(db)
     season, week = ctx["season"], ctx["week"]
+    if not is_in_season(ctx["season_type"]):
+        week = SEASON_LONG_WEEK  # offseason -> season-long snapshots
     if job == "state":
         return collect_state(db)
     if job == "players":
@@ -774,12 +789,12 @@ def run_job(db: Session, job: str) -> FantasyCollectionRun:
             raise ValueError("no season known — run the state job first")
         return collect_weekly_stats(db, season)
     if job == "projections":
-        if not (season and week):
-            raise ValueError("no season/week known — run the state job first")
+        if not season:
+            raise ValueError("no season known — run the state job first")
         return collect_projections(db, season, week)
     if job == "rankings":
-        if not (season and week):
-            raise ValueError("no season/week known — run the state job first")
+        if not season:
+            raise ValueError("no season known — run the state job first")
         return build_derived_rankings(db, season, week)
     if job == "odds_lines":
         return collect_odds_lines(db)

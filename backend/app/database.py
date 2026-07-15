@@ -191,7 +191,7 @@ class FantasyProjection(Base):
     id = Column(Integer, primary_key=True, index=True)
     run_id = Column(Integer, index=True)
     season = Column(Integer, index=True)
-    week = Column(Integer, index=True)
+    week = Column(Integer, index=True)  # 0 = season-long
     source = Column(String)  # sleeper|fantasypros|espn
     player_id = Column(String, index=True)
     pts_ppr = Column(Float, nullable=True)
@@ -207,7 +207,7 @@ class FantasyRanking(Base):
     id = Column(Integer, primary_key=True, index=True)
     run_id = Column(Integer, index=True)
     season = Column(Integer, index=True)
-    week = Column(Integer, nullable=True, index=True)  # NULL = seasonal
+    week = Column(Integer, nullable=True, index=True)  # 0 = season-long
     source = Column(String)  # fantasypros|derived
     scoring = Column(String)  # ppr|half|std
     position = Column(String, index=True)  # QB..DST|FLEX|ALL

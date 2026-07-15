@@ -45,10 +45,11 @@ def db():
 
 
 class FakeSleeper:
-    def __init__(self, players=None, state=None, projections=None, trending=None):
+    def __init__(self, players=None, state=None, projections=None, trending=None, season_projections=None):
         self._players = players or {}
         self._state = state or {"season": "2025", "week": 3, "season_type": "regular"}
         self._projections = projections or []
+        self._season_projections = season_projections or []
         self._trending = trending or {"add": [], "drop": []}
 
     def get_players(self):
@@ -59,6 +60,9 @@ class FakeSleeper:
 
     def get_projections(self, season, week, season_type="regular"):
         return parse_projection_rows(self._projections)
+
+    def get_season_projections(self, season, season_type="regular"):
+        return parse_projection_rows(self._season_projections)
 
     def get_trending(self, kind, lookback_hours=24, limit=25):
         return self._trending[kind]
@@ -298,3 +302,54 @@ def test_run_scheduled_runs_due_jobs_and_sets_next_due(db, monkeypatch):
 
     # Everything is now marked not-due, so a second immediate cycle is a no-op.
     assert fc.run_scheduled(db) == []
+
+
+def test_run_scheduled_offseason_collects_season_long_rankings(db, monkeypatch):
+    """Offseason (season_type=off): the cycle snapshots Sleeper's full-season
+    projections for the upcoming season under week 0 and derives season-long
+    rankings from them, instead of fetching a (nonexistent) weekly slate."""
+    fake_sleeper = FakeSleeper(
+        players=PLAYERS_DUMP,
+        state={"season": "2026", "week": 0, "season_type": "off", "display_week": 0},
+        season_projections=[
+            {"player_id": "100", "stats": {"pts_ppr": 360.0, "pts_half_ppr": 360.0, "pts_std": 360.0}},
+            {"player_id": "200", "stats": {"pts_ppr": 310.0, "pts_half_ppr": 290.0, "pts_std": 270.0}},
+        ],
+    )
+    monkeypatch.setattr(fc, "sleeper_client", fake_sleeper)
+    monkeypatch.setattr(fc, "nflverse_client", FakeNflverse())
+
+    summaries = fc.run_scheduled(db)
+    proj = next(s for s in summaries if s["job"] == "projections")
+    assert (proj["season"], proj["week"], proj["status"]) == (2026, fc.SEASON_LONG_WEEK, "success")
+    assert proj["rows_written"] == 2
+
+    rankings_run = fc.latest_successful_run(db, "rankings", 2026, fc.SEASON_LONG_WEEK)
+    assert rankings_run is not None
+    overall = (
+        db.query(FantasyRanking)
+        .filter_by(run_id=rankings_run.id, scoring="ppr", position="ALL")
+        .order_by(FantasyRanking.rank)
+        .all()
+    )
+    assert [r.player_id for r in overall] == ["100", "200"]
+    # No weekly projection rows were written — only the week-0 snapshot.
+    assert db.query(FantasyProjection).filter(FantasyProjection.week != 0).count() == 0
+
+
+def test_run_job_uses_season_long_week_in_offseason(db, monkeypatch):
+    fake_sleeper = FakeSleeper(
+        players=PLAYERS_DUMP,
+        state={"season": "2026", "week": 0, "season_type": "off", "display_week": 0},
+        season_projections=[
+            {"player_id": "100", "stats": {"pts_ppr": 360.0, "pts_half_ppr": 360.0, "pts_std": 360.0}},
+        ],
+    )
+    monkeypatch.setattr(fc, "sleeper_client", fake_sleeper)
+    fc.collect_state(db, client=fake_sleeper)
+    fc.collect_players(db, client=fake_sleeper)
+
+    run = fc.run_job(db, "projections")
+    assert (run.season, run.week, run.status) == (2026, fc.SEASON_LONG_WEEK, "success")
+    rankings = fc.run_job(db, "rankings")
+    assert (rankings.season, rankings.week, rankings.status) == (2026, fc.SEASON_LONG_WEEK, "success")

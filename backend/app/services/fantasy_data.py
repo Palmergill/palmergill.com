@@ -21,7 +21,12 @@ from app.database import (
     FantasyRanking,
     FantasyTrendingSnapshot,
 )
-from app.services.fantasy_collector import current_season_week, latest_successful_run
+from app.services.fantasy_collector import (
+    SEASON_LONG_WEEK,
+    current_season_week,
+    is_in_season,
+    latest_successful_run,
+)
 from app.services.fantasy_common import (
     SCORING_POINTS_FIELD,
     display_position,
@@ -68,15 +73,21 @@ def _player_public(player: Optional[FantasyPlayer]) -> Dict[str, Any]:
 def default_context(db: Session) -> Dict[str, Any]:
     """Resolve the season/week to show by default.
 
-    Prefers the current NFL week when it already has a rankings snapshot;
-    otherwise falls back to the most recent week that does (e.g. showing the
-    prior completed season during the July–August offseason).
+    In-season, prefers the current NFL week when it already has a rankings
+    snapshot. In the offseason, prefers season-long rankings for the upcoming
+    season (stored as week SEASON_LONG_WEEK). Either way, falls back to the
+    most recent snapshot of any kind (e.g. the prior season's final week).
     """
     ctx = current_season_week(db)
     season, week, season_type = ctx["season"], ctx["week"], ctx["season_type"]
 
-    if season and week and latest_successful_run(db, "rankings", season, week):
-        return {"season": season, "week": week, "season_type": season_type, "is_fallback": False}
+    if is_in_season(season_type):
+        if season and week and latest_successful_run(db, "rankings", season, week):
+            return {"season": season, "week": week, "season_type": season_type, "is_fallback": False}
+    elif season and latest_successful_run(db, "rankings", season, SEASON_LONG_WEEK):
+        # Offseason: Sleeper's state season is the upcoming season, so this is
+        # the season-long view for it — the intended default, not a fallback.
+        return {"season": season, "week": SEASON_LONG_WEEK, "season_type": season_type, "is_fallback": False}
 
     newest = latest_successful_run(db, "rankings")
     if newest is not None:
