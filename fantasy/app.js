@@ -75,6 +75,14 @@
         return node;
     }
 
+    function sleeperLink() {
+        const link = el("a", "source-link", "Sleeper");
+        link.href = "https://sleeper.com/";
+        link.target = "_blank";
+        link.rel = "noopener noreferrer";
+        return link;
+    }
+
     // ── controls ────────────────────────────────────────────────────────
 
     function buildChips() {
@@ -147,7 +155,14 @@
     }
 
     function renderRankings(data) {
-        els.rankingsSource.textContent = data.source ? `source: ${data.source}` : "";
+        els.rankingsSource.innerHTML = "";
+        if (data.source === "derived") {
+            els.rankingsSource.append("Rankings derived from ", sleeperLink(), " projections");
+        } else if (data.source === "sleeper") {
+            els.rankingsSource.append("Projections by ", sleeperLink());
+        } else if (data.source) {
+            els.rankingsSource.textContent = `Source: ${data.source}`;
+        }
         els.rankingsAsOf.textContent = formatAsOf(data.as_of);
         els.rankBody.innerHTML = "";
 
@@ -429,6 +444,16 @@
             grid.appendChild(statBlock("Half", F.formatPoints(proj.pts_half_ppr)));
             grid.appendChild(statBlock("Std", F.formatPoints(proj.pts_std)));
             card.appendChild(grid);
+            const source = el("p", "projection-source");
+            source.append("Projection by ");
+            if (proj.source === "sleeper") {
+                source.appendChild(sleeperLink());
+            } else {
+                source.append(proj.source || "Sleeper");
+            }
+            const asOf = formatAsOf(proj.as_of);
+            if (asOf) source.append(` · ${asOf}`);
+            card.appendChild(source);
             els.drawerBody.appendChild(card);
         }
 

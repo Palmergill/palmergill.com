@@ -264,6 +264,7 @@ def get_player_detail(db: Session, player_id: str) -> Optional[Dict[str, Any]]:
             detail["projection"] = {
                 "season": season,
                 "week": week,
+                "source": proj.source or proj_run.source,
                 "pts_ppr": proj.pts_ppr,
                 "pts_half_ppr": proj.pts_half_ppr,
                 "pts_std": proj.pts_std,

@@ -137,6 +137,7 @@ def test_offseason_defaults_to_upcoming_season_long_rankings():
     detail = client.get("/api/fantasy/players/100").json()
     assert detail["projection"]["season"] == 2026
     assert detail["projection"]["week"] == 0
+    assert detail["projection"]["source"] == "sleeper"
 
 
 def test_offseason_without_season_long_snapshot_falls_back_to_last_season():
@@ -181,6 +182,7 @@ def test_player_detail_known_and_unknown():
     detail = client.get("/api/fantasy/players/200").json()
     assert detail["name"] == "Justin Jefferson"
     assert detail["projection"]["pts_ppr"] == 21.0
+    assert detail["projection"]["source"] == "sleeper"
 
 
 def test_player_news_endpoint(monkeypatch):

@@ -19,7 +19,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/shared/site-nav.css?v=12">
-    <link rel="stylesheet" href="style.css?v=3">
+    <link rel="stylesheet" href="style.css?v=4">
 </head>
 <body>
     <main class="app-shell">
@@ -27,7 +27,10 @@
             <div class="page-head__titles">
                 <span class="eyebrow">NFL fantasy</span>
                 <h1>Fantasy Football Dashboard</h1>
-                <p class="lede">Weekly rankings and point projections by position, from free public data.</p>
+                <p class="lede">
+                    Weekly rankings and point projections by position.
+                    Projections provided by <a class="source-link" href="https://sleeper.com/" target="_blank" rel="noopener noreferrer">Sleeper</a>.
+                </p>
             </div>
             <div class="week-badge" id="weekBadge" aria-live="polite">
                 <span class="week-badge__label" id="weekLabel">Week</span>
@@ -148,6 +151,6 @@
     <script src="/shared/api-base.js?v=1"></script>
     <script src="format.js?v=3"></script>
     <script src="chat.js?v=1"></script>
-    <script src="app.js?v=4"></script>
+    <script src="app.js?v=5"></script>
 </body>
 </html>
