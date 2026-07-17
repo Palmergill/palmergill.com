@@ -631,6 +631,19 @@ async def require_app_auth(request: Request, call_next):
     return auth_challenge(request)
 
 
+@app.get("/login/session")
+async def login_session_status(request: Request):
+    """Return the signed-in identity without exposing the HttpOnly cookie."""
+    config = app_auth_config()
+    authenticated = bool(
+        config and getattr(request.state, "app_auth_authenticated", False)
+    )
+    body = {"authenticated": authenticated}
+    if authenticated:
+        body["username"] = config["username"]
+    return JSONResponse(body, headers={"Cache-Control": "no-store"})
+
+
 @app.post("/login/session")
 async def login_session(request: Request):
     config = app_auth_config()
@@ -657,7 +670,10 @@ async def login_session(request: Request):
         return JSONResponse({"error": "Invalid username or password"}, status_code=401)
 
     clear_auth_failures(request)
-    response = JSONResponse({"ok": True, "redirect": redirect})
+    response = JSONResponse(
+        {"ok": True, "redirect": redirect, "username": config["username"]},
+        headers={"Cache-Control": "no-store"},
+    )
     response.set_cookie(
         SESSION_COOKIE_NAME,
         create_app_session_token(config["username"], config["password"]),

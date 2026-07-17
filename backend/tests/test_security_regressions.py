@@ -730,6 +730,32 @@ def test_login_session_sets_signed_session_cookie(monkeypatch):
     assert protected_response.status_code == 404
 
 
+def test_login_session_status_reports_signed_in_username(monkeypatch):
+    monkeypatch.setenv("APP_AUTH_USERNAME", "palmer")
+    monkeypatch.setenv("APP_AUTH_PASSWORD", "secret")
+    auth_client = TestClient(app)
+
+    signed_out = auth_client.get("/login/session")
+    assert signed_out.status_code == 200
+    assert signed_out.json() == {"authenticated": False}
+    assert signed_out.headers["cache-control"] == "no-store"
+
+    login = auth_client.post(
+        "/login/session",
+        json={"username": "palmer", "password": "secret"},
+    )
+    assert login.status_code == 200
+    assert login.json()["username"] == "palmer"
+
+    signed_in = auth_client.get("/login/session")
+    assert signed_in.status_code == 200
+    assert signed_in.json() == {"authenticated": True, "username": "palmer"}
+
+    logout = auth_client.post("/login/logout")
+    assert logout.status_code == 200
+    assert auth_client.get("/login/session").json() == {"authenticated": False}
+
+
 def test_logout_rejects_get_and_only_clears_session_via_post():
     # A GET endpoint that clears the session cookie is a CSRF vector — any
     # third-party page can trigger it with a plain <img src="/login/logout">.

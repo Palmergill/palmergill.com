@@ -311,8 +311,26 @@ function clearSessionCookie(request) {
 }
 
 async function handleLoginSession(request, username, password) {
+  if (request.method === 'GET') {
+    const authorization = decodeBasicAuth(request.headers.get('authorization'));
+    const basicAuthenticated = Boolean(
+      password &&
+      authorization &&
+      timingSafeEqual(authorization.username, username) &&
+      timingSafeEqual(authorization.password, password)
+    );
+    const authenticated = Boolean(
+      password && (basicAuthenticated || await validSessionCookie(request, username, password))
+    );
+    return jsonResponse(
+      authenticated ? { authenticated: true, username } : { authenticated: false },
+      200,
+      { 'Cache-Control': 'no-store' },
+    );
+  }
+
   if (request.method !== 'POST') {
-    return jsonResponse({ error: 'Method not allowed' }, 405, { Allow: 'POST' });
+    return jsonResponse({ error: 'Method not allowed' }, 405, { Allow: 'GET, POST' });
   }
 
   if (!password) {
@@ -345,9 +363,12 @@ async function handleLoginSession(request, username, password) {
   clearAuthFailures(request);
   const token = await createSessionToken(username, password);
   return jsonResponse(
-    { ok: true, redirect },
+    { ok: true, redirect, username },
     200,
-    { 'Set-Cookie': sessionCookie(token, request) },
+    {
+      'Cache-Control': 'no-store',
+      'Set-Cookie': sessionCookie(token, request),
+    },
   );
 }
 

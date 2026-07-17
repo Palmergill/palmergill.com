@@ -50,7 +50,8 @@
             label: "Login",
             hint: "Protected access",
             href: loginHref,
-            icon: "log-in"
+            icon: "log-in",
+            auth: true
         }
     ];
 
@@ -65,6 +66,8 @@
         "book-open": '<path d="M12 7v14"/><path d="M3 18a2 2 0 0 1 2-2h5a2 2 0 0 1 2 2V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v13Z"/><path d="M21 18a2 2 0 0 0-2-2h-5a2 2 0 0 0-2 2V5a2 2 0 0 1 2-2h5a2 2 0 0 1 2 2v13Z"/>',
         football: '<path d="M4 4c8-1 15 6 16 16-10 1-17-6-16-16Z"/><path d="M9 9l6 6"/><path d="M11 8l1 1"/><path d="M8 11l1 1"/><path d="M14 11l1 1"/><path d="M11 14l1 1"/>',
         "log-in": '<path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><path d="M10 17l5-5-5-5"/><path d="M15 12H3"/>',
+        "log-out": '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/>',
+        "circle-user": '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="10" r="3"/><path d="M6.2 18.4c1.2-2.2 3.1-3.4 5.8-3.4s4.6 1.2 5.8 3.4"/>',
         menu: '<path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h16"/>'
     };
 
@@ -112,6 +115,77 @@
         toggle.setAttribute("aria-label", "Open navigation");
     }
 
+    async function logOut(button) {
+        button.disabled = true;
+        button.setAttribute("aria-busy", "true");
+
+        try {
+            const response = await fetch("/login/logout", {
+                method: "POST",
+                credentials: "same-origin",
+                headers: { "Accept": "application/json" }
+            });
+            if (!response.ok) throw new Error("Unable to log out");
+            window.location.assign(loginHref());
+        } catch {
+            button.disabled = false;
+            button.removeAttribute("aria-busy");
+        }
+    }
+
+    function renderAuthenticatedState(nav, username) {
+        nav.classList.add("is-authenticated");
+        const desktopLogin = nav.querySelector("[data-auth-control]");
+        if (desktopLogin) {
+            const auth = document.createElement("div");
+            auth.className = "site-nav__auth";
+            auth.innerHTML = [
+                '<span class="site-nav__user">',
+                `<span class="site-nav__user-icon">${iconSvg("circle-user")}</span>`,
+                '<span class="site-nav__username"></span>',
+                '</span>',
+                '<button class="site-nav__link site-nav__logout" type="button">',
+                `<span class="site-nav__icon">${iconSvg("log-out")}</span>`,
+                '<span><span class="site-nav__label">Logout</span><span class="site-nav__hint">End session</span></span>',
+                '</button>'
+            ].join("");
+            auth.querySelector(".site-nav__username").textContent = username;
+            auth.querySelector(".site-nav__logout").addEventListener("click", (event) => logOut(event.currentTarget));
+            desktopLogin.replaceWith(auth);
+        }
+
+        const mobileLogin = nav.querySelector("[data-auth-top]");
+        if (mobileLogin) {
+            const mobileLogout = document.createElement("button");
+            mobileLogout.className = "site-nav__top-login site-nav__top-logout";
+            mobileLogout.type = "button";
+            mobileLogout.title = `Log out ${username}`;
+            mobileLogout.setAttribute("aria-label", `Log out ${username}`);
+            mobileLogout.innerHTML = `${iconSvg("log-out")}<span class="site-nav__top-username"></span><span aria-hidden="true">· Logout</span>`;
+            mobileLogout.querySelector(".site-nav__top-username").textContent = username;
+            mobileLogout.addEventListener("click", (event) => logOut(event.currentTarget));
+            mobileLogin.replaceWith(mobileLogout);
+        }
+    }
+
+    async function hydrateAuthState(nav) {
+        try {
+            const response = await fetch("/login/session", {
+                credentials: "same-origin",
+                cache: "no-store",
+                headers: { "Accept": "application/json" }
+            });
+            if (!response.ok) return;
+
+            const session = await response.json();
+            const username = typeof session.username === "string" ? session.username.trim() : "";
+            if (session.authenticated && username) renderAuthenticatedState(nav, username);
+        } catch {
+            // Authentication status is progressive enhancement; keep Login visible
+            // if the status check is unavailable.
+        }
+    }
+
     function init() {
         if (document.querySelector(".site-nav")) return;
 
@@ -124,8 +198,9 @@
         const renderLinks = (navItems) => navItems.map((item) => {
             const href = typeof item.href === "function" ? item.href() : item.href;
             const current = isCurrent(href, item.matches) ? ' aria-current="page"' : "";
+            const auth = item.auth ? ' data-auth-control' : "";
             return [
-                `<a class="site-nav__link" href="${href}" title="${item.label}"${current}>`,
+                `<a class="site-nav__link" href="${href}" title="${item.label}"${current}${auth}>`,
                 `<span class="site-nav__icon">${iconSvg(item.icon)}</span>`,
                 '<span>',
                 `<span class="site-nav__label">${item.label}</span>`,
@@ -143,7 +218,7 @@
             iconSvg("menu"),
             '</button>',
             '<a class="site-nav__mobile-brand" href="/" aria-label="palmergill.com home"><img class="site-nav__mobile-logo" src="/assets/palmer-gill-logo-small.png" alt="" aria-hidden="true"><span><span class="site-nav__mobile-title">Palmergill.com</span><span class="site-nav__mobile-subtitle">Projects and tools</span></span></a>',
-            `<a class="site-nav__top-login" href="${loginHref()}" title="Login">${iconSvg("log-in")}<span>Login</span></a>`,
+            `<a class="site-nav__top-login" data-auth-top href="${loginHref()}" title="Login">${iconSvg("log-in")}<span>Login</span></a>`,
             '<div class="site-nav__backdrop" aria-hidden="true"></div>',
             '<div class="site-nav__panel">',
             '<a class="site-nav__brand" href="/" title="palmergill.com home"><img class="site-nav__brand-logo" src="/assets/palmer-gill-logo-small.png" alt="" aria-hidden="true"><span class="site-nav__brand-name">Palmergill.com</span></a>',
@@ -154,6 +229,7 @@
 
         document.body.prepend(nav);
         ensureFavicon();
+        hydrateAuthState(nav);
 
         const toggle = nav.querySelector(".site-nav__toggle");
         const backdrop = nav.querySelector(".site-nav__backdrop");
