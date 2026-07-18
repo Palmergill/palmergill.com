@@ -4,45 +4,51 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin · Palmer Gill</title>
-    <meta name="theme-color" content="#faf6f0">
+    <meta name="theme-color" content="#17201d">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/shared/site-nav.css?v=13">
-    <link rel="stylesheet" href="/admin/style.css?v=5">
+    <link rel="stylesheet" href="/admin/style.css?v=6">
 </head>
 <body>
     <div class="container">
-        <header>
+        <header class="console-header">
             <div class="header-content">
-                <div>
-                    <h1>Admin</h1>
-                    <span class="subtitle">Traffic, app analytics, and logs</span>
+                <div class="header-copy">
+                    <h1>Operations Console</h1>
                 </div>
                 <div class="header-actions">
-                    <label for="windowSelect">Window</label>
-                    <select id="windowSelect">
-                        <option value="1">1 hour</option>
-                        <option value="24" selected>24 hours</option>
-                        <option value="168">7 days</option>
-                        <option value="720">30 days</option>
-                        <option value="2160">90 days</option>
-                    </select>
-                    <button id="refreshBtn" class="btn">Refresh</button>
+                    <div class="window-control">
+                        <label for="windowSelect">Time window</label>
+                        <select id="windowSelect">
+                            <option value="1">Last hour</option>
+                            <option value="24" selected>Last 24 hours</option>
+                            <option value="168">Last 7 days</option>
+                            <option value="720">Last 30 days</option>
+                            <option value="2160">Last 90 days</option>
+                        </select>
+                    </div>
+                    <button id="refreshBtn" class="btn refresh-btn"><span aria-hidden="true">↻</span> Refresh data</button>
                 </div>
             </div>
         </header>
 
         <main>
-            <nav class="tabs" aria-label="Admin sections">
-                <button class="tab-btn active" data-view="dashboard">Dashboard</button>
-                <button class="tab-btn" data-view="analytics">Analytics</button>
-                <button class="tab-btn" data-view="logs">Logs</button>
+            <nav class="tabs primary-tabs" aria-label="Admin sections">
+                <button class="tab-btn active" data-view="dashboard"><span>01</span> Overview</button>
+                <button class="tab-btn" data-view="analytics"><span>02</span> Analytics</button>
+                <button class="tab-btn" data-view="logs"><span>03</span> Logs</button>
             </nav>
 
             <div id="status" class="status"></div>
 
             <section id="dashboardView" class="view">
+                <div class="section-heading">
+                    <div>
+                        <h2>Overview</h2>
+                    </div>
+                </div>
                 <div class="metric-grid">
                     <article class="metric-card">
                         <span>Page views</span>
@@ -75,7 +81,11 @@
                 </div>
 
                 <section class="panel casino-panel">
-                    <h2>Casino games</h2>
+                    <div class="panel-heading">
+                        <div>
+                            <h2>Casino activity</h2>
+                        </div>
+                    </div>
                     <div class="casino-grid">
                         <article class="casino-card" data-app="poker">
                             <span class="casino-label">Poker</span>
