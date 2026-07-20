@@ -80,6 +80,22 @@ class FakeNflverse:
         return [r for r in self._weekly if r["season"] == season]
 
 
+class FakeFantasyPros:
+    def __init__(self, projections=None):
+        self._projections = projections or []
+
+    def get_projections(self, season, week):
+        return self._projections
+
+
+class FakeEspnProjections:
+    def __init__(self, projections=None):
+        self._projections = projections or []
+
+    def get_projections(self, season, week):
+        return self._projections
+
+
 PLAYERS_DUMP = {
     "100": {
         "full_name": "Patrick Mahomes",
@@ -174,6 +190,98 @@ def test_projections_snapshot_and_latest_resolution(db):
     assert latest.id == run2.id
     # Both snapshots persist (history), 2 rows each.
     assert db.query(FantasyProjection).count() == 4
+
+
+def test_fantasypros_projections_match_players_by_name_and_team(db):
+    _seed_players(db)
+    client = FakeFantasyPros(
+        [
+            {
+                "name": "Patrick Mahomes II",
+                "team": "KC",
+                "position": "QB",
+                "pts_ppr": 27.5,
+                "pts_half_ppr": 27.5,
+                "pts_std": 27.5,
+                "stats": {"points_ppr": 27.5},
+            },
+            {
+                "name": "Unknown Player",
+                "team": "FA",
+                "position": "WR",
+                "pts_ppr": 10,
+                "pts_half_ppr": 9,
+                "pts_std": 8,
+                "stats": {},
+            },
+        ]
+    )
+
+    run = fc.collect_fantasypros_projections(db, 2025, 3, client=client)
+
+    assert run.status == "success"
+    assert run.rows_written == 1
+    projection = db.query(FantasyProjection).filter_by(run_id=run.id).one()
+    assert projection.player_id == "100"
+    assert projection.source == "fantasypros"
+    assert projection.pts_ppr == 27.5
+
+
+def test_fantasypros_projections_normalize_defense_team_aliases(db):
+    db.add(
+        FantasyPlayer(
+            player_id="JAX",
+            full_name="Jacksonville Jaguars",
+            search_name=normalize_name("Jacksonville Jaguars"),
+            team="JAX",
+            position="DEF",
+        )
+    )
+    db.commit()
+    client = FakeFantasyPros(
+        [
+            {
+                "name": "Jacksonville Jaguars",
+                "team": "JAC",
+                "position": "DEF",
+                "pts_ppr": 7.0,
+                "pts_half_ppr": 7.0,
+                "pts_std": 7.0,
+                "stats": {"points": 7.0},
+            }
+        ]
+    )
+
+    run = fc.collect_fantasypros_projections(db, 2025, 3, client=client)
+
+    assert run.status == "success"
+    projection = db.query(FantasyProjection).filter_by(run_id=run.id).one()
+    assert projection.player_id == "JAX"
+
+
+def test_espn_projections_match_players_by_crosswalk_id(db):
+    _seed_players(db)
+    client = FakeEspnProjections(
+        [
+            {
+                "espn_id": "3139477",
+                "name": "Patrick Mahomes",
+                "position": "QB",
+                "pts_ppr": 26.0,
+                "pts_half_ppr": 25.0,
+                "pts_std": 24.0,
+                "stats": {"espn_ppr": 26.0, "espn_standard": 24.0},
+            }
+        ]
+    )
+
+    run = fc.collect_espn_projections(db, 2025, 3, client=client)
+
+    assert run.status == "success"
+    projection = db.query(FantasyProjection).filter_by(run_id=run.id).one()
+    assert projection.player_id == "100"
+    assert projection.source == "espn"
+    assert projection.pts_half_ppr == 25.0
 
 
 def test_derived_rankings_sorted_by_position(db):
@@ -293,6 +401,7 @@ def test_run_scheduled_runs_due_jobs_and_sets_next_due(db, monkeypatch):
     )
     monkeypatch.setattr(fc, "sleeper_client", fake_sleeper)
     monkeypatch.setattr(fc, "nflverse_client", fake_nflverse)
+    monkeypatch.setattr(fc, "espn_projection_client", FakeEspnProjections())
 
     summaries = fc.run_scheduled(db)
     jobs_ran = {s["job"] for s in summaries}
@@ -318,6 +427,7 @@ def test_run_scheduled_offseason_collects_season_long_rankings(db, monkeypatch):
     )
     monkeypatch.setattr(fc, "sleeper_client", fake_sleeper)
     monkeypatch.setattr(fc, "nflverse_client", FakeNflverse())
+    monkeypatch.setattr(fc, "espn_projection_client", FakeEspnProjections())
 
     summaries = fc.run_scheduled(db)
     proj = next(s for s in summaries if s["job"] == "projections")

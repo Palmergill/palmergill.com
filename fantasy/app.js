@@ -12,6 +12,8 @@
         week: null,
         position: "ALL",
         scoring: "ppr",
+        source: "sleeper",
+        sources: [],
         drawerPlayerId: null,
     };
 
@@ -23,6 +25,7 @@
         errorBanner: document.getElementById("errorBanner"),
         positionChips: document.getElementById("positionChips"),
         scoringChips: document.getElementById("scoringChips"),
+        sourceChips: document.getElementById("sourceChips"),
         rankingsSource: document.getElementById("rankingsSource"),
         rankingsAsOf: document.getElementById("rankingsAsOf"),
         rankBody: document.getElementById("rankBody"),
@@ -75,12 +78,20 @@
         return node;
     }
 
-    function sleeperLink() {
-        const link = el("a", "source-link", "Sleeper");
-        link.href = "https://sleeper.com/";
+    function providerLink(provider) {
+        const link = el("a", "source-link", provider.label);
+        link.href = provider.url;
         link.target = "_blank";
         link.rel = "noopener noreferrer";
         return link;
+    }
+
+    function providerFor(sourceId) {
+        return state.sources.find((source) => source.id === sourceId) || {
+            id: sourceId,
+            label: sourceId ? sourceId.replace(/\b\w/g, (char) => char.toUpperCase()) : "Unknown",
+            url: null,
+        };
     }
 
     // ── controls ────────────────────────────────────────────────────────
@@ -121,11 +132,50 @@
         els.scoringChips.querySelectorAll(".chip").forEach((chip) => {
             chip.setAttribute("aria-pressed", String(chip.dataset.scoring === state.scoring));
         });
+        els.sourceChips.querySelectorAll(".chip").forEach((chip) => {
+            chip.setAttribute("aria-pressed", String(chip.dataset.source === state.source));
+        });
+    }
+
+    function renderSourceChips(sources) {
+        state.sources = sources;
+        if (!sources.some((source) => source.id === state.source)) {
+            state.source = sources[0]?.id || "sleeper";
+        }
+        els.sourceChips.innerHTML = "";
+        sources.forEach((source) => {
+            const chip = el("button", "chip chip--source", source.label);
+            chip.type = "button";
+            chip.dataset.source = source.id;
+            chip.setAttribute("aria-pressed", String(source.id === state.source));
+            chip.addEventListener("click", () => {
+                if (state.source === source.id) return;
+                state.source = source.id;
+                syncChips();
+                loadRankings();
+                if (state.drawerPlayerId && !els.drawer.hidden) openPlayer(state.drawerPlayerId);
+                window.pgAnalytics?.track?.("app_event", "fantasy_source", { source: source.id });
+            });
+            els.sourceChips.appendChild(chip);
+        });
+    }
+
+    async function loadSources() {
+        const params = new URLSearchParams();
+        if (state.season != null) params.set("season", state.season);
+        if (state.week != null) params.set("week", state.week);
+        try {
+            const data = await fetchJson(`${API_BASE}/projection-sources?${params.toString()}`);
+            renderSourceChips(data.sources || []);
+        } catch (err) {
+            renderSourceChips([{ id: "sleeper", label: "Sleeper", url: "https://sleeper.com/" }]);
+        }
     }
 
     // ── rankings ────────────────────────────────────────────────────────
 
     async function loadRankings() {
+        const requestedSource = state.source;
         els.rankBody.innerHTML = "";
         els.rankBody.appendChild(rowMessage("Loading rankings…"));
         const params = new URLSearchParams({
@@ -135,11 +185,14 @@
         });
         if (state.season != null) params.set("season", state.season);
         if (state.week != null) params.set("week", state.week); // 0 = season-long
+        if (state.source) params.set("source", state.source);
 
         try {
             const data = await fetchJson(`${API_BASE}/rankings?${params.toString()}`);
+            if (state.source !== requestedSource) return;
             renderRankings(data);
         } catch (err) {
+            if (state.source !== requestedSource) return;
             els.rankBody.innerHTML = "";
             els.rankBody.appendChild(rowMessage("Rankings unavailable right now."));
             showError(err.message);
@@ -156,12 +209,14 @@
 
     function renderRankings(data) {
         els.rankingsSource.innerHTML = "";
-        if (data.source === "derived") {
-            els.rankingsSource.append("Rankings derived from ", sleeperLink(), " projections");
-        } else if (data.source === "sleeper") {
-            els.rankingsSource.append("Projections by ", sleeperLink());
-        } else if (data.source) {
-            els.rankingsSource.textContent = `Source: ${data.source}`;
+        if (data.source) {
+            const provider = providerFor(data.source);
+            els.rankingsSource.append("Projections by ");
+            if (provider.url) {
+                els.rankingsSource.appendChild(providerLink(provider));
+            } else {
+                els.rankingsSource.append(provider.label);
+            }
         }
         els.rankingsAsOf.textContent = formatAsOf(data.as_of);
         els.rankBody.innerHTML = "";
@@ -372,6 +427,7 @@
 
     async function openPlayer(playerId) {
         if (!playerId) return;
+        const requestedSource = state.source;
         state.drawerPlayerId = playerId;
         els.drawer.hidden = false;
         document.body.classList.add("drawer-open");
@@ -382,11 +438,12 @@
         window.pgAnalytics?.track?.("app_event", "fantasy_player_view", { player_id: playerId });
 
         try {
-            const player = await fetchJson(`${API_BASE}/players/${encodeURIComponent(playerId)}`);
-            if (state.drawerPlayerId !== playerId) return;
+            const params = new URLSearchParams({ source: state.source });
+            const player = await fetchJson(`${API_BASE}/players/${encodeURIComponent(playerId)}?${params.toString()}`);
+            if (state.drawerPlayerId !== playerId || state.source !== requestedSource) return;
             renderPlayer(player);
         } catch (err) {
-            if (state.drawerPlayerId !== playerId) return;
+            if (state.drawerPlayerId !== playerId || state.source !== requestedSource) return;
             els.drawerBody.innerHTML = "";
             els.drawerBody.appendChild(el("p", "drawer__loading", "Could not load this player."));
             return;
@@ -446,10 +503,11 @@
             card.appendChild(grid);
             const source = el("p", "projection-source");
             source.append("Projection by ");
-            if (proj.source === "sleeper") {
-                source.appendChild(sleeperLink());
+            const provider = providerFor(proj.source);
+            if (provider.url) {
+                source.appendChild(providerLink(provider));
             } else {
-                source.append(proj.source || "Sleeper");
+                source.append(provider.label);
             }
             const asOf = formatAsOf(proj.as_of);
             if (asOf) source.append(` · ${asOf}`);
@@ -588,8 +646,10 @@
         try {
             const stateData = await fetchJson(`${API_BASE}/state`);
             renderHeader(stateData);
+            await loadSources();
         } catch (err) {
             showError("Could not load the current NFL week.");
+            renderSourceChips([{ id: "sleeper", label: "Sleeper", url: "https://sleeper.com/" }]);
         }
 
         await Promise.all([

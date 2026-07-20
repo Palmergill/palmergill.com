@@ -28,6 +28,7 @@ from app.services.fantasy_collector import (
     latest_successful_run,
 )
 from app.services.fantasy_common import (
+    FLEX_POSITIONS,
     SCORING_POINTS_FIELD,
     display_position,
     normalize_position,
@@ -132,6 +133,7 @@ def get_rankings(
     week: Optional[int] = None,
     position: str = "ALL",
     scoring: str = "ppr",
+    source: Optional[str] = None,
     limit: int = 100,
 ) -> Dict[str, Any]:
     if season is None or week is None:
@@ -142,6 +144,34 @@ def get_rankings(
     scoring = normalize_scoring(scoring)
     position = (position or "ALL").upper()
     query_position = "DEF" if position in ("DST", "DEF") else position
+
+    # A selected projection provider is ranked directly from that provider's
+    # latest snapshot. The legacy no-source path continues to serve the
+    # materialized derived rankings table for existing API consumers.
+    if source:
+        projection_data = get_projections(
+            db,
+            season=season,
+            week=week,
+            position=position,
+            scoring=scoring,
+            source=source,
+            limit=limit,
+        )
+        rankings = []
+        for rank, projection in enumerate(projection_data["projections"], start=1):
+            entry = dict(projection)
+            entry.update({"rank": rank, "tier": None})
+            rankings.append(entry)
+        return {
+            "season": season,
+            "week": week,
+            "position": position,
+            "scoring": scoring,
+            "source": projection_data.get("source") or source,
+            "as_of": projection_data.get("as_of"),
+            "rankings": rankings,
+        }
 
     run = latest_successful_run(db, "rankings", season, week)
     if run is None:
@@ -182,6 +212,7 @@ def get_projections(
     week: Optional[int] = None,
     position: Optional[str] = None,
     scoring: str = "ppr",
+    source: Optional[str] = None,
     limit: int = 200,
 ) -> Dict[str, Any]:
     if season is None or week is None:
@@ -192,18 +223,35 @@ def get_projections(
     scoring = normalize_scoring(scoring)
     points_field = SCORING_POINTS_FIELD[scoring]
 
-    run = latest_successful_run(db, "projections", season, week)
+    requested_source = (source or "").strip().lower() or None
+    run = latest_successful_run(db, "projections", season, week, source=requested_source)
+    if run is None and requested_source is None:
+        # Sleeper is the stable default even when an optional provider was
+        # collected more recently.
+        run = latest_successful_run(db, "projections", season, week, source="sleeper")
+        run = run or latest_successful_run(db, "projections", season, week)
     if run is None:
-        return {"season": season, "week": week, "scoring": scoring, "projections": []}
+        return {
+            "season": season,
+            "week": week,
+            "scoring": scoring,
+            "source": requested_source,
+            "projections": [],
+        }
 
     rows = db.query(FantasyProjection).filter(FantasyProjection.run_id == run.id).all()
+    raw_position = (position or "").upper()
     query_position = normalize_position(position) if position else None
     players = _player_index(db, [r.player_id for r in rows])
 
     projections = []
     for r in rows:
         player = players.get(r.player_id)
-        if query_position and (player is None or player.position != query_position):
+        if raw_position == "FLEX" and (player is None or player.position not in FLEX_POSITIONS):
+            continue
+        if query_position and raw_position not in ("ALL", "FLEX") and (
+            player is None or player.position != query_position
+        ):
             continue
         points = getattr(r, points_field)
         if points is None:
@@ -223,6 +271,51 @@ def get_projections(
     }
 
 
+def get_projection_sources(
+    db: Session,
+    season: Optional[int] = None,
+    week: Optional[int] = None,
+) -> Dict[str, Any]:
+    if season is None or week is None:
+        default = default_context(db)
+        season = season if season is not None else default["season"]
+        week = week if week is not None else default["week"]
+
+    runs = (
+        db.query(FantasyCollectionRun)
+        .filter(
+            FantasyCollectionRun.job == "projections",
+            FantasyCollectionRun.status == "success",
+            FantasyCollectionRun.season == season,
+            FantasyCollectionRun.week == week,
+        )
+        .order_by(FantasyCollectionRun.id.desc())
+        .all()
+    )
+    provider_meta = {
+        "sleeper": {"label": "Sleeper", "url": "https://sleeper.com/"},
+        "fantasypros": {"label": "FantasyPros", "url": "https://www.fantasypros.com/"},
+        "espn": {"label": "ESPN", "url": "https://www.espn.com/fantasy/football/"},
+    }
+    sources = []
+    seen = set()
+    for run in runs:
+        if not run.source or run.source in seen:
+            continue
+        seen.add(run.source)
+        meta = provider_meta.get(run.source, {"label": run.source.title(), "url": None})
+        sources.append(
+            {
+                "id": run.source,
+                "label": meta["label"],
+                "url": meta["url"],
+                "as_of": run.finished_at.isoformat() if run.finished_at else None,
+            }
+        )
+    sources.sort(key=lambda item: (item["id"] != "sleeper", item["label"]))
+    return {"season": season, "week": week, "sources": sources}
+
+
 def search_players(db: Session, query: str, limit: int = 10) -> List[Dict[str, Any]]:
     term = (query or "").strip().lower()
     if len(term) < 2:
@@ -238,7 +331,9 @@ def search_players(db: Session, query: str, limit: int = 10) -> List[Dict[str, A
     return [_player_public(p) for p in rows]
 
 
-def get_player_detail(db: Session, player_id: str) -> Optional[Dict[str, Any]]:
+def get_player_detail(
+    db: Session, player_id: str, source: Optional[str] = None
+) -> Optional[Dict[str, Any]]:
     player = db.get(FantasyPlayer, player_id)
     if player is None:
         return None
@@ -250,7 +345,11 @@ def get_player_detail(db: Session, player_id: str) -> Optional[Dict[str, Any]]:
     season, week = ctx["season"], ctx["week"]
 
     # Latest projection for the default week.
-    proj_run = latest_successful_run(db, "projections", season, week)
+    requested_source = (source or "").strip().lower() or None
+    proj_run = latest_successful_run(db, "projections", season, week, source=requested_source)
+    if proj_run is None and requested_source is None:
+        proj_run = latest_successful_run(db, "projections", season, week, source="sleeper")
+        proj_run = proj_run or latest_successful_run(db, "projections", season, week)
     if proj_run is not None:
         proj = (
             db.query(FantasyProjection)
@@ -272,12 +371,14 @@ def get_player_detail(db: Session, player_id: str) -> Optional[Dict[str, Any]]:
             }
 
     # Intra/inter-week projection movement: every snapshot this season.
+    history_query = db.query(FantasyProjection).filter(
+        FantasyProjection.player_id == player_id,
+        FantasyProjection.season == season,
+    )
+    if proj_run is not None and proj_run.source:
+        history_query = history_query.filter(FantasyProjection.source == proj_run.source)
     history = (
-        db.query(FantasyProjection)
-        .filter(
-            FantasyProjection.player_id == player_id,
-            FantasyProjection.season == season,
-        )
+        history_query
         .order_by(FantasyProjection.fetched_at.asc())
         .all()
     )

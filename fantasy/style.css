@@ -125,6 +125,29 @@ body {
     margin-bottom: 12px;
 }
 
+.source-picker {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px 12px;
+    padding-bottom: 14px;
+    margin-bottom: 14px;
+    border-bottom: 1px solid var(--line, #ece4d8);
+}
+
+.source-picker__label {
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--muted, #928a7d);
+}
+
+.chip--source[aria-pressed="true"] {
+    background: var(--ink, #23201c);
+    border-color: var(--ink, #23201c);
+}
+
 .chip-row {
     display: flex;
     flex-wrap: wrap;

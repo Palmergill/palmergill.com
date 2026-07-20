@@ -41,6 +41,8 @@ from app.services.fantasy_common import (
     normalize_name,
     normalize_position,
 )
+from app.services.fantasy_fantasypros import fantasypros_client
+from app.services.fantasy_espn import espn_projection_client
 from app.services.fantasy_nflverse import nflverse_client
 from app.services.fantasy_odds import (
     FUTURES_MARKETS,
@@ -54,6 +56,10 @@ from app.services.fantasy_odds import (
 from app.services.fantasy_sleeper import parse_trending_rows, sleeper_client
 
 logger = logging.getLogger(__name__)
+
+FANTASYPROS_TEAM_ALIASES = {
+    "JAC": "JAX",
+}
 
 # All jobs a scheduler tick may run, plus their cadence in seconds keyed by
 # whether the NFL season is active. rankings is derived from stored
@@ -169,6 +175,7 @@ def latest_successful_run(
     job: str,
     season: Optional[int] = None,
     week: Optional[int] = None,
+    source: Optional[str] = None,
 ) -> Optional[FantasyCollectionRun]:
     query = db.query(FantasyCollectionRun).filter(
         FantasyCollectionRun.job == job,
@@ -178,6 +185,8 @@ def latest_successful_run(
         query = query.filter(FantasyCollectionRun.season == season)
     if week is not None:
         query = query.filter(FantasyCollectionRun.week == week)
+    if source is not None:
+        query = query.filter(FantasyCollectionRun.source == source)
     return query.order_by(FantasyCollectionRun.id.desc()).first()
 
 
@@ -323,6 +332,114 @@ def collect_projections(
     return _finish_run(db, run, status, rows_written=written, detail=detail)
 
 
+def collect_fantasypros_projections(
+    db: Session, season: int, week: int, client=None
+) -> FantasyCollectionRun:
+    """Snapshot FantasyPros projections and match them to canonical players."""
+    client = client or fantasypros_client
+    run = _start_run(db, "projections", "fantasypros", season, week)
+    try:
+        rows = client.get_projections(season, week)
+    except Exception as exc:
+        logger.warning("FantasyPros projections fetch failed (%s wk %s): %s", season, week, exc)
+        return _finish_run(db, run, "error", detail=str(exc))
+
+    players = db.query(FantasyPlayer).all()
+    by_name_team = {(p.search_name, p.team): p.player_id for p in players if p.search_name}
+    by_name: Dict[str, List[str]] = {}
+    defenses = {}
+    for player in players:
+        if player.search_name:
+            by_name.setdefault(player.search_name, []).append(player.player_id)
+        if player.position == "DEF" and player.team:
+            defenses[player.team] = player.player_id
+
+    written = 0
+    unmatched = 0
+    for row in rows:
+        team = (row.get("team") or "").upper() or None
+        team = FANTASYPROS_TEAM_ALIASES.get(team, team)
+        if row.get("position") == "DEF":
+            player_id = defenses.get(team)
+        else:
+            name = normalize_name(row.get("name"))
+            player_id = by_name_team.get((name, team))
+            if player_id is None and len(by_name.get(name, [])) == 1:
+                player_id = by_name[name][0]
+        if player_id is None:
+            unmatched += 1
+            continue
+        db.add(
+            FantasyProjection(
+                run_id=run.id,
+                season=season,
+                week=week,
+                source="fantasypros",
+                player_id=player_id,
+                pts_ppr=row.get("pts_ppr"),
+                pts_half_ppr=row.get("pts_half_ppr"),
+                pts_std=row.get("pts_std"),
+                stats_json=json.dumps(row.get("stats") or {}),
+                fetched_at=utc_now(),
+            )
+        )
+        written += 1
+    db.commit()
+    status = "success" if written else "partial"
+    detail = f"{unmatched} rows could not be matched" if unmatched else None
+    return _finish_run(db, run, status, rows_written=written, detail=detail)
+
+
+def collect_espn_projections(
+    db: Session, season: int, week: int, client=None
+) -> FantasyCollectionRun:
+    """Snapshot keyless ESPN projections, matching primarily by ESPN id."""
+    client = client or espn_projection_client
+    run = _start_run(db, "projections", "espn", season, week)
+    try:
+        rows = client.get_projections(season, week)
+    except Exception as exc:
+        logger.warning("ESPN projections fetch failed (%s wk %s): %s", season, week, exc)
+        return _finish_run(db, run, "error", detail=str(exc))
+
+    players = db.query(FantasyPlayer).all()
+    by_espn_id = {p.espn_id: p.player_id for p in players if p.espn_id}
+    by_name: Dict[str, List[str]] = {}
+    for player in players:
+        if player.search_name:
+            by_name.setdefault(player.search_name, []).append(player.player_id)
+
+    written = 0
+    unmatched = 0
+    for row in rows:
+        player_id = by_espn_id.get(str(row.get("espn_id")))
+        if player_id is None:
+            matches = by_name.get(normalize_name(row.get("name")), [])
+            player_id = matches[0] if len(matches) == 1 else None
+        if player_id is None:
+            unmatched += 1
+            continue
+        db.add(
+            FantasyProjection(
+                run_id=run.id,
+                season=season,
+                week=week,
+                source="espn",
+                player_id=player_id,
+                pts_ppr=row.get("pts_ppr"),
+                pts_half_ppr=row.get("pts_half_ppr"),
+                pts_std=row.get("pts_std"),
+                stats_json=json.dumps(row.get("stats") or {}),
+                fetched_at=utc_now(),
+            )
+        )
+        written += 1
+    db.commit()
+    status = "success" if written else "partial"
+    detail = f"{unmatched} rows could not be matched" if unmatched else None
+    return _finish_run(db, run, status, rows_written=written, detail=detail)
+
+
 def build_derived_rankings(db: Session, season: int, week: int) -> FantasyCollectionRun:
     """Derive rankings from the latest projection snapshot for the week.
 
@@ -331,7 +448,7 @@ def build_derived_rankings(db: Session, season: int, week: int) -> FantasyCollec
     alive without the optional FantasyPros key.
     """
     run = _start_run(db, "rankings", "derived", season, week)
-    proj_run = latest_successful_run(db, "projections", season, week)
+    proj_run = latest_successful_run(db, "projections", season, week, source="sleeper")
     if proj_run is None:
         return _finish_run(db, run, "partial", detail="no projections snapshot to rank")
 
@@ -748,6 +865,9 @@ def run_scheduled(db: Session, now: Optional[datetime] = None) -> List[Dict[str,
     if season and _job_due(db, "projections", now):
         proj_run = collect_projections(db, season, proj_week)
         summaries.append(_summary(proj_run))
+        summaries.append(_summary(collect_espn_projections(db, season, proj_week)))
+        if fantasypros_client.available:
+            summaries.append(_summary(collect_fantasypros_projections(db, season, proj_week)))
         _mark_next_due(db, "projections", now, in_season)
         # Rankings are derived from the snapshot we just took.
         summaries.append(_summary(build_derived_rankings(db, season, proj_week)))
@@ -792,6 +912,14 @@ def run_job(db: Session, job: str) -> FantasyCollectionRun:
         if not season:
             raise ValueError("no season known — run the state job first")
         return collect_projections(db, season, week)
+    if job == "projections_fantasypros":
+        if not season:
+            raise ValueError("no season known — run the state job first")
+        return collect_fantasypros_projections(db, season, week)
+    if job == "projections_espn":
+        if not season:
+            raise ValueError("no season known — run the state job first")
+        return collect_espn_projections(db, season, week)
     if job == "rankings":
         if not season:
             raise ValueError("no season known — run the state job first")
@@ -812,6 +940,8 @@ REFRESHABLE_JOBS = (
     "schedule",
     "weekly_stats",
     "projections",
+    "projections_fantasypros",
+    "projections_espn",
     "rankings",
     "odds_lines",
     "odds_props",

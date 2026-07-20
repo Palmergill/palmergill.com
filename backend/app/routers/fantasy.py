@@ -71,11 +71,12 @@ def rankings(
     week: Optional[int] = None,
     position: str = Query("ALL"),
     scoring: str = Query("ppr"),
+    source: Optional[str] = None,
     limit: int = Query(100, ge=1, le=400),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     return fantasy_data.get_rankings(
-        db, season=season, week=week, position=position, scoring=scoring, limit=limit
+        db, season=season, week=week, position=position, scoring=scoring, source=source, limit=limit
     )
 
 
@@ -85,12 +86,22 @@ def projections(
     week: Optional[int] = None,
     position: Optional[str] = None,
     scoring: str = Query("ppr"),
+    source: Optional[str] = None,
     limit: int = Query(200, ge=1, le=400),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     return fantasy_data.get_projections(
-        db, season=season, week=week, position=position, scoring=scoring, limit=limit
+        db, season=season, week=week, position=position, scoring=scoring, source=source, limit=limit
     )
+
+
+@router.get("/projection-sources")
+def projection_sources(
+    season: Optional[int] = None,
+    week: Optional[int] = None,
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    return fantasy_data.get_projection_sources(db, season=season, week=week)
 
 
 @router.get("/players/search")
@@ -103,8 +114,12 @@ def players_search(
 
 
 @router.get("/players/{player_id}")
-def player_detail(player_id: str, db: Session = Depends(get_db)) -> Dict[str, Any]:
-    detail = fantasy_data.get_player_detail(db, player_id)
+def player_detail(
+    player_id: str,
+    source: Optional[str] = None,
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    detail = fantasy_data.get_player_detail(db, player_id, source=source)
     if detail is None:
         raise HTTPException(status_code=404, detail="Unknown player")
     return detail

@@ -171,6 +171,50 @@ def test_projections_endpoint_returns_sorted_points():
     assert points == sorted(points, reverse=True)
 
 
+def test_projection_sources_can_be_listed_and_selected():
+    session = SessionLocal()
+
+    class FakeFantasyPros:
+        def get_projections(self, season, week):
+            return [
+                {
+                    "name": "Patrick Mahomes",
+                    "team": "KC",
+                    "position": "QB",
+                    "pts_ppr": 30.0,
+                    "pts_half_ppr": 30.0,
+                    "pts_std": 30.0,
+                    "stats": {"points_ppr": 30.0},
+                },
+                {
+                    "name": "Justin Jefferson",
+                    "team": "MIN",
+                    "position": "WR",
+                    "pts_ppr": 25.0,
+                    "pts_half_ppr": 22.0,
+                    "pts_std": 19.0,
+                    "stats": {"points_ppr": 25.0},
+                },
+            ]
+
+    fc.collect_fantasypros_projections(session, 2025, 3, client=FakeFantasyPros())
+    session.close()
+
+    sources = client.get("/api/fantasy/projection-sources").json()["sources"]
+    assert [source["id"] for source in sources] == ["sleeper", "fantasypros"]
+
+    rankings = client.get(
+        "/api/fantasy/rankings",
+        params={"source": "fantasypros", "position": "ALL", "scoring": "ppr"},
+    ).json()
+    assert rankings["source"] == "fantasypros"
+    assert [row["projected_points"] for row in rankings["rankings"]] == [30.0, 25.0]
+
+    detail = client.get("/api/fantasy/players/100", params={"source": "fantasypros"}).json()
+    assert detail["projection"]["source"] == "fantasypros"
+    assert detail["projection"]["pts_ppr"] == 30.0
+
+
 def test_player_search_validates_and_finds():
     assert client.get("/api/fantasy/players/search", params={"q": "j"}).status_code == 422
     results = client.get("/api/fantasy/players/search", params={"q": "jeff"}).json()["results"]
