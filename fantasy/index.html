@@ -19,7 +19,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/shared/site-nav.css?v=13">
-    <link rel="stylesheet" href="style.css?v=5">
+    <link rel="stylesheet" href="style.css?v=6">
 </head>
 <body>
     <main class="app-shell">
@@ -62,6 +62,19 @@
         </section>
 
         <section class="board" aria-label="Rankings">
+            <div class="board__toolbar">
+                <div class="week-picker">
+                    <label class="week-picker__label" for="weekSelect">Week</label>
+                    <select id="weekSelect" class="week-select" aria-label="Week"></select>
+                </div>
+                <div class="player-search">
+                    <label class="sr-only" for="playerSearch">Search players</label>
+                    <input id="playerSearch" type="search" class="player-search__input"
+                           placeholder="Search a player…" autocomplete="off"
+                           role="combobox" aria-expanded="false" aria-controls="searchResults" aria-autocomplete="list">
+                    <ul id="searchResults" class="search-results" role="listbox" hidden></ul>
+                </div>
+            </div>
             <div class="source-picker">
                 <span class="source-picker__label">Projection source</span>
                 <div class="chip-row" id="sourceChips" role="group" aria-label="Projection source"></div>
@@ -79,14 +92,16 @@
                     <thead>
                         <tr>
                             <th scope="col" class="col-rank">#</th>
+                            <th scope="col" class="col-move" title="Rank change vs last week"><span class="sr-only">Change</span>Δ</th>
                             <th scope="col" class="col-player">Player</th>
                             <th scope="col" class="col-pos">Pos</th>
                             <th scope="col" class="col-team">Team</th>
+                            <th scope="col" class="col-opp">Opp</th>
                             <th scope="col" class="col-proj">Proj</th>
                         </tr>
                     </thead>
                     <tbody id="rankBody">
-                        <tr><td colspan="5" class="table-empty">Loading rankings…</td></tr>
+                        <tr><td colspan="7" class="table-empty">Loading rankings…</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -134,6 +149,28 @@
         </section>
     </main>
 
+    <!-- Compare tray: floats while players are selected for comparison -->
+    <div class="compare-tray" id="compareTray" hidden aria-live="polite">
+        <div class="compare-tray__chips" id="compareChips"></div>
+        <div class="compare-tray__actions">
+            <button type="button" class="compare-tray__clear" id="compareClear">Clear</button>
+            <button type="button" class="compare-tray__go" id="compareGo" disabled>Compare</button>
+        </div>
+    </div>
+
+    <!-- Compare slide-over -->
+    <div class="drawer" id="compareDrawer" hidden>
+        <div class="drawer__backdrop" id="compareBackdrop"></div>
+        <aside class="drawer__panel drawer__panel--wide" role="dialog" aria-modal="true" aria-labelledby="compareTitle">
+            <button type="button" class="drawer__close" id="compareDrawerClose" aria-label="Close comparison">×</button>
+            <header class="drawer__head">
+                <h2 id="compareTitle">Compare players</h2>
+                <p class="drawer__sub" id="compareSub"></p>
+            </header>
+            <div class="drawer__body" id="compareBody"></div>
+        </aside>
+    </div>
+
     <!-- Player detail slide-over -->
     <div class="drawer" id="playerDrawer" hidden>
         <div class="drawer__backdrop" id="drawerBackdrop"></div>
@@ -152,8 +189,8 @@
     <script src="/shared/site-nav.js?v=13"></script>
     <script src="/shared/analytics.js?v=1"></script>
     <script src="/shared/api-base.js?v=1"></script>
-    <script src="format.js?v=3"></script>
+    <script src="format.js?v=4"></script>
     <script src="chat.js?v=1"></script>
-    <script src="app.js?v=6"></script>
+    <script src="app.js?v=7"></script>
 </body>
 </html>

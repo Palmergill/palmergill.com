@@ -82,4 +82,21 @@ describe('FantasyFormat', () => {
         expect(FantasyFormat.formatArticleDate('not-a-date')).toBe('');
         expect(FantasyFormat.formatArticleDate(null)).toBe('');
     });
+
+    test('injuryBadge maps known statuses and shortens unknown ones', () => {
+        expect(FantasyFormat.injuryBadge('Questionable')).toEqual({ code: 'Q', label: 'Questionable', severity: 'warn' });
+        expect(FantasyFormat.injuryBadge('Out')).toEqual({ code: 'O', label: 'Out', severity: 'bad' });
+        expect(FantasyFormat.injuryBadge('IR')).toEqual({ code: 'IR', label: 'IR', severity: 'bad' });
+        expect(FantasyFormat.injuryBadge('Migraine')).toEqual({ code: 'MIG', label: 'Migraine', severity: 'warn' });
+        expect(FantasyFormat.injuryBadge(null)).toBeNull();
+        expect(FantasyFormat.injuryBadge('')).toBeNull();
+    });
+
+    test('formatMatchup renders home/away/bye', () => {
+        expect(FantasyFormat.formatMatchup({ opponent: 'BUF', home: true })).toBe('vs BUF');
+        expect(FantasyFormat.formatMatchup({ opponent: 'BUF', home: false })).toBe('@ BUF');
+        expect(FantasyFormat.formatMatchup({ bye: true })).toBe('BYE');
+        expect(FantasyFormat.formatMatchup({ opponent: null })).toBe('');
+        expect(FantasyFormat.formatMatchup(null)).toBe('');
+    });
 });

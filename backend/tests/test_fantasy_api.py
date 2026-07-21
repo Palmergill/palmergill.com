@@ -201,7 +201,9 @@ def test_projection_sources_can_be_listed_and_selected():
     session.close()
 
     sources = client.get("/api/fantasy/projection-sources").json()["sources"]
-    assert [source["id"] for source in sources] == ["sleeper", "fantasypros"]
+    # Sleeper stays the default; a consensus blend is offered once a second
+    # provider (FantasyPros) is present.
+    assert [source["id"] for source in sources] == ["sleeper", "consensus", "fantasypros"]
 
     rankings = client.get(
         "/api/fantasy/rankings",
@@ -213,6 +215,41 @@ def test_projection_sources_can_be_listed_and_selected():
     detail = client.get("/api/fantasy/players/100", params={"source": "fantasypros"}).json()
     assert detail["projection"]["source"] == "fantasypros"
     assert detail["projection"]["pts_ppr"] == 30.0
+
+
+def test_consensus_source_blends_providers():
+    session = SessionLocal()
+
+    class FakeFantasyPros:
+        def get_projections(self, season, week):
+            return [
+                {"name": "Patrick Mahomes", "team": "KC", "position": "QB",
+                 "pts_ppr": 30.0, "pts_half_ppr": 30.0, "pts_std": 30.0, "stats": {}},
+            ]
+
+    fc.collect_fantasypros_projections(session, 2025, 3, client=FakeFantasyPros())
+    session.close()
+
+    # Sleeper Mahomes = 24.0, FantasyPros = 30.0 -> consensus 27.0.
+    rankings = client.get(
+        "/api/fantasy/rankings", params={"source": "consensus", "position": "QB"}
+    ).json()
+    assert rankings["source"] == "consensus"
+    assert rankings["rankings"][0]["player_id"] == "100"
+    assert rankings["rankings"][0]["projected_points"] == 27.0
+
+    detail = client.get("/api/fantasy/players/100", params={"source": "consensus"}).json()
+    assert detail["projection"]["source"] == "consensus"
+    assert detail["projection"]["pts_ppr"] == 27.0
+    assert sorted(detail["projection"]["providers"]) == ["fantasypros", "sleeper"]
+
+
+def test_compare_endpoint_returns_players():
+    body = client.get("/api/fantasy/compare", params={"ids": "100,200"}).json()
+    assert [p["player_id"] for p in body["players"]] == ["100", "200"]
+    assert body["players"][0]["projected_points"] == 24.0
+    # Fewer than two valid ids is a client error.
+    assert client.get("/api/fantasy/compare", params={"ids": "100"}).status_code == 400
 
 
 def test_player_search_validates_and_finds():

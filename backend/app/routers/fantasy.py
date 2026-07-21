@@ -113,6 +113,19 @@ def players_search(
     return {"results": fantasy_data.search_players(db, q, limit)}
 
 
+@router.get("/compare")
+def compare(
+    ids: str = Query(..., description="Comma-separated player_ids (2-4)."),
+    source: Optional[str] = None,
+    scoring: str = Query("ppr"),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    player_ids = [pid.strip() for pid in ids.split(",") if pid.strip()][:4]
+    if len(player_ids) < 2:
+        raise HTTPException(status_code=400, detail="Provide 2-4 player ids to compare")
+    return fantasy_data.compare_players(db, player_ids, source=source, scoring=scoring)
+
+
 @router.get("/players/{player_id}")
 def player_detail(
     player_id: str,

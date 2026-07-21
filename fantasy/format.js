@@ -116,6 +116,36 @@
         return date.toLocaleDateString("en-US", options);
     }
 
+    // Injury status -> a compact badge {code, label, severity}. Returns null
+    // for healthy/unknown players so callers can skip rendering.
+    const INJURY_CODES = {
+        questionable: { code: "Q", severity: "warn" },
+        doubtful: { code: "D", severity: "bad" },
+        out: { code: "O", severity: "bad" },
+        ir: { code: "IR", severity: "bad" },
+        pup: { code: "PUP", severity: "bad" },
+        sus: { code: "SUS", severity: "bad" },
+        suspension: { code: "SUS", severity: "bad" },
+        na: { code: "NA", severity: "bad" },
+        dnr: { code: "DNR", severity: "bad" },
+    };
+    function injuryBadge(status) {
+        if (!status) return null;
+        const key = String(status).trim().toLowerCase();
+        const mapped = INJURY_CODES[key];
+        if (mapped) return { code: mapped.code, label: status, severity: mapped.severity };
+        return { code: String(status).slice(0, 3).toUpperCase(), label: status, severity: "warn" };
+    }
+
+    // Weekly matchup label from a rankings/detail row. "@BUF" (away), "vs BUF"
+    // (home), "BYE", or "" when the schedule isn't loaded.
+    function formatMatchup(row) {
+        if (!row) return "";
+        if (row.bye) return "BYE";
+        if (!row.opponent) return "";
+        return row.home ? `vs ${row.opponent}` : `@ ${row.opponent}`;
+    }
+
     // Signed movement, e.g. +0.5 / -1.0. 0 -> "0".
     function formatSigned(delta, digits) {
         if (delta === null || delta === undefined || Number.isNaN(Number(delta))) return "";
@@ -139,5 +169,7 @@
         formatSpread,
         formatSigned,
         formatArticleDate,
+        injuryBadge,
+        formatMatchup,
     };
 });
