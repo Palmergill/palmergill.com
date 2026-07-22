@@ -447,6 +447,50 @@ def test_run_scheduled_offseason_collects_season_long_rankings(db, monkeypatch):
     assert db.query(FantasyProjection).filter(FantasyProjection.week != 0).count() == 0
 
 
+def test_new_provider_bootstraps_when_sleeper_is_not_due(db, monkeypatch):
+    """A provider added after the shared timer was set should not wait for it."""
+    now = fc.utc_now()
+    fake_sleeper = FakeSleeper(
+        players=PLAYERS_DUMP,
+        state={"season": "2026", "week": 0, "season_type": "off", "display_week": 0},
+    )
+    fc.collect_state(db, client=fake_sleeper)
+    fc.collect_players(db, client=fake_sleeper)
+
+    # Reproduce an existing deployment whose original jobs (including the
+    # shared Sleeper projection job) already have future next-due timestamps.
+    future = (now + fc.timedelta(days=2)).isoformat()
+    for job in fc.JOB_INTERVALS_SECONDS:
+        fc.set_meta(db, f"{fc._DUE_META_PREFIX}{job}", future)
+    db.commit()
+
+    espn = FakeEspnProjections(
+        [
+            {
+                "espn_id": "3139477",
+                "name": "Patrick Mahomes",
+                "position": "QB",
+                "pts_ppr": 355.0,
+                "pts_half_ppr": 355.0,
+                "pts_std": 355.0,
+                "stats": {},
+            }
+        ]
+    )
+    monkeypatch.setattr(fc, "espn_projection_client", espn)
+    monkeypatch.setattr(fc, "fantasypros_client", type("Unavailable", (), {"available": False})())
+
+    summaries = fc.run_scheduled(db, now=now)
+
+    assert [(item["job"], item["rows_written"]) for item in summaries] == [
+        ("projections", 1)
+    ]
+    run = fc.latest_successful_run(db, "projections", 2026, 0, source="espn")
+    assert run is not None
+    assert fc.get_meta(db, f"due:projections:espn:2026:0") is not None
+    assert fc.run_scheduled(db, now=now) == []
+
+
 def test_run_job_uses_season_long_week_in_offseason(db, monkeypatch):
     fake_sleeper = FakeSleeper(
         players=PLAYERS_DUMP,

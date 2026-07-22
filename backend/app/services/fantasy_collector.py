@@ -827,6 +827,28 @@ def _mark_next_due(db: Session, job: str, now: datetime, in_season: bool) -> Non
     db.commit()
 
 
+def _provider_due_job(source: str, season: int, week: int) -> str:
+    """Return a context-specific timer key for an additional provider.
+
+    Sleeper keeps the original ``projections`` timer. Additional providers
+    need their own key so a newly deployed provider is collected immediately
+    instead of inheriting Sleeper's potentially week-old next-due timestamp.
+    Including the season/week also bootstraps every provider as soon as the
+    dashboard moves to a new ranking context.
+    """
+    return f"projections:{source}:{season}:{week}"
+
+
+def _mark_provider_next_due(
+    db: Session, source: str, season: int, week: int, now: datetime, in_season: bool
+) -> None:
+    cadence = JOB_INTERVALS_SECONDS["projections"]
+    seconds = cadence["in_season" if in_season else "off_season"]
+    key = _provider_due_job(source, season, week)
+    set_meta(db, f"{_DUE_META_PREFIX}{key}", (now + timedelta(seconds=seconds)).isoformat())
+    db.commit()
+
+
 def run_scheduled(db: Session, now: Optional[datetime] = None) -> List[Dict[str, Any]]:
     """Run whichever jobs are due. Returns a summary per job that ran."""
     now = now or utc_now()
@@ -865,12 +887,28 @@ def run_scheduled(db: Session, now: Optional[datetime] = None) -> List[Dict[str,
     if season and _job_due(db, "projections", now):
         proj_run = collect_projections(db, season, proj_week)
         summaries.append(_summary(proj_run))
-        summaries.append(_summary(collect_espn_projections(db, season, proj_week)))
-        if fantasypros_client.available:
-            summaries.append(_summary(collect_fantasypros_projections(db, season, proj_week)))
         _mark_next_due(db, "projections", now, in_season)
         # Rankings are derived from the snapshot we just took.
         summaries.append(_summary(build_derived_rankings(db, season, proj_week)))
+
+    # Providers added after the original Sleeper collector use independent,
+    # context-specific timers. This lets them populate immediately after a
+    # deploy (and on a season/week change) even when Sleeper is not yet due.
+    if season:
+        espn_due_job = _provider_due_job("espn", season, proj_week)
+        if _job_due(db, espn_due_job, now):
+            summaries.append(_summary(collect_espn_projections(db, season, proj_week)))
+            _mark_provider_next_due(db, "espn", season, proj_week, now, in_season)
+
+        if fantasypros_client.available:
+            fantasypros_due_job = _provider_due_job("fantasypros", season, proj_week)
+            if _job_due(db, fantasypros_due_job, now):
+                summaries.append(
+                    _summary(collect_fantasypros_projections(db, season, proj_week))
+                )
+                _mark_provider_next_due(
+                    db, "fantasypros", season, proj_week, now, in_season
+                )
 
     # Betting jobs. They self-skip when ODDS_API_KEY is unset or the monthly
     # budget is spent. Futures are live year-round; lines/props only in-season
