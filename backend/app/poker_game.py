@@ -109,6 +109,10 @@ class PokerGame:
         self.pot: int = 0
         self.current_bet: int = 0
         self.dealer_index: int = 0
+        # Who posted the blinds this hand. The table UI marks these seats, and
+        # they only make sense once a hand has started.
+        self.small_blind_index: Optional[int] = None
+        self.big_blind_index: Optional[int] = None
         self.current_player_index: int = 0
         self.small_blind: int = 10
         self.big_blind: int = 20
@@ -304,6 +308,9 @@ class PokerGame:
         else:
             sb_index = eligible_indices[(dealer_pos + 1) % len(eligible_indices)]
             bb_index = eligible_indices[(dealer_pos + 2) % len(eligible_indices)]
+
+        self.small_blind_index = sb_index
+        self.big_blind_index = bb_index
 
         self._post_blind(self.players[sb_index], self.small_blind)
         self._post_blind(self.players[bb_index], self.big_blind)
@@ -786,8 +793,13 @@ class PokerGame:
             'current_bet': self.current_bet,
             'community_cards': [c.to_dict() for c in self.community_cards],
             'players': [
-                p.to_dict(show_cards=for_player == p.id or (self.phase == 'showdown' and not p.folded))
-                for p in self.players
+                {
+                    **p.to_dict(show_cards=for_player == p.id or (self.phase == 'showdown' and not p.folded)),
+                    'is_dealer': idx == self.dealer_index and self.phase != 'waiting',
+                    'is_small_blind': idx == getattr(self, 'small_blind_index', None),
+                    'is_big_blind': idx == getattr(self, 'big_blind_index', None),
+                }
+                for idx, p in enumerate(self.players)
             ],
             'current_player': current.id if current else None,
             'dealer_index': self.dealer_index,

@@ -19,7 +19,7 @@ Welcome to the Poker App! This guide will help you get started playing Texas Hol
 
 1. Visit https://palmergill.com/poker/
 2. Enter your name
-3. Click "Play vs AI" for a single-player cash game, "Sit-and-Go Tournament" for a single-table SNG against AI, or create/join a multiplayer game
+3. Click "Play" for a single-player cash game, or open "More modes" for a Sit & Go, or to host/join a multiplayer table
 4. Single-player and tournament modes start automatically against five named AI opponents
 
 ---
@@ -94,34 +94,33 @@ When it's your turn, you have several options:
 ### Main Screen
 
 ```
-┌─────────────────────────────────────┐
-│  Pot: 150 chips    Odds: 3:1        │  ← Top bar
-├─────────────────────────────────────┤
-│                                     │
-│    [AI Players - Top]               │  ← Opponents
-│                                     │
-├─────────────────────────────────────┤
-│                                     │
-│         [Community Cards]           │  ← The Board
-│                                     │
-├─────────────────────────────────────┤
-│                                     │
-│    [Your Cards]    [Hand Strength]  │  ← Your area
-│                                     │
-├─────────────────────────────────────┤
-│  [Fold] [Check] [Call] [Raise]      │  ← Action buttons
-└─────────────────────────────────────┘
+┌─────────────────────────────────────────────┐
+│ #12  FLOP  10/20                        [?] │  ← HUD / rules
+│         ╭───────────────────────╮           │
+│      [seat]     [seat]     [seat]           │  ← Opponents on the rail
+│    ╭                             ╮          │
+│   [seat]   POT 340   [board]   [seat]       │  ← Pot + community cards
+│    ╰                             ╯          │
+│         ╰───────────────────────╯           │
+├─────────────────────────────────────────────┤
+│ [your cards]  Palmer (D)  1,000             │  ← Your dock
+│ Two Pair - 8s and 2s                        │
+│ [Fold]        [Call 40]       [Raise]       │  ← Action buttons
+└─────────────────────────────────────────────┘
 ```
 
 ### Visual Indicators
 
 | Element | Meaning |
 |---------|---------|
-| 🟡 Yellow border | It's your turn |
-| 🔴 Red "FOLDED" badge | Player has folded |
-| 🟢 Green chips | Active player |
-| ⏱️ Timer bar | Time remaining (30 seconds) |
-| 💰 Pot display | Total chips in the pot |
+| Gold ring on a seat | That player is to act |
+| Dimmed, grey seat | Player has folded |
+| Green outline + green stack | Winner of the hand |
+| `D` / `SB` / `BB` chip | Dealer button, small blind, big blind |
+| `TAG` / `LP` / `MAN` / `STD` / `ROC` tag | That bot's playing style — hover for the full description |
+| Gold pill beside a seat | Chips that seat has bet this round |
+| Thin gold bar above the buttons | Time left to act (30 seconds) |
+| Dimmed action buttons | Not your turn — hover to see who the table is waiting on |
 
 ### Hand Strength Indicator
 
@@ -163,37 +162,19 @@ Stats persist across sessions using browser storage. The hand history can be cle
 
 ### Sit-and-Go Tournament
 
-Click "Sit-and-Go Tournament" on the start screen to play a single-table SNG against the same five AI opponents. Everyone starts with 1500 chips and a 12-level blind schedule escalates every six hands. The in-game banner shows the current level, blinds, hands until the next level, and players remaining; eliminations are tracked in order so finishing position is preserved.
+Open "More modes" on the start screen and choose "Sit & Go" to play a single-table SNG against the same five AI opponents. Everyone starts with 1500 chips and a 12-level blind schedule escalates every six hands. The in-game banner shows the current level, blinds, hands until the next level, and players remaining; eliminations are tracked in order so finishing position is preserved.
 
 ### Multiplayer
 
-Use "Create Multiplayer Game" to create a lobby and share the Game ID. The host can start once at least two players have joined. Use "Join Multiplayer Game" to enter an existing lobby.
+Under "More modes", use "Host table" to create a lobby and share the Game ID. The host can deal once at least two players have joined. Use "Join table" to enter an existing lobby.
 
 ---
 
 ## Settings & Customization
 
-### Table Themes
+### Tooltips
 
-Click the theme button (🎨) to choose:
-- **Green** - Classic casino felt
-- **Blue** - Cool blue tone
-- **Red** - Bold red felt
-- **Black** - Modern dark
-- **Purple** - Rich purple
-
-### Card Deck Themes
-
-Click the cards button (🃏) to change card style:
-- **Classic** - Traditional design
-- **Modern** - Sleek rounded corners
-- **Minimal** - Clean and simple
-- **Vintage** - Aged paper look
-- **Neon** - Cyberpunk glow (great for dark mode)
-
-### Dark Mode
-
-Click the moon/sun button (🌙/☀️) to toggle between light and dark modes. Your preference is saved.
+The table shows numbers and short labels rather than explanations. Hover (or tab to) anything that is not self-evident — the betting-round chip, the pot, the dealer button and blind chips, an opponent's style tag, the Call button — and a tooltip explains it. The Call tooltip includes the pot odds for the decision in front of you.
 
 ### PWA Installation
 

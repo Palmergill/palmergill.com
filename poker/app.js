@@ -132,7 +132,7 @@ const GestureManager = {
         // Swipe left to fold. Guard on gameState so a pre-load swipe doesn't
         // fire a no-op fold against null state.
         if (gameState && isMyTurn && gameState.phase !== 'showdown') {
-            this.showGestureFeedback('👋 Fold', 'left');
+            this.showGestureFeedback('Fold', 'left');
             playerAction('fold');
         }
     },
@@ -144,10 +144,10 @@ const GestureManager = {
             const toCall = (gameState.current_bet || 0) - (myPlayer?.bet || 0);
 
             if (toCall === 0) {
-                this.showGestureFeedback('✓ Check', 'right');
+                this.showGestureFeedback('Check', 'right');
                 playerAction('check');
             } else {
-                this.showGestureFeedback('→ Swipe right to check (not available)', 'right', true);
+                this.showGestureFeedback('Check not available', 'right', true);
             }
         }
     },
@@ -159,10 +159,10 @@ const GestureManager = {
             const toCall = (gameState.current_bet || 0) - (myPlayer?.bet || 0);
 
             if (toCall > 0) {
-                this.showGestureFeedback('📞 Call', 'center');
+                this.showGestureFeedback('Call', 'center');
                 playerAction('call');
             } else {
-                this.showGestureFeedback('✓ Check', 'center');
+                this.showGestureFeedback('Check', 'center');
                 playerAction('check');
             }
         }
@@ -593,6 +593,16 @@ let pollIntervalId = null;
 let pollInFlight = false;
 let isRequestPending = false; // Lock to prevent race conditions
 const AI_POLL_INTERVAL_MS = 1800;
+// Betting rounds: the label on the table, the explanation on hover.
+const PHASES = {
+    waiting: { label: 'Waiting', tip: 'Waiting for the hand to start' },
+    preflop: { label: 'Preflop', tip: 'Two hole cards each, no community cards yet' },
+    flop: { label: 'Flop', tip: 'First three community cards are out' },
+    turn: { label: 'Turn', tip: 'Fourth community card is out' },
+    river: { label: 'River', tip: 'Fifth and last community card is out' },
+    showdown: { label: 'Showdown', tip: 'Cards face up — best five-card hand takes the pot' }
+};
+
 const CLOCKWISE_OPPONENT_SEATS = {
     1: ['seat-1'],
     2: ['seat-2', 'seat-3'],
@@ -658,6 +668,7 @@ const elements = {
     startBtn: document.getElementById('start-btn'),
     handNumber: document.getElementById('hand-number'),
     phase: document.getElementById('phase'),
+    hudBlinds: document.getElementById('hud-blinds'),
     potAmount: document.getElementById('pot-amount'),
     opponentsRow: document.getElementById('opponents-row'),
     communityCards: document.getElementById('community-cards'),
@@ -698,159 +709,19 @@ const elements = {
     btnResetStats: document.getElementById('btn-reset-stats')
 };
 
-// Theme Manager
-const ThemeManager = {
-    themes: ['theme-green', 'theme-blue', 'theme-red', 'theme-black', 'theme-purple'],
-
-    init() {
-        const savedTheme = localStorage.getItem('poker-theme');
-        if (savedTheme && this.themes.includes(savedTheme)) {
-            this.applyTheme(savedTheme);
-        }
-    },
-
-    applyTheme(themeClass) {
-        if (!elements.gameScreen) return;
-        
-        this.themes.forEach(t => elements.gameScreen.classList.remove(t));
-        elements.gameScreen.classList.add(themeClass);
-    }
-};
-
-// Dark Mode Manager
-const DarkModeManager = {
-    isDarkMode: true,
-
-    init() {
-        const savedMode = localStorage.getItem('poker-dark-mode');
-        if (savedMode !== null) {
-            this.isDarkMode = savedMode === 'true';
-        }
-        this.applyMode();
-    },
-
-    applyMode() {
-        const body = document.body;
-        if (this.isDarkMode) {
-            body.classList.remove('light-mode');
-        } else {
-            body.classList.add('light-mode');
-        }
-    }
-};
-
-// Card Deck Theme Manager
-const CardDeckManager = {
-    decks: ['card-deck-classic', 'card-deck-modern', 'card-deck-minimal', 'card-deck-vintage', 'card-deck-neon'],
-
-    init() {
-        const savedDeck = localStorage.getItem('poker-card-deck');
-        if (savedDeck && this.decks.includes(savedDeck)) {
-            this.applyDeck(savedDeck);
-        }
-    },
-
-    applyDeck(deckClass) {
-        if (!elements.gameScreen) return;
-        
-        this.decks.forEach(d => elements.gameScreen.classList.remove(d));
-        elements.gameScreen.classList.add(deckClass);
-    }
-};
-
-// Chip Stack Visualizer
-const ChipStackVisualizer = {
-    // Chip denominations and their colors
-    denominations: [
-        { value: 1000, color: 'chip-purple', max: 10 },
-        { value: 500, color: 'chip-black', max: 8 },
-        { value: 100, color: 'chip-gold', max: 8 },
-        { value: 25, color: 'chip-green', max: 10 },
-        { value: 5, color: 'chip-red', max: 10 },
-        { value: 1, color: 'chip-blue', max: 10 }
-    ],
-
-    /**
-     * Generate HTML for chip stack visualization
-     * @param {number} amount - Chip amount to display
-     * @param {boolean} showAmount - Whether to show the numeric amount alongside
-     * @param {boolean} large - Whether to use large chip size
-     * @returns {string} HTML string for chip stack
-     */
-    render(amount, showAmount = true, large = false) {
-        if (amount <= 0) return '<span class="chips-amount">0</span>';
-        
-        let remaining = amount;
-        const chips = [];
-        
-        // Calculate chips for each denomination
-        for (const denom of this.denominations) {
-            const count = Math.min(Math.floor(remaining / denom.value), denom.max);
-            if (count > 0) {
-                for (let i = 0; i < count; i++) {
-                    chips.push(denom.color);
-                }
-                remaining -= count * denom.value;
-            }
-        }
-        
-        // Cap total visible chips for performance and aesthetics
-        const maxVisibleChips = large ? 25 : 15;
-        const displayChips = chips.slice(0, maxVisibleChips);
-        
-        const stackClass = large ? 'chip-stack-large' : 'chip-stack';
-        const chipsHTML = displayChips.map(color => `<div class="chip ${color}"></div>`).join('');
-        
-        if (showAmount) {
-            return `
-                <span class="chips-display">
-                    <span class="${stackClass}">${chipsHTML}</span>
-                    <span class="chips-amount">${amount}</span>
-                </span>
-            `;
-        } else {
-            return `<span class="${stackClass}">${chipsHTML}</span>`;
-        }
-    },
-
-    /**
-     * Render a simplified chip indicator (just a few chips + amount)
-     * Used for opponent chip displays
-     */
-    renderCompact(amount) {
-        if (amount <= 0) return '0';
-        
-        // Determine the highest denomination
-        let color = 'chip-blue';
-        if (amount >= 500) color = 'chip-purple';
-        else if (amount >= 100) color = 'chip-black';
-        else if (amount >= 25) color = 'chip-gold';
-        else if (amount >= 5) color = 'chip-green';
-        
-        // Show 1-3 chips based on amount size
-        let chipCount = 1;
-        if (amount >= 100) chipCount = 2;
-        if (amount >= 500) chipCount = 3;
-        
-        const chipsHTML = Array(chipCount).fill(`<div class="chip ${color}"></div>`).join('');
-        
-        return `
-            <span class="chips-display">
-                <span class="chip-stack">${chipsHTML}</span>
-                <span class="chips-amount">${amount}</span>
-            </span>
-        `;
-    }
-};
+// Chip amounts read as numbers, not as stacks of decorative discs: at a glance
+// a player wants the count, and the thousands separator is what makes it
+// scannable.
+function formatChips(amount) {
+    const n = Number(amount) || 0;
+    return n.toLocaleString('en-US');
+}
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
-    // Initialize error boundary, sound manager, theme manager, dark mode, stats, and chat
+    // Initialize error boundary, sound manager, and stats
     ErrorBoundary.init();
     SoundManager.init();
-    ThemeManager.init();
-    DarkModeManager.init();
-    CardDeckManager.init();
     StatsManager.init();
 
     // Cleanup on page unload
@@ -1507,7 +1378,7 @@ async function nextHand() {
 
     try {
         elements.btnNextHand.disabled = true;
-        showLoading('Dealing next hand...');
+        showLoading('Dealing…');
 
         const response = await APIRequest.fetch(`${API_BASE}/api/poker/games/${gameId}/next-hand`, {
             method: 'POST',
@@ -1537,7 +1408,7 @@ async function nextHand() {
     } finally {
         isRequestPending = false;
         elements.btnNextHand.disabled = false;
-        elements.btnNextHand.textContent = 'Ready for Next Hand';
+        elements.btnNextHand.textContent = 'Next hand';
     }
 }
 
@@ -1576,10 +1447,15 @@ function updateGameDisplay() {
         dismissedShowdownHand = null;
     }
 
-    // Update header
+    // Update the table HUD
     elements.handNumber.textContent = gameState.hand_number;
-    elements.phase.textContent = gameState.phase.replace('_', ' ').toUpperCase();
-    elements.potAmount.innerHTML = ChipStackVisualizer.render(gameState.pot, true, true);
+    const phase = PHASES[gameState.phase] || { label: gameState.phase, tip: '' };
+    elements.phase.textContent = phase.label;
+    elements.phase.dataset.tip = phase.tip;
+    elements.potAmount.textContent = formatChips(gameState.pot);
+    if (elements.hudBlinds && gameState.small_blind) {
+        elements.hudBlinds.textContent = `${formatChips(gameState.small_blind)} / ${formatChips(gameState.big_blind)}`;
+    }
     renderTournamentBanner(gameState);
     elements.gameScreen?.classList.toggle('showdown-active', isShowdown);
     if (!isShowdown) {
@@ -1592,13 +1468,12 @@ function updateGameDisplay() {
     // Update your info
     const myPlayer = gameState.players.find(p => p.id === playerId);
     if (myPlayer) {
-        elements.yourChips.innerHTML = ChipStackVisualizer.render(myPlayer.chips, true, true);
+        elements.yourChips.textContent = formatChips(myPlayer.chips);
         window.pokerCasinoHeader?.setChips(myPlayer.chips);
         if (elements.yourPositionChip) {
             elements.yourPositionChip.innerHTML = renderPositionChip(myPlayer);
         }
-        document.querySelector('.your-avatar-container')?.remove();
-        
+
         // Your cards with staggered animation (deal player cards first)
         const cardsHTML = myPlayer.hand.map((card, index) => renderCard(card, index)).join('');
         elements.yourCards.innerHTML = cardsHTML;
@@ -1693,49 +1568,76 @@ function getClockwiseOpponents(players, heroId) {
 // blind, so dealer takes priority over the blind chips.
 function renderPositionChip(player) {
     if (player.is_dealer) {
-        return `<span class="position-chip dealer" title="Dealer button" aria-label="Dealer">D</span>`;
+        return `<span class="position-chip dealer" data-tip="Dealer button — acts last after the flop" aria-label="Dealer">D</span>`;
     }
     if (player.is_small_blind) {
-        return `<span class="position-chip small-blind" title="Small blind" aria-label="Small blind">SB</span>`;
+        return `<span class="position-chip small-blind" data-tip="Small blind — posts ${gameState?.small_blind ?? ''} before the deal" aria-label="Small blind">SB</span>`;
     }
     if (player.is_big_blind) {
-        return `<span class="position-chip big-blind" title="Big blind" aria-label="Big blind">BB</span>`;
+        return `<span class="position-chip big-blind" data-tip="Big blind — posts ${gameState?.big_blind ?? ''} before the deal" aria-label="Big blind">BB</span>`;
     }
     return '';
+}
+
+// A HUD-style tag for each bot's style. Two or three letters on the table,
+// the full explanation on hover.
+const PERSONALITY_TAGS = {
+    tag: { tag: 'TAG', tip: 'Tight-aggressive — plays few hands, bets them hard' },
+    lp: { tag: 'LP', tip: 'Loose-passive — calls far too much, rarely raises' },
+    mn: { tag: 'MAN', tip: 'Maniac — bets and bluffs relentlessly, high variance' },
+    std: { tag: 'STD', tip: 'Standard — balanced, by-the-book ranges' },
+    rock: { tag: 'ROC', tip: 'Rock — folds anything marginal, only bets the nuts' }
+};
+
+function renderPersonalityTag(player) {
+    const preset = PERSONALITY_TAGS[player.ai_personality];
+    if (!preset) return '';
+    const tip = player.ai_personality_label
+        ? preset.tip
+        : `${preset.tag} playing style`;
+    return `<span class="seat-style" data-tip="${escapeHtml(tip)}" aria-label="${escapeHtml(player.ai_personality_label || preset.tag)}">${preset.tag}</span>`;
 }
 
 function renderOpponent(player, seatClass = 'seat-1') {
     const isCurrent = gameState.phase !== 'showdown' && gameState.current_player === player.id;
     const isShowdown = gameState.phase === 'showdown';
-    const showCards = gameState.phase === 'showdown' && !player.folded;
+    const showCards = isShowdown && !player.folded;
     const isWinner = gameState.winners?.some(w => w.id === player.id);
     const recentAIAction = gameState.last_ai_action?.player_name === player.name ? gameState.last_ai_action : null;
-    const recentActionClass = recentAIAction ? 'recent-ai-action' : '';
     const actionLabel = recentAIAction ? formatActionLabel(recentAIAction) : '';
+    const classes = [
+        'seat',
+        seatClass,
+        player.folded ? 'is-folded' : '',
+        isCurrent ? 'is-active' : '',
+        isWinner ? 'is-winner' : ''
+    ].filter(Boolean).join(' ');
+
+    const cards = showCards
+        ? player.hand.map(c => renderCard(c)).join('')
+        : isShowdown
+            ? ''
+            : '<div class="card-back"></div><div class="card-back"></div>';
 
     return `
-        <div class="opponent ${seatClass} ${recentActionClass} ${player.folded ? 'folded' : ''} ${isCurrent ? 'active-turn' : ''} ${isWinner ? 'winner' : ''}">
-            ${renderPositionChip(player)}
-            <div class="opponent-cards">
-                ${showCards
-                    ? player.hand.map(c => renderCard(c)).join('')
-                    : isShowdown
-                        ? ''
-                    : `<div class="card-back ${player.folded ? 'folded' : ''}">🂠</div><div class="card-back ${player.folded ? 'folded' : ''}">🂠</div>`
-                }
+        <div class="${classes}">
+            <div class="seat-cards">${cards}</div>
+            <div class="seat-plate">
+                ${renderPositionChip(player)}
+                <span class="seat-name"><span class="seat-nick">${escapeHtml(player.name)}</span>${renderPersonalityTag(player)}</span>
+                <span class="seat-stack" data-tip="Chips behind">${formatChips(player.chips)}</span>
+                ${player.bet > 0 ? `<span class="seat-bet" data-tip="Bet this round">${formatChips(player.bet)}</span>` : ''}
+                ${actionLabel ? `<span class="seat-action">${escapeHtml(actionLabel)}</span>` : ''}
             </div>
-            <span class="opponent-name">${escapeHtml(player.name)}${player.ai_personality_label ? `<span class="opponent-personality" title="${escapeHtml(player.ai_personality_label)}">${escapeHtml(player.ai_personality_label)}</span>` : ''}</span>
-            <span class="opponent-chips">${ChipStackVisualizer.renderCompact(player.chips)}</span>
-            ${player.bet > 0 ? `<span class="opponent-bet">${ChipStackVisualizer.renderCompact(player.bet)}</span>` : ''}
-            ${actionLabel ? `<span class="opponent-action-badge">${escapeHtml(actionLabel)}</span>` : ''}
         </div>
     `;
 }
 
 function formatActionLabel(action) {
     if (!action) return '';
-    const label = String(action.action || '').replace('-', ' ').toUpperCase();
-    return action.amount ? `${label} ${action.amount}` : label;
+    const label = String(action.action || '').replace('-', ' ');
+    const pretty = label.charAt(0).toUpperCase() + label.slice(1);
+    return action.amount ? `${pretty} ${formatChips(action.amount)}` : pretty;
 }
 
 function renderCard(card, dealIndex = null) {
@@ -1767,9 +1669,11 @@ function renderCard(card, dealIndex = null) {
         animationClass = 'new-card';
     }
     
-    // Use inline style for color to ensure it works
-    const colorStyle = isRed ? 'color:#dc3545' : 'color:#1a1a2e';
-    return `<div class="card ${animationClass} ${isRed ? 'red' : 'black'}" style="${colorStyle}">${rank}${suitSymbol}</div>`;
+    return `<div class="card ${animationClass} ${isRed ? 'red' : 'black'}" aria-label="${rank} of ${card.suit.toLowerCase()}">
+        <span class="card-corner" aria-hidden="true">${rank}</span>
+        <span class="card-rank">${rank}</span>
+        <span class="card-suit">${suitSymbol}</span>
+    </div>`;
 }
 
 function evaluateHandStrength(playerCards, communityCards) {
@@ -1965,20 +1869,38 @@ function getHandNameFrom5Cards(cards) {
     return `${getRankName(highCard)} High`;
 }
 
+// The action row stays on screen the whole hand and simply goes inert when
+// it is someone else's turn — an empty dock reads as a broken UI, and a
+// row that appears and disappears makes the layout jump.
+function setActionsIdle(idle, waitingOn = '') {
+    elements.actionButtons.classList.toggle('is-idle', idle);
+    [elements.btnFold, elements.btnCall, elements.btnRaise].forEach((btn) => {
+        if (btn) btn.disabled = idle;
+    });
+    if (idle) {
+        elements.actionButtons.dataset.tip = waitingOn ? `Waiting on ${waitingOn}` : 'Not your turn';
+    } else {
+        delete elements.actionButtons.dataset.tip;
+    }
+}
+
 function updateActionButtons() {
     if (!gameState || gameState.phase === 'showdown') {
-        elements.actionButtons.classList.add('hidden');
         elements.raiseContainer.classList.add('hidden');
+        elements.actionButtons.classList.remove('hidden');
+        setActionsIdle(true);
         document.querySelector('.your-section')?.classList.remove('raise-open');
         return;
     }
-    
+
     const myPlayer = gameState.players.find(p => p.id === playerId);
     isMyTurn = gameState.current_player === playerId;
-    
+
     if (!isMyTurn || !myPlayer) {
-        elements.actionButtons.classList.add('hidden');
         elements.raiseContainer.classList.add('hidden');
+        elements.actionButtons.classList.remove('hidden');
+        const waitingOn = gameState.players.find(p => p.id === gameState.current_player)?.name || '';
+        setActionsIdle(true, waitingOn);
         document.querySelector('.your-section')?.classList.remove('raise-open');
         return;
     }
@@ -1988,33 +1910,38 @@ function updateActionButtons() {
         document.querySelector('.your-section')?.classList.add('raise-open');
         return;
     }
-    
+
     elements.actionButtons.classList.remove('hidden');
-    
+    setActionsIdle(false);
+
     const toCall = gameState.current_bet - myPlayer.bet;
-    
+
     if (toCall === 0) {
         elements.btnCall.textContent = 'Check';
         elements.btnCall.setAttribute('aria-label', 'Check (C)');
+        elements.btnCall.dataset.tip = 'Stay in the hand without betting (C)';
     } else {
         const callAmount = Math.min(toCall, myPlayer.chips);
-        const label = myPlayer.chips <= toCall ? 'All In' : `Call ${callAmount}`;
+        const label = myPlayer.chips <= toCall ? 'All in' : `Call ${formatChips(callAmount)}`;
         elements.btnCall.textContent = label;
         elements.btnCall.setAttribute('aria-label', `${label} (C)`);
+        // Pot odds are the one number that makes a call obviously right or
+        // obviously wrong, so it goes in the tooltip rather than on screen.
+        const potAfterCall = (gameState.pot || 0) + callAmount;
+        const breakEven = Math.round((callAmount / (potAfterCall + callAmount)) * 100);
+        elements.btnCall.dataset.tip = `Pay ${formatChips(callAmount)} to play for ${formatChips(potAfterCall)} — break even at ${breakEven}% (C)`;
     }
     elements.btnFold.setAttribute('aria-label', 'Fold (F)');
     elements.btnRaise.setAttribute('aria-label', 'Raise (R)');
-    
-    // Hide raise button if can't afford min raise
+
+    // Too short to make a legal raise: leave the button in place, disabled,
+    // so the row keeps its shape and the tooltip says why.
     const minRaise = gameState.min_raise || 20;
     const canRaise = myPlayer.chips > toCall + minRaise;
-    if (canRaise) {
-        elements.btnRaise.classList.remove('hidden');
-        elements.btnRaise.disabled = false;
-        elements.btnRaise.style.opacity = '1';
-    } else {
-        elements.btnRaise.classList.add('hidden');
-    }
+    elements.btnRaise.disabled = !canRaise;
+    elements.btnRaise.dataset.tip = canRaise
+        ? 'Bet more and put the table to a decision (R)'
+        : `Not enough chips to raise — a legal raise needs ${formatChips(toCall + minRaise)}`;
 }
 
 function showHandResult() {
@@ -2081,11 +2008,13 @@ function showHandResult() {
     const outcomeLabel = isMe ? (isChop ? 'CHOP' : 'WIN') : 'LOSS';
     const isDismissed = dismissedShowdownHand === getShowdownHandKey();
 
-    elements.showdownTitle.textContent = isMe ? (isChop ? 'You chop the pot' : 'You won') : 'You lost';
-    elements.showdownDetails.textContent = isBusted
-        ? `${winnerNames} ${gameState.winners.length > 1 ? 'win' : 'wins'} with ${handName || 'best hand'} - ${totalWon} chips awarded. Buy back to keep playing.`
-        : `${winnerNames} ${gameState.winners.length > 1 ? 'win' : 'wins'} with ${handName || 'best hand'} - ${totalWon} chips awarded.`;
-    elements.btnNextHand.textContent = isBusted ? 'Buy Back In' : 'Ready for Next Hand';
+    elements.showdownTitle.textContent = isMe ? (isChop ? 'Chop' : 'You win') : 'You lose';
+    elements.showdownDetails.textContent = [
+        winnerNames,
+        handName || 'best hand',
+        `+${formatChips(totalWon)}`
+    ].join(' · ');
+    elements.btnNextHand.textContent = isBusted ? 'Buy back in' : 'Next hand';
     elements.btnNextHand.disabled = false;
     elements.showdownPanel.classList.remove('showdown-win', 'showdown-loss', 'showdown-chop', 'showdown-animate', 'showdown-dismissed');
     elements.showdownPanel.classList.add(outcomeClass);
@@ -2141,27 +2070,27 @@ function showStats() {
 
     elements.statsContent.innerHTML = `
         <div class="stat-row">
-            <span class="stat-label">Hands Played</span>
-            <span class="stat-value">${stats.handsPlayed}</span>
+            <span class="stat-label" data-tip="Hands you have been dealt in" data-tip-pos="right">Hands</span>
+            <span class="stat-value">${formatChips(stats.handsPlayed)}</span>
         </div>
         <div class="stat-row">
-            <span class="stat-label">Hands Won</span>
-            <span class="stat-value gold">${stats.handsWon}</span>
+            <span class="stat-label" data-tip="Hands where you took at least part of the pot" data-tip-pos="right">Won</span>
+            <span class="stat-value">${formatChips(stats.handsWon)}</span>
         </div>
         <div class="stat-row">
-            <span class="stat-label">Win Rate</span>
-            <span class="stat-value gold">${stats.winRate}%</span>
+            <span class="stat-label" data-tip="Share of hands you won" data-tip-pos="right">Win rate</span>
+            <span class="stat-value">${stats.winRate}%</span>
         </div>
         <div class="stat-row">
-            <span class="stat-label">Biggest Pot Won</span>
-            <span class="stat-value gold">${stats.biggestPotWon} chips</span>
+            <span class="stat-label" data-tip="Largest single pot you have taken down" data-tip-pos="right">Biggest pot</span>
+            <span class="stat-value">${formatChips(stats.biggestPotWon)}</span>
         </div>
         <div class="stat-row">
-            <span class="stat-label">Net Profit/Loss</span>
-            <span class="stat-value ${netProfitClass}">${stats.netProfit >= 0 ? '+' : ''}${stats.netProfit} chips</span>
+            <span class="stat-label" data-tip="Chips won minus chips lost, all time" data-tip-pos="right">Net</span>
+            <span class="stat-value ${netProfitClass}">${stats.netProfit >= 0 ? '+' : ''}${formatChips(stats.netProfit)}</span>
         </div>
         <div class="stat-row">
-            <span class="stat-label">Best Hand</span>
+            <span class="stat-label" data-tip="Strongest holding you have made at showdown" data-tip-pos="right">Best hand</span>
             <span class="stat-value">${escapeHtml(stats.bestHand)}</span>
         </div>
         ${historyHtml}
@@ -2181,17 +2110,20 @@ function formatHistoryCard(card) {
     if (!card) return '·';
     if (typeof card === 'string') return card;
     if (typeof card === 'object') {
-        const r = card.rank || card.value || card.r || '?';
-        const s = card.suit || card.s || '';
+        // The API sends numeric ranks and upper-case suit names; older stored
+        // history may use single letters.
+        const raw = card.rank ?? card.value ?? card.r ?? '?';
+        const rank = { 14: 'A', 13: 'K', 12: 'Q', 11: 'J' }[raw] ?? String(raw);
+        const suit = String(card.suit || card.s || '').toLowerCase();
         const suitSym = { hearts: '♥', diamonds: '♦', spades: '♠', clubs: '♣', h: '♥', d: '♦', s: '♠', c: '♣' };
-        return `${r}${suitSym[s] || s || ''}`;
+        return `${rank}${suitSym[suit] || ''}`;
     }
     return String(card);
 }
 
 function renderHandHistory(history) {
     if (!history || history.length === 0) {
-        return '<div class="hand-history-empty">No hand history yet — finish a hand to start logging.</div>';
+        return '<div class="hand-history-empty">No hands yet.</div>';
     }
     const rows = history.slice(0, 20).map((h) => {
         const result = h.result === 'win' ? 'Win' : h.result === 'chop' ? 'Chop' : 'Loss';
@@ -2203,7 +2135,7 @@ function renderHandHistory(history) {
         return `
             <li class="hand-history-row">
                 <span class="hh-result hh-${h.result}">${result}</span>
-                <span class="hh-cards">${escapeHtml(hole) || '—'}<span class="hh-board"> · ${escapeHtml(board) || 'no board'}</span></span>
+                <span class="hh-cards">${escapeHtml(hole) || '—'}<span class="hh-board"> · ${escapeHtml(board) || '—'}</span></span>
                 <span class="hh-amt ${cls}">${escapeHtml(String(amt))}</span>
                 <span class="hh-when">${escapeHtml(when)}</span>
             </li>
@@ -2252,7 +2184,7 @@ function startTurnTimer() {
         if (elapsed >= TURN_TIME_LIMIT) {
             stopTurnTimer();
             // Auto-fold on timeout
-            elements.timerText.textContent = 'Time up! Folding...';
+            elements.timerText.textContent = 'Time up — folding';
             elements.timerText.classList.add('urgent');
             setTimeout(() => {
                 playerAction('fold');
@@ -2283,15 +2215,13 @@ function updateTimerDisplay() {
     const seconds = Math.ceil(remaining / 1000);
     const percentage = (remaining / TURN_TIME_LIMIT) * 100;
     
-    elements.timerText.textContent = `Your turn - ${seconds}s`;
+    elements.timerText.textContent = `Your turn — ${seconds}s left`;
     elements.timerFill.style.width = `${percentage}%`;
-    
+
     // Add urgency styling when time is low
-    if (seconds <= 5) {
-        elements.timerText.classList.add('urgent');
-    } else {
-        elements.timerText.classList.remove('urgent');
-    }
+    const urgent = seconds <= 5;
+    elements.timerText.classList.toggle('urgent', urgent);
+    elements.decisionTimer?.classList.toggle('urgent', urgent);
 }
 
 // Haptic Feedback Function

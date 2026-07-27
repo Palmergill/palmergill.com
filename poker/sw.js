@@ -3,8 +3,8 @@ const CACHE_PREFIX = 'poker-app-';
 const STATIC_ASSETS = [
     '/poker/',
     '/poker/index.html',
-    '/poker/style.css?v=22',
-    '/poker/app.js?v=18',
+    '/poker/style.css?v=24',
+    '/poker/app.js?v=19',
     '/poker/manifest.json',
     '/shared/casino-theme.css?v=2',
     '/shared/rules-viewer.css?v=1',
@@ -110,7 +110,10 @@ self.addEventListener('fetch', (event) => {
     // immediately, with the cached poker shell as an offline fallback.
     if (request.mode === 'navigate') {
         event.respondWith(
-            fetch(request)
+            // `no-cache` forces a revalidation against the server. Without it
+            // a returning visitor can be served a stale shell out of the HTTP
+            // cache and never see a new build, versioned asset URLs and all.
+            fetch(request, { cache: 'no-cache' })
                 .then((networkResponse) => {
                     if (networkResponse.ok) {
                         const requestClone = networkResponse.clone();

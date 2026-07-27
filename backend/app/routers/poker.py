@@ -233,6 +233,8 @@ def _serialize_game(game: PokerGame) -> dict:
         "pot": game.pot,
         "current_bet": game.current_bet,
         "dealer_index": game.dealer_index,
+        "small_blind_index": game.small_blind_index,
+        "big_blind_index": game.big_blind_index,
         "current_player_index": game.current_player_index,
         "small_blind": game.small_blind,
         "big_blind": game.big_blind,
@@ -260,6 +262,8 @@ def _deserialize_game(data: dict) -> PokerGame:
     game.pot = data.get("pot", 0)
     game.current_bet = data.get("current_bet", 0)
     game.dealer_index = data.get("dealer_index", 0)
+    game.small_blind_index = data.get("small_blind_index")
+    game.big_blind_index = data.get("big_blind_index")
     game.current_player_index = data.get("current_player_index", 0)
     game.small_blind = data.get("small_blind", 10)
     game.big_blind = data.get("big_blind", 20)
