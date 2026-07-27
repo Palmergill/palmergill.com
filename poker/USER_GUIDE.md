@@ -117,7 +117,6 @@ When it's your turn, you have several options:
 | Dimmed, grey seat | Player has folded |
 | Green outline + green stack | Winner of the hand |
 | `D` / `SB` / `BB` chip | Dealer button, small blind, big blind |
-| `TAG` / `LP` / `MAN` / `STD` / `ROC` tag | That bot's playing style — hover for the full description |
 | Gold pill beside a seat | Chips that seat has bet this round |
 | Thin gold bar above the buttons | Time left to act (30 seconds) |
 | Dimmed action buttons | Not your turn — hover to see who the table is waiting on |
@@ -174,7 +173,7 @@ Under "More modes", use "Host table" to create a lobby and share the Game ID. Th
 
 ### Tooltips
 
-The table shows numbers and short labels rather than explanations. Hover (or tab to) anything that is not self-evident — the betting-round chip, the pot, the dealer button and blind chips, an opponent's style tag, the Call button — and a tooltip explains it. The Call tooltip includes the pot odds for the decision in front of you.
+The table shows numbers and short labels rather than explanations. Hover (or tab to) anything that is not self-evident — the betting-round chip, the pot, the dealer button and blind chips, or the Call button — and a tooltip explains it. The Call tooltip includes the pot odds for the decision in front of you.
 
 ### PWA Installation
 
@@ -225,17 +224,8 @@ Watch for:
 
 ### Bluffing
 
-AI opponents have distinct personality archetypes labeled on each seat:
-
-| Bot | Archetype | What to expect |
-|-----|-----------|---------------|
-| Reg | Tight-Aggressive (TAG) | Folds weak hands, bets value hard. |
-| Cal | Loose-Passive (LP) | Calls too much; raise for value, fold to its aggression. |
-| Action Jackson | Maniac | Bets and raises light; trap with strong hands. |
-| Stone | Rock | Folds almost everything; respect a raise. |
-| Avery | Standard | Balanced baseline. |
-
-Adjust your strategy by opponent.
+AI opponents use distinct playing styles behind the scenes. Pay attention to
+their actions and adjust your strategy as you learn how each opponent plays.
 
 ---
 

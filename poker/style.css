@@ -757,18 +757,6 @@ select {
     white-space: nowrap;
 }
 
-.seat-style {
-    flex: none;
-    padding: 1px 4px;
-    border: 1px solid rgba(232, 199, 115, 0.24);
-    border-radius: 3px;
-    color: rgba(232, 199, 115, 0.8);
-    font-size: 0.54rem;
-    font-weight: 800;
-    letter-spacing: 0.06em;
-    cursor: help;
-}
-
 .seat-stack {
     color: rgba(245, 235, 216, 0.72);
     font-size: 0.8rem;

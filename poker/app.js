@@ -1579,25 +1579,6 @@ function renderPositionChip(player) {
     return '';
 }
 
-// A HUD-style tag for each bot's style. Two or three letters on the table,
-// the full explanation on hover.
-const PERSONALITY_TAGS = {
-    tag: { tag: 'TAG', tip: 'Tight-aggressive — plays few hands, bets them hard' },
-    lp: { tag: 'LP', tip: 'Loose-passive — calls far too much, rarely raises' },
-    mn: { tag: 'MAN', tip: 'Maniac — bets and bluffs relentlessly, high variance' },
-    std: { tag: 'STD', tip: 'Standard — balanced, by-the-book ranges' },
-    rock: { tag: 'ROC', tip: 'Rock — folds anything marginal, only bets the nuts' }
-};
-
-function renderPersonalityTag(player) {
-    const preset = PERSONALITY_TAGS[player.ai_personality];
-    if (!preset) return '';
-    const tip = player.ai_personality_label
-        ? preset.tip
-        : `${preset.tag} playing style`;
-    return `<span class="seat-style" data-tip="${escapeHtml(tip)}" aria-label="${escapeHtml(player.ai_personality_label || preset.tag)}">${preset.tag}</span>`;
-}
-
 function renderOpponent(player, seatClass = 'seat-1') {
     const isCurrent = gameState.phase !== 'showdown' && gameState.current_player === player.id;
     const isShowdown = gameState.phase === 'showdown';
@@ -1624,7 +1605,7 @@ function renderOpponent(player, seatClass = 'seat-1') {
             <div class="seat-cards">${cards}</div>
             <div class="seat-plate">
                 ${renderPositionChip(player)}
-                <span class="seat-name"><span class="seat-nick">${escapeHtml(player.name)}</span>${renderPersonalityTag(player)}</span>
+                <span class="seat-name"><span class="seat-nick">${escapeHtml(player.name)}</span></span>
                 <span class="seat-stack" data-tip="Chips behind">${formatChips(player.chips)}</span>
                 ${player.bet > 0 ? `<span class="seat-bet" data-tip="Bet this round">${formatChips(player.bet)}</span>` : ''}
                 ${actionLabel ? `<span class="seat-action">${escapeHtml(actionLabel)}</span>` : ''}

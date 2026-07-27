@@ -60,6 +60,15 @@ def create_single_player_game():
     return response.json()
 
 
+def test_single_player_roster_uses_short_neutral_names():
+    data = create_single_player_game()
+    game = poker.games[data["game_id"]]
+
+    assert [player.name for player in game.players if not player.is_human] == [
+        "Alex", "Sam", "Jordan", "Casey", "Riley",
+    ]
+
+
 def test_poker_state_requires_player_token_header_not_query_string():
     data = create_single_player_game()
 

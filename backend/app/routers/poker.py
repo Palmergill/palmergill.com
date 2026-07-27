@@ -114,7 +114,12 @@ BOT_AGGRESSION_BY_NAME = {
     "Charlie": 0.7,
     "Diana": 0.6,
     "Eve": 0.4,
-    # New personality-named bots from the AI personalities feature.
+    "Alex": 0.7,
+    "Sam": 0.2,
+    "Jordan": 0.95,
+    "Casey": 0.35,
+    "Riley": 0.5,
+    # Preserve personality values when restoring games made with the old roster.
     "Reg": 0.7,
     "Cal": 0.2,
     "Action Jackson": 0.95,
@@ -566,15 +571,13 @@ async def create_game(http_request: Request, request: CreateGameRequest):
     player_token = create_player_token(game_id, human.id)
 
     if request.game_type in ("single", "tournament"):
-        # Add AI bots with named personalities so each opponent plays differently.
-        # The roster mixes archetypes — one of each plus a TAG variant — to
-        # give a single-table experience the feel of a real mixed lineup.
+        # Keep the visible roster neutral while retaining distinct play styles.
         ai_manager = AIManager(game)
-        ai_manager.add_bot("Reg",            personality="tag")
-        ai_manager.add_bot("Cal",            personality="lp")
-        ai_manager.add_bot("Action Jackson", personality="mn")
-        ai_manager.add_bot("Stone",          personality="rock")
-        ai_manager.add_bot("Avery",          personality="std")
+        ai_manager.add_bot("Alex",   personality="tag")
+        ai_manager.add_bot("Sam",    personality="lp")
+        ai_manager.add_bot("Jordan", personality="mn")
+        ai_manager.add_bot("Casey",  personality="rock")
+        ai_manager.add_bot("Riley",  personality="std")
 
         if request.game_type == "tournament":
             game.configure_tournament()
