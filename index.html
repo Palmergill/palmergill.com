@@ -155,45 +155,103 @@
             align-items: flex-end;
             justify-content: space-between;
             gap: 16px;
-            margin-bottom: 22px;
+            margin-bottom: 26px;
         }
         .sec-head h2 { font-size: clamp(1.3rem, 3vw, 1.5rem); font-weight: 700; letter-spacing: -0.01em; }
         .sec-head p { color: var(--muted); font-size: 0.92rem; }
 
         .cards {
             display: grid;
-            grid-template-columns: repeat(3, minmax(0, 1fr));
-            gap: 18px;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 20px;
         }
         .card {
-            background: var(--card);
+            position: relative;
+            isolation: isolate;
+            background:
+                linear-gradient(145deg, color-mix(in srgb, var(--ac) 6%, var(--card)) 0%, var(--card) 42%);
             border: 1px solid var(--line);
             border-radius: var(--radius);
             overflow: hidden;
             display: flex;
             flex-direction: column;
-            transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+            box-shadow: 0 8px 24px rgba(60, 50, 35, 0.04);
+            transition: box-shadow 0.2s ease, border-color 0.2s ease;
+        }
+        .card::before {
+            content: "";
+            position: absolute;
+            z-index: 2;
+            inset: 0 auto 0 0;
+            width: 4px;
+            background: var(--ac);
+            opacity: 0.78;
         }
         .card:hover {
-            transform: translateY(-4px);
-            box-shadow: 0 18px 40px rgba(60, 50, 35, 0.10);
+            box-shadow: 0 16px 38px rgba(60, 50, 35, 0.09);
             border-color: color-mix(in srgb, var(--ac) 40%, var(--line));
         }
         .card .thumb {
-            aspect-ratio: 16 / 10;
+            position: relative;
+            aspect-ratio: 16 / 9;
+            margin: 10px 10px 0;
             overflow: hidden;
             background: var(--bg);
-            border-bottom: 1px solid var(--line);
+            border: 1px solid color-mix(in srgb, var(--ac) 14%, var(--line));
+            border-radius: 11px;
         }
         .card .thumb img {
             width: 100%;
             height: 100%;
             object-fit: cover;
             object-position: top center;
+            transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1);
         }
-        .card .thumb--ph { display: grid; place-items: center; background: linear-gradient(135deg, var(--surface), var(--bg)); }
-        .card .thumb-ph { font-size: 3.4rem; line-height: 1; filter: saturate(0.9); }
-        .card .pad { padding: 20px 20px 22px; display: flex; flex-direction: column; flex: 1; }
+        .card:hover .thumb img {
+            transform: scale(1.018);
+        }
+        .card .thumb--ph {
+            display: grid;
+            place-items: center;
+            background:
+                linear-gradient(90deg, transparent 49.6%, rgba(255, 255, 255, 0.34) 49.6% 50.4%, transparent 50.4%),
+                repeating-linear-gradient(0deg, transparent 0 17%, rgba(255, 255, 255, 0.13) 17% 17.6%),
+                linear-gradient(135deg, #60784f, #415c39);
+        }
+        .card .thumb--ph::before,
+        .card .thumb--ph::after {
+            content: "";
+            position: absolute;
+            top: 18%;
+            bottom: 18%;
+            width: 17%;
+            border: 2px solid rgba(255, 255, 255, 0.28);
+        }
+        .card .thumb--ph::before { left: -1px; border-left: 0; }
+        .card .thumb--ph::after { right: -1px; border-right: 0; }
+        .card .thumb-ph {
+            position: relative;
+            z-index: 1;
+            display: grid;
+            place-items: center;
+            width: 72px;
+            height: 72px;
+            border: 1px solid rgba(255, 255, 255, 0.45);
+            border-radius: 50%;
+            background: rgba(35, 32, 28, 0.25);
+            color: #fff;
+            font-size: 1.3rem;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            box-shadow: 0 10px 28px rgba(18, 30, 15, 0.22);
+        }
+        .card .pad { padding: 21px 22px 22px; display: flex; flex-direction: column; flex: 1; }
+        .card-topline {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+        }
         .card .ey {
             font-size: 0.74rem;
             font-weight: 600;
@@ -201,7 +259,21 @@
             text-transform: uppercase;
             color: var(--ac);
         }
-        .card h3 { font-size: 1.3rem; font-weight: 700; margin: 8px 0; letter-spacing: -0.01em; }
+        .card .project-no {
+            color: color-mix(in srgb, var(--ac) 65%, var(--muted));
+            font-size: 0.72rem;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+        }
+        .card h3 { font-size: clamp(1.35rem, 2.4vw, 1.55rem); font-weight: 700; margin: 8px 0; letter-spacing: -0.02em; }
+        .card h3 a { text-decoration: none; }
+        .card h3 a:hover { color: var(--ac); }
+        .card h3 a:focus-visible {
+            color: var(--ac);
+            outline: 2px solid var(--ac);
+            outline-offset: 3px;
+            border-radius: 3px;
+        }
         .card p { color: var(--soft); font-size: 0.92rem; flex: 1; }
 
         .card-meta {
@@ -234,19 +306,37 @@
 
         .card .go {
             margin-top: 18px;
-            display: inline-flex;
+            padding-top: 15px;
+            border-top: 1px solid var(--line);
+            display: flex;
             align-items: center;
-            gap: 7px;
+            justify-content: space-between;
+            gap: 12px;
             font-weight: 600;
             font-size: 0.88rem;
             text-decoration: none;
             color: var(--ac);
-            transition: gap 0.16s ease;
         }
-        .card .go:hover, .card .go:focus-visible { gap: 11px; outline: none; }
+        .card .go-arrow {
+            display: grid;
+            place-items: center;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            background: color-mix(in srgb, var(--ac) 10%, transparent);
+            transition: background 0.16s ease, color 0.16s ease;
+        }
+        .card .go:hover .go-arrow,
+        .card .go:focus-visible .go-arrow { background: var(--ac); color: #fff; }
+        .card .go:focus-visible {
+            outline: 2px solid var(--ac);
+            outline-offset: 4px;
+            border-radius: 4px;
+        }
 
         .card[data-c="stock"] { --ac: var(--sky); }
         .card[data-c="btc"] { --ac: var(--clay); }
+        .card[data-c="fantasy"] { --ac: var(--plum); }
         .card[data-c="casino"] { --ac: var(--sage); }
 
         /* ---- footer ---- */
@@ -381,15 +471,6 @@
         @keyframes drift-a { from { transform: translate3d(0, 0, 0); } to { transform: translate3d(4vw, 3vh, 0); } }
         @keyframes drift-b { from { transform: translate3d(0, 0, 0); } to { transform: translate3d(-3vw, -2.5vh, 0); } }
 
-        /* ---- reveal ---- */
-        .cards.is-reveal-ready .card {
-            opacity: 0;
-            transform: translateY(20px);
-            transition: opacity 0.6s cubic-bezier(0.22, 1, 0.36, 1), transform 0.6s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.2s ease, border-color 0.2s ease;
-            transition-delay: calc(var(--reveal-index, 0) * 90ms);
-        }
-        .cards.is-reveal-ready .card.is-visible { opacity: 1; transform: translateY(0); }
-
         @media (max-width: 820px) {
             .hero { grid-template-columns: 1fr; gap: 24px; padding-top: 32px; }
             .portrait { max-width: 320px; aspect-ratio: 4 / 3; }
@@ -402,8 +483,6 @@
                 transition-duration: 0.01ms !important;
                 animation-duration: 0.01ms !important;
             }
-            .cards.is-reveal-ready .card,
-            .cards.is-reveal-ready .card.is-visible { opacity: 1; transform: none; }
             #welcome-splash { display: none !important; }
             html.is-splashing { overflow: auto; }
             .hero-glow { animation: none !important; opacity: 1 !important; }
@@ -468,11 +547,11 @@
                             <img src="/assets/project-screenshots/stock-research-1.png?v=2" alt="Stock Research landing page" loading="lazy" decoding="async">
                         </a>
                         <div class="pad">
-                            <span class="ey">Market data</span>
-                            <h3>Stock Research</h3>
+                            <div class="card-topline"><span class="ey">Market data</span><span class="project-no">01</span></div>
+                            <h3><a href="/stock-research/">Stock Research</a></h3>
                             <p>Real-time price action, fundamentals, and earnings trends on interactive canvas charts. FastAPI backend with provider failover across Polygon and Finnhub.</p>
                             <div class="card-meta"><span>Provider failover</span><span>Canvas charts</span></div>
-                            <a class="go" href="/stock-research/">Open →</a>
+                            <a class="go" href="/stock-research/"><span>Explore project</span><span class="go-arrow" aria-hidden="true">→</span></a>
                         </div>
                     </article>
 
@@ -481,24 +560,24 @@
                             <img src="/assets/project-screenshots/bitcoin-chat-1.png" alt="Bitcoin Chat dashboard" loading="lazy" decoding="async">
                         </a>
                         <div class="pad">
-                            <span class="ey">BTC tooling</span>
-                            <h3>Bitcoin Chat</h3>
+                            <div class="card-topline"><span class="ey">BTC tooling</span><span class="project-no">02</span></div>
+                            <h3><a href="/bitcoin-chat/">Bitcoin Chat</a></h3>
                             <p>Ask about block height, mempool, and fees in plain English — answers come back as structured cards from read-only Bitcoin Core RPC plus mempool.space context.</p>
                             <div class="card-meta"><span>Read-only RPC</span><span>Plain English</span></div>
-                            <a class="go" href="/bitcoin-chat/">Open →</a>
+                            <a class="go" href="/bitcoin-chat/"><span>Explore project</span><span class="go-arrow" aria-hidden="true">→</span></a>
                         </div>
                     </article>
 
                     <article class="card" data-c="fantasy">
                         <a class="thumb thumb--ph" href="/fantasy/" aria-label="Open Fantasy Football">
-                            <span class="thumb-ph" aria-hidden="true">🏈</span>
+                            <span class="thumb-ph" aria-hidden="true">FF</span>
                         </a>
                         <div class="pad">
-                            <span class="ey">NFL fantasy</span>
-                            <h3>Fantasy Football</h3>
+                            <div class="card-topline"><span class="ey">NFL fantasy</span><span class="project-no">03</span></div>
+                            <h3><a href="/fantasy/">Fantasy Football</a></h3>
                             <p>Weekly rankings and point projections by position, plus trending adds and drops — collected from free public data (Sleeper, nflverse) into the shared FastAPI backend.</p>
                             <div class="card-meta"><span>Weekly rankings</span><span>Free data</span></div>
-                            <a class="go" href="/fantasy/">Open →</a>
+                            <a class="go" href="/fantasy/"><span>Explore project</span><span class="go-arrow" aria-hidden="true">→</span></a>
                         </div>
                     </article>
 
@@ -507,8 +586,8 @@
                             <img src="/assets/project-screenshots/poker.png?v=2" alt="Texas Hold'em game selection screen" loading="lazy" decoding="async">
                         </a>
                         <div class="pad">
-                            <span class="ey">Table games</span>
-                            <h3>Casino</h3>
+                            <div class="card-topline"><span class="ey">Table games</span><span class="project-no">04</span></div>
+                            <h3><a href="/casino/">Casino</a></h3>
                             <p>Texas hold'em, craps, and blackjack with Vegas rules, tested hand and bet logic, and mobile-friendly tables.</p>
                             <div class="card-meta"><span>Shared bankroll</span><span>Mobile tables</span></div>
                             <div class="subgames">
@@ -516,7 +595,7 @@
                                 <a href="/craps/">Craps</a>
                                 <a href="/blackjack/">Blackjack</a>
                             </div>
-                            <a class="go" href="/casino/">View all →</a>
+                            <a class="go" href="/casino/"><span>View all games</span><span class="go-arrow" aria-hidden="true">→</span></a>
                         </div>
                     </article>
                 </div>
@@ -542,8 +621,6 @@
     <script src="/shared/analytics.js?v=1"></script>
     <script>
         (() => {
-            const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
             const splash = document.getElementById('welcome-splash');
             const finishSplash = () => {
                 splash?.remove();
@@ -559,25 +636,6 @@
                 finishSplash();
             }
 
-            const cards = document.querySelector('.cards');
-            const targets = [...document.querySelectorAll('.cards > .card')];
-            if (!cards || targets.length === 0 || reduceMotion) return;
-
-            cards.classList.add('is-reveal-ready');
-            targets.forEach((el, i) => el.style.setProperty('--reveal-index', String(i)));
-
-            if ('IntersectionObserver' in window) {
-                const observer = new IntersectionObserver((entries) => {
-                    entries.forEach((entry) => {
-                        if (!entry.isIntersecting) return;
-                        entry.target.classList.add('is-visible');
-                        observer.unobserve(entry.target);
-                    });
-                }, { rootMargin: '0px 0px -10% 0px', threshold: 0.12 });
-                targets.forEach((el) => observer.observe(el));
-            } else {
-                targets.forEach((el) => el.classList.add('is-visible'));
-            }
         })();
     </script>
 </body>
