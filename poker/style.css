@@ -853,6 +853,12 @@ select {
     animation: badgeIn 220ms ease-out;
 }
 
+/* Once the cards are face up the badges are noise, and they would sit under
+   the revealed hands. */
+.showdown-active .seat-action {
+    display: none;
+}
+
 .seat.is-folded {
     opacity: 0.38;
     filter: grayscale(0.7);
@@ -1552,11 +1558,20 @@ select {
             0 18px 44px rgba(0, 0, 0, 0.5);
     }
 
-    .seat-4 { left: 18%; top: 66%; }
-    .seat-2 { left: 21%; top: 24%; }
-    .seat-1 { left: 50%; top: 9%; }
-    .seat-3 { left: 79%; top: 24%; }
-    .seat-5 { left: 82%; top: 66%; }
+    /* The lower seats sit far enough down that their showdown cards clear
+       the board. */
+    .seat-4 { left: 18%; top: 73%; }
+    .seat-2 { left: 21%; top: 25%; }
+    .seat-1 { left: 50%; top: 10%; }
+    .seat-3 { left: 79%; top: 25%; }
+    .seat-5 { left: 82%; top: 73%; }
+
+    /* Bets sit below every seat here, so the action badge takes the top edge
+       — free during play, since face-down cards are hidden in portrait. */
+    .seat-action {
+        top: -9px;
+        bottom: auto;
+    }
 
     .seat-2 .seat-bet,
     .seat-4 .seat-bet,
@@ -1593,7 +1608,8 @@ select {
         gap: 10px;
     }
 
-    .raise-sizing button { flex: 1; }
+    .raise-sizing button,
+    .raise-actions button { flex: 1; }
 
     .showdown-panel {
         grid-template-columns: 1fr;

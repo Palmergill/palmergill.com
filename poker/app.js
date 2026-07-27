@@ -1719,10 +1719,8 @@ function evaluateHandStrength(playerCards, communityCards) {
     
     // Get rank names for display
     const rankNames = { 14: 'Ace', 13: 'King', 12: 'Queen', 11: 'Jack' };
-    const pluralize = (rank) => {
-        const name = rankNames[rank] || rank;
-        return name + (rank !== 6 && rank !== 9 && rank !== 10 ? 's' : 'es');
-    };
+    // Numeric ranks stay numeric — "6s", not "Sixes" and certainly not "6es".
+    const pluralize = (rank) => `${rankNames[rank] || rank}s`;
     
     const getRankName = (rank) => rankNames[rank] || rank;
     
