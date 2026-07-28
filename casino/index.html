@@ -3,28 +3,41 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Casino Games - Palmer Gill</title>
+    <title>Casino - Palmer Gill</title>
     <meta name="description" content="Browser-based casino games — Texas Hold'em poker, craps, and blackjack — built by Palmer Gill.">
-    <meta name="theme-color" content="#0a3d24">
+    <meta name="theme-color" content="#08110c">
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://palmergill.com/casino/">
-    <meta property="og:title" content="Casino Games — Palmer Gill">
+    <meta property="og:title" content="Casino — Palmer Gill">
     <meta property="og:description" content="Browser-based casino games — Texas Hold'em poker, craps, and blackjack.">
     <meta property="og:image" content="https://palmergill.com/assets/palmer-gill-logo.png">
     <meta property="og:image:width" content="960">
     <meta property="og:image:height" content="960">
     <meta name="twitter:card" content="summary">
-    <meta name="twitter:title" content="Casino Games — Palmer Gill">
+    <meta name="twitter:title" content="Casino — Palmer Gill">
     <meta name="twitter:description" content="Browser-based casino games — Texas Hold'em poker, craps, and blackjack.">
     <meta name="twitter:image" content="https://palmergill.com/assets/palmer-gill-logo.png">
     <link rel="icon" type="image/png" href="/assets/palmer-gill-logo-small.png">
     <link rel="stylesheet" href="/shared/site-nav.css?v=13">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;700;900&family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/shared/casino-theme.css?v=3">
     <style>
-        /* Brand tokens (palette, gold, fonts) live in /shared/casino-theme.css */
+        /* Brand tokens (gold, cream, fonts) live in /shared/casino-theme.css.
+           The lobby runs a darker, quieter surface than the felt tables so it
+           reads as the room the games sit in, not another table. */
+        :root {
+            --lobby-bg: #060c09;
+            /* tiles sit on their own raised surface — a clear step up from the
+               page, or the grid reads as flat empty space */
+            --tile-bg: #151d18;
+            --tile-bg-hi: #1d2620;
+            --lobby-raise: rgba(245, 235, 216, 0.06);
+            --hairline: rgba(var(--gold-rgb), 0.16);
+            --hairline-hi: rgba(var(--gold-rgb), 0.45);
+        }
+
         * {
             box-sizing: border-box;
             margin: 0;
@@ -32,47 +45,25 @@
         }
 
         html {
-            background: var(--felt-deep);
+            background: var(--lobby-bg);
             color-scheme: dark;
-            scroll-behavior: smooth;
         }
 
         body {
             min-width: 320px;
             min-height: 100vh;
             color: var(--text);
-            font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            font-family: var(--font-body);
             line-height: 1.5;
-            overflow-x: hidden;
+            -webkit-font-smoothing: antialiased;
             background:
-                radial-gradient(ellipse at 50% 0%, var(--felt-light) 0%, var(--felt) 38%, var(--felt-deep) 100%),
-                var(--felt-deep);
-        }
-
-        /* felt fiber texture */
-        body::before {
-            content: "";
-            position: fixed;
-            inset: 0;
-            background-image:
-                radial-gradient(circle at 25% 30%, rgba(255,255,255,0.025) 0.5px, transparent 1px),
-                radial-gradient(circle at 75% 60%, rgba(0,0,0,0.06) 0.5px, transparent 1px),
-                radial-gradient(circle at 40% 80%, rgba(255,255,255,0.02) 0.5px, transparent 1px),
-                radial-gradient(circle at 10% 60%, rgba(0,0,0,0.05) 0.5px, transparent 1px);
-            background-size: 6px 6px, 9px 9px, 7px 7px, 11px 11px;
-            opacity: 0.85;
-            pointer-events: none;
-            z-index: 0;
+                radial-gradient(120% 70% at 50% -10%, rgba(26, 92, 57, 0.28) 0%, transparent 62%),
+                var(--lobby-bg);
+            background-attachment: fixed;
         }
 
         a { color: inherit; }
-        img, svg { display: block; }
-
-        .page-shell {
-            position: relative;
-            isolation: isolate;
-            z-index: 1;
-        }
+        img, svg { display: block; max-width: 100%; }
 
         .sr-only {
             position: absolute;
@@ -84,680 +75,437 @@
             border: 0;
         }
 
-        /* Wood rail beneath site nav */
-        .rail {
-            position: relative;
-            height: 32px;
-            background:
-                linear-gradient(180deg, var(--wood-light) 0%, var(--wood) 50%, var(--wood-dark) 100%);
-            border-bottom: 2px solid #2a1808;
-            box-shadow: inset 0 -8px 14px rgba(0,0,0,0.4), inset 0 4px 8px rgba(200,149,104,0.3);
-        }
-        .rail::after {
-            content: "";
-            position: absolute; left: 0; right: 0; bottom: -10px;
-            height: 10px;
-            background: linear-gradient(180deg, rgba(0,0,0,0.55), transparent);
-            pointer-events: none;
-        }
-
-        .hero {
-            position: relative;
-            padding: clamp(42px, 6vw, 72px) 24px clamp(24px, 3vw, 38px);
-            text-align: center;
-        }
-
-        .hero-inner {
+        .wrap {
             width: min(100%, var(--max));
             margin: 0 auto;
+            padding: 0 clamp(20px, 4vw, 40px);
         }
 
-        .suits-row {
-            display: flex;
-            justify-content: center;
-            gap: 26px;
-            margin-bottom: 22px;
-            font-size: 1.4rem;
+        :focus-visible {
+            outline: 1px solid var(--gold);
+            outline-offset: 3px;
         }
-        .suits-row span:nth-child(1) { color: var(--cream); }
-        .suits-row span:nth-child(2) { color: #d44a3a; }
-        .suits-row span:nth-child(3) { color: #d44a3a; }
-        .suits-row span:nth-child(4) { color: var(--gold); }
 
-        .eyebrow {
-            display: inline-flex;
-            align-items: center;
-            gap: 12px;
-            margin-bottom: 20px;
-            color: var(--gold);
-            font-size: 0.78rem;
-            font-weight: 800;
-            letter-spacing: 0.32em;
-            text-transform: uppercase;
-        }
-        .eyebrow::before,
-        .eyebrow::after {
-            content: "";
-            width: 40px;
-            height: 1px;
-            background: currentColor;
-            opacity: 0.6;
+        /* ── masthead ─────────────────────────────────────────── */
+        .masthead {
+            padding: clamp(56px, 9vw, 104px) 0 clamp(28px, 4vw, 40px);
         }
 
         h1 {
-            font-family: 'Playfair Display', Georgia, "Times New Roman", serif;
-            font-weight: 900;
-            font-size: clamp(2.8rem, 7vw, 5.4rem);
-            line-height: 1;
+            font-family: var(--font-display);
+            font-weight: 500;
+            font-size: clamp(3rem, 8vw, 5.5rem);
+            line-height: 0.95;
+            letter-spacing: -0.02em;
             color: var(--cream);
-            letter-spacing: 0.01em;
-            text-shadow:
-                0 2px 0 rgba(0,0,0,0.4),
-                0 4px 18px rgba(0,0,0,0.5);
-        }
-        h1 .amp {
-            font-style: italic;
-            color: var(--gold);
-            font-weight: 700;
         }
 
-        .lede {
-            max-width: 620px;
-            margin: 22px auto 0;
-            color: var(--muted);
-            font-size: clamp(1.02rem, 1.5vw, 1.2rem);
-        }
-
-        .embossed-divider {
-            display: block;
-            max-width: 320px;
-            margin: 22px auto 0;
-            border: none;
-            height: 2px;
-            background: linear-gradient(90deg, transparent, var(--gold), transparent);
-            opacity: 0.5;
-        }
-
-        .back-link {
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            margin-top: 24px;
-            color: var(--muted);
-            font-size: 0.8rem;
-            font-weight: 800;
-            letter-spacing: 0.1em;
-            text-decoration: none;
-            text-transform: uppercase;
-            transition: color 180ms ease;
-        }
-
-        .back-link:hover,
-        .back-link:focus-visible {
-            color: var(--cream);
-            outline: none;
-        }
-
-        .back-link svg {
-            width: 16px;
-            height: 16px;
-            transition: transform 180ms ease;
-        }
-
-        .back-link:hover svg,
-        .back-link:focus-visible svg {
-            transform: translateX(-3px);
-        }
-
-        main {
-            position: relative;
-            z-index: 1;
-        }
-
-        .section {
-            width: min(100%, var(--max));
-            margin: 0 auto;
-            padding: clamp(24px, 4vw, 40px) 24px clamp(64px, 8vw, 100px);
-        }
-
-        .games-grid {
-            display: grid;
-            grid-template-columns: repeat(12, minmax(0, 1fr));
-            align-items: stretch;
-            gap: 26px;
-            perspective: 1400px;
-        }
-
-        .your-house {
-            margin: clamp(40px, 5vw, 58px) 0 0;
-            padding: clamp(20px, 3vw, 32px);
-            border: 1px solid rgba(232, 199, 115, 0.28);
-            border-radius: 14px;
-            background:
-                linear-gradient(180deg, rgba(232, 199, 115, 0.06), rgba(0, 0, 0, 0.18));
-            box-shadow: 0 10px 36px rgba(0, 0, 0, 0.36);
-        }
-
-        .your-house-header {
+        .masthead-rule {
             display: flex;
-            flex-wrap: wrap;
             align-items: center;
-            justify-content: space-between;
             gap: 16px;
-            margin-bottom: 22px;
+            margin-top: clamp(22px, 3vw, 32px);
         }
 
-        .your-house-title {
-            font-family: "Playfair Display", Georgia, serif;
-            font-size: clamp(1.4rem, 2.4vw, 1.8rem);
-            font-weight: 700;
-            color: var(--gold);
-            letter-spacing: 0.02em;
+        .masthead-rule::after {
+            content: "";
+            flex: 1;
+            height: 1px;
+            background: linear-gradient(90deg, var(--hairline), transparent);
         }
 
-        .your-house-name {
-            display: inline-flex;
-            align-items: center;
-            gap: 10px;
-            font-size: 0.84rem;
-            color: var(--muted);
+        /* Suits are drawn, not typed: the ♠♥♦♣ characters get picked up by the
+           OS colour-emoji face on macOS/Android, which ignores `color`. */
+        .suits {
+            display: flex;
+            gap: 12px;
+            color: rgba(var(--gold-rgb), 0.5);
         }
 
-        .your-house-name input {
-            min-width: 120px;
-            padding: 7px 12px;
-            border: 1px solid rgba(232, 199, 115, 0.3);
-            border-radius: 8px;
-            background: rgba(0, 0, 0, 0.28);
-            color: var(--cream);
-            font: inherit;
-            font-size: 0.86rem;
+        .suits svg {
+            width: 12px;
+            height: 12px;
+            fill: currentColor;
         }
 
-        .your-house-name input:focus {
-            outline: none;
-            border-color: var(--gold);
-            box-shadow: 0 0 0 2px rgba(232, 199, 115, 0.24);
-        }
-
-        .your-house-grid {
+        /* ── ledger (shared bankroll + stats) ─────────────────── */
+        .ledger {
             display: grid;
-            grid-template-columns: repeat(4, minmax(0, 1fr));
+            grid-template-columns: repeat(4, minmax(0, 1fr)) auto;
+            align-items: end;
+            gap: clamp(18px, 3vw, 44px);
+            padding: clamp(20px, 3vw, 26px) 0 clamp(22px, 3vw, 28px);
+            border-bottom: 1px solid var(--hairline);
+        }
+
+        .figure-label {
+            display: block;
+            color: var(--quiet);
+            font-size: 0.62rem;
+            font-weight: 600;
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
+        }
+
+        .figure-value {
+            display: block;
+            margin-top: 6px;
+            font-family: var(--font-display);
+            font-weight: 500;
+            font-size: clamp(1.5rem, 3vw, 2rem);
+            line-height: 1.05;
+            color: var(--cream);
+            font-variant-numeric: tabular-nums;
+        }
+
+        .figure-value.is-positive { color: #7fd9ab; }
+        .figure-value.is-negative { color: #e28a82; }
+
+        .ledger-account {
+            display: flex;
+            align-items: center;
             gap: 14px;
         }
 
-        .stat-tile {
-            padding: 16px 18px;
-            border: 1px solid rgba(255, 255, 255, 0.12);
-            border-radius: 10px;
-            background: rgba(0, 0, 0, 0.28);
-        }
-
-        .stat-label {
-            color: var(--quiet);
-            font-size: 0.7rem;
-            font-weight: 700;
-            letter-spacing: 0.14em;
-            text-transform: uppercase;
-        }
-
-        .stat-value {
-            margin-top: 8px;
-            font-family: "Playfair Display", Georgia, serif;
-            font-size: clamp(1.4rem, 2.4vw, 1.9rem);
-            font-weight: 700;
+        .ledger-account input {
+            width: 130px;
+            padding: 7px 0;
+            border: none;
+            border-bottom: 1px solid var(--hairline);
+            background: none;
             color: var(--cream);
-            line-height: 1.1;
+            font: inherit;
+            font-size: 0.85rem;
+            text-align: right;
         }
 
-        .stat-value.is-positive { color: #74d39a; }
-        .stat-value.is-negative { color: #e07a6a; }
+        .ledger-account input::placeholder { color: var(--quiet); }
 
-        .your-house-foot {
-            margin-top: 14px;
-            display: flex;
-            flex-wrap: wrap;
-            justify-content: space-between;
-            gap: 12px;
-            font-size: 0.78rem;
+        .ledger-account input:focus {
+            outline: none;
+            border-bottom-color: var(--gold);
+        }
+
+        .ledger-reset {
+            border: none;
+            background: none;
+            padding: 7px 0;
             color: var(--quiet);
-        }
-
-        .your-house-reset {
-            border: 1px solid rgba(232, 199, 115, 0.3);
-            border-radius: 999px;
-            background: transparent;
-            color: var(--cream);
-            padding: 6px 14px;
-            font-size: 0.74rem;
-            font-weight: 700;
-            letter-spacing: 0.1em;
+            font: inherit;
+            font-size: 0.68rem;
+            font-weight: 600;
+            letter-spacing: 0.16em;
             text-transform: uppercase;
             cursor: pointer;
-            transition: background 180ms ease, border-color 180ms ease;
+            transition: color 160ms ease;
         }
 
-        .your-house-reset:hover,
-        .your-house-reset:focus-visible {
-            background: rgba(232, 199, 115, 0.14);
-            border-color: var(--gold);
-            outline: none;
+        .ledger-reset:hover,
+        .ledger-reset:focus-visible { color: var(--gold); }
+
+        /* ── game tiles ───────────────────────────────────────── */
+        .tiles {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 1px;
+            background: var(--hairline);
+            box-shadow: 0 30px 70px rgba(0, 0, 0, 0.5);
         }
 
-        @media (max-width: 720px) {
-            .your-house-grid {
-                grid-template-columns: repeat(2, minmax(0, 1fr));
-            }
-        }
-
-        .game-card {
+        .tile {
             position: relative;
-            min-height: 440px;
-            grid-column: span 3;
-            display: block;
-            text-decoration: none;
-            color: var(--text);
-            border-radius: 12px;
-            overflow: hidden;
-            background:
-                radial-gradient(ellipse at 50% 50%, var(--felt-light) 0%, var(--felt) 60%, var(--felt-deep) 100%);
-            border: 6px solid;
-            border-image: linear-gradient(180deg, var(--wood-light) 0%, var(--wood) 50%, var(--wood-dark) 100%) 1;
-            box-shadow:
-                0 0 0 1px #2a1808,
-                0 0 0 8px #1a0f04,
-                0 20px 60px rgba(0,0,0,0.5),
-                inset 0 0 40px rgba(0,0,0,0.3);
-            transform-style: preserve-3d;
-            transition: transform 520ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 280ms ease;
-        }
-
-        /* dashed gold stitch */
-        .game-card::before {
-            content: "";
-            position: absolute;
-            inset: 8px;
-            border: 1px dashed rgba(232, 199, 115, 0.35);
-            border-radius: 8px;
-            pointer-events: none;
-            z-index: 2;
-        }
-
-        .game-card:hover,
-        .game-card:focus-visible {
-            transform: translateY(-6px);
-            box-shadow:
-                0 0 0 1px #2a1808,
-                0 0 0 8px #1a0f04,
-                0 30px 80px rgba(0,0,0,0.6),
-                inset 0 0 60px rgba(0,0,0,0.25);
-            outline: none;
-        }
-
-        .game-face,
-        .game-screenshot {
-            position: absolute;
-            inset: 0;
-            backface-visibility: hidden;
-            -webkit-backface-visibility: hidden;
-            transition: opacity 260ms ease, transform 520ms cubic-bezier(0.22, 1, 0.36, 1);
-        }
-
-        .game-face {
-            padding: 42px 28px 30px;
-            text-align: center;
+            isolation: isolate;
             display: flex;
             flex-direction: column;
             justify-content: space-between;
-            opacity: 1;
-            transform: rotateY(0);
-            z-index: 1;
+            gap: 40px;
+            min-height: 236px;
+            padding: clamp(28px, 4vw, 40px);
+            overflow: hidden;
+            background: var(--tile-bg);
+            text-decoration: none;
+            transition: background 220ms ease;
         }
 
-        .corner-rank {
+        .tile:hover,
+        .tile:focus-visible { background: var(--tile-bg-hi); }
+
+        /* the suit reads as a watermark, not decoration */
+        .tile-mark {
             position: absolute;
-            font-family: 'Playfair Display', Georgia, serif;
-            font-weight: 700;
-            font-size: 1.4rem;
-            color: var(--gold);
-            opacity: 0.85;
-            z-index: 3;
+            top: 0;
+            bottom: 0;
+            right: -44px;
+            margin: auto 0;
+            z-index: -1;
+            width: 200px;
+            height: 200px;
+            fill: currentColor;
+            color: rgba(var(--gold-rgb), 0.07);
+            transition: color 260ms ease, transform 420ms cubic-bezier(0.22, 1, 0.36, 1);
         }
-        .corner-rank.tl { top: 18px; left: 22px; }
-        .corner-rank.br { bottom: 18px; right: 22px; transform: rotate(180deg); }
 
-        .suit-big {
-            font-size: 80px;
-            line-height: 1;
-            margin: 6px 0 14px;
-            text-shadow: 0 6px 18px rgba(0,0,0,0.5);
+        .tile::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            z-index: -2;
+            background: linear-gradient(150deg, var(--lobby-raise), transparent 58%);
+            opacity: 0;
+            transition: opacity 220ms ease;
         }
-        .game-card[data-suit="spade"] .suit-big { color: #0a0a05; }
-        .game-card[data-suit="spade"] .corner-rank { color: var(--gold); }
-        .game-card[data-suit="heart"] .suit-big { color: #c43a2c; text-shadow: 0 6px 18px rgba(196,58,44,0.45); }
-        .game-card[data-suit="club"] .suit-big { color: var(--gold); text-shadow: 0 6px 18px rgba(232,199,115,0.5); }
 
-        .game-title {
-            font-family: 'Playfair Display', Georgia, serif;
-            font-weight: 700;
-            font-size: clamp(1.7rem, 2.4vw, 2.1rem);
-            color: var(--cream);
+        .tile:hover::before,
+        .tile:focus-visible::before { opacity: 1; }
+
+        /* a hairline of gold draws across the top edge on hover */
+        .tile::after {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: linear-gradient(90deg, var(--gold), transparent 70%);
+            transform: scaleX(0);
+            transform-origin: left;
+            transition: transform 340ms cubic-bezier(0.22, 1, 0.36, 1);
+        }
+
+        .tile:hover::after,
+        .tile:focus-visible::after { transform: scaleX(1); }
+
+        .tile:hover .tile-mark,
+        .tile:focus-visible .tile-mark {
+            color: rgba(var(--gold-rgb), 0.1);
+            transform: translate3d(-10px, 0, 0);
+        }
+
+        .tile-title {
+            font-family: var(--font-display);
+            font-weight: 500;
+            font-size: clamp(1.7rem, 3.2vw, 2.25rem);
             line-height: 1.1;
-            margin-bottom: 4px;
-            text-shadow: 0 2px 6px rgba(0,0,0,0.4);
+            letter-spacing: -0.01em;
+            color: var(--cream);
         }
-        .game-title em { font-style: italic; color: var(--gold); }
 
-        .subline {
-            font-family: Inter, sans-serif;
-            font-size: 0.72rem;
-            letter-spacing: 0.32em;
+        .tile-meta {
+            margin-top: 12px;
+            color: rgba(var(--gold-rgb), 0.72);
+            font-size: 0.68rem;
+            font-weight: 600;
+            letter-spacing: 0.22em;
             text-transform: uppercase;
-            color: var(--gold);
-            margin-bottom: 16px;
         }
 
-        .game-description {
-            color: var(--muted);
-            font-size: 0.97rem;
-            line-height: 1.55;
-            margin-bottom: 22px;
-            padding: 0 4px;
-        }
-
-        .chips-stack {
+        .tile-foot {
             display: flex;
+            align-items: center;
+            gap: 16px;
+            color: var(--quiet);
+            font-size: 0.74rem;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .tile-record:empty { display: none; }
+
+        .tile-go {
+            display: inline-flex;
+            align-items: center;
             justify-content: center;
-            gap: 6px;
-            margin-bottom: 22px;
-        }
-        .poker-chip {
-            width: 28px; height: 28px;
+            flex: none;
+            width: 34px;
+            height: 34px;
+            border: 1px solid var(--hairline);
             border-radius: 50%;
-            border: 3px dashed rgba(245,235,216,0.85);
-            background: var(--chip);
-            box-shadow: 0 4px 8px rgba(0,0,0,0.5), inset 0 -3px 6px rgba(0,0,0,0.3);
+            color: var(--cream);
+            transition: border-color 200ms ease, background 200ms ease, color 200ms ease, transform 260ms ease;
         }
-        .poker-chip:nth-child(1) { --chip: #c43a2c; }
-        .poker-chip:nth-child(2) { --chip: #1f4f8c; transform: translateY(-2px); }
-        .poker-chip:nth-child(3) { --chip: #1a1a1a; }
-        .poker-chip:nth-child(4) { --chip: var(--gold); transform: translateY(-2px); }
-        .poker-chip:nth-child(5) { --chip: #ffffff; }
 
-        .play-btn {
-            display: inline-block;
-            padding: 12px 28px;
-            font-family: Inter, sans-serif;
-            font-size: 0.8rem;
-            font-weight: 800;
-            letter-spacing: 0.28em;
-            text-transform: uppercase;
+        .tile-go svg {
+            width: 14px;
+            height: 14px;
+        }
+
+        .tile:hover .tile-go,
+        .tile:focus-visible .tile-go {
+            border-color: var(--gold);
+            background: var(--gold);
             color: var(--ink);
-            background: linear-gradient(180deg, var(--gold) 0%, var(--gold-deep) 100%);
-            border: 1px solid #8a6c2a;
-            border-radius: 4px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.5);
-            transition: transform 180ms ease;
-        }
-        .game-card:hover .play-btn,
-        .game-card:focus-visible .play-btn {
-            transform: translateY(-2px);
+            transform: translateX(4px);
         }
 
-        .game-screenshot {
-            margin: 0;
-            padding: 14px;
-            opacity: 0;
-            transform: rotateY(-180deg);
-            background: rgba(0,0,0,0.4);
-            display: grid;
-            place-items: center;
-            z-index: 0;
-        }
-
-        .game-screenshot img {
-            width: 100%;
-            height: 100%;
-            object-fit: contain;
-            object-position: center;
-            border-radius: 6px;
-            filter: saturate(0.96) contrast(1.02);
-        }
-
-        .game-card:hover .game-face,
-        .game-card:focus-visible .game-face {
-            opacity: 0;
-            transform: rotateY(180deg);
-        }
-
-        .game-card:hover .game-screenshot,
-        .game-card:focus-visible .game-screenshot {
-            opacity: 1;
-            transform: rotateY(0);
-        }
-
+        /* ── footer ───────────────────────────────────────────── */
         footer {
+            padding: 28px 0 44px;
+            color: var(--quiet);
+            font-size: 0.76rem;
+        }
+
+        .footer-inner {
             display: flex;
             flex-wrap: wrap;
             align-items: center;
             justify-content: space-between;
-            gap: 18px;
-            width: min(100%, var(--max));
-            margin: 0 auto;
-            padding: 30px 24px 50px;
-            color: var(--quiet);
-            font-size: 0.9rem;
+            gap: 14px;
         }
 
-        footer a {
-            color: rgba(245, 235, 216, 0.7);
-            text-decoration: none;
-        }
+        footer a { text-decoration: none; }
+        footer a:hover { color: var(--cream); }
 
-        /* 4-up desktop row: narrower cards need tighter type and a bit more height. */
-        @media (min-width: 1051px) {
-            .game-card {
-                min-height: 505px;
+        @media (max-width: 860px) {
+            .ledger {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                gap: 22px;
             }
-
-            .game-face {
-                padding: 34px 22px 26px;
-            }
-
-            .suit-big {
-                font-size: 64px;
-                margin: 4px 0 10px;
-            }
-
-            .game-description {
-                font-size: 0.9rem;
-                margin-bottom: 16px;
-            }
-
-            .chips-stack {
-                margin-bottom: 16px;
-            }
-        }
-
-        @media (max-width: 1050px) {
-            .game-card {
-                grid-column: span 6;
-            }
-        }
-
-        @media (max-width: 720px) {
-            .hero { padding: 40px 20px 24px; }
-            .suits-row { margin-bottom: 15px; }
-            .lede { margin-top: 16px; }
-            .embossed-divider { margin-top: 20px; }
-            .game-card {
+            .ledger-account {
                 grid-column: 1 / -1;
-                min-height: 420px;
+                justify-content: space-between;
+                padding-top: 4px;
+                border-top: 1px solid var(--hairline);
             }
-            .suit-big {
-                font-size: 64px;
+
+            .ledger-account input {
+                flex: 1;
+                width: auto;
+                text-align: left;
             }
+        }
+
+        @media (max-width: 640px) {
+            .tiles { grid-template-columns: minmax(0, 1fr); }
+            .tile { min-height: 0; gap: 30px; }
+            .tile-mark { width: 132px; height: 132px; top: 18px; }
         }
 
         @media (prefers-reduced-motion: reduce) {
-            html { scroll-behavior: auto; }
-            *, *::before, *::after {
-                transition-duration: 0.01ms !important;
-            }
-            .game-card:hover,
-            .game-card:focus-visible {
-                transform: none;
-            }
-            .game-card:hover .game-face,
-            .game-card:focus-visible .game-face {
-                opacity: 0;
-                transform: none;
-            }
-            .game-card:hover .game-screenshot,
-            .game-card:focus-visible .game-screenshot {
-                opacity: 1;
-                transform: none;
-            }
+            *, *::before, *::after { transition-duration: 0.01ms !important; }
         }
     </style>
 </head>
 <body class="theme-casino">
-    <div class="page-shell">
-        <div class="rail" aria-hidden="true"></div>
+    <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+        <symbol id="suit-spade" viewBox="0 0 100 100">
+            <path d="M50 8C50 8 12 37 12 60c0 12 9 21 20 21 6 0 11-2 15-7-1 12-5 21-13 28h32c-8-7-12-16-13-28 4 5 9 7 15 7 11 0 20-9 20-21C88 37 50 8 50 8Z"/>
+        </symbol>
+        <symbol id="suit-heart" viewBox="0 0 100 100">
+            <path d="M50 90S8 61 8 34C8 20 19 10 32 10c9 0 15 5 18 10 3-5 9-10 18-10 13 0 24 10 24 24 0 27-42 56-42 56Z"/>
+        </symbol>
+        <symbol id="suit-diamond" viewBox="0 0 100 100">
+            <path d="M50 6 88 50 50 94 12 50Z"/>
+        </symbol>
+        <symbol id="suit-club" viewBox="0 0 100 100">
+            <circle cx="50" cy="27" r="17"/>
+            <circle cx="27" cy="55" r="17"/>
+            <circle cx="73" cy="55" r="17"/>
+            <path d="M44 58c0 17-3 27-9 33h30c-6-6-9-16-9-33Z"/>
+        </symbol>
+    </svg>
 
-        <header class="hero">
-            <div class="hero-inner">
-                <div class="suits-row" aria-hidden="true">
-                    <span>♠</span><span>♥</span><span>♦</span><span>♣</span>
-                </div>
-                <p class="eyebrow">Browser games</p>
-                <h1>Casino <span class="amp">Games</span></h1>
-                <hr class="embossed-divider">
+    <header class="masthead">
+        <div class="wrap">
+            <h1>Casino</h1>
+            <div class="masthead-rule">
+                <span class="suits" aria-hidden="true"><svg viewBox="0 0 100 100"><use href="#suit-spade"/></svg><svg viewBox="0 0 100 100"><use href="#suit-heart"/></svg><svg viewBox="0 0 100 100"><use href="#suit-diamond"/></svg><svg viewBox="0 0 100 100"><use href="#suit-club"/></svg></span>
             </div>
-        </header>
+        </div>
+    </header>
 
-        <main>
-            <section class="section" aria-labelledby="games-title">
-                <h2 id="games-title" class="sr-only">Casino games</h2>
-
-                <div class="games-grid">
-                    <a href="/poker/" class="game-card" data-suit="spade">
-                        <span class="corner-rank tl">A♠</span>
-                        <span class="corner-rank br">A♠</span>
-                        <div class="game-face">
-                            <div>
-                                <div class="suit-big" aria-hidden="true">♠</div>
-                                <h3 class="game-title">Texas Hold'em</h3>
-                                <p class="subline">No-Limit · 6 Seats</p>
-                                <p class="game-description">Mobile-friendly No-Limit Hold'em with realistic table flow, hand evaluation, and AI opponents that play different each hand.</p>
-                            </div>
-                            <div>
-                                <div class="chips-stack" aria-hidden="true">
-                                    <span class="poker-chip"></span><span class="poker-chip"></span><span class="poker-chip"></span><span class="poker-chip"></span><span class="poker-chip"></span>
-                                </div>
-                                <span class="play-btn">Sit Down</span>
-                            </div>
-                        </div>
-                        <figure class="game-screenshot">
-                            <img src="/assets/project-screenshots/poker.png" alt="Texas Hold'em Poker app screenshot" loading="lazy" decoding="async">
-                        </figure>
-                    </a>
-
-                    <a href="/craps/" class="game-card" data-suit="heart">
-                        <span class="corner-rank tl">K♥</span>
-                        <span class="corner-rank br">K♥</span>
-                        <div class="game-face">
-                            <div>
-                                <div class="suit-big" aria-hidden="true">♥</div>
-                                <h3 class="game-title">Craps</h3>
-                                <p class="subline">Pass · Come · Field</p>
-                                <p class="game-description">A Vegas-style dice table — Pass Line, Come, propositions, point handling, payouts, all in your browser.</p>
-                            </div>
-                            <div>
-                                <div class="chips-stack" aria-hidden="true">
-                                    <span class="poker-chip"></span><span class="poker-chip"></span><span class="poker-chip"></span><span class="poker-chip"></span><span class="poker-chip"></span>
-                                </div>
-                                <span class="play-btn">Shooter Up</span>
-                            </div>
-                        </div>
-                        <figure class="game-screenshot">
-                            <img src="/assets/project-screenshots/craps.png" alt="Craps app screenshot" loading="lazy" decoding="async">
-                        </figure>
-                    </a>
-
-                    <a href="/blackjack/" class="game-card" data-suit="club">
-                        <span class="corner-rank tl">Q♣</span>
-                        <span class="corner-rank br">Q♣</span>
-                        <div class="game-face">
-                            <div>
-                                <div class="suit-big" aria-hidden="true">♣</div>
-                                <h3 class="game-title">Blackjack</h3>
-                                <p class="subline">Six-Deck Shoe</p>
-                                <p class="game-description">A crisp single-player table with splits, doubles, insurance, full dealer rules — and a clean count to twenty-one.</p>
-                            </div>
-                            <div>
-                                <div class="chips-stack" aria-hidden="true">
-                                    <span class="poker-chip"></span><span class="poker-chip"></span><span class="poker-chip"></span><span class="poker-chip"></span><span class="poker-chip"></span>
-                                </div>
-                                <span class="play-btn">Take a Card</span>
-                            </div>
-                        </div>
-                        <figure class="game-screenshot">
-                            <img src="/assets/project-screenshots/blackjack.png" alt="Blackjack app screenshot" loading="lazy" decoding="async">
-                        </figure>
-                    </a>
-
-                    <a href="/craps-strategy/" class="game-card" data-suit="diamond">
-                        <span class="corner-rank tl">J♦</span>
-                        <span class="corner-rank br">J♦</span>
-                        <div class="game-face">
-                            <div>
-                                <div class="suit-big" aria-hidden="true">♦</div>
-                                <h3 class="game-title">Strategy Lab</h3>
-                                <p class="subline">Monte-Carlo · 100 Trials</p>
-                                <p class="game-description">Describe a craps betting strategy in plain English, set your bankroll, and watch 100 simulated runs play out across 1,000 rolls.</p>
-                            </div>
-                            <div>
-                                <div class="chips-stack" aria-hidden="true">
-                                    <span class="poker-chip"></span><span class="poker-chip"></span><span class="poker-chip"></span><span class="poker-chip"></span><span class="poker-chip"></span>
-                                </div>
-                                <span class="play-btn">Run the Numbers</span>
-                            </div>
-                        </div>
-                        <figure class="game-screenshot">
-                            <img src="/assets/project-screenshots/craps.png" alt="Craps strategy simulator screenshot" loading="lazy" decoding="async">
-                        </figure>
-                    </a>
+    <main>
+        <div class="wrap">
+            <section class="ledger" id="yourHouse" aria-label="Your bankroll" hidden>
+                <div>
+                    <span class="figure-label">Bankroll</span>
+                    <span class="figure-value" id="statBankroll">$0</span>
                 </div>
-
-                <aside class="your-house" id="yourHouse" aria-labelledby="yourHouseTitle" hidden>
-                    <div class="your-house-header">
-                        <h3 class="your-house-title" id="yourHouseTitle">Your House</h3>
-                        <label class="your-house-name">
-                            <span>Name</span>
-                            <input type="text" id="yourHouseName" maxlength="24" autocomplete="off" spellcheck="false" placeholder="Anonymous">
-                        </label>
-                    </div>
-                    <div class="your-house-grid">
-                        <div class="stat-tile"><div class="stat-label">Bankroll</div><div class="stat-value" id="statBankroll">$0</div></div>
-                        <div class="stat-tile"><div class="stat-label">Hands Played</div><div class="stat-value" id="statHands">0</div></div>
-                        <div class="stat-tile"><div class="stat-label">Net P/L</div><div class="stat-value" id="statNet">$0</div></div>
-                        <div class="stat-tile"><div class="stat-label">Biggest Win</div><div class="stat-value" id="statBiggest">$0</div></div>
-                    </div>
-                    <div class="your-house-foot">
-                        <span id="statBreakdown">No games played yet.</span>
-                        <button type="button" class="your-house-reset" id="yourHouseReset">Reset all</button>
-                    </div>
-                </aside>
+                <div>
+                    <span class="figure-label">Hands</span>
+                    <span class="figure-value" id="statHands">0</span>
+                </div>
+                <div>
+                    <span class="figure-label">Net</span>
+                    <span class="figure-value" id="statNet">$0</span>
+                </div>
+                <div>
+                    <span class="figure-label">Best</span>
+                    <span class="figure-value" id="statBiggest">$0</span>
+                </div>
+                <div class="ledger-account">
+                    <input type="text" id="yourHouseName" maxlength="24" autocomplete="off" spellcheck="false" placeholder="Your name" aria-label="Your name">
+                    <button type="button" class="ledger-reset" id="yourHouseReset">Reset</button>
+                </div>
             </section>
-        </main>
 
-        <footer>
-            <p>© 2026 Palmer Gill. Table closes at dawn.</p>
-        </footer>
-    </div>
+            <section class="tiles" aria-labelledby="games-title">
+                <h2 id="games-title" class="sr-only">Games</h2>
+                <a href="/poker/" class="tile" data-game="poker">
+                    <svg class="tile-mark" viewBox="0 0 100 100" aria-hidden="true"><use href="#suit-spade"/></svg>
+                    <div>
+                        <h3 class="tile-title">Texas Hold'em</h3>
+                        <p class="tile-meta">No-Limit · Six seats</p>
+                    </div>
+                    <div class="tile-foot">
+                        <span class="tile-go" aria-hidden="true">
+                            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 8h11M9 3.5 13.5 8 9 12.5"/></svg>
+                        </span>
+                        <span class="tile-record" data-record></span>
+                    </div>
+                </a>
 
-        <script src="/shared/site-nav.js?v=13"></script>
+                <a href="/craps/" class="tile" data-game="craps">
+                    <svg class="tile-mark" viewBox="0 0 100 100" aria-hidden="true"><use href="#suit-heart"/></svg>
+                    <div>
+                        <h3 class="tile-title">Craps</h3>
+                        <p class="tile-meta">Pass · Come · Field</p>
+                    </div>
+                    <div class="tile-foot">
+                        <span class="tile-go" aria-hidden="true">
+                            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 8h11M9 3.5 13.5 8 9 12.5"/></svg>
+                        </span>
+                        <span class="tile-record" data-record></span>
+                    </div>
+                </a>
+
+                <a href="/blackjack/" class="tile" data-game="blackjack">
+                    <svg class="tile-mark" viewBox="0 0 100 100" aria-hidden="true"><use href="#suit-club"/></svg>
+                    <div>
+                        <h3 class="tile-title">Blackjack</h3>
+                        <p class="tile-meta">Six-deck shoe</p>
+                    </div>
+                    <div class="tile-foot">
+                        <span class="tile-go" aria-hidden="true">
+                            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 8h11M9 3.5 13.5 8 9 12.5"/></svg>
+                        </span>
+                        <span class="tile-record" data-record></span>
+                    </div>
+                </a>
+
+                <a href="/craps-strategy/" class="tile" data-game="craps-strategy">
+                    <svg class="tile-mark" viewBox="0 0 100 100" aria-hidden="true"><use href="#suit-diamond"/></svg>
+                    <div>
+                        <h3 class="tile-title">Strategy Lab</h3>
+                        <p class="tile-meta">Monte Carlo · 100 runs</p>
+                    </div>
+                    <div class="tile-foot">
+                        <span class="tile-go" aria-hidden="true">
+                            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 8h11M9 3.5 13.5 8 9 12.5"/></svg>
+                        </span>
+                        <span class="tile-record" data-record></span>
+                    </div>
+                </a>
+            </section>
+        </div>
+    </main>
+
+    <footer>
+        <div class="wrap footer-inner">
+            <span>© 2026 Palmer Gill</span>
+            <a href="/">palmergill.com</a>
+        </div>
+    </footer>
+
+    <script src="/shared/site-nav.js?v=13"></script>
     <script src="/shared/analytics.js?v=1"></script>
     <script src="/shared/casino-profile.js?v=2"></script>
     <script>
@@ -766,15 +514,15 @@
             if (!profile) return;
 
             const panel = document.getElementById('yourHouse');
+            if (!panel) return;
+
             const nameInput = document.getElementById('yourHouseName');
             const resetBtn = document.getElementById('yourHouseReset');
             const bankrollEl = document.getElementById('statBankroll');
             const handsEl = document.getElementById('statHands');
             const netEl = document.getElementById('statNet');
             const biggestEl = document.getElementById('statBiggest');
-            const breakdownEl = document.getElementById('statBreakdown');
-
-            if (!panel) return;
+            const recordEls = document.querySelectorAll('.tile[data-game] .tile-record');
 
             function fmtMoney(n) {
                 const sign = n < 0 ? '-' : '';
@@ -787,18 +535,6 @@
                 else if (value < 0) el.classList.add('is-negative');
             }
 
-            function gameLabel(game) {
-                return { poker: 'Poker', craps: 'Craps', blackjack: 'Blackjack' }[game] || game;
-            }
-
-            function lastPlayedLabel(iso) {
-                if (!iso) return null;
-                const days = Math.floor((Date.now() - new Date(iso).getTime()) / 86400000);
-                if (days <= 0) return 'today';
-                if (days === 1) return 'yesterday';
-                return `${days}d ago`;
-            }
-
             function render() {
                 const bankroll = profile.getBankroll();
                 const stats = profile.getAggregateStats();
@@ -808,13 +544,14 @@
                 classifyMoney(netEl, stats.netProfit);
                 biggestEl.textContent = fmtMoney(stats.biggestWin);
 
-                const parts = Object.entries(stats.byGame)
-                    .filter(([, s]) => s.handsPlayed > 0)
-                    .map(([game, s]) => {
-                        const played = lastPlayedLabel(s.lastPlayed);
-                        return `${gameLabel(game)} ${s.handsPlayed} · ${fmtMoney(s.netProfit)}${played ? ` · ${played}` : ''}`;
-                    });
-                breakdownEl.textContent = parts.length ? parts.join('  •  ') : 'No games played yet.';
+                // Per-game history rides on its own tile instead of a prose summary line.
+                recordEls.forEach((el) => {
+                    const game = el.closest('.tile').dataset.game;
+                    const s = stats.byGame[game];
+                    el.textContent = s && s.handsPlayed > 0
+                        ? `${s.handsPlayed.toLocaleString()} hands · ${fmtMoney(s.netProfit)}`
+                        : '';
+                });
             }
 
             nameInput.value = profile.getDisplayName();
