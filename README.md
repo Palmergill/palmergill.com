@@ -110,6 +110,6 @@ blackjack/        Active blackjack frontend and tests
 
 ## Notes
 
-Bitcoin Chat production node, Cloudflare Tunnel, and Railway setup are documented in [docs/BITCOIN_CHAT_SETUP.md](docs/BITCOIN_CHAT_SETUP.md).
+Bitcoin Dashboard production node, Cloudflare Tunnel, and Railway setup are documented in [docs/BITCOIN_CHAT_SETUP.md](docs/BITCOIN_CHAT_SETUP.md).
 
 The production Railway Dockerfile copies and runs `backend/`. Poker uses the shared backend router under `backend/app/routers/poker.py`.

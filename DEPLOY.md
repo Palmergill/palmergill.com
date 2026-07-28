@@ -65,7 +65,7 @@ POLYGON_API_KEY=<secret Polygon key>
 
 `USE_REAL_DATA` defaults to `true` in the app and Docker image; set it to `false` only for local development with synthetic stock data.
 
-Bitcoin Chat uses mempool.space as the default live provider. Configure:
+Bitcoin Dashboard uses mempool.space as the default live provider. Configure:
 
 ```text
 BITCOIN_DATA_PROVIDER=mempool

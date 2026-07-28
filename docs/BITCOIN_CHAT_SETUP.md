@@ -1,6 +1,6 @@
-# Bitcoin Chat Setup
+# Bitcoin Dashboard Setup
 
-This documents the production wiring for the Bitcoin Chat app at `/bitcoin-chat/`.
+This documents the production wiring for the Bitcoin Dashboard app at `/bitcoin-chat/`.
 
 Last reviewed against the repo on May 22, 2026.
 
