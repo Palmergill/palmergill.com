@@ -99,23 +99,6 @@
         }
         .lede b { color: var(--ink); font-weight: 600; }
 
-        .proof {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 8px;
-            margin-top: 22px;
-            list-style: none;
-        }
-        .proof li {
-            padding: 7px 11px;
-            border: 1px solid var(--line);
-            border-radius: 999px;
-            background: rgba(255, 255, 255, 0.62);
-            color: var(--soft);
-            font-size: 0.78rem;
-            font-weight: 600;
-        }
-
         .cta { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 30px; }
         .btn {
             display: inline-flex;
@@ -451,7 +434,6 @@
 
         .js-welcome .hero .role,
         .js-welcome .hero .lede,
-        .js-welcome .hero .proof,
         .js-welcome .hero .cta,
         .js-welcome .hero .portrait {
             opacity: 0;
@@ -459,8 +441,7 @@
         }
         .js-welcome .hero .role { animation-delay: 0.96s; }
         .js-welcome .hero .lede { animation-delay: 1.02s; }
-        .js-welcome .hero .proof { animation-delay: 1.08s; }
-        .js-welcome .hero .cta { animation-delay: 1.14s; }
+        .js-welcome .hero .cta { animation-delay: 1.08s; }
         .js-welcome .hero .portrait { animation-delay: 1s; }
 
         @keyframes splash-pop { from { opacity: 0; transform: scale(0.76); } to { opacity: 1; transform: scale(1); } }
@@ -489,7 +470,6 @@
             .js-welcome .name .word,
             .js-welcome .hero .role,
             .js-welcome .hero .lede,
-            .js-welcome .hero .proof,
             .js-welcome .hero .cta,
             .js-welcome .hero .portrait {
                 opacity: 1 !important;
@@ -519,11 +499,6 @@
                 <h1 class="name"><span class="mask"><span class="word">Palmer</span></span> <span class="mask"><span class="word">Gill</span></span></h1>
                 <p class="role">Full Stack Software Engineer</p>
                 <p class="lede">I work in <b>identity &amp; access management</b> at H-E-B, based in Austin, TX. Take a look at some of my side projects: a <b>real-time market research tool</b>, a <b>Bitcoin explorer</b> for plain-English blockchain insights, and a suite of <b>browser-based table games</b> — poker, craps, and blackjack.</p>
-                <ul class="proof" aria-label="Engineering focus">
-                    <li>API-backed products</li>
-                    <li>Security &amp; identity</li>
-                    <li>Tested game logic</li>
-                </ul>
                 <div class="cta">
                     <a class="btn solid" href="#work">See my work</a>
                     <a class="btn ghost" href="/about/">About me</a>
