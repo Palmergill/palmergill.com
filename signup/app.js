@@ -1,8 +1,10 @@
 (function () {
-    const form = document.getElementById("loginForm");
-    const status = document.getElementById("loginStatus");
+    const form = document.getElementById("signupForm");
+    const status = document.getElementById("signupStatus");
+    const inviteCode = document.getElementById("inviteCode");
     const username = document.getElementById("username");
     const password = document.getElementById("password");
+    const confirmPassword = document.getElementById("confirmPassword");
     const button = form.querySelector("button[type='submit']");
 
     function safeNextPath() {
@@ -13,7 +15,7 @@
             if (url.origin !== window.location.origin) {
                 return "/";
             }
-            if (url.pathname === "/login" || url.pathname === "/login/") {
+            if (url.pathname.startsWith("/login") || url.pathname.startsWith("/signup")) {
                 return "/";
             }
             return `${url.pathname}${url.search}${url.hash}`;
@@ -29,16 +31,26 @@
 
     function setBusy(isBusy) {
         button.disabled = isBusy;
-        button.querySelector("span").textContent = isBusy ? "Signing in" : "Sign in";
+        button.querySelector("span").textContent = isBusy ? "Creating account" : "Create account";
     }
 
     form.addEventListener("submit", async (event) => {
         event.preventDefault();
 
+        const codeValue = inviteCode.value.trim();
         const userValue = username.value.trim();
         const passwordValue = password.value;
-        if (!userValue || !passwordValue) {
-            setStatus("Enter both username and password.");
+
+        if (!codeValue || !userValue || !passwordValue) {
+            setStatus("Fill in every field.");
+            return;
+        }
+
+        // Checked here as a courtesy; the server never sees this field and
+        // does its own validation of everything it does see.
+        if (passwordValue !== confirmPassword.value) {
+            setStatus("Those passwords don't match.");
+            confirmPassword.select();
             return;
         }
 
@@ -46,7 +58,7 @@
         setStatus("");
 
         try {
-            const response = await fetch("/login/session", {
+            const response = await fetch("/login/signup", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
@@ -55,48 +67,26 @@
                 body: JSON.stringify({
                     username: userValue,
                     password: passwordValue,
+                    inviteCode: codeValue,
                     next: safeNextPath(),
                 }),
             });
 
             const data = await response.json().catch(() => ({}));
             if (!response.ok) {
-                window.pgAnalytics?.track?.("login_failed", { status: response.status });
-                throw new Error(data.error || "Unable to sign in.");
+                window.pgAnalytics?.track?.("signup_failed", { status: response.status });
+                throw new Error(data.error || "Unable to create the account.");
             }
 
-            window.pgAnalytics?.track?.("login_success", { role: data.role });
-            setStatus("Signed in. Opening page.", true);
+            window.pgAnalytics?.track?.("signup_success");
+            setStatus("Account created. Opening page.", true);
             window.location.assign(data.redirect || safeNextPath());
         } catch (error) {
-            setStatus(error.message || "Unable to sign in.");
-            password.select();
+            setStatus(error.message || "Unable to create the account.");
         } finally {
             setBusy(false);
         }
     });
 
-    // Only advertise account creation when an invite code is configured;
-    // otherwise the signup page would just hand out a 403.
-    async function revealSignupPrompt() {
-        const prompt = document.getElementById("signupPrompt");
-        if (!prompt) return;
-
-        try {
-            const response = await fetch("/login/signup", {
-                credentials: "same-origin",
-                cache: "no-store",
-                headers: { "Accept": "application/json" },
-            });
-            if (!response.ok) return;
-            const data = await response.json();
-            if (data.enabled) prompt.hidden = false;
-        } catch {
-            // Signup discovery is progressive enhancement — a failed check
-            // just leaves the prompt hidden.
-        }
-    }
-
-    username.focus();
-    revealSignupPrompt();
+    inviteCode.focus();
 })();

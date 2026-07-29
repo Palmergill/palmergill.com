@@ -14,6 +14,8 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTextResponse, RedirectResponse
+from app import accounts
+from app.accounts import ROLE_ADMIN, ROLE_MEMBER, AccountError
 from app.database import SessionLocal
 from app.database_migration import init_db_with_migration
 from app.log_handler import install_db_logging
@@ -246,6 +248,15 @@ PROTECTED_PATH_PREFIXES = (
     "/api",
     "/admin",
 )
+# Signed in is not enough for these — they expose logs, analytics, and the
+# raw API surface, so they require the admin role specifically.
+ADMIN_PATH_PREFIXES = (
+    "/admin",
+    "/api/admin",
+    "/api/fantasy/admin",
+    "/docs",
+    "/openapi.json",
+)
 
 
 def app_auth_config():
@@ -391,46 +402,81 @@ def _session_signature(secret: str, payload: str) -> str:
     )
 
 
-def create_app_session_token(username: str, password: str, now: int | None = None) -> str:
-    payload = _base64url_encode(
-        json.dumps(
-            {
-                "u": username,
-                "exp": int(now if now is not None else time.time()) + SESSION_TTL_SECONDS,
-            },
-            separators=(",", ":"),
-        ).encode("utf-8")
-    )
+def create_app_session_token(
+    username: str,
+    password: str,
+    now: int | None = None,
+    role: str | None = None,
+) -> str:
+    """Mint a session token. `role=None` omits the claim, producing the
+    pre-accounts token shape; the verifier reads a missing role as admin only
+    when the username matches the configured admin, so cookies issued before
+    member accounts existed stay valid until they expire."""
+    claims = {
+        "u": username,
+        "exp": int(now if now is not None else time.time()) + SESSION_TTL_SECONDS,
+    }
+    if role is not None:
+        claims["r"] = role
+    payload = _base64url_encode(json.dumps(claims, separators=(",", ":")).encode("utf-8"))
     return f"{payload}.{_session_signature(session_signing_secret(password), payload)}"
 
 
-def valid_app_session_cookie(request: Request) -> bool:
+def session_identity(request: Request) -> dict | None:
+    """Resolve the `pg_session` cookie to {"username", "role"}, or None."""
     config = app_auth_config()
     if not config:
-        return False
+        return None
 
     token = request.cookies.get(SESSION_COOKIE_NAME)
     if not token:
-        return False
+        return None
 
     try:
         payload, signature = token.split(".", 1)
     except ValueError:
-        return False
+        return None
 
     expected_signature = _session_signature(session_signing_secret(config["password"]), payload)
     if not secrets.compare_digest(signature, expected_signature):
-        return False
+        return None
 
     try:
         data = json.loads(_base64url_decode(payload))
     except (ValueError, json.JSONDecodeError):
-        return False
+        return None
 
-    return (
-        secrets.compare_digest(str(data.get("u", "")), config["username"])
-        and int(data.get("exp", 0)) > int(time.time())
-    )
+    if int(data.get("exp", 0)) <= int(time.time()):
+        return None
+
+    username = str(data.get("u", ""))
+    if not username:
+        return None
+
+    role = data.get("r")
+    if role is None:
+        # Legacy token with no role claim: only the admin could have been
+        # issued one, so anything else is not trusted with a role at all.
+        if not secrets.compare_digest(username, config["username"]):
+            return None
+        return {"username": config["username"], "role": ROLE_ADMIN}
+
+    if role == ROLE_ADMIN:
+        # An admin claim is only honored for the configured admin username,
+        # so a member account named in a forged-but-unsigned way is moot and
+        # a renamed admin cannot leave a stale admin token behind.
+        if not secrets.compare_digest(username, config["username"]):
+            return None
+        return {"username": config["username"], "role": ROLE_ADMIN}
+
+    if role == ROLE_MEMBER:
+        return {"username": username, "role": ROLE_MEMBER}
+
+    return None
+
+
+def valid_app_session_cookie(request: Request) -> bool:
+    return session_identity(request) is not None
 
 
 def should_redirect_to_login(request: Request) -> bool:
@@ -460,6 +506,42 @@ def auth_challenge(request: Request):
         status_code=401,
         headers={"WWW-Authenticate": f'Basic realm="{AUTH_REALM}", charset="UTF-8"'},
     )
+
+
+def is_admin_path(path: str) -> bool:
+    return any(path == prefix or path.startswith(f"{prefix}/") for prefix in ADMIN_PATH_PREFIXES)
+
+
+FORBIDDEN_PAGE = """<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Not your area — Palmer Gill</title>
+<style>
+  body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #faf6f0; color: #23201c; font-family: "Plus Jakarta Sans", system-ui, -apple-system, "Segoe UI", sans-serif; }
+  .card { max-width: 420px; margin: 24px; padding: 36px 32px; background: #ffffff; border: 1px solid #ece4d8; border-radius: 18px; text-align: center; box-shadow: 0 10px 30px rgba(60, 50, 35, 0.08); }
+  h1 { font-size: 1.25rem; margin: 0 0 8px; letter-spacing: -0.01em; }
+  p { color: #5d574e; margin: 0 0 22px; line-height: 1.55; font-size: 0.95rem; }
+  a { display: inline-block; padding: 10px 20px; border-radius: 999px; background: #5b7152; color: #ffffff; text-decoration: none; font-weight: 600; font-size: 0.9rem; }
+  a:hover { background: #4c6044; }
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>This part is admin-only</h1>
+  <p>Your account is signed in, but logs and site internals are limited to the site owner.</p>
+  <a href="/">Back to projects</a>
+</div>
+</body>
+</html>"""
+
+
+def admin_required(request: Request):
+    accept = request.headers.get("accept") or ""
+    if request.method in {"GET", "HEAD"} and "text/html" in accept:
+        return HTMLResponse(FORBIDDEN_PAGE, status_code=403)
+    return JSONResponse({"error": "Admin access required"}, status_code=403)
 
 
 MISSING_CONFIG_PAGE = """<!DOCTYPE html>
@@ -539,10 +621,8 @@ def _request_cookie(request: Request, name: str) -> str | None:
 
 
 def _analytics_username(request: Request) -> str | None:
-    if not getattr(request.state, "app_auth_authenticated", False):
-        return None
-    config = app_auth_config()
-    return config["username"] if config else None
+    identity = getattr(request.state, "app_user", None)
+    return identity["username"] if identity else None
 
 
 @app.middleware("http")
@@ -603,11 +683,21 @@ async def add_security_headers(request: Request, call_next):
 async def require_app_auth(request: Request, call_next):
     request.state.demo_mode = False
     request.state.app_auth_authenticated = False
+    request.state.app_user = None
 
     authorization = request.headers.get("authorization")
-    if valid_app_credentials(authorization) or valid_app_session_cookie(request):
+    identity = None
+    if valid_app_credentials(authorization):
+        identity = {"username": app_auth_config()["username"], "role": ROLE_ADMIN}
+    else:
+        identity = session_identity(request)
+
+    if identity:
         request.state.app_auth_authenticated = True
+        request.state.app_user = identity
         clear_auth_failures(request)
+        if identity["role"] != ROLE_ADMIN and is_admin_path(request.url.path):
+            return admin_required(request)
         return await call_next(request)
 
     if authorization and app_auth_config() and (
@@ -634,14 +724,27 @@ async def require_app_auth(request: Request, call_next):
 @app.get("/login/session")
 async def login_session_status(request: Request):
     """Return the signed-in identity without exposing the HttpOnly cookie."""
-    config = app_auth_config()
-    authenticated = bool(
-        config and getattr(request.state, "app_auth_authenticated", False)
-    )
-    body = {"authenticated": authenticated}
-    if authenticated:
-        body["username"] = config["username"]
+    identity = getattr(request.state, "app_user", None)
+    body: dict = {"authenticated": bool(identity)}
+    if identity:
+        body["username"] = identity["username"]
+        body["role"] = identity["role"]
+    body["signupEnabled"] = accounts.signup_enabled()
     return JSONResponse(body, headers={"Cache-Control": "no-store"})
+
+
+def _set_session_cookie(response: JSONResponse, request: Request, username: str, role: str):
+    config = app_auth_config()
+    response.set_cookie(
+        SESSION_COOKIE_NAME,
+        create_app_session_token(username, config["password"], role=role),
+        max_age=SESSION_TTL_SECONDS,
+        httponly=True,
+        secure=request.url.scheme == "https",
+        samesite="lax",
+        path="/",
+    )
+    return response
 
 
 @app.post("/login/session")
@@ -662,28 +765,90 @@ async def login_session(request: Request):
     username = str(body.get("username", ""))
     password = str(body.get("password", ""))
     redirect = safe_next_path(body.get("next"))
-    if not (
+
+    is_admin = (
         secrets.compare_digest(username, config["username"])
         and secrets.compare_digest(password, config["password"])
-    ):
+    )
+
+    if is_admin:
+        identity = {"username": config["username"], "role": ROLE_ADMIN}
+    else:
+        db = SessionLocal()
+        try:
+            user = accounts.authenticate(db, username, password)
+            identity = (
+                {"username": user.display_name, "role": ROLE_MEMBER} if user else None
+            )
+        finally:
+            db.close()
+
+    if identity is None:
         record_auth_failure(request)
         return JSONResponse({"error": "Invalid username or password"}, status_code=401)
 
     clear_auth_failures(request)
     response = JSONResponse(
-        {"ok": True, "redirect": redirect, "username": config["username"]},
+        {
+            "ok": True,
+            "redirect": redirect,
+            "username": identity["username"],
+            "role": identity["role"],
+        },
         headers={"Cache-Control": "no-store"},
     )
-    response.set_cookie(
-        SESSION_COOKIE_NAME,
-        create_app_session_token(config["username"], config["password"]),
-        max_age=SESSION_TTL_SECONDS,
-        httponly=True,
-        secure=request.url.scheme == "https",
-        samesite="lax",
-        path="/",
+    return _set_session_cookie(response, request, identity["username"], identity["role"])
+
+
+@app.get("/login/signup")
+async def signup_status():
+    """Lets the sign-in page decide whether to advertise account creation."""
+    return JSONResponse(
+        {"enabled": accounts.signup_enabled()},
+        headers={"Cache-Control": "no-store"},
     )
-    return response
+
+
+@app.post("/login/signup")
+async def signup(request: Request):
+    config = app_auth_config()
+    if not config:
+        return JSONResponse({"error": "App authentication is not configured"}, status_code=503)
+
+    # Signup is rate limited on the same counter as failed logins: it is the
+    # other way to guess an invite code, and it is the expensive one to serve.
+    if auth_rate_limited(request):
+        return auth_rate_limit_response()
+
+    try:
+        body = await request.json()
+    except ValueError:
+        record_auth_failure(request)
+        return JSONResponse({"error": "Invalid signup request"}, status_code=400)
+
+    redirect = safe_next_path(body.get("next"))
+    db = SessionLocal()
+    try:
+        accounts.check_invite_code(body.get("inviteCode"))
+        user = accounts.create_user(db, body.get("username"), body.get("password"))
+    except AccountError as error:
+        record_auth_failure(request)
+        return JSONResponse({"error": error.message}, status_code=error.status_code)
+    finally:
+        db.close()
+
+    clear_auth_failures(request)
+    logger.info("Created member account %s", user.username)
+    response = JSONResponse(
+        {
+            "ok": True,
+            "redirect": redirect,
+            "username": user.display_name,
+            "role": ROLE_MEMBER,
+        },
+        headers={"Cache-Control": "no-store"},
+    )
+    return _set_session_cookie(response, request, user.display_name, ROLE_MEMBER)
 
 
 @app.post("/login/logout")
@@ -756,6 +921,7 @@ if local_site_root_enabled:
         "/casino": "casino",
         "/admin": "admin",
         "/login": "login",
+        "/signup": "signup",
     }.items():
         directory = os.path.join(repo_root, folder)
         if os.path.exists(directory):

@@ -126,6 +126,24 @@ class AnalyticsEvent(Base):
     metadata_json = Column(Text, nullable=True)
 
 
+class AppUser(Base):
+    """A member account. The admin identity still comes from APP_AUTH_*
+    env vars and is deliberately not stored here — a database row can never
+    grant admin, so a write bug in this table cannot escalate to the logs."""
+
+    __tablename__ = "app_users"
+
+    id = Column(Integer, primary_key=True, index=True)
+    # Lowercased for lookup and uniqueness; display_name keeps the casing the
+    # person typed at signup.
+    username = Column(String, unique=True, index=True, nullable=False)
+    display_name = Column(String, nullable=False)
+    password_hash = Column(String, nullable=False)
+    is_active = Column(Boolean, default=True, nullable=False)
+    created_at = Column(DateTime, default=utc_now)
+    last_login_at = Column(DateTime, nullable=True)
+
+
 class PokerGameState(Base):
     __tablename__ = "poker_game_states"
 

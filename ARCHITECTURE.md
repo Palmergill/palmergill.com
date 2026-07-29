@@ -81,6 +81,15 @@ logs/backend.log
 ## Deployment
 
 - Static site hosting serves the root static files and project directories.
-- Vercel rewrites `/api/*` to the Railway API.
+- Vercel rewrites `/api/*`, `/login/session`, `/login/signup`, and `/login/logout` to the Railway API.
 - Railway runs the Dockerized FastAPI backend from `backend/`.
-- `/`, `/docs/`, `/login/`, `/casino/`, `/poker/`, `/craps/`, `/craps-strategy/`, `/blackjack/`, `/api/poker/*`, `/api/craps/*`, `/stock-research/`, `/bitcoin-chat/`, `/api/stocks/*`, `/api/bitcoin/*`, and `/api/analytics/*` are public. Stock and Bitcoin routes serve demo data when unauthenticated; valid app credentials unlock live provider-backed data. Admin, FastAPI docs/OpenAPI JSON, and other API routes require authentication. Protected backend routes return `503` when `APP_AUTH_PASSWORD` is missing.
+- `/`, `/docs/`, `/login/`, `/signup/`, `/casino/`, `/poker/`, `/craps/`, `/craps-strategy/`, `/blackjack/`, `/api/poker/*`, `/api/craps/*`, `/stock-research/`, `/bitcoin-chat/`, `/api/stocks/*`, `/api/bitcoin/*`, and `/api/analytics/*` are public. Stock and Bitcoin routes serve demo data when unauthenticated; any signed-in account unlocks live provider-backed data. Admin, FastAPI docs/OpenAPI JSON, and other API routes require authentication. Protected backend routes return `503` when `APP_AUTH_PASSWORD` is missing.
+
+## Accounts
+
+Two roles, stored in different places on purpose:
+
+- **admin** — the `APP_AUTH_USERNAME` / `APP_AUTH_PASSWORD` env pair. No database row, so nothing that can write to `app_users` can grant itself the logs.
+- **member** — a row in `app_users`, created at `/signup/` with the invite code in `APP_SIGNUP_INVITE_CODE`. Passwords are hashed with stdlib scrypt (`backend/app/accounts.py`). Members get the live tools; `/admin/*`, `/api/admin/*`, `/api/fantasy/admin/*`, and the FastAPI docs return `403`.
+
+The API service is the only thing that authenticates anyone — it owns the user table and mints the signed `pg_session` cookie, which carries a role claim. `middleware.js` at the Vercel edge only verifies that cookie and enforces the role gate; it deliberately no longer implements a second login. An admin role claim is honored only for the configured admin username, so a member token cannot be rewritten into an admin one even though both are signed with the same secret. Cookies issued before member accounts existed carry no role claim and are read as admin only when the username matches.

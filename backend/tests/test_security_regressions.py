@@ -746,7 +746,8 @@ def test_login_session_status_reports_signed_in_username(monkeypatch):
 
     signed_out = auth_client.get("/login/session")
     assert signed_out.status_code == 200
-    assert signed_out.json() == {"authenticated": False}
+    assert signed_out.json()["authenticated"] is False
+    assert "username" not in signed_out.json()
     assert signed_out.headers["cache-control"] == "no-store"
 
     login = auth_client.post(
@@ -758,11 +759,13 @@ def test_login_session_status_reports_signed_in_username(monkeypatch):
 
     signed_in = auth_client.get("/login/session")
     assert signed_in.status_code == 200
-    assert signed_in.json() == {"authenticated": True, "username": "palmer"}
+    assert signed_in.json()["authenticated"] is True
+    assert signed_in.json()["username"] == "palmer"
+    assert signed_in.json()["role"] == "admin"
 
     logout = auth_client.post("/login/logout")
     assert logout.status_code == 200
-    assert auth_client.get("/login/session").json() == {"authenticated": False}
+    assert auth_client.get("/login/session").json()["authenticated"] is False
 
 
 def test_logout_rejects_get_and_only_clears_session_via_post():

@@ -1,7 +1,6 @@
 import { next } from '@vercel/functions';
 
 const SESSION_COOKIE_NAME = 'pg_session';
-const SESSION_TTL_SECONDS = 8 * 60 * 60;
 const AUTH_RATE_LIMIT_WINDOW_SECONDS = Number(process.env.APP_AUTH_RATE_LIMIT_WINDOW_SECONDS || 900);
 const AUTH_RATE_LIMIT_MAX_ATTEMPTS = Number(process.env.APP_AUTH_RATE_LIMIT_MAX_ATTEMPTS || 8);
 // Best-effort, per-isolate auth-failure tracking. On Vercel each instance is
@@ -18,8 +17,6 @@ const PUBLIC_PREFIXES = [
   '/craps',
   '/craps-strategy',
   '/api/poker',
-  '/login/session',
-  '/login/logout',
   '/stock-research',
   '/bitcoin-chat',
   '/api/stocks',
@@ -31,6 +28,17 @@ const PROTECTED_PREFIXES = [
   '/admin',
   '/api',
 ];
+
+// Signed in is not enough here: these expose logs, analytics, and collector
+// controls, so they require the admin role rather than any member account.
+const ADMIN_PREFIXES = [
+  '/admin',
+  '/api/admin',
+  '/api/fantasy/admin',
+];
+
+const ROLE_ADMIN = 'admin';
+const ROLE_MEMBER = 'member';
 
 const OPTIONAL_AUTH_API_PREFIXES = [
   '/api/stocks',
@@ -73,17 +81,13 @@ async function signSessionValue(secret, value) {
 // as an offline oracle to brute-force the account password. Falls back to the
 // password to preserve existing deployments; set APP_SESSION_SECRET to decouple
 // them and allow rotating sessions without changing the password.
+//
+// Whatever this resolves to must match the API service, which mints every
+// session token now that member accounts live in its database. Both platforms
+// already read APP_AUTH_PASSWORD, so the fallback keeps working — but set
+// APP_SESSION_SECRET in both places to decouple sessions from the password.
 function sessionSigningSecret(password) {
   return process.env.APP_SESSION_SECRET || password;
-}
-
-async function createSessionToken(username, password) {
-  const payload = base64UrlEncode(JSON.stringify({
-    u: username,
-    exp: Math.floor(Date.now() / 1000) + SESSION_TTL_SECONDS,
-  }));
-  const signature = await signSessionValue(sessionSigningSecret(password), payload);
-  return `${payload}.${signature}`;
 }
 
 function parseCookies(cookieHeader) {
@@ -101,26 +105,44 @@ function parseCookies(cookieHeader) {
   return cookies;
 }
 
-async function validSessionCookie(request, username, password) {
+// Resolve the session cookie to { username, role }, or null. Mirrors
+// `session_identity` in backend/app/main.py — the API service issues these
+// tokens, this only verifies them.
+async function sessionIdentity(request, adminUsername, password) {
   const token = parseCookies(request.headers.get('cookie')).get(SESSION_COOKIE_NAME);
-  if (!token) return false;
+  if (!token) return null;
 
   const [payload, signature, extra] = token.split('.');
-  if (!payload || !signature || extra) return false;
+  if (!payload || !signature || extra) return null;
 
   const expectedSignature = await signSessionValue(sessionSigningSecret(password), payload);
-  if (!timingSafeEqual(signature, expectedSignature)) return false;
+  if (!timingSafeEqual(signature, expectedSignature)) return null;
 
+  let data;
   try {
-    const data = JSON.parse(base64UrlDecode(payload));
-    return (
-      data &&
-      timingSafeEqual(String(data.u || ''), username) &&
-      Number(data.exp || 0) > Math.floor(Date.now() / 1000)
-    );
+    data = JSON.parse(base64UrlDecode(payload));
   } catch {
-    return false;
+    return null;
   }
+
+  if (!data || Number(data.exp || 0) <= Math.floor(Date.now() / 1000)) return null;
+
+  const username = String(data.u || '');
+  if (!username) return null;
+
+  // A missing role claim is a token minted before member accounts existed;
+  // only the admin could hold one. An explicit admin claim is likewise only
+  // honored for the configured admin username.
+  if (data.r === undefined || data.r === ROLE_ADMIN) {
+    if (!timingSafeEqual(username, adminUsername)) return null;
+    return { username: adminUsername, role: ROLE_ADMIN };
+  }
+
+  if (data.r === ROLE_MEMBER) {
+    return { username, role: ROLE_MEMBER };
+  }
+
+  return null;
 }
 
 function isProtectedPath(pathname) {
@@ -141,7 +163,22 @@ function isOptionalAuthApiPath(pathname) {
   ));
 }
 
-function withOriginAuth(request, username, password) {
+function isAdminPath(pathname) {
+  return ADMIN_PREFIXES.some((prefix) => (
+    pathname === prefix || pathname.startsWith(`${prefix}/`)
+  ));
+}
+
+// The admin keeps being announced to the origin with Basic credentials, which
+// is how this has always worked. A member is NOT: forwarding the admin's
+// credentials would hand every signed-in account admin rights at the origin.
+// Their `pg_session` cookie rides along with the proxied request and the API
+// service validates it there.
+function withOriginAuth(request, identity, username, password) {
+  if (identity.role !== ROLE_ADMIN) {
+    return next();
+  }
+
   if (!new URL(request.url).pathname.startsWith('/api/')) {
     return next();
   }
@@ -204,6 +241,41 @@ const MISSING_CONFIG_PAGE = `<!DOCTYPE html>
 </body>
 </html>`;
 
+const FORBIDDEN_PAGE = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Not your area — Palmer Gill</title>
+<style>
+  body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #faf6f0; color: #23201c; font-family: "Plus Jakarta Sans", system-ui, -apple-system, "Segoe UI", sans-serif; }
+  .card { max-width: 420px; margin: 24px; padding: 36px 32px; background: #ffffff; border: 1px solid #ece4d8; border-radius: 18px; text-align: center; box-shadow: 0 10px 30px rgba(60, 50, 35, 0.08); }
+  h1 { font-size: 1.25rem; margin: 0 0 8px; letter-spacing: -0.01em; }
+  p { color: #5d574e; margin: 0 0 22px; line-height: 1.55; font-size: 0.95rem; }
+  a { display: inline-block; padding: 10px 20px; border-radius: 999px; background: #5b7152; color: #ffffff; text-decoration: none; font-weight: 600; font-size: 0.9rem; }
+  a:hover { background: #4c6044; }
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>This part is admin-only</h1>
+  <p>Your account is signed in, but logs and site internals are limited to the site owner.</p>
+  <a href="/">Back to projects</a>
+</div>
+</body>
+</html>`;
+
+function forbidden(request) {
+  const accept = request.headers.get('accept') || '';
+  if ((request.method === 'GET' || request.method === 'HEAD') && accept.includes('text/html')) {
+    return new Response(FORBIDDEN_PAGE, {
+      status: 403,
+      headers: { 'Content-Type': 'text/html; charset=utf-8' },
+    });
+  }
+  return jsonResponse({ error: 'Admin access required' }, 403);
+}
+
 function missingConfig(request) {
   const accept = (request && request.headers.get('accept')) || '';
   if (accept.includes('text/html')) {
@@ -233,21 +305,6 @@ function jsonResponse(body, status = 200, headers = {}) {
       ...headers,
     },
   });
-}
-
-function safeNextPath(value, fallback = '/') {
-  if (!value || typeof value !== 'string') return fallback;
-
-  let url;
-  try {
-    url = new URL(value, 'https://palmergill.local');
-  } catch {
-    return fallback;
-  }
-
-  if (url.origin !== 'https://palmergill.local') return fallback;
-  if (url.pathname === '/login' || url.pathname === '/login/') return fallback;
-  return `${url.pathname}${url.search}${url.hash}`;
 }
 
 // The real client IP is the hop the trusted edge proxy appended, counting from
@@ -300,92 +357,6 @@ function clearAuthFailures(request) {
   authFailureStore.delete(authRateLimitKey(request));
 }
 
-function sessionCookie(token, request) {
-  const secure = new URL(request.url).protocol === 'https:' ? '; Secure' : '';
-  return `${SESSION_COOKIE_NAME}=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${SESSION_TTL_SECONDS}${secure}`;
-}
-
-function clearSessionCookie(request) {
-  const secure = new URL(request.url).protocol === 'https:' ? '; Secure' : '';
-  return `${SESSION_COOKIE_NAME}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0${secure}`;
-}
-
-async function handleLoginSession(request, username, password) {
-  if (request.method === 'GET') {
-    const authorization = decodeBasicAuth(request.headers.get('authorization'));
-    const basicAuthenticated = Boolean(
-      password &&
-      authorization &&
-      timingSafeEqual(authorization.username, username) &&
-      timingSafeEqual(authorization.password, password)
-    );
-    const authenticated = Boolean(
-      password && (basicAuthenticated || await validSessionCookie(request, username, password))
-    );
-    return jsonResponse(
-      authenticated ? { authenticated: true, username } : { authenticated: false },
-      200,
-      { 'Cache-Control': 'no-store' },
-    );
-  }
-
-  if (request.method !== 'POST') {
-    return jsonResponse({ error: 'Method not allowed' }, 405, { Allow: 'GET, POST' });
-  }
-
-  if (!password) {
-    return jsonResponse({ error: 'App authentication is not configured' }, 503);
-  }
-
-  if (authRateLimited(request)) {
-    return tooManyAuthAttempts();
-  }
-
-  let body;
-  try {
-    body = await request.json();
-  } catch {
-    recordAuthFailure(request);
-    return jsonResponse({ error: 'Invalid login request' }, 400);
-  }
-
-  const submittedUsername = String(body?.username || '');
-  const submittedPassword = String(body?.password || '');
-  const redirect = safeNextPath(body?.next);
-  if (
-    !timingSafeEqual(submittedUsername, username) ||
-    !timingSafeEqual(submittedPassword, password)
-  ) {
-    recordAuthFailure(request);
-    return jsonResponse({ error: 'Invalid username or password' }, 401);
-  }
-
-  clearAuthFailures(request);
-  const token = await createSessionToken(username, password);
-  return jsonResponse(
-    { ok: true, redirect, username },
-    200,
-    {
-      'Cache-Control': 'no-store',
-      'Set-Cookie': sessionCookie(token, request),
-    },
-  );
-}
-
-function handleLogout(request) {
-  // POST-only: a GET endpoint that clears the session is a CSRF vector — any
-  // third-party page can trigger it with a plain <img> tag. Nothing in this
-  // app links to /login/logout as a GET, so there is no compatibility cost.
-  if (request.method !== 'POST') {
-    return jsonResponse({ error: 'Method not allowed' }, 405, { Allow: 'POST' });
-  }
-  return jsonResponse(
-    { ok: true },
-    200,
-    { 'Set-Cookie': clearSessionCookie(request) },
-  );
-}
-
 function timingSafeEqual(a, b) {
   const encoder = new TextEncoder();
   const aBytes = encoder.encode(a);
@@ -419,26 +390,29 @@ function decodeBasicAuth(value) {
   }
 }
 
+// Sign-in, sign-up, and sign-out are handled by the API service (see
+// backend/app/main.py) because member accounts live in its database, which
+// the edge runtime can't reach. vercel.json rewrites /login/session,
+// /login/signup, and /login/logout there; this middleware only verifies the
+// session cookie that service issues.
 export default async function middleware(request) {
   const url = new URL(request.url);
   const username = process.env.APP_AUTH_USERNAME || 'palmer';
   const password = process.env.APP_AUTH_PASSWORD;
 
-  if (url.pathname === '/login/session') {
-    return handleLoginSession(request, username, password);
-  }
+  const identity = password ? await sessionIdentity(request, username, password) : null;
 
-  if (url.pathname === '/login/logout') {
-    return handleLogout(request);
-  }
-
-  if (
-    isOptionalAuthApiPath(url.pathname) &&
-    password &&
-    await validSessionCookie(request, username, password)
-  ) {
+  if (identity && isAdminPath(url.pathname)) {
     clearAuthFailures(request);
-    return withOriginAuth(request, username, password);
+    if (identity.role !== ROLE_ADMIN) {
+      return forbidden(request);
+    }
+    return withOriginAuth(request, identity, username, password);
+  }
+
+  if (isOptionalAuthApiPath(url.pathname) && identity) {
+    clearAuthFailures(request);
+    return withOriginAuth(request, identity, username, password);
   }
 
   if (!isProtectedPath(url.pathname)) {
@@ -449,9 +423,9 @@ export default async function middleware(request) {
     return process.env.VERCEL ? missingConfig(request) : next();
   }
 
-  if (await validSessionCookie(request, username, password)) {
+  if (identity) {
     clearAuthFailures(request);
-    return withOriginAuth(request, username, password);
+    return withOriginAuth(request, identity, username, password);
   }
 
   if (request.headers.get('authorization') && authRateLimited(request)) {
@@ -470,16 +444,15 @@ export default async function middleware(request) {
     return unauthorized(request);
   }
 
+  // Basic credentials are the admin's, so this is always an admin identity.
   clearAuthFailures(request);
-  return withOriginAuth(request, username, password);
+  return withOriginAuth(request, { username, role: ROLE_ADMIN }, username, password);
 }
 
 export const config = {
   matcher: [
     '/stock-research/:path*',
     '/bitcoin-chat/:path*',
-    '/login/session',
-    '/login/logout',
     '/admin/:path*',
     '/api/:path*',
   ],

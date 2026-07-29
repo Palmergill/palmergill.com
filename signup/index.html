@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login · Palmer Gill</title>
+    <title>Create account · Palmer Gill</title>
     <meta name="theme-color" content="#faf6f0">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -13,29 +13,40 @@
 </head>
 <body>
     <main class="login-shell">
-        <section class="login-card" aria-labelledby="loginTitle">
+        <section class="login-card" aria-labelledby="signupTitle">
             <div class="login-brand">
                 <img src="/assets/palmer-gill-logo-small.png" alt="" aria-hidden="true">
                 <span>Palmer Gill</span>
             </div>
 
-            <h1 id="loginTitle">Sign in</h1>
+            <h1 id="signupTitle">Create account</h1>
 
-            <form class="login-form" id="loginForm" novalidate>
+            <form class="login-form" id="signupForm" novalidate>
+                <div class="field">
+                    <label for="inviteCode">Invite code</label>
+                    <input id="inviteCode" name="inviteCode" type="text" autocomplete="off" spellcheck="false" required>
+                </div>
+
                 <div class="field">
                     <label for="username">Username</label>
-                    <input id="username" name="username" type="text" autocomplete="username" required>
+                    <input id="username" name="username" type="text" autocomplete="username" spellcheck="false" minlength="3" maxlength="24" required>
                 </div>
 
                 <div class="field">
                     <label for="password">Password</label>
-                    <input id="password" name="password" type="password" autocomplete="current-password" required>
+                    <input id="password" name="password" type="password" autocomplete="new-password" minlength="10" required>
+                    <p class="field-hint">10+ characters. There's no reset, so save it.</p>
                 </div>
 
-                <p class="status" id="loginStatus" role="status" aria-live="polite"></p>
+                <div class="field">
+                    <label for="confirmPassword">Confirm password</label>
+                    <input id="confirmPassword" name="confirmPassword" type="password" autocomplete="new-password" required>
+                </div>
+
+                <p class="status" id="signupStatus" role="status" aria-live="polite"></p>
 
                 <button class="login-button" type="submit">
-                    <span>Sign in</span>
+                    <span>Create account</span>
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                         <path d="M5 12h14"></path>
                         <path d="m13 6 6 6-6 6"></path>
@@ -43,8 +54,8 @@
                 </button>
             </form>
 
-            <p class="login-alt" id="signupPrompt" hidden>
-                Have an invite code? <a href="/signup/">Create an account</a>
+            <p class="login-alt">
+                Already have an account? <a href="/login/">Sign in</a>
             </p>
         </section>
 
@@ -53,6 +64,6 @@
 
     <script src="/shared/site-nav.js?v=13"></script>
     <script src="/shared/analytics.js?v=1"></script>
-    <script src="/login/app.js?v=2"></script>
+    <script src="/signup/app.js?v=1"></script>
 </body>
 </html>

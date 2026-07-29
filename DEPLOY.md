@@ -20,14 +20,25 @@ The active static site lives at the repo root:
 - `fantasy/`
 - `admin/`
 
-Production static hosting should serve those files directly. `vercel.json` rewrites `/api/*` requests to the Railway backend.
+Production static hosting should serve those files directly. `vercel.json` rewrites `/api/*` requests to the Railway backend, along with `/login/session`, `/login/signup`, and `/login/logout`.
 
-Vercel middleware keeps `/` public and requires Basic Auth for:
+### Two roles
 
-- `/admin/*`
-- `/api/*`, except `/api/poker/*`, `/api/craps/*`, `/api/stocks/*`, `/api/bitcoin/*`, `/api/fantasy/*`, and `/api/analytics/*`
+| Role | Comes from | Gets |
+| --- | --- | --- |
+| `admin` | `APP_AUTH_USERNAME` / `APP_AUTH_PASSWORD` env vars | Everything, including `/admin/*`, `/api/admin/*`, `/api/fantasy/admin/*`, and FastAPI docs |
+| `member` | A row in the `app_users` table, created at `/signup/` with an invite code | Live (non-demo) stock, Bitcoin, and fantasy data. No admin surfaces. |
 
-`/docs/*`, `/login/*`, `/stock-research/*`, `/bitcoin-chat/*`, `/fantasy/*`, `/poker/*`, `/craps/*`, `/craps-strategy/*`, `/blackjack/*`, `/api/poker/*`, `/api/craps/*`, `/api/stocks/*`, `/api/bitcoin/*`, `/api/fantasy/*`, and `/api/analytics/*` are public. Unauthenticated stock, Bitcoin, and fantasy API requests run in demo mode; valid app credentials unlock the live provider-backed paths and the fantasy admin refresh. The login page posts to `/login/session`, which sets a signed HttpOnly session cookie for `/admin/*` and protected API requests. Basic Auth remains supported for direct scripted access.
+There is deliberately no admin row in the database: nothing that can write to `app_users` can mint an account that reads the logs.
+
+Sign-in, sign-up, and sign-out are served by the API service, not the edge, because member accounts live in its database. Vercel middleware only *verifies* the `pg_session` cookie that service issues and enforces the role gate. Both platforms must therefore agree on the token signing secret — they already do, since both read `APP_AUTH_PASSWORD`, but setting `APP_SESSION_SECRET` in both places decouples sessions from the password.
+
+Vercel middleware keeps `/` public and requires a session (or Basic Auth) for:
+
+- `/admin/*` — admin role only
+- `/api/*`, except `/api/poker/*`, `/api/craps/*`, `/api/stocks/*`, `/api/bitcoin/*`, `/api/fantasy/*`, and `/api/analytics/*`; `/api/admin/*` and `/api/fantasy/admin/*` are admin role only
+
+`/docs/*`, `/login/*`, `/signup/*`, `/stock-research/*`, `/bitcoin-chat/*`, `/fantasy/*`, `/poker/*`, `/craps/*`, `/craps-strategy/*`, `/blackjack/*`, `/api/poker/*`, `/api/craps/*`, `/api/stocks/*`, `/api/bitcoin/*`, `/api/fantasy/*`, and `/api/analytics/*` are public. Unauthenticated stock, Bitcoin, and fantasy API requests run in demo mode; any signed-in account unlocks the live provider-backed paths, but only the admin can trigger the fantasy admin refresh. Basic Auth remains supported for direct scripted admin access.
 
 Configure these environment variables in Vercel:
 
@@ -37,6 +48,16 @@ APP_AUTH_PASSWORD=<secret password>
 ```
 
 If `APP_AUTH_PASSWORD` is missing in Vercel, protected routes return `503` so the apps do not accidentally publish without auth.
+
+### Turning member sign-ups on
+
+Set the invite code on **Railway** (the API service creates accounts, so Vercel does not need it):
+
+```text
+APP_SIGNUP_INVITE_CODE=<code you hand out>
+```
+
+Sign-ups are closed whenever this is unset — `/login/signup` returns `403` and the sign-in page hides the "Create an account" link. Rotating the code immediately invalidates any copy already handed out; existing accounts are unaffected. Passwords are hashed with scrypt, and there is no self-serve password reset: to reset one, delete the row from `app_users` and have the person sign up again.
 
 ## API Backend
 
@@ -52,7 +73,7 @@ Health check:
 /health
 ```
 
-The backend mirrors the same auth model for protected API docs, `/api/*` routes, and locally served app folders. Poker, craps, craps-strategy, blackjack, login, `/api/poker/*`, `/api/craps/*`, and `/api/analytics/*` remain public in the backend. Stock research, Bitcoin chat, the fantasy dashboard, `/api/stocks/*`, `/api/bitcoin/*`, and `/api/fantasy/*` allow unauthenticated demo-mode responses and use live providers only after valid app credentials are supplied. Admin, FastAPI docs/OpenAPI JSON, and other `/api/*` routes are protected. Protected routes return `503` if `APP_AUTH_PASSWORD` is missing, so set the same `APP_AUTH_USERNAME` and `APP_AUTH_PASSWORD` values in Railway to keep direct backend access usable and protected.
+The backend owns the auth model: it authenticates sign-ins, creates member accounts, mints the `pg_session` cookie, and enforces the same path rules for locally served app folders. Poker, craps, craps-strategy, blackjack, login, signup, `/api/poker/*`, `/api/craps/*`, and `/api/analytics/*` remain public in the backend. Stock research, Bitcoin chat, the fantasy dashboard, `/api/stocks/*`, `/api/bitcoin/*`, and `/api/fantasy/*` allow unauthenticated demo-mode responses and use live providers for any signed-in account. Admin, `/api/admin/*`, `/api/fantasy/admin/*`, and FastAPI docs/OpenAPI JSON require the admin role and return `403` for members. Protected routes return `503` if `APP_AUTH_PASSWORD` is missing, so set the same `APP_AUTH_USERNAME` and `APP_AUTH_PASSWORD` values in Railway to keep direct backend access usable and protected.
 
 The root Railway deployment uses the root `Dockerfile`, which copies only `backend/`.
 

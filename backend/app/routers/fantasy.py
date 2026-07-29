@@ -31,6 +31,12 @@ def is_authenticated(request: Request) -> bool:
     return bool(getattr(request.state, "app_auth_authenticated", False))
 
 
+def is_admin(request: Request) -> bool:
+    # Member accounts are authenticated but must not trigger collector runs.
+    identity = getattr(request.state, "app_user", None)
+    return bool(identity and identity.get("role") == "admin")
+
+
 async def run_blocking(func, *args, **kwargs):
     return await asyncio.to_thread(func, *args, **kwargs)
 
@@ -226,7 +232,7 @@ async def fantasy_chat(http_request: Request, request: FantasyChatRequest):
 async def admin_refresh(http_request: Request, job: str = Query(...)):
     # This endpoint performs writes/network fetches; it must never run for an
     # anonymous demo caller even though /api/fantasy is a demo prefix.
-    if is_demo_request(http_request) or not is_authenticated(http_request):
+    if is_demo_request(http_request) or not is_admin(http_request):
         raise HTTPException(status_code=403, detail="Admin authentication required")
     if job not in fantasy_collector.REFRESHABLE_JOBS:
         raise HTTPException(
