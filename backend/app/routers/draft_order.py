@@ -118,6 +118,19 @@ def bank(
     return view
 
 
+@router.post("/sessions/{session_id}/forfeit")
+def forfeit(
+    session_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    identity = _identity(request)
+    room, event = draft_order_game.forfeit_current_player(db, identity, session_id)
+    view = draft_order_game.serialize_session(db, room, identity["username"])
+    view["event"] = event
+    return view
+
+
 @router.get("/sessions/{session_id}/verify")
 def verify_room(
     session_id: str,

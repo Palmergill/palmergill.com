@@ -111,7 +111,11 @@ def check_invite_code(submitted: object, db: Session | None = None) -> None:
     submitted_code = submitted.strip() if isinstance(submitted, str) else ""
     if len(submitted_code) > 128:
         raise AccountError("That invite code isn't valid.", 403)
-    if expected is not None and secrets.compare_digest(submitted_code, expected):
+    # Compare bytes, not str: secrets.compare_digest raises TypeError on a
+    # non-ASCII string, which would turn a mistyped code into a 500.
+    if expected is not None and secrets.compare_digest(
+        submitted_code.encode("utf-8"), expected.encode("utf-8")
+    ):
         return
 
     room_code = "".join(submitted_code.upper().split())

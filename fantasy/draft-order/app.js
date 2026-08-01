@@ -4,6 +4,7 @@
     const API_BASE = `${window.API_ORIGIN || ""}/api/fantasy/draft`;
     const F = window.DraftOrderFormat;
     const POLL_MS = 2500;
+    const ROOM_STATE_LABELS = { lobby: "Lobby", active: "Live", complete: "Final" };
     const state = {
         identity: null,
         room: null,
@@ -11,6 +12,11 @@
         actionBusy: false,
         revealTimers: [],
         resultsRevealed: false,
+        statusTimer: null,
+        // Bumped by every action. A poll that was already in flight when the
+        // action landed carries a stale generation and is discarded, so the
+        // board never rewinds to the pre-action snapshot.
+        generation: 0,
     };
 
     const byId = (id) => document.getElementById(id);
@@ -54,6 +60,7 @@
         playActions: byId("playActions"),
         flipButton: byId("flipButton"),
         bankButton: byId("bankButton"),
+        forfeitButton: byId("forfeitButton"),
         leaderboard: byId("leaderboard"),
         resultPanel: byId("resultPanel"),
         revealButton: byId("revealButton"),
@@ -78,24 +85,61 @@
         });
         const data = await response.json().catch(() => ({}));
         if (!response.ok) {
-            const error = new Error(data.detail || data.error || "Something went wrong.");
+            const error = new Error(detailMessage(data));
             error.status = response.status;
             throw error;
         }
         return data;
     }
 
+    // FastAPI sends a string detail for our own HTTPExceptions but an array of
+    // validation objects for a 422, which would stringify into noise.
+    function detailMessage(data) {
+        const detail = data?.detail;
+        if (typeof detail === "string" && detail) return detail;
+        if (Array.isArray(detail) && detail.length) {
+            const first = detail[0];
+            if (typeof first?.msg === "string") return first.msg;
+        }
+        if (typeof data?.error === "string" && data.error) return data.error;
+        return "Something went wrong.";
+    }
+
     function nextPath() {
         return `${window.location.pathname}${window.location.search}${window.location.hash}`;
     }
 
+    function redirectToLogin() {
+        window.location.assign(`/login/?next=${encodeURIComponent(nextPath())}`);
+    }
+
+    // Every action shares this: a session that expired while the tab sat open
+    // has to send the manager back to sign in, not fail quietly behind a
+    // banner they may have scrolled past.
+    function handleActionError(error) {
+        if (error?.status === 401) {
+            showStatus("Your session expired. Taking you back to sign in…", true);
+            redirectToLogin();
+            return;
+        }
+        showStatus(error?.message || "Something went wrong.", true);
+    }
+
     function showStatus(message, isError) {
+        window.clearTimeout(state.statusTimer);
         els.globalStatus.textContent = message;
         els.globalStatus.classList.toggle("is-error", Boolean(isError));
         els.globalStatus.hidden = !message;
-        if (message) window.setTimeout(() => {
-            if (els.globalStatus.textContent === message) els.globalStatus.hidden = true;
-        }, 5000);
+        if (!message) return;
+        // The banner lives above a tall hero, so a manager acting on the setup
+        // cards or the play stage would never see it where it sits.
+        els.globalStatus.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        // Errors stay until the next message replaces them; confirmations fade.
+        if (!isError) {
+            state.statusTimer = window.setTimeout(() => {
+                if (els.globalStatus.textContent === message) els.globalStatus.hidden = true;
+            }, 5000);
+        }
     }
 
     function setView(name) {
@@ -105,11 +149,24 @@
         els.roomView.hidden = name !== "room";
     }
 
+    // Flip and Bank carry a <span> headline over a <small> subtitle, so the
+    // label has to be swapped without touching the button's own children.
     function setButtonBusy(button, busy, busyLabel) {
         if (!button) return;
-        if (!button.dataset.label) button.dataset.label = button.textContent;
         button.disabled = busy;
-        button.textContent = busy ? busyLabel : button.dataset.label;
+        let overlay = button.querySelector(":scope > .button-busy-label");
+        if (!busy) {
+            if (overlay) overlay.remove();
+            button.classList.remove("is-busy");
+            return;
+        }
+        if (!overlay) {
+            overlay = document.createElement("span");
+            overlay.className = "button-busy-label";
+            button.appendChild(overlay);
+        }
+        overlay.textContent = busyLabel;
+        button.classList.add("is-busy");
     }
 
     function initials(name) {
@@ -152,13 +209,18 @@
         stopPolling();
         if (!state.room || !["lobby", "active"].includes(state.room.state)) return;
         state.pollTimer = window.setTimeout(async () => {
+            const generation = state.generation;
+            const roomId = state.room.id;
             try {
-                const room = await requestJson(`/sessions/${state.room.id}`);
+                const room = await requestJson(`/sessions/${roomId}`);
+                // An action that resolved while this GET was in flight already
+                // rendered newer state — don't overwrite it with the old one.
+                if (generation !== state.generation || state.room?.id !== roomId) return;
                 state.room = room;
                 renderRoom();
             } catch (error) {
                 if (error.status === 401) {
-                    window.location.assign(`/login/?next=${encodeURIComponent(nextPath())}`);
+                    redirectToLogin();
                     return;
                 }
             } finally {
@@ -179,10 +241,15 @@
             const title = document.createElement("strong");
             title.textContent = room.leagueName;
             const details = document.createElement("span");
-            const stateLabel = room.state === "complete" ? "Draft order final" : room.state === "active" ? `${room.currentPlayer?.displayName || "Player"} is up` : `${room.players.length} managers in lobby`;
+            const managers = room.players.length;
+            const stateLabel = room.state === "complete"
+                ? "Draft order final"
+                : room.state === "active"
+                    ? `${room.currentPlayer?.displayName || "Player"} is up`
+                    : `${managers} manager${managers === 1 ? "" : "s"} in lobby`;
             details.textContent = stateLabel;
             const status = document.createElement("small");
-            status.textContent = room.state;
+            status.textContent = ROOM_STATE_LABELS[room.state] || room.state;
             button.append(title, details, status);
             button.addEventListener("click", () => openRoom(room.id));
             els.recentRooms.appendChild(button);
@@ -201,6 +268,10 @@
             const data = await requestJson("/sessions/mine");
             renderHome(data.sessions || []);
         } catch (error) {
+            if (error?.status === 401) {
+                handleActionError(error);
+                return;
+            }
             renderHome([]);
             showStatus(error.message, true);
         }
@@ -208,14 +279,21 @@
 
     async function openRoom(roomId) {
         stopPolling();
+        state.generation += 1;
         setView("loading");
         try {
             state.room = await requestJson(`/sessions/${roomId}`);
             state.resultsRevealed = false;
+            state.revealTimers.forEach(window.clearTimeout);
+            state.revealTimers = [];
             updateRoomUrl(roomId);
             renderRoom();
             schedulePoll();
         } catch (error) {
+            if (error?.status === 401) {
+                handleActionError(error);
+                return;
+            }
             showStatus(error.message, true);
             await loadHome();
         }
@@ -312,10 +390,22 @@
         els.currentPot.textContent = round.pot || 0;
         els.bustChance.textContent = F.bustCopy(round.bustChance);
         els.bankPosition.textContent = decision.bankPosition ? F.ordinal(decision.bankPosition) : "—";
-        els.scoreToBeat.textContent = decision.isLeadingIfBanked ? "You’d lead" : `${decision.scoreToBeat || 0} pts`;
+        // These stats describe the player at the table, so only phrase them in
+        // the second person when the viewer is that player.
+        els.scoreToBeat.textContent = decision.isLeadingIfBanked
+            ? (room.canPlay ? "You’d lead" : "Would lead")
+            : `${decision.scoreToBeat || 0} pts`;
         els.playActions.hidden = !room.canPlay;
         els.flipButton.disabled = state.actionBusy;
         els.bankButton.disabled = state.actionBusy || !(round.cards || []).length;
+
+        // The host's way out of a room stalled on someone who left.
+        const stalledOn = room.currentPlayer?.displayName;
+        els.forfeitButton.hidden = !room.canForfeit || room.canPlay;
+        els.forfeitButton.disabled = state.actionBusy;
+        if (!els.forfeitButton.hidden) {
+            els.forfeitButton.textContent = `${stalledOn} isn’t responding — skip them`;
+        }
 
         if (!room.canPlay) {
             els.turnMessage.className = "turn-message";
@@ -404,6 +494,7 @@
         setButtonBusy(button, true, busyLabel);
         try {
             const room = await requestJson(`/sessions/${state.room.id}/${path}`, { method: "POST" });
+            state.generation += 1;
             state.room = room;
             els.turnMessage.dataset.event = room.event?.type || "";
             if (room.event?.type === "flip" && room.event.busted) {
@@ -415,14 +506,18 @@
             } else if (room.event?.type === "bank") {
                 els.turnMessage.className = "turn-message is-bank";
                 els.turnMessage.textContent = `${room.event.score} points banked.`;
+            } else if (room.event?.type === "forfeit") {
+                els.turnMessage.className = "turn-message is-bust";
+                els.turnMessage.textContent = `${room.event.displayName} was skipped. Their remaining rounds score zero.`;
             }
             renderRoom();
             window.setTimeout(() => { delete els.turnMessage.dataset.event; }, 1800);
             schedulePoll();
         } catch (error) {
-            showStatus(error.message, true);
-            if (state.room) {
+            handleActionError(error);
+            if (error?.status !== 401 && state.room) {
                 try {
+                    state.generation += 1;
                     state.room = await requestJson(`/sessions/${state.room.id}`);
                     renderRoom();
                 } catch { /* Keep the last known room visible. */ }
@@ -437,10 +532,11 @@
     async function removePlayer(player) {
         if (!state.room || !window.confirm(`Remove ${player.displayName} from the lobby?`)) return;
         try {
+            state.generation += 1;
             state.room = await requestJson(`/sessions/${state.room.id}/players/${player.id}`, { method: "DELETE" });
             renderRoom();
         } catch (error) {
-            showStatus(error.message, true);
+            handleActionError(error);
         }
     }
 
@@ -454,7 +550,7 @@
             els.verifyPanel.hidden = false;
             els.verifyPanel.scrollIntoView({ behavior: "smooth", block: "start" });
         } catch (error) {
-            showStatus(error.message, true);
+            handleActionError(error);
         } finally {
             setButtonBusy(els.verifyButton, false, "Loading proof");
         }
@@ -526,13 +622,15 @@
                 method: "POST",
                 body: JSON.stringify({ league_name: els.leagueName.value.trim() }),
             });
+            state.generation += 1;
             state.room = room;
+            state.resultsRevealed = false;
             updateRoomUrl(room.id);
             renderRoom();
             schedulePoll();
             window.pgAnalytics?.track?.("app_event", "draft_room_created");
         } catch (error) {
-            showStatus(error.message, true);
+            handleActionError(error);
         } finally {
             setButtonBusy(button, false, "Creating room");
         }
@@ -547,13 +645,15 @@
                 method: "POST",
                 body: JSON.stringify({ join_code: els.joinCode.value.trim() }),
             });
+            state.generation += 1;
             state.room = room;
+            state.resultsRevealed = false;
             updateRoomUrl(room.id);
             renderRoom();
             schedulePoll();
             window.pgAnalytics?.track?.("app_event", "draft_room_joined");
         } catch (error) {
-            showStatus(error.message, true);
+            handleActionError(error);
         } finally {
             setButtonBusy(button, false, "Joining room");
         }
@@ -568,12 +668,14 @@
         state.actionBusy = true;
         setButtonBusy(els.startGameButton, true, "Locking roster");
         try {
-            state.room = await requestJson(`/sessions/${state.room.id}/start`, { method: "POST" });
+            const room = await requestJson(`/sessions/${state.room.id}/start`, { method: "POST" });
+            state.generation += 1;
+            state.room = room;
             renderRoom();
             schedulePoll();
             window.pgAnalytics?.track?.("app_event", "draft_game_started", { players: state.room.players.length });
         } catch (error) {
-            showStatus(error.message, true);
+            handleActionError(error);
         } finally {
             state.actionBusy = false;
             setButtonBusy(els.startGameButton, false, "Locking roster");
@@ -581,6 +683,11 @@
     });
     els.flipButton.addEventListener("click", () => performAction("flip", els.flipButton, "Dealing"));
     els.bankButton.addEventListener("click", () => performAction("bank", els.bankButton, "Banking"));
+    els.forfeitButton.addEventListener("click", () => {
+        const name = state.room?.currentPlayer?.displayName || "this manager";
+        if (!window.confirm(`Skip ${name}? Their remaining rounds score zero and the draft moves on. This can't be undone.`)) return;
+        performAction("forfeit", els.forfeitButton, "Skipping");
+    });
     els.revealButton.addEventListener("click", revealResults);
     els.verifyButton.addEventListener("click", showVerification);
     els.closeVerifyButton.addEventListener("click", () => {
@@ -605,11 +712,16 @@
                 method: "POST",
                 body: JSON.stringify({ join_code: code }),
             });
+            state.generation += 1;
             state.room = room;
             updateRoomUrl(room.id);
             renderRoom();
             schedulePoll();
         } catch (error) {
+            if (error?.status === 401) {
+                handleActionError(error);
+                return;
+            }
             await loadHome();
             els.joinCode.value = code;
             showStatus(error.message, true);

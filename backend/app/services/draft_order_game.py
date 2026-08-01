@@ -33,6 +33,9 @@ from app.database import (
 
 GAME_VERSION = "fourth-and-fortune-v1"
 ROUNDS_PER_PLAYER = 3
+# A round is over once it is banked, busted, or written off by the host when a
+# manager walks away mid-draft. Forfeited rounds score zero and hold no cards.
+FINISHED_ROUND_STATES = frozenset({"banked", "busted", "forfeited"})
 MIN_PLAYERS = 2
 MAX_PLAYERS = 16
 JOIN_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
@@ -210,11 +213,14 @@ def _cards(round_row: FantasyDraftRound) -> list[str]:
 
 
 def _round_score_total(rounds: list[FantasyDraftRound]) -> int:
-    return sum(row.score for row in rounds if row.state in {"banked", "busted"})
+    return sum(row.score for row in rounds if row.state in FINISHED_ROUND_STATES)
 
 
 def _best_round(rounds: list[FantasyDraftRound]) -> int:
-    return max((row.score for row in rounds if row.state in {"banked", "busted"}), default=0)
+    return max(
+        (row.score for row in rounds if row.state in FINISHED_ROUND_STATES),
+        default=0,
+    )
 
 
 def _active_round(rounds: list[FantasyDraftRound]) -> FantasyDraftRound | None:
@@ -231,6 +237,22 @@ def _round_payload(round_row: FantasyDraftRound) -> dict[str, Any]:
     }
 
 
+def standing_key(
+    score: int,
+    best_round: int,
+    master_seed: str,
+    username: str,
+) -> tuple[int, int, int]:
+    """The one ranking rule: total, then best round, then the seeded tiebreak.
+
+    The live standings and the final draft order both sort on this. They used
+    to disagree — the standings fell back to turn position on a tie — so a
+    manager could watch themselves hold first place and then be handed the
+    second pick.
+    """
+    return (-score, -best_round, -tie_break_value(master_seed, username))
+
+
 def _final_order(
     players: list[FantasyDraftPlayer],
     rounds_by_player: dict[str, list[FantasyDraftRound]],
@@ -238,10 +260,11 @@ def _final_order(
 ) -> list[FantasyDraftPlayer]:
     return sorted(
         players,
-        key=lambda player: (
-            -player.final_score,
-            -_best_round(rounds_by_player[player.id]),
-            -tie_break_value(master_seed, player.username),
+        key=lambda player: standing_key(
+            player.final_score,
+            _best_round(rounds_by_player[player.id]),
+            master_seed,
+            player.username,
         ),
     )
 
@@ -288,8 +311,9 @@ def serialize_session(
             "displayName": player.display_name,
             "turnPosition": player.turn_position,
             "score": score,
+            "bestRound": _best_round(player_rounds),
             "roundsCompleted": sum(
-                1 for row in player_rounds if row.state in {"banked", "busted"}
+                1 for row in player_rounds if row.state in FINISHED_ROUND_STATES
             ),
             "rounds": [_round_payload(row) for row in player_rounds],
             "isCurrent": player.id == room.current_player_id,
@@ -298,10 +322,11 @@ def serialize_session(
 
     leaderboard = sorted(
         player_payloads,
-        key=lambda player: (
-            -player["score"],
-            player["turnPosition"] if player["turnPosition"] is not None else MAX_PLAYERS + 1,
-            player["displayName"].casefold(),
+        key=lambda player: standing_key(
+            player["score"],
+            player["bestRound"],
+            room.master_seed,
+            player["username"],
         ),
     )
     for place, player in enumerate(leaderboard, start=1):
@@ -389,6 +414,11 @@ def serialize_session(
             and current_player is not None
             and member.id == current_player.id
             and room.state == "active"
+        ),
+        "canForfeit": bool(
+            viewer_normalized == room.created_by
+            and room.state == "active"
+            and current_player is not None
         ),
         "currentPlayer": (
             {
@@ -559,7 +589,7 @@ def _get_or_create_active_round(
         return round_row
     completed = db.query(func.count(FantasyDraftRound.id)).filter(
         FantasyDraftRound.player_id == player.id,
-        FantasyDraftRound.state.in_(("banked", "busted")),
+        FantasyDraftRound.state.in_(tuple(FINISHED_ROUND_STATES)),
     ).scalar() or 0
     if completed >= ROUNDS_PER_PLAYER:
         raise HTTPException(status_code=409, detail="This player's rounds are complete.")
@@ -588,7 +618,7 @@ def _advance_after_round(
         .order_by(FantasyDraftRound.round_number)
         .all()
     )
-    completed = [row for row in player_rounds if row.state in {"banked", "busted"}]
+    completed = [row for row in player_rounds if row.state in FINISHED_ROUND_STATES]
     if len(completed) < ROUNDS_PER_PLAYER:
         return
 
@@ -690,6 +720,71 @@ def bank_round(
     }
 
 
+def forfeit_current_player(
+    db: Session,
+    identity: dict[str, str],
+    session_id: str,
+) -> tuple[FantasyDraftSession, dict[str, Any]]:
+    """Host-only escape hatch for a manager who never comes back.
+
+    Without this a closed laptop strands the room forever: the roster is
+    locked, only the current player may act, and the seed stays sealed because
+    verification waits on a final score. Every unplayed round is written down
+    as a zero so the turn order and each deck still reproduce exactly.
+    """
+    username, _ = _identity_names(identity)
+    room = _session_or_404(db, session_id, lock=True)
+    if username != room.created_by:
+        raise HTTPException(status_code=403, detail="Only the host can skip a manager.")
+    if room.state != "active" or not room.current_player_id:
+        raise HTTPException(status_code=409, detail="This draft room isn't in play.")
+    player = db.query(FantasyDraftPlayer).filter(
+        FantasyDraftPlayer.id == room.current_player_id,
+        FantasyDraftPlayer.session_id == room.id,
+    ).first()
+    if player is None:
+        raise HTTPException(status_code=409, detail="The current player is unavailable.")
+
+    existing = (
+        db.query(FantasyDraftRound)
+        .filter(FantasyDraftRound.player_id == player.id)
+        .order_by(FantasyDraftRound.round_number)
+        .all()
+    )
+    finished = {row.round_number for row in existing if row.state in FINISHED_ROUND_STATES}
+    for round_row in existing:
+        if round_row.state == "active":
+            # Cards already dealt stay on the record — the proof should show
+            # what was in front of them — but the round is worth nothing.
+            round_row.state = "forfeited"
+            round_row.score = 0
+            round_row.busted = False
+            round_row.ended_at = utc_now()
+            finished.add(round_row.round_number)
+    for number in range(1, ROUNDS_PER_PLAYER + 1):
+        if number in finished:
+            continue
+        db.add(FantasyDraftRound(
+            id=str(uuid.uuid4()),
+            session_id=room.id,
+            player_id=player.id,
+            round_number=number,
+            cards_json="[]",
+            score=0,
+            busted=False,
+            state="forfeited",
+            ended_at=utc_now(),
+        ))
+    db.flush()
+    _advance_after_round(db, room, player)
+    db.commit()
+    return room, {
+        "type": "forfeit",
+        "playerId": player.id,
+        "displayName": player.display_name,
+    }
+
+
 def list_sessions_for_user(db: Session, identity: dict[str, str]) -> list[dict[str, Any]]:
     username, _ = _identity_names(identity)
     rooms = (
@@ -766,6 +861,10 @@ def verification(db: Session, room: FantasyDraftSession) -> dict[str, Any]:
                 "tieBreak": "first 8 bytes of HMAC-SHA256(master_seed, tiebreak:v1:{normalized account name})",
             },
             "tieBreakRule": "Total score, then best round, then higher seeded tie-break value.",
+            "forfeit": (
+                "A round in state 'forfeited' was written off by the host after the manager "
+                "stopped playing. It scores zero regardless of any cards already dealt."
+            ),
         },
     }
 

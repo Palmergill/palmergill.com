@@ -398,3 +398,24 @@ def test_check_invite_code_requires_exact_match(monkeypatch):
     for wrong in [None, "", "come-on-i", f"{INVITE_CODE}x", INVITE_CODE.upper(), 42]:
         with pytest.raises(AccountError):
             accounts.check_invite_code(wrong)
+
+
+def test_check_invite_code_rejects_non_ascii_without_crashing(monkeypatch):
+    """secrets.compare_digest raises TypeError on non-ASCII str, which turned
+    a mistyped code into a 500 instead of a refusal."""
+    monkeypatch.setenv("APP_SIGNUP_INVITE_CODE", INVITE_CODE)
+
+    for wrong in ["café☕", "пароль", "🎲🎲🎲"]:
+        with pytest.raises(AccountError):
+            accounts.check_invite_code(wrong)
+
+
+def test_signup_rejects_non_ascii_invite_code(configured):
+    response = configured.post("/login/signup", json={
+        "username": "curious",
+        "password": "a-great-password",
+        "inviteCode": "café☕",
+    })
+
+    assert response.status_code == 403
+    assert response.json()["error"] == "That invite code isn't valid."

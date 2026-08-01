@@ -7,8 +7,11 @@
     const confirmPassword = document.getElementById("confirmPassword");
     const button = form.querySelector("button[type='submit']");
 
+    // Prefill verbatim. Draft room codes already arrive uppercase, and the
+    // site invite code is compared exactly — upper-casing it here made every
+    // /signup/?invite=<site-code> link impossible to submit.
     const inviteFromUrl = new URLSearchParams(window.location.search).get("invite");
-    if (inviteFromUrl) inviteCode.value = inviteFromUrl.trim().toUpperCase();
+    if (inviteFromUrl) inviteCode.value = inviteFromUrl.trim();
 
     function safeNextPath() {
         const params = new URLSearchParams(window.location.search);

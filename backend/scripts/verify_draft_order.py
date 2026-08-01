@@ -71,11 +71,16 @@ def verify_proof(proof: dict) -> list[str]:
         final_score = 0
         for round_row in player.get("rounds", []):
             cards = [card.get("code") for card in round_row.get("cards", [])]
-            try:
-                expected_score, expected_bust = _round_score(cards)
-            except (KeyError, TypeError):
-                errors.append(f"{label}: round {round_row.get('number')} contains an invalid card.")
-                continue
+            if round_row.get("state") == "forfeited":
+                # The host wrote this round off when the manager stopped
+                # playing; it is worth nothing whatever was on the table.
+                expected_score, expected_bust = 0, False
+            else:
+                try:
+                    expected_score, expected_bust = _round_score(cards)
+                except (KeyError, TypeError):
+                    errors.append(f"{label}: round {round_row.get('number')} contains an invalid card.")
+                    continue
             if expected_score != round_row.get("score") or expected_bust != round_row.get("busted"):
                 errors.append(f"{label}: round {round_row.get('number')} score or bust flag is wrong.")
             final_score += expected_score

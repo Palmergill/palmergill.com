@@ -135,12 +135,18 @@ body::before {
 
 .hero-mark span:last-child { font-size: 3.4rem; }
 
+/* Sticky, not static: the banner sits above a tall hero, and a manager acting
+   on the setup cards or the play stage would never scroll back up to find it. */
 .notice {
+    position: sticky;
+    z-index: 20;
+    top: 68px;
     margin: 0 0 18px;
     padding: 13px 16px;
     border: 1px solid #d8b778;
     border-radius: 12px;
     background: #fff4d8;
+    box-shadow: 0 10px 28px rgba(35, 43, 36, 0.16);
     color: #6f4c16;
     font-size: 0.9rem;
     font-weight: 600;
@@ -657,6 +663,32 @@ code { font-family: "DM Mono", ui-monospace, monospace; }
 .play-actions .button small { margin-top: 2px; font-size: 0.65rem; font-weight: 600; opacity: 0.68; }
 .button--flip { background: var(--draft-gold); color: #261d0d; }
 .button--bank { border-color: rgba(255, 255, 255, 0.25); background: transparent; color: #fff; }
+
+/* A busy button overlays its label instead of replacing its text, so the
+   two-line span/small structure survives the round trip. */
+/* Host escape hatch, deliberately quiet: it sits under the play actions and
+   should never compete with Flip or Bank. */
+.text-button--warn {
+    display: block;
+    width: 100%;
+    margin-top: 14px;
+    padding: 8px;
+    color: #e8a79f;
+    text-align: center;
+}
+.text-button--warn:hover { color: #ffcdc6; }
+.text-button--warn[disabled] { opacity: 0.5; }
+
+.button.is-busy { position: relative; }
+.button.is-busy > :not(.button-busy-label) { visibility: hidden; }
+.button-busy-label {
+    position: absolute;
+    display: grid;
+    inset: 0;
+    place-items: center;
+    padding: 0 12px;
+    text-align: center;
+}
 
 .leaderboard-card {
     min-width: 0;

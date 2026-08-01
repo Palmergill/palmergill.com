@@ -16,6 +16,7 @@ from app.database import (
 )
 from app.main import SESSION_COOKIE_NAME, app, create_app_session_token
 from app.services import draft_order_game
+from app.services.draft_order_game import ROUNDS_PER_PLAYER
 from scripts.verify_draft_order import verify_proof
 
 ADMIN_PASSWORD = "secret"
@@ -262,3 +263,120 @@ def test_host_can_remove_player_only_before_start(monkeypatch):
     )
     assert removed.status_code == 200
     assert len(removed.json()["players"]) == 1
+
+
+def test_host_can_skip_a_manager_who_stops_playing(monkeypatch):
+    """A closed laptop used to strand the room: locked roster, only the
+    current player may act, and no seed reveal without a final score."""
+    host = member_client(monkeypatch, "host-player")
+    guest = member_client(monkeypatch, "road-warrior")
+    room = create_room(host)
+    join_room(guest, room["joinCode"])
+    rid = room["id"]
+    view = host.post(f"/api/fantasy/draft/sessions/{rid}/start").json()
+    clients = clients_by_player(view, host, guest)
+
+    while view["state"] == "active":
+        current_name = next(
+            player["username"] for player in view["players"] if player["isCurrent"]
+        )
+        if current_name == "road-warrior":
+            # The guest walks away. Only the host can move the room on, and
+            # the guest cannot skip themselves out of a bad position.
+            assert guest.post(
+                f"/api/fantasy/draft/sessions/{rid}/forfeit"
+            ).status_code == 403
+            guest_view = guest.get(f"/api/fantasy/draft/sessions/{rid}").json()
+            assert guest_view["canForfeit"] is False
+            assert view["canForfeit"] is True
+            skipped = host.post(f"/api/fantasy/draft/sessions/{rid}/forfeit")
+            assert skipped.status_code == 200
+            view = skipped.json()
+            assert view["event"]["type"] == "forfeit"
+            continue
+        view = clients[current_name].post(
+            f"/api/fantasy/draft/sessions/{rid}/flip"
+        ).json()
+        view = clients[current_name].post(
+            f"/api/fantasy/draft/sessions/{rid}/bank"
+        ).json()
+
+    assert view["state"] == "complete"
+    walked = next(p for p in view["players"] if p["username"] == "road-warrior")
+    assert walked["score"] == 0
+    assert walked["roundsCompleted"] == ROUNDS_PER_PLAYER
+    assert all(row["state"] == "forfeited" for row in walked["rounds"])
+    # The whole point: the proof still unlocks and still reproduces.
+    proof = host.get(f"/api/fantasy/draft/sessions/{rid}/verify").json()
+    assert proof["hashMatches"] is True
+    assert verify_proof(proof) == []
+    assert [entry["pick"] for entry in view["draftOrder"]] == [1, 2]
+
+
+def test_forfeit_zeroes_a_round_that_already_holds_cards(monkeypatch):
+    host = member_client(monkeypatch, "host-player")
+    guest = member_client(monkeypatch, "road-warrior")
+    room = create_room(host)
+    join_room(guest, room["joinCode"])
+    rid = room["id"]
+    view = host.post(f"/api/fantasy/draft/sessions/{rid}/start").json()
+    clients = clients_by_player(view, host, guest)
+    current_name = view["currentPlayer"]["displayName"]
+    dealt = clients[current_name].post(f"/api/fantasy/draft/sessions/{rid}/flip").json()
+    assert dealt["currentRound"]["pot"] > 0
+
+    view = host.post(f"/api/fantasy/draft/sessions/{rid}/forfeit").json()
+    walked = next(p for p in view["players"] if p["username"] == current_name)
+    # The dealt card stays on the record, but the round is worth nothing.
+    assert walked["rounds"][0]["cards"]
+    assert walked["rounds"][0]["score"] == 0
+    assert walked["rounds"][0]["state"] == "forfeited"
+    assert walked["score"] == 0
+
+
+def test_standings_and_draft_order_break_ties_the_same_way(monkeypatch):
+    """The leaderboard used to fall back to turn position, so a manager could
+    hold first place in the standings and be handed the second pick."""
+    host = member_client(monkeypatch, "host-player")
+    guest = member_client(monkeypatch, "road-warrior")
+    room = create_room(host)
+    join_room(guest, room["joinCode"])
+    rid = room["id"]
+    host.post(f"/api/fantasy/draft/sessions/{rid}/start")
+
+    db = SessionLocal()
+    try:
+        players = db.query(FantasyDraftPlayer).filter(
+            FantasyDraftPlayer.session_id == rid
+        ).all()
+        for index, player in enumerate(players):
+            player.final_score = 40
+            for number, score in enumerate([[30, 10, 0], [20, 20, 0]][index], start=1):
+                db.add(FantasyDraftRound(
+                    id=f"{player.id}-{number}",
+                    session_id=rid,
+                    player_id=player.id,
+                    round_number=number,
+                    cards_json="[]",
+                    score=score,
+                    busted=False,
+                    state="banked",
+                ))
+        session_row = db.query(FantasyDraftSession).filter(
+            FantasyDraftSession.id == rid
+        ).first()
+        session_row.state = "complete"
+        session_row.current_player_id = None
+        db.commit()
+    finally:
+        db.close()
+
+    view = host.get(f"/api/fantasy/draft/sessions/{rid}").json()
+    assert [p["score"] for p in view["leaderboard"]] == [40, 40]
+    assert (
+        [p["displayName"] for p in view["leaderboard"]]
+        == [entry["displayName"] for entry in view["draftOrder"]]
+    )
+    assert [p["place"] for p in view["leaderboard"]] == [1, 2]
+    # Best round is the first tiebreak, so 30 beats 20 in both lists.
+    assert view["leaderboard"][0]["bestRound"] == 30
