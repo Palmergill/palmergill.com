@@ -123,6 +123,7 @@ def check_invite_code(submitted: object, db: Session | None = None) -> None:
         open_room = db.query(FantasyDraftSession.id).filter(
             FantasyDraftSession.join_code == room_code,
             FantasyDraftSession.state == "lobby",
+            FantasyDraftSession.mode == "league",
         ).first()
         if open_room:
             return

@@ -18,7 +18,7 @@ from collections import defaultdict
 from typing import Any, Iterable
 
 from fastapi import HTTPException
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -38,6 +38,27 @@ ROUNDS_PER_PLAYER = 3
 FINISHED_ROUND_STATES = frozenset({"banked", "busted", "forfeited"})
 MIN_PLAYERS = 2
 MAX_PLAYERS = 16
+MODE_LEAGUE = "league"
+MODE_PRACTICE = "practice"
+MODE_TEST = "test"
+ROOM_MODES = frozenset({MODE_LEAGUE, MODE_PRACTICE, MODE_TEST})
+BOT_NAMES = (
+    "Ace Bot",
+    "Blitz Bot",
+    "Clover Bot",
+    "Dime Bot",
+    "End Zone Bot",
+    "Fumble Bot",
+    "Gridiron Bot",
+    "Huddle Bot",
+    "Iceman Bot",
+    "Juke Bot",
+    "Kickoff Bot",
+    "Lombardi Bot",
+    "Mascot Bot",
+    "Nickel Bot",
+    "Overtime Bot",
+)
 JOIN_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 SUITS = ("C", "D", "H", "S")
 RANKS = tuple(str(value) for value in range(2, 11)) + ("J", "Q", "K", "A")
@@ -318,6 +339,7 @@ def serialize_session(
             "rounds": [_round_payload(row) for row in player_rounds],
             "isCurrent": player.id == room.current_player_id,
             "isHost": player.username == room.created_by,
+            "isBot": bool(player.is_bot),
         })
 
     leaderboard = sorted(
@@ -393,13 +415,19 @@ def serialize_session(
                 "displayName": player.display_name,
                 "score": player.final_score,
                 "bestRound": _best_round(rounds_by_player[player.id]),
+                "isBot": bool(player.is_bot),
             })
 
     member = next((player for player in players if player.username == viewer_normalized), None)
     return {
         "id": room.id,
         "leagueName": room.league_name,
-        "joinCode": room.join_code if member is not None else None,
+        "mode": room.mode or MODE_LEAGUE,
+        "joinCode": (
+            room.join_code
+            if member is not None and room.mode == MODE_LEAGUE
+            else None
+        ),
         "seedHash": room.seed_hash,
         "state": room.state,
         "roundsPerPlayer": ROUNDS_PER_PLAYER,
@@ -420,11 +448,19 @@ def serialize_session(
             and room.state == "active"
             and current_player is not None
         ),
+        "canRunBot": bool(
+            viewer_normalized == room.created_by
+            and room.mode == MODE_TEST
+            and room.state == "active"
+            and current_player is not None
+            and current_player.is_bot
+        ),
         "currentPlayer": (
             {
                 "id": current_player.id,
                 "displayName": current_player.display_name,
                 "turnPosition": current_player.turn_position,
+                "isBot": bool(current_player.is_bot),
             }
             if current_player is not None
             else None
@@ -437,11 +473,19 @@ def serialize_session(
     }
 
 
-def create_session(db: Session, identity: dict[str, str], league_name: str) -> FantasyDraftSession:
+def create_session(
+    db: Session,
+    identity: dict[str, str],
+    league_name: str,
+    *,
+    mode: str = MODE_LEAGUE,
+) -> FantasyDraftSession:
     username, display_name = _identity_names(identity)
     cleaned_name = " ".join(league_name.split())
     if len(cleaned_name) < 3 or len(cleaned_name) > 60:
         raise HTTPException(status_code=400, detail="League name must be 3–60 characters.")
+    if mode not in ROOM_MODES:
+        raise ValueError(f"Unsupported draft room mode: {mode}")
 
     master_seed = secrets.token_hex(32)
     room = FantasyDraftSession(
@@ -450,6 +494,7 @@ def create_session(db: Session, identity: dict[str, str], league_name: str) -> F
         join_code=_new_join_code(db),
         master_seed=master_seed,
         seed_hash=seed_commitment(master_seed),
+        mode=mode,
         state="lobby",
         created_by=username,
     )
@@ -464,7 +509,85 @@ def create_session(db: Session, identity: dict[str, str], league_name: str) -> F
         session_id=room.id,
         username=username,
         display_name=display_name,
+        is_bot=False,
     ))
+    db.commit()
+    db.refresh(room)
+    return room
+
+
+def create_practice_session(db: Session, identity: dict[str, str]) -> FantasyDraftSession:
+    """Create or resume a private three-round solo warm-up."""
+    username, display_name = _identity_names(identity)
+    existing = (
+        db.query(FantasyDraftSession)
+        .join(FantasyDraftPlayer, FantasyDraftPlayer.session_id == FantasyDraftSession.id)
+        .filter(
+            FantasyDraftSession.mode == MODE_PRACTICE,
+            FantasyDraftSession.created_by == username,
+            FantasyDraftSession.state.in_(("lobby", "active")),
+            FantasyDraftPlayer.username == username,
+        )
+        .order_by(FantasyDraftSession.created_at.desc())
+        .first()
+    )
+    if existing is not None:
+        if existing.state == "lobby":
+            player = db.query(FantasyDraftPlayer).filter(
+                FantasyDraftPlayer.session_id == existing.id,
+                FantasyDraftPlayer.username == username,
+            ).one()
+            player.turn_position = 1
+            existing.current_player_id = player.id
+            existing.state = "active"
+            existing.started_at = utc_now()
+            db.commit()
+            db.refresh(existing)
+        return existing
+
+    room = create_session(
+        db,
+        identity,
+        f"{display_name} practice",
+        mode=MODE_PRACTICE,
+    )
+    player = db.query(FantasyDraftPlayer).filter(
+        FantasyDraftPlayer.session_id == room.id,
+        FantasyDraftPlayer.username == username,
+    ).one()
+    player.turn_position = 1
+    room.current_player_id = player.id
+    room.state = "active"
+    room.started_at = utc_now()
+    db.commit()
+    db.refresh(room)
+    return room
+
+
+def create_test_session(
+    db: Session,
+    identity: dict[str, str],
+    league_name: str,
+    bot_count: int,
+) -> FantasyDraftSession:
+    """Create an admin-only production test room with marked bot players."""
+    if identity.get("role") != accounts.ROLE_ADMIN:
+        raise HTTPException(status_code=403, detail="Only the site admin can create bot test rooms.")
+    if bot_count < 1 or bot_count > len(BOT_NAMES):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Choose between 1 and {len(BOT_NAMES)} bot opponents.",
+        )
+
+    room = create_session(db, identity, league_name, mode=MODE_TEST)
+    for index, display_name in enumerate(BOT_NAMES[:bot_count], start=1):
+        db.add(FantasyDraftPlayer(
+            id=str(uuid.uuid4()),
+            session_id=room.id,
+            username=f"__bot_{index:02d}",
+            display_name=display_name,
+            is_bot=True,
+        ))
     db.commit()
     db.refresh(room)
     return room
@@ -481,6 +604,8 @@ def join_session(db: Session, identity: dict[str, str], join_code: str) -> Fanta
     )
     if room is None:
         raise HTTPException(status_code=404, detail="That room code doesn't exist.")
+    if room.mode != MODE_LEAGUE:
+        raise HTTPException(status_code=409, detail="That room isn't open to league managers.")
     if room.state != "lobby":
         raise HTTPException(status_code=409, detail="That draft room has already started.")
     existing = db.query(FantasyDraftPlayer).filter(
@@ -500,6 +625,7 @@ def join_session(db: Session, identity: dict[str, str], join_code: str) -> Fanta
         session_id=room.id,
         username=username,
         display_name=display_name,
+        is_bot=False,
     ))
     try:
         db.commit()
@@ -549,7 +675,8 @@ def start_session(db: Session, identity: dict[str, str], session_id: str) -> Fan
     if room.state != "lobby":
         raise HTTPException(status_code=409, detail="This draft room has already started.")
     players = _players(db, room.id)
-    if len(players) < MIN_PLAYERS:
+    minimum_players = 1 if room.mode == MODE_PRACTICE else MIN_PLAYERS
+    if len(players) < minimum_players:
         raise HTTPException(status_code=409, detail="At least two players are needed.")
 
     by_username = {player.username: player for player in players}
@@ -790,12 +917,86 @@ def forfeit_current_player(
     }
 
 
+def _bot_should_bank(
+    room: FantasyDraftSession,
+    player: FantasyDraftPlayer,
+    round_row: FantasyDraftRound,
+) -> bool:
+    cards = _cards(round_row)
+    context = f"bot-strategy:v1:{player.username}:{round_row.round_number}"
+    target = 18 + (int.from_bytes(_context_key(room.master_seed, context)[:2], "big") % 10)
+    return len(cards) >= 4 or (len(cards) >= 2 and round_row.score >= target)
+
+
+def play_test_bot_round(
+    db: Session,
+    identity: dict[str, str],
+    session_id: str,
+) -> tuple[FantasyDraftSession, dict[str, Any]]:
+    """Play one complete bot round so the UI can animate test progress."""
+    username, _ = _identity_names(identity)
+    room = _session_or_404(db, session_id, lock=True)
+    if room.mode != MODE_TEST:
+        raise HTTPException(status_code=409, detail="Bots only play inside test rooms.")
+    if username != room.created_by:
+        raise HTTPException(status_code=403, detail="Only the test-room host can run bots.")
+    if room.state != "active" or not room.current_player_id:
+        raise HTTPException(status_code=409, detail="This test room isn't waiting on a bot.")
+
+    player = db.query(FantasyDraftPlayer).filter(
+        FantasyDraftPlayer.id == room.current_player_id,
+        FantasyDraftPlayer.session_id == room.id,
+    ).first()
+    if player is None or not player.is_bot:
+        raise HTTPException(status_code=409, detail="The current turn belongs to a real player.")
+
+    bot_identity = {"username": player.username, "role": accounts.ROLE_MEMBER}
+    cards = []
+    round_number = None
+    outcome = "banked"
+    score = 0
+    for _ in range(5):
+        room, flip_event = flip_card(db, bot_identity, session_id)
+        round_number = flip_event["round"]
+        cards.append(flip_event["card"])
+        if flip_event["busted"]:
+            outcome = "busted"
+            break
+
+        active_round = db.query(FantasyDraftRound).filter(
+            FantasyDraftRound.player_id == player.id,
+            FantasyDraftRound.state == "active",
+        ).first()
+        if active_round is not None and _bot_should_bank(room, player, active_round):
+            room, bank_event = bank_round(db, bot_identity, session_id)
+            score = bank_event["score"]
+            break
+    else:  # Defensive only: the strategy always banks by card four.
+        raise HTTPException(status_code=500, detail="The bot couldn't finish its round.")
+
+    return room, {
+        "type": "bot_round",
+        "playerId": player.id,
+        "displayName": player.display_name,
+        "round": round_number,
+        "outcome": outcome,
+        "score": score,
+        "cards": cards,
+    }
+
+
 def list_sessions_for_user(db: Session, identity: dict[str, str]) -> list[dict[str, Any]]:
     username, _ = _identity_names(identity)
     rooms = (
         db.query(FantasyDraftSession)
         .join(FantasyDraftPlayer, FantasyDraftPlayer.session_id == FantasyDraftSession.id)
-        .filter(FantasyDraftPlayer.username == username)
+        .filter(
+            FantasyDraftPlayer.username == username,
+            or_(
+                FantasyDraftSession.mode != MODE_PRACTICE,
+                FantasyDraftSession.state != "complete",
+            ),
+        )
         .order_by(FantasyDraftSession.created_at.desc())
         .limit(12)
         .all()

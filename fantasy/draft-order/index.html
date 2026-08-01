@@ -17,7 +17,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&amp;family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/shared/site-nav.css?v=13">
-    <link rel="stylesheet" href="style.css?v=2">
+    <link rel="stylesheet" href="style.css?v=3">
 </head>
 <body>
     <main class="draft-shell">
@@ -62,6 +62,15 @@
                 <p class="account-note">Every manager joins from their own account.</p>
             </div>
 
+            <section class="state-card practice-card">
+                <div>
+                    <p class="section-kicker">Warm-up table</p>
+                    <h3>Practice all three rounds</h3>
+                    <p>Flip, bank, and learn the rhythm in a private solo run. Practice scores never touch a league draft room.</p>
+                </div>
+                <button id="startPracticeButton" class="button button--action" type="button">Start practice</button>
+            </section>
+
             <div class="setup-grid">
                 <form id="createRoomForm" class="state-card setup-card">
                     <span class="setup-number">01</span>
@@ -83,6 +92,28 @@
                     <button class="button button--quiet" type="submit">Join room</button>
                 </form>
             </div>
+
+            <form id="testRoomForm" class="state-card test-lab" hidden>
+                <div>
+                    <p class="section-kicker">Admin test lab</p>
+                    <h3>Run the full flow with bots</h3>
+                    <p>Create a private production test room with you and bot managers. Bots play automatically when their turns arrive.</p>
+                </div>
+                <div class="test-lab-fields">
+                    <label for="testLeagueName">Test room name</label>
+                    <input id="testLeagueName" name="testLeagueName" type="text" minlength="3" maxlength="60" value="Production End-to-End Test" required>
+                    <label for="testBotCount">Bot opponents</label>
+                    <select id="testBotCount" name="testBotCount">
+                        <option value="3">3 bots</option>
+                        <option value="5" selected>5 bots</option>
+                        <option value="7">7 bots</option>
+                        <option value="9">9 bots</option>
+                        <option value="11">11 bots</option>
+                        <option value="15">15 bots</option>
+                    </select>
+                    <button class="button button--quiet" type="submit">Create bot test room</button>
+                </div>
+            </form>
 
             <section id="recentRoomsSection" class="recent-rooms" hidden>
                 <div class="section-heading">
@@ -112,7 +143,7 @@
             </header>
 
             <section id="lobbyPanel" class="lobby-layout" hidden>
-                <div class="state-card room-code-card">
+                <div id="roomCodeCard" class="state-card room-code-card">
                     <p class="section-kicker">Send this to the league</p>
                     <div id="roomCode" class="room-code">—</div>
                     <div class="share-row">
@@ -120,6 +151,13 @@
                         <button id="copyLinkButton" class="button button--quiet" type="button">Copy invite link</button>
                     </div>
                     <p>The roster locks when the host starts. Late joins won’t be accepted.</p>
+                </div>
+
+                <div id="testRoomCard" class="state-card room-code-card room-code-card--test" hidden>
+                    <p class="section-kicker">Production test room</p>
+                    <div class="test-room-mark" aria-hidden="true">BOT</div>
+                    <h3>Bot managers are staged.</h3>
+                    <p>This room cannot be joined or used for a real draft. Start it to test turns, scoring, results, and verification end to end.</p>
                 </div>
 
                 <div class="state-card roster-card">
@@ -195,13 +233,14 @@
 
             <section id="resultPanel" class="result-panel" hidden>
                 <div class="result-intro">
-                    <p class="section-kicker">Scores locked · seed revealed</p>
-                    <h2>The draft order is ready.</h2>
-                    <p>Reveal from the last pick to the first, then open the proof behind every card.</p>
+                    <p id="resultKicker" class="section-kicker">Scores locked · seed revealed</p>
+                    <h2 id="resultTitle">The draft order is ready.</h2>
+                    <p id="resultCopy">Reveal from the last pick to the first, then open the proof behind every card.</p>
                     <button id="revealButton" class="button button--action" type="button">Reveal draft order</button>
                 </div>
                 <ol id="draftOrder" class="draft-order" aria-live="polite"></ol>
                 <div id="resultActions" class="result-actions" hidden>
+                    <button id="practiceAgainButton" class="button button--action" type="button" hidden>Practice again</button>
                     <button id="verifyButton" class="button button--quiet" type="button">Verify every deal</button>
                     <button id="copyResultsButton" class="text-button" type="button">Copy draft order</button>
                 </div>
@@ -252,7 +291,7 @@
     <script src="/shared/site-nav.js?v=13"></script>
     <script src="/shared/analytics.js?v=1"></script>
     <script src="/shared/api-base.js?v=1"></script>
-    <script src="format.js?v=1"></script>
-    <script src="app.js?v=2"></script>
+    <script src="format.js?v=2"></script>
+    <script src="app.js?v=3"></script>
 </body>
 </html>

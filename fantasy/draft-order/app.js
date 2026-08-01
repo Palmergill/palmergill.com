@@ -13,6 +13,8 @@
         revealTimers: [],
         resultsRevealed: false,
         statusTimer: null,
+        botTimer: null,
+        botPaused: false,
         // Bumped by every action. A poll that was already in flight when the
         // action landed carries a stale generation and is discarded, so the
         // board never rewinds to the pre-action snapshot.
@@ -29,10 +31,14 @@
         signInLink: byId("signInLink"),
         createAccountLink: byId("createAccountLink"),
         accountName: byId("accountName"),
+        startPracticeButton: byId("startPracticeButton"),
         createRoomForm: byId("createRoomForm"),
         leagueName: byId("leagueName"),
         joinRoomForm: byId("joinRoomForm"),
         joinCode: byId("joinCode"),
+        testRoomForm: byId("testRoomForm"),
+        testLeagueName: byId("testLeagueName"),
+        testBotCount: byId("testBotCount"),
         recentRoomsSection: byId("recentRoomsSection"),
         recentRooms: byId("recentRooms"),
         leaveRoomView: byId("leaveRoomView"),
@@ -41,6 +47,8 @@
         seedHash: byId("seedHash"),
         copyHashButton: byId("copyHashButton"),
         lobbyPanel: byId("lobbyPanel"),
+        roomCodeCard: byId("roomCodeCard"),
+        testRoomCard: byId("testRoomCard"),
         roomCode: byId("roomCode"),
         copyCodeButton: byId("copyCodeButton"),
         copyLinkButton: byId("copyLinkButton"),
@@ -63,11 +71,15 @@
         forfeitButton: byId("forfeitButton"),
         leaderboard: byId("leaderboard"),
         resultPanel: byId("resultPanel"),
+        resultKicker: byId("resultKicker"),
+        resultTitle: byId("resultTitle"),
+        resultCopy: byId("resultCopy"),
         revealButton: byId("revealButton"),
         draftOrder: byId("draftOrder"),
         resultActions: byId("resultActions"),
         verifyButton: byId("verifyButton"),
         copyResultsButton: byId("copyResultsButton"),
+        practiceAgainButton: byId("practiceAgainButton"),
         verifyPanel: byId("verifyPanel"),
         closeVerifyButton: byId("closeVerifyButton"),
         hashMatchBadge: byId("hashMatchBadge"),
@@ -205,6 +217,22 @@
         state.pollTimer = null;
     }
 
+    function stopBotTimer() {
+        if (state.botTimer) window.clearTimeout(state.botTimer);
+        state.botTimer = null;
+    }
+
+    function scheduleBotTurn() {
+        stopBotTimer();
+        if (
+            state.botPaused
+            || state.actionBusy
+            || !state.room?.canRunBot
+            || state.room.state !== "active"
+        ) return;
+        state.botTimer = window.setTimeout(playBotRound, 900);
+    }
+
     function schedulePoll() {
         stopPolling();
         if (!state.room || !["lobby", "active"].includes(state.room.state)) return;
@@ -232,6 +260,7 @@
     function renderHome(sessions) {
         setView("home");
         els.accountName.textContent = state.identity.username;
+        els.testRoomForm.hidden = state.identity.role !== "admin";
         const rooms = sessions || [];
         els.recentRoomsSection.hidden = rooms.length === 0;
         els.recentRooms.innerHTML = "";
@@ -249,7 +278,10 @@
                     : `${managers} manager${managers === 1 ? "" : "s"} in lobby`;
             details.textContent = stateLabel;
             const status = document.createElement("small");
-            status.textContent = ROOM_STATE_LABELS[room.state] || room.state;
+            const modeLabel = room.mode === "league"
+                ? ROOM_STATE_LABELS[room.state] || room.state
+                : F.roomModeName(room.mode);
+            status.textContent = modeLabel;
             button.append(title, details, status);
             button.addEventListener("click", () => openRoom(room.id));
             els.recentRooms.appendChild(button);
@@ -258,6 +290,7 @@
 
     async function loadHome() {
         stopPolling();
+        stopBotTimer();
         state.room = null;
         state.resultsRevealed = false;
         state.revealTimers.forEach(window.clearTimeout);
@@ -279,6 +312,8 @@
 
     async function openRoom(roomId) {
         stopPolling();
+        stopBotTimer();
+        state.botPaused = false;
         state.generation += 1;
         setView("loading");
         try {
@@ -306,13 +341,23 @@
         els.verifyPanel.hidden = true;
         els.roomLeagueName.textContent = room.leagueName;
         els.seedHash.textContent = F.compactHash(room.seedHash, 12);
-        els.roomStateLabel.textContent = room.state === "lobby" ? "Lobby open" : room.state === "active" ? "Draft order game · live" : "Final result";
+        const modeLabel = F.roomModeName(room.mode);
+        els.roomStateLabel.textContent = room.state === "lobby"
+            ? `${modeLabel} · lobby open`
+            : room.state === "active"
+                ? `${modeLabel} · live`
+                : `${modeLabel} · final result`;
         els.lobbyPanel.hidden = room.state !== "lobby";
         els.gamePanel.hidden = room.state !== "active";
         els.resultPanel.hidden = room.state !== "complete";
 
         if (room.state === "lobby") renderLobby(room);
-        if (room.state === "active") renderGame(room);
+        if (room.state === "active") {
+            renderGame(room);
+            scheduleBotTurn();
+        } else {
+            stopBotTimer();
+        }
         if (room.state === "complete") {
             stopPolling();
             renderResults(room);
@@ -320,6 +365,9 @@
     }
 
     function renderLobby(room) {
+        const isTest = room.mode === "test";
+        els.roomCodeCard.hidden = isTest;
+        els.testRoomCard.hidden = !isTest;
         els.roomCode.textContent = room.joinCode || "—";
         els.rosterCount.textContent = room.players.length;
         els.lobbyRoster.innerHTML = "";
@@ -332,6 +380,12 @@
             name.className = "roster-name";
             name.textContent = player.displayName;
             row.append(avatar, name);
+            if (player.isBot) {
+                const bot = document.createElement("span");
+                bot.className = "bot-chip";
+                bot.textContent = "Bot";
+                row.appendChild(bot);
+            }
             if (player.isHost) {
                 const host = document.createElement("span");
                 host.className = "host-chip";
@@ -349,8 +403,15 @@
         });
         els.startGameButton.hidden = !room.isHost;
         els.startGameButton.disabled = !room.canStart || state.actionBusy;
+        els.startGameButton.textContent = isTest
+            ? "Start full-flow test"
+            : "Lock roster & reveal turn order";
         els.startHelp.textContent = room.isHost
-            ? (room.canStart ? "Starting locks the roster and reveals the seeded turn order." : "One more manager must join before you can start.")
+            ? (room.canStart
+                ? (isTest
+                    ? "Bots will play automatically. Your three rounds stay under your control."
+                    : "Starting locks the roster and reveals the seeded turn order.")
+                : "One more manager must join before you can start.")
             : "Waiting for the host to lock the roster and start.";
     }
 
@@ -401,13 +462,16 @@
 
         // The host's way out of a room stalled on someone who left.
         const stalledOn = room.currentPlayer?.displayName;
-        els.forfeitButton.hidden = !room.canForfeit || room.canPlay;
+        els.forfeitButton.hidden = room.canRunBot || !room.canForfeit || room.canPlay;
         els.forfeitButton.disabled = state.actionBusy;
         if (!els.forfeitButton.hidden) {
             els.forfeitButton.textContent = `${stalledOn} isn’t responding — skip them`;
         }
 
-        if (!room.canPlay) {
+        if (room.canRunBot && !els.turnMessage.dataset.event) {
+            els.turnMessage.className = "turn-message";
+            els.turnMessage.textContent = `${room.currentPlayer?.displayName || "A bot"} is playing automatically…`;
+        } else if (!room.canPlay && !els.turnMessage.dataset.event) {
             els.turnMessage.className = "turn-message";
             els.turnMessage.textContent = `Watching ${room.currentPlayer?.displayName || "the current player"}. This screen updates automatically.`;
         } else if (!els.turnMessage.dataset.event) {
@@ -430,7 +494,7 @@
             const info = document.createElement("span");
             info.className = "leaderboard-player";
             const name = document.createElement("strong");
-            name.textContent = player.displayName;
+            name.textContent = `${player.displayName}${player.isBot ? " · BOT" : ""}`;
             const rounds = document.createElement("span");
             rounds.textContent = `${player.roundsCompleted}/${room.roundsPerPlayer} rounds${player.isCurrent ? " · up now" : ""}`;
             info.append(name, rounds);
@@ -444,8 +508,18 @@
 
     function renderResults(room) {
         els.draftOrder.innerHTML = "";
+        const isPractice = room.mode === "practice";
+        if (isPractice) state.resultsRevealed = true;
+        els.resultKicker.textContent = isPractice ? "Practice complete · seed revealed" : "Scores locked · seed revealed";
+        els.resultTitle.textContent = isPractice ? "Three practice rounds complete." : "The draft order is ready.";
+        els.resultCopy.textContent = isPractice
+            ? `You scored ${room.draftOrder?.[0]?.score || 0} points. Run it again whenever you want another warm-up.`
+            : "Reveal from the last pick to the first, then open the proof behind every card.";
+        els.practiceAgainButton.hidden = !isPractice;
+        els.copyResultsButton.hidden = isPractice;
+        els.verifyButton.textContent = isPractice ? "Verify practice deal" : "Verify every deal";
         els.resultActions.hidden = !state.resultsRevealed;
-        els.revealButton.hidden = state.resultsRevealed;
+        els.revealButton.hidden = isPractice || state.resultsRevealed;
         if (state.resultsRevealed) {
             room.draftOrder.forEach((entry) => els.draftOrder.appendChild(resultRow(entry)));
         }
@@ -481,11 +555,70 @@
                 els.draftOrder.prepend(resultRow(entry));
                 if (index === sequence.length - 1) {
                     els.resultActions.hidden = false;
-                    window.pgAnalytics?.track?.("app_event", "draft_order_revealed", { players: sequence.length });
+                    window.pgAnalytics?.track?.("draft_order_revealed", { players: sequence.length });
                 }
             }, reducedMotion ? 0 : index * 850);
             state.revealTimers.push(timer);
         });
+    }
+
+    async function startPractice(button) {
+        if (state.actionBusy) return;
+        state.actionBusy = true;
+        state.botPaused = false;
+        stopPolling();
+        stopBotTimer();
+        setButtonBusy(button, true, "Shuffling practice");
+        try {
+            const room = await requestJson("/practice", { method: "POST" });
+            state.generation += 1;
+            state.room = room;
+            state.resultsRevealed = false;
+            updateRoomUrl(room.id);
+            renderRoom();
+            schedulePoll();
+            window.pgAnalytics?.track?.("draft_practice_started");
+        } catch (error) {
+            handleActionError(error);
+        } finally {
+            state.actionBusy = false;
+            setButtonBusy(button, false, "Shuffling practice");
+            if (state.room?.state === "active") renderGame(state.room);
+        }
+    }
+
+    async function playBotRound() {
+        if (state.actionBusy || state.botPaused || !state.room?.canRunBot) return;
+        state.actionBusy = true;
+        stopPolling();
+        const botName = state.room.currentPlayer?.displayName || "Bot";
+        els.turnMessage.dataset.event = "bot_round";
+        els.turnMessage.className = "turn-message";
+        els.turnMessage.textContent = `${botName} is playing round ${state.room.currentRound?.number || 1}…`;
+        try {
+            const room = await requestJson(
+                `/sessions/${state.room.id}/bots/play-round`,
+                { method: "POST" },
+            );
+            state.generation += 1;
+            state.room = room;
+            const event = room.event;
+            els.turnMessage.className = event?.outcome === "busted"
+                ? "turn-message is-bust"
+                : "turn-message is-bank";
+            els.turnMessage.textContent = F.botRoundMessage(event);
+            renderRoom();
+            window.setTimeout(() => { delete els.turnMessage.dataset.event; }, 700);
+            schedulePoll();
+        } catch (error) {
+            state.botPaused = true;
+            delete els.turnMessage.dataset.event;
+            handleActionError(error);
+        } finally {
+            state.actionBusy = false;
+            if (state.room?.state === "active") renderGame(state.room);
+            scheduleBotTurn();
+        }
     }
 
     async function performAction(path, button, busyLabel) {
@@ -526,6 +659,7 @@
             state.actionBusy = false;
             setButtonBusy(button, false, busyLabel);
             if (state.room?.state === "active") renderGame(state.room);
+            scheduleBotTurn();
         }
     }
 
@@ -628,11 +762,47 @@
             updateRoomUrl(room.id);
             renderRoom();
             schedulePoll();
-            window.pgAnalytics?.track?.("app_event", "draft_room_created");
+            window.pgAnalytics?.track?.("draft_room_created");
         } catch (error) {
             handleActionError(error);
         } finally {
             setButtonBusy(button, false, "Creating room");
+        }
+    });
+
+    els.startPracticeButton.addEventListener("click", () => startPractice(els.startPracticeButton));
+    els.practiceAgainButton.addEventListener("click", () => startPractice(els.practiceAgainButton));
+
+    els.testRoomForm.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        if (state.actionBusy) return;
+        const button = els.testRoomForm.querySelector("button[type='submit']");
+        state.actionBusy = true;
+        state.botPaused = false;
+        setButtonBusy(button, true, "Staging bots");
+        try {
+            const room = await requestJson("/sessions/test", {
+                method: "POST",
+                body: JSON.stringify({
+                    league_name: els.testLeagueName.value.trim(),
+                    bot_count: Number(els.testBotCount.value),
+                }),
+            });
+            state.generation += 1;
+            state.room = room;
+            state.resultsRevealed = false;
+            updateRoomUrl(room.id);
+            renderRoom();
+            schedulePoll();
+            window.pgAnalytics?.track?.("draft_test_room_created", {
+                bots: Number(els.testBotCount.value),
+            });
+        } catch (error) {
+            handleActionError(error);
+        } finally {
+            state.actionBusy = false;
+            setButtonBusy(button, false, "Staging bots");
+            if (state.room?.state === "lobby") renderLobby(state.room);
         }
     });
 
@@ -651,7 +821,7 @@
             updateRoomUrl(room.id);
             renderRoom();
             schedulePoll();
-            window.pgAnalytics?.track?.("app_event", "draft_room_joined");
+            window.pgAnalytics?.track?.("draft_room_joined");
         } catch (error) {
             handleActionError(error);
         } finally {
@@ -673,12 +843,14 @@
             state.room = room;
             renderRoom();
             schedulePoll();
-            window.pgAnalytics?.track?.("app_event", "draft_game_started", { players: state.room.players.length });
+            window.pgAnalytics?.track?.("draft_game_started", { players: state.room.players.length });
         } catch (error) {
             handleActionError(error);
         } finally {
             state.actionBusy = false;
             setButtonBusy(els.startGameButton, false, "Locking roster");
+            if (state.room?.state === "active") renderGame(state.room);
+            scheduleBotTurn();
         }
     });
     els.flipButton.addEventListener("click", () => performAction("flip", els.flipButton, "Dealing"));

@@ -29,4 +29,19 @@ describe('DraftOrderFormat', () => {
             'https://palmergill.com/fantasy/draft-order/?room=room-1'
         );
     });
+
+    test('roomModeName keeps practice and bot tests distinct from league rooms', () => {
+        expect(DraftOrderFormat.roomModeName('league')).toBe('Draft order game');
+        expect(DraftOrderFormat.roomModeName('practice')).toBe('Practice');
+        expect(DraftOrderFormat.roomModeName('test')).toBe('Bot test');
+    });
+
+    test('botRoundMessage reports both banked and busted bot rounds', () => {
+        expect(DraftOrderFormat.botRoundMessage({
+            displayName: 'Blitz Bot', round: 2, outcome: 'banked', score: 24,
+        })).toBe('Blitz Bot banked 24 in round 2.');
+        expect(DraftOrderFormat.botRoundMessage({
+            displayName: 'Dime Bot', round: 1, outcome: 'busted', score: 0,
+        })).toBe('Dime Bot busted round 1.');
+    });
 });

@@ -11,6 +11,7 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
     create_engine,
+    false,
 )
 from sqlalchemy.orm import declarative_base
 from sqlalchemy.orm import sessionmaker
@@ -370,6 +371,7 @@ class FantasyDraftSession(Base):
     join_code = Column(String, unique=True, index=True, nullable=False)
     master_seed = Column(String, nullable=False)
     seed_hash = Column(String, nullable=False)
+    mode = Column(String, default="league", server_default="league", nullable=False)
     state = Column(String, default="lobby", index=True, nullable=False)
     created_by = Column(String, index=True, nullable=False)
     current_player_id = Column(String, nullable=True, index=True)
@@ -395,6 +397,7 @@ class FantasyDraftPlayer(Base):
     # the casing chosen during account creation for the live room UI.
     username = Column(String, index=True, nullable=False)
     display_name = Column(String, nullable=False)
+    is_bot = Column(Boolean, default=False, server_default=false(), nullable=False)
     turn_position = Column(Integer, nullable=True)
     final_score = Column(Integer, default=0, nullable=False)
     joined_at = Column(DateTime, default=utc_now, nullable=False)

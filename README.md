@@ -15,7 +15,7 @@ navigation chrome.
 - `/stock-research/` - polished stock research app
 - `/bitcoin-chat/` - Bitcoin chat app
 - `/fantasy/` - NFL rankings, projections, and league tools
-- `/fantasy/draft-order/` - account-backed, verifiable draft-order game
+- `/fantasy/draft-order/` - account-backed, verifiable draft-order game with solo practice and admin bot-test rooms
 - `/casino/` - landing page linking the casino games
 - `/poker/` - Texas Hold'em poker app
 - `/craps/` - craps app

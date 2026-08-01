@@ -98,6 +98,9 @@ Two roles, stored in different places on purpose:
 Fourth & Fortune persists rooms, players, rounds, and every dealt card in the
 `ff_draft_*` tables. The API owns turn authorization and derives a separate
 per-account deck from a committed master seed; the seed is disclosed only when
-the last score is locked.
+the last score is locked. A room has an explicit mode: `league` rooms accept
+account-backed invites, `practice` rooms are private solo warm-ups, and
+admin-only `test` rooms contain marked bot players that advance one round at a
+time through the same scoring and verification path as a real draft.
 
 The API service is the only thing that authenticates anyone — it owns the user table and mints the signed `pg_session` cookie, which carries a role claim. `middleware.js` at the Vercel edge only verifies that cookie and enforces the role gate; it deliberately no longer implements a second login. An admin role claim is honored only for the configured admin username, so a member token cannot be rewritten into an admin one even though both are signed with the same secret. Cookies issued before member accounts existed carry no role claim and are read as admin only when the username matches.

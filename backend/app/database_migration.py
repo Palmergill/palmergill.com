@@ -8,6 +8,24 @@ logger = logging.getLogger(__name__)
 
 _SAFE_IDENTIFIER = re.compile(r'^[a-zA-Z_][a-zA-Z0-9_]*$')
 
+
+def _add_column_if_missing(inspector, table_name, column_name, definition):
+    """Add one backwards-compatible column to an existing deployment."""
+    if table_name not in inspector.get_table_names():
+        return
+    existing = {column["name"] for column in inspector.get_columns(table_name)}
+    if column_name in existing:
+        return
+    if not _SAFE_IDENTIFIER.match(table_name) or not _SAFE_IDENTIFIER.match(column_name):
+        logger.warning("Skipping unsafe migration identifier %s.%s", table_name, column_name)
+        return
+
+    logger.info("Adding column %s to %s", column_name, table_name)
+    with engine.begin() as conn:
+        conn.execute(text(
+            f"ALTER TABLE {table_name} ADD COLUMN {column_name} {definition}"
+        ))
+
 def migrate_database():
     """Auto-migrate database schema without losing data"""
     try:
@@ -65,6 +83,21 @@ def migrate_database():
                             conn.commit()
                     except Exception as e:
                         logger.warning(f"Could not add column {col_name}: {e}")
+
+        # Fourth & Fortune existed before practice/test modes. These defaults
+        # preserve every existing room and player as a real league participant.
+        _add_column_if_missing(
+            inspector,
+            "ff_draft_sessions",
+            "mode",
+            "VARCHAR NOT NULL DEFAULT 'league'",
+        )
+        _add_column_if_missing(
+            inspector,
+            "ff_draft_players",
+            "is_bot",
+            "BOOLEAN NOT NULL DEFAULT FALSE" if is_postgres else "BOOLEAN NOT NULL DEFAULT 0",
+        )
         
         logger.info("Database migration complete")
         

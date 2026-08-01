@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app import accounts
 from app.services import draft_order_game
 
 router = APIRouter(prefix="/api/fantasy/draft", tags=["fantasy-draft-order"])
@@ -18,6 +19,11 @@ class CreateRoomRequest(BaseModel):
 
 class JoinRoomRequest(BaseModel):
     join_code: str = Field(..., min_length=6, max_length=12)
+
+
+class CreateTestRoomRequest(BaseModel):
+    league_name: str = Field(..., min_length=3, max_length=60)
+    bot_count: int = Field(5, ge=1, le=len(draft_order_game.BOT_NAMES))
 
 
 def _identity(request: Request) -> dict[str, str]:
@@ -41,6 +47,34 @@ def create_room(
 ) -> dict[str, Any]:
     identity = _identity(request)
     room = draft_order_game.create_session(db, identity, payload.league_name)
+    return draft_order_game.serialize_session(db, room, identity["username"])
+
+
+@router.post("/practice", status_code=201)
+def create_practice(
+    request: Request,
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    identity = _identity(request)
+    room = draft_order_game.create_practice_session(db, identity)
+    return draft_order_game.serialize_session(db, room, identity["username"])
+
+
+@router.post("/sessions/test", status_code=201)
+def create_test_room(
+    payload: CreateTestRoomRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    identity = _identity(request)
+    if identity.get("role") != accounts.ROLE_ADMIN:
+        raise HTTPException(status_code=403, detail="Only the site admin can create bot test rooms.")
+    room = draft_order_game.create_test_session(
+        db,
+        identity,
+        payload.league_name,
+        payload.bot_count,
+    )
     return draft_order_game.serialize_session(db, room, identity["username"])
 
 
@@ -126,6 +160,19 @@ def forfeit(
 ) -> dict[str, Any]:
     identity = _identity(request)
     room, event = draft_order_game.forfeit_current_player(db, identity, session_id)
+    view = draft_order_game.serialize_session(db, room, identity["username"])
+    view["event"] = event
+    return view
+
+
+@router.post("/sessions/{session_id}/bots/play-round")
+def play_bot_round(
+    session_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    identity = _identity(request)
+    room, event = draft_order_game.play_test_bot_round(db, identity, session_id)
     view = draft_order_game.serialize_session(db, room, identity["username"])
     view["event"] = event
     return view

@@ -18,7 +18,8 @@
 [hidden] { display: none !important; }
 
 button,
-input { font: inherit; }
+input,
+select { font: inherit; }
 
 button,
 a { -webkit-tap-highlight-color: transparent; }
@@ -250,7 +251,8 @@ body::before {
 .text-button:focus-visible,
 .commitment button:focus-visible,
 summary:focus-visible,
-input:focus-visible {
+input:focus-visible,
+select:focus-visible {
     outline: 3px solid rgba(231, 185, 95, 0.55);
     outline-offset: 3px;
 }
@@ -297,11 +299,44 @@ input:focus-visible {
 .welcome-line .section-kicker { margin-top: 0; }
 .account-note { color: var(--draft-muted); font-size: 0.82rem; }
 
+.practice-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 28px;
+    margin-bottom: 18px;
+    padding: clamp(22px, 4vw, 32px);
+    background: linear-gradient(120deg, #f9f4e7, #fffdf8 60%);
+}
+
+.practice-card .section-kicker,
+.test-lab .section-kicker { margin-top: 0; }
+.practice-card h3,
+.test-lab h3,
+.room-code-card--test h3 { margin: 0; font-size: 1.35rem; letter-spacing: -0.025em; }
+.practice-card p:not(.section-kicker),
+.test-lab p:not(.section-kicker) { max-width: 62ch; margin: 9px 0 0; color: var(--draft-muted); font-size: 0.88rem; line-height: 1.55; }
+.practice-card .button { flex: 0 0 auto; }
+
 .setup-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 18px;
 }
+
+.test-lab {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(280px, 0.62fr);
+    align-items: center;
+    gap: clamp(24px, 5vw, 60px);
+    margin-top: 18px;
+    padding: clamp(22px, 4vw, 34px);
+    border-style: dashed;
+}
+
+.test-lab-fields { display: grid; }
+.test-lab-fields label:first-child { margin-top: 0; }
+.test-lab-fields .button { margin-top: 4px; }
 
 .setup-card {
     position: relative;
@@ -351,7 +386,8 @@ label {
     text-transform: uppercase;
 }
 
-input {
+input,
+select {
     width: 100%;
     height: 51px;
     margin-bottom: 12px;
@@ -360,6 +396,12 @@ input {
     background: #fff;
     color: var(--draft-ink);
     padding: 0 14px;
+}
+
+select {
+    margin-bottom: 12px;
+    appearance: none;
+    background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='none' stroke='%2359645b' stroke-width='1.5' d='m1 1 5 5 5-5'/%3E%3C/svg%3E") no-repeat right 14px center;
 }
 
 input::placeholder { color: #aaa296; }
@@ -496,6 +538,22 @@ code { font-family: "DM Mono", ui-monospace, monospace; }
 .room-code-card .button--quiet { background: transparent; color: #fff; border-color: rgba(255, 255, 255, 0.26); }
 .room-code-card > p:last-child { margin: 18px 0 0; color: #b7c2b9; font-size: 0.78rem; }
 
+.room-code-card--test { justify-content: center; }
+.test-room-mark {
+    width: fit-content;
+    margin: 10px 0 24px;
+    border: 1px solid rgba(231, 185, 95, 0.5);
+    border-radius: 999px;
+    background: rgba(231, 185, 95, 0.12);
+    padding: 9px 13px;
+    color: var(--draft-gold-bright);
+    font-family: "DM Mono", monospace;
+    font-size: 0.78rem;
+    letter-spacing: 0.18em;
+}
+.room-code-card--test h3 { position: relative; z-index: 1; font-size: clamp(1.5rem, 4vw, 2.2rem); }
+.room-code-card--test > p:last-child { max-width: 52ch; }
+
 .roster-card { display: flex; min-height: 360px; flex-direction: column; }
 .live-dot, .poll-note { color: #627063; font-size: 0.68rem; font-weight: 800; text-transform: uppercase; }
 .live-dot::before { display: inline-block; width: 7px; height: 7px; margin-right: 5px; border-radius: 50%; background: #5e9a65; content: ""; }
@@ -528,7 +586,10 @@ code { font-family: "DM Mono", ui-monospace, monospace; }
 }
 
 .roster-name { min-width: 0; flex: 1; overflow: hidden; font-size: 0.9rem; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
-.host-chip { color: #8a692c; font-size: 0.64rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; }
+.host-chip,
+.bot-chip { font-size: 0.64rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; }
+.host-chip { color: #8a692c; }
+.bot-chip { border-radius: 999px; background: #eef1eb; padding: 4px 7px; color: #607064; }
 .remove-player { border: 0; background: transparent; color: #9d756e; cursor: pointer; font-size: 0.72rem; }
 .roster-card .button { margin-top: auto; }
 .fine-print { margin: 10px 0 0; color: var(--draft-muted); font-size: 0.73rem; text-align: center; }
@@ -827,7 +888,10 @@ summary { padding: 17px 18px; cursor: pointer; font-size: 0.86rem; font-weight: 
     .hero-mark span:first-child { top: 9px; left: 11px; font-size: 0.95rem; }
     .hero-mark span:last-child { font-size: 2.05rem; }
     .account-gate,
-    .setup-grid { grid-template-columns: 1fr; }
+    .setup-grid,
+    .test-lab { grid-template-columns: 1fr; }
+    .practice-card { align-items: stretch; flex-direction: column; }
+    .practice-card .button { width: 100%; }
     .account-actions { width: 100%; }
     .account-actions .button { flex: 1; }
     .welcome-line,

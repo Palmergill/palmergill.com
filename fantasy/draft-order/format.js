@@ -45,5 +45,19 @@
         return url.toString();
     }
 
-    return { ordinal, cardLabel, compactHash, bustCopy, roomUrl };
+    function roomModeName(mode) {
+        if (mode === "practice") return "Practice";
+        if (mode === "test") return "Bot test";
+        return "Draft order game";
+    }
+
+    function botRoundMessage(event) {
+        if (!event) return "Bot round complete.";
+        if (event.outcome === "busted") {
+            return `${event.displayName} busted round ${event.round}.`;
+        }
+        return `${event.displayName} banked ${event.score} in round ${event.round}.`;
+    }
+
+    return { ordinal, cardLabel, compactHash, bustCopy, roomUrl, roomModeName, botRoundMessage };
 });

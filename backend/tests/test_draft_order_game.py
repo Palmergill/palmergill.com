@@ -5,7 +5,7 @@ import hashlib
 from fastapi.testclient import TestClient
 from sqlalchemy import event
 
-from app.accounts import ROLE_MEMBER
+from app.accounts import ROLE_ADMIN, ROLE_MEMBER
 from app.database import (
     Base,
     FantasyDraftFlip,
@@ -43,6 +43,17 @@ def member_client(monkeypatch, username):
     client.cookies.set(
         SESSION_COOKIE_NAME,
         create_app_session_token(username, ADMIN_PASSWORD, role=ROLE_MEMBER),
+    )
+    return client
+
+
+def admin_client(monkeypatch):
+    monkeypatch.setenv("APP_AUTH_USERNAME", "palmer")
+    monkeypatch.setenv("APP_AUTH_PASSWORD", ADMIN_PASSWORD)
+    client = TestClient(app)
+    client.cookies.set(
+        SESSION_COOKIE_NAME,
+        create_app_session_token("palmer", ADMIN_PASSWORD, role=ROLE_ADMIN),
     )
     return client
 
@@ -106,6 +117,112 @@ def test_room_is_inserted_before_host_player():
         event.remove(engine, "before_cursor_execute", capture_insert)
 
     assert inserted_tables == ["ff_draft_sessions", "ff_draft_players"]
+
+
+def test_practice_is_private_replayable_and_does_not_fill_recent_rooms(monkeypatch):
+    player = member_client(monkeypatch, "road-warrior")
+    practice = player.post("/api/fantasy/draft/practice")
+
+    assert practice.status_code == 201
+    view = practice.json()
+    first_id = view["id"]
+    assert view["mode"] == draft_order_game.MODE_PRACTICE
+    assert view["state"] == "active"
+    assert view["joinCode"] is None
+    assert view["canPlay"] is True
+    assert len(view["players"]) == 1
+
+    # Starting practice twice resumes the unfinished warm-up instead of
+    # leaving abandoned rooms behind.
+    assert player.post("/api/fantasy/draft/practice").json()["id"] == first_id
+
+    while view["state"] == "active":
+        view = player.post(
+            f"/api/fantasy/draft/sessions/{first_id}/flip"
+        ).json()
+        view = player.post(
+            f"/api/fantasy/draft/sessions/{first_id}/bank"
+        ).json()
+
+    assert view["state"] == "complete"
+    assert len(view["draftOrder"]) == 1
+    assert player.get(
+        f"/api/fantasy/draft/sessions/{first_id}/verify"
+    ).status_code == 200
+    assert all(
+        room["id"] != first_id
+        for room in player.get("/api/fantasy/draft/sessions/mine").json()["sessions"]
+    )
+
+    replay = player.post("/api/fantasy/draft/practice").json()
+    assert replay["id"] != first_id
+    assert replay["state"] == "active"
+
+
+def test_only_admin_can_create_bot_test_room_and_bots_finish_full_flow(monkeypatch):
+    member = member_client(monkeypatch, "road-warrior")
+    forbidden = member.post(
+        "/api/fantasy/draft/sessions/test",
+        json={"league_name": "Production Test", "bot_count": 4},
+    )
+    assert forbidden.status_code == 403
+
+    host = admin_client(monkeypatch)
+    created = host.post(
+        "/api/fantasy/draft/sessions/test",
+        json={"league_name": "Production Test", "bot_count": 4},
+    )
+    assert created.status_code == 201
+    view = created.json()
+    room_id = view["id"]
+    assert view["mode"] == draft_order_game.MODE_TEST
+    assert view["joinCode"] is None
+    assert len(view["players"]) == 5
+    assert sum(player["isBot"] for player in view["players"]) == 4
+    assert view["canStart"] is True
+
+    db = SessionLocal()
+    try:
+        join_code = db.query(FantasyDraftSession.join_code).filter(
+            FantasyDraftSession.id == room_id
+        ).scalar()
+    finally:
+        db.close()
+    assert member.post(
+        "/api/fantasy/draft/sessions/join",
+        json={"join_code": join_code},
+    ).status_code == 409
+
+    view = host.post(f"/api/fantasy/draft/sessions/{room_id}/start").json()
+    bot_rounds = 0
+    while view["state"] == "active":
+        if view["currentPlayer"]["isBot"]:
+            assert view["canRunBot"] is True
+            response = host.post(
+                f"/api/fantasy/draft/sessions/{room_id}/bots/play-round"
+            )
+            assert response.status_code == 200
+            view = response.json()
+            assert view["event"]["type"] == "bot_round"
+            assert view["event"]["outcome"] in {"banked", "busted"}
+            bot_rounds += 1
+        else:
+            assert view["canPlay"] is True
+            view = host.post(
+                f"/api/fantasy/draft/sessions/{room_id}/flip"
+            ).json()
+            view = host.post(
+                f"/api/fantasy/draft/sessions/{room_id}/bank"
+            ).json()
+
+    assert bot_rounds == 4 * draft_order_game.ROUNDS_PER_PLAYER
+    assert view["state"] == "complete"
+    assert len(view["draftOrder"]) == 5
+    proof = host.get(
+        f"/api/fantasy/draft/sessions/{room_id}/verify"
+    ).json()
+    assert proof["hashMatches"] is True
+    assert verify_proof(proof) == []
 
 
 def test_open_room_code_can_invite_a_new_account(monkeypatch):
@@ -268,7 +385,8 @@ def test_full_game_reveals_seed_and_reproducible_decks(monkeypatch):
         assert [draw["deckIndex"] for draw in player["draws"]] == list(range(3))
     assert verify_proof(proof) == []
 
-    proof["players"][0]["deck"][0]["code"] = "AS"
+    original_code = proof["players"][0]["deck"][0]["code"]
+    proof["players"][0]["deck"][0]["code"] = "AS" if original_code != "AS" else "KH"
     assert any("full deck" in error for error in verify_proof(proof))
 
 
