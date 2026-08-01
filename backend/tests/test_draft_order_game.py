@@ -195,7 +195,23 @@ def test_only_admin_can_create_bot_test_room_and_bots_finish_full_flow(monkeypat
 
     view = host.post(f"/api/fantasy/draft/sessions/{room_id}/start").json()
     bot_rounds = 0
+    turns_by_round = {number: [] for number in range(1, ROUNDS_PER_PLAYER + 1)}
+    expected_orders = {
+        1: [
+            player["username"]
+            for player in sorted(view["players"], key=lambda player: player["turnPosition"])
+        ]
+    }
     while view["state"] == "active":
+        round_number = view["currentRound"]["number"]
+        current_username = next(
+            player["username"] for player in view["players"] if player["isCurrent"]
+        )
+        if round_number not in expected_orders:
+            expected_orders[round_number] = [
+                player["username"] for player in view["leaderboard"]
+            ]
+        turns_by_round[round_number].append(current_username)
         if view["currentPlayer"]["isBot"]:
             assert view["canRunBot"] is True
             response = host.post(
@@ -216,6 +232,7 @@ def test_only_admin_can_create_bot_test_room_and_bots_finish_full_flow(monkeypat
             ).json()
 
     assert bot_rounds == 4 * draft_order_game.ROUNDS_PER_PLAYER
+    assert turns_by_round == expected_orders
     assert view["state"] == "complete"
     assert len(view["draftOrder"]) == 5
     proof = host.get(
@@ -307,11 +324,38 @@ def test_turn_is_server_authoritative_and_deck_continues_between_rounds(monkeypa
     first = current_client.post(f"/api/fantasy/draft/sessions/{room['id']}/flip")
     assert first.status_code == 200
     assert first.json()["event"]["card"]["deckIndex"] == 0
-    assert current_client.post(
+    after_first = current_client.post(
         f"/api/fantasy/draft/sessions/{room['id']}/bank"
-    ).status_code == 200
+    )
+    assert after_first.status_code == 200
+    after_first_view = after_first.json()
+    next_name = next(
+        player["username"]
+        for player in after_first_view["players"]
+        if player["isCurrent"]
+    )
+    assert next_name != current_name
 
-    second = current_client.post(f"/api/fantasy/draft/sessions/{room['id']}/flip")
+    # Everyone completes round one before anyone starts round two.
+    next_client = clients[next_name]
+    assert next_client.post(
+        f"/api/fantasy/draft/sessions/{room['id']}/flip"
+    ).status_code == 200
+    round_two_view = next_client.post(
+        f"/api/fantasy/draft/sessions/{room['id']}/bank"
+    ).json()
+    assert round_two_view["currentRound"]["number"] == 2
+
+    # The round-two leader goes first, and their personal deck resumes at the
+    # next undealt card rather than being reshuffled between rounds.
+    leader_name = round_two_view["leaderboard"][0]["username"]
+    assert next(
+        player["username"]
+        for player in round_two_view["players"]
+        if player["isCurrent"]
+    ) == leader_name
+
+    second = clients[leader_name].post(f"/api/fantasy/draft/sessions/{room['id']}/flip")
     assert second.status_code == 200
     assert second.json()["event"]["card"]["deckIndex"] == 1
     assert second.json()["currentRound"]["number"] == 2

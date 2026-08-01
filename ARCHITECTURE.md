@@ -98,7 +98,9 @@ Two roles, stored in different places on purpose:
 Fourth & Fortune persists rooms, players, rounds, and every dealt card in the
 `ff_draft_*` tables. The API owns turn authorization and derives a separate
 per-account deck from a committed master seed; the seed is disclosed only when
-the last score is locked. A room has an explicit mode: `league` rooms accept
+the last score is locked. Round one follows the seed-derived player order;
+rounds two and three are frozen from the standings after the preceding round,
+with the scoring leader first. A room has an explicit mode: `league` rooms accept
 account-backed invites, `practice` rooms are private solo warm-ups, and
 admin-only `test` rooms contain marked bot players that advance one round at a
 time through the same scoring and verification path as a real draft.

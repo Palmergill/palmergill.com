@@ -290,6 +290,48 @@ def _final_order(
     )
 
 
+def _round_play_order(
+    players: list[FantasyDraftPlayer],
+    rounds_by_player: dict[str, list[FantasyDraftRound]],
+    room: FantasyDraftSession,
+    round_number: int,
+) -> list[FantasyDraftPlayer]:
+    """Freeze each round's order from information known before it begins.
+
+    Round one uses the committed seed order. Later rounds use the standings
+    after the preceding round: total score, best round, then the existing
+    seeded tiebreak. Recomputing from only earlier rounds keeps the sequence
+    stable while the current round is being played.
+    """
+    if round_number == 1:
+        return sorted(
+            players,
+            key=lambda player: (
+                player.turn_position
+                if player.turn_position is not None
+                else MAX_PLAYERS + 1,
+                player.id,
+            ),
+        )
+
+    def prior_rounds(player: FantasyDraftPlayer) -> list[FantasyDraftRound]:
+        return [
+            row
+            for row in rounds_by_player[player.id]
+            if row.round_number < round_number and row.state in FINISHED_ROUND_STATES
+        ]
+
+    return sorted(
+        players,
+        key=lambda player: standing_key(
+            _round_score_total(prior_rounds(player)),
+            _best_round(prior_rounds(player)),
+            room.master_seed,
+            player.username,
+        ),
+    )
+
+
 def _bust_chance(
     room: FantasyDraftSession,
     player: FantasyDraftPlayer,
@@ -744,29 +786,34 @@ def _advance_after_round(
     room: FantasyDraftSession,
     player: FantasyDraftPlayer,
 ) -> None:
-    player_rounds = (
-        db.query(FantasyDraftRound)
-        .filter(FantasyDraftRound.player_id == player.id)
-        .order_by(FantasyDraftRound.round_number)
-        .all()
-    )
-    completed = [row for row in player_rounds if row.state in FINISHED_ROUND_STATES]
-    if len(completed) < ROUNDS_PER_PLAYER:
-        return
+    players = _players(db, room.id)
+    all_rounds = _rounds(db, room.id)
+    rounds_by_player: dict[str, list[FantasyDraftRound]] = defaultdict(list)
+    for round_row in all_rounds:
+        rounds_by_player[round_row.player_id].append(round_row)
 
+    completed = [
+        row
+        for row in rounds_by_player[player.id]
+        if row.state in FINISHED_ROUND_STATES
+    ]
     player.final_score = sum(row.score for row in completed)
-    next_player = (
-        db.query(FantasyDraftPlayer)
-        .filter(
-            FantasyDraftPlayer.session_id == room.id,
-            FantasyDraftPlayer.turn_position > player.turn_position,
+
+    for round_number in range(1, ROUNDS_PER_PLAYER + 1):
+        ordered_players = _round_play_order(
+            players,
+            rounds_by_player,
+            room,
+            round_number,
         )
-        .order_by(FantasyDraftPlayer.turn_position)
-        .first()
-    )
-    if next_player is not None:
-        room.current_player_id = next_player.id
-        return
+        for candidate in ordered_players:
+            round_finished = any(
+                row.round_number == round_number and row.state in FINISHED_ROUND_STATES
+                for row in rounds_by_player[candidate.id]
+            )
+            if not round_finished:
+                room.current_player_id = candidate.id
+                return
 
     room.current_player_id = None
     room.state = "complete"

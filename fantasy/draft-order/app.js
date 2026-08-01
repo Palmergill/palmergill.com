@@ -409,8 +409,8 @@
         els.startHelp.textContent = room.isHost
             ? (room.canStart
                 ? (isTest
-                    ? "Bots will play automatically. Your three rounds stay under your control."
-                    : "Starting locks the roster and reveals the seeded turn order.")
+                    ? "Bots play automatically. Everyone finishes each round before the standings leader starts the next one."
+                    : "Everyone finishes Round 1 in the seeded order. The standings leader starts Rounds 2 and 3.")
                 : "One more manager must join before you can start.")
             : "Waiting for the host to lock the roster and start.";
     }
