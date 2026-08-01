@@ -3,6 +3,7 @@
 import hashlib
 
 from fastapi.testclient import TestClient
+from sqlalchemy import event
 
 from app.accounts import ROLE_MEMBER
 from app.database import (
@@ -82,6 +83,29 @@ def test_account_is_required_to_create_or_join(monkeypatch):
     assert client.post(
         "/api/fantasy/draft/sessions/join", json={"join_code": "ABC234"}
     ).status_code == 401
+
+
+def test_room_is_inserted_before_host_player():
+    inserted_tables = []
+
+    def capture_insert(_connection, _cursor, statement, _parameters, _context, _many):
+        normalized = " ".join(statement.lower().split())
+        if normalized.startswith("insert into ff_draft_"):
+            inserted_tables.append(normalized.split()[2].strip('"'))
+
+    event.listen(engine, "before_cursor_execute", capture_insert)
+    db = SessionLocal()
+    try:
+        draft_order_game.create_session(
+            db,
+            {"username": "host-player", "role": ROLE_MEMBER},
+            "Sunday Legends",
+        )
+    finally:
+        db.close()
+        event.remove(engine, "before_cursor_execute", capture_insert)
+
+    assert inserted_tables == ["ff_draft_sessions", "ff_draft_players"]
 
 
 def test_open_room_code_can_invite_a_new_account(monkeypatch):

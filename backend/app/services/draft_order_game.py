@@ -454,6 +454,11 @@ def create_session(db: Session, identity: dict[str, str], league_name: str) -> F
         created_by=username,
     )
     db.add(room)
+    # These models deliberately do not define ORM relationships. Without an
+    # explicit flush SQLAlchemy may insert the host player before the room;
+    # PostgreSQL then rejects the player's session_id foreign key. Persist the
+    # parent row first so every supported database sees a valid room ID.
+    db.flush()
     db.add(FantasyDraftPlayer(
         id=str(uuid.uuid4()),
         session_id=room.id,
