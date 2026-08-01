@@ -1,4 +1,17 @@
-from sqlalchemy import create_engine, Column, String, Float, Date, DateTime, Integer, LargeBinary, Boolean, Text
+from sqlalchemy import (
+    Boolean,
+    Column,
+    Date,
+    DateTime,
+    Float,
+    ForeignKey,
+    Integer,
+    LargeBinary,
+    String,
+    Text,
+    UniqueConstraint,
+    create_engine,
+)
 from sqlalchemy.orm import declarative_base
 from sqlalchemy.orm import sessionmaker
 from datetime import datetime, timezone
@@ -342,6 +355,107 @@ class FantasyMeta(Base):
     key = Column(String, primary_key=True)
     value = Column(Text, nullable=True)
     updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
+
+
+# ── Fantasy football draft-order game ──────────────────────────────────
+
+
+class FantasyDraftSession(Base):
+    """A live Fourth & Fortune room and its commit–reveal seed."""
+
+    __tablename__ = "ff_draft_sessions"
+
+    id = Column(String, primary_key=True, index=True)
+    league_name = Column(String, nullable=False)
+    join_code = Column(String, unique=True, index=True, nullable=False)
+    master_seed = Column(String, nullable=False)
+    seed_hash = Column(String, nullable=False)
+    state = Column(String, default="lobby", index=True, nullable=False)
+    created_by = Column(String, index=True, nullable=False)
+    current_player_id = Column(String, nullable=True, index=True)
+    created_at = Column(DateTime, default=utc_now, nullable=False)
+    started_at = Column(DateTime, nullable=True)
+    completed_at = Column(DateTime, nullable=True)
+
+
+class FantasyDraftPlayer(Base):
+    __tablename__ = "ff_draft_players"
+    __table_args__ = (
+        UniqueConstraint("session_id", "username", name="uq_ff_draft_player_account"),
+    )
+
+    id = Column(String, primary_key=True, index=True)
+    session_id = Column(
+        String,
+        ForeignKey("ff_draft_sessions.id", ondelete="CASCADE"),
+        index=True,
+        nullable=False,
+    )
+    # Normalized account name is the durable identity. display_name preserves
+    # the casing chosen during account creation for the live room UI.
+    username = Column(String, index=True, nullable=False)
+    display_name = Column(String, nullable=False)
+    turn_position = Column(Integer, nullable=True)
+    final_score = Column(Integer, default=0, nullable=False)
+    joined_at = Column(DateTime, default=utc_now, nullable=False)
+
+
+class FantasyDraftRound(Base):
+    __tablename__ = "ff_draft_rounds"
+    __table_args__ = (
+        UniqueConstraint("player_id", "round_number", name="uq_ff_draft_player_round"),
+    )
+
+    id = Column(String, primary_key=True, index=True)
+    session_id = Column(
+        String,
+        ForeignKey("ff_draft_sessions.id", ondelete="CASCADE"),
+        index=True,
+        nullable=False,
+    )
+    player_id = Column(
+        String,
+        ForeignKey("ff_draft_players.id", ondelete="CASCADE"),
+        index=True,
+        nullable=False,
+    )
+    round_number = Column(Integer, nullable=False)
+    cards_json = Column(Text, default="[]", nullable=False)
+    score = Column(Integer, default=0, nullable=False)
+    busted = Column(Boolean, default=False, nullable=False)
+    state = Column(String, default="active", index=True, nullable=False)
+    started_at = Column(DateTime, default=utc_now, nullable=False)
+    ended_at = Column(DateTime, nullable=True)
+
+
+class FantasyDraftFlip(Base):
+    __tablename__ = "ff_draft_flips"
+    __table_args__ = (
+        UniqueConstraint("player_id", "deck_index", name="uq_ff_draft_player_deck_index"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    session_id = Column(
+        String,
+        ForeignKey("ff_draft_sessions.id", ondelete="CASCADE"),
+        index=True,
+        nullable=False,
+    )
+    player_id = Column(
+        String,
+        ForeignKey("ff_draft_players.id", ondelete="CASCADE"),
+        index=True,
+        nullable=False,
+    )
+    round_id = Column(
+        String,
+        ForeignKey("ff_draft_rounds.id", ondelete="CASCADE"),
+        index=True,
+        nullable=False,
+    )
+    card = Column(String, nullable=False)
+    deck_index = Column(Integer, nullable=False)
+    timestamp = Column(DateTime, default=utc_now, nullable=False)
 
 
 def get_db():

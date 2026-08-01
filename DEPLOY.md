@@ -27,7 +27,7 @@ Production static hosting should serve those files directly. `vercel.json` rewri
 | Role | Comes from | Gets |
 | --- | --- | --- |
 | `admin` | `APP_AUTH_USERNAME` / `APP_AUTH_PASSWORD` env vars | Everything, including `/admin/*`, `/api/admin/*`, `/api/fantasy/admin/*`, and FastAPI docs |
-| `member` | A row in the `app_users` table, created at `/signup/` with an invite code | Live (non-demo) stock, Bitcoin, and fantasy data. No admin surfaces. |
+| `member` | A row in the `app_users` table, created at `/signup/` with a site invite or open draft-room code | Live (non-demo) stock, Bitcoin, and fantasy data plus a seat in league draft rooms. No admin surfaces. |
 
 There is deliberately no admin row in the database: nothing that can write to `app_users` can mint an account that reads the logs.
 
@@ -57,7 +57,7 @@ Set the invite code on **Railway** (the API service creates accounts, so Vercel 
 APP_SIGNUP_INVITE_CODE=<code you hand out>
 ```
 
-Sign-ups are closed whenever this is unset — `/login/signup` returns `403` and the sign-in page hides the "Create an account" link. Rotating the code immediately invalidates any copy already handed out; existing accounts are unaffected. Passwords are hashed with scrypt, and there is no self-serve password reset: to reset one, delete the row from `app_users` and have the person sign up again.
+When this is unset, general sign-ups are closed. An open Fourth & Fortune room code remains a narrowly scoped account invite so the host only has to share one code with league managers; it stops creating accounts as soon as the roster is locked. Rotating the site invite immediately invalidates any copy already handed out; existing accounts are unaffected. Passwords are hashed with scrypt, and there is no self-serve password reset: to reset one, delete the row from `app_users` and have the person sign up again.
 
 ## API Backend
 

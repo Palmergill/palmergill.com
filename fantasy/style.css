@@ -118,6 +118,68 @@ body {
     color: #9a4526;
 }
 
+/* ── draft-order game feature ───────────────────────────────────────── */
+
+.draft-feature {
+    position: relative;
+    display: flex;
+    min-height: 224px;
+    align-items: center;
+    justify-content: space-between;
+    gap: 28px;
+    overflow: hidden;
+    margin-bottom: 28px;
+    border: 1px solid #2d4436;
+    border-radius: 18px;
+    background:
+        radial-gradient(circle at 84% 30%, rgba(231, 185, 95, 0.15), transparent 14rem),
+        #17251d;
+    box-shadow: 0 16px 40px rgba(23, 37, 29, 0.14);
+    padding: clamp(24px, 5vw, 40px);
+    color: #fff;
+}
+
+.draft-feature::after {
+    position: absolute;
+    right: -70px;
+    bottom: -130px;
+    width: 310px;
+    height: 310px;
+    border: 50px solid rgba(255, 255, 255, 0.035);
+    border-radius: 50%;
+    content: "";
+}
+
+.draft-feature__copy { position: relative; z-index: 1; max-width: 610px; }
+.draft-feature .eyebrow { color: #b7cbb9; }
+.draft-feature h2 { margin: 6px 0 9px; font-size: clamp(1.55rem, 4vw, 2.35rem); letter-spacing: -0.035em; }
+.draft-feature p { margin: 0; color: #b8c5bb; font-size: 0.92rem; line-height: 1.6; }
+
+.draft-feature__link {
+    display: inline-flex;
+    align-items: center;
+    gap: 9px;
+    margin-top: 20px;
+    border-radius: 9px;
+    background: #e7b95f;
+    padding: 11px 16px;
+    color: #241d0e;
+    font-size: 0.82rem;
+    font-weight: 800;
+    text-decoration: none;
+    transition: transform 0.15s ease, background 0.15s ease;
+}
+
+.draft-feature__link:hover { background: #f4d789; transform: translateY(-2px); }
+.draft-feature__link:focus-visible { outline: 3px solid rgba(231, 185, 95, 0.45); outline-offset: 3px; }
+
+.draft-feature__cards { position: relative; z-index: 1; width: 150px; height: 145px; flex: 0 0 150px; }
+.draft-feature__card { position: absolute; display: grid; width: 82px; height: 116px; place-items: center; border-radius: 9px; }
+.draft-feature__card--back { top: 5px; left: 15px; border: 1px solid #809384; background: repeating-linear-gradient(45deg, #294333 0 5px, #355440 5px 10px); transform: rotate(-10deg); }
+.draft-feature__card--front { right: 10px; bottom: 5px; border: 1px solid #e2dccf; background: #fffdf8; box-shadow: 0 12px 24px rgba(0, 0, 0, 0.24); color: #17251d; font-family: Georgia, serif; transform: rotate(8deg); }
+.draft-feature__card--front b { position: absolute; top: 8px; left: 10px; font-size: 1rem; font-weight: 400; }
+.draft-feature__card--front i { font-size: 2.4rem; font-style: normal; }
+
 /* ── board / controls ────────────────────────────────────────────────── */
 
 .board {
@@ -830,6 +892,9 @@ body.drawer-open { overflow: hidden; }
 /* ── responsive ──────────────────────────────────────────────────────── */
 
 @media (max-width: 620px) {
+    .draft-feature { min-height: 260px; align-items: flex-end; }
+    .draft-feature__copy { max-width: calc(100% - 36px); }
+    .draft-feature__cards { position: absolute; top: 20px; right: 3px; width: 92px; transform: scale(0.67); transform-origin: top right; }
     .trending { grid-template-columns: 1fr; }
     .week-badge { flex-direction: row; gap: 8px; align-items: baseline; }
     .player-search { max-width: none; }

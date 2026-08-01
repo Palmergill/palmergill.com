@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fourth &amp; Fortune · Fantasy Football</title>
+    <meta name="description" content="A live, verifiable push-your-luck game that decides your fantasy football league's draft order.">
+    <meta name="theme-color" content="#17251d">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://palmergill.com/fantasy/draft-order/">
+    <meta property="og:title" content="Fourth &amp; Fortune · Fantasy Football">
+    <meta property="og:description" content="Flip, bank, or bust. Three rounds decide the draft order—and every deal can be verified.">
+    <meta property="og:image" content="https://palmergill.com/assets/palmer-gill-logo.png">
+    <meta name="twitter:card" content="summary">
+    <link rel="icon" type="image/png" href="/assets/palmer-gill-logo-small.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&amp;family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/shared/site-nav.css?v=13">
+    <link rel="stylesheet" href="style.css?v=1">
+</head>
+<body>
+    <main class="draft-shell">
+        <header class="draft-hero">
+            <div>
+                <a class="back-link" href="/fantasy/">← Fantasy Football</a>
+                <p class="eyebrow">League draft night</p>
+                <h1>Fourth <span>&amp;</span> Fortune</h1>
+                <p class="hero-copy">Flip, bank, or bust. Three rounds decide the draft order—and the deal proves itself.</p>
+            </div>
+            <div class="hero-mark" aria-hidden="true">
+                <span>4</span>
+                <span>♠</span>
+            </div>
+        </header>
+
+        <div id="globalStatus" class="notice" role="status" aria-live="polite" hidden></div>
+
+        <section id="loadingView" class="state-card state-card--center" aria-live="polite">
+            <div class="shuffle-loader" aria-hidden="true"><i></i><i></i><i></i></div>
+            <p>Shuffling the room…</p>
+        </section>
+
+        <section id="signedOutView" class="state-card account-gate" hidden>
+            <div>
+                <p class="section-kicker">One account per manager</p>
+                <h2>Your seat is tied to your account.</h2>
+                <p>That keeps turns private, lets a disconnected phone resume safely, and records exactly who earned every pick.</p>
+            </div>
+            <div class="account-actions">
+                <a id="signInLink" class="button button--primary" href="/login/">Sign in</a>
+                <a id="createAccountLink" class="button button--quiet" href="/signup/">Create account</a>
+            </div>
+        </section>
+
+        <section id="homeView" hidden>
+            <div class="welcome-line">
+                <div>
+                    <p class="section-kicker">Draft control</p>
+                    <h2>Welcome, <span id="accountName">manager</span>.</h2>
+                </div>
+                <p class="account-note">Every manager joins from their own account.</p>
+            </div>
+
+            <div class="setup-grid">
+                <form id="createRoomForm" class="state-card setup-card">
+                    <span class="setup-number">01</span>
+                    <p class="section-kicker">Host the league</p>
+                    <h3>Create a draft room</h3>
+                    <p>You’ll get a six-character code to send to the rest of the league.</p>
+                    <label for="leagueName">League name</label>
+                    <input id="leagueName" name="leagueName" type="text" minlength="3" maxlength="60" placeholder="Sunday Legends" autocomplete="organization" required>
+                    <button class="button button--primary" type="submit">Create room</button>
+                </form>
+
+                <form id="joinRoomForm" class="state-card setup-card">
+                    <span class="setup-number">02</span>
+                    <p class="section-kicker">Take your seat</p>
+                    <h3>Join your league</h3>
+                    <p>Enter the room code from your host. Your account name becomes your roster name.</p>
+                    <label for="joinCode">Room code</label>
+                    <input id="joinCode" class="code-input" name="joinCode" type="text" minlength="6" maxlength="8" placeholder="H7K9QP" autocomplete="off" autocapitalize="characters" spellcheck="false" required>
+                    <button class="button button--quiet" type="submit">Join room</button>
+                </form>
+            </div>
+
+            <section id="recentRoomsSection" class="recent-rooms" hidden>
+                <div class="section-heading">
+                    <div>
+                        <p class="section-kicker">Your rooms</p>
+                        <h2>Pick up where you left off</h2>
+                    </div>
+                </div>
+                <div id="recentRooms" class="room-list"></div>
+            </section>
+        </section>
+
+        <section id="roomView" hidden>
+            <header class="room-header">
+                <div>
+                    <button id="leaveRoomView" class="text-button" type="button">← All draft rooms</button>
+                    <p id="roomStateLabel" class="section-kicker">Lobby open</p>
+                    <h2 id="roomLeagueName">League</h2>
+                </div>
+                <div class="commitment" title="The server committed to this seed before the first card was dealt.">
+                    <span>Seed commitment</span>
+                    <button id="copyHashButton" type="button" aria-label="Copy full seed commitment">
+                        <code id="seedHash">—</code>
+                        <small>Copy</small>
+                    </button>
+                </div>
+            </header>
+
+            <section id="lobbyPanel" class="lobby-layout" hidden>
+                <div class="state-card room-code-card">
+                    <p class="section-kicker">Send this to the league</p>
+                    <div id="roomCode" class="room-code">—</div>
+                    <div class="share-row">
+                        <button id="copyCodeButton" class="button button--primary" type="button">Copy room code</button>
+                        <button id="copyLinkButton" class="button button--quiet" type="button">Copy invite link</button>
+                    </div>
+                    <p>The roster locks when the host starts. Late joins won’t be accepted.</p>
+                </div>
+
+                <div class="state-card roster-card">
+                    <div class="section-heading section-heading--compact">
+                        <div>
+                            <p class="section-kicker">At the table</p>
+                            <h3><span id="rosterCount">0</span> managers ready</h3>
+                        </div>
+                        <span class="live-dot">Live</span>
+                    </div>
+                    <ol id="lobbyRoster" class="roster-list"></ol>
+                    <button id="startGameButton" class="button button--action" type="button" hidden>Lock roster &amp; reveal turn order</button>
+                    <p id="startHelp" class="fine-print"></p>
+                </div>
+            </section>
+
+            <section id="gamePanel" class="game-layout" hidden>
+                <article class="play-stage">
+                    <div class="turn-banner">
+                        <div>
+                            <p class="section-kicker">At the table</p>
+                            <h3 id="currentPlayerName">—</h3>
+                        </div>
+                        <span id="roundBadge" class="round-badge">Round 1 of 3</span>
+                    </div>
+
+                    <div id="cardsHeld" class="cards-held" aria-label="Cards held" aria-live="polite"></div>
+
+                    <div class="decision-strip">
+                        <div class="pot-block">
+                            <span>Current pot</span>
+                            <strong><span id="currentPot">0</span><small> pts</small></strong>
+                        </div>
+                        <div class="decision-stat decision-stat--risk">
+                            <span>Next flip</span>
+                            <strong id="bustChance">Safe</strong>
+                        </div>
+                        <div class="decision-stat">
+                            <span>If banked</span>
+                            <strong id="bankPosition">—</strong>
+                        </div>
+                        <div class="decision-stat">
+                            <span>Score to beat</span>
+                            <strong id="scoreToBeat">—</strong>
+                        </div>
+                    </div>
+
+                    <p id="turnMessage" class="turn-message" aria-live="polite"></p>
+                    <div id="playActions" class="play-actions" hidden>
+                        <button id="flipButton" class="button button--flip" type="button">
+                            <span>Flip</span>
+                            <small>Take another card</small>
+                        </button>
+                        <button id="bankButton" class="button button--bank" type="button">
+                            <span>Bank</span>
+                            <small>Lock this round</small>
+                        </button>
+                    </div>
+                </article>
+
+                <aside class="leaderboard-card">
+                    <div class="section-heading section-heading--compact">
+                        <div>
+                            <p class="section-kicker">Live standings</p>
+                            <h3>The chase</h3>
+                        </div>
+                        <span class="poll-note">Updates live</span>
+                    </div>
+                    <ol id="leaderboard" class="leaderboard"></ol>
+                </aside>
+            </section>
+
+            <section id="resultPanel" class="result-panel" hidden>
+                <div class="result-intro">
+                    <p class="section-kicker">Scores locked · seed revealed</p>
+                    <h2>The draft order is ready.</h2>
+                    <p>Reveal from the last pick to the first, then open the proof behind every card.</p>
+                    <button id="revealButton" class="button button--action" type="button">Reveal draft order</button>
+                </div>
+                <ol id="draftOrder" class="draft-order" aria-live="polite"></ol>
+                <div id="resultActions" class="result-actions" hidden>
+                    <button id="verifyButton" class="button button--quiet" type="button">Verify every deal</button>
+                    <button id="copyResultsButton" class="text-button" type="button">Copy draft order</button>
+                </div>
+            </section>
+
+            <section id="verifyPanel" class="verify-panel" hidden>
+                <button id="closeVerifyButton" class="text-button" type="button">← Back to results</button>
+                <div class="proof-head">
+                    <div>
+                        <p class="section-kicker">Independent proof</p>
+                        <h2>The commitment matches.</h2>
+                        <p>The seed below reproduces the turn order, every player deck, and every card drawn.</p>
+                    </div>
+                    <span id="hashMatchBadge" class="proof-badge">✓ SHA-256 matched</span>
+                </div>
+                <div class="proof-values">
+                    <div><span>Master seed</span><code id="masterSeed">—</code></div>
+                    <div><span>Published hash</span><code id="publishedHash">—</code></div>
+                </div>
+                <details class="algorithm-card">
+                    <summary>How the shuffle is reproduced</summary>
+                    <div id="algorithmCopy" class="algorithm-copy"></div>
+                </details>
+                <div id="verificationPlayers" class="verification-players"></div>
+            </section>
+        </section>
+
+        <section class="rules-strip" aria-label="Game rules">
+            <div>
+                <span class="rule-no">01</span>
+                <strong>Flip</strong>
+                <p>Add the card’s value to your pot.</p>
+            </div>
+            <div>
+                <span class="rule-no">02</span>
+                <strong>Avoid pairs</strong>
+                <p>A repeated rank busts the round to zero.</p>
+            </div>
+            <div>
+                <span class="rule-no">03</span>
+                <strong>Bank</strong>
+                <p>Lock your points. The same deck runs across all three rounds.</p>
+            </div>
+            <p class="fairness-note"><span>SHA-256</span> The seed is committed before play and revealed after the last score. Ties go to the best round, then a seeded tiebreak.</p>
+        </section>
+    </main>
+
+    <script src="/shared/site-nav.js?v=13"></script>
+    <script src="/shared/analytics.js?v=1"></script>
+    <script src="/shared/api-base.js?v=1"></script>
+    <script src="format.js?v=1"></script>
+    <script src="app.js?v=1"></script>
+</body>
+</html>

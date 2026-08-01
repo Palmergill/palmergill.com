@@ -7,6 +7,9 @@
     const confirmPassword = document.getElementById("confirmPassword");
     const button = form.querySelector("button[type='submit']");
 
+    const inviteFromUrl = new URLSearchParams(window.location.search).get("invite");
+    if (inviteFromUrl) inviteCode.value = inviteFromUrl.trim().toUpperCase();
+
     function safeNextPath() {
         const params = new URLSearchParams(window.location.search);
         const next = params.get("next") || "/";
@@ -88,5 +91,5 @@
         }
     });
 
-    inviteCode.focus();
+    (inviteCode.value ? username : inviteCode).focus();
 })();

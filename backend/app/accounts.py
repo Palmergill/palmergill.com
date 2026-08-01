@@ -21,7 +21,7 @@ import unicodedata
 
 from sqlalchemy.orm import Session
 
-from app.database import AppUser, utc_now
+from app.database import AppUser, FantasyDraftSession, utc_now
 
 ROLE_ADMIN = "admin"
 ROLE_MEMBER = "member"
@@ -100,12 +100,32 @@ def signup_enabled() -> bool:
     return signup_invite_code() is not None
 
 
-def check_invite_code(submitted: object) -> None:
+def check_invite_code(submitted: object, db: Session | None = None) -> None:
+    """Accept the site invite or an open fantasy draft-room code.
+
+    A room code is intentionally also an account invitation: the host only
+    needs to share one code with the league, and a newly created account lands
+    back on the room link to claim its own seat.
+    """
     expected = signup_invite_code()
+    submitted_code = submitted.strip() if isinstance(submitted, str) else ""
+    if len(submitted_code) > 128:
+        raise AccountError("That invite code isn't valid.", 403)
+    if expected is not None and secrets.compare_digest(submitted_code, expected):
+        return
+
+    room_code = "".join(submitted_code.upper().split())
+    if db is not None and room_code:
+        open_room = db.query(FantasyDraftSession.id).filter(
+            FantasyDraftSession.join_code == room_code,
+            FantasyDraftSession.state == "lobby",
+        ).first()
+        if open_room:
+            return
+
     if expected is None:
         raise AccountError("Sign-ups are closed right now.", 403)
-    if not isinstance(submitted, str) or not secrets.compare_digest(submitted.strip(), expected):
-        raise AccountError("That invite code isn't valid.", 403)
+    raise AccountError("That invite code isn't valid.", 403)
 
 
 def validate_username(value: object) -> str:

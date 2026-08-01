@@ -19,7 +19,7 @@ from app.accounts import ROLE_ADMIN, ROLE_MEMBER, AccountError
 from app.database import SessionLocal
 from app.database_migration import init_db_with_migration
 from app.log_handler import install_db_logging
-from app.routers import admin, analytics, bitcoin, stocks, poker, craps, fantasy
+from app.routers import admin, analytics, bitcoin, stocks, poker, craps, draft_order, fantasy
 from app.routers.analytics import cleanup_old_analytics, record_analytics_event
 import os
 
@@ -829,7 +829,7 @@ async def signup(request: Request):
     redirect = safe_next_path(body.get("next"))
     db = SessionLocal()
     try:
-        accounts.check_invite_code(body.get("inviteCode"))
+        accounts.check_invite_code(body.get("inviteCode"), db)
         user = accounts.create_user(db, body.get("username"), body.get("password"))
     except AccountError as error:
         record_auth_failure(request)
@@ -895,6 +895,7 @@ app.include_router(craps.router)
 app.include_router(analytics.router)
 app.include_router(admin.router)
 app.include_router(fantasy.router)
+app.include_router(draft_order.router)
 
 @app.get("/health")
 async def health():

@@ -30,6 +30,8 @@ The active public site is static:
 - `/login/` - protected workspace sign-in
 - `/stock-research/` - stock research app
 - `/bitcoin-chat/` - Bitcoin chat app
+- `/fantasy/` - fantasy football dashboard
+- `/fantasy/draft-order/` - Fourth & Fortune draft-order rooms
 - `/casino/` - casino landing page linking poker, craps, and blackjack
 - `/poker/` - poker app
 - `/craps/` - craps app
@@ -51,6 +53,7 @@ Important routes:
 - `/api/poker/*` (includes the `GET /api/poker/games/{game_id}/ws` WebSocket push channel)
 - `/api/craps/*`
 - `/api/bitcoin/*`
+- `/api/fantasy/*` (public fantasy reads plus account-gated persistent draft rooms)
 - `/api/analytics/*` (public client analytics ingest)
 - `/api/admin/*`
 - `/health`
@@ -90,6 +93,11 @@ logs/backend.log
 Two roles, stored in different places on purpose:
 
 - **admin** — the `APP_AUTH_USERNAME` / `APP_AUTH_PASSWORD` env pair. No database row, so nothing that can write to `app_users` can grant itself the logs.
-- **member** — a row in `app_users`, created at `/signup/` with the invite code in `APP_SIGNUP_INVITE_CODE`. Passwords are hashed with stdlib scrypt (`backend/app/accounts.py`). Members get the live tools; `/admin/*`, `/api/admin/*`, `/api/fantasy/admin/*`, and the FastAPI docs return `403`.
+- **member** — a row in `app_users`, created at `/signup/` with the invite code in `APP_SIGNUP_INVITE_CODE` or the join code for an open fantasy draft room. Passwords are hashed with stdlib scrypt (`backend/app/accounts.py`). Members get the live tools; `/admin/*`, `/api/admin/*`, `/api/fantasy/admin/*`, and the FastAPI docs return `403`.
+
+Fourth & Fortune persists rooms, players, rounds, and every dealt card in the
+`ff_draft_*` tables. The API owns turn authorization and derives a separate
+per-account deck from a committed master seed; the seed is disclosed only when
+the last score is locked.
 
 The API service is the only thing that authenticates anyone — it owns the user table and mints the signed `pg_session` cookie, which carries a role claim. `middleware.js` at the Vercel edge only verifies that cookie and enforces the role gate; it deliberately no longer implements a second login. An admin role claim is honored only for the configured admin username, so a member token cannot be rewritten into an admin one even though both are signed with the same secret. Cookies issued before member accounts existed carry no role claim and are read as admin only when the username matches.
