@@ -662,6 +662,18 @@ code { font-family: "DM Mono", ui-monospace, monospace; }
 
 .playing-card + .playing-card { margin-left: clamp(-27px, -2vw, -12px); }
 .playing-card.is-red { color: var(--draft-red); }
+.playing-card.is-concealed {
+    overflow: hidden;
+    border-color: #6f826f;
+    background:
+        radial-gradient(circle at center, rgba(235, 195, 107, 0.24) 0 3px, transparent 4px),
+        repeating-linear-gradient(45deg, #223e2d 0 8px, #2e5239 8px 16px);
+    background-size: 18px 18px, auto;
+    box-shadow: 0 13px 24px rgba(0, 0, 0, 0.32), inset 0 0 0 5px #173322;
+    color: rgba(255, 255, 255, 0.52);
+    filter: blur(1.1px);
+    font-size: clamp(1.25rem, 3vw, 2rem);
+}
 .playing-card small { position: absolute; top: 9px; left: 10px; display: flex; flex-direction: column; align-items: center; font-size: 0.65em; line-height: 0.9; }
 .playing-card b { font-weight: 400; }
 
@@ -679,6 +691,7 @@ code { font-family: "DM Mono", ui-monospace, monospace; }
     text-align: center;
     text-transform: uppercase;
 }
+.card-placeholder--sealed { padding: 12px; border-style: solid; color: #b6c7b9; }
 
 @keyframes deal-in {
     from { opacity: 0; transform: translateY(-22px) rotate(calc(var(--tilt, 0deg) - 5deg)); }

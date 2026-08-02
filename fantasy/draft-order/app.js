@@ -3,7 +3,8 @@
 
     const API_BASE = `${window.API_ORIGIN || ""}/api/fantasy/draft`;
     const F = window.DraftOrderFormat;
-    const POLL_MS = 2500;
+    const ACTIVE_POLL_MS = 900;
+    const IDLE_POLL_MS = 2500;
     const ROOM_STATE_LABELS = { lobby: "Lobby", active: "Live", complete: "Final" };
     const state = {
         identity: null,
@@ -61,6 +62,7 @@
         roundBadge: byId("roundBadge"),
         cardsHeld: byId("cardsHeld"),
         currentPot: byId("currentPot"),
+        currentPotUnit: byId("currentPotUnit"),
         bustChance: byId("bustChance"),
         bankPosition: byId("bankPosition"),
         scoreToBeat: byId("scoreToBeat"),
@@ -70,6 +72,8 @@
         bankButton: byId("bankButton"),
         forfeitButton: byId("forfeitButton"),
         leaderboard: byId("leaderboard"),
+        leaderboardTitle: byId("leaderboardTitle"),
+        pollNote: byId("pollNote"),
         resultPanel: byId("resultPanel"),
         resultKicker: byId("resultKicker"),
         resultTitle: byId("resultTitle"),
@@ -235,7 +239,9 @@
 
     function schedulePoll() {
         stopPolling();
-        if (!state.room || !["lobby", "active"].includes(state.room.state)) return;
+        const waitingForReveal = state.room?.state === "complete" && !state.room.resultsRevealed;
+        if (!state.room || (!["lobby", "active"].includes(state.room.state) && !waitingForReveal)) return;
+        const delay = state.room.state === "active" ? ACTIVE_POLL_MS : IDLE_POLL_MS;
         state.pollTimer = window.setTimeout(async () => {
             const generation = state.generation;
             const roomId = state.room.id;
@@ -254,7 +260,7 @@
             } finally {
                 schedulePoll();
             }
-        }, POLL_MS);
+        }, delay);
     }
 
     function renderHome(sessions) {
@@ -272,7 +278,7 @@
             const details = document.createElement("span");
             const managers = room.players.length;
             const stateLabel = room.state === "complete"
-                ? "Draft order final"
+                ? (room.resultsRevealed ? "Draft order final" : "Final reveal ready")
                 : room.state === "active"
                     ? `${room.currentPlayer?.displayName || "Player"} is up`
                     : `${managers} manager${managers === 1 ? "" : "s"} in lobby`;
@@ -318,7 +324,7 @@
         setView("loading");
         try {
             state.room = await requestJson(`/sessions/${roomId}`);
-            state.resultsRevealed = false;
+            state.resultsRevealed = Boolean(state.room.resultsRevealed);
             state.revealTimers.forEach(window.clearTimeout);
             state.revealTimers = [];
             updateRoomUrl(roomId);
@@ -346,7 +352,7 @@
             ? `${modeLabel} · lobby open`
             : room.state === "active"
                 ? `${modeLabel} · live`
-                : `${modeLabel} · final result`;
+                : `${modeLabel} · ${room.resultsRevealed ? "final result" : "reveal ready"}`;
         els.lobbyPanel.hidden = room.state !== "lobby";
         els.gamePanel.hidden = room.state !== "active";
         els.resultPanel.hidden = room.state !== "complete";
@@ -359,7 +365,7 @@
             stopBotTimer();
         }
         if (room.state === "complete") {
-            stopPolling();
+            if (room.resultsRevealed) stopPolling();
             renderResults(room);
         }
     }
@@ -415,8 +421,26 @@
             : "Waiting for the host to lock the roster and start.";
     }
 
-    function renderCards(cards) {
+    function renderCards(cards, concealedCount) {
         els.cardsHeld.innerHTML = "";
+        if (concealedCount !== null && concealedCount !== undefined) {
+            if (!concealedCount) {
+                const placeholder = document.createElement("div");
+                placeholder.className = "card-placeholder card-placeholder--sealed";
+                placeholder.textContent = "Final hand sealed";
+                els.cardsHeld.appendChild(placeholder);
+                return;
+            }
+            for (let index = 0; index < concealedCount; index += 1) {
+                const node = document.createElement("div");
+                node.className = "playing-card is-concealed";
+                node.setAttribute("aria-label", `Hidden card ${index + 1} of ${concealedCount}`);
+                node.textContent = "♠";
+                node.style.setProperty("--tilt", `${(index - (concealedCount - 1) / 2) * 2.2}deg`);
+                els.cardsHeld.appendChild(node);
+            }
+            return;
+        }
         if (!cards.length) {
             const placeholder = document.createElement("div");
             placeholder.className = "card-placeholder";
@@ -445,17 +469,23 @@
     function renderGame(room) {
         const round = room.currentRound || { number: 1, cards: [], pot: 0, bustChance: 0 };
         const decision = room.decision || {};
+        const concealed = Boolean(round.concealed && !room.canPlay);
         els.currentPlayerName.textContent = room.currentPlayer?.displayName || "—";
         els.roundBadge.textContent = `Round ${round.number} of ${room.roundsPerPlayer}`;
-        renderCards(round.cards || []);
-        els.currentPot.textContent = round.pot || 0;
-        els.bustChance.textContent = F.bustCopy(round.bustChance);
-        els.bankPosition.textContent = decision.bankPosition ? F.ordinal(decision.bankPosition) : "—";
+        renderCards(round.cards || [], concealed ? (round.cardCount || 0) : null);
+        els.currentPot.textContent = concealed ? "Sealed" : (round.pot || 0);
+        els.currentPotUnit.textContent = concealed ? "" : " pts";
+        els.bustChance.textContent = concealed ? "Hidden" : F.bustCopy(round.bustChance);
+        els.bankPosition.textContent = concealed
+            ? "After reveal"
+            : (decision.bankPosition ? F.ordinal(decision.bankPosition) : "—");
         // These stats describe the player at the table, so only phrase them in
         // the second person when the viewer is that player.
-        els.scoreToBeat.textContent = decision.isLeadingIfBanked
-            ? (room.canPlay ? "You’d lead" : "Would lead")
-            : `${decision.scoreToBeat || 0} pts`;
+        els.scoreToBeat.textContent = concealed
+            ? "Sealed"
+            : decision.isLeadingIfBanked
+                ? (room.canPlay ? "You’d lead" : "Would lead")
+                : `${decision.scoreToBeat || 0} pts`;
         els.playActions.hidden = !room.canPlay;
         els.flipButton.disabled = state.actionBusy;
         els.bankButton.disabled = state.actionBusy || !(round.cards || []).length;
@@ -473,7 +503,9 @@
             els.turnMessage.textContent = `${room.currentPlayer?.displayName || "A bot"} is playing automatically…`;
         } else if (!room.canPlay && !els.turnMessage.dataset.event) {
             els.turnMessage.className = "turn-message";
-            els.turnMessage.textContent = `Watching ${room.currentPlayer?.displayName || "the current player"}. This screen updates automatically.`;
+            els.turnMessage.textContent = concealed
+                ? `${room.currentPlayer?.displayName || "The current player"} has pulled ${round.cardCount || 0} card${round.cardCount === 1 ? "" : "s"}. Values and score stay sealed for the reveal.`
+                : `Watching ${room.currentPlayer?.displayName || "the current player"} live — every card and point appears here.`;
         } else if (!els.turnMessage.dataset.event) {
             els.turnMessage.className = "turn-message";
             els.turnMessage.textContent = round.cards.length
@@ -485,6 +517,9 @@
 
     function renderLeaderboard(room) {
         els.leaderboard.innerHTML = "";
+        const finalRound = room.currentRound?.number === room.roundsPerPlayer;
+        els.leaderboardTitle.textContent = finalRound ? "Standings after Round 2" : "The chase";
+        els.pollNote.textContent = finalRound ? "Final scores sealed" : "Updates live";
         room.leaderboard.forEach((player) => {
             const row = document.createElement("li");
             if (player.isCurrent) row.className = "is-current";
@@ -496,11 +531,11 @@
             const name = document.createElement("strong");
             name.textContent = `${player.displayName}${player.isBot ? " · BOT" : ""}`;
             const rounds = document.createElement("span");
-            rounds.textContent = `${player.roundsCompleted}/${room.roundsPerPlayer} rounds${player.isCurrent ? " · up now" : ""}`;
+            rounds.textContent = `${player.roundsCompleted}/${room.roundsPerPlayer} rounds${player.isCurrent ? " · up now" : ""}${player.scoreHidden ? " · final locked" : ""}`;
             info.append(name, rounds);
             const score = document.createElement("span");
             score.className = "leaderboard-score";
-            score.textContent = `${player.score}`;
+            score.textContent = player.scoreHidden ? "🔒" : `${player.score}`;
             row.append(place, info, score);
             els.leaderboard.appendChild(row);
         });
@@ -509,19 +544,35 @@
     function renderResults(room) {
         els.draftOrder.innerHTML = "";
         const isPractice = room.mode === "practice";
-        if (isPractice) state.resultsRevealed = true;
-        els.resultKicker.textContent = isPractice ? "Practice complete · seed revealed" : "Scores locked · seed revealed";
-        els.resultTitle.textContent = isPractice ? "Three practice rounds complete." : "The draft order is ready.";
-        els.resultCopy.textContent = isPractice
-            ? `You scored ${room.draftOrder?.[0]?.score || 0} points. Run it again whenever you want another warm-up.`
-            : "Reveal from the last pick to the first, then open the proof behind every card.";
+        const serverRevealed = isPractice || room.resultsRevealed;
         els.practiceAgainButton.hidden = !isPractice;
         els.copyResultsButton.hidden = isPractice;
         els.verifyButton.textContent = isPractice ? "Verify practice deal" : "Verify every deal";
+        if (!serverRevealed) {
+            els.resultKicker.textContent = "Final round complete · scores sealed";
+            els.resultTitle.textContent = "The final table is locked.";
+            els.resultCopy.textContent = room.canReveal
+                ? "Every third-round score is hidden. Reveal the final draft order when everyone is ready."
+                : "Every third-round score is hidden. Waiting for the host to begin the reveal.";
+            els.revealButton.textContent = "Reveal final draft order";
+            els.revealButton.hidden = !room.canReveal;
+            els.revealButton.disabled = state.actionBusy;
+            els.resultActions.hidden = true;
+            return;
+        }
+
+        els.resultKicker.textContent = isPractice ? "Practice complete · seed revealed" : "Scores revealed · seed unlocked";
+        els.resultTitle.textContent = isPractice ? "Three practice rounds complete." : "The draft order is ready.";
+        els.resultCopy.textContent = isPractice
+            ? `You scored ${room.draftOrder?.[0]?.score || 0} points. Run it again whenever you want another warm-up.`
+            : "Revealing from the last pick to the first, followed by the proof behind every card.";
+        els.revealButton.hidden = true;
+        if (isPractice) state.resultsRevealed = true;
         els.resultActions.hidden = !state.resultsRevealed;
-        els.revealButton.hidden = isPractice || state.resultsRevealed;
-        if (state.resultsRevealed) {
-            room.draftOrder.forEach((entry) => els.draftOrder.appendChild(resultRow(entry)));
+        if (!state.resultsRevealed) {
+            animateResults(room);
+        } else {
+            (room.draftOrder || []).forEach((entry) => els.draftOrder.appendChild(resultRow(entry)));
         }
     }
 
@@ -543,12 +594,12 @@
         return row;
     }
 
-    function revealResults() {
-        if (!state.room?.draftOrder || state.resultsRevealed) return;
+    function animateResults(room) {
+        if (!room?.draftOrder || state.resultsRevealed) return;
         state.resultsRevealed = true;
         els.revealButton.hidden = true;
         els.draftOrder.innerHTML = "";
-        const sequence = [...state.room.draftOrder].reverse();
+        const sequence = [...room.draftOrder].reverse();
         const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
         sequence.forEach((entry, index) => {
             const timer = window.setTimeout(() => {
@@ -560,6 +611,26 @@
             }, reducedMotion ? 0 : index * 850);
             state.revealTimers.push(timer);
         });
+    }
+
+    async function revealResults() {
+        if (state.actionBusy || !state.room?.canReveal) return;
+        state.actionBusy = true;
+        stopPolling();
+        setButtonBusy(els.revealButton, true, "Opening the table");
+        try {
+            const room = await requestJson(`/sessions/${state.room.id}/reveal`, { method: "POST" });
+            state.generation += 1;
+            state.room = room;
+            state.resultsRevealed = false;
+            renderRoom();
+        } catch (error) {
+            handleActionError(error);
+            schedulePoll();
+        } finally {
+            state.actionBusy = false;
+            setButtonBusy(els.revealButton, false, "Opening the table");
+        }
     }
 
     async function startPractice(button) {

@@ -12,19 +12,20 @@ _SAFE_IDENTIFIER = re.compile(r'^[a-zA-Z_][a-zA-Z0-9_]*$')
 def _add_column_if_missing(inspector, table_name, column_name, definition):
     """Add one backwards-compatible column to an existing deployment."""
     if table_name not in inspector.get_table_names():
-        return
+        return False
     existing = {column["name"] for column in inspector.get_columns(table_name)}
     if column_name in existing:
-        return
+        return False
     if not _SAFE_IDENTIFIER.match(table_name) or not _SAFE_IDENTIFIER.match(column_name):
         logger.warning("Skipping unsafe migration identifier %s.%s", table_name, column_name)
-        return
+        return False
 
     logger.info("Adding column %s to %s", column_name, table_name)
     with engine.begin() as conn:
         conn.execute(text(
             f"ALTER TABLE {table_name} ADD COLUMN {column_name} {definition}"
         ))
+    return True
 
 def migrate_database():
     """Auto-migrate database schema without losing data"""
@@ -98,6 +99,21 @@ def migrate_database():
             "is_bot",
             "BOOLEAN NOT NULL DEFAULT FALSE" if is_postgres else "BOOLEAN NOT NULL DEFAULT 0",
         )
+        revealed_at_added = _add_column_if_missing(
+            inspector,
+            "ff_draft_sessions",
+            "revealed_at",
+            "TIMESTAMP" if is_postgres else "DATETIME",
+        )
+        if revealed_at_added:
+            # Rooms completed before synchronized reveals existed have already
+            # shown their results, so preserve them as revealed history.
+            with engine.begin() as conn:
+                conn.execute(text(
+                    "UPDATE ff_draft_sessions "
+                    "SET revealed_at = completed_at "
+                    "WHERE state = 'complete'"
+                ))
         
         logger.info("Database migration complete")
         

@@ -178,6 +178,17 @@ def play_bot_round(
     return view
 
 
+@router.post("/sessions/{session_id}/reveal")
+def reveal_room(
+    session_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    identity = _identity(request)
+    room = draft_order_game.reveal_results(db, identity, session_id)
+    return draft_order_game.serialize_session(db, room, identity["username"])
+
+
 @router.get("/sessions/{session_id}/verify")
 def verify_room(
     session_id: str,

@@ -220,7 +220,13 @@ def test_only_admin_can_create_bot_test_room_and_bots_finish_full_flow(monkeypat
             assert response.status_code == 200
             view = response.json()
             assert view["event"]["type"] == "bot_round"
-            assert view["event"]["outcome"] in {"banked", "busted"}
+            if round_number == ROUNDS_PER_PLAYER:
+                assert view["event"]["outcome"] == "sealed"
+                assert view["event"]["cards"] == []
+                assert view["event"]["score"] is None
+                assert view["event"]["cardCount"] >= 1
+            else:
+                assert view["event"]["outcome"] in {"banked", "busted"}
             bot_rounds += 1
         else:
             assert view["canPlay"] is True
@@ -234,6 +240,18 @@ def test_only_admin_can_create_bot_test_room_and_bots_finish_full_flow(monkeypat
     assert bot_rounds == 4 * draft_order_game.ROUNDS_PER_PLAYER
     assert turns_by_round == expected_orders
     assert view["state"] == "complete"
+    assert view["resultsRevealed"] is False
+    assert view["draftOrder"] is None
+    assert host.get(
+        f"/api/fantasy/draft/sessions/{room_id}/verify"
+    ).status_code == 409
+
+    revealed = host.post(
+        f"/api/fantasy/draft/sessions/{room_id}/reveal"
+    )
+    assert revealed.status_code == 200
+    view = revealed.json()
+    assert view["resultsRevealed"] is True
     assert len(view["draftOrder"]) == 5
     proof = host.get(
         f"/api/fantasy/draft/sessions/{room_id}/verify"
@@ -361,6 +379,73 @@ def test_turn_is_server_authoritative_and_deck_continues_between_rounds(monkeypa
     assert second.json()["currentRound"]["number"] == 2
 
 
+def test_spectators_see_live_cards_until_the_final_round_is_sealed(monkeypatch):
+    host = member_client(monkeypatch, "host-player")
+    guest = member_client(monkeypatch, "road-warrior")
+    room = create_room(host)
+    join_room(guest, room["joinCode"])
+    rid = room["id"]
+    view = host.post(f"/api/fantasy/draft/sessions/{rid}/start").json()
+    clients = clients_by_player(view, host, guest)
+
+    first_name = next(player["username"] for player in view["players"] if player["isCurrent"])
+    first_client = clients[first_name]
+    spectator = guest if first_client is host else host
+    first_flip = first_client.post(f"/api/fantasy/draft/sessions/{rid}/flip").json()
+    spectator_view = spectator.get(f"/api/fantasy/draft/sessions/{rid}").json()
+
+    assert spectator_view["currentRound"]["concealed"] is False
+    assert spectator_view["currentRound"]["cards"] == first_flip["currentRound"]["cards"]
+    assert spectator_view["currentRound"]["pot"] == first_flip["currentRound"]["pot"]
+    view = first_client.post(f"/api/fantasy/draft/sessions/{rid}/bank").json()
+
+    while view["state"] == "active" and view["currentRound"]["number"] < ROUNDS_PER_PLAYER:
+        current_name = next(
+            player["username"] for player in view["players"] if player["isCurrent"]
+        )
+        current_client = clients[current_name]
+        view = current_client.post(f"/api/fantasy/draft/sessions/{rid}/flip").json()
+        view = current_client.post(f"/api/fantasy/draft/sessions/{rid}/bank").json()
+
+    assert view["currentRound"]["number"] == ROUNDS_PER_PLAYER
+    final_name = next(player["username"] for player in view["players"] if player["isCurrent"])
+    final_client = clients[final_name]
+    final_spectator = guest if final_client is host else host
+    pre_final_score = next(
+        player["score"] for player in view["leaderboard"] if player["username"] == final_name
+    )
+
+    actor_view = final_client.post(f"/api/fantasy/draft/sessions/{rid}/flip").json()
+    spectator_view = final_spectator.get(f"/api/fantasy/draft/sessions/{rid}").json()
+    assert actor_view["currentRound"]["concealed"] is False
+    assert len(actor_view["currentRound"]["cards"]) == 1
+    assert actor_view["currentRound"]["pot"] > 0
+    assert actor_view["decision"] is not None
+    assert spectator_view["currentRound"] == {
+        "number": ROUNDS_PER_PLAYER,
+        "cards": [],
+        "cardCount": 1,
+        "concealed": True,
+        "pot": None,
+        "bustChance": None,
+        "deckRemaining": None,
+    }
+    assert spectator_view["decision"] is None
+
+    final_client.post(f"/api/fantasy/draft/sessions/{rid}/bank")
+    sealed_view = final_spectator.get(f"/api/fantasy/draft/sessions/{rid}").json()
+    sealed_player = next(
+        player for player in sealed_view["players"] if player["username"] == final_name
+    )
+    sealed_round = next(row for row in sealed_player["rounds"] if row["number"] == ROUNDS_PER_PLAYER)
+    assert sealed_player["scoreHidden"] is True
+    assert sealed_player["score"] == pre_final_score
+    assert sealed_round["cards"] == []
+    assert sealed_round["cardCount"] == 1
+    assert sealed_round["score"] is None
+    assert sealed_round["state"] == "sealed"
+
+
 def test_duplicate_rank_busts_and_scores_zero(monkeypatch):
     host = member_client(monkeypatch, "host-player")
     guest = member_client(monkeypatch, "road-warrior")
@@ -412,7 +497,23 @@ def test_full_game_reveals_seed_and_reproducible_decks(monkeypatch):
         ).json()
 
     assert view["state"] == "complete"
+    assert view["resultsRevealed"] is False
+    assert view["draftOrder"] is None
+    assert guest.post(
+        f"/api/fantasy/draft/sessions/{room['id']}/reveal"
+    ).status_code == 403
+    assert host.get(
+        f"/api/fantasy/draft/sessions/{room['id']}/verify"
+    ).status_code == 409
+
+    reveal = host.post(f"/api/fantasy/draft/sessions/{room['id']}/reveal")
+    assert reveal.status_code == 200
+    view = reveal.json()
+    assert view["resultsRevealed"] is True
     assert [entry["pick"] for entry in view["draftOrder"]] == [1, 2]
+    assert guest.get(
+        f"/api/fantasy/draft/sessions/{room['id']}"
+    ).json()["resultsRevealed"] is True
 
     verified = host.get(f"/api/fantasy/draft/sessions/{room['id']}/verify")
     assert verified.status_code == 200
@@ -488,6 +589,7 @@ def test_host_can_skip_a_manager_who_stops_playing(monkeypatch):
         ).json()
 
     assert view["state"] == "complete"
+    view = host.post(f"/api/fantasy/draft/sessions/{rid}/reveal").json()
     walked = next(p for p in view["players"] if p["username"] == "road-warrior")
     assert walked["score"] == 0
     assert walked["roundsCompleted"] == ROUNDS_PER_PLAYER
@@ -557,7 +659,7 @@ def test_standings_and_draft_order_break_ties_the_same_way(monkeypatch):
     finally:
         db.close()
 
-    view = host.get(f"/api/fantasy/draft/sessions/{rid}").json()
+    view = host.post(f"/api/fantasy/draft/sessions/{rid}/reveal").json()
     assert [p["score"] for p in view["leaderboard"]] == [40, 40]
     assert (
         [p["displayName"] for p in view["leaderboard"]]

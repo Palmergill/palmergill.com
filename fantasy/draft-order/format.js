@@ -53,6 +53,9 @@
 
     function botRoundMessage(event) {
         if (!event) return "Bot round complete.";
+        if (event.outcome === "sealed") {
+            return `${event.displayName} locked ${event.cardCount} card${event.cardCount === 1 ? "" : "s"} for the final reveal.`;
+        }
         if (event.outcome === "busted") {
             return `${event.displayName} busted round ${event.round}.`;
         }

@@ -103,6 +103,10 @@ rounds two and three are frozen from the standings after the preceding round,
 with the scoring leader first. A room has an explicit mode: `league` rooms accept
 account-backed invites, `practice` rooms are private solo warm-ups, and
 admin-only `test` rooms contain marked bot players that advance one round at a
-time through the same scoring and verification path as a real draft.
+time through the same scoring and verification path as a real draft. Spectators
+receive every live card and pot value in rounds one and two. During round three,
+the API returns only each opponent's card count, freezes the public leaderboard
+at the two-round standings, and withholds the seed, final scores, and draft order
+until the host records the synchronized reveal in `revealed_at`.
 
 The API service is the only thing that authenticates anyone — it owns the user table and mints the signed `pg_session` cookie, which carries a role claim. `middleware.js` at the Vercel edge only verifies that cookie and enforces the role gate; it deliberately no longer implements a second login. An admin role claim is honored only for the configured admin username, so a member token cannot be rewritten into an admin one even though both are signed with the same secret. Cookies issued before member accounts existed carry no role claim and are read as admin only when the username matches.

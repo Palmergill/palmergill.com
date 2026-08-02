@@ -378,6 +378,7 @@ class FantasyDraftSession(Base):
     created_at = Column(DateTime, default=utc_now, nullable=False)
     started_at = Column(DateTime, nullable=True)
     completed_at = Column(DateTime, nullable=True)
+    revealed_at = Column(DateTime, nullable=True)
 
 
 class FantasyDraftPlayer(Base):

@@ -9,13 +9,15 @@ def test_draft_room_modes_are_added_to_an_existing_database(monkeypatch):
     legacy_engine = create_engine("sqlite:///:memory:")
     with legacy_engine.begin() as connection:
         connection.execute(text(
-            "CREATE TABLE ff_draft_sessions (id VARCHAR PRIMARY KEY)"
+            "CREATE TABLE ff_draft_sessions ("
+            "id VARCHAR PRIMARY KEY, state VARCHAR, completed_at DATETIME)"
         ))
         connection.execute(text(
             "CREATE TABLE ff_draft_players (id VARCHAR PRIMARY KEY, session_id VARCHAR)"
         ))
         connection.execute(text(
-            "INSERT INTO ff_draft_sessions (id) VALUES ('room-1')"
+            "INSERT INTO ff_draft_sessions (id, state, completed_at) "
+            "VALUES ('room-1', 'complete', '2026-08-01 12:00:00')"
         ))
         connection.execute(text(
             "INSERT INTO ff_draft_players (id, session_id) VALUES ('player-1', 'room-1')"
@@ -29,6 +31,7 @@ def test_draft_room_modes_are_added_to_an_existing_database(monkeypatch):
     session_columns = {column["name"] for column in inspector.get_columns("ff_draft_sessions")}
     player_columns = {column["name"] for column in inspector.get_columns("ff_draft_players")}
     assert "mode" in session_columns
+    assert "revealed_at" in session_columns
     assert "is_bot" in player_columns
 
     with legacy_engine.connect() as connection:
@@ -38,3 +41,6 @@ def test_draft_room_modes_are_added_to_an_existing_database(monkeypatch):
         assert connection.execute(text(
             "SELECT is_bot FROM ff_draft_players WHERE id = 'player-1'"
         )).scalar_one() == 0
+        assert connection.execute(text(
+            "SELECT revealed_at FROM ff_draft_sessions WHERE id = 'room-1'"
+        )).scalar_one() is not None

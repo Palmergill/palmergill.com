@@ -248,10 +248,27 @@ def _active_round(rounds: list[FantasyDraftRound]) -> FantasyDraftRound | None:
     return next((row for row in rounds if row.state == "active"), None)
 
 
-def _round_payload(round_row: FantasyDraftRound) -> dict[str, Any]:
+def _round_payload(
+    round_row: FantasyDraftRound,
+    *,
+    concealed: bool = False,
+) -> dict[str, Any]:
+    cards = _cards(round_row)
+    if concealed:
+        return {
+            "number": round_row.round_number,
+            "cards": [],
+            "cardCount": len(cards),
+            "concealed": True,
+            "score": None,
+            "busted": None,
+            "state": "active" if round_row.state == "active" else "sealed",
+        }
     return {
         "number": round_row.round_number,
-        "cards": [card_payload(code) for code in _cards(round_row)],
+        "cards": [card_payload(code) for code in cards],
+        "cardCount": len(cards),
+        "concealed": False,
         "score": round_row.score,
         "busted": bool(round_row.busted),
         "state": round_row.state,
@@ -362,11 +379,43 @@ def serialize_session(
 
     viewer_normalized = accounts.normalize_username(viewer_username)
     current_player = next((player for player in players if player.id == room.current_player_id), None)
+    results_revealed = bool(room.revealed_at) or room.mode == MODE_PRACTICE
+    current_round = None
+    current_round_number = None
+    if current_player is not None:
+        current_round = _active_round(rounds_by_player[current_player.id])
+        completed_current = sum(
+            1
+            for row in rounds_by_player[current_player.id]
+            if row.state in FINISHED_ROUND_STATES
+        )
+        current_round_number = (
+            current_round.round_number
+            if current_round is not None
+            else min(completed_current + 1, ROUNDS_PER_PLAYER)
+        )
+    final_round_sealed = not results_revealed and (
+        room.state == "complete" or current_round_number == ROUNDS_PER_PLAYER
+    )
     player_payloads = []
     scores: dict[str, int] = {}
     for player in players:
         player_rounds = rounds_by_player[player.id]
-        score = player.final_score if room.state == "complete" else _round_score_total(player_rounds)
+        scoring_rounds = (
+            [row for row in player_rounds if row.round_number < ROUNDS_PER_PLAYER]
+            if final_round_sealed
+            else player_rounds
+        )
+        score = (
+            player.final_score
+            if room.state == "complete" and results_revealed
+            else _round_score_total(scoring_rounds)
+        )
+        best_round = _best_round(scoring_rounds)
+        final_round_finished = any(
+            row.round_number == ROUNDS_PER_PLAYER and row.state in FINISHED_ROUND_STATES
+            for row in player_rounds
+        )
         scores[player.id] = score
         player_payloads.append({
             "id": player.id,
@@ -374,11 +423,22 @@ def serialize_session(
             "displayName": player.display_name,
             "turnPosition": player.turn_position,
             "score": score,
-            "bestRound": _best_round(player_rounds),
+            "scoreHidden": bool(final_round_sealed and final_round_finished),
+            "bestRound": best_round,
             "roundsCompleted": sum(
                 1 for row in player_rounds if row.state in FINISHED_ROUND_STATES
             ),
-            "rounds": [_round_payload(row) for row in player_rounds],
+            "rounds": [
+                _round_payload(
+                    row,
+                    concealed=bool(
+                        row.round_number == ROUNDS_PER_PLAYER
+                        and player.username != viewer_normalized
+                        and not results_revealed
+                    ),
+                )
+                for row in player_rounds
+            ],
             "isCurrent": player.id == room.current_player_id,
             "isHost": player.username == room.created_by,
             "isBot": bool(player.is_bot),
@@ -399,56 +459,71 @@ def serialize_session(
     current_round_payload = None
     decision = None
     if current_player is not None:
-        current_round = _active_round(rounds_by_player[current_player.id])
         flips_used = db.query(func.count(FantasyDraftFlip.id)).filter(
             FantasyDraftFlip.player_id == current_player.id
         ).scalar() or 0
-        completed = sum(
-            1
-            for row in rounds_by_player[current_player.id]
-            if row.state in {"banked", "busted"}
+        spectator_final_round = bool(
+            current_round_number == ROUNDS_PER_PLAYER
+            and current_player.username != viewer_normalized
+            and not results_revealed
         )
         if current_round is None:
             current_round_payload = {
-                "number": min(completed + 1, ROUNDS_PER_PLAYER),
+                "number": current_round_number,
                 "cards": [],
-                "pot": 0,
-                "bustChance": 0.0,
-                "deckRemaining": 52 - flips_used,
+                "cardCount": 0,
+                "concealed": spectator_final_round,
+                "pot": None if spectator_final_round else 0,
+                "bustChance": None if spectator_final_round else 0.0,
+                "deckRemaining": None if spectator_final_round else 52 - flips_used,
             }
-        else:
+        elif spectator_final_round:
             current_round_payload = {
                 "number": current_round.round_number,
-                "cards": [card_payload(code) for code in _cards(current_round)],
+                "cards": [],
+                "cardCount": len(_cards(current_round)),
+                "concealed": True,
+                "pot": None,
+                "bustChance": None,
+                "deckRemaining": None,
+            }
+        else:
+            current_cards = _cards(current_round)
+            current_round_payload = {
+                "number": current_round.round_number,
+                "cards": [card_payload(code) for code in current_cards],
+                "cardCount": len(current_cards),
+                "concealed": False,
                 "pot": current_round.score,
                 "bustChance": _bust_chance(room, current_player, current_round, flips_used),
                 "deckRemaining": 52 - flips_used,
             }
 
-        projected_score = scores[current_player.id] + current_round_payload["pot"]
-        hypothetical = dict(scores)
-        hypothetical[current_player.id] = projected_score
-        projected_order = sorted(
-            players,
-            key=lambda player: (
-                -hypothetical[player.id],
-                player.turn_position if player.turn_position is not None else MAX_PLAYERS + 1,
-            ),
-        )
-        bank_position = next(
-            index for index, player in enumerate(projected_order, start=1) if player.id == current_player.id
-        )
-        other_scores = [score for player_id, score in scores.items() if player_id != current_player.id]
-        score_to_beat = max(other_scores, default=0)
-        decision = {
-            "projectedScore": projected_score,
-            "bankPosition": bank_position,
-            "scoreToBeat": score_to_beat,
-            "isLeadingIfBanked": projected_score > score_to_beat,
-        }
+        if not spectator_final_round:
+            projected_score = scores[current_player.id] + current_round_payload["pot"]
+            hypothetical = dict(scores)
+            hypothetical[current_player.id] = projected_score
+            projected_order = sorted(
+                players,
+                key=lambda player: (
+                    -hypothetical[player.id],
+                    player.turn_position if player.turn_position is not None else MAX_PLAYERS + 1,
+                ),
+            )
+            bank_position = next(
+                index for index, player in enumerate(projected_order, start=1) if player.id == current_player.id
+            )
+            other_scores = [score for player_id, score in scores.items() if player_id != current_player.id]
+            score_to_beat = max(other_scores, default=0)
+            decision = {
+                "projectedScore": projected_score,
+                "bankPosition": bank_position,
+                "scoreToBeat": score_to_beat,
+                "isLeadingIfBanked": projected_score > score_to_beat,
+            }
 
     draft_order = None
-    if room.state == "complete":
+    if room.state == "complete" and results_revealed:
         draft_order = []
         for pick, player in enumerate(_final_order(players, rounds_by_player, room.master_seed), start=1):
             draft_order.append({
@@ -476,8 +551,15 @@ def serialize_session(
         "createdAt": room.created_at.isoformat() if room.created_at else None,
         "startedAt": room.started_at.isoformat() if room.started_at else None,
         "completedAt": room.completed_at.isoformat() if room.completed_at else None,
+        "revealedAt": room.revealed_at.isoformat() if room.revealed_at else None,
+        "resultsRevealed": results_revealed,
         "isHost": viewer_normalized == room.created_by,
         "isMember": member is not None,
+        "canReveal": bool(
+            viewer_normalized == room.created_by
+            and room.state == "complete"
+            and not results_revealed
+        ),
         "canStart": viewer_normalized == room.created_by and room.state == "lobby" and len(players) >= MIN_PLAYERS,
         "canPlay": bool(
             member is not None
@@ -818,6 +900,27 @@ def _advance_after_round(
     room.current_player_id = None
     room.state = "complete"
     room.completed_at = utc_now()
+    if room.mode == MODE_PRACTICE:
+        room.revealed_at = room.completed_at
+
+
+def reveal_results(
+    db: Session,
+    identity: dict[str, str],
+    session_id: str,
+) -> FantasyDraftSession:
+    """Open the final scores and proof for the whole room at once."""
+    username, _ = _identity_names(identity)
+    room = _session_or_404(db, session_id, lock=True)
+    if username != room.created_by:
+        raise HTTPException(status_code=403, detail="Only the host can reveal the final order.")
+    if room.state != "complete":
+        raise HTTPException(status_code=409, detail="The final round must finish before the reveal.")
+    if room.revealed_at is None:
+        room.revealed_at = utc_now()
+        db.commit()
+        db.refresh(room)
+    return room
 
 
 def flip_card(
@@ -1021,14 +1124,16 @@ def play_test_bot_round(
     else:  # Defensive only: the strategy always banks by card four.
         raise HTTPException(status_code=500, detail="The bot couldn't finish its round.")
 
+    concealed = round_number == ROUNDS_PER_PLAYER
     return room, {
         "type": "bot_round",
         "playerId": player.id,
         "displayName": player.display_name,
         "round": round_number,
-        "outcome": outcome,
-        "score": score,
-        "cards": cards,
+        "outcome": "sealed" if concealed else outcome,
+        "score": None if concealed else score,
+        "cards": [] if concealed else cards,
+        "cardCount": len(cards),
     }
 
 
@@ -1056,6 +1161,11 @@ def verification(db: Session, room: FantasyDraftSession) -> dict[str, Any]:
         raise HTTPException(
             status_code=409,
             detail="Verification unlocks after the final score is locked.",
+        )
+    if room.mode != MODE_PRACTICE and room.revealed_at is None:
+        raise HTTPException(
+            status_code=409,
+            detail="Verification unlocks with the final reveal.",
         )
     players = sorted(_players(db, room.id), key=lambda player: player.turn_position or MAX_PLAYERS + 1)
     all_rounds = _rounds(db, room.id)

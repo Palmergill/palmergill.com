@@ -43,5 +43,8 @@ describe('DraftOrderFormat', () => {
         expect(DraftOrderFormat.botRoundMessage({
             displayName: 'Dime Bot', round: 1, outcome: 'busted', score: 0,
         })).toBe('Dime Bot busted round 1.');
+        expect(DraftOrderFormat.botRoundMessage({
+            displayName: 'Ace Bot', round: 3, outcome: 'sealed', cardCount: 4,
+        })).toBe('Ace Bot locked 4 cards for the final reveal.');
     });
 });
