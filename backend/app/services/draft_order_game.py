@@ -1078,12 +1078,18 @@ def _bot_should_bank(
     return len(cards) >= 4 or (len(cards) >= 2 and round_row.score >= target)
 
 
-def play_test_bot_round(
+def play_test_bot_step(
     db: Session,
     identity: dict[str, str],
     session_id: str,
 ) -> tuple[FantasyDraftSession, dict[str, Any]]:
-    """Play one complete bot round so the UI can animate test progress."""
+    """Play a single bot action — one flip, or the bank that ends the round.
+
+    A bot round used to resolve inside one request, so a spectator only ever saw
+    the finished result: the cards were dealt and cleared before the board
+    rendered. One action per call lets the client pace a bot like a person
+    sitting at the table, with every card visible on the way.
+    """
     username, _ = _identity_names(identity)
     room = _session_or_404(db, session_id, lock=True)
     if room.mode != MODE_TEST:
@@ -1101,39 +1107,45 @@ def play_test_bot_round(
         raise HTTPException(status_code=409, detail="The current turn belongs to a real player.")
 
     bot_identity = {"username": player.username, "role": accounts.ROLE_MEMBER}
-    cards = []
-    round_number = None
-    outcome = "banked"
-    score = 0
-    for _ in range(5):
-        room, flip_event = flip_card(db, bot_identity, session_id)
-        round_number = flip_event["round"]
-        cards.append(flip_event["card"])
-        if flip_event["busted"]:
-            outcome = "busted"
-            break
+    active_round = db.query(FantasyDraftRound).filter(
+        FantasyDraftRound.player_id == player.id,
+        FantasyDraftRound.state == "active",
+    ).first()
+    held = _cards(active_round) if active_round is not None else []
+    banking = bool(held) and (
+        _bot_should_bank(room, player, active_round)
+        # Defensive only: the strategy always banks by card four.
+        or len(held) >= 5
+    )
 
-        active_round = db.query(FantasyDraftRound).filter(
-            FantasyDraftRound.player_id == player.id,
-            FantasyDraftRound.state == "active",
-        ).first()
-        if active_round is not None and _bot_should_bank(room, player, active_round):
-            room, bank_event = bank_round(db, bot_identity, session_id)
-            score = bank_event["score"]
-            break
-    else:  # Defensive only: the strategy always banks by card four.
-        raise HTTPException(status_code=500, detail="The bot couldn't finish its round.")
+    if banking:
+        room, event = bank_round(db, bot_identity, session_id)
+        round_number = event["round"]
+        outcome = "banked"
+        score = event["score"]
+        card = None
+        card_count = len(held)
+    else:
+        room, event = flip_card(db, bot_identity, session_id)
+        round_number = event["round"]
+        outcome = "busted" if event["busted"] else "playing"
+        score = None
+        card = event["card"]
+        card_count = len(held) + 1
 
     concealed = round_number == ROUNDS_PER_PLAYER
+    turn_complete = outcome != "playing"
     return room, {
-        "type": "bot_round",
+        "type": "bot_step",
         "playerId": player.id,
         "displayName": player.display_name,
         "round": round_number,
-        "outcome": "sealed" if concealed else outcome,
+        "action": "bank" if banking else "flip",
+        "outcome": "sealed" if (concealed and turn_complete) else outcome,
         "score": None if concealed else score,
-        "cards": [] if concealed else cards,
-        "cardCount": len(cards),
+        "card": None if concealed else card,
+        "cardCount": card_count,
+        "turnComplete": turn_complete,
     }
 
 

@@ -5,6 +5,12 @@
     const F = window.DraftOrderFormat;
     const ACTIVE_POLL_MS = 900;
     const IDLE_POLL_MS = 2500;
+    // Bots act one card at a time and wait like a person would: long enough to
+    // read the card that just landed, longer still after a round ends.
+    const BOT_TURN_START_MS = 1100;
+    const BOT_THINK_MIN_MS = 900;
+    const BOT_THINK_MAX_MS = 1900;
+    const BOT_ROUND_END_MS = 2200;
     const ROOM_STATE_LABELS = { lobby: "Lobby", active: "Live", complete: "Final" };
     const state = {
         identity: null,
@@ -226,15 +232,25 @@
         state.botTimer = null;
     }
 
-    function scheduleBotTurn() {
-        stopBotTimer();
+    function botThinkDelay() {
+        const spread = BOT_THINK_MAX_MS - BOT_THINK_MIN_MS;
+        return BOT_THINK_MIN_MS + Math.floor(Math.random() * (spread + 1));
+    }
+
+    function scheduleBotTurn(delay) {
         if (
             state.botPaused
             || state.actionBusy
             || !state.room?.canRunBot
             || state.room.state !== "active"
-        ) return;
-        state.botTimer = window.setTimeout(playBotRound, 900);
+        ) {
+            stopBotTimer();
+            return;
+        }
+        // Renders happen on every poll. Restarting the countdown each time would
+        // keep pushing the bot's next card back, so let a pending one run out.
+        if (state.botTimer) return;
+        state.botTimer = window.setTimeout(playBotStep, delay || BOT_TURN_START_MS);
     }
 
     function schedulePoll() {
@@ -658,28 +674,33 @@
         }
     }
 
-    async function playBotRound() {
+    // One card per request, paced by the client, so a spectator watches a bot's
+    // hand build the same way a human's does.
+    async function playBotStep() {
+        stopBotTimer();
         if (state.actionBusy || state.botPaused || !state.room?.canRunBot) return;
         state.actionBusy = true;
         stopPolling();
-        const botName = state.room.currentPlayer?.displayName || "Bot";
-        els.turnMessage.dataset.event = "bot_round";
-        els.turnMessage.className = "turn-message";
-        els.turnMessage.textContent = `${botName} is playing round ${state.room.currentRound?.number || 1}…`;
+        let nextDelay = botThinkDelay();
         try {
             const room = await requestJson(
-                `/sessions/${state.room.id}/bots/play-round`,
+                `/sessions/${state.room.id}/bots/step`,
                 { method: "POST" },
             );
             state.generation += 1;
             state.room = room;
             const event = room.event;
+            // Held until the next bot action replaces it, so the card that just
+            // landed stays on screen through the pause that follows it.
+            els.turnMessage.dataset.event = "bot_step";
             els.turnMessage.className = event?.outcome === "busted"
                 ? "turn-message is-bust"
-                : "turn-message is-bank";
-            els.turnMessage.textContent = F.botRoundMessage(event);
+                : event?.turnComplete
+                    ? "turn-message is-bank"
+                    : "turn-message";
+            els.turnMessage.textContent = F.botStepMessage(event);
             renderRoom();
-            window.setTimeout(() => { delete els.turnMessage.dataset.event; }, 700);
+            if (event?.turnComplete) nextDelay = BOT_ROUND_END_MS;
             schedulePoll();
         } catch (error) {
             state.botPaused = true;
@@ -687,8 +708,16 @@
             handleActionError(error);
         } finally {
             state.actionBusy = false;
+            if (!state.room?.canRunBot) {
+                // The table is back to a human — let the result sit a beat, then
+                // hand the message line back to the normal turn copy.
+                window.setTimeout(() => {
+                    delete els.turnMessage.dataset.event;
+                    if (state.room?.state === "active") renderGame(state.room);
+                }, BOT_ROUND_END_MS);
+            }
             if (state.room?.state === "active") renderGame(state.room);
-            scheduleBotTurn();
+            scheduleBotTurn(nextDelay);
         }
     }
 

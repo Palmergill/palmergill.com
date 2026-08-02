@@ -165,14 +165,14 @@ def forfeit(
     return view
 
 
-@router.post("/sessions/{session_id}/bots/play-round")
-def play_bot_round(
+@router.post("/sessions/{session_id}/bots/step")
+def play_bot_step(
     session_id: str,
     request: Request,
     db: Session = Depends(get_db),
 ) -> dict[str, Any]:
     identity = _identity(request)
-    room, event = draft_order_game.play_test_bot_round(db, identity, session_id)
+    room, event = draft_order_game.play_test_bot_step(db, identity, session_id)
     view = draft_order_game.serialize_session(db, room, identity["username"])
     view["event"] = event
     return view

@@ -51,16 +51,23 @@
         return "Draft order game";
     }
 
-    function botRoundMessage(event) {
-        if (!event) return "Bot round complete.";
+    function botStepMessage(event) {
+        if (!event) return "Bot turn complete.";
         if (event.outcome === "sealed") {
             return `${event.displayName} locked ${event.cardCount} card${event.cardCount === 1 ? "" : "s"} for the final reveal.`;
         }
         if (event.outcome === "busted") {
-            return `${event.displayName} busted round ${event.round}.`;
+            return `${event.displayName} pulled ${cardLabel(event.card)} and busted round ${event.round}.`;
         }
-        return `${event.displayName} banked ${event.score} in round ${event.round}.`;
+        if (event.outcome === "banked") {
+            return `${event.displayName} banked ${event.score} in round ${event.round}.`;
+        }
+        // A sealed final round hides the card itself, so count what they hold.
+        if (!event.card) {
+            return `${event.displayName} takes card ${event.cardCount}, face down.`;
+        }
+        return `${event.displayName} pulls ${cardLabel(event.card)}.`;
     }
 
-    return { ordinal, cardLabel, compactHash, bustCopy, roomUrl, roomModeName, botRoundMessage };
+    return { ordinal, cardLabel, compactHash, bustCopy, roomUrl, roomModeName, botStepMessage };
 });

@@ -36,15 +36,24 @@ describe('DraftOrderFormat', () => {
         expect(DraftOrderFormat.roomModeName('test')).toBe('Bot test');
     });
 
-    test('botRoundMessage reports both banked and busted bot rounds', () => {
-        expect(DraftOrderFormat.botRoundMessage({
+    test('botStepMessage narrates each card, bank, and bust', () => {
+        expect(DraftOrderFormat.botStepMessage({
+            displayName: 'Blitz Bot', round: 2, outcome: 'playing', card: { rank: '9', symbol: '♦' },
+        })).toBe('Blitz Bot pulls 9♦.');
+        expect(DraftOrderFormat.botStepMessage({
             displayName: 'Blitz Bot', round: 2, outcome: 'banked', score: 24,
         })).toBe('Blitz Bot banked 24 in round 2.');
-        expect(DraftOrderFormat.botRoundMessage({
-            displayName: 'Dime Bot', round: 1, outcome: 'busted', score: 0,
-        })).toBe('Dime Bot busted round 1.');
-        expect(DraftOrderFormat.botRoundMessage({
+        expect(DraftOrderFormat.botStepMessage({
+            displayName: 'Dime Bot', round: 1, outcome: 'busted', card: { rank: 'K', symbol: '♣' },
+        })).toBe('Dime Bot pulled K♣ and busted round 1.');
+        expect(DraftOrderFormat.botStepMessage({
             displayName: 'Ace Bot', round: 3, outcome: 'sealed', cardCount: 4,
         })).toBe('Ace Bot locked 4 cards for the final reveal.');
+    });
+
+    test('botStepMessage hides the card value in the sealed final round', () => {
+        expect(DraftOrderFormat.botStepMessage({
+            displayName: 'Ace Bot', round: 3, outcome: 'playing', card: null, cardCount: 2,
+        })).toBe('Ace Bot takes card 2, face down.');
     });
 });

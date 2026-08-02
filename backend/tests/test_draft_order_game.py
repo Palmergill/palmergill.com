@@ -214,19 +214,33 @@ def test_only_admin_can_create_bot_test_room_and_bots_finish_full_flow(monkeypat
         turns_by_round[round_number].append(current_username)
         if view["currentPlayer"]["isBot"]:
             assert view["canRunBot"] is True
-            response = host.post(
-                f"/api/fantasy/draft/sessions/{room_id}/bots/play-round"
-            )
-            assert response.status_code == 200
-            view = response.json()
-            assert view["event"]["type"] == "bot_round"
+            # One request per card lets the UI pace the bot; the round is over
+            # only when a step reports the bank or the bust.
+            steps = 0
+            while True:
+                response = host.post(
+                    f"/api/fantasy/draft/sessions/{room_id}/bots/step"
+                )
+                assert response.status_code == 200
+                view = response.json()
+                event = view["event"]
+                steps += 1
+                assert event["type"] == "bot_step"
+                assert event["round"] == round_number
+                if round_number == ROUNDS_PER_PLAYER:
+                    assert event["card"] is None
+                    assert event["score"] is None
+                elif event["action"] == "flip":
+                    assert event["card"]["rank"]
+                if event["turnComplete"]:
+                    break
+                assert event["outcome"] == "playing"
+                assert steps <= 5
             if round_number == ROUNDS_PER_PLAYER:
-                assert view["event"]["outcome"] == "sealed"
-                assert view["event"]["cards"] == []
-                assert view["event"]["score"] is None
-                assert view["event"]["cardCount"] >= 1
+                assert event["outcome"] == "sealed"
+                assert event["cardCount"] >= 1
             else:
-                assert view["event"]["outcome"] in {"banked", "busted"}
+                assert event["outcome"] in {"banked", "busted"}
             bot_rounds += 1
         else:
             assert view["canPlay"] is True
