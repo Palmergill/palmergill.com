@@ -36,24 +36,47 @@ describe('DraftOrderFormat', () => {
         expect(DraftOrderFormat.roomModeName('test')).toBe('Bot test');
     });
 
-    test('botStepMessage narrates each card, bank, and bust', () => {
-        expect(DraftOrderFormat.botStepMessage({
-            displayName: 'Blitz Bot', round: 2, outcome: 'playing', card: { rank: '9', symbol: '♦' },
+    test('turnEventMessage narrates a spectator view of each card, bank, and bust', () => {
+        expect(DraftOrderFormat.turnEventMessage({
+            type: 'flip', displayName: 'Blitz Bot', round: 2, card: { rank: '9', symbol: '♦' },
         })).toBe('Blitz Bot pulls 9♦.');
-        expect(DraftOrderFormat.botStepMessage({
-            displayName: 'Blitz Bot', round: 2, outcome: 'banked', score: 24,
-        })).toBe('Blitz Bot banked 24 in round 2.');
-        expect(DraftOrderFormat.botStepMessage({
-            displayName: 'Dime Bot', round: 1, outcome: 'busted', card: { rank: 'K', symbol: '♣' },
-        })).toBe('Dime Bot pulled K♣ and busted round 1.');
-        expect(DraftOrderFormat.botStepMessage({
-            displayName: 'Ace Bot', round: 3, outcome: 'sealed', cardCount: 4,
+        expect(DraftOrderFormat.turnEventMessage({
+            type: 'bank', displayName: 'Blitz Bot', round: 2, score: 24, turnComplete: true,
+        })).toBe('Blitz Bot banked 24 points.');
+        expect(DraftOrderFormat.turnEventMessage({
+            type: 'flip', displayName: 'Dime Bot', round: 1, busted: true, turnComplete: true,
+            card: { rank: 'K', symbol: '♣' },
+        })).toBe('K♣ repeats a rank. Dime Bot busted.');
+        expect(DraftOrderFormat.turnEventMessage({
+            type: 'forfeit', displayName: 'Road Warrior', turnComplete: true,
+        })).toBe('Road Warrior was skipped. Their remaining rounds score zero.');
+    });
+
+    test('turnEventMessage speaks to the player who acted', () => {
+        const dealt = { type: 'flip', displayName: 'Palmer', card: { rank: '9', symbol: '♦' } };
+        expect(DraftOrderFormat.turnEventMessage(dealt, { isSelf: true }))
+            .toBe('9♦ dealt. Bank it or press again.');
+        expect(DraftOrderFormat.turnEventMessage({
+            type: 'bank', displayName: 'Palmer', score: 1, turnComplete: true,
+        }, { isSelf: true })).toBe('1 point banked.');
+    });
+
+    test('turnEventMessage hides the card value in the sealed final round', () => {
+        expect(DraftOrderFormat.turnEventMessage({
+            type: 'flip', displayName: 'Ace Bot', round: 3, sealed: true, card: null, cardCount: 2,
+        })).toBe('Ace Bot takes card 2, face down.');
+        expect(DraftOrderFormat.turnEventMessage({
+            type: 'bank', displayName: 'Ace Bot', round: 3, sealed: true, cardCount: 4,
+            turnComplete: true,
         })).toBe('Ace Bot locked 4 cards for the final reveal.');
     });
 
-    test('botStepMessage hides the card value in the sealed final round', () => {
-        expect(DraftOrderFormat.botStepMessage({
-            displayName: 'Ace Bot', round: 3, outcome: 'playing', card: null, cardCount: 2,
-        })).toBe('Ace Bot takes card 2, face down.');
+    test('turnEventTone flags busts and banks for the message styling', () => {
+        expect(DraftOrderFormat.turnEventTone(null)).toBe('');
+        expect(DraftOrderFormat.turnEventTone({ type: 'flip' })).toBe('');
+        expect(DraftOrderFormat.turnEventTone({ type: 'flip', busted: true })).toBe('is-bust');
+        expect(DraftOrderFormat.turnEventTone({ type: 'bank' })).toBe('is-bank');
+        expect(DraftOrderFormat.turnEventTone({ type: 'forfeit' })).toBe('is-bust');
+        expect(DraftOrderFormat.turnEventTone({ type: 'flip', sealed: true })).toBe('');
     });
 });

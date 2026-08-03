@@ -33,6 +33,9 @@ def test_draft_room_modes_are_added_to_an_existing_database(monkeypatch):
     assert "mode" in session_columns
     assert "revealed_at" in session_columns
     assert "is_bot" in player_columns
+    assert "turn_state" in session_columns
+    assert "resolved_at" in session_columns
+    assert "last_event_json" in session_columns
 
     with legacy_engine.connect() as connection:
         assert connection.execute(text(
@@ -44,3 +47,8 @@ def test_draft_room_modes_are_added_to_an_existing_database(monkeypatch):
         assert connection.execute(text(
             "SELECT revealed_at FROM ff_draft_sessions WHERE id = 'room-1'"
         )).scalar_one() is not None
+        # Rooms mid-draft when this shipped are holding nothing, which is
+        # exactly how they behaved before the turn could be held at all.
+        assert connection.execute(text(
+            "SELECT turn_state FROM ff_draft_sessions WHERE id = 'room-1'"
+        )).scalar_one() == "playing"

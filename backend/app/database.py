@@ -375,6 +375,11 @@ class FantasyDraftSession(Base):
     state = Column(String, default="lobby", index=True, nullable=False)
     created_by = Column(String, index=True, nullable=False)
     current_player_id = Column(String, nullable=True, index=True)
+    # A turn that has just ended is held on the table long enough for every
+    # spectator's poll to see the card that ended it, then released.
+    turn_state = Column(String, default="playing", server_default="playing", nullable=False)
+    resolved_at = Column(DateTime, nullable=True)
+    last_event_json = Column(Text, nullable=True)
     created_at = Column(DateTime, default=utc_now, nullable=False)
     started_at = Column(DateTime, nullable=True)
     completed_at = Column(DateTime, nullable=True)

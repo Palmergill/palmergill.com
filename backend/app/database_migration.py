@@ -114,7 +114,30 @@ def migrate_database():
                     "SET revealed_at = completed_at "
                     "WHERE state = 'complete'"
                 ))
-        
+
+        # Turns used to advance inside the same transaction that ended them, so
+        # a spectator's poll never saw the card that busted or banked a round.
+        # 'playing' is the correct default for every in-flight room: nothing is
+        # being held, which is exactly how they behaved before.
+        _add_column_if_missing(
+            inspector,
+            "ff_draft_sessions",
+            "turn_state",
+            "VARCHAR NOT NULL DEFAULT 'playing'",
+        )
+        _add_column_if_missing(
+            inspector,
+            "ff_draft_sessions",
+            "resolved_at",
+            "TIMESTAMP" if is_postgres else "DATETIME",
+        )
+        _add_column_if_missing(
+            inspector,
+            "ff_draft_sessions",
+            "last_event_json",
+            "TEXT",
+        )
+
         logger.info("Database migration complete")
         
     except Exception as e:

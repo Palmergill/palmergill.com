@@ -17,7 +17,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&amp;family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/shared/site-nav.css?v=13">
-    <link rel="stylesheet" href="style.css?v=4">
+    <link rel="stylesheet" href="style.css?v=6">
 </head>
 <body>
     <main class="draft-shell">
@@ -184,7 +184,7 @@
                         <span id="roundBadge" class="round-badge">Round 1 of 3</span>
                     </div>
 
-                    <div id="cardsHeld" class="cards-held" aria-label="Cards held" aria-live="polite"></div>
+                    <div id="cardsHeld" class="cards-held" role="group" aria-label="Cards held" aria-live="polite"></div>
 
                     <div class="decision-strip">
                         <div class="pot-block">
@@ -196,7 +196,7 @@
                             <strong id="bustChance">Safe</strong>
                         </div>
                         <div class="decision-stat">
-                            <span>If banked</span>
+                            <span>If banked now</span>
                             <strong id="bankPosition">—</strong>
                         </div>
                         <div class="decision-stat">
@@ -217,6 +217,7 @@
                         </button>
                     </div>
                     <button id="forfeitButton" class="text-button text-button--warn" type="button" hidden></button>
+                    <button id="resumeBotsButton" class="text-button text-button--resume" type="button" hidden>Resume bots</button>
                 </article>
 
                 <aside class="leaderboard-card">
@@ -291,7 +292,7 @@
     <script src="/shared/site-nav.js?v=13"></script>
     <script src="/shared/analytics.js?v=1"></script>
     <script src="/shared/api-base.js?v=1"></script>
-    <script src="format.js?v=3"></script>
-    <script src="app.js?v=6"></script>
+    <script src="format.js?v=4"></script>
+    <script src="app.js?v=10"></script>
 </body>
 </html>

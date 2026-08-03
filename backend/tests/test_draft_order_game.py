@@ -25,6 +25,11 @@ ADMIN_PASSWORD = "secret"
 
 def setup_function():
     Base.metadata.create_all(bind=engine)
+    # A finished hand is normally held face up for a beat so every spectator's
+    # poll catches the card that ended the round. Flow tests drive dozens of
+    # turns, so they release instantly; the hold itself is covered on its own
+    # in test_finished_hand_is_held_on_the_table_before_the_turn_moves.
+    draft_order_game.TURN_HOLD_SECONDS = 0
     db = SessionLocal()
     try:
         db.query(FantasyDraftFlip).delete()
@@ -34,6 +39,13 @@ def setup_function():
         db.commit()
     finally:
         db.close()
+
+
+def settled(client, room_id):
+    """Read the room back so a turn-ending action's held hand has cleared."""
+    response = client.get(f"/api/fantasy/draft/sessions/{room_id}")
+    assert response.status_code == 200, response.text
+    return response.json()
 
 
 def member_client(monkeypatch, username):
@@ -137,12 +149,9 @@ def test_practice_is_private_replayable_and_does_not_fill_recent_rooms(monkeypat
     assert player.post("/api/fantasy/draft/practice").json()["id"] == first_id
 
     while view["state"] == "active":
-        view = player.post(
-            f"/api/fantasy/draft/sessions/{first_id}/flip"
-        ).json()
-        view = player.post(
-            f"/api/fantasy/draft/sessions/{first_id}/bank"
-        ).json()
+        player.post(f"/api/fantasy/draft/sessions/{first_id}/flip")
+        player.post(f"/api/fantasy/draft/sessions/{first_id}/bank")
+        view = settled(player, first_id)
 
     assert view["state"] == "complete"
     assert len(view["draftOrder"]) == 1
@@ -223,33 +232,30 @@ def test_only_admin_can_create_bot_test_room_and_bots_finish_full_flow(monkeypat
                 )
                 assert response.status_code == 200
                 view = response.json()
-                event = view["event"]
+                event = view["lastEvent"]
                 steps += 1
-                assert event["type"] == "bot_step"
+                assert event["type"] in {"flip", "bank"}
                 assert event["round"] == round_number
+                assert event["isBot"] is True
                 if round_number == ROUNDS_PER_PLAYER:
+                    # The host is a spectator to every bot, so the final round
+                    # stays sealed to them even though they drive the requests.
+                    assert event["sealed"] is True
                     assert event["card"] is None
                     assert event["score"] is None
-                elif event["action"] == "flip":
+                elif event["type"] == "flip":
                     assert event["card"]["rank"]
                 if event["turnComplete"]:
                     break
-                assert event["outcome"] == "playing"
                 assert steps <= 5
-            if round_number == ROUNDS_PER_PLAYER:
-                assert event["outcome"] == "sealed"
-                assert event["cardCount"] >= 1
-            else:
-                assert event["outcome"] in {"banked", "busted"}
+            assert event["cardCount"] >= 1
+            view = settled(host, room_id)
             bot_rounds += 1
         else:
             assert view["canPlay"] is True
-            view = host.post(
-                f"/api/fantasy/draft/sessions/{room_id}/flip"
-            ).json()
-            view = host.post(
-                f"/api/fantasy/draft/sessions/{room_id}/bank"
-            ).json()
+            host.post(f"/api/fantasy/draft/sessions/{room_id}/flip")
+            host.post(f"/api/fantasy/draft/sessions/{room_id}/bank")
+            view = settled(host, room_id)
 
     assert bot_rounds == 4 * draft_order_game.ROUNDS_PER_PLAYER
     assert turns_by_round == expected_orders
@@ -355,12 +361,12 @@ def test_turn_is_server_authoritative_and_deck_continues_between_rounds(monkeypa
     current_client = clients[current_name]
     first = current_client.post(f"/api/fantasy/draft/sessions/{room['id']}/flip")
     assert first.status_code == 200
-    assert first.json()["event"]["card"]["deckIndex"] == 0
+    assert first.json()["lastEvent"]["card"]["deckIndex"] == 0
     after_first = current_client.post(
         f"/api/fantasy/draft/sessions/{room['id']}/bank"
     )
     assert after_first.status_code == 200
-    after_first_view = after_first.json()
+    after_first_view = settled(current_client, room["id"])
     next_name = next(
         player["username"]
         for player in after_first_view["players"]
@@ -373,9 +379,8 @@ def test_turn_is_server_authoritative_and_deck_continues_between_rounds(monkeypa
     assert next_client.post(
         f"/api/fantasy/draft/sessions/{room['id']}/flip"
     ).status_code == 200
-    round_two_view = next_client.post(
-        f"/api/fantasy/draft/sessions/{room['id']}/bank"
-    ).json()
+    next_client.post(f"/api/fantasy/draft/sessions/{room['id']}/bank")
+    round_two_view = settled(next_client, room["id"])
     assert round_two_view["currentRound"]["number"] == 2
 
     # The round-two leader goes first, and their personal deck resumes at the
@@ -389,7 +394,7 @@ def test_turn_is_server_authoritative_and_deck_continues_between_rounds(monkeypa
 
     second = clients[leader_name].post(f"/api/fantasy/draft/sessions/{room['id']}/flip")
     assert second.status_code == 200
-    assert second.json()["event"]["card"]["deckIndex"] == 1
+    assert second.json()["lastEvent"]["card"]["deckIndex"] == 1
     assert second.json()["currentRound"]["number"] == 2
 
 
@@ -411,15 +416,17 @@ def test_spectators_see_live_cards_until_the_final_round_is_sealed(monkeypatch):
     assert spectator_view["currentRound"]["concealed"] is False
     assert spectator_view["currentRound"]["cards"] == first_flip["currentRound"]["cards"]
     assert spectator_view["currentRound"]["pot"] == first_flip["currentRound"]["pot"]
-    view = first_client.post(f"/api/fantasy/draft/sessions/{rid}/bank").json()
+    first_client.post(f"/api/fantasy/draft/sessions/{rid}/bank")
+    view = settled(first_client, rid)
 
     while view["state"] == "active" and view["currentRound"]["number"] < ROUNDS_PER_PLAYER:
         current_name = next(
             player["username"] for player in view["players"] if player["isCurrent"]
         )
         current_client = clients[current_name]
-        view = current_client.post(f"/api/fantasy/draft/sessions/{rid}/flip").json()
-        view = current_client.post(f"/api/fantasy/draft/sessions/{rid}/bank").json()
+        current_client.post(f"/api/fantasy/draft/sessions/{rid}/flip")
+        current_client.post(f"/api/fantasy/draft/sessions/{rid}/bank")
+        view = settled(current_client, rid)
 
     assert view["currentRound"]["number"] == ROUNDS_PER_PLAYER
     final_name = next(player["username"] for player in view["players"] if player["isCurrent"])
@@ -476,7 +483,7 @@ def test_duplicate_rank_busts_and_scores_zero(monkeypatch):
         response = current_client.post(f"/api/fantasy/draft/sessions/{room['id']}/flip")
         assert response.status_code == 200
         view = response.json()
-        if view["event"]["busted"]:
+        if view["lastEvent"]["busted"]:
             break
     else:
         raise AssertionError("A duplicate rank must appear within 14 cards")
@@ -503,12 +510,9 @@ def test_full_game_reveals_seed_and_reproducible_decks(monkeypatch):
             player["username"] for player in view["players"] if player["isCurrent"]
         )
         current_client = clients[current_name]
-        view = current_client.post(
-            f"/api/fantasy/draft/sessions/{room['id']}/flip"
-        ).json()
-        view = current_client.post(
-            f"/api/fantasy/draft/sessions/{room['id']}/bank"
-        ).json()
+        current_client.post(f"/api/fantasy/draft/sessions/{room['id']}/flip")
+        current_client.post(f"/api/fantasy/draft/sessions/{room['id']}/bank")
+        view = settled(current_client, room["id"])
 
     assert view["state"] == "complete"
     assert view["resultsRevealed"] is False
@@ -592,15 +596,12 @@ def test_host_can_skip_a_manager_who_stops_playing(monkeypatch):
             assert view["canForfeit"] is True
             skipped = host.post(f"/api/fantasy/draft/sessions/{rid}/forfeit")
             assert skipped.status_code == 200
-            view = skipped.json()
-            assert view["event"]["type"] == "forfeit"
+            assert skipped.json()["lastEvent"]["type"] == "forfeit"
+            view = settled(host, rid)
             continue
-        view = clients[current_name].post(
-            f"/api/fantasy/draft/sessions/{rid}/flip"
-        ).json()
-        view = clients[current_name].post(
-            f"/api/fantasy/draft/sessions/{rid}/bank"
-        ).json()
+        clients[current_name].post(f"/api/fantasy/draft/sessions/{rid}/flip")
+        clients[current_name].post(f"/api/fantasy/draft/sessions/{rid}/bank")
+        view = settled(clients[current_name], rid)
 
     assert view["state"] == "complete"
     view = host.post(f"/api/fantasy/draft/sessions/{rid}/reveal").json()
@@ -634,6 +635,166 @@ def test_forfeit_zeroes_a_round_that_already_holds_cards(monkeypatch):
     assert walked["rounds"][0]["score"] == 0
     assert walked["rounds"][0]["state"] == "forfeited"
     assert walked["score"] == 0
+
+
+def test_finished_hand_is_held_on_the_table_before_the_turn_moves(monkeypatch):
+    """The card that ended a round used to be gone before anyone could poll.
+
+    Banking advanced the turn inside the same transaction, so a spectator's
+    next read already showed the next manager sitting behind an empty table.
+    """
+    draft_order_game.TURN_HOLD_SECONDS = 30
+    host = member_client(monkeypatch, "host-player")
+    guest = member_client(monkeypatch, "road-warrior")
+    room = create_room(host)
+    join_room(guest, room["joinCode"])
+    rid = room["id"]
+    view = host.post(f"/api/fantasy/draft/sessions/{rid}/start").json()
+    clients = clients_by_player(view, host, guest)
+    current_name = next(p["username"] for p in view["players"] if p["isCurrent"])
+    current_client = clients[current_name]
+    spectator = guest if current_client is host else host
+
+    current_client.post(f"/api/fantasy/draft/sessions/{rid}/flip")
+    banked = current_client.post(f"/api/fantasy/draft/sessions/{rid}/bank").json()
+
+    assert banked["holdingTurn"] is True
+    assert banked["currentPlayer"]["displayName"] == current_name
+    assert len(banked["currentRound"]["cards"]) == 1
+    assert banked["canPlay"] is False
+    assert banked["decision"] is None
+
+    # A spectator polling mid-hold sees the same hand, and is told what it was.
+    watched = spectator.get(f"/api/fantasy/draft/sessions/{rid}").json()
+    assert watched["holdingTurn"] is True
+    assert watched["currentPlayer"]["id"] == banked["currentPlayer"]["id"]
+    assert watched["currentRound"]["cards"] == banked["currentRound"]["cards"]
+    assert watched["lastEvent"]["type"] == "bank"
+    assert watched["lastEvent"]["turnComplete"] is True
+    assert watched["lastEvent"]["displayName"] == current_name
+    assert watched["lastEvent"]["score"] == banked["currentRound"]["pot"]
+
+    # Nobody is on the clock while the hand is still up.
+    assert current_client.post(
+        f"/api/fantasy/draft/sessions/{rid}/flip"
+    ).status_code == 409
+
+    draft_order_game.TURN_HOLD_SECONDS = 0
+    released = spectator.get(f"/api/fantasy/draft/sessions/{rid}").json()
+    assert released["holdingTurn"] is False
+    assert released["currentPlayer"]["id"] != banked["currentPlayer"]["id"]
+    assert released["currentRound"]["cards"] == []
+
+
+def test_a_busting_card_stays_face_up_for_the_table(monkeypatch):
+    draft_order_game.TURN_HOLD_SECONDS = 30
+    host = member_client(monkeypatch, "host-player")
+    guest = member_client(monkeypatch, "road-warrior")
+    room = create_room(host)
+    join_room(guest, room["joinCode"])
+    rid = room["id"]
+    view = host.post(f"/api/fantasy/draft/sessions/{rid}/start").json()
+    clients = clients_by_player(view, host, guest)
+    current_name = next(p["username"] for p in view["players"] if p["isCurrent"])
+    current_client = clients[current_name]
+    spectator = guest if current_client is host else host
+
+    for _ in range(14):
+        view = current_client.post(f"/api/fantasy/draft/sessions/{rid}/flip").json()
+        if view["lastEvent"]["busted"]:
+            break
+    else:
+        raise AssertionError("A duplicate rank must appear within 14 cards")
+
+    watched = spectator.get(f"/api/fantasy/draft/sessions/{rid}").json()
+    assert watched["holdingTurn"] is True
+    assert watched["lastEvent"]["busted"] is True
+    assert watched["lastEvent"]["card"] == view["lastEvent"]["card"]
+    # The whole busted hand is still on the table, including the card that
+    # ended it, and the pot has already dropped to zero.
+    assert watched["currentRound"]["cards"] == view["currentRound"]["cards"]
+    assert watched["currentRound"]["cards"][-1]["code"] == view["lastEvent"]["card"]["code"]
+    assert watched["currentRound"]["pot"] == 0
+
+
+def test_bank_position_agrees_with_the_standings_on_a_tie(monkeypatch):
+    """The decision strip used to rank on turn position while the standings
+    ranked on best round, so a manager could be told they'd sit first and be
+    shown second in the same screenful."""
+    host = member_client(monkeypatch, "host-player")
+    guest = member_client(monkeypatch, "road-warrior")
+    room = create_room(host)
+    join_room(guest, room["joinCode"])
+    rid = room["id"]
+    host.post(f"/api/fantasy/draft/sessions/{rid}/start")
+
+    db = SessionLocal()
+    try:
+        players = {
+            player.username: player
+            for player in db.query(FantasyDraftPlayer).filter(
+                FantasyDraftPlayer.session_id == rid
+            ).all()
+        }
+        # Equal totals, different best rounds. The host is second on the one
+        # ranking rule but first in turn order, so the two disagree unless the
+        # projection uses the same key as the standings.
+        rounds = {"host-player": [20, 20], "road-warrior": [30, 10]}
+        for username, scores in rounds.items():
+            for number, score in enumerate(scores, start=1):
+                db.add(FantasyDraftRound(
+                    id=f"{players[username].id}-{number}",
+                    session_id=rid,
+                    player_id=players[username].id,
+                    round_number=number,
+                    cards_json="[]",
+                    score=score,
+                    busted=False,
+                    state="banked",
+                ))
+            players[username].final_score = sum(scores)
+        players["host-player"].turn_position = 1
+        players["road-warrior"].turn_position = 2
+        room_row = db.query(FantasyDraftSession).filter(
+            FantasyDraftSession.id == rid
+        ).first()
+        room_row.current_player_id = players["host-player"].id
+        db.commit()
+    finally:
+        db.close()
+
+    view = host.get(f"/api/fantasy/draft/sessions/{rid}").json()
+    places = {player["username"]: player["place"] for player in view["leaderboard"]}
+
+    assert places["road-warrior"] == 1
+    assert places["host-player"] == 2
+    assert view["decision"]["projectedScore"] == 40
+    assert view["decision"]["scoreToBeat"] == 40
+    assert view["decision"]["isLeadingIfBanked"] is False
+    assert view["decision"]["bankPosition"] == places["host-player"]
+
+
+def test_room_list_summarises_without_building_every_view(monkeypatch):
+    host = member_client(monkeypatch, "host-player")
+    guest = member_client(monkeypatch, "road-warrior")
+    room = create_room(host)
+    join_room(guest, room["joinCode"])
+    host.post(f"/api/fantasy/draft/sessions/{room['id']}/start")
+
+    listed = host.get("/api/fantasy/draft/sessions/mine").json()["sessions"]
+
+    assert len(listed) == 1
+    card = listed[0]
+    assert card["id"] == room["id"]
+    assert card["leagueName"] == "Sunday Legends"
+    assert card["state"] == "active"
+    assert card["playerCount"] == 2
+    assert card["isHost"] is True
+    assert card["currentPlayerName"] in {"host-player", "road-warrior"}
+    # The launcher never needed the seed-derived heavy fields, and building
+    # them for a dozen rooms cost hundreds of queries per page load.
+    assert "leaderboard" not in card
+    assert "players" not in card
 
 
 def test_standings_and_draft_order_break_ties_the_same_way(monkeypatch):

@@ -51,23 +51,58 @@
         return "Draft order game";
     }
 
-    function botStepMessage(event) {
-        if (!event) return "Bot turn complete.";
-        if (event.outcome === "sealed") {
-            return `${event.displayName} locked ${event.cardCount} card${event.cardCount === 1 ? "" : "s"} for the final reveal.`;
-        }
-        if (event.outcome === "busted") {
-            return `${event.displayName} pulled ${cardLabel(event.card)} and busted round ${event.round}.`;
-        }
-        if (event.outcome === "banked") {
-            return `${event.displayName} banked ${event.score} in round ${event.round}.`;
-        }
-        // A sealed final round hides the card itself, so count what they hold.
-        if (!event.card) {
-            return `${event.displayName} takes card ${event.cardCount}, face down.`;
-        }
-        return `${event.displayName} pulls ${cardLabel(event.card)}.`;
+    function plural(count, word) {
+        return `${count} ${word}${count === 1 ? "" : "s"}`;
     }
 
-    return { ordinal, cardLabel, compactHash, bustCopy, roomUrl, roomModeName, botStepMessage };
+    // The room now publishes what just happened to everyone, not only to the
+    // player who did it, so one narrator covers the actor, the spectators, and
+    // the bots. Only the point of view changes.
+    function turnEventMessage(event, options) {
+        if (!event) return "";
+        const isSelf = Boolean(options && options.isSelf);
+        const who = event.displayName || "The current player";
+        if (event.type === "forfeit") {
+            return `${who} was skipped. Their remaining rounds score zero.`;
+        }
+        // A sealed final round hides the card itself, so count what they hold.
+        if (event.sealed) {
+            return event.turnComplete
+                ? `${who} locked ${plural(event.cardCount, "card")} for the final reveal.`
+                : `${who} takes card ${event.cardCount}, face down.`;
+        }
+        if (event.type === "bank") {
+            return isSelf
+                ? `${plural(event.score, "point")} banked.`
+                : `${who} banked ${plural(event.score, "point")}.`;
+        }
+        if (event.busted) {
+            return isSelf
+                ? `${cardLabel(event.card)} repeats a rank. Round busted.`
+                : `${cardLabel(event.card)} repeats a rank. ${who} busted.`;
+        }
+        return isSelf
+            ? `${cardLabel(event.card)} dealt. Bank it or press again.`
+            : `${who} pulls ${cardLabel(event.card)}.`;
+    }
+
+    function turnEventTone(event) {
+        if (!event) return "";
+        if (event.type === "forfeit") return "is-bust";
+        if (event.sealed) return event.turnComplete ? "is-bank" : "";
+        if (event.busted) return "is-bust";
+        if (event.type === "bank") return "is-bank";
+        return "";
+    }
+
+    return {
+        ordinal,
+        cardLabel,
+        compactHash,
+        bustCopy,
+        roomUrl,
+        roomModeName,
+        turnEventMessage,
+        turnEventTone,
+    };
 });

@@ -136,6 +136,28 @@ body::before {
 
 .hero-mark span:last-child { font-size: 3.4rem; }
 
+/* Inside a room the hero is decoration the manager has already read, and at
+   full size it costs the entire first screen: the play stage, the pot, and the
+   Flip and Bank buttons all started below the fold on a laptop. */
+body.in-room .draft-hero {
+    align-items: center;
+    margin-bottom: 18px;
+}
+
+body.in-room .draft-hero .eyebrow,
+body.in-room .draft-hero .hero-copy,
+body.in-room .hero-mark { display: none; }
+
+body.in-room .draft-hero h1 {
+    margin-top: 6px;
+    font-size: clamp(1.35rem, 3vw, 1.7rem);
+    letter-spacing: -0.03em;
+}
+
+/* Programmatic scrolls have to clear the sticky site nav. */
+.play-stage,
+.room-header { scroll-margin-top: 76px; }
+
 /* Sticky, not static: the banner sits above a tall hero, and a manager acting
    on the setup cards or the play stage would never scroll back up to find it. */
 .notice {
@@ -439,8 +461,8 @@ input::placeholder { color: #aaa296; }
 
 .room-list button:hover { border-color: #98a596; }
 .room-list strong { font-size: 0.96rem; }
-.room-list span { margin-top: 5px; color: var(--draft-muted); font-size: 0.78rem; }
-.room-list small { margin-top: auto; color: #687768; font-size: 0.69rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; }
+.room-list span { margin-top: 5px; color: var(--draft-muted); font-size: 0.82rem; }
+.room-list small { margin-top: auto; color: #5c6a5d; font-size: 0.75rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; }
 
 .room-header {
     align-items: flex-start;
@@ -469,7 +491,7 @@ input::placeholder { color: #aaa296; }
     display: block;
     margin-bottom: 5px;
     color: var(--draft-muted);
-    font-size: 0.62rem;
+    font-size: 0.72rem;
     font-weight: 800;
     letter-spacing: 0.08em;
     text-transform: uppercase;
@@ -560,7 +582,7 @@ code { font-family: "DM Mono", ui-monospace, monospace; }
 .room-code-card--test > p:last-child { max-width: 52ch; }
 
 .roster-card { display: flex; min-height: 360px; flex-direction: column; }
-.live-dot, .poll-note { color: #627063; font-size: 0.68rem; font-weight: 800; text-transform: uppercase; }
+.live-dot, .poll-note { color: #566254; font-size: 0.75rem; font-weight: 800; text-transform: uppercase; }
 .live-dot::before { display: inline-block; width: 7px; height: 7px; margin-right: 5px; border-radius: 50%; background: #5e9a65; content: ""; }
 
 .roster-list,
@@ -592,12 +614,12 @@ code { font-family: "DM Mono", ui-monospace, monospace; }
 
 .roster-name { min-width: 0; flex: 1; overflow: hidden; font-size: 0.9rem; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
 .host-chip,
-.bot-chip { font-size: 0.64rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; }
-.host-chip { color: #8a692c; }
-.bot-chip { border-radius: 999px; background: #eef1eb; padding: 4px 7px; color: #607064; }
-.remove-player { border: 0; background: transparent; color: #9d756e; cursor: pointer; font-size: 0.72rem; }
+.bot-chip { font-size: 0.72rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; }
+.host-chip { color: #7a5c24; }
+.bot-chip { border-radius: 999px; background: #eef1eb; padding: 4px 7px; color: #556354; }
+.remove-player { border: 0; background: transparent; color: #8a4c43; cursor: pointer; font-size: 0.78rem; }
 .roster-card .button { margin-top: auto; }
-.fine-print { margin: 10px 0 0; color: var(--draft-muted); font-size: 0.73rem; text-align: center; }
+.fine-print { margin: 10px 0 0; color: var(--draft-muted); font-size: 0.8rem; text-align: center; }
 
 .play-stage {
     position: relative;
@@ -623,7 +645,7 @@ code { font-family: "DM Mono", ui-monospace, monospace; }
 }
 
 .turn-banner { position: relative; z-index: 1; }
-.turn-banner .section-kicker { margin-top: 0; color: #9fb3a3; }
+.turn-banner .section-kicker { margin-top: 0; color: #adc0b1; }
 .turn-banner h3 { font-size: clamp(1.45rem, 4vw, 2.2rem); }
 
 .round-badge {
@@ -689,9 +711,9 @@ code { font-family: "DM Mono", ui-monospace, monospace; }
     place-items: center;
     border: 1px dashed rgba(255, 255, 255, 0.22);
     border-radius: 11px;
-    color: #8ba08f;
+    color: #9db2a1;
     font-family: "DM Mono", monospace;
-    font-size: 0.65rem;
+    font-size: 0.72rem;
     letter-spacing: 0.08em;
     text-align: center;
     text-transform: uppercase;
@@ -717,10 +739,10 @@ code { font-family: "DM Mono", ui-monospace, monospace; }
 .decision-stat { padding: 14px; }
 .decision-stat { border-left: 1px solid rgba(255, 255, 255, 0.1); }
 .pot-block > span,
-.decision-stat > span { display: block; color: #91a596; font-size: 0.63rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; }
+.decision-stat > span { display: block; color: #a7bbac; font-size: 0.72rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; }
 .pot-block strong { display: block; margin-top: 2px; color: var(--draft-gold-bright); font-family: "DM Mono", monospace; font-size: 1.8rem; font-weight: 500; }
-.pot-block small { font-size: 0.62rem; }
-.decision-stat strong { display: block; margin-top: 8px; font-size: 0.84rem; }
+.pot-block small { font-size: 0.72rem; }
+.decision-stat strong { display: block; margin-top: 8px; font-size: 0.9rem; }
 .decision-stat--risk strong { color: #ffd18a; }
 
 .turn-message {
@@ -728,8 +750,8 @@ code { font-family: "DM Mono", ui-monospace, monospace; }
     z-index: 1;
     min-height: 22px;
     margin: 16px 0 10px;
-    color: #b8c6bb;
-    font-size: 0.8rem;
+    color: #c3d0c6;
+    font-size: 0.86rem;
     text-align: center;
 }
 
@@ -739,7 +761,7 @@ code { font-family: "DM Mono", ui-monospace, monospace; }
 .play-actions { position: relative; z-index: 1; display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 10px; }
 .play-actions .button { min-height: 66px; flex-direction: column; }
 .play-actions .button span { font-size: 1rem; letter-spacing: 0.06em; text-transform: uppercase; }
-.play-actions .button small { margin-top: 2px; font-size: 0.65rem; font-weight: 600; opacity: 0.68; }
+.play-actions .button small { margin-top: 2px; font-size: 0.72rem; font-weight: 600; opacity: 0.78; }
 .button--flip { background: var(--draft-gold); color: #261d0d; }
 .button--bank { border-color: rgba(255, 255, 255, 0.25); background: transparent; color: #fff; }
 
@@ -757,6 +779,21 @@ code { font-family: "DM Mono", ui-monospace, monospace; }
 }
 .text-button--warn:hover { color: #ffcdc6; }
 .text-button--warn[disabled] { opacity: 0.5; }
+
+/* Shown only after a bot step failed. Without it a paused test room had no way
+   back other than reloading the page. */
+.text-button--resume {
+    display: block;
+    width: 100%;
+    margin-top: 14px;
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    border-radius: 10px;
+    padding: 10px;
+    color: var(--draft-gold-bright);
+    text-align: center;
+}
+.text-button--resume:hover { background: rgba(255, 255, 255, 0.06); color: #fff; }
+.text-button--resume[disabled] { opacity: 0.5; }
 
 .button.is-busy { position: relative; }
 .button.is-busy > :not(.button-busy-label) { visibility: hidden; }
@@ -787,10 +824,10 @@ code { font-family: "DM Mono", ui-monospace, monospace; }
 }
 
 .leaderboard li.is-current { margin: 0 -10px; border-bottom-color: transparent; border-radius: 10px; background: #eef2ea; padding-right: 10px; padding-left: 10px; }
-.leaderboard-place { color: #9b9387; font-family: "DM Mono", monospace; font-size: 0.75rem; }
+.leaderboard-place { color: #6f6759; font-family: "DM Mono", monospace; font-size: 0.75rem; }
 .leaderboard-player { min-width: 0; }
 .leaderboard-player strong { display: block; overflow: hidden; font-size: 0.88rem; text-overflow: ellipsis; white-space: nowrap; }
-.leaderboard-player span { display: block; margin-top: 3px; color: var(--draft-muted); font-size: 0.65rem; }
+.leaderboard-player span { display: block; margin-top: 3px; color: var(--draft-muted); font-size: 0.75rem; }
 .leaderboard-score { color: var(--draft-forest); font-family: "DM Mono", monospace; font-size: 1rem; font-weight: 500; }
 
 .result-panel {
@@ -823,9 +860,9 @@ code { font-family: "DM Mono", ui-monospace, monospace; }
 }
 
 .draft-order li:first-child { border-color: rgba(231, 185, 95, 0.55); background: rgba(231, 185, 95, 0.11); }
-.pick-number { display: grid; width: 47px; height: 47px; place-items: center; border-radius: 9px; background: rgba(255, 255, 255, 0.08); color: var(--draft-gold-bright); font-family: "DM Mono", monospace; font-size: 0.78rem; }
+.pick-number { display: grid; width: 47px; height: 47px; place-items: center; border-radius: 9px; background: rgba(255, 255, 255, 0.08); color: var(--draft-gold-bright); font-family: "DM Mono", monospace; font-size: 0.85rem; }
 .draft-order strong { font-size: 1rem; }
-.draft-order small { display: block; margin-top: 3px; color: #9dafA2; font-size: 0.65rem; }
+.draft-order small { display: block; margin-top: 3px; color: #a8b9ac; font-size: 0.75rem; }
 .draft-score { color: #dbe4dc; font-family: "DM Mono", monospace; font-size: 0.88rem; }
 
 @keyframes result-in {
@@ -845,7 +882,7 @@ code { font-family: "DM Mono", ui-monospace, monospace; }
 
 .proof-values { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .proof-values > div { min-width: 0; border: 1px solid var(--draft-line); border-radius: 12px; background: var(--draft-paper); padding: 15px; }
-.proof-values span { display: block; margin-bottom: 7px; color: var(--draft-muted); font-size: 0.64rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; }
+.proof-values span { display: block; margin-bottom: 7px; color: var(--draft-muted); font-size: 0.72rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; }
 .proof-values code { display: block; overflow-wrap: anywhere; font-size: 0.73rem; line-height: 1.55; }
 
 .algorithm-card,
@@ -862,15 +899,47 @@ summary { padding: 17px 18px; cursor: pointer; font-size: 0.86rem; font-weight: 
 
 .verification-player > summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; list-style: none; }
 .verification-player > summary::-webkit-details-marker { display: none; }
-.verification-player > summary span { color: var(--draft-muted); font-family: "DM Mono", monospace; font-size: 0.7rem; font-weight: 500; }
+.verification-player > summary span { color: var(--draft-muted); font-family: "DM Mono", monospace; font-size: 0.76rem; font-weight: 500; }
 .verification-body { border-top: 1px solid #ebe3d7; padding: 18px; }
 .verification-meta { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
-.verification-meta span { border-radius: 999px; background: #eef1eb; padding: 6px 9px; color: #59685c; font-size: 0.66rem; font-weight: 700; }
-.deck-grid { display: grid; grid-template-columns: repeat(13, 1fr); gap: 5px; }
-.mini-card { display: grid; min-width: 0; aspect-ratio: 0.72; place-items: center; border: 1px solid #ddd5c8; border-radius: 5px; background: #fff; color: var(--draft-ink); font-family: Georgia, serif; font-size: clamp(0.48rem, 1.2vw, 0.7rem); }
+
+/* A round the host wrote off is the only part of this game a person can
+   influence, so the proof states it rather than showing a bare zero. */
+.verification-rounds { list-style: none; margin: 0 0 16px; padding: 0; display: grid; gap: 6px; }
+.round-line {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    gap: 3px 16px;
+    border-left: 3px solid #c8d2c6;
+    border-radius: 0 7px 7px 0;
+    background: #f6f4ec;
+    padding: 9px 13px;
+    font-size: 0.78rem;
+}
+.round-line--busted { border-left-color: #c98b83; }
+.round-line--forfeited { border-left-color: #b9883a; background: #fbf3e3; }
+.round-line strong { grid-column: 1; grid-row: 1; }
+.round-cards { grid-column: 1; grid-row: 2; color: var(--draft-muted); font-family: Georgia, serif; }
+.round-outcome { grid-column: 2; grid-row: 1 / 3; align-self: center; color: #4e5c51; }
+.round-line--busted .round-outcome { color: #8b352e; }
+.round-line--forfeited .round-outcome { color: #7a5410; font-weight: 700; }
+.round-points {
+    grid-column: 3;
+    grid-row: 1 / 3;
+    align-self: center;
+    color: var(--draft-ink);
+    font-family: "DM Mono", monospace;
+    font-weight: 500;
+}
+.verification-meta span { border-radius: 999px; background: #eef1eb; padding: 6px 9px; color: #4e5c51; font-size: 0.74rem; font-weight: 700; }
+/* Capped: the grid used to stretch to the full card width, so on a desktop
+   each cell rendered at roughly 88x123px around type clamped to 11px — a
+   playing-card-sized box with a speck in the middle. */
+.deck-grid { display: grid; grid-template-columns: repeat(13, minmax(0, 46px)); gap: 5px; }
+.mini-card { display: grid; min-width: 0; aspect-ratio: 0.72; place-items: center; border: 1px solid #ddd5c8; border-radius: 5px; background: #fff; color: var(--draft-ink); font-family: Georgia, serif; font-size: 0.8rem; }
 .mini-card.is-red { color: var(--draft-red); }
 .mini-card.is-drawn { border-color: #79907b; background: #e7eee5; box-shadow: inset 0 0 0 1px #79907b; font-weight: 700; }
-.deck-legend { margin: 9px 0 0; color: var(--draft-muted); font-size: 0.67rem; }
+.deck-legend { margin: 9px 0 0; color: var(--draft-muted); font-size: 0.75rem; }
 
 .rules-strip {
     display: grid;
@@ -884,11 +953,11 @@ summary { padding: 17px 18px; cursor: pointer; font-size: 0.86rem; font-weight: 
 
 .rules-strip > div { display: grid; grid-template-columns: 32px 1fr; column-gap: 8px; align-content: start; border-right: 1px solid var(--draft-line); padding: 0 18px; }
 .rules-strip > div:first-child { padding-left: 0; }
-.rule-no { grid-row: 1 / 3; color: #a8792a; font-family: "DM Mono", monospace; font-size: 0.67rem; }
+.rule-no { grid-row: 1 / 3; color: #8f6620; font-family: "DM Mono", monospace; font-size: 0.75rem; }
 .rules-strip strong { font-size: 0.8rem; }
-.rules-strip p { margin: 3px 0 0; color: var(--draft-muted); font-size: 0.7rem; line-height: 1.45; }
+.rules-strip p { margin: 3px 0 0; color: var(--draft-muted); font-size: 0.78rem; line-height: 1.45; }
 .fairness-note { padding-left: 22px; }
-.fairness-note span { display: block; margin-bottom: 4px; color: #68766a; font-family: "DM Mono", monospace; font-size: 0.62rem; font-weight: 500; }
+.fairness-note span { display: block; margin-bottom: 4px; color: #5b685d; font-family: "DM Mono", monospace; font-size: 0.72rem; font-weight: 500; }
 
 @media (max-width: 900px) {
     .lobby-layout,
@@ -925,11 +994,16 @@ summary { padding: 17px 18px; cursor: pointer; font-size: 0.86rem; font-weight: 
     .decision-stat:nth-child(odd) { border-left: 1px solid rgba(255, 255, 255, 0.1); }
     .pot-block { border-bottom: 1px solid rgba(255, 255, 255, 0.1); }
     .play-stage { min-height: 620px; padding: 24px 20px; }
-    .cards-held { min-height: 215px; overflow: hidden; }
+    /* The tilt on the outermost cards used to overhang a clipped container and
+       shave a sliver off the first and last card of a long hand. */
+    .cards-held { min-height: 215px; padding: 26px 10px; }
     .playing-card { width: 84px; }
     .playing-card + .playing-card { margin-left: -30px; }
     .proof-values { grid-template-columns: 1fr; }
-    .deck-grid { grid-template-columns: repeat(8, 1fr); }
+    .deck-grid { grid-template-columns: repeat(8, minmax(0, 46px)); }
+    .round-line { grid-template-columns: minmax(0, 1fr) auto; }
+    .round-outcome { grid-column: 1 / -1; grid-row: 3; }
+    .round-points { grid-column: 2; grid-row: 1 / 3; }
     .rules-strip { grid-template-columns: 1fr; }
     .rules-strip > div { border-right: 0; border-bottom: 1px solid var(--draft-line); padding: 13px 0; }
     .rules-strip > div:first-child { padding-top: 0; }

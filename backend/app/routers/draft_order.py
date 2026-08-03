@@ -133,10 +133,8 @@ def flip(
     db: Session = Depends(get_db),
 ) -> dict[str, Any]:
     identity = _identity(request)
-    room, event = draft_order_game.flip_card(db, identity, session_id)
-    view = draft_order_game.serialize_session(db, room, identity["username"])
-    view["event"] = event
-    return view
+    room = draft_order_game.flip_card(db, identity, session_id)
+    return draft_order_game.serialize_session(db, room, identity["username"])
 
 
 @router.post("/sessions/{session_id}/bank")
@@ -146,10 +144,8 @@ def bank(
     db: Session = Depends(get_db),
 ) -> dict[str, Any]:
     identity = _identity(request)
-    room, event = draft_order_game.bank_round(db, identity, session_id)
-    view = draft_order_game.serialize_session(db, room, identity["username"])
-    view["event"] = event
-    return view
+    room = draft_order_game.bank_round(db, identity, session_id)
+    return draft_order_game.serialize_session(db, room, identity["username"])
 
 
 @router.post("/sessions/{session_id}/forfeit")
@@ -159,10 +155,8 @@ def forfeit(
     db: Session = Depends(get_db),
 ) -> dict[str, Any]:
     identity = _identity(request)
-    room, event = draft_order_game.forfeit_current_player(db, identity, session_id)
-    view = draft_order_game.serialize_session(db, room, identity["username"])
-    view["event"] = event
-    return view
+    room = draft_order_game.forfeit_current_player(db, identity, session_id)
+    return draft_order_game.serialize_session(db, room, identity["username"])
 
 
 @router.post("/sessions/{session_id}/bots/step")
@@ -172,10 +166,8 @@ def play_bot_step(
     db: Session = Depends(get_db),
 ) -> dict[str, Any]:
     identity = _identity(request)
-    room, event = draft_order_game.play_test_bot_step(db, identity, session_id)
-    view = draft_order_game.serialize_session(db, room, identity["username"])
-    view["event"] = event
-    return view
+    room = draft_order_game.play_test_bot_step(db, identity, session_id)
+    return draft_order_game.serialize_session(db, room, identity["username"])
 
 
 @router.post("/sessions/{session_id}/reveal")

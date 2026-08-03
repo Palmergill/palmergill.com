@@ -103,8 +103,19 @@ rounds two and three are frozen from the standings after the preceding round,
 with the scoring leader first. A room has an explicit mode: `league` rooms accept
 account-backed invites, `practice` rooms are private solo warm-ups, and
 admin-only `test` rooms contain marked bot players that advance one round at a
-time through the same scoring and verification path as a real draft. Spectators
-receive every live card and pot value in rounds one and two. During round three,
+time through the same scoring and verification path as a real draft.
+
+A turn that ends is not handed straight to the next manager. The room enters
+`turn_state = 'resolved'`, keeps the finished hand and the acting player on the
+table, and publishes the action in `last_event_json`; the turn advances on the
+first read or action that arrives more than `TURN_HOLD_SECONDS` later. Without
+that hold the card that busted or banked a round was already gone by the time a
+spectator's poll landed. There is no scheduler, so reads are what drive the
+clock — a held room is never stuck for longer than it takes someone to look at
+it. `lastEvent` carries the same round-three concealment as the cards it
+describes.
+
+Spectators receive every live card and pot value in rounds one and two. During round three,
 the API returns only each opponent's card count, freezes the public leaderboard
 at the two-round standings, and withholds the seed, final scores, and draft order
 until the host records the synchronized reveal in `revealed_at`.

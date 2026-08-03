@@ -10,8 +10,14 @@
     const BOT_TURN_START_MS = 1100;
     const BOT_THINK_MIN_MS = 900;
     const BOT_THINK_MAX_MS = 1900;
-    const BOT_ROUND_END_MS = 2200;
     const ROOM_STATE_LABELS = { lobby: "Lobby", active: "Live", complete: "Final" };
+    const ROUND_STATE_COPY = {
+        banked: "Banked",
+        busted: "Busted on a repeated rank",
+        forfeited: "Written off by the host — scores zero",
+    };
+    // Clears the sticky site nav when the table is scrolled into view.
+    const STICKY_NAV_OFFSET = 76;
     const state = {
         identity: null,
         room: null,
@@ -22,6 +28,10 @@
         statusTimer: null,
         botTimer: null,
         botPaused: false,
+        // The table sits below a full-height hero, so a manager whose turn
+        // arrives while they are reading the standings would never see the
+        // Flip and Bank buttons without scrolling for them.
+        wasMyTurn: false,
         // Bumped by every action. A poll that was already in flight when the
         // action landed carries a stale generation and is discarded, so the
         // board never rewinds to the pre-action snapshot.
@@ -77,6 +87,7 @@
         flipButton: byId("flipButton"),
         bankButton: byId("bankButton"),
         forfeitButton: byId("forfeitButton"),
+        resumeBotsButton: byId("resumeBotsButton"),
         leaderboard: byId("leaderboard"),
         leaderboardTitle: byId("leaderboardTitle"),
         pollNote: byId("pollNote"),
@@ -169,6 +180,23 @@
         els.signedOutView.hidden = name !== "signedOut";
         els.homeView.hidden = name !== "home";
         els.roomView.hidden = name !== "room";
+        // Inside a room the hero is pure decoration, and at full size it costs
+        // the whole first screen — the play stage and its buttons start below
+        // the fold on a laptop. Collapse it to a slim bar.
+        document.body.classList.toggle("in-room", name === "room");
+    }
+
+    function scrollToPlayStage() {
+        // After a frame: the first render of a room swaps panels and collapses
+        // the hero, so measuring inline lands on the pre-layout position.
+        window.requestAnimationFrame(() => {
+            const stage = document.querySelector(".play-stage");
+            if (!stage || els.gamePanel.hidden) return;
+            const top = Math.max(0, stage.getBoundingClientRect().top + window.scrollY - STICKY_NAV_OFFSET);
+            if (Math.abs(window.scrollY - top) < 8) return;
+            const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+            window.scrollTo({ top, behavior: reducedMotion ? "auto" : "smooth" });
+        });
     }
 
     // Flip and Bank carry a <span> headline over a <small> subtitle, so the
@@ -292,11 +320,11 @@
             const title = document.createElement("strong");
             title.textContent = room.leagueName;
             const details = document.createElement("span");
-            const managers = room.players.length;
+            const managers = room.playerCount;
             const stateLabel = room.state === "complete"
                 ? (room.resultsRevealed ? "Draft order final" : "Final reveal ready")
                 : room.state === "active"
-                    ? `${room.currentPlayer?.displayName || "Player"} is up`
+                    ? `${room.currentPlayerName || "Player"} is up`
                     : `${managers} manager${managers === 1 ? "" : "s"} in lobby`;
             details.textContent = stateLabel;
             const status = document.createElement("small");
@@ -314,6 +342,7 @@
         stopPolling();
         stopBotTimer();
         state.room = null;
+        state.wasMyTurn = false;
         state.resultsRevealed = false;
         state.revealTimers.forEach(window.clearTimeout);
         state.revealTimers = [];
@@ -336,6 +365,9 @@
         stopPolling();
         stopBotTimer();
         state.botPaused = false;
+        // Arriving at a room is a fresh turn as far as the table is concerned,
+        // otherwise a manager who has played once never gets scrolled in again.
+        state.wasMyTurn = false;
         state.generation += 1;
         setView("loading");
         try {
@@ -488,8 +520,10 @@
                 const card = descriptor.card;
                 node.className = `playing-card${card.red ? " is-red" : ""}`;
                 const center = document.createElement("b");
+                center.setAttribute("aria-hidden", "true");
                 center.textContent = card.symbol;
                 const corner = document.createElement("small");
+                corner.setAttribute("aria-hidden", "true");
                 const rank = document.createElement("span");
                 rank.textContent = card.rank;
                 const suit = document.createElement("span");
@@ -502,9 +536,15 @@
 
         Array.from(els.cardsHeld.children).forEach((node, index) => {
             node.style.setProperty("--tilt", `${(index - (descriptors.length - 1) / 2) * 2.2}deg`);
-            if (concealed) {
-                node.setAttribute("aria-label", `Hidden card ${index + 1} of ${descriptors.length}`);
-            }
+            // Every card announces itself. Without this the live region read out
+            // the raw glyphs — a king of spades arrived as "♠ K ♠".
+            node.setAttribute(
+                "aria-label",
+                concealed
+                    ? `Hidden card ${index + 1} of ${descriptors.length}`
+                    : `${descriptors[index].card.rank} of ${descriptors[index].card.suit}`,
+            );
+            node.setAttribute("role", "img");
         });
     }
 
@@ -540,28 +580,61 @@
         if (!els.forfeitButton.hidden) {
             els.forfeitButton.textContent = `${stalledOn} isn’t responding — skip them`;
         }
+        els.resumeBotsButton.hidden = !(state.botPaused && room.mode === "test" && room.isHost);
+        els.resumeBotsButton.disabled = state.actionBusy;
 
-        if (room.canRunBot && !els.turnMessage.dataset.event) {
-            els.turnMessage.className = "turn-message";
+        // Bring the table to the manager the moment the turn becomes theirs.
+        // Latch first: the scroll is deferred a frame, and several call sites
+        // re-render straight after this one.
+        const turnJustArrived = room.canPlay && !state.wasMyTurn;
+        state.wasMyTurn = Boolean(room.canPlay);
+        if (turnJustArrived) scrollToPlayStage();
+
+        renderTurnMessage(room, round, concealed);
+        renderLeaderboard(room);
+    }
+
+    // The room publishes its own last action, so the actor and every spectator
+    // narrate the same moment from one source. This used to be stitched
+    // together client-side from an action's private response plus a timer,
+    // which meant a watcher never learned what ended somebody else's round.
+    function renderTurnMessage(room, round, concealed) {
+        const event = room.lastEvent;
+        const describesTable = Boolean(event) && event.playerId === room.currentPlayer?.id;
+        els.turnMessage.className = "turn-message";
+        if (describesTable) {
+            const tone = F.turnEventTone(event);
+            if (tone) els.turnMessage.classList.add(tone);
+            els.turnMessage.textContent = F.turnEventMessage(event, {
+                isSelf: event.playerId === room.viewerPlayerId,
+            });
+            return;
+        }
+        if (state.botPaused && room.mode === "test" && room.isHost) {
+            els.turnMessage.textContent = "Bots are paused. Resume them when you’re ready.";
+            return;
+        }
+        if (room.canRunBot) {
             els.turnMessage.textContent = `${room.currentPlayer?.displayName || "A bot"} is playing automatically…`;
-        } else if (!room.canPlay && !els.turnMessage.dataset.event) {
-            els.turnMessage.className = "turn-message";
+            return;
+        }
+        if (!room.canPlay) {
             els.turnMessage.textContent = concealed
                 ? `${room.currentPlayer?.displayName || "The current player"} has pulled ${round.cardCount || 0} card${round.cardCount === 1 ? "" : "s"}. Values and score stay sealed for the reveal.`
                 : `Watching ${room.currentPlayer?.displayName || "the current player"} live — every card and point appears here.`;
-        } else if (!els.turnMessage.dataset.event) {
-            els.turnMessage.className = "turn-message";
-            els.turnMessage.textContent = round.cards.length
-                ? "Bank the pot or press your luck."
-                : "Your turn. The first flip can’t bust.";
+            return;
         }
-        renderLeaderboard(room);
+        els.turnMessage.textContent = round.cards.length
+            ? "Bank the pot or press your luck."
+            : "Your turn. The first flip can’t bust.";
     }
 
     function renderLeaderboard(room) {
         els.leaderboard.innerHTML = "";
         const finalRound = room.currentRound?.number === room.roundsPerPlayer;
-        els.leaderboardTitle.textContent = finalRound ? "Standings after Round 2" : "The chase";
+        els.leaderboardTitle.textContent = finalRound
+            ? `Standings after Round ${room.roundsPerPlayer - 1}`
+            : "The chase";
         els.pollNote.textContent = finalRound ? "Final scores sealed" : "Updates live";
         room.leaderboard.forEach((player) => {
             const row = document.createElement("li");
@@ -702,13 +775,14 @@
     }
 
     // One card per request, paced by the client, so a spectator watches a bot's
-    // hand build the same way a human's does.
+    // hand build the same way a human's does. The pause after a round ends is
+    // the server's now: it holds the finished hand and reports canRunBot false
+    // until the table clears.
     async function playBotStep() {
         stopBotTimer();
         if (state.actionBusy || state.botPaused || !state.room?.canRunBot) return;
         state.actionBusy = true;
         stopPolling();
-        let nextDelay = botThinkDelay();
         try {
             const room = await requestJson(
                 `/sessions/${state.room.id}/bots/step`,
@@ -716,36 +790,26 @@
             );
             state.generation += 1;
             state.room = room;
-            const event = room.event;
-            // Held until the next bot action replaces it, so the card that just
-            // landed stays on screen through the pause that follows it.
-            els.turnMessage.dataset.event = "bot_step";
-            els.turnMessage.className = event?.outcome === "busted"
-                ? "turn-message is-bust"
-                : event?.turnComplete
-                    ? "turn-message is-bank"
-                    : "turn-message";
-            els.turnMessage.textContent = F.botStepMessage(event);
             renderRoom();
-            if (event?.turnComplete) nextDelay = BOT_ROUND_END_MS;
-            schedulePoll();
         } catch (error) {
+            // Pause the bots rather than hammering a room that just rejected a
+            // step, but keep the room live — this used to stop polling too,
+            // which froze the whole view until a manual reload.
             state.botPaused = true;
-            delete els.turnMessage.dataset.event;
             handleActionError(error);
         } finally {
             state.actionBusy = false;
-            if (!state.room?.canRunBot) {
-                // The table is back to a human — let the result sit a beat, then
-                // hand the message line back to the normal turn copy.
-                window.setTimeout(() => {
-                    delete els.turnMessage.dataset.event;
-                    if (state.room?.state === "active") renderGame(state.room);
-                }, BOT_ROUND_END_MS);
-            }
+            schedulePoll();
             if (state.room?.state === "active") renderGame(state.room);
-            scheduleBotTurn(nextDelay);
+            scheduleBotTurn(botThinkDelay());
         }
+    }
+
+    function resumeBots() {
+        state.botPaused = false;
+        showStatus("Bots resumed.");
+        if (state.room?.state === "active") renderGame(state.room);
+        scheduleBotTurn(BOT_TURN_START_MS);
     }
 
     async function performAction(path, button, busyLabel) {
@@ -756,22 +820,7 @@
             const room = await requestJson(`/sessions/${state.room.id}/${path}`, { method: "POST" });
             state.generation += 1;
             state.room = room;
-            els.turnMessage.dataset.event = room.event?.type || "";
-            if (room.event?.type === "flip" && room.event.busted) {
-                els.turnMessage.className = "turn-message is-bust";
-                els.turnMessage.textContent = `${F.cardLabel(room.event.card)} repeats a rank. Round busted.`;
-            } else if (room.event?.type === "flip") {
-                els.turnMessage.className = "turn-message";
-                els.turnMessage.textContent = `${F.cardLabel(room.event.card)} dealt. Bank it or press again.`;
-            } else if (room.event?.type === "bank") {
-                els.turnMessage.className = "turn-message is-bank";
-                els.turnMessage.textContent = `${room.event.score} points banked.`;
-            } else if (room.event?.type === "forfeit") {
-                els.turnMessage.className = "turn-message is-bust";
-                els.turnMessage.textContent = `${room.event.displayName} was skipped. Their remaining rounds score zero.`;
-            }
             renderRoom();
-            window.setTimeout(() => { delete els.turnMessage.dataset.event; }, 1800);
             schedulePoll();
         } catch (error) {
             handleActionError(error);
@@ -853,8 +902,34 @@
             const tie = document.createElement("span");
             tie.textContent = `Tie key ${player.tieBreakValue}`;
             const draws = document.createElement("span");
-            draws.textContent = `Draws: ${player.draws.map((draw) => `R${draw.round} ${F.cardLabel(draw.card)} @${draw.deckIndex}`).join(" · ")}`;
+            draws.textContent = player.draws.length
+                ? `Draws: ${player.draws.map((draw) => `R${draw.round} ${F.cardLabel(draw.card)} @${draw.deckIndex}`).join(" · ")}`
+                : "Draws: none — no card was ever dealt to this manager";
             meta.append(tie, draws);
+            // A round the host wrote off is the one thing about this game a
+            // person can influence, so the proof has to say so out loud. It
+            // used to look identical to a round somebody simply played badly.
+            const rounds = document.createElement("ol");
+            rounds.className = "verification-rounds";
+            (player.rounds || []).forEach((round) => {
+                const item = document.createElement("li");
+                item.className = `round-line round-line--${round.state}`;
+                const label = document.createElement("strong");
+                label.textContent = `Round ${round.number}`;
+                const outcome = document.createElement("span");
+                outcome.className = "round-outcome";
+                outcome.textContent = ROUND_STATE_COPY[round.state] || round.state;
+                const cards = document.createElement("span");
+                cards.className = "round-cards";
+                cards.textContent = round.cards.length
+                    ? round.cards.map((card) => F.cardLabel(card)).join(" ")
+                    : "no cards dealt";
+                const score = document.createElement("span");
+                score.className = "round-points";
+                score.textContent = `${round.score} pts`;
+                item.append(label, outcome, cards, score);
+                rounds.appendChild(item);
+            });
             const used = new Set(player.draws.map((draw) => draw.deckIndex));
             const deck = document.createElement("div");
             deck.className = "deck-grid";
@@ -868,7 +943,7 @@
             const legend = document.createElement("p");
             legend.className = "deck-legend";
             legend.textContent = "Highlighted cards were drawn. Indexing starts at 0.";
-            body.append(meta, deck, legend);
+            body.append(meta, rounds, deck, legend);
             details.append(summary, body);
             els.verificationPlayers.appendChild(details);
         });
@@ -987,6 +1062,7 @@
         if (!window.confirm(`Skip ${name}? Their remaining rounds score zero and the draft moves on. This can't be undone.`)) return;
         performAction("forfeit", els.forfeitButton, "Skipping");
     });
+    els.resumeBotsButton.addEventListener("click", resumeBots);
     els.revealButton.addEventListener("click", revealResults);
     els.verifyButton.addEventListener("click", showVerification);
     els.closeVerifyButton.addEventListener("click", () => {

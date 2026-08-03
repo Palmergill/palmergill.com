@@ -36,6 +36,14 @@ ROUNDS_PER_PLAYER = 3
 # A round is over once it is banked, busted, or written off by the host when a
 # manager walks away mid-draft. Forfeited rounds score zero and hold no cards.
 FINISHED_ROUND_STATES = frozenset({"banked", "busted", "forfeited"})
+TURN_STATE_PLAYING = "playing"
+TURN_STATE_RESOLVED = "resolved"
+# How long the table keeps a finished hand face up before the next manager is
+# put on the clock. Turns used to advance inside the same transaction that
+# ended them, so the card that busted or banked a round was already gone by the
+# time anyone polled. This has to comfortably exceed the client's active poll
+# interval (900ms) or a spectator can still miss it between two reads.
+TURN_HOLD_SECONDS = 1.8
 MIN_PLAYERS = 2
 MAX_PLAYERS = 16
 MODE_LEAGUE = "league"
@@ -225,6 +233,34 @@ def _player_flips(db: Session, player_id: str) -> list[FantasyDraftFlip]:
     )
 
 
+def _minimum_players(room: FantasyDraftSession) -> int:
+    """A solo warm-up needs one seat; a real draft needs someone to beat."""
+    return 1 if room.mode == MODE_PRACTICE else MIN_PLAYERS
+
+
+def _last_event(room: FantasyDraftSession) -> dict[str, Any] | None:
+    try:
+        value = json.loads(room.last_event_json or "null")
+    except (TypeError, json.JSONDecodeError):
+        return None
+    return value if isinstance(value, dict) else None
+
+
+def _is_holding(room: FantasyDraftSession) -> bool:
+    return room.turn_state == TURN_STATE_RESOLVED
+
+
+def _hold_expired(room: FantasyDraftSession) -> bool:
+    if room.resolved_at is None:
+        return True
+    return (utc_now() - room.resolved_at).total_seconds() >= TURN_HOLD_SECONDS
+
+
+def _reject_if_held(room: FantasyDraftSession) -> None:
+    if _is_holding(room):
+        raise HTTPException(status_code=409, detail="The table is still clearing that hand.")
+
+
 def _cards(round_row: FantasyDraftRound) -> list[str]:
     try:
         value = json.loads(round_row.cards_json or "[]")
@@ -380,10 +416,22 @@ def serialize_session(
     viewer_normalized = accounts.normalize_username(viewer_username)
     current_player = next((player for player in players if player.id == room.current_player_id), None)
     results_revealed = bool(room.revealed_at) or room.mode == MODE_PRACTICE
+    holding = _is_holding(room)
+    last_event = _last_event(room)
     current_round = None
     current_round_number = None
     if current_player is not None:
         current_round = _active_round(rounds_by_player[current_player.id])
+        if current_round is None and holding and last_event is not None:
+            # The hand that just ended is still the one on the table.
+            current_round = next(
+                (
+                    row
+                    for row in rounds_by_player[current_player.id]
+                    if row.round_number == last_event.get("round")
+                ),
+                None,
+            )
         completed_current = sum(
             1
             for row in rounds_by_player[current_player.id]
@@ -399,6 +447,7 @@ def serialize_session(
     )
     player_payloads = []
     scores: dict[str, int] = {}
+    best_rounds: dict[str, int] = {}
     for player in players:
         player_rounds = rounds_by_player[player.id]
         scoring_rounds = (
@@ -417,6 +466,7 @@ def serialize_session(
             for row in player_rounds
         )
         scores[player.id] = score
+        best_rounds[player.id] = best_round
         player_payloads.append({
             "id": player.id,
             "username": player.username,
@@ -495,19 +545,37 @@ def serialize_session(
                 "cardCount": len(current_cards),
                 "concealed": False,
                 "pot": current_round.score,
-                "bustChance": _bust_chance(room, current_player, current_round, flips_used),
+                # A hand that has already resolved has no next flip to price.
+                "bustChance": (
+                    None
+                    if holding
+                    else _bust_chance(room, current_player, current_round, flips_used)
+                ),
                 "deckRemaining": 52 - flips_used,
             }
 
-        if not spectator_final_round:
+        if not spectator_final_round and not holding:
             projected_score = scores[current_player.id] + current_round_payload["pot"]
             hypothetical = dict(scores)
             hypothetical[current_player.id] = projected_score
+            # Banking the pot can also raise the best-round tiebreak, so the
+            # projection has to move both halves of the key.
+            hypothetical_best = dict(best_rounds)
+            hypothetical_best[current_player.id] = max(
+                best_rounds[current_player.id],
+                current_round_payload["pot"],
+            )
+            # One ranking rule everywhere. This used to sort on turn position,
+            # so a manager tied for the lead could be told they'd sit first
+            # while the standings beside it — and the final draft order — had
+            # them second. See standing_key.
             projected_order = sorted(
                 players,
-                key=lambda player: (
-                    -hypothetical[player.id],
-                    player.turn_position if player.turn_position is not None else MAX_PLAYERS + 1,
+                key=lambda player: standing_key(
+                    hypothetical[player.id],
+                    hypothetical_best[player.id],
+                    room.master_seed,
+                    player.username,
                 ),
             )
             bank_position = next(
@@ -555,22 +623,33 @@ def serialize_session(
         "resultsRevealed": results_revealed,
         "isHost": viewer_normalized == room.created_by,
         "isMember": member is not None,
+        # Lets the client tell "you banked 24" from "Ace Bot banked 24" without
+        # having to re-derive account-name normalization in the browser.
+        "viewerPlayerId": member.id if member is not None else None,
         "canReveal": bool(
             viewer_normalized == room.created_by
             and room.state == "complete"
             and not results_revealed
         ),
-        "canStart": viewer_normalized == room.created_by and room.state == "lobby" and len(players) >= MIN_PLAYERS,
+        "canStart": (
+            viewer_normalized == room.created_by
+            and room.state == "lobby"
+            and len(players) >= _minimum_players(room)
+        ),
+        # Nobody acts while a finished hand is still face up on the table.
+        "holdingTurn": holding,
         "canPlay": bool(
             member is not None
             and current_player is not None
             and member.id == current_player.id
             and room.state == "active"
+            and not holding
         ),
         "canForfeit": bool(
             viewer_normalized == room.created_by
             and room.state == "active"
             and current_player is not None
+            and not holding
         ),
         "canRunBot": bool(
             viewer_normalized == room.created_by
@@ -578,6 +657,7 @@ def serialize_session(
             and room.state == "active"
             and current_player is not None
             and current_player.is_bot
+            and not holding
         ),
         "currentPlayer": (
             {
@@ -590,6 +670,7 @@ def serialize_session(
             else None
         ),
         "currentRound": current_round_payload,
+        "lastEvent": _visible_event(last_event, viewer_normalized, results_revealed),
         "decision": decision,
         "players": player_payloads,
         "leaderboard": leaderboard,
@@ -799,9 +880,12 @@ def start_session(db: Session, identity: dict[str, str], session_id: str) -> Fan
     if room.state != "lobby":
         raise HTTPException(status_code=409, detail="This draft room has already started.")
     players = _players(db, room.id)
-    minimum_players = 1 if room.mode == MODE_PRACTICE else MIN_PLAYERS
+    minimum_players = _minimum_players(room)
     if len(players) < minimum_players:
-        raise HTTPException(status_code=409, detail="At least two players are needed.")
+        raise HTTPException(
+            status_code=409,
+            detail=f"At least {minimum_players} player{'' if minimum_players == 1 else 's'} needed.",
+        )
 
     by_username = {player.username: player for player in players}
     ordered_names = derive_turn_order(room.master_seed, by_username)
@@ -863,23 +947,85 @@ def _get_or_create_active_round(
     return round_row
 
 
-def _advance_after_round(
+def _play_event(
+    kind: str,
+    player: FantasyDraftPlayer,
+    round_row: FantasyDraftRound | None,
+    *,
+    card: dict[str, Any] | None = None,
+    turn_complete: bool = False,
+) -> dict[str, Any]:
+    """One shape for every action, so actor and spectator render the same line."""
+    cards = _cards(round_row) if round_row is not None else []
+    return {
+        "type": kind,
+        "playerId": player.id,
+        # Normalized name, already public in the roster. Used to decide whether
+        # this viewer is allowed to see a sealed final-round card.
+        "username": player.username,
+        "displayName": player.display_name,
+        "isBot": bool(player.is_bot),
+        "round": round_row.round_number if round_row is not None else None,
+        "card": card,
+        "cardCount": len(cards),
+        "score": round_row.score if round_row is not None else 0,
+        "busted": bool(round_row.busted) if round_row is not None else False,
+        "turnComplete": turn_complete,
+    }
+
+
+def _visible_event(
+    event: dict[str, Any] | None,
+    viewer_normalized: str,
+    results_revealed: bool,
+) -> dict[str, Any] | None:
+    """Same concealment rule the final round applies to cards and scores."""
+    if event is None:
+        return None
+    sealed = (
+        event.get("round") == ROUNDS_PER_PLAYER
+        and event.get("username") != viewer_normalized
+        and not results_revealed
+    )
+    if not sealed:
+        return event
+    # The card count stays visible — the play stage already advertises how many
+    # cards a sealed hand holds — but nothing that implies a score.
+    return {**event, "card": None, "score": None, "busted": None, "sealed": True}
+
+
+def _record_event(
     db: Session,
     room: FantasyDraftSession,
     player: FantasyDraftPlayer,
+    event: dict[str, Any],
 ) -> None:
+    """Publish what just happened so every poller sees it, not just the actor.
+
+    Before this the event only came back on the acting player's own POST, so a
+    spectator polling the room had no way to know a card had been dealt at all.
+    """
+    room.last_event_json = json.dumps(event, separators=(",", ":"))
+    if not event.get("turnComplete"):
+        return
+    # Recompute here rather than at release time: the score is settled the
+    # moment the round ends, and the hold is only about what the table shows.
+    finished = db.query(FantasyDraftRound).filter(
+        FantasyDraftRound.player_id == player.id,
+        FantasyDraftRound.state.in_(tuple(FINISHED_ROUND_STATES)),
+    ).all()
+    player.final_score = sum(row.score for row in finished)
+    room.turn_state = TURN_STATE_RESOLVED
+    room.resolved_at = utc_now()
+
+
+def _advance_turn(db: Session, room: FantasyDraftSession) -> None:
+    """Put the next manager on the clock, or close the room out."""
     players = _players(db, room.id)
     all_rounds = _rounds(db, room.id)
     rounds_by_player: dict[str, list[FantasyDraftRound]] = defaultdict(list)
     for round_row in all_rounds:
         rounds_by_player[round_row.player_id].append(round_row)
-
-    completed = [
-        row
-        for row in rounds_by_player[player.id]
-        if row.state in FINISHED_ROUND_STATES
-    ]
-    player.final_score = sum(row.score for row in completed)
 
     for round_number in range(1, ROUNDS_PER_PLAYER + 1):
         ordered_players = _round_play_order(
@@ -902,6 +1048,29 @@ def _advance_after_round(
     room.completed_at = utc_now()
     if room.mode == MODE_PRACTICE:
         room.revealed_at = room.completed_at
+
+
+def release_due_turn(db: Session, session_id: str) -> bool:
+    """Advance a held turn once the table has shown the result long enough.
+
+    There is no scheduler in this app, so the release rides on whatever request
+    arrives next — a spectator's poll, the next player's action, or the host
+    opening the room. A held room is therefore never stuck for longer than it
+    takes someone to look at it.
+    """
+    room = db.query(FantasyDraftSession).filter(FantasyDraftSession.id == session_id).first()
+    if room is None or not _is_holding(room) or not _hold_expired(room):
+        return False
+    # Re-read under the row lock so two concurrent polls can't both advance.
+    db.expire(room)
+    room = _session_or_404(db, session_id, lock=True)
+    if not _is_holding(room) or not _hold_expired(room):
+        return False
+    room.turn_state = TURN_STATE_PLAYING
+    room.resolved_at = None
+    _advance_turn(db, room)
+    db.commit()
+    return True
 
 
 def reveal_results(
@@ -927,9 +1096,11 @@ def flip_card(
     db: Session,
     identity: dict[str, str],
     session_id: str,
-) -> tuple[FantasyDraftSession, dict[str, Any]]:
+) -> FantasyDraftSession:
     username, _ = _identity_names(identity)
+    release_due_turn(db, session_id)
     room = _session_or_404(db, session_id, lock=True)
+    _reject_if_held(room)
     player = _current_player_or_error(db, room, username)
     round_row = _get_or_create_active_round(db, room, player)
     flips_used = db.query(func.count(FantasyDraftFlip.id)).filter(
@@ -956,30 +1127,32 @@ def flip_card(
     if busted:
         round_row.state = "busted"
         round_row.ended_at = utc_now()
-        db.flush()
-        _advance_after_round(db, room, player)
+    db.flush()
+    _record_event(db, room, player, _play_event(
+        "flip",
+        player,
+        round_row,
+        card=card_payload(code, flips_used),
+        turn_complete=busted,
+    ))
 
     try:
         db.commit()
     except IntegrityError:
         db.rollback()
         raise HTTPException(status_code=409, detail="That card was already dealt. Refresh the room.")
-    return room, {
-        "type": "flip",
-        "playerId": player.id,
-        "round": round_row.round_number,
-        "card": card_payload(code, flips_used),
-        "busted": busted,
-    }
+    return room
 
 
 def bank_round(
     db: Session,
     identity: dict[str, str],
     session_id: str,
-) -> tuple[FantasyDraftSession, dict[str, Any]]:
+) -> FantasyDraftSession:
     username, _ = _identity_names(identity)
+    release_due_turn(db, session_id)
     room = _session_or_404(db, session_id, lock=True)
+    _reject_if_held(room)
     player = _current_player_or_error(db, room, username)
     round_row = db.query(FantasyDraftRound).filter(
         FantasyDraftRound.player_id == player.id,
@@ -990,16 +1163,15 @@ def bank_round(
 
     round_row.state = "banked"
     round_row.ended_at = utc_now()
-    banked_score = round_row.score
     db.flush()
-    _advance_after_round(db, room, player)
+    _record_event(db, room, player, _play_event(
+        "bank",
+        player,
+        round_row,
+        turn_complete=True,
+    ))
     db.commit()
-    return room, {
-        "type": "bank",
-        "playerId": player.id,
-        "round": round_row.round_number,
-        "score": banked_score,
-    }
+    return room
 
 
 def forfeit_current_player(
@@ -1015,7 +1187,9 @@ def forfeit_current_player(
     as a zero so the turn order and each deck still reproduce exactly.
     """
     username, _ = _identity_names(identity)
+    release_due_turn(db, session_id)
     room = _session_or_404(db, session_id, lock=True)
+    _reject_if_held(room)
     if username != room.created_by:
         raise HTTPException(status_code=403, detail="Only the host can skip a manager.")
     if room.state != "active" or not room.current_player_id:
@@ -1034,6 +1208,7 @@ def forfeit_current_player(
         .all()
     )
     finished = {row.round_number for row in existing if row.state in FINISHED_ROUND_STATES}
+    forfeited_round = None
     for round_row in existing:
         if round_row.state == "active":
             # Cards already dealt stay on the record — the proof should show
@@ -1043,6 +1218,7 @@ def forfeit_current_player(
             round_row.busted = False
             round_row.ended_at = utc_now()
             finished.add(round_row.round_number)
+            forfeited_round = round_row
     for number in range(1, ROUNDS_PER_PLAYER + 1):
         if number in finished:
             continue
@@ -1058,13 +1234,14 @@ def forfeit_current_player(
             ended_at=utc_now(),
         ))
     db.flush()
-    _advance_after_round(db, room, player)
+    _record_event(db, room, player, _play_event(
+        "forfeit",
+        player,
+        forfeited_round,
+        turn_complete=True,
+    ))
     db.commit()
-    return room, {
-        "type": "forfeit",
-        "playerId": player.id,
-        "displayName": player.display_name,
-    }
+    return room
 
 
 def _bot_should_bank(
@@ -1082,16 +1259,19 @@ def play_test_bot_step(
     db: Session,
     identity: dict[str, str],
     session_id: str,
-) -> tuple[FantasyDraftSession, dict[str, Any]]:
+) -> FantasyDraftSession:
     """Play a single bot action — one flip, or the bank that ends the round.
 
     A bot round used to resolve inside one request, so a spectator only ever saw
     the finished result: the cards were dealt and cleared before the board
     rendered. One action per call lets the client pace a bot like a person
-    sitting at the table, with every card visible on the way.
+    sitting at the table, with every card visible on the way. The bank that ends
+    a round then holds the table like any other turn.
     """
     username, _ = _identity_names(identity)
+    release_due_turn(db, session_id)
     room = _session_or_404(db, session_id, lock=True)
+    _reject_if_held(room)
     if room.mode != MODE_TEST:
         raise HTTPException(status_code=409, detail="Bots only play inside test rooms.")
     if username != room.created_by:
@@ -1118,38 +1298,18 @@ def play_test_bot_step(
         or len(held) >= 5
     )
 
-    if banking:
-        room, event = bank_round(db, bot_identity, session_id)
-        round_number = event["round"]
-        outcome = "banked"
-        score = event["score"]
-        card = None
-        card_count = len(held)
-    else:
-        room, event = flip_card(db, bot_identity, session_id)
-        round_number = event["round"]
-        outcome = "busted" if event["busted"] else "playing"
-        score = None
-        card = event["card"]
-        card_count = len(held) + 1
-
-    concealed = round_number == ROUNDS_PER_PLAYER
-    turn_complete = outcome != "playing"
-    return room, {
-        "type": "bot_step",
-        "playerId": player.id,
-        "displayName": player.display_name,
-        "round": round_number,
-        "action": "bank" if banking else "flip",
-        "outcome": "sealed" if (concealed and turn_complete) else outcome,
-        "score": None if concealed else score,
-        "card": None if concealed else card,
-        "cardCount": card_count,
-        "turnComplete": turn_complete,
-    }
+    # Both paths publish their own event, and the room's own concealment rules
+    # decide what each viewer is allowed to see of it.
+    return bank_round(db, bot_identity, session_id) if banking else flip_card(db, bot_identity, session_id)
 
 
 def list_sessions_for_user(db: Session, identity: dict[str, str]) -> list[dict[str, Any]]:
+    """Room cards for the home screen.
+
+    Deliberately not serialize_session: the launcher only needs a name, a state,
+    and who's up. Building the full view for a dozen rooms meant a few hundred
+    queries and a dozen 52-card shuffles to render text nobody reads.
+    """
     username, _ = _identity_names(identity)
     rooms = (
         db.query(FantasyDraftSession)
@@ -1165,7 +1325,37 @@ def list_sessions_for_user(db: Session, identity: dict[str, str]) -> list[dict[s
         .limit(12)
         .all()
     )
-    return [serialize_session(db, room, username) for room in rooms]
+    if not rooms:
+        return []
+
+    room_ids = [room.id for room in rooms]
+    counts = dict(
+        db.query(FantasyDraftPlayer.session_id, func.count(FantasyDraftPlayer.id))
+        .filter(FantasyDraftPlayer.session_id.in_(room_ids))
+        .group_by(FantasyDraftPlayer.session_id)
+        .all()
+    )
+    current_ids = [room.current_player_id for room in rooms if room.current_player_id]
+    current_names = dict(
+        db.query(FantasyDraftPlayer.id, FantasyDraftPlayer.display_name)
+        .filter(FantasyDraftPlayer.id.in_(current_ids))
+        .all()
+    ) if current_ids else {}
+
+    return [
+        {
+            "id": room.id,
+            "leagueName": room.league_name,
+            "mode": room.mode or MODE_LEAGUE,
+            "state": room.state,
+            "resultsRevealed": bool(room.revealed_at) or room.mode == MODE_PRACTICE,
+            "isHost": username == room.created_by,
+            "playerCount": counts.get(room.id, 0),
+            "currentPlayerName": current_names.get(room.current_player_id),
+            "createdAt": room.created_at.isoformat() if room.created_at else None,
+        }
+        for room in rooms
+    ]
 
 
 def verification(db: Session, room: FantasyDraftSession) -> dict[str, Any]:
@@ -1245,4 +1435,7 @@ def verification(db: Session, room: FantasyDraftSession) -> dict[str, Any]:
 
 
 def get_session(db: Session, session_id: str) -> FantasyDraftSession:
+    # Reads are what drive the clock: whoever looks at the room next is the one
+    # who releases a hand that has been face up long enough.
+    release_due_turn(db, session_id)
     return _session_or_404(db, session_id)
