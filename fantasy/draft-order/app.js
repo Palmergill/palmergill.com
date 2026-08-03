@@ -437,48 +437,74 @@
             : "Waiting for the host to lock the roster and start.";
     }
 
-    function renderCards(cards, concealedCount) {
-        els.cardsHeld.innerHTML = "";
-        if (concealedCount !== null && concealedCount !== undefined) {
-            if (!concealedCount) {
-                const placeholder = document.createElement("div");
-                placeholder.className = "card-placeholder card-placeholder--sealed";
-                placeholder.textContent = "Final hand sealed";
-                els.cardsHeld.appendChild(placeholder);
+    function renderCards(cards, concealedCount, scope) {
+        const concealed = concealedCount !== null && concealedCount !== undefined;
+        const descriptors = concealed
+            ? Array.from({ length: concealedCount }, (_, index) => ({ key: `hidden:${index}` }))
+            : cards.map((card, index) => ({ key: `${index}:${card.code}`, card }));
+
+        // Polling redraws the rest of the live room frequently. Keep cards that
+        // are already on the table mounted so their deal animation cannot
+        // restart; append only cards that actually arrived since the last view.
+        if (els.cardsHeld.dataset.cardScope !== scope) {
+            els.cardsHeld.innerHTML = "";
+            els.cardsHeld.dataset.cardScope = scope;
+        }
+
+        if (!descriptors.length) {
+            const placeholderKey = concealed ? "placeholder:sealed" : "placeholder:first";
+            if (els.cardsHeld.children.length === 1 && els.cardsHeld.children[0].dataset.cardKey === placeholderKey) {
                 return;
             }
-            for (let index = 0; index < concealedCount; index += 1) {
-                const node = document.createElement("div");
-                node.className = "playing-card is-concealed";
-                node.setAttribute("aria-label", `Hidden card ${index + 1} of ${concealedCount}`);
-                node.textContent = "♠";
-                node.style.setProperty("--tilt", `${(index - (concealedCount - 1) / 2) * 2.2}deg`);
-                els.cardsHeld.appendChild(node);
-            }
-            return;
-        }
-        if (!cards.length) {
+            els.cardsHeld.innerHTML = "";
             const placeholder = document.createElement("div");
-            placeholder.className = "card-placeholder";
-            placeholder.textContent = "First flip";
+            placeholder.className = concealed
+                ? "card-placeholder card-placeholder--sealed"
+                : "card-placeholder";
+            placeholder.dataset.cardKey = placeholderKey;
+            placeholder.textContent = concealed ? "Final hand sealed" : "First flip";
             els.cardsHeld.appendChild(placeholder);
             return;
         }
-        cards.forEach((card, index) => {
+
+        let rendered = Array.from(els.cardsHeld.children);
+        const existingCardsMatch = rendered.length <= descriptors.length && rendered.every(
+            (node, index) => node.dataset.cardKey === descriptors[index].key,
+        );
+        if (!existingCardsMatch) {
+            els.cardsHeld.innerHTML = "";
+            rendered = [];
+        }
+
+        for (let index = rendered.length; index < descriptors.length; index += 1) {
+            const descriptor = descriptors[index];
             const node = document.createElement("div");
-            node.className = `playing-card${card.red ? " is-red" : ""}`;
-            const center = document.createElement("b");
-            center.textContent = card.symbol;
-            const corner = document.createElement("small");
-            const rank = document.createElement("span");
-            rank.textContent = card.rank;
-            const suit = document.createElement("span");
-            suit.textContent = card.symbol;
-            corner.append(rank, suit);
-            node.append(center, corner);
-            node.style.setProperty("--tilt", `${(index - (cards.length - 1) / 2) * 2.2}deg`);
+            node.dataset.cardKey = descriptor.key;
             node.style.animationDelay = `${index * 35}ms`;
+            if (concealed) {
+                node.className = "playing-card is-concealed";
+                node.textContent = "♠";
+            } else {
+                const card = descriptor.card;
+                node.className = `playing-card${card.red ? " is-red" : ""}`;
+                const center = document.createElement("b");
+                center.textContent = card.symbol;
+                const corner = document.createElement("small");
+                const rank = document.createElement("span");
+                rank.textContent = card.rank;
+                const suit = document.createElement("span");
+                suit.textContent = card.symbol;
+                corner.append(rank, suit);
+                node.append(center, corner);
+            }
             els.cardsHeld.appendChild(node);
+        }
+
+        Array.from(els.cardsHeld.children).forEach((node, index) => {
+            node.style.setProperty("--tilt", `${(index - (descriptors.length - 1) / 2) * 2.2}deg`);
+            if (concealed) {
+                node.setAttribute("aria-label", `Hidden card ${index + 1} of ${descriptors.length}`);
+            }
         });
     }
 
@@ -488,7 +514,8 @@
         const concealed = Boolean(round.concealed && !room.canPlay);
         els.currentPlayerName.textContent = room.currentPlayer?.displayName || "—";
         els.roundBadge.textContent = `Round ${round.number} of ${room.roundsPerPlayer}`;
-        renderCards(round.cards || [], concealed ? (round.cardCount || 0) : null);
+        const cardScope = `${room.id}:${room.currentPlayer?.id || "none"}:${round.number}:${concealed ? "sealed" : "open"}`;
+        renderCards(round.cards || [], concealed ? (round.cardCount || 0) : null, cardScope);
         els.currentPot.textContent = concealed ? "Sealed" : (round.pot || 0);
         els.currentPotUnit.textContent = concealed ? "" : " pts";
         els.bustChance.textContent = concealed ? "Hidden" : F.bustCopy(round.bustChance);
