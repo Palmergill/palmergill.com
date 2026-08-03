@@ -45,7 +45,7 @@ body::before {
 }
 
 .draft-shell {
-    width: min(1160px, calc(100% - 32px));
+    width: min(1320px, calc(100% - 32px));
     margin: 0 auto;
     padding: clamp(28px, 5vw, 64px) 0 80px;
 }
@@ -492,11 +492,16 @@ code { font-family: "DM Mono", ui-monospace, monospace; }
 .commitment code { overflow: hidden; font-size: 0.76rem; text-overflow: ellipsis; }
 .commitment small { color: #69756c; font-weight: 800; }
 
-.lobby-layout,
-.game-layout {
+.lobby-layout {
     display: grid;
     grid-template-columns: minmax(0, 1.25fr) minmax(330px, 0.75fr);
     gap: 18px;
+}
+
+.game-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(310px, 340px);
+    gap: 24px;
 }
 
 .room-code-card,
@@ -596,16 +601,16 @@ code { font-family: "DM Mono", ui-monospace, monospace; }
 
 .play-stage {
     position: relative;
-    min-height: 600px;
+    min-height: 680px;
     overflow: hidden;
     border: 1px solid #2f4939;
-    border-radius: 22px;
+    border-radius: 26px;
     background:
         radial-gradient(circle at 50% 35%, rgba(96, 137, 107, 0.2), transparent 44%),
         var(--draft-forest-deep);
     box-shadow: 0 24px 55px rgba(17, 32, 25, 0.2);
     color: #fff;
-    padding: clamp(22px, 4vw, 34px);
+    padding: clamp(28px, 4vw, 44px);
 }
 
 .play-stage::before {
@@ -636,7 +641,7 @@ code { font-family: "DM Mono", ui-monospace, monospace; }
     position: relative;
     z-index: 1;
     display: flex;
-    min-height: 225px;
+    min-height: 290px;
     align-items: center;
     justify-content: center;
     padding: 26px 4px;
@@ -645,9 +650,9 @@ code { font-family: "DM Mono", ui-monospace, monospace; }
 .playing-card {
     position: relative;
     display: grid;
-    width: clamp(76px, 10vw, 108px);
+    width: clamp(88px, 9vw, 126px);
     aspect-ratio: 0.7;
-    flex: 0 1 108px;
+    flex: 0 1 126px;
     place-items: center;
     border: 1px solid #dad6cb;
     border-radius: 11px;
@@ -655,7 +660,7 @@ code { font-family: "DM Mono", ui-monospace, monospace; }
     box-shadow: 0 13px 24px rgba(0, 0, 0, 0.28);
     color: #17221b;
     font-family: Georgia, serif;
-    font-size: clamp(1.7rem, 4vw, 2.6rem);
+    font-size: clamp(1.9rem, 4vw, 3rem);
     transform: rotate(var(--tilt, 0deg));
     animation: deal-in 0.35s cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
@@ -895,7 +900,7 @@ summary { padding: 17px 18px; cursor: pointer; font-size: 0.86rem; font-weight: 
 }
 
 @media (max-width: 680px) {
-    .draft-shell { width: min(100% - 24px, 1160px); padding-top: 22px; }
+    .draft-shell { width: min(100% - 24px, 1320px); padding-top: 22px; }
     .draft-hero { align-items: flex-start; }
     .hero-mark { width: 66px; height: 88px; border-radius: 9px; box-shadow: 6px 7px 0 var(--draft-forest); }
     .hero-mark span:first-child { top: 9px; left: 11px; font-size: 0.95rem; }
@@ -919,8 +924,9 @@ summary { padding: 17px 18px; cursor: pointer; font-size: 0.86rem; font-weight: 
     .decision-stat { border-left: 0; border-top: 1px solid rgba(255, 255, 255, 0.1); }
     .decision-stat:nth-child(odd) { border-left: 1px solid rgba(255, 255, 255, 0.1); }
     .pot-block { border-bottom: 1px solid rgba(255, 255, 255, 0.1); }
-    .cards-held { min-height: 195px; overflow: hidden; }
-    .playing-card { width: 77px; }
+    .play-stage { min-height: 620px; padding: 24px 20px; }
+    .cards-held { min-height: 215px; overflow: hidden; }
+    .playing-card { width: 84px; }
     .playing-card + .playing-card { margin-left: -30px; }
     .proof-values { grid-template-columns: 1fr; }
     .deck-grid { grid-template-columns: repeat(8, 1fr); }
