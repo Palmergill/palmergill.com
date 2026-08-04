@@ -143,6 +143,7 @@ def test_practice_is_private_replayable_and_does_not_fill_recent_rooms(monkeypat
     assert view["joinCode"] is None
     assert view["canPlay"] is True
     assert len(view["players"]) == 1
+    assert player.get("/api/fantasy/draft/sessions/mine").json()["sessions"] == []
 
     # Starting practice twice resumes the unfinished warm-up instead of
     # leaving abandoned rooms behind.
@@ -795,6 +796,22 @@ def test_room_list_summarises_without_building_every_view(monkeypatch):
     # them for a dozen rooms cost hundreds of queries per page load.
     assert "leaderboard" not in card
     assert "players" not in card
+
+
+def test_room_list_excludes_practice_and_test_rooms(monkeypatch):
+    host = admin_client(monkeypatch)
+    league = create_room(host)
+    practice = host.post("/api/fantasy/draft/practice").json()
+    test_room = host.post(
+        "/api/fantasy/draft/sessions/test",
+        json={"league_name": "Production Test", "bot_count": 3},
+    ).json()
+
+    listed = host.get("/api/fantasy/draft/sessions/mine").json()["sessions"]
+
+    assert [room["id"] for room in listed] == [league["id"]]
+    assert practice["id"] not in {room["id"] for room in listed}
+    assert test_room["id"] not in {room["id"] for room in listed}
 
 
 def test_standings_and_draft_order_break_ties_the_same_way(monkeypatch):

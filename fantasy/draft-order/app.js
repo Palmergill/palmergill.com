@@ -328,10 +328,9 @@
                     : `${managers} manager${managers === 1 ? "" : "s"} in lobby`;
             details.textContent = stateLabel;
             const status = document.createElement("small");
-            const modeLabel = room.mode === "league"
-                ? ROOM_STATE_LABELS[room.state] || room.state
-                : F.roomModeName(room.mode);
-            status.textContent = modeLabel;
+            // /sessions/mine only returns league rooms — practice and bot test
+            // rooms stay out of the launcher — so the state label always applies.
+            status.textContent = ROOM_STATE_LABELS[room.state] || room.state;
             button.append(title, details, status);
             button.addEventListener("click", () => openRoom(room.id));
             els.recentRooms.appendChild(button);

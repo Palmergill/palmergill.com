@@ -18,7 +18,7 @@ from collections import defaultdict
 from typing import Any, Iterable
 
 from fastapi import HTTPException
-from sqlalchemy import func, or_
+from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -1316,10 +1316,7 @@ def list_sessions_for_user(db: Session, identity: dict[str, str]) -> list[dict[s
         .join(FantasyDraftPlayer, FantasyDraftPlayer.session_id == FantasyDraftSession.id)
         .filter(
             FantasyDraftPlayer.username == username,
-            or_(
-                FantasyDraftSession.mode != MODE_PRACTICE,
-                FantasyDraftSession.state != "complete",
-            ),
+            FantasyDraftSession.mode == MODE_LEAGUE,
         )
         .order_by(FantasyDraftSession.created_at.desc())
         .limit(12)
