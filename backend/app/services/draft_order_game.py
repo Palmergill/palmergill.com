@@ -872,6 +872,22 @@ def remove_player(
     return room
 
 
+def delete_session(db: Session, identity: dict[str, str], session_id: str) -> None:
+    """Admin-only teardown of a room and everything dealt inside it.
+
+    The child tables declare ON DELETE CASCADE, but SQLite only honours that
+    with foreign keys switched on per connection, so the rows are cleared here
+    rather than trusting the database to do it.
+    """
+    if identity.get("role") != accounts.ROLE_ADMIN:
+        raise HTTPException(status_code=403, detail="Only the site admin can delete a room.")
+    room = _session_or_404(db, session_id, lock=True)
+    for model in (FantasyDraftFlip, FantasyDraftRound, FantasyDraftPlayer):
+        db.query(model).filter(model.session_id == room.id).delete(synchronize_session=False)
+    db.delete(room)
+    db.commit()
+
+
 def start_session(db: Session, identity: dict[str, str], session_id: str) -> FantasyDraftSession:
     username, _ = _identity_names(identity)
     room = _session_or_404(db, session_id, lock=True)
@@ -1349,6 +1365,44 @@ def list_sessions_for_user(db: Session, identity: dict[str, str]) -> list[dict[s
             "isHost": username == room.created_by,
             "playerCount": counts.get(room.id, 0),
             "currentPlayerName": current_names.get(room.current_player_id),
+            "createdAt": room.created_at.isoformat() if room.created_at else None,
+        }
+        for room in rooms
+    ]
+
+
+def list_all_sessions(db: Session, identity: dict[str, str]) -> list[dict[str, Any]]:
+    """Every room on the site, for the admin's cleanup list.
+
+    The launcher above it is scoped to rooms you actually sit in, so this is the
+    only place a practice run, a bot test, or somebody else's league is
+    reachable — and the only way the admin can clear one out.
+    """
+    if identity.get("role") != accounts.ROLE_ADMIN:
+        raise HTTPException(status_code=403, detail="Only the site admin can list every room.")
+    rooms = (
+        db.query(FantasyDraftSession)
+        .order_by(FantasyDraftSession.created_at.desc())
+        .limit(60)
+        .all()
+    )
+    if not rooms:
+        return []
+
+    counts = dict(
+        db.query(FantasyDraftPlayer.session_id, func.count(FantasyDraftPlayer.id))
+        .filter(FantasyDraftPlayer.session_id.in_([room.id for room in rooms]))
+        .group_by(FantasyDraftPlayer.session_id)
+        .all()
+    )
+    return [
+        {
+            "id": room.id,
+            "leagueName": room.league_name,
+            "mode": room.mode or MODE_LEAGUE,
+            "state": room.state,
+            "createdBy": room.created_by,
+            "playerCount": counts.get(room.id, 0),
             "createdAt": room.created_at.isoformat() if room.created_at else None,
         }
         for room in rooms

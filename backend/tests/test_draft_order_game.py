@@ -814,6 +814,52 @@ def test_room_list_excludes_practice_and_test_rooms(monkeypatch):
     assert test_room["id"] not in {room["id"] for room in listed}
 
 
+def test_only_admin_can_delete_a_room_and_the_deal_goes_with_it(monkeypatch):
+    admin = admin_client(monkeypatch)
+    guest = member_client(monkeypatch, "road-warrior")
+    room = create_room(admin)
+    join_room(guest, room["joinCode"])
+    started = admin.post(f"/api/fantasy/draft/sessions/{room['id']}/start").json()
+    current = next(
+        player["username"] for player in started["players"] if player["isCurrent"]
+    )
+    dealer = admin if current == "palmer" else guest
+    assert dealer.post(f"/api/fantasy/draft/sessions/{room['id']}/flip").status_code == 200
+
+    assert guest.delete(f"/api/fantasy/draft/sessions/{room['id']}").status_code == 403
+    assert admin.delete(f"/api/fantasy/draft/sessions/{room['id']}").status_code == 204
+
+    assert admin.get(f"/api/fantasy/draft/sessions/{room['id']}").status_code == 404
+    assert admin.get("/api/fantasy/draft/sessions/mine").json()["sessions"] == []
+    db = SessionLocal()
+    try:
+        for model in (FantasyDraftFlip, FantasyDraftRound, FantasyDraftPlayer):
+            assert db.query(model).filter(model.session_id == room["id"]).count() == 0
+    finally:
+        db.close()
+
+
+def test_admin_lists_and_deletes_rooms_it_never_joined(monkeypatch):
+    guest = member_client(monkeypatch, "road-warrior")
+    stranger = create_room(guest, league_name="Someone Else's League")
+    practice = guest.post("/api/fantasy/draft/practice").json()
+    admin = admin_client(monkeypatch)
+
+    assert guest.get("/api/fantasy/draft/sessions/all").status_code == 403
+    listed = admin.get("/api/fantasy/draft/sessions/all").json()["sessions"]
+
+    # The launcher is scoped to rooms you sit in; this list is not.
+    assert admin.get("/api/fantasy/draft/sessions/mine").json()["sessions"] == []
+    by_id = {room["id"]: room for room in listed}
+    assert by_id[stranger["id"]]["createdBy"] == "road-warrior"
+    assert by_id[practice["id"]]["mode"] == draft_order_game.MODE_PRACTICE
+
+    assert admin.delete(f"/api/fantasy/draft/sessions/{stranger['id']}").status_code == 204
+    assert admin.delete(f"/api/fantasy/draft/sessions/{practice['id']}").status_code == 204
+    assert admin.get("/api/fantasy/draft/sessions/all").json()["sessions"] == []
+    assert guest.get("/api/fantasy/draft/sessions/mine").json()["sessions"] == []
+
+
 def test_standings_and_draft_order_break_ties_the_same_way(monkeypatch):
     """The leaderboard used to fall back to turn position, so a manager could
     hold first place in the standings and be handed the second pick."""

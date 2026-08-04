@@ -445,9 +445,12 @@ input::placeholder { color: #aaa296; }
 
 .room-list { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
 
-.room-list button {
+.room-slot { position: relative; display: flex; }
+
+.room-list .room-open {
     display: flex;
     min-height: 105px;
+    flex: 1;
     flex-direction: column;
     align-items: flex-start;
     border: 1px solid var(--draft-line);
@@ -459,7 +462,48 @@ input::placeholder { color: #aaa296; }
     text-align: left;
 }
 
-.room-list button:hover { border-color: #98a596; }
+.room-list .room-open:hover { border-color: #98a596; }
+
+/* Keeps a long league name clear of the admin's delete control. */
+.room-slot.has-delete .room-open { padding-right: 42px; }
+
+.room-delete {
+    position: absolute;
+    top: 9px;
+    right: 9px;
+    display: flex;
+    width: 26px;
+    height: 26px;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid transparent;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--draft-muted);
+    font-size: 1.05rem;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.room-delete:hover:not(:disabled) { border-color: #c2705f; background: rgba(194, 112, 95, 0.12); color: #a84b38; }
+.room-delete:disabled { cursor: progress; opacity: 0.5; }
+
+.admin-room-list { display: grid; gap: 8px; }
+
+.admin-room {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    border: 1px solid var(--draft-line);
+    border-radius: 12px;
+    background: var(--draft-paper);
+    padding: 12px 46px 12px 15px;
+}
+
+.admin-room strong { font-size: 0.92rem; overflow-wrap: anywhere; }
+.admin-room span { color: var(--draft-muted); font-size: 0.78rem; }
+.admin-room .room-delete { top: 50%; transform: translateY(-50%); }
 .room-list strong { font-size: 0.96rem; }
 .room-list span { margin-top: 5px; color: var(--draft-muted); font-size: 0.82rem; }
 .room-list small { margin-top: auto; color: #5c6a5d; font-size: 0.75rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; }

@@ -58,6 +58,8 @@
         testBotCount: byId("testBotCount"),
         recentRoomsSection: byId("recentRoomsSection"),
         recentRooms: byId("recentRooms"),
+        adminRoomsSection: byId("adminRoomsSection"),
+        adminRooms: byId("adminRooms"),
         leaveRoomView: byId("leaveRoomView"),
         roomStateLabel: byId("roomStateLabel"),
         roomLeagueName: byId("roomLeagueName"),
@@ -314,9 +316,14 @@
         const rooms = sessions || [];
         els.recentRoomsSection.hidden = rooms.length === 0;
         els.recentRooms.innerHTML = "";
+        const isAdmin = state.identity.role === "admin";
+        if (!isAdmin) els.adminRoomsSection.hidden = true;
         rooms.forEach((room) => {
+            const slot = document.createElement("div");
+            slot.className = "room-slot";
             const button = document.createElement("button");
             button.type = "button";
+            button.className = "room-open";
             const title = document.createElement("strong");
             title.textContent = room.leagueName;
             const details = document.createElement("span");
@@ -333,8 +340,64 @@
             status.textContent = ROOM_STATE_LABELS[room.state] || room.state;
             button.append(title, details, status);
             button.addEventListener("click", () => openRoom(room.id));
-            els.recentRooms.appendChild(button);
+            slot.appendChild(button);
+            if (isAdmin) {
+                slot.classList.add("has-delete");
+                slot.appendChild(deleteRoomButton(room));
+            }
+            els.recentRooms.appendChild(slot);
         });
+    }
+
+    function renderAdminRooms(sessions) {
+        const rooms = sessions || [];
+        els.adminRoomsSection.hidden = rooms.length === 0;
+        els.adminRooms.innerHTML = "";
+        rooms.forEach((room) => {
+            const row = document.createElement("div");
+            row.className = "admin-room";
+            const title = document.createElement("strong");
+            title.textContent = room.leagueName;
+            const meta = document.createElement("span");
+            const managers = room.playerCount;
+            // Rooms the admin never joined are listed but not openable — the
+            // room endpoint still answers only to the managers playing in it.
+            meta.textContent = [
+                F.roomModeName(room.mode),
+                ROOM_STATE_LABELS[room.state] || room.state,
+                `${managers} manager${managers === 1 ? "" : "s"}`,
+                `hosted by ${room.createdBy}`,
+            ].join(" · ");
+            row.append(title, meta, deleteRoomButton(room));
+            els.adminRooms.appendChild(row);
+        });
+    }
+
+    // Admin-only: rooms accumulate faster than a league finishes them, and
+    // nobody else should be able to erase a draft other managers played.
+    function deleteRoomButton(room) {
+        const remove = document.createElement("button");
+        remove.type = "button";
+        remove.className = "room-delete";
+        remove.textContent = "×";
+        remove.title = `Delete ${room.leagueName}`;
+        remove.setAttribute("aria-label", `Delete ${room.leagueName}`);
+        remove.addEventListener("click", async () => {
+            const confirmed = window.confirm(
+                `Delete "${room.leagueName}"? Every hand played in it goes with it.`,
+            );
+            if (!confirmed) return;
+            remove.disabled = true;
+            try {
+                await requestJson(`/sessions/${room.id}`, { method: "DELETE" });
+                showStatus(`Deleted ${room.leagueName}.`);
+                await loadHome();
+            } catch (error) {
+                remove.disabled = false;
+                handleActionError(error);
+            }
+        });
+        return remove;
     }
 
     async function loadHome() {
@@ -356,6 +419,18 @@
                 return;
             }
             renderHome([]);
+            showStatus(error.message, true);
+        }
+        // Its own request so a failure here leaves the launcher standing.
+        if (state.identity.role === "admin") await loadAdminRooms();
+    }
+
+    async function loadAdminRooms() {
+        try {
+            const data = await requestJson("/sessions/all");
+            renderAdminRooms(data.sessions || []);
+        } catch (error) {
+            renderAdminRooms([]);
             showStatus(error.message, true);
         }
     }

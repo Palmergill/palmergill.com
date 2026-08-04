@@ -2,7 +2,7 @@
 
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -37,6 +37,12 @@ def _identity(request: Request) -> dict[str, str]:
 def my_sessions(request: Request, db: Session = Depends(get_db)) -> dict[str, Any]:
     identity = _identity(request)
     return {"sessions": draft_order_game.list_sessions_for_user(db, identity)}
+
+
+@router.get("/sessions/all")
+def all_sessions(request: Request, db: Session = Depends(get_db)) -> dict[str, Any]:
+    identity = _identity(request)
+    return {"sessions": draft_order_game.list_all_sessions(db, identity)}
 
 
 @router.post("/sessions", status_code=201)
@@ -101,6 +107,17 @@ def room_status(
     if not view["isMember"]:
         raise HTTPException(status_code=403, detail="Join this draft room to view it.")
     return view
+
+
+@router.delete("/sessions/{session_id}", status_code=204)
+def delete_room(
+    session_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+) -> Response:
+    identity = _identity(request)
+    draft_order_game.delete_session(db, identity, session_id)
+    return Response(status_code=204)
 
 
 @router.delete("/sessions/{session_id}/players/{player_id}")
