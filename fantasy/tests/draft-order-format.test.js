@@ -24,6 +24,15 @@ describe('DraftOrderFormat', () => {
         expect(DraftOrderFormat.bustCopy(12)).toBe('12.0% bust chance');
     });
 
+    test('bustCopy separates an unknown chance from a safe one', () => {
+        // A held hand has no next flip to price, so the room sends null. That
+        // used to read "Safe first flip" over the card that had just busted.
+        expect(DraftOrderFormat.bustCopy(null, 4)).toBe('—');
+        expect(DraftOrderFormat.bustCopy(undefined, 0)).toBe('—');
+        expect(DraftOrderFormat.bustCopy(0, 3)).toBe('0.0% bust chance');
+        expect(DraftOrderFormat.bustCopy(0, 0)).toBe('Safe first flip');
+    });
+
     test('roomUrl creates a shareable same-site room link', () => {
         expect(DraftOrderFormat.roomUrl('https://palmergill.com', 'room-1')).toBe(
             'https://palmergill.com/fantasy/draft-order/?room=room-1'

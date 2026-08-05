@@ -120,6 +120,19 @@ def delete_room(
     return Response(status_code=204)
 
 
+# Declared before the {player_id} route below: Starlette matches in order, and
+# "me" would otherwise be read as a player ID.
+@router.delete("/sessions/{session_id}/players/me", status_code=204)
+def leave_room(
+    session_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+) -> Response:
+    identity = _identity(request)
+    draft_order_game.leave_session(db, identity, session_id)
+    return Response(status_code=204)
+
+
 @router.delete("/sessions/{session_id}/players/{player_id}")
 def remove_player(
     session_id: str,

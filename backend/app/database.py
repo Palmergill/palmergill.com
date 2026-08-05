@@ -379,6 +379,9 @@ class FantasyDraftSession(Base):
     # spectator's poll to see the card that ended it, then released.
     turn_state = Column(String, default="playing", server_default="playing", nullable=False)
     resolved_at = Column(DateTime, nullable=True)
+    # When the current manager was put on the clock. The host's skip is gated on
+    # this so a rival cannot be written off the instant their turn opens.
+    turn_started_at = Column(DateTime, nullable=True)
     last_event_json = Column(Text, nullable=True)
     created_at = Column(DateTime, default=utc_now, nullable=False)
     started_at = Column(DateTime, nullable=True)

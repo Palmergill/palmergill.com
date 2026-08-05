@@ -15,6 +15,7 @@
         banked: "Banked",
         busted: "Busted on a repeated rank",
         forfeited: "Written off by the host — scores zero",
+        exhausted: "No deck left to deal — scores zero",
     };
     // Clears the sticky site nav when the table is scrolled into view.
     const STICKY_NAV_OFFSET = 76;
@@ -75,6 +76,7 @@
         lobbyRoster: byId("lobbyRoster"),
         startGameButton: byId("startGameButton"),
         startHelp: byId("startHelp"),
+        leaveRoomButton: byId("leaveRoomButton"),
         gamePanel: byId("gamePanel"),
         currentPlayerName: byId("currentPlayerName"),
         roundBadge: byId("roundBadge"),
@@ -89,6 +91,7 @@
         flipButton: byId("flipButton"),
         bankButton: byId("bankButton"),
         forfeitButton: byId("forfeitButton"),
+        forfeitNote: byId("forfeitNote"),
         resumeBotsButton: byId("resumeBotsButton"),
         leaderboard: byId("leaderboard"),
         leaderboardTitle: byId("leaderboardTitle"),
@@ -341,7 +344,9 @@
             button.append(title, details, status);
             button.addEventListener("click", () => openRoom(room.id));
             slot.appendChild(button);
-            if (isAdmin) {
+            // A host can clear a lobby nobody has played yet — otherwise an
+            // account that fills its room cap has no way to open another.
+            if (isAdmin || (room.isHost && room.state === "lobby")) {
                 slot.classList.add("has-delete");
                 slot.appendChild(deleteRoomButton(room));
             }
@@ -373,8 +378,9 @@
         });
     }
 
-    // Admin-only: rooms accumulate faster than a league finishes them, and
-    // nobody else should be able to erase a draft other managers played.
+    // Rooms accumulate faster than a league finishes them. The admin can clear
+    // any of them; a host only their own lobby, since nobody should be able to
+    // erase a draft other managers actually played.
     function deleteRoomButton(room) {
         const remove = document.createElement("button");
         remove.type = "button";
@@ -534,6 +540,9 @@
         els.startGameButton.textContent = isTest
             ? "Start full-flow test"
             : "Lock roster & reveal turn order";
+        // A manager who typed the wrong code used to be stuck in the room for
+        // good: the roster locks on start and only the host could remove them.
+        els.leaveRoomButton.hidden = room.isHost;
         els.startHelp.textContent = room.isHost
             ? (room.canStart
                 ? (isTest
@@ -632,27 +641,44 @@
         renderCards(round.cards || [], concealed ? (round.cardCount || 0) : null, cardScope);
         els.currentPot.textContent = concealed ? "Sealed" : (round.pot || 0);
         els.currentPotUnit.textContent = concealed ? "" : " pts";
-        els.bustChance.textContent = concealed ? "Hidden" : F.bustCopy(round.bustChance);
-        els.bankPosition.textContent = concealed
+        els.bustChance.textContent = concealed
+            ? "Hidden"
+            : F.bustCopy(round.bustChance, (round.cards || []).length);
+        // In the final round the server freezes every other total at the
+        // pre-round standings, so it sends no position and no score to beat.
+        // Showing one anyway told a manager they'd lead when an opponent had
+        // already banked past them behind the seal.
+        const standingsSealed = concealed || Boolean(decision.standingsSealed);
+        els.bankPosition.textContent = standingsSealed
             ? "After reveal"
             : (decision.bankPosition ? F.ordinal(decision.bankPosition) : "—");
         // These stats describe the player at the table, so only phrase them in
         // the second person when the viewer is that player.
-        els.scoreToBeat.textContent = concealed
+        els.scoreToBeat.textContent = standingsSealed
             ? "Sealed"
             : decision.isLeadingIfBanked
                 ? (room.canPlay ? "You’d lead" : "Would lead")
                 : `${decision.scoreToBeat || 0} pts`;
         els.playActions.hidden = !room.canPlay;
-        els.flipButton.disabled = state.actionBusy;
+        // Five rounds can outrun a 52-card deck. There is nothing left to deal.
+        const deckEmpty = round.deckRemaining === 0;
+        els.flipButton.disabled = state.actionBusy || deckEmpty;
         els.bankButton.disabled = state.actionBusy || !(round.cards || []).length;
 
-        // The host's way out of a room stalled on someone who left.
+        // The host's way out of a room stalled on someone who left. It stays
+        // out of reach for the first stretch of a turn so it can't be used on a
+        // rival who is simply still thinking; the note counts that down.
         const stalledOn = room.currentPlayer?.displayName;
-        els.forfeitButton.hidden = room.canRunBot || !room.canForfeit || room.canPlay;
+        const hostIsWaiting = room.isHost && !room.canRunBot && !room.canPlay;
+        const skipIn = room.forfeitAvailableIn;
+        els.forfeitButton.hidden = !hostIsWaiting || !room.canForfeit;
         els.forfeitButton.disabled = state.actionBusy;
         if (!els.forfeitButton.hidden) {
             els.forfeitButton.textContent = `${stalledOn} isn’t responding — skip them`;
+        }
+        els.forfeitNote.hidden = !hostIsWaiting || !skipIn;
+        if (!els.forfeitNote.hidden) {
+            els.forfeitNote.textContent = `If ${stalledOn} never plays, you can skip them in ${skipIn}s.`;
         }
         els.resumeBotsButton.hidden = !(state.botPaused && room.mode === "test" && room.isHost);
         els.resumeBotsButton.disabled = state.actionBusy;
@@ -664,7 +690,7 @@
         state.wasMyTurn = Boolean(room.canPlay);
         if (turnJustArrived) scrollToPlayStage();
 
-        renderTurnMessage(room, round, concealed);
+        renderTurnMessage(room, round, concealed, deckEmpty);
         renderLeaderboard(room);
     }
 
@@ -672,10 +698,21 @@
     // narrate the same moment from one source. This used to be stitched
     // together client-side from an action's private response plus a timer,
     // which meant a watcher never learned what ended somebody else's round.
-    function renderTurnMessage(room, round, concealed) {
+    function renderTurnMessage(room, round, concealed, deckEmpty) {
         const event = room.lastEvent;
-        const describesTable = Boolean(event) && event.playerId === room.currentPlayer?.id;
+        // A solo practice run keeps the same player across rounds, so matching
+        // on the player alone left round one's "10 points banked" sitting over
+        // an empty round-two table.
+        const describesTable = Boolean(event)
+            && event.playerId === room.currentPlayer?.id
+            && (event.round == null || event.round === round.number);
         els.turnMessage.className = "turn-message";
+        if (room.canPlay && deckEmpty) {
+            els.turnMessage.textContent = round.cards.length
+                ? "Your deck is out of cards. Bank what you’re holding."
+                : "Your deck is out of cards. This round scores zero.";
+            return;
+        }
         if (describesTable) {
             const tone = F.turnEventTone(event);
             if (tone) els.turnMessage.classList.add(tone);
@@ -1134,6 +1171,23 @@
     });
 
     els.leaveRoomView.addEventListener("click", loadHome);
+    els.leaveRoomButton.addEventListener("click", async () => {
+        if (!state.room) return;
+        const confirmed = window.confirm(
+            `Leave "${state.room.leagueName}"? You can rejoin with the room code while the lobby is open.`,
+        );
+        if (!confirmed) return;
+        els.leaveRoomButton.disabled = true;
+        try {
+            await requestJson(`/sessions/${state.room.id}/players/me`, { method: "DELETE" });
+            showStatus("You left the room.");
+            await loadHome();
+        } catch (error) {
+            handleActionError(error);
+        } finally {
+            els.leaveRoomButton.disabled = false;
+        }
+    });
     els.copyHashButton.addEventListener("click", () => state.room && copyText(state.room.seedHash, "Seed commitment copied."));
     els.copyCodeButton.addEventListener("click", () => state.room && copyText(state.room.joinCode, "Room code copied."));
     els.copyLinkButton.addEventListener("click", () => state.room && copyText(roomInviteUrl(state.room.joinCode), "Invite link copied."));

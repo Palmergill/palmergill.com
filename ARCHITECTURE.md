@@ -98,9 +98,13 @@ Two roles, stored in different places on purpose:
 Fourth & Fortune persists rooms, players, rounds, and every dealt card in the
 `ff_draft_*` tables. The API owns turn authorization and derives a separate
 per-account deck from a committed master seed; the seed is disclosed only when
-the last score is locked. Round one follows the seed-derived player order;
-rounds two and three are frozen from the standings after the preceding round,
-with the scoring leader first. A room has an explicit mode: `league` rooms accept
+the last score is locked. Each player takes `ROUNDS_PER_PLAYER` (5) rounds from
+their own deck, consumed continuously. Round one follows the seed-derived player
+order; every later round is frozen from the standings after the preceding round,
+with the scoring leader first. Five rounds can consume up to 65 cards from a
+52-card deck, so a round with no deck left to deal from is recorded as
+`exhausted` and scores zero rather than stranding the room on a manager who can
+neither flip nor bank. A room has an explicit mode: `league` rooms accept
 account-backed invites, `practice` rooms are private solo warm-ups, and
 admin-only `test` rooms contain marked bot players that advance one round at a
 time through the same scoring and verification path as a real draft.
@@ -112,12 +116,17 @@ first read or action that arrives more than `TURN_HOLD_SECONDS` later. Without
 that hold the card that busted or banked a round was already gone by the time a
 spectator's poll landed. There is no scheduler, so reads are what drive the
 clock — a held room is never stuck for longer than it takes someone to look at
-it. `lastEvent` carries the same round-three concealment as the cards it
-describes.
+it. `lastEvent` carries the same final-round concealment as the cards it
+describes. `turn_started_at` records when the current manager went on the clock:
+the host's forfeit is the one lever a person controls rather than the seed, so it
+stays out of reach until `FORFEIT_GRACE_SECONDS` have passed.
 
-Spectators receive every live card and pot value in rounds one and two. During round three,
-the API returns only each opponent's card count, freezes the public leaderboard
-at the two-round standings, and withholds the seed, final scores, and draft order
-until the host records the synchronized reveal in `revealed_at`.
+Spectators receive every live card and pot value in rounds one through four.
+During the final round the API returns only each opponent's card count, freezes
+the public leaderboard at the standings after round four, and withholds the seed,
+final scores, and draft order until the host records the synchronized reveal in
+`revealed_at`. Because those standings are frozen, the decision strip reports
+`standingsSealed` and omits the bank position and score to beat instead of
+ranking a manager against totals that opponents have already played past.
 
 The API service is the only thing that authenticates anyone — it owns the user table and mints the signed `pg_session` cookie, which carries a role claim. `middleware.js` at the Vercel edge only verifies that cookie and enforces the role gate; it deliberately no longer implements a second login. An admin role claim is honored only for the configured admin username, so a member token cannot be rewritten into an admin one even though both are signed with the same secret. Cookies issued before member accounts existed carry no role claim and are read as admin only when the username matches.

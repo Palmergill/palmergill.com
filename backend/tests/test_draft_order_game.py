@@ -1,6 +1,9 @@
 """Fourth & Fortune fairness, account gating, and live turn flow."""
 
+import copy
 import hashlib
+import json
+from datetime import timedelta
 
 from fastapi.testclient import TestClient
 from sqlalchemy import event
@@ -14,6 +17,7 @@ from app.database import (
     FantasyDraftSession,
     SessionLocal,
     engine,
+    utc_now,
 )
 from app.main import SESSION_COOKIE_NAME, app, create_app_session_token
 from app.services import draft_order_game
@@ -30,6 +34,10 @@ def setup_function():
     # turns, so they release instantly; the hold itself is covered on its own
     # in test_finished_hand_is_held_on_the_table_before_the_turn_moves.
     draft_order_game.TURN_HOLD_SECONDS = 0
+    # The host's skip normally waits out a grace period so a rival can't be
+    # written off the moment their turn opens. Flow tests skip instantly; the
+    # grace itself is covered in test_host_cannot_skip_a_manager_who_just_sat_down.
+    draft_order_game.FORFEIT_GRACE_SECONDS = 0
     db = SessionLocal()
     try:
         db.query(FantasyDraftFlip).delete()
@@ -915,3 +923,282 @@ def test_standings_and_draft_order_break_ties_the_same_way(monkeypatch):
     assert [p["place"] for p in view["leaderboard"]] == [1, 2]
     # Best round is the first tiebreak, so 30 beats 20 in both lists.
     assert view["leaderboard"][0]["bestRound"] == 30
+
+
+def test_verification_rejects_a_round_scored_on_cards_never_dealt(monkeypatch):
+    """The proof used to check the deck and the draws without joining them.
+
+    A rewritten hand still reproduced from the seed — deck intact, draws intact —
+    while the round it belonged to quietly grew a better score, so the one thing
+    a skeptical league actually runs would have signed off on it.
+    """
+    host = member_client(monkeypatch, "host-player")
+    guest = member_client(monkeypatch, "road-warrior")
+    room = create_room(host)
+    join_room(guest, room["joinCode"])
+    rid = room["id"]
+    view = host.post(f"/api/fantasy/draft/sessions/{rid}/start").json()
+    clients = clients_by_player(view, host, guest)
+
+    while view["state"] == "active":
+        current = clients[next(p["username"] for p in view["players"] if p["isCurrent"])]
+        current.post(f"/api/fantasy/draft/sessions/{rid}/flip")
+        current.post(f"/api/fantasy/draft/sessions/{rid}/bank")
+        view = settled(current, rid)
+
+    host.post(f"/api/fantasy/draft/sessions/{rid}/reveal")
+    proof = host.get(f"/api/fantasy/draft/sessions/{rid}/verify").json()
+    assert verify_proof(proof) == []
+
+    tampered = copy.deepcopy(proof)
+    player = tampered["players"][0]
+    round_one = player["rounds"][0]
+    player["finalScore"] += 39 - round_one["score"]
+    round_one["cards"] = [
+        draft_order_game.card_payload(code) for code in ("AS", "KH", "QD")
+    ]
+    round_one["cardCount"] = 3
+    round_one["score"] = 39
+    round_one["busted"] = False
+
+    assert verify_proof(tampered) == [
+        f"{player['displayName']}: round 1 was scored on cards that were never "
+        "dealt to this manager."
+    ]
+
+    # The mirror image: a card dealt into a round the proof leaves out.
+    dropped = copy.deepcopy(proof)
+    player = dropped["players"][0]
+    kept = [row for row in player["rounds"] if row["number"] != 1]
+    player["finalScore"] -= player["rounds"][0]["score"]
+    player["rounds"] = kept
+    assert verify_proof(dropped) == [
+        f"{player['displayName']}: cards were dealt into round 1, which the proof omits."
+    ]
+
+
+def test_final_round_makes_no_claim_about_where_banking_lands(monkeypatch):
+    """The standings freeze before the final round, so the decision strip used
+    to price a bank against totals opponents had already played past — telling a
+    manager they'd lead when the seal hid a bigger score sitting above them."""
+    host = member_client(monkeypatch, "host-player")
+    guest = member_client(monkeypatch, "road-warrior")
+    room = create_room(host)
+    join_room(guest, room["joinCode"])
+    rid = room["id"]
+    view = host.post(f"/api/fantasy/draft/sessions/{rid}/start").json()
+    clients = clients_by_player(view, host, guest)
+
+    while view["currentRound"]["number"] < ROUNDS_PER_PLAYER:
+        current = clients[next(p["username"] for p in view["players"] if p["isCurrent"])]
+        current.post(f"/api/fantasy/draft/sessions/{rid}/flip")
+        current.post(f"/api/fantasy/draft/sessions/{rid}/bank")
+        view = settled(current, rid)
+        # Before the final round the strip still answers in full.
+        if view["state"] == "active" and view["currentRound"]["number"] < ROUNDS_PER_PLAYER:
+            assert view["decision"]["standingsSealed"] is False
+            assert view["decision"]["bankPosition"] is not None
+            assert view["decision"]["scoreToBeat"] is not None
+
+    assert view["currentRound"]["number"] == ROUNDS_PER_PLAYER
+    current = clients[next(p["username"] for p in view["players"] if p["isCurrent"])]
+    played = current.post(f"/api/fantasy/draft/sessions/{rid}/flip").json()
+
+    decision = played["decision"]
+    assert decision["standingsSealed"] is True
+    assert decision["bankPosition"] is None
+    assert decision["scoreToBeat"] is None
+    assert decision["isLeadingIfBanked"] is None
+    # Their own running total is theirs to know; only the comparison is sealed.
+    mine = next(p for p in played["players"] if p["id"] == played["viewerPlayerId"])
+    assert decision["projectedScore"] == mine["score"] + played["currentRound"]["pot"]
+
+
+def test_host_cannot_skip_a_manager_who_just_sat_down(monkeypatch):
+    """Forfeit is the one lever a person controls rather than the seed. Without
+    a floor the host could zero a rival's remaining rounds the instant their
+    turn opened, so it waits out a grace period first."""
+    draft_order_game.FORFEIT_GRACE_SECONDS = 90
+    host = member_client(monkeypatch, "host-player")
+    guest = member_client(monkeypatch, "road-warrior")
+    room = create_room(host)
+    join_room(guest, room["joinCode"])
+    rid = room["id"]
+    view = host.post(f"/api/fantasy/draft/sessions/{rid}/start").json()
+
+    assert view["canForfeit"] is False
+    assert 0 < view["forfeitAvailableIn"] <= 90
+    blocked = host.post(f"/api/fantasy/draft/sessions/{rid}/forfeit")
+    assert blocked.status_code == 409
+    assert "seconds" in blocked.json()["detail"]
+
+    db = SessionLocal()
+    try:
+        room_row = db.query(FantasyDraftSession).filter(
+            FantasyDraftSession.id == rid
+        ).first()
+        room_row.turn_started_at = utc_now() - timedelta(seconds=91)
+        db.commit()
+    finally:
+        db.close()
+
+    waited = host.get(f"/api/fantasy/draft/sessions/{rid}").json()
+    assert waited["canForfeit"] is True
+    assert waited["forfeitAvailableIn"] == 0
+    assert host.post(f"/api/fantasy/draft/sessions/{rid}/forfeit").status_code == 200
+
+    # The next manager starts their own clock, not the skipped one's.
+    view = settled(host, rid)
+    assert view["canForfeit"] is False
+    assert view["forfeitAvailableIn"] > 0
+
+
+def test_a_spent_deck_closes_a_round_instead_of_stranding_the_room(monkeypatch):
+    """Five rounds can consume up to 65 cards and a deck holds 52. A manager who
+    runs dry can neither flip nor bank, so seating them would stall the room for
+    good — nobody else can act and the seed never unseals."""
+    host = member_client(monkeypatch, "host-player")
+    guest = member_client(monkeypatch, "road-warrior")
+    room = create_room(host)
+    join_room(guest, room["joinCode"])
+    rid = room["id"]
+    view = host.post(f"/api/fantasy/draft/sessions/{rid}/start").json()
+    clients = clients_by_player(view, host, guest)
+
+    db = SessionLocal()
+    try:
+        players = db.query(FantasyDraftPlayer).filter(
+            FantasyDraftPlayer.session_id == rid
+        ).all()
+        spent = next(p for p in players if p.username == "road-warrior")
+        other = next(p for p in players if p.username == "host-player")
+        deck = draft_order_game.derive_player_deck(
+            db.query(FantasyDraftSession).filter(FantasyDraftSession.id == rid).first().master_seed,
+            spent.username,
+        )
+        # Four rounds of thirteen cards is the whole deck, so round five has
+        # nothing left to deal from.
+        for number in range(1, ROUNDS_PER_PLAYER):
+            db.add(FantasyDraftRound(
+                id=f"{spent.id}-{number}",
+                session_id=rid,
+                player_id=spent.id,
+                round_number=number,
+                cards_json=json.dumps(deck[(number - 1) * 13:number * 13]),
+                score=10,
+                busted=False,
+                state="banked",
+            ))
+            db.add(FantasyDraftRound(
+                id=f"{other.id}-{number}",
+                session_id=rid,
+                player_id=other.id,
+                round_number=number,
+                cards_json="[]",
+                score=5,
+                busted=False,
+                state="banked",
+            ))
+        spent.final_score = 40
+        other.final_score = 20
+        room_row = db.query(FantasyDraftSession).filter(
+            FantasyDraftSession.id == rid
+        ).first()
+        # Hand the clock over as if the fourth round had just ended.
+        room_row.current_player_id = other.id
+        room_row.turn_state = "resolved"
+        room_row.resolved_at = utc_now()
+        db.commit()
+        spent_id, other_id = spent.id, other.id
+    finally:
+        db.close()
+
+    view = settled(host, rid)
+
+    # The room moved on rather than seating a manager who cannot act.
+    assert view["state"] == "active"
+    assert view["currentPlayer"]["id"] == other_id
+    ran_dry = next(p for p in view["players"] if p["id"] == spent_id)
+    final_round = next(r for r in ran_dry["rounds"] if r["number"] == ROUNDS_PER_PLAYER)
+    assert final_round["state"] == "sealed"
+
+    current = clients[view["currentPlayer"]["displayName"]]
+    current.post(f"/api/fantasy/draft/sessions/{rid}/flip")
+    current.post(f"/api/fantasy/draft/sessions/{rid}/bank")
+    view = settled(current, rid)
+    assert view["state"] == "complete"
+
+    revealed = host.post(f"/api/fantasy/draft/sessions/{rid}/reveal").json()
+    ran_dry = next(p for p in revealed["players"] if p["id"] == spent_id)
+    closed = next(r for r in ran_dry["rounds"] if r["number"] == ROUNDS_PER_PLAYER)
+    assert closed["state"] == draft_order_game.ROUND_STATE_EXHAUSTED
+    assert closed["score"] == 0
+    assert closed["cards"] == []
+    # The write-off is worth nothing, so the four banked rounds are the total.
+    assert ran_dry["score"] == 40
+
+
+def test_a_manager_can_leave_a_lobby_but_not_a_locked_roster(monkeypatch):
+    host = member_client(monkeypatch, "host-player")
+    guest = member_client(monkeypatch, "road-warrior")
+    room = create_room(host)
+    join_room(guest, room["joinCode"])
+    rid = room["id"]
+
+    # The host holds the room together; leaving is for the seats around them.
+    assert host.delete(f"/api/fantasy/draft/sessions/{rid}/players/me").status_code == 409
+    assert guest.delete(f"/api/fantasy/draft/sessions/{rid}/players/me").status_code == 204
+    assert host.get(f"/api/fantasy/draft/sessions/{rid}").json()["players"] == [
+        player
+        for player in host.get(f"/api/fantasy/draft/sessions/{rid}").json()["players"]
+        if player["username"] == "host-player"
+    ]
+    assert guest.get(f"/api/fantasy/draft/sessions/{rid}").status_code == 403
+
+    join_room(guest, room["joinCode"])
+    host.post(f"/api/fantasy/draft/sessions/{rid}/start")
+    # Once cards can be dealt the seat is part of the record.
+    assert guest.delete(f"/api/fantasy/draft/sessions/{rid}/players/me").status_code == 409
+
+
+def test_a_host_can_clear_their_own_lobby_but_not_a_played_draft(monkeypatch):
+    host = member_client(monkeypatch, "host-player")
+    guest = member_client(monkeypatch, "road-warrior")
+    outsider = member_client(monkeypatch, "nosy-manager")
+    room = create_room(host)
+    join_room(guest, room["joinCode"])
+    rid = room["id"]
+
+    assert outsider.delete(f"/api/fantasy/draft/sessions/{rid}").status_code == 403
+    assert guest.delete(f"/api/fantasy/draft/sessions/{rid}").status_code == 403
+
+    host.post(f"/api/fantasy/draft/sessions/{rid}/start")
+    started = host.delete(f"/api/fantasy/draft/sessions/{rid}")
+    assert started.status_code == 409
+    assert "admin" in started.json()["detail"]
+    # The admin's reach is unchanged.
+    assert admin_client(monkeypatch).delete(
+        f"/api/fantasy/draft/sessions/{rid}"
+    ).status_code == 204
+
+    lobby = create_room(host, "Second Chance")
+    assert host.delete(f"/api/fantasy/draft/sessions/{lobby['id']}").status_code == 204
+    assert host.get("/api/fantasy/draft/sessions/mine").json()["sessions"] == []
+
+
+def test_open_rooms_per_host_are_capped(monkeypatch):
+    host = member_client(monkeypatch, "host-player")
+    for index in range(draft_order_game.MAX_OPEN_ROOMS_PER_HOST):
+        create_room(host, f"League {index:02d}")
+
+    refused = host.post(
+        "/api/fantasy/draft/sessions",
+        json={"league_name": "One Too Many"},
+    )
+    assert refused.status_code == 409
+    assert str(draft_order_game.MAX_OPEN_ROOMS_PER_HOST) in refused.json()["detail"]
+
+    # Clearing one lobby makes room again, so the cap is never a dead end.
+    opened = host.get("/api/fantasy/draft/sessions/mine").json()["sessions"]
+    assert host.delete(f"/api/fantasy/draft/sessions/{opened[0]['id']}").status_code == 204
+    assert create_room(host, "One Too Many")["leagueName"] == "One Too Many"

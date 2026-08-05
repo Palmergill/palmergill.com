@@ -665,6 +665,21 @@ code { font-family: "DM Mono", ui-monospace, monospace; }
 .roster-card .button { margin-top: auto; }
 .fine-print { margin: 10px 0 0; color: var(--draft-muted); font-size: 0.8rem; text-align: center; }
 
+/* The guest's way out of a lobby they joined by mistake. It sits on the light
+   roster card, so it borrows the roster's own warning ink rather than the
+   salmon that the host's forfeit uses against the dark play stage. */
+.text-button--leave {
+    display: block;
+    width: 100%;
+    margin-top: 10px;
+    padding: 6px;
+    color: #8a4c43;
+    font-size: 0.8rem;
+    text-align: center;
+}
+.text-button--leave:hover { color: #6d382f; }
+.text-button--leave[disabled] { opacity: 0.5; }
+
 .play-stage {
     position: relative;
     min-height: 680px;
@@ -823,6 +838,10 @@ code { font-family: "DM Mono", ui-monospace, monospace; }
 }
 .text-button--warn:hover { color: #ffcdc6; }
 .text-button--warn[disabled] { opacity: 0.5; }
+
+/* Counts down to the forfeit above. The shared .fine-print ink is tuned for the
+   cream cards and disappears against the felt. */
+.play-stage .fine-print { color: #9fb0a3; }
 
 /* Shown only after a bot step failed. Without it a paused test room had no way
    back other than reloading the page. */

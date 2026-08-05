@@ -33,9 +33,15 @@
         return `${text.slice(0, size)}…${text.slice(-size)}`;
     }
 
-    function bustCopy(chance) {
+    // The room sends no bust chance while a finished hand is held on the table:
+    // a resolved round has no next flip to price. Number(null) is 0, so folding
+    // that into the zero case read "Safe first flip" over the card that had
+    // just busted somebody. Unknown and safe are different answers.
+    function bustCopy(chance, cardsHeld) {
+        if (chance === null || chance === undefined) return "—";
         const value = Number(chance);
-        if (!Number.isFinite(value) || value <= 0) return "Safe first flip";
+        if (!Number.isFinite(value)) return "—";
+        if (value <= 0) return cardsHeld ? "0.0% bust chance" : "Safe first flip";
         return `${value.toFixed(1)}% bust chance`;
     }
 

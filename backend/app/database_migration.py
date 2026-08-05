@@ -137,6 +137,15 @@ def migrate_database():
             "last_event_json",
             "TEXT",
         )
+        # The host's skip used to be available the moment a turn opened. NULL is
+        # the right value for rooms already in flight: an unknown turn start
+        # reads as "long enough ago", which is how those rooms behaved.
+        _add_column_if_missing(
+            inspector,
+            "ff_draft_sessions",
+            "turn_started_at",
+            "TIMESTAMP" if is_postgres else "DATETIME",
+        )
 
         logger.info("Database migration complete")
         

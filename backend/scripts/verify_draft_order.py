@@ -11,7 +11,9 @@ from __future__ import annotations
 
 import json
 import sys
+from collections import defaultdict
 from pathlib import Path
+from typing import Any
 
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
 if str(BACKEND_ROOT) not in sys.path:
@@ -68,9 +70,23 @@ def verify_proof(proof: dict) -> list[str]:
                 errors.append(f"{label}: draw at deck index {expected_index} does not match.")
                 break
 
+        # Every round has to be scored on the cards this manager was actually
+        # dealt. Checking the deck and the draws alone leaves the two halves of
+        # the proof unjoined: a rewritten hand still reproduces from the seed
+        # while the round it belongs to quietly grows a better score.
+        dealt_by_round: dict[Any, list[str]] = defaultdict(list)
+        for draw in draws:
+            dealt_by_round[draw.get("round")].append((draw.get("card") or {}).get("code"))
+
         final_score = 0
         for round_row in player.get("rounds", []):
+            number = round_row.get("number")
             cards = [card.get("code") for card in round_row.get("cards", [])]
+            if cards != dealt_by_round.pop(number, []):
+                errors.append(
+                    f"{label}: round {number} was scored on cards that were never "
+                    "dealt to this manager."
+                )
             if round_row.get("state") == "forfeited":
                 # The host wrote this round off when the manager stopped
                 # playing; it is worth nothing whatever was on the table.
@@ -84,6 +100,10 @@ def verify_proof(proof: dict) -> list[str]:
             if expected_score != round_row.get("score") or expected_bust != round_row.get("busted"):
                 errors.append(f"{label}: round {round_row.get('number')} score or bust flag is wrong.")
             final_score += expected_score
+        # Anything left over was dealt into a round the proof never lists, which
+        # is the same tampering seen from the other side.
+        for number in sorted(dealt_by_round, key=lambda value: (value is None, value)):
+            errors.append(f"{label}: cards were dealt into round {number}, which the proof omits.")
         if final_score != player.get("finalScore"):
             errors.append(f"{label}: final score should be {final_score}, not {player.get('finalScore')}.")
 

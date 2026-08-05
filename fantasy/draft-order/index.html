@@ -17,7 +17,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&amp;family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/shared/site-nav.css?v=13">
-    <link rel="stylesheet" href="style.css?v=8">
+    <link rel="stylesheet" href="style.css?v=9">
 </head>
 <body>
     <main class="draft-shell">
@@ -181,6 +181,7 @@
                     <ol id="lobbyRoster" class="roster-list"></ol>
                     <button id="startGameButton" class="button button--action" type="button" hidden>Lock roster &amp; reveal turn order</button>
                     <p id="startHelp" class="fine-print"></p>
+                    <button id="leaveRoomButton" class="text-button text-button--leave" type="button" hidden>Leave this room</button>
                 </div>
             </section>
 
@@ -227,6 +228,7 @@
                         </button>
                     </div>
                     <button id="forfeitButton" class="text-button text-button--warn" type="button" hidden></button>
+                    <p id="forfeitNote" class="fine-print" hidden></p>
                     <button id="resumeBotsButton" class="text-button text-button--resume" type="button" hidden>Resume bots</button>
                 </article>
 
@@ -302,7 +304,7 @@
     <script src="/shared/site-nav.js?v=13"></script>
     <script src="/shared/analytics.js?v=1"></script>
     <script src="/shared/api-base.js?v=1"></script>
-    <script src="format.js?v=4"></script>
-    <script src="app.js?v=13"></script>
+    <script src="format.js?v=5"></script>
+    <script src="app.js?v=14"></script>
 </body>
 </html>

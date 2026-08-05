@@ -33,9 +33,11 @@ from app.database import (
 
 GAME_VERSION = "fourth-and-fortune-v1"
 ROUNDS_PER_PLAYER = 5
-# A round is over once it is banked, busted, or written off by the host when a
-# manager walks away mid-draft. Forfeited rounds score zero and hold no cards.
-FINISHED_ROUND_STATES = frozenset({"banked", "busted", "forfeited"})
+# A round is over once it is banked, busted, written off by the host when a
+# manager walks away mid-draft, or left with no deck to deal from. Forfeited and
+# exhausted rounds both score zero.
+ROUND_STATE_EXHAUSTED = "exhausted"
+FINISHED_ROUND_STATES = frozenset({"banked", "busted", "forfeited", ROUND_STATE_EXHAUSTED})
 TURN_STATE_PLAYING = "playing"
 TURN_STATE_RESOLVED = "resolved"
 # How long the table keeps a finished hand face up before the next manager is
@@ -44,8 +46,16 @@ TURN_STATE_RESOLVED = "resolved"
 # time anyone polled. This has to comfortably exceed the client's active poll
 # interval (900ms) or a spectator can still miss it between two reads.
 TURN_HOLD_SECONDS = 1.8
+# How long a manager gets on the clock before the host may write them off. The
+# skip exists for a closed laptop, not for a rival in the lead: without a floor
+# the host could zero somebody's remaining rounds the instant their turn opened,
+# which is the one thing in this game a person can decide rather than the seed.
+FORFEIT_GRACE_SECONDS = 90
 MIN_PLAYERS = 2
 MAX_PLAYERS = 16
+# Rooms are cheap to open and, until a host could clear their own lobby, nothing
+# ever removed one. This is a guard rail, not a quota: a league runs one draft.
+MAX_OPEN_ROOMS_PER_HOST = 10
 MODE_LEAGUE = "league"
 MODE_PRACTICE = "practice"
 MODE_TEST = "test"
@@ -254,6 +264,24 @@ def _hold_expired(room: FantasyDraftSession) -> bool:
     if room.resolved_at is None:
         return True
     return (utc_now() - room.resolved_at).total_seconds() >= TURN_HOLD_SECONDS
+
+
+def _seconds_on_the_clock(room: FantasyDraftSession) -> float | None:
+    """How long the current manager has had the turn, or None if unknown.
+
+    Rooms that were mid-draft when the column arrived carry no turn start. An
+    unknown start reads as "long enough ago", matching how they already behaved.
+    """
+    if room.turn_started_at is None:
+        return None
+    return (utc_now() - room.turn_started_at).total_seconds()
+
+
+def _forfeit_grace_remaining(room: FantasyDraftSession) -> float:
+    elapsed = _seconds_on_the_clock(room)
+    if elapsed is None:
+        return 0.0
+    return max(0.0, FORFEIT_GRACE_SECONDS - elapsed)
 
 
 def _reject_if_held(room: FantasyDraftSession) -> None:
@@ -556,39 +584,52 @@ def serialize_session(
 
         if not spectator_final_round and not holding:
             projected_score = scores[current_player.id] + current_round_payload["pot"]
-            hypothetical = dict(scores)
-            hypothetical[current_player.id] = projected_score
-            # Banking the pot can also raise the best-round tiebreak, so the
-            # projection has to move both halves of the key.
-            hypothetical_best = dict(best_rounds)
-            hypothetical_best[current_player.id] = max(
-                best_rounds[current_player.id],
-                current_round_payload["pot"],
-            )
-            # One ranking rule everywhere. This used to sort on turn position,
-            # so a manager tied for the lead could be told they'd sit first
-            # while the standings beside it — and the final draft order — had
-            # them second. See standing_key.
-            projected_order = sorted(
-                players,
-                key=lambda player: standing_key(
-                    hypothetical[player.id],
-                    hypothetical_best[player.id],
-                    room.master_seed,
-                    player.username,
-                ),
-            )
-            bank_position = next(
-                index for index, player in enumerate(projected_order, start=1) if player.id == current_player.id
-            )
-            other_scores = [score for player_id, score in scores.items() if player_id != current_player.id]
-            score_to_beat = max(other_scores, default=0)
             decision = {
                 "projectedScore": projected_score,
-                "bankPosition": bank_position,
-                "scoreToBeat": score_to_beat,
-                "isLeadingIfBanked": projected_score > score_to_beat,
+                # While the last hands are sealed, every other total here is
+                # frozen at the standings from before the final round. A
+                # position or a "you'd lead" read off them is a claim the room
+                # cannot make: opponents who already played their final round
+                # may have banked straight past this manager behind the seal.
+                "standingsSealed": final_round_sealed,
+                "bankPosition": None,
+                "scoreToBeat": None,
+                "isLeadingIfBanked": None,
             }
+            if not final_round_sealed:
+                hypothetical = dict(scores)
+                hypothetical[current_player.id] = projected_score
+                # Banking the pot can also raise the best-round tiebreak, so the
+                # projection has to move both halves of the key.
+                hypothetical_best = dict(best_rounds)
+                hypothetical_best[current_player.id] = max(
+                    best_rounds[current_player.id],
+                    current_round_payload["pot"],
+                )
+                # One ranking rule everywhere. This used to sort on turn
+                # position, so a manager tied for the lead could be told they'd
+                # sit first while the standings beside it — and the final draft
+                # order — had them second. See standing_key.
+                projected_order = sorted(
+                    players,
+                    key=lambda player: standing_key(
+                        hypothetical[player.id],
+                        hypothetical_best[player.id],
+                        room.master_seed,
+                        player.username,
+                    ),
+                )
+                other_scores = [
+                    score for player_id, score in scores.items() if player_id != current_player.id
+                ]
+                score_to_beat = max(other_scores, default=0)
+                decision["bankPosition"] = next(
+                    index
+                    for index, player in enumerate(projected_order, start=1)
+                    if player.id == current_player.id
+                )
+                decision["scoreToBeat"] = score_to_beat
+                decision["isLeadingIfBanked"] = projected_score > score_to_beat
 
     draft_order = None
     if room.state == "complete" and results_revealed:
@@ -650,6 +691,14 @@ def serialize_session(
             and room.state == "active"
             and current_player is not None
             and not holding
+            and _forfeit_grace_remaining(room) <= 0
+        ),
+        # Lets the host see the skip coming instead of watching a stalled room
+        # with no affordance at all.
+        "forfeitAvailableIn": (
+            round(_forfeit_grace_remaining(room))
+            if viewer_normalized == room.created_by and room.state == "active"
+            else None
         ),
         "canRunBot": bool(
             viewer_normalized == room.created_by
@@ -691,6 +740,20 @@ def create_session(
         raise HTTPException(status_code=400, detail="League name must be 3–60 characters.")
     if mode not in ROOM_MODES:
         raise ValueError(f"Unsupported draft room mode: {mode}")
+    if mode == MODE_LEAGUE:
+        open_rooms = db.query(func.count(FantasyDraftSession.id)).filter(
+            FantasyDraftSession.created_by == username,
+            FantasyDraftSession.mode == MODE_LEAGUE,
+            FantasyDraftSession.state.in_(("lobby", "active")),
+        ).scalar() or 0
+        if open_rooms >= MAX_OPEN_ROOMS_PER_HOST:
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    f"You already have {MAX_OPEN_ROOMS_PER_HOST} draft rooms open. "
+                    "Finish or delete one before starting another."
+                ),
+            )
 
     master_seed = secrets.token_hex(32)
     room = FantasyDraftSession(
@@ -746,6 +809,7 @@ def create_practice_session(db: Session, identity: dict[str, str]) -> FantasyDra
             existing.current_player_id = player.id
             existing.state = "active"
             existing.started_at = utc_now()
+            existing.turn_started_at = existing.started_at
             db.commit()
             db.refresh(existing)
         return existing
@@ -764,6 +828,7 @@ def create_practice_session(db: Session, identity: dict[str, str]) -> FantasyDra
     room.current_player_id = player.id
     room.state = "active"
     room.started_at = utc_now()
+    room.turn_started_at = room.started_at
     db.commit()
     db.refresh(room)
     return room
@@ -872,16 +937,56 @@ def remove_player(
     return room
 
 
+def leave_session(db: Session, identity: dict[str, str], session_id: str) -> None:
+    """Let a manager out of a lobby they joined by mistake.
+
+    Only before the roster locks. Once the draft starts, the seat is part of the
+    record: the turn order and every deck are derived from who was sitting in it.
+    """
+    username, _ = _identity_names(identity)
+    room = _session_or_404(db, session_id, lock=True)
+    if room.state != "lobby":
+        raise HTTPException(status_code=409, detail="The roster is already locked.")
+    if username == room.created_by:
+        raise HTTPException(
+            status_code=409,
+            detail="The host can't leave their own room. Delete it instead.",
+        )
+    player = db.query(FantasyDraftPlayer).filter(
+        FantasyDraftPlayer.session_id == room.id,
+        FantasyDraftPlayer.username == username,
+    ).first()
+    if player is None:
+        raise HTTPException(status_code=404, detail="You aren't in this draft room.")
+    db.delete(player)
+    db.commit()
+
+
 def delete_session(db: Session, identity: dict[str, str], session_id: str) -> None:
-    """Admin-only teardown of a room and everything dealt inside it.
+    """Tear down a room and everything dealt inside it.
+
+    The admin can clear anything. A host can clear their own room only while it
+    is still a lobby: no hand has been played yet, so nothing is being erased out
+    from under the managers who played it — and without this, an account that
+    filled MAX_OPEN_ROOMS_PER_HOST would have no way to open another.
 
     The child tables declare ON DELETE CASCADE, but SQLite only honours that
     with foreign keys switched on per connection, so the rows are cleared here
     rather than trusting the database to do it.
     """
-    if identity.get("role") != accounts.ROLE_ADMIN:
-        raise HTTPException(status_code=403, detail="Only the site admin can delete a room.")
+    username, _ = _identity_names(identity)
     room = _session_or_404(db, session_id, lock=True)
+    if identity.get("role") != accounts.ROLE_ADMIN:
+        if username != room.created_by:
+            raise HTTPException(
+                status_code=403,
+                detail="Only the host or the site admin can delete a room.",
+            )
+        if room.state != "lobby":
+            raise HTTPException(
+                status_code=409,
+                detail="Cards have already been dealt here. Ask the site admin to clear it.",
+            )
     for model in (FantasyDraftFlip, FantasyDraftRound, FantasyDraftPlayer):
         db.query(model).filter(model.session_id == room.id).delete(synchronize_session=False)
     db.delete(room)
@@ -910,6 +1015,7 @@ def start_session(db: Session, identity: dict[str, str], session_id: str) -> Fan
     room.current_player_id = by_username[ordered_names[0]].id
     room.state = "active"
     room.started_at = utc_now()
+    room.turn_started_at = room.started_at
     db.commit()
     return room
 
@@ -1035,6 +1141,61 @@ def _record_event(
     room.resolved_at = utc_now()
 
 
+def _close_unplayable_rounds(
+    db: Session,
+    room: FantasyDraftSession,
+    players: list[FantasyDraftPlayer],
+    rounds_by_player: dict[str, list[FantasyDraftRound]],
+) -> None:
+    """Write off rounds a manager could never deal a single card into.
+
+    A deck holds 52 cards and five rounds can consume up to 65, so a manager who
+    presses their luck every round can run dry. Seating them would stall the
+    room for good: there is no card left to flip and nothing in front of them to
+    bank. Recording the round at zero keeps the clock moving, and because every
+    flip also lands in its round's cards, the count needs no extra query.
+    """
+    deck_size = len(canonical_deck())
+    for player in players:
+        player_rounds = rounds_by_player[player.id]
+        if sum(len(_cards(row)) for row in player_rounds) < deck_size:
+            continue
+        settled = {
+            row.round_number
+            for row in player_rounds
+            # A round already holding cards is still playable — it can be banked.
+            if row.state in FINISHED_ROUND_STATES or _cards(row)
+        }
+        closed = False
+        for number in range(1, ROUNDS_PER_PLAYER + 1):
+            if number in settled:
+                continue
+            existing = next(
+                (row for row in player_rounds if row.round_number == number),
+                None,
+            )
+            if existing is None:
+                existing = FantasyDraftRound(
+                    id=str(uuid.uuid4()),
+                    session_id=room.id,
+                    player_id=player.id,
+                    round_number=number,
+                    cards_json="[]",
+                )
+                db.add(existing)
+                player_rounds.append(existing)
+            existing.state = ROUND_STATE_EXHAUSTED
+            existing.score = 0
+            existing.busted = False
+            existing.ended_at = utc_now()
+            closed = True
+        if closed:
+            player.final_score = sum(
+                row.score for row in player_rounds if row.state in FINISHED_ROUND_STATES
+            )
+            db.flush()
+
+
 def _advance_turn(db: Session, room: FantasyDraftSession) -> None:
     """Put the next manager on the clock, or close the room out."""
     players = _players(db, room.id)
@@ -1042,6 +1203,7 @@ def _advance_turn(db: Session, room: FantasyDraftSession) -> None:
     rounds_by_player: dict[str, list[FantasyDraftRound]] = defaultdict(list)
     for round_row in all_rounds:
         rounds_by_player[round_row.player_id].append(round_row)
+    _close_unplayable_rounds(db, room, players, rounds_by_player)
 
     for round_number in range(1, ROUNDS_PER_PLAYER + 1):
         ordered_players = _round_play_order(
@@ -1057,9 +1219,11 @@ def _advance_turn(db: Session, room: FantasyDraftSession) -> None:
             )
             if not round_finished:
                 room.current_player_id = candidate.id
+                room.turn_started_at = utc_now()
                 return
 
     room.current_player_id = None
+    room.turn_started_at = None
     room.state = "complete"
     room.completed_at = utc_now()
     if room.mode == MODE_PRACTICE:
@@ -1210,6 +1374,12 @@ def forfeit_current_player(
         raise HTTPException(status_code=403, detail="Only the host can skip a manager.")
     if room.state != "active" or not room.current_player_id:
         raise HTTPException(status_code=409, detail="This draft room isn't in play.")
+    remaining = _forfeit_grace_remaining(room)
+    if remaining > 0:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Give them another {round(remaining)} seconds before skipping them.",
+        )
     player = db.query(FantasyDraftPlayer).filter(
         FantasyDraftPlayer.id == room.current_player_id,
         FantasyDraftPlayer.session_id == room.id,
@@ -1480,6 +1650,10 @@ def verification(db: Session, room: FantasyDraftSession) -> dict[str, Any]:
             "forfeit": (
                 "A round in state 'forfeited' was written off by the host after the manager "
                 "stopped playing. It scores zero regardless of any cards already dealt."
+            ),
+            "exhausted": (
+                "A round in state 'exhausted' had no deck left to deal from — five rounds can "
+                "consume up to 65 cards and a deck holds 52. It scores zero and holds no cards."
             ),
         },
     }
