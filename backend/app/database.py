@@ -371,6 +371,14 @@ class FantasyDraftSession(Base):
     join_code = Column(String, unique=True, index=True, nullable=False)
     master_seed = Column(String, nullable=False)
     seed_hash = Column(String, nullable=False)
+    # The committed shuffle rules must survive deployments so an in-progress
+    # or completed room always verifies under the rules it started with.
+    game_version = Column(
+        String,
+        default="fourth-and-fortune-v2",
+        server_default="fourth-and-fortune-v2",
+        nullable=False,
+    )
     mode = Column(String, default="league", server_default="league", nullable=False)
     state = Column(String, default="lobby", index=True, nullable=False)
     created_by = Column(String, index=True, nullable=False)

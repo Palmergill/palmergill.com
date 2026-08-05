@@ -1004,6 +1004,8 @@ summary { padding: 17px 18px; cursor: pointer; font-size: 0.86rem; font-weight: 
    each cell rendered at roughly 88x123px around type clamped to 11px — a
    playing-card-sized box with a speck in the middle. */
 .deck-grid { display: grid; grid-template-columns: repeat(13, minmax(0, 46px)); gap: 5px; }
+.deck-heading { margin: 16px 0 7px; color: var(--draft-muted); font-size: 0.72rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; }
+.deck-heading:first-child { margin-top: 0; }
 .mini-card { display: grid; min-width: 0; aspect-ratio: 0.72; place-items: center; border: 1px solid #ddd5c8; border-radius: 5px; background: #fff; color: var(--draft-ink); font-family: Georgia, serif; font-size: 0.8rem; }
 .mini-card.is-red { color: var(--draft-red); }
 .mini-card.is-drawn { border-color: #79907b; background: #e7eee5; box-shadow: inset 0 0 0 1px #79907b; font-weight: 700; }

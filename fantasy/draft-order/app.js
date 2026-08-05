@@ -660,7 +660,8 @@
                 ? (room.canPlay ? "You’d lead" : "Would lead")
                 : `${decision.scoreToBeat || 0} pts`;
         els.playActions.hidden = !room.canPlay;
-        // Five rounds can outrun a 52-card deck. There is nothing left to deal.
+        // Fresh-round decks never empty in normal play; this remains for a
+        // version 1 room that was already active when the rules changed.
         const deckEmpty = round.deckRemaining === 0;
         els.flipButton.disabled = state.actionBusy || deckEmpty;
         els.bankButton.disabled = state.actionBusy || !(round.cards || []).length;
@@ -1069,20 +1070,38 @@
                 item.append(label, outcome, cards, score);
                 rounds.appendChild(item);
             });
-            const used = new Set(player.draws.map((draw) => draw.deckIndex));
-            const deck = document.createElement("div");
-            deck.className = "deck-grid";
-            player.deck.forEach((card) => {
-                const node = document.createElement("span");
-                node.className = `mini-card${card.red ? " is-red" : ""}${used.has(card.deckIndex) ? " is-drawn" : ""}`;
-                node.textContent = F.cardLabel(card);
-                node.title = `Deck index ${card.deckIndex}${used.has(card.deckIndex) ? " · drawn" : ""}`;
-                deck.appendChild(node);
+            const deckRows = player.decks || [{ round: null, cards: player.deck || [] }];
+            const decks = document.createElement("div");
+            decks.className = "verification-decks";
+            deckRows.forEach((deckRow) => {
+                if (deckRow.round !== null) {
+                    const heading = document.createElement("p");
+                    heading.className = "deck-heading";
+                    heading.textContent = `Round ${deckRow.round} fresh deck`;
+                    decks.appendChild(heading);
+                }
+                const used = new Set(
+                    player.draws
+                        .filter((draw) => deckRow.round === null || draw.round === deckRow.round)
+                        .map((draw) => draw.deckIndex)
+                );
+                const deck = document.createElement("div");
+                deck.className = "deck-grid";
+                deckRow.cards.forEach((card) => {
+                    const node = document.createElement("span");
+                    node.className = `mini-card${card.red ? " is-red" : ""}${used.has(card.deckIndex) ? " is-drawn" : ""}`;
+                    node.textContent = F.cardLabel(card);
+                    node.title = `Deck index ${card.deckIndex}${used.has(card.deckIndex) ? " · drawn" : ""}`;
+                    deck.appendChild(node);
+                });
+                decks.appendChild(deck);
             });
             const legend = document.createElement("p");
             legend.className = "deck-legend";
-            legend.textContent = "Highlighted cards were drawn. Indexing starts at 0.";
-            body.append(meta, rounds, deck, legend);
+            legend.textContent = player.decks
+                ? "Each round starts at index 0. Highlighted cards were drawn from that round’s fresh deck."
+                : "Highlighted cards were drawn. Indexing starts at 0.";
+            body.append(meta, rounds, decks, legend);
             details.append(summary, body);
             els.verificationPlayers.appendChild(details);
         });

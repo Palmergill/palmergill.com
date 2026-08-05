@@ -349,7 +349,7 @@ def test_only_host_can_start_and_two_players_are_required(monkeypatch):
     assert guest.post(f"/api/fantasy/draft/sessions/{room['id']}/start").status_code == 403
 
 
-def test_turn_is_server_authoritative_and_deck_continues_between_rounds(monkeypatch):
+def test_turn_is_server_authoritative_and_each_round_starts_a_fresh_deck(monkeypatch):
     host = member_client(monkeypatch, "host-player")
     guest = member_client(monkeypatch, "road-warrior")
     room = create_room(host)
@@ -392,8 +392,7 @@ def test_turn_is_server_authoritative_and_deck_continues_between_rounds(monkeypa
     round_two_view = settled(next_client, room["id"])
     assert round_two_view["currentRound"]["number"] == 2
 
-    # The round-two leader goes first, and their personal deck resumes at the
-    # next undealt card rather than being reshuffled between rounds.
+    # The round-two leader goes first, and their fresh deck restarts at index 0.
     leader_name = round_two_view["leaderboard"][0]["username"]
     assert next(
         player["username"]
@@ -403,7 +402,8 @@ def test_turn_is_server_authoritative_and_deck_continues_between_rounds(monkeypa
 
     second = clients[leader_name].post(f"/api/fantasy/draft/sessions/{room['id']}/flip")
     assert second.status_code == 200
-    assert second.json()["lastEvent"]["card"]["deckIndex"] == 1
+    assert second.json()["lastEvent"]["card"]["deckIndex"] == 0
+    assert second.json()["currentRound"]["deckRemaining"] == 51
     assert second.json()["currentRound"]["number"] == 2
 
 
@@ -554,21 +554,60 @@ def test_full_game_reveals_seed_and_reproducible_decks(monkeypatch):
     verified = host.get(f"/api/fantasy/draft/sessions/{room['id']}/verify")
     assert verified.status_code == 200
     proof = verified.json()
+    assert proof["game"] == draft_order_game.GAME_VERSION
     assert proof["hashMatches"] is True
     assert hashlib.sha256(bytes.fromhex(proof["masterSeed"])).hexdigest() == room["seedHash"]
     assert len(proof["players"]) == 2
     for player in proof["players"]:
-        assert len(player["deck"]) == 52
-        derived_codes = [card["code"] for card in player["deck"]]
-        assert derived_codes == draft_order_game.derive_player_deck(
-            proof["masterSeed"], player["username"]
-        )
-        assert [draw["deckIndex"] for draw in player["draws"]] == list(range(ROUNDS_PER_PLAYER))
+        assert len(player["decks"]) == ROUNDS_PER_PLAYER
+        for deck_row in player["decks"]:
+            assert len(deck_row["cards"]) == 52
+            derived_codes = [card["code"] for card in deck_row["cards"]]
+            assert derived_codes == draft_order_game.derive_round_deck(
+                proof["masterSeed"], player["username"], deck_row["round"]
+            )
+        assert [draw["deckIndex"] for draw in player["draws"]] == [0] * ROUNDS_PER_PLAYER
     assert verify_proof(proof) == []
 
-    original_code = proof["players"][0]["deck"][0]["code"]
-    proof["players"][0]["deck"][0]["code"] = "AS" if original_code != "AS" else "KH"
+    original_code = proof["players"][0]["decks"][0]["cards"][0]["code"]
+    proof["players"][0]["decks"][0]["cards"][0]["code"] = (
+        "AS" if original_code != "AS" else "KH"
+    )
     assert any("full deck" in error for error in verify_proof(proof))
+
+
+def test_existing_version_one_room_keeps_its_continuous_verifiable_deck(monkeypatch):
+    host = member_client(monkeypatch, "host-player")
+    guest = member_client(monkeypatch, "road-warrior")
+    room = create_room(host)
+    join_room(guest, room["joinCode"])
+    rid = room["id"]
+
+    db = SessionLocal()
+    try:
+        room_row = db.query(FantasyDraftSession).filter(FantasyDraftSession.id == rid).one()
+        room_row.game_version = draft_order_game.LEGACY_GAME_VERSION
+        db.commit()
+    finally:
+        db.close()
+
+    view = host.post(f"/api/fantasy/draft/sessions/{rid}/start").json()
+    clients = clients_by_player(view, host, guest)
+    while view["state"] == "active":
+        current = clients[next(p["username"] for p in view["players"] if p["isCurrent"])]
+        current.post(f"/api/fantasy/draft/sessions/{rid}/flip")
+        current.post(f"/api/fantasy/draft/sessions/{rid}/bank")
+        view = settled(current, rid)
+
+    host.post(f"/api/fantasy/draft/sessions/{rid}/reveal")
+    proof = host.get(f"/api/fantasy/draft/sessions/{rid}/verify").json()
+    assert proof["game"] == draft_order_game.LEGACY_GAME_VERSION
+    assert all("deck" in player and "decks" not in player for player in proof["players"])
+    assert all(
+        [draw["deckIndex"] for draw in player["draws"]] == list(range(ROUNDS_PER_PLAYER))
+        for player in proof["players"]
+    )
+    assert verify_proof(proof) == []
 
 
 def test_host_can_remove_player_only_before_start(monkeypatch):
@@ -1053,10 +1092,8 @@ def test_host_cannot_skip_a_manager_who_just_sat_down(monkeypatch):
     assert view["forfeitAvailableIn"] > 0
 
 
-def test_a_spent_deck_closes_a_round_instead_of_stranding_the_room(monkeypatch):
-    """Five rounds can consume up to 65 cards and a deck holds 52. A manager who
-    runs dry can neither flip nor bank, so seating them would stall the room for
-    good — nobody else can act and the seed never unseals."""
+def test_a_spent_legacy_deck_closes_a_round_instead_of_stranding_the_room(monkeypatch):
+    """Version 1 rooms retain their continuous-deck exhaustion fallback."""
     host = member_client(monkeypatch, "host-player")
     guest = member_client(monkeypatch, "road-warrior")
     room = create_room(host)
@@ -1072,8 +1109,12 @@ def test_a_spent_deck_closes_a_round_instead_of_stranding_the_room(monkeypatch):
         ).all()
         spent = next(p for p in players if p.username == "road-warrior")
         other = next(p for p in players if p.username == "host-player")
+        room_row = db.query(FantasyDraftSession).filter(
+            FantasyDraftSession.id == rid
+        ).first()
+        room_row.game_version = draft_order_game.LEGACY_GAME_VERSION
         deck = draft_order_game.derive_player_deck(
-            db.query(FantasyDraftSession).filter(FantasyDraftSession.id == rid).first().master_seed,
+            room_row.master_seed,
             spent.username,
         )
         # Four rounds of thirteen cards is the whole deck, so round five has
@@ -1101,9 +1142,6 @@ def test_a_spent_deck_closes_a_round_instead_of_stranding_the_room(monkeypatch):
             ))
         spent.final_score = 40
         other.final_score = 20
-        room_row = db.query(FantasyDraftSession).filter(
-            FantasyDraftSession.id == rid
-        ).first()
         # Hand the clock over as if the fourth round had just ended.
         room_row.current_player_id = other.id
         room_row.turn_state = "resolved"

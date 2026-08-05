@@ -147,6 +147,30 @@ def migrate_database():
             "TIMESTAMP" if is_postgres else "DATETIME",
         )
 
+        # Version 1 consumed one personal deck across the whole game. Preserve
+        # rooms that may already contain cards under those committed rules, but
+        # move untouched lobbies to version 2 so they start with a fresh deck
+        # for every round when their host locks the roster.
+        _add_column_if_missing(
+            inspector,
+            "ff_draft_sessions",
+            "game_version",
+            "VARCHAR NOT NULL DEFAULT 'fourth-and-fortune-v1'",
+        )
+        refreshed = inspect(engine)
+        if (
+            "ff_draft_sessions" in refreshed.get_table_names()
+            and "game_version" in {
+                column["name"] for column in refreshed.get_columns("ff_draft_sessions")
+            }
+        ):
+            with engine.begin() as conn:
+                conn.execute(text(
+                    "UPDATE ff_draft_sessions "
+                    "SET game_version = 'fourth-and-fortune-v2' "
+                    "WHERE state = 'lobby'"
+                ))
+
         logger.info("Database migration complete")
         
     except Exception as e:

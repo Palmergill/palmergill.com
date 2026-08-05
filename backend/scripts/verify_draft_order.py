@@ -53,22 +53,73 @@ def verify_proof(proof: dict) -> list[str]:
     if actual_names != expected_names:
         errors.append("Turn order does not match the committed seed.")
 
+    fresh_round_decks = proof.get("game") == game.GAME_VERSION
+    rounds_per_player = int(proof.get("roundsPerPlayer", game.ROUNDS_PER_PLAYER))
+
     for player in players:
         label = player.get("displayName") or player.get("username") or "Unknown player"
         username = str(player.get("username", ""))
-        expected_deck = game.derive_player_deck(seed, username)
-        actual_deck = [card.get("code") for card in player.get("deck", [])]
-        if actual_deck != expected_deck:
-            errors.append(f"{label}: full deck does not match the committed seed.")
+        expected_decks: dict[int, list[str]] = {}
+        deck_mismatch = False
+        if fresh_round_decks:
+            actual_decks = {
+                int(deck_row.get("round", -1)): [
+                    card.get("code") for card in deck_row.get("cards", [])
+                ]
+                for deck_row in player.get("decks", [])
+            }
+            if (
+                len(player.get("decks", [])) != rounds_per_player
+                or set(actual_decks) != set(range(1, rounds_per_player + 1))
+            ):
+                errors.append(f"{label}: proof does not contain one full deck for every round.")
+                continue
+            for round_number in range(1, rounds_per_player + 1):
+                expected_deck = game.derive_round_deck(seed, username, round_number)
+                expected_decks[round_number] = expected_deck
+                if actual_decks[round_number] != expected_deck:
+                    errors.append(
+                        f"{label}: round {round_number} full deck does not match the committed seed."
+                    )
+                    deck_mismatch = True
+        else:
+            expected_deck = game.derive_player_deck(seed, username)
+            expected_decks[0] = expected_deck
+            actual_deck = [card.get("code") for card in player.get("deck", [])]
+            if actual_deck != expected_deck:
+                errors.append(f"{label}: full deck does not match the committed seed.")
+                deck_mismatch = True
+        if deck_mismatch:
             continue
 
-        draws = sorted(player.get("draws", []), key=lambda draw: int(draw.get("deckIndex", -1)))
-        for expected_index, draw in enumerate(draws):
+        draw_sort_key = (
+            (lambda draw: (int(draw.get("round", -1)), int(draw.get("deckIndex", -1))))
+            if fresh_round_decks
+            else (lambda draw: int(draw.get("deckIndex", -1)))
+        )
+        draws = sorted(player.get("draws", []), key=draw_sort_key)
+        next_index_by_round: dict[int, int] = defaultdict(int)
+        for draw in draws:
+            round_number = int(draw.get("round", -1))
+            expected_index = (
+                next_index_by_round[round_number]
+                if fresh_round_decks
+                else sum(next_index_by_round.values())
+            )
             index = draw.get("deckIndex")
             code = (draw.get("card") or {}).get("code")
-            if index != expected_index or expected_deck[expected_index] != code:
-                errors.append(f"{label}: draw at deck index {expected_index} does not match.")
+            expected_deck = expected_decks.get(round_number if fresh_round_decks else 0)
+            if (
+                index != expected_index
+                or expected_deck is None
+                or expected_index >= len(expected_deck)
+                or expected_deck[expected_index] != code
+            ):
+                errors.append(
+                    f"{label}: round {round_number} draw at deck index {expected_index} does not match."
+                )
                 break
+            next_index_by_round[round_number] += 1
 
         # Every round has to be scored on the cards this manager was actually
         # dealt. Checking the deck and the draws alone leaves the two halves of

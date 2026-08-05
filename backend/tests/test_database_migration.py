@@ -17,7 +17,8 @@ def test_draft_room_modes_are_added_to_an_existing_database(monkeypatch):
         ))
         connection.execute(text(
             "INSERT INTO ff_draft_sessions (id, state, completed_at) "
-            "VALUES ('room-1', 'complete', '2026-08-01 12:00:00')"
+            "VALUES ('room-1', 'complete', '2026-08-01 12:00:00'), "
+            "('room-2', 'lobby', NULL)"
         ))
         connection.execute(text(
             "INSERT INTO ff_draft_players (id, session_id) VALUES ('player-1', 'room-1')"
@@ -36,6 +37,7 @@ def test_draft_room_modes_are_added_to_an_existing_database(monkeypatch):
     assert "turn_state" in session_columns
     assert "resolved_at" in session_columns
     assert "last_event_json" in session_columns
+    assert "game_version" in session_columns
 
     with legacy_engine.connect() as connection:
         assert connection.execute(text(
@@ -52,3 +54,11 @@ def test_draft_room_modes_are_added_to_an_existing_database(monkeypatch):
         assert connection.execute(text(
             "SELECT turn_state FROM ff_draft_sessions WHERE id = 'room-1'"
         )).scalar_one() == "playing"
+        # Dealt/completed rooms retain their old proof rules. An untouched
+        # lobby can safely adopt fresh per-round decks before it starts.
+        assert connection.execute(text(
+            "SELECT game_version FROM ff_draft_sessions WHERE id = 'room-1'"
+        )).scalar_one() == "fourth-and-fortune-v1"
+        assert connection.execute(text(
+            "SELECT game_version FROM ff_draft_sessions WHERE id = 'room-2'"
+        )).scalar_one() == "fourth-and-fortune-v2"

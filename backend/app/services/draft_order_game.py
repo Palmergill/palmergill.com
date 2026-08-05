@@ -1,10 +1,9 @@
 """Server-authoritative Fourth & Fortune draft-order game.
 
-Every player gets a deterministic 52-card deck derived from the committed
-master seed and their normalized account name. A player's five rounds consume
-that deck continuously. The seed remains private until the room completes, at
-which point the verification endpoint exposes everything needed to reproduce
-the deal.
+Every player gets a fresh deterministic 52-card deck for each round, derived
+from the committed master seed, their normalized account name, and the round
+number. The seed remains private until the room completes, at which point the
+verification endpoint exposes everything needed to reproduce every shuffle.
 """
 
 from __future__ import annotations
@@ -31,7 +30,8 @@ from app.database import (
     utc_now,
 )
 
-GAME_VERSION = "fourth-and-fortune-v1"
+LEGACY_GAME_VERSION = "fourth-and-fortune-v1"
+GAME_VERSION = "fourth-and-fortune-v2"
 ROUNDS_PER_PLAYER = 5
 # A round is over once it is banked, busted, written off by the host when a
 # manager walks away mid-draft, or left with no deck to deal from. Forfeited and
@@ -156,8 +156,39 @@ def canonical_deck() -> list[str]:
 
 
 def derive_player_deck(master_seed: str, username: str) -> list[str]:
+    """Version 1's single continuous deck, retained for existing room proofs."""
     normalized = accounts.normalize_username(username)
     return _shuffle(canonical_deck(), master_seed, f"deck:v1:{normalized}")
+
+
+def derive_round_deck(master_seed: str, username: str, round_number: int) -> list[str]:
+    """Version 2's independent, reproducible deck for one player's round."""
+    if round_number < 1:
+        raise ValueError("round_number must be positive")
+    normalized = accounts.normalize_username(username)
+    return _shuffle(
+        canonical_deck(),
+        master_seed,
+        f"deck:v2:{normalized}:round:{round_number}",
+    )
+
+
+def _game_version(room: FantasyDraftSession) -> str:
+    return room.game_version or LEGACY_GAME_VERSION
+
+
+def _uses_fresh_round_decks(room: FantasyDraftSession) -> bool:
+    return _game_version(room) == GAME_VERSION
+
+
+def _deck_for_round(
+    room: FantasyDraftSession,
+    player: FantasyDraftPlayer,
+    round_number: int,
+) -> list[str]:
+    if _uses_fresh_round_decks(room):
+        return derive_round_deck(room.master_seed, player.username, round_number)
+    return derive_player_deck(room.master_seed, player.username)
 
 
 def derive_turn_order(master_seed: str, usernames: Iterable[str]) -> list[str]:
@@ -417,13 +448,13 @@ def _bust_chance(
     room: FantasyDraftSession,
     player: FantasyDraftPlayer,
     active_round: FantasyDraftRound | None,
-    flips_used: int,
+    deck_position: int,
 ) -> float:
     if active_round is None:
         return 0.0
     held_ranks = {_card_rank(code) for code in _cards(active_round)}
-    deck = derive_player_deck(room.master_seed, player.username)
-    remaining = deck[flips_used:]
+    deck = _deck_for_round(room, player, active_round.round_number)
+    remaining = deck[deck_position:]
     if not remaining or not held_ranks:
         return 0.0
     danger = sum(1 for code in remaining if _card_rank(code) in held_ranks)
@@ -537,9 +568,15 @@ def serialize_session(
     current_round_payload = None
     decision = None
     if current_player is not None:
-        flips_used = db.query(func.count(FantasyDraftFlip.id)).filter(
+        total_flips_used = db.query(func.count(FantasyDraftFlip.id)).filter(
             FantasyDraftFlip.player_id == current_player.id
         ).scalar() or 0
+        current_cards = _cards(current_round) if current_round is not None else []
+        deck_position = (
+            len(current_cards)
+            if _uses_fresh_round_decks(room)
+            else total_flips_used
+        )
         spectator_final_round = bool(
             current_round_number == ROUNDS_PER_PLAYER
             and current_player.username != viewer_normalized
@@ -553,7 +590,7 @@ def serialize_session(
                 "concealed": spectator_final_round,
                 "pot": None if spectator_final_round else 0,
                 "bustChance": None if spectator_final_round else 0.0,
-                "deckRemaining": None if spectator_final_round else 52 - flips_used,
+                "deckRemaining": None if spectator_final_round else 52 - deck_position,
             }
         elif spectator_final_round:
             current_round_payload = {
@@ -566,7 +603,6 @@ def serialize_session(
                 "deckRemaining": None,
             }
         else:
-            current_cards = _cards(current_round)
             current_round_payload = {
                 "number": current_round.round_number,
                 "cards": [card_payload(code) for code in current_cards],
@@ -577,9 +613,9 @@ def serialize_session(
                 "bustChance": (
                     None
                     if holding
-                    else _bust_chance(room, current_player, current_round, flips_used)
+                    else _bust_chance(room, current_player, current_round, deck_position)
                 ),
-                "deckRemaining": 52 - flips_used,
+                "deckRemaining": 52 - deck_position,
             }
 
         if not spectator_final_round and not holding:
@@ -762,6 +798,7 @@ def create_session(
         join_code=_new_join_code(db),
         master_seed=master_seed,
         seed_hash=seed_commitment(master_seed),
+        game_version=GAME_VERSION,
         mode=mode,
         state="lobby",
         created_by=username,
@@ -1147,14 +1184,15 @@ def _close_unplayable_rounds(
     players: list[FantasyDraftPlayer],
     rounds_by_player: dict[str, list[FantasyDraftRound]],
 ) -> None:
-    """Write off rounds a manager could never deal a single card into.
+    """Write off legacy rounds a manager could never deal a single card into.
 
-    A deck holds 52 cards and five rounds can consume up to 65, so a manager who
-    presses their luck every round can run dry. Seating them would stall the
-    room for good: there is no card left to flip and nothing in front of them to
-    bank. Recording the round at zero keeps the clock moving, and because every
-    flip also lands in its round's cards, the count needs no extra query.
+    Version 2 starts every round with a full deck and can never reach this path.
+    A version 1 deck holds 52 cards across all five rounds, so a manager who
+    presses their luck can run dry. Recording the round at zero keeps an older
+    in-flight room moving under the rules it committed to.
     """
+    if _uses_fresh_round_decks(room):
+        return
     deck_size = len(canonical_deck())
     for player in players:
         player_rounds = rounds_by_player[player.id]
@@ -1283,15 +1321,20 @@ def flip_card(
     _reject_if_held(room)
     player = _current_player_or_error(db, room, username)
     round_row = _get_or_create_active_round(db, room, player)
-    flips_used = db.query(func.count(FantasyDraftFlip.id)).filter(
+    total_flips_used = db.query(func.count(FantasyDraftFlip.id)).filter(
         FantasyDraftFlip.player_id == player.id
     ).scalar() or 0
-    deck = derive_player_deck(room.master_seed, player.username)
-    if flips_used >= len(deck):
+    previous_cards = _cards(round_row)
+    deck_index = (
+        len(previous_cards)
+        if _uses_fresh_round_decks(room)
+        else total_flips_used
+    )
+    deck = _deck_for_round(room, player, round_row.round_number)
+    if deck_index >= len(deck):
         raise HTTPException(status_code=409, detail="No cards remain in this player's deck.")
 
-    code = deck[flips_used]
-    previous_cards = _cards(round_row)
+    code = deck[deck_index]
     busted = _card_rank(code) in {_card_rank(card) for card in previous_cards}
     cards = previous_cards + [code]
     round_row.cards_json = json.dumps(cards, separators=(",", ":"))
@@ -1302,7 +1345,10 @@ def flip_card(
         player_id=player.id,
         round_id=round_row.id,
         card=code,
-        deck_index=flips_used,
+        # This column is the player's durable deal sequence. Version 2 exposes
+        # the round-local index above while keeping this legacy uniqueness key
+        # monotonic, avoiding a destructive schema rewrite for existing rooms.
+        deck_index=total_flips_used,
     ))
     if busted:
         round_row.state = "busted"
@@ -1312,7 +1358,7 @@ def flip_card(
         "flip",
         player,
         round_row,
-        card=card_payload(code, flips_used),
+        card=card_payload(code, deck_index),
         turn_complete=busted,
     ))
 
@@ -1596,34 +1642,58 @@ def verification(db: Session, room: FantasyDraftSession) -> dict[str, Any]:
     for round_row in all_rounds:
         rounds_by_player[round_row.player_id].append(round_row)
 
+    fresh_round_decks = _uses_fresh_round_decks(room)
     verification_players = []
     for player in players:
-        deck = derive_player_deck(room.master_seed, player.username)
         flips = _player_flips(db, player.id)
         round_number_by_id = {row.id: row.round_number for row in rounds_by_player[player.id]}
-        verification_players.append({
+        round_draw_counts: dict[int, int] = defaultdict(int)
+        draw_payloads = []
+        for flip in flips:
+            round_number = round_number_by_id[flip.round_id]
+            deck_index = round_draw_counts[round_number] if fresh_round_decks else flip.deck_index
+            round_draw_counts[round_number] += 1
+            draw_payloads.append({
+                "round": round_number,
+                "deckIndex": deck_index,
+                "card": card_payload(flip.card, deck_index),
+            })
+
+        player_payload = {
             "playerId": player.id,
             "username": player.username,
             "displayName": player.display_name,
             "turnPosition": player.turn_position,
             "finalScore": player.final_score,
             "tieBreakValue": f"{tie_break_value(room.master_seed, player.username):016x}",
-            "deck": [card_payload(code, index) for index, code in enumerate(deck)],
-            "draws": [
-                {
-                    "round": round_number_by_id[flip.round_id],
-                    "deckIndex": flip.deck_index,
-                    "card": card_payload(flip.card, flip.deck_index),
-                }
-                for flip in flips
-            ],
+            "draws": draw_payloads,
             "rounds": [_round_payload(row) for row in rounds_by_player[player.id]],
-        })
+        }
+        if fresh_round_decks:
+            player_payload["decks"] = [
+                {
+                    "round": round_number,
+                    "cards": [
+                        card_payload(code, index)
+                        for index, code in enumerate(
+                            derive_round_deck(room.master_seed, player.username, round_number)
+                        )
+                    ],
+                }
+                for round_number in range(1, ROUNDS_PER_PLAYER + 1)
+            ]
+        else:
+            deck = derive_player_deck(room.master_seed, player.username)
+            player_payload["deck"] = [
+                card_payload(code, index) for index, code in enumerate(deck)
+            ]
+        verification_players.append(player_payload)
 
     return {
-        "game": GAME_VERSION,
+        "game": _game_version(room),
         "sessionId": room.id,
         "leagueName": room.league_name,
+        "roundsPerPlayer": ROUNDS_PER_PLAYER,
         "masterSeed": room.master_seed,
         "publishedSeedHash": room.seed_hash,
         "computedSeedHash": seed_commitment(room.master_seed),
@@ -1643,7 +1713,11 @@ def verification(db: Session, room: FantasyDraftSession) -> dict[str, Any]:
             ),
             "contexts": {
                 "turnOrder": "turn-order:v1 over account names sorted lowercase first",
-                "playerDeck": "deck:v1:{normalized account name}",
+                "playerDeck": (
+                    "deck:v2:{normalized account name}:round:{round number} — a fresh deck each round"
+                    if fresh_round_decks
+                    else "deck:v1:{normalized account name} — one continuous legacy deck"
+                ),
                 "tieBreak": "first 8 bytes of HMAC-SHA256(master_seed, tiebreak:v1:{normalized account name})",
             },
             "tieBreakRule": "Total score, then best round, then higher seeded tie-break value.",
@@ -1652,8 +1726,8 @@ def verification(db: Session, room: FantasyDraftSession) -> dict[str, Any]:
                 "stopped playing. It scores zero regardless of any cards already dealt."
             ),
             "exhausted": (
-                "A round in state 'exhausted' had no deck left to deal from — five rounds can "
-                "consume up to 65 cards and a deck holds 52. It scores zero and holds no cards."
+                "Only a version 1 room can contain an 'exhausted' round. Its one continuous "
+                "deck ran out, so the round scores zero and holds no cards."
             ),
         },
     }
