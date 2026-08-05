@@ -1,7 +1,7 @@
 """Server-authoritative Fourth & Fortune draft-order game.
 
 Every player gets a deterministic 52-card deck derived from the committed
-master seed and their normalized account name. A player's three rounds consume
+master seed and their normalized account name. A player's five rounds consume
 that deck continuously. The seed remains private until the room completes, at
 which point the verification endpoint exposes everything needed to reproduce
 the deal.
@@ -32,7 +32,7 @@ from app.database import (
 )
 
 GAME_VERSION = "fourth-and-fortune-v1"
-ROUNDS_PER_PLAYER = 3
+ROUNDS_PER_PLAYER = 5
 # A round is over once it is banked, busted, or written off by the host when a
 # manager walks away mid-draft. Forfeited rounds score zero and hold no cards.
 FINISHED_ROUND_STATES = frozenset({"banked", "busted", "forfeited"})
@@ -722,7 +722,7 @@ def create_session(
 
 
 def create_practice_session(db: Session, identity: dict[str, str]) -> FantasyDraftSession:
-    """Create or resume a private three-round solo warm-up."""
+    """Create or resume a private five-round solo warm-up."""
     username, display_name = _identity_names(identity)
     existing = (
         db.query(FantasyDraftSession)

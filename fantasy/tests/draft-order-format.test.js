@@ -63,10 +63,10 @@ describe('DraftOrderFormat', () => {
 
     test('turnEventMessage hides the card value in the sealed final round', () => {
         expect(DraftOrderFormat.turnEventMessage({
-            type: 'flip', displayName: 'Ace Bot', round: 3, sealed: true, card: null, cardCount: 2,
+            type: 'flip', displayName: 'Ace Bot', round: 5, sealed: true, card: null, cardCount: 2,
         })).toBe('Ace Bot takes card 2, face down.');
         expect(DraftOrderFormat.turnEventMessage({
-            type: 'bank', displayName: 'Ace Bot', round: 3, sealed: true, cardCount: 4,
+            type: 'bank', displayName: 'Ace Bot', round: 5, sealed: true, cardCount: 4,
             turnComplete: true,
         })).toBe('Ace Bot locked 4 cards for the final reveal.');
     });

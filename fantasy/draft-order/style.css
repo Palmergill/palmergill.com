@@ -873,6 +873,11 @@ code { font-family: "DM Mono", ui-monospace, monospace; }
 .leaderboard-player strong { display: block; overflow: hidden; font-size: 0.88rem; text-overflow: ellipsis; white-space: nowrap; }
 .leaderboard-player span { display: block; margin-top: 3px; color: var(--draft-muted); font-size: 0.75rem; }
 .leaderboard-score { color: var(--draft-forest); font-family: "DM Mono", monospace; font-size: 1rem; font-weight: 500; }
+.leaderboard-score--sealed { display: grid; min-width: 96px; gap: 5px; }
+.leaderboard-score__line { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.leaderboard-score__line--final { border-bottom: 1px solid #e3dbce; padding-bottom: 5px; }
+.leaderboard-score__label { color: var(--draft-muted); font-family: "Plus Jakarta Sans", sans-serif; font-size: 0.66rem; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase; }
+.leaderboard-score__value { color: var(--draft-forest); font-family: "DM Mono", monospace; font-size: 0.88rem; font-weight: 500; }
 
 .result-panel {
     overflow: hidden;

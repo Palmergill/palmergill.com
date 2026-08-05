@@ -406,6 +406,7 @@ def test_spectators_see_live_cards_until_the_final_round_is_sealed(monkeypatch):
     join_room(guest, room["joinCode"])
     rid = room["id"]
     view = host.post(f"/api/fantasy/draft/sessions/{rid}/start").json()
+    assert view["roundsPerPlayer"] == 5
     clients = clients_by_player(view, host, guest)
 
     first_name = next(player["username"] for player in view["players"] if player["isCurrent"])
@@ -417,6 +418,7 @@ def test_spectators_see_live_cards_until_the_final_round_is_sealed(monkeypatch):
     assert spectator_view["currentRound"]["concealed"] is False
     assert spectator_view["currentRound"]["cards"] == first_flip["currentRound"]["cards"]
     assert spectator_view["currentRound"]["pot"] == first_flip["currentRound"]["pot"]
+    open_rounds_checked = {1}
     first_client.post(f"/api/fantasy/draft/sessions/{rid}/bank")
     view = settled(first_client, rid)
 
@@ -425,10 +427,17 @@ def test_spectators_see_live_cards_until_the_final_round_is_sealed(monkeypatch):
             player["username"] for player in view["players"] if player["isCurrent"]
         )
         current_client = clients[current_name]
-        current_client.post(f"/api/fantasy/draft/sessions/{rid}/flip")
+        flip_view = current_client.post(f"/api/fantasy/draft/sessions/{rid}/flip").json()
+        open_spectator = guest if current_client is host else host
+        open_view = open_spectator.get(f"/api/fantasy/draft/sessions/{rid}").json()
+        assert open_view["currentRound"]["concealed"] is False
+        assert open_view["currentRound"]["cards"] == flip_view["currentRound"]["cards"]
+        assert open_view["currentRound"]["pot"] == flip_view["currentRound"]["pot"]
+        open_rounds_checked.add(view["currentRound"]["number"])
         current_client.post(f"/api/fantasy/draft/sessions/{rid}/bank")
         view = settled(current_client, rid)
 
+    assert open_rounds_checked == set(range(1, ROUNDS_PER_PLAYER))
     assert view["currentRound"]["number"] == ROUNDS_PER_PLAYER
     final_name = next(player["username"] for player in view["players"] if player["isCurrent"])
     final_client = clients[final_name]
@@ -546,7 +555,7 @@ def test_full_game_reveals_seed_and_reproducible_decks(monkeypatch):
         assert derived_codes == draft_order_game.derive_player_deck(
             proof["masterSeed"], player["username"]
         )
-        assert [draw["deckIndex"] for draw in player["draws"]] == list(range(3))
+        assert [draw["deckIndex"] for draw in player["draws"]] == list(range(ROUNDS_PER_PLAYER))
     assert verify_proof(proof) == []
 
     original_code = proof["players"][0]["deck"][0]["code"]

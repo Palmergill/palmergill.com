@@ -538,7 +538,7 @@
             ? (room.canStart
                 ? (isTest
                     ? "Bots play automatically. Everyone finishes each round before the standings leader starts the next one."
-                    : "Everyone finishes Round 1 in the seeded order. The standings leader starts Rounds 2 and 3.")
+                    : "Everyone finishes Round 1 in the seeded order. The standings leader starts each following round.")
                 : "One more manager must join before you can start.")
             : "Waiting for the host to lock the roster and start.";
     }
@@ -723,9 +723,37 @@
             const rounds = document.createElement("span");
             rounds.textContent = `${player.roundsCompleted}/${room.roundsPerPlayer} rounds${player.isCurrent ? " · up now" : ""}${player.scoreHidden ? " · final locked" : ""}`;
             info.append(name, rounds);
-            const score = document.createElement("span");
+            const score = document.createElement("div");
             score.className = "leaderboard-score";
-            score.textContent = player.scoreHidden ? "🔒" : `${player.score}`;
+            if (finalRound) {
+                score.classList.add("leaderboard-score--sealed");
+
+                const finalLine = document.createElement("span");
+                finalLine.className = "leaderboard-score__line leaderboard-score__line--final";
+                const finalLabel = document.createElement("span");
+                finalLabel.className = "leaderboard-score__label";
+                finalLabel.textContent = "Final";
+                const finalValue = document.createElement("strong");
+                finalValue.className = "leaderboard-score__value";
+                finalValue.textContent = "🔒";
+                finalValue.setAttribute("role", "img");
+                finalValue.setAttribute("aria-label", "Locked until reveal");
+                finalLine.append(finalLabel, finalValue);
+
+                const priorLine = document.createElement("span");
+                priorLine.className = "leaderboard-score__line";
+                const priorLabel = document.createElement("span");
+                priorLabel.className = "leaderboard-score__label";
+                priorLabel.textContent = `After R${room.roundsPerPlayer - 1}`;
+                const priorValue = document.createElement("strong");
+                priorValue.className = "leaderboard-score__value";
+                priorValue.textContent = `${player.score}`;
+                priorLine.append(priorLabel, priorValue);
+
+                score.append(finalLine, priorLine);
+            } else {
+                score.textContent = `${player.score}`;
+            }
             row.append(place, info, score);
             els.leaderboard.appendChild(row);
         });
@@ -742,8 +770,8 @@
             els.resultKicker.textContent = "Final round complete · scores sealed";
             els.resultTitle.textContent = "The final table is locked.";
             els.resultCopy.textContent = room.canReveal
-                ? "Every third-round score is hidden. Reveal the final draft order when everyone is ready."
-                : "Every third-round score is hidden. Waiting for the host to begin the reveal.";
+                ? "Every final-round score is hidden. Reveal the final draft order when everyone is ready."
+                : "Every final-round score is hidden. Waiting for the host to begin the reveal.";
             els.revealButton.textContent = "Reveal final draft order";
             els.revealButton.hidden = !room.canReveal;
             els.revealButton.disabled = state.actionBusy;
@@ -752,7 +780,7 @@
         }
 
         els.resultKicker.textContent = isPractice ? "Practice complete · seed revealed" : "Scores revealed · seed unlocked";
-        els.resultTitle.textContent = isPractice ? "Three practice rounds complete." : "The draft order is ready.";
+        els.resultTitle.textContent = isPractice ? "Five practice rounds complete." : "The draft order is ready.";
         els.resultCopy.textContent = isPractice
             ? `You scored ${room.draftOrder?.[0]?.score || 0} points. Run it again whenever you want another warm-up.`
             : "Revealing from the last pick to the first, followed by the proof behind every card.";

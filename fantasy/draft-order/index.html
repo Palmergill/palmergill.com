@@ -9,7 +9,7 @@
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://palmergill.com/fantasy/draft-order/">
     <meta property="og:title" content="Fourth &amp; Fortune · Fantasy Football">
-    <meta property="og:description" content="Flip, bank, or bust. Three rounds decide the draft order—and every deal can be verified.">
+    <meta property="og:description" content="Flip, bank, or bust. Five rounds decide the draft order—and every deal can be verified.">
     <meta property="og:image" content="https://palmergill.com/assets/palmer-gill-logo.png">
     <meta name="twitter:card" content="summary">
     <link rel="icon" type="image/png" href="/assets/palmer-gill-logo-small.png">
@@ -17,7 +17,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&amp;family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/shared/site-nav.css?v=13">
-    <link rel="stylesheet" href="style.css?v=7">
+    <link rel="stylesheet" href="style.css?v=8">
 </head>
 <body>
     <main class="draft-shell">
@@ -26,7 +26,7 @@
                 <a class="back-link" href="/fantasy/">← Fantasy Football</a>
                 <p class="eyebrow">League draft night</p>
                 <h1>Fourth <span>&amp;</span> Fortune</h1>
-                <p class="hero-copy">Flip, bank, or bust. Three rounds decide the draft order—and the deal proves itself.</p>
+                <p class="hero-copy">Flip, bank, or bust. Five rounds decide the draft order—and the deal proves itself.</p>
             </div>
             <div class="hero-mark" aria-hidden="true">
                 <span>4</span>
@@ -65,7 +65,7 @@
             <section class="state-card practice-card">
                 <div>
                     <p class="section-kicker">Warm-up table</p>
-                    <h3>Practice all three rounds</h3>
+                    <h3>Practice all five rounds</h3>
                     <p>Flip, bank, and learn the rhythm in a private solo run. Practice scores never touch a league draft room.</p>
                 </div>
                 <button id="startPracticeButton" class="button button--action" type="button">Start practice</button>
@@ -191,7 +191,7 @@
                             <p class="section-kicker">At the table</p>
                             <h3 id="currentPlayerName">—</h3>
                         </div>
-                        <span id="roundBadge" class="round-badge">Round 1 of 3</span>
+                        <span id="roundBadge" class="round-badge">Round 1 of 5</span>
                     </div>
 
                     <div id="cardsHeld" class="cards-held" role="group" aria-label="Cards held" aria-live="polite"></div>
@@ -295,7 +295,7 @@
                 <strong>Bank</strong>
                 <p>Lock your points. Everyone finishes the round before the next begins; your deck carries over.</p>
             </div>
-            <p class="fairness-note"><span>SHA-256</span> Rounds 1–2 are open-table. Final-round cards and scores stay sealed until the host reveals them. The seed proves every deal; ties go to the best round, then a seeded tiebreak.</p>
+            <p class="fairness-note"><span>SHA-256</span> Rounds 1–4 are open-table. Only final-round cards and scores stay sealed until the host reveals them. The seed proves every deal; ties go to the best round, then a seeded tiebreak.</p>
         </section>
     </main>
 
@@ -303,6 +303,6 @@
     <script src="/shared/analytics.js?v=1"></script>
     <script src="/shared/api-base.js?v=1"></script>
     <script src="format.js?v=4"></script>
-    <script src="app.js?v=11"></script>
+    <script src="app.js?v=13"></script>
 </body>
 </html>
