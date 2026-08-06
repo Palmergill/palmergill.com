@@ -558,6 +558,16 @@ def test_full_game_reveals_seed_and_reproducible_decks(monkeypatch):
     assert proof["hashMatches"] is True
     assert hashlib.sha256(bytes.fromhex(proof["masterSeed"])).hexdigest() == room["seedHash"]
     assert len(proof["players"]) == 2
+    assert proof["draftOrder"] == [
+        {
+            "pick": entry["pick"],
+            "playerId": entry["playerId"],
+            "displayName": entry["displayName"],
+            "score": entry["score"],
+            "bestRound": entry["bestRound"],
+        }
+        for entry in view["draftOrder"]
+    ]
     for player in proof["players"]:
         assert len(player["decks"]) == ROUNDS_PER_PLAYER
         for deck_row in player["decks"]:
@@ -568,6 +578,17 @@ def test_full_game_reveals_seed_and_reproducible_decks(monkeypatch):
             )
         assert [draw["deckIndex"] for draw in player["draws"]] == [0] * ROUNDS_PER_PLAYER
     assert verify_proof(proof) == []
+
+    outsider = TestClient(app)
+    public_proof = outsider.get(f"/api/fantasy/draft/sessions/{room['id']}/verify")
+    assert public_proof.status_code == 200
+    assert public_proof.json()["publishedSeedHash"] == room["seedHash"]
+
+    changed_order = copy.deepcopy(proof)
+    changed_order["draftOrder"][0]["score"] += 1
+    assert verify_proof(changed_order) == [
+        "Final draft order does not match the verified scores and tiebreaks."
+    ]
 
     original_code = proof["players"][0]["decks"][0]["cards"][0]["code"]
     proof["players"][0]["decks"][0]["cards"][0]["code"] = (

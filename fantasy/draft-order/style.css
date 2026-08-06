@@ -684,6 +684,7 @@ code { font-family: "DM Mono", ui-monospace, monospace; }
     position: relative;
     min-height: 680px;
     overflow: hidden;
+    overflow-anchor: none;
     border: 1px solid #2f4939;
     border-radius: 26px;
     background:
@@ -947,6 +948,7 @@ code { font-family: "DM Mono", ui-monospace, monospace; }
 .proof-head p:not(.section-kicker) { max-width: 650px; color: var(--draft-muted); line-height: 1.6; }
 .proof-badge { flex: 0 0 auto; border: 1px solid #a7c2a8; border-radius: 999px; background: #eaf3e9; padding: 9px 13px; color: #365b3b; font-size: 0.72rem; font-weight: 800; }
 .proof-badge.is-failed { border-color: #dda7a1; background: #fae7e4; color: #8d352e; }
+.proof-errors { margin: -8px 0 18px; border: 1px solid #dda7a1; border-radius: 12px; background: #fae7e4; padding: 13px 16px 13px 34px; color: #7a302a; font-size: 0.8rem; line-height: 1.55; }
 
 .proof-values { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .proof-values > div { min-width: 0; border: 1px solid var(--draft-line); border-radius: 12px; background: var(--draft-paper); padding: 15px; }
@@ -1000,6 +1002,7 @@ summary { padding: 17px 18px; cursor: pointer; font-size: 0.86rem; font-weight: 
     font-weight: 500;
 }
 .verification-meta span { border-radius: 999px; background: #eef1eb; padding: 6px 9px; color: #4e5c51; font-size: 0.74rem; font-weight: 700; }
+.deck-prompt { margin: 0; border-radius: 9px; background: #f3f1e9; padding: 11px 13px; color: var(--draft-muted); font-size: 0.76rem; }
 /* Capped: the grid used to stretch to the full card width, so on a desktop
    each cell rendered at roughly 88x123px around type clamped to 11px — a
    playing-card-sized box with a speck in the middle. */

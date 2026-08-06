@@ -55,10 +55,14 @@ def verify_proof(proof: dict) -> list[str]:
 
     fresh_round_decks = proof.get("game") == game.GAME_VERSION
     rounds_per_player = int(proof.get("roundsPerPlayer", game.ROUNDS_PER_PLAYER))
+    computed_players: list[dict[str, Any]] = []
 
     for player in players:
         label = player.get("displayName") or player.get("username") or "Unknown player"
         username = str(player.get("username", ""))
+        expected_tie_break = game.tie_break_value(seed, username)
+        if player.get("tieBreakValue") != f"{expected_tie_break:016x}":
+            errors.append(f"{label}: seeded tie-break value is wrong.")
         expected_decks: dict[int, list[str]] = {}
         deck_mismatch = False
         if fresh_round_decks:
@@ -130,6 +134,7 @@ def verify_proof(proof: dict) -> list[str]:
             dealt_by_round[draw.get("round")].append((draw.get("card") or {}).get("code"))
 
         final_score = 0
+        best_round = 0
         for round_row in player.get("rounds", []):
             number = round_row.get("number")
             cards = [card.get("code") for card in round_row.get("cards", [])]
@@ -151,12 +156,45 @@ def verify_proof(proof: dict) -> list[str]:
             if expected_score != round_row.get("score") or expected_bust != round_row.get("busted"):
                 errors.append(f"{label}: round {round_row.get('number')} score or bust flag is wrong.")
             final_score += expected_score
+            best_round = max(best_round, expected_score)
         # Anything left over was dealt into a round the proof never lists, which
         # is the same tampering seen from the other side.
         for number in sorted(dealt_by_round, key=lambda value: (value is None, value)):
             errors.append(f"{label}: cards were dealt into round {number}, which the proof omits.")
         if final_score != player.get("finalScore"):
             errors.append(f"{label}: final score should be {final_score}, not {player.get('finalScore')}.")
+        computed_players.append({
+            "playerId": player.get("playerId"),
+            "displayName": player.get("displayName"),
+            "score": final_score,
+            "bestRound": best_round,
+            "tieBreak": expected_tie_break,
+        })
+
+    # Avoid cascading a bad hand into a second, less useful order error. When
+    # every underlying value is sound, the published picks must also follow the
+    # documented total/best-round/seeded-tiebreak rule.
+    if not errors:
+        computed_players.sort(
+            key=lambda player: (
+                -player["score"],
+                -player["bestRound"],
+                -player["tieBreak"],
+            )
+        )
+        expected_order = [
+            {
+                "pick": pick,
+                "playerId": player["playerId"],
+                "displayName": player["displayName"],
+                "score": player["score"],
+                "bestRound": player["bestRound"],
+            }
+            for pick, player in enumerate(computed_players, start=1)
+        ]
+        published_order = proof.get("draftOrder")
+        if published_order != expected_order:
+            errors.append("Final draft order does not match the verified scores and tiebreaks.")
 
     return errors
 

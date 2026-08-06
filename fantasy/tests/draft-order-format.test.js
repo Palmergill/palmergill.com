@@ -39,6 +39,18 @@ describe('DraftOrderFormat', () => {
         );
     });
 
+    test('verificationUrl creates a public proof link instead of a member room link', () => {
+        expect(DraftOrderFormat.verificationUrl('https://palmergill.com', 'room-1')).toBe(
+            'https://palmergill.com/fantasy/draft-order/?verify=room-1'
+        );
+    });
+
+    test('gameLengthCopy makes the sequential turn count and estimate visible', () => {
+        expect(DraftOrderFormat.gameLengthCopy(16, 5)).toBe(
+            '80 total turns · allow roughly 14–27 minutes.'
+        );
+    });
+
     test('roomModeName keeps practice and bot tests distinct from league rooms', () => {
         expect(DraftOrderFormat.roomModeName('league')).toBe('Draft order game');
         expect(DraftOrderFormat.roomModeName('practice')).toBe('Practice');

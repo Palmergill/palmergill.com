@@ -1689,6 +1689,20 @@ def verification(db: Session, room: FantasyDraftSession) -> dict[str, Any]:
             ]
         verification_players.append(player_payload)
 
+    draft_order = [
+        {
+            "pick": pick,
+            "playerId": player.id,
+            "displayName": player.display_name,
+            "score": player.final_score,
+            "bestRound": _best_round(rounds_by_player[player.id]),
+        }
+        for pick, player in enumerate(
+            _final_order(players, rounds_by_player, room.master_seed),
+            start=1,
+        )
+    ]
+
     return {
         "game": _game_version(room),
         "sessionId": room.id,
@@ -1699,6 +1713,7 @@ def verification(db: Session, room: FantasyDraftSession) -> dict[str, Any]:
         "computedSeedHash": seed_commitment(room.master_seed),
         "hashMatches": secrets.compare_digest(room.seed_hash, seed_commitment(room.master_seed)),
         "turnOrder": [player.display_name for player in players],
+        "draftOrder": draft_order,
         "players": verification_players,
         "algorithm": {
             "commitment": "SHA-256 of the raw 32-byte master seed, displayed as lowercase hex.",

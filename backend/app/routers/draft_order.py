@@ -214,12 +214,10 @@ def reveal_room(
 @router.get("/sessions/{session_id}/verify")
 def verify_room(
     session_id: str,
-    request: Request,
     db: Session = Depends(get_db),
 ) -> dict[str, Any]:
-    identity = _identity(request)
     room = draft_order_game.get_session(db, session_id)
-    view = draft_order_game.serialize_session(db, room, identity["username"])
-    if not view["isMember"]:
-        raise HTTPException(status_code=403, detail="Join this draft room to verify it.")
+    # Once the host reveals the result, the proof is intentionally public. A
+    # copied draft order is only independently checkable if a league member can
+    # send it to somebody who was never signed into the room.
     return draft_order_game.verification(db, room)

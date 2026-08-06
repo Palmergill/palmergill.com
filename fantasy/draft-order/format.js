@@ -51,6 +51,21 @@
         return url.toString();
     }
 
+    function verificationUrl(origin, roomId) {
+        const url = new URL("/fantasy/draft-order/", origin);
+        url.searchParams.set("verify", roomId);
+        return url.toString();
+    }
+
+    function gameLengthCopy(managerCount, roundsPerPlayer) {
+        const managers = Math.max(0, Number(managerCount) || 0);
+        const rounds = Math.max(1, Number(roundsPerPlayer) || 5);
+        const turns = managers * rounds;
+        const lowMinutes = Math.max(1, Math.ceil(turns * 10 / 60));
+        const highMinutes = Math.max(lowMinutes, Math.ceil(turns * 20 / 60));
+        return `${turns} total turns · allow roughly ${lowMinutes}–${highMinutes} minutes.`;
+    }
+
     function roomModeName(mode) {
         if (mode === "practice") return "Practice";
         if (mode === "test") return "Bot test";
@@ -107,6 +122,8 @@
         compactHash,
         bustCopy,
         roomUrl,
+        verificationUrl,
+        gameLengthCopy,
         roomModeName,
         turnEventMessage,
         turnEventTone,

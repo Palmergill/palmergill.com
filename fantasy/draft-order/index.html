@@ -17,7 +17,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&amp;family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/shared/site-nav.css?v=13">
-    <link rel="stylesheet" href="style.css?v=10">
+    <link rel="stylesheet" href="style.css?v=11">
 </head>
 <body>
     <main class="draft-shell">
@@ -264,11 +264,12 @@
                 <div class="proof-head">
                     <div>
                         <p class="section-kicker">Independent proof</p>
-                        <h2>The commitment matches.</h2>
-                        <p>The seed below reproduces the turn order, every player deck, and every card drawn.</p>
+                        <h2 id="proofTitle">Checking the commitment…</h2>
+                        <p id="proofSummary">Your browser is reproducing the turn order, decks, draws, scores, and final picks.</p>
                     </div>
-                    <span id="hashMatchBadge" class="proof-badge">✓ SHA-256 matched</span>
+                    <span id="hashMatchBadge" class="proof-badge">Checking locally…</span>
                 </div>
+                <ul id="proofErrors" class="proof-errors" hidden></ul>
                 <div class="proof-values">
                     <div><span>Master seed</span><code id="masterSeed">—</code></div>
                     <div><span>Published hash</span><code id="publishedHash">—</code></div>
@@ -304,7 +305,8 @@
     <script src="/shared/site-nav.js?v=13"></script>
     <script src="/shared/analytics.js?v=1"></script>
     <script src="/shared/api-base.js?v=1"></script>
-    <script src="format.js?v=5"></script>
-    <script src="app.js?v=15"></script>
+    <script src="format.js?v=6"></script>
+    <script src="verify.js?v=1"></script>
+    <script src="app.js?v=16"></script>
 </body>
 </html>

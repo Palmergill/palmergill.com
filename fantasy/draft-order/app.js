@@ -3,6 +3,7 @@
 
     const API_BASE = `${window.API_ORIGIN || ""}/api/fantasy/draft`;
     const F = window.DraftOrderFormat;
+    const V = window.DraftOrderVerify;
     const ACTIVE_POLL_MS = 900;
     const IDLE_POLL_MS = 2500;
     // Bots act one card at a time and wait like a person would: long enough to
@@ -29,6 +30,7 @@
         statusTimer: null,
         botTimer: null,
         botPaused: false,
+        publicProof: false,
         // The table sits below a full-height hero, so a manager whose turn
         // arrives while they are reading the standings would never see the
         // Flip and Bank buttons without scrolling for them.
@@ -108,6 +110,9 @@
         practiceAgainButton: byId("practiceAgainButton"),
         verifyPanel: byId("verifyPanel"),
         closeVerifyButton: byId("closeVerifyButton"),
+        proofTitle: byId("proofTitle"),
+        proofSummary: byId("proofSummary"),
+        proofErrors: byId("proofErrors"),
         hashMatchBadge: byId("hashMatchBadge"),
         masterSeed: byId("masterSeed"),
         publishedHash: byId("publishedHash"),
@@ -410,6 +415,7 @@
         stopPolling();
         stopBotTimer();
         state.room = null;
+        state.publicProof = false;
         state.wasMyTurn = false;
         state.resultsRevealed = false;
         state.revealTimers.forEach(window.clearTimeout);
@@ -445,6 +451,7 @@
         stopPolling();
         stopBotTimer();
         state.botPaused = false;
+        state.publicProof = false;
         // Arriving at a room is a fresh turn as far as the table is concerned,
         // otherwise a manager who has played once never gets scrolled in again.
         state.wasMyTurn = false;
@@ -472,6 +479,10 @@
         const room = state.room;
         if (!room) return;
         setView("room");
+        els.leaveRoomView.hidden = false;
+        els.leaveRoomView.textContent = "← All draft rooms";
+        els.closeVerifyButton.hidden = false;
+        els.closeVerifyButton.textContent = "← Back to results";
         els.verifyPanel.hidden = true;
         els.roomLeagueName.textContent = room.leagueName;
         els.seedHash.textContent = F.compactHash(room.seedHash, 12);
@@ -530,6 +541,7 @@
                 remove.className = "remove-player";
                 remove.type = "button";
                 remove.textContent = "Remove";
+                remove.setAttribute("aria-label", `Remove ${player.displayName}`);
                 remove.addEventListener("click", () => removePlayer(player));
                 row.appendChild(remove);
             }
@@ -543,13 +555,14 @@
         // A manager who typed the wrong code used to be stuck in the room for
         // good: the roster locks on start and only the host could remove them.
         els.leaveRoomButton.hidden = room.isHost;
+        const duration = F.gameLengthCopy(room.players.length, room.roundsPerPlayer);
         els.startHelp.textContent = room.isHost
             ? (room.canStart
                 ? (isTest
-                    ? "Bots play automatically. Everyone finishes each round before the standings leader starts the next one."
-                    : "Everyone finishes Round 1 in the seeded order. The standings leader starts each following round.")
-                : "One more manager must join before you can start.")
-            : "Waiting for the host to lock the roster and start.";
+                    ? `${duration} Bots play automatically. Everyone finishes each round before the standings leader starts the next one.`
+                    : `${duration} Everyone finishes Round 1 in the seeded order. The standings leader starts each following round.`)
+                : `${duration} One more manager must join before you can start.`)
+            : `${duration} Waiting for the host to lock the roster and start.`;
     }
 
     function renderCards(cards, concealedCount, scope) {
@@ -649,12 +662,17 @@
         // Showing one anyway told a manager they'd lead when an opponent had
         // already banked past them behind the seal.
         const standingsSealed = concealed || Boolean(decision.standingsSealed);
-        els.bankPosition.textContent = standingsSealed
+        const canBank = Boolean((round.cards || []).length);
+        els.bankPosition.textContent = !canBank
+            ? "—"
+            : standingsSealed
             ? "After reveal"
             : (decision.bankPosition ? F.ordinal(decision.bankPosition) : "—");
         // These stats describe the player at the table, so only phrase them in
         // the second person when the viewer is that player.
-        els.scoreToBeat.textContent = standingsSealed
+        els.scoreToBeat.textContent = !canBank
+            ? "—"
+            : standingsSealed
             ? "Sealed"
             : decision.isLeadingIfBanked
                 ? (room.canPlay ? "You’d lead" : "Would lead")
@@ -664,7 +682,7 @@
         // version 1 room that was already active when the rules changed.
         const deckEmpty = round.deckRemaining === 0;
         els.flipButton.disabled = state.actionBusy || deckEmpty;
-        els.bankButton.disabled = state.actionBusy || !(round.cards || []).length;
+        els.bankButton.disabled = state.actionBusy || !canBank;
 
         // The host's way out of a room stalled on someone who left. It stays
         // out of reach for the first stretch of a turn so it can't be used on a
@@ -975,6 +993,7 @@
             state.actionBusy = false;
             setButtonBusy(button, false, busyLabel);
             if (state.room?.state === "active") renderGame(state.room);
+            if (path === "flip") scrollToPlayStage();
             scheduleBotTurn();
         }
     }
@@ -995,10 +1014,10 @@
         setButtonBusy(els.verifyButton, true, "Loading proof");
         try {
             const proof = await requestJson(`/sessions/${state.room.id}/verify`);
-            renderVerification(proof);
             els.resultPanel.hidden = true;
             els.verifyPanel.hidden = false;
             els.verifyPanel.scrollIntoView({ behavior: "smooth", block: "start" });
+            await renderVerification(proof);
         } catch (error) {
             handleActionError(error);
         } finally {
@@ -1006,9 +1025,13 @@
         }
     }
 
-    function renderVerification(proof) {
-        els.hashMatchBadge.textContent = proof.hashMatches ? "✓ SHA-256 matched" : "Hash mismatch";
-        els.hashMatchBadge.classList.toggle("is-failed", !proof.hashMatches);
+    async function renderVerification(proof) {
+        els.proofTitle.textContent = "Checking the commitment…";
+        els.proofSummary.textContent = "Your browser is reproducing the turn order, decks, draws, scores, and final picks.";
+        els.hashMatchBadge.textContent = "Checking locally…";
+        els.hashMatchBadge.classList.remove("is-failed");
+        els.proofErrors.innerHTML = "";
+        els.proofErrors.hidden = true;
         els.masterSeed.textContent = proof.masterSeed;
         els.publishedHash.textContent = proof.publishedSeedHash;
         els.algorithmCopy.innerHTML = "";
@@ -1025,15 +1048,35 @@
             els.algorithmCopy.appendChild(paragraph);
         });
 
+        const verification = await V.verifyProof(proof, window.crypto);
+        els.proofTitle.textContent = verification.ok
+            ? "The full result checks out."
+            : "This proof does not match.";
+        els.proofSummary.textContent = verification.ok
+            ? "This browser independently reproduced the seed commitment, initial turn order, every deck and draw, all scores and tiebreaks, and the final draft order."
+            : "At least one published value could not be reproduced from the revealed seed. Do not use this draft order until the mismatch is resolved.";
+        els.hashMatchBadge.textContent = verification.ok ? "✓ Verified in this browser" : "Verification failed";
+        els.hashMatchBadge.classList.toggle("is-failed", !verification.ok);
+        if (!verification.ok) {
+            verification.errors.forEach((message) => {
+                const item = document.createElement("li");
+                item.textContent = message;
+                els.proofErrors.appendChild(item);
+            });
+            els.proofErrors.hidden = false;
+        }
+
         els.verificationPlayers.innerHTML = "";
+        const finalPickByPlayer = new Map((proof.draftOrder || []).map((entry) => [entry.playerId, entry.pick]));
         proof.players.forEach((player) => {
             const details = document.createElement("details");
             details.className = "verification-player";
             const summary = document.createElement("summary");
             const name = document.createElement("strong");
-            name.textContent = `${player.turnPosition}. ${player.displayName}`;
+            name.textContent = `Turn ${player.turnPosition} · ${player.displayName}`;
             const score = document.createElement("span");
-            score.textContent = `${player.finalScore} pts · ${player.draws.length} cards used`;
+            const finalPick = finalPickByPlayer.get(player.playerId);
+            score.textContent = `${finalPick ? `Pick #${finalPick} · ` : ""}${player.finalScore} pts · ${player.draws.length} cards used`;
             summary.append(name, score);
             const body = document.createElement("div");
             body.className = "verification-body";
@@ -1070,32 +1113,12 @@
                 item.append(label, outcome, cards, score);
                 rounds.appendChild(item);
             });
-            const deckRows = player.decks || [{ round: null, cards: player.deck || [] }];
             const decks = document.createElement("div");
             decks.className = "verification-decks";
-            deckRows.forEach((deckRow) => {
-                if (deckRow.round !== null) {
-                    const heading = document.createElement("p");
-                    heading.className = "deck-heading";
-                    heading.textContent = `Round ${deckRow.round} fresh deck`;
-                    decks.appendChild(heading);
-                }
-                const used = new Set(
-                    player.draws
-                        .filter((draw) => deckRow.round === null || draw.round === deckRow.round)
-                        .map((draw) => draw.deckIndex)
-                );
-                const deck = document.createElement("div");
-                deck.className = "deck-grid";
-                deckRow.cards.forEach((card) => {
-                    const node = document.createElement("span");
-                    node.className = `mini-card${card.red ? " is-red" : ""}${used.has(card.deckIndex) ? " is-drawn" : ""}`;
-                    node.textContent = F.cardLabel(card);
-                    node.title = `Deck index ${card.deckIndex}${used.has(card.deckIndex) ? " · drawn" : ""}`;
-                    deck.appendChild(node);
-                });
-                decks.appendChild(deck);
-            });
+            const deckPrompt = document.createElement("p");
+            deckPrompt.className = "deck-prompt";
+            deckPrompt.textContent = "Open this manager to render the full shuffled decks.";
+            decks.appendChild(deckPrompt);
             const legend = document.createElement("p");
             legend.className = "deck-legend";
             legend.textContent = player.decks
@@ -1103,8 +1126,70 @@
                 : "Highlighted cards were drawn. Indexing starts at 0.";
             body.append(meta, rounds, decks, legend);
             details.append(summary, body);
+            // A maximum room proves 80 full decks. Build those card grids only
+            // when somebody asks to inspect this manager, not while the proof
+            // panel is still opening.
+            details.addEventListener("toggle", () => {
+                if (!details.open || decks.dataset.rendered) return;
+                decks.dataset.rendered = "true";
+                decks.innerHTML = "";
+                const deckRows = player.decks || [{ round: null, cards: player.deck || [] }];
+                deckRows.forEach((deckRow) => {
+                    if (deckRow.round !== null) {
+                        const heading = document.createElement("p");
+                        heading.className = "deck-heading";
+                        heading.textContent = `Round ${deckRow.round} fresh deck`;
+                        decks.appendChild(heading);
+                    }
+                    const used = new Set(
+                        player.draws
+                            .filter((draw) => deckRow.round === null || draw.round === deckRow.round)
+                            .map((draw) => draw.deckIndex)
+                    );
+                    const deck = document.createElement("div");
+                    deck.className = "deck-grid";
+                    deckRow.cards.forEach((card) => {
+                        const node = document.createElement("span");
+                        node.className = `mini-card${card.red ? " is-red" : ""}${used.has(card.deckIndex) ? " is-drawn" : ""}`;
+                        node.textContent = F.cardLabel(card);
+                        node.title = `Deck index ${card.deckIndex}${used.has(card.deckIndex) ? " · drawn" : ""}`;
+                        deck.appendChild(node);
+                    });
+                    decks.appendChild(deck);
+                });
+            });
             els.verificationPlayers.appendChild(details);
         });
+    }
+
+    async function openPublicVerification(roomId) {
+        stopPolling();
+        stopBotTimer();
+        state.publicProof = true;
+        setView("loading");
+        try {
+            const proof = await requestJson(`/sessions/${roomId}/verify`);
+            state.room = {
+                id: roomId,
+                leagueName: proof.leagueName,
+                seedHash: proof.publishedSeedHash,
+                draftOrder: proof.draftOrder,
+            };
+            setView("room");
+            els.leaveRoomView.textContent = "← Fourth & Fortune";
+            els.roomStateLabel.textContent = "Public proof · final result";
+            els.roomLeagueName.textContent = proof.leagueName;
+            els.seedHash.textContent = F.compactHash(proof.publishedSeedHash, 12);
+            els.lobbyPanel.hidden = true;
+            els.gamePanel.hidden = true;
+            els.resultPanel.hidden = true;
+            els.verifyPanel.hidden = false;
+            els.closeVerifyButton.hidden = true;
+            await renderVerification(proof);
+        } catch (error) {
+            showStatus(error.message, true);
+            setView("signedOut");
+        }
     }
 
     els.createRoomForm.addEventListener("submit", async (event) => {
@@ -1189,7 +1274,13 @@
         }
     });
 
-    els.leaveRoomView.addEventListener("click", loadHome);
+    els.leaveRoomView.addEventListener("click", () => {
+        if (state.publicProof) {
+            window.location.assign("/fantasy/draft-order/");
+            return;
+        }
+        loadHome();
+    });
     els.leaveRoomButton.addEventListener("click", async () => {
         if (!state.room) return;
         const confirmed = window.confirm(
@@ -1241,6 +1332,10 @@
     els.revealButton.addEventListener("click", revealResults);
     els.verifyButton.addEventListener("click", showVerification);
     els.closeVerifyButton.addEventListener("click", () => {
+        if (state.publicProof) {
+            window.location.assign("/fantasy/draft-order/");
+            return;
+        }
         els.verifyPanel.hidden = true;
         els.resultPanel.hidden = false;
         els.resultPanel.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -1250,7 +1345,7 @@
         const text = [
             `${state.room.leagueName} draft order`,
             ...state.room.draftOrder.map((entry) => `${entry.pick}. ${entry.displayName} — ${entry.score} pts`),
-            `Verified at ${F.roomUrl(window.location.origin, state.room.id)}`,
+            `Verified at ${F.verificationUrl(window.location.origin, state.room.id)}`,
         ].join("\n");
         copyText(text, "Draft order copied.");
     });
@@ -1281,8 +1376,13 @@
     async function init() {
         const params = new URLSearchParams(window.location.search);
         const desiredRoom = params.get("room");
+        const verificationRoom = params.get("verify");
         const inviteCode = (params.get("join") || "").trim().toUpperCase();
         try {
+            if (verificationRoom) {
+                await openPublicVerification(verificationRoom);
+                return;
+            }
             const response = await fetch("/login/session", { credentials: "include", cache: "no-store" });
             const identity = await response.json();
             if (!identity.authenticated) {
