@@ -4,8 +4,8 @@
 // feels continuous.
 //
 // Usage:
-//   <script src="/shared/casino-profile.js?v=2"></script>
-//   <script src="/shared/casino-header.js?v=1"></script>
+//   <script src="/shared/casino-profile.js?v=3"></script>
+//   <script src="/shared/casino-header.js?v=2"></script>
 //   <div id="casino-header-mount"></div>
 //   <script>
 //     window.CasinoHeaderInstance = CasinoHeader.mount({

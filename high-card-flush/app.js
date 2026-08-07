@@ -340,17 +340,25 @@
         render();
     }
 
+    // An outside bankroll change (header Rebuy, another tab) patches the
+    // balance in place rather than rebuilding state, so a dealt hand or an
+    // unread settlement survives the update.
     function syncBalanceFromProfile() {
         if (!profile || isPersistingOwnBankroll) return;
         const nextBalance = profile.getBankroll();
         if (nextBalance === state.balance) return;
 
-        const savedWagers = { ...state.wagers };
-        state = game.createState({ bankroll: nextBalance, startingAnte: savedWagers.ante });
-        lastRecordedRound = 0;
-        game.setWager(state, "flushBonus", savedWagers.flushBonus);
-        game.setWager(state, "straightFlushBonus", savedWagers.straightFlushBonus);
-        state.message = "Bankroll updated. Set your wagers and deal.";
+        const delta = nextBalance - state.balance;
+        state.balance = nextBalance;
+        if (state.roundStartBalance !== null) {
+            // Shift the baseline too: the round's net is what the wagers won,
+            // not what the outside deposit added.
+            state.roundStartBalance = Math.round((state.roundStartBalance + delta) * 100) / 100;
+        }
+        if (state.status === "betting") {
+            const validation = game.validateWagers(state);
+            state.message = validation.valid ? "Bankroll updated. Set your wagers and deal." : validation.message;
+        }
         render();
     }
 

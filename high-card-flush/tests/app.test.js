@@ -21,9 +21,9 @@ const TABLE_MARKUP = `
   <section id="decisionPanel" hidden>
     <p id="raiseHelp"></p>
     <button id="foldButton" type="button">Fold</button>
-    <button type="button" data-raise="1">Raise 1<small id="raise1Amount"></small></button>
-    <button type="button" data-raise="2">Raise 2<small id="raise2Amount"></small></button>
-    <button type="button" data-raise="3">Raise 3<small id="raise3Amount"></small></button>
+    <button type="button" data-raise="1">Raise 1<small></small></button>
+    <button type="button" data-raise="2">Raise 2<small></small></button>
+    <button type="button" data-raise="3">Raise 3<small></small></button>
   </section>
   <section id="settlementPanel" hidden>
     <h2 id="settlementTitle"></h2><p id="settlementSummary"></p><div id="settlementBreakdown"></div>
@@ -131,6 +131,26 @@ describe('High Card Flush table app', () => {
         expect(document.getElementById('settlementSummary').textContent).toContain('Flush Bonus pays 10:1');
         expect(document.getElementById('settlementSummary').textContent).toContain('Straight Flush Bonus pays 100:1');
         expect(document.getElementById('dealerHandLabel').textContent).toBe('Not revealed after fold');
+    });
+
+    test('keeps a dealt hand alive when the bankroll changes mid-round', () => {
+        const { profile } = loadApp();
+        document.getElementById('dealButton').click();
+        expect(profile.getBankroll()).toBe(975);
+
+        // A rebuy from the shared header (or another tab) lands during the decision.
+        profile.setBankroll(1975);
+
+        expect(document.body.dataset.gameStatus).toBe('decision');
+        expect(document.querySelectorAll('#playerCards .playing-card')).toHaveLength(7);
+        expect(document.getElementById('decisionPanel').hidden).toBe(false);
+
+        // The round still reports only what the wagers won, not the deposit.
+        document.querySelector('[data-raise="2"]').click();
+        expect(document.getElementById('statNet').textContent).toBe('+$75');
+        expect(profile.getGameStats('high-card-flush')).toMatchObject({ handsPlayed: 1, netProfit: 75 });
+        // $1,000 start + $1,000 deposit + $75 won on the hand.
+        expect(profile.getBankroll()).toBe(2075);
     });
 
     test('resets the shared bankroll and returns the app to betting', () => {

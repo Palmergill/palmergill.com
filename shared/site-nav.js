@@ -32,9 +32,9 @@
         },
         {
             label: "Casino",
-            hint: "Poker, craps & blackjack",
+            hint: "Table games & strategy",
             href: "/casino/",
-            matches: ["/casino/", "/poker/", "/craps/", "/craps-strategy/", "/blackjack/"],
+            matches: ["/casino/", "/poker/", "/craps/", "/craps-strategy/", "/blackjack/", "/high-card-flush/"],
             icon: "spade"
         }
     ];
