@@ -232,6 +232,7 @@ PUBLIC_PATH_PREFIXES = (
     "/poker",
     "/craps",
     "/craps-strategy",
+    "/high-card-flush",
     "/login",
 )
 DEMO_PATH_PREFIXES = (
@@ -917,6 +918,7 @@ if local_site_root_enabled:
         "/craps": "craps",
         "/craps-strategy": "craps-strategy",
         "/blackjack": "blackjack",
+        "/high-card-flush": "high-card-flush",
         "/bitcoin-chat": "bitcoin-chat",
         "/fantasy": "fantasy",
         "/casino": "casino",

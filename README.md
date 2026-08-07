@@ -21,6 +21,7 @@ navigation chrome.
 - `/craps/` - craps app
 - `/craps-strategy/` - craps strategy simulator
 - `/blackjack/` - blackjack app
+- `/high-card-flush/` - single-player High Card Flush table
 - `/admin/` - protected backend log dashboard
 
 ## Active Backend Paths
@@ -49,7 +50,7 @@ Open:
 http://127.0.0.1:8000
 ```
 
-The local server runs FastAPI and, with `LOCAL_SITE_ROOT=true`, also serves the static root page plus `assets/`, `shared/`, `about/`, `login/`, `signup/`, `stock-research/`, `bitcoin-chat/`, `fantasy/`, `casino/`, `poker/`, `craps/`, `craps-strategy/`, `blackjack/`, and `admin/`. The local `/docs` path is reserved for FastAPI API docs; the static website docs page is served by production static hosting at `/docs/`.
+The local server runs FastAPI and, with `LOCAL_SITE_ROOT=true`, also serves the static root page plus `assets/`, `shared/`, `about/`, `login/`, `signup/`, `stock-research/`, `bitcoin-chat/`, `fantasy/`, `casino/`, `poker/`, `craps/`, `craps-strategy/`, `blackjack/`, `high-card-flush/`, and `admin/`. The local `/docs` path is reserved for FastAPI API docs; the static website docs page is served by production static hosting at `/docs/`.
 
 Protected local app routes, FastAPI docs/OpenAPI JSON, and protected API routes require Basic Auth. Stock and Bitcoin app/API routes run in demo mode without credentials and use live providers with valid credentials. Set:
 
@@ -81,7 +82,7 @@ pytest
 ```
 
 Frontend game suites (Jest, covers `poker/tests`, `craps/tests`,
-`blackjack/tests`, `craps-strategy/tests`):
+`blackjack/tests`, `high-card-flush/tests`, and `craps-strategy/tests`):
 
 ```bash
 npm install
@@ -96,7 +97,7 @@ Both run automatically on every push/PR via
 - Static site: hosted from the repo root and project folders.
 - API service: Railway/FastAPI from `backend/`.
 - Vercel rewrites `/api/*`, `/login/session`, `/login/signup`, and `/login/logout` to the Railway backend in production.
-- The root page `/`, `/docs/`, `/login/`, `/signup/`, `/stock-research/`, `/bitcoin-chat/`, `/casino/`, `/poker/`, `/craps/`, `/craps-strategy/`, `/blackjack/`, `/api/poker/*`, `/api/craps/*`, `/api/stocks/*`, `/api/bitcoin/*`, and `/api/analytics/*` stay public. Unauthenticated stock and Bitcoin API requests return demo data only; any signed-in account unlocks the live provider-backed paths. Admin and other `/api/*` routes require authentication; sign-in creates a signed HttpOnly session cookie carrying a role, failed sign-ins are rate-limited, and Basic Auth remains supported for the admin. Protected routes return `503` if `APP_AUTH_PASSWORD` is missing. Set the same `APP_AUTH_USERNAME` and `APP_AUTH_PASSWORD` values in Vercel and Railway.
+- The root page `/`, `/docs/`, `/login/`, `/signup/`, `/stock-research/`, `/bitcoin-chat/`, `/casino/`, `/poker/`, `/craps/`, `/craps-strategy/`, `/blackjack/`, `/high-card-flush/`, `/api/poker/*`, `/api/craps/*`, `/api/stocks/*`, `/api/bitcoin/*`, and `/api/analytics/*` stay public. Unauthenticated stock and Bitcoin API requests return demo data only; any signed-in account unlocks the live provider-backed paths. Admin and other `/api/*` routes require authentication; sign-in creates a signed HttpOnly session cookie carrying a role, failed sign-ins are rate-limited, and Basic Auth remains supported for the admin. Protected routes return `503` if `APP_AUTH_PASSWORD` is missing. Set the same `APP_AUTH_USERNAME` and `APP_AUTH_PASSWORD` values in Vercel and Railway.
 - Two roles: the **admin** (env vars, full access) and **members** (rows in `app_users`, created at `/signup/` with the `APP_SIGNUP_INVITE_CODE` or an open fantasy draft-room code). Members get the live tools but are refused `/admin/*`, `/api/admin/*`, `/api/fantasy/admin/*`, and the API docs. See `ARCHITECTURE.md` for how the roles are kept apart.
 - Poker games are cached in process and snapshotted to the backend database so a fresh backend process can recover active games until inactive cleanup removes them.
 
@@ -112,11 +113,12 @@ docs/             Website docs and provider/setup markdown docs
 stock-research/   Active stock research frontend
 bitcoin-chat/     Active Bitcoin chat frontend
 fantasy/          Fantasy dashboard and Fourth & Fortune draft-order game
-casino/           Casino landing page linking poker, craps, and blackjack
+casino/           Casino landing page and game rules
 poker/            Active poker frontend and supporting docs/tests
 craps/            Active craps frontend
 craps-strategy/   Active craps strategy simulator
 blackjack/        Active blackjack frontend and tests
+high-card-flush/  High Card Flush frontend, PWA shell, and tests
 ```
 
 ## Notes

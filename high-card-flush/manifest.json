@@ -1,0 +1,27 @@
+{
+  "name": "High Card Flush — Palmer Gill Casino",
+  "short_name": "High Card Flush",
+  "description": "A seven-card High Card Flush table with Ante, Raise, and fixed bonus paytables.",
+  "start_url": "/high-card-flush/",
+  "display": "standalone",
+  "background_color": "#050b08",
+  "theme_color": "#07150f",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'%3E%3Crect fill='%230d4a2c' width='192' height='192' rx='28'/%3E%3Crect x='45' y='35' width='102' height='122' rx='12' fill='%23f5ebd8' stroke='%23e8c773' stroke-width='6'/%3E%3Ctext x='96' y='119' font-size='62' text-anchor='middle' fill='%23a92532'%3E%E2%99%A5%3C/text%3E%3C/svg%3E",
+      "sizes": "192x192",
+      "type": "image/svg+xml"
+    },
+    {
+      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect fill='%230d4a2c' width='512' height='512' rx='64'/%3E%3Crect x='120' y='88' width='272' height='336' rx='30' fill='%23f5ebd8' stroke='%23e8c773' stroke-width='16'/%3E%3Ctext x='256' y='320' font-size='180' text-anchor='middle' fill='%23a92532'%3E%E2%99%A5%3C/text%3E%3C/svg%3E",
+      "sizes": "512x512",
+      "type": "image/svg+xml"
+    }
+  ],
+  "categories": ["games", "entertainment"],
+  "lang": "en",
+  "dir": "ltr",
+  "scope": "/high-card-flush/",
+  "screenshots": []
+}

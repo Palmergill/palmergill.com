@@ -624,22 +624,26 @@ def test_analytics_summary_and_timeseries_use_sql_aggregation(monkeypatch):
             db, event_type="app_event", app="blackjack", event_name="blackjack_win",
             visitor_id="v1", session_id="s1",
         )
+        record_analytics_event(
+            db, event_type="app_event", app="high-card-flush", event_name="high_card_flush_round_completed",
+            visitor_id="v2", session_id="s2",
+        )
     finally:
         db.close()
 
     summary = auth_client.get("/api/admin/analytics/summary").json()
-    assert summary["total"] == 9
+    assert summary["total"] == 10
     assert summary["page_views"] == 3
     assert summary["requests"] == 3
-    assert summary["app_events"] == 3
+    assert summary["app_events"] == 4
     assert summary["unique_visitors"] == 2
     assert summary["sessions"] == 2
-    assert summary["success"] == 7
+    assert summary["success"] == 8
     assert summary["warning"] == 1
     assert summary["error"] == 1
     assert summary["authenticated"] == 1
     assert summary["admin"] == 1
-    assert summary["public"] == 8
+    assert summary["public"] == 9
     assert summary["avg_duration_ms"] == 200.0
 
     def by_name(entries):
@@ -648,9 +652,16 @@ def test_analytics_summary_and_timeseries_use_sql_aggregation(monkeypatch):
     assert by_name(summary["top_pages"]) == {"/craps-strategy/": 2, "/poker/": 1}
     assert by_name(summary["top_apps"]) == {
         "craps-strategy": 2, "poker": 1, "api:stocks": 2, "api:craps": 1, "craps": 2, "blackjack": 1,
+        "high-card-flush": 1,
     }
-    assert by_name(summary["casino_app_events"]) == {"craps": 2, "blackjack": 1}
-    assert by_name(summary["top_events"]) == {"craps_strategy_simulated": 2, "blackjack_win": 1}
+    assert by_name(summary["casino_app_events"]) == {
+        "craps": 2, "blackjack": 1, "high-card-flush": 1,
+    }
+    assert by_name(summary["top_events"]) == {
+        "craps_strategy_simulated": 2,
+        "blackjack_win": 1,
+        "high_card_flush_round_completed": 1,
+    }
     assert by_name(summary["top_referrers"]) == {"www.google.com": 2, "www.bing.com": 1}
 
     assert len(summary["recent_errors"]) == 1
@@ -660,7 +671,7 @@ def test_analytics_summary_and_timeseries_use_sql_aggregation(monkeypatch):
     timeseries = auth_client.get("/api/admin/analytics/timeseries").json()
     assert len(timeseries["points"]) == 1  # all seeded events land in the current hour
     point = timeseries["points"][0]
-    assert point["success"] == 7
+    assert point["success"] == 8
     assert point["warning"] == 1
     assert point["error"] == 1
     assert point["page_views"] == 3

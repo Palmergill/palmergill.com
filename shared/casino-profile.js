@@ -1,10 +1,10 @@
 // Shared casino profile: display name, bankroll, and per-game session stats
 // persisted to localStorage so each visit feels continuous across
-// /blackjack/, /craps/, and /poker/.
+// /blackjack/, /craps/, /high-card-flush/, and /poker/.
 //
-// Bankroll is shared between blackjack and craps. Poker uses server-managed
-// chip stacks for multiplayer, so it reads display name and contributes to
-// aggregate stats but does not draw from the shared bankroll.
+// Bankroll is shared between blackjack, craps, and High Card Flush. Poker
+// uses server-managed chip stacks for multiplayer, so it reads display name
+// and contributes to aggregate stats but does not draw from the shared bankroll.
 //
 // Usage:
 //   <script src="/shared/casino-profile.js"></script>
@@ -43,7 +43,7 @@
         maxNameLength: 24
     };
 
-    const KNOWN_GAMES = ['blackjack', 'craps', 'poker'];
+    const KNOWN_GAMES = ['blackjack', 'craps', 'high-card-flush', 'poker'];
 
     function safeRead(key) {
         try {

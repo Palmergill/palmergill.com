@@ -20,6 +20,7 @@
       "poker/tests",
       "craps/tests",
       "blackjack/tests",
+      "high-card-flush/tests",
       "craps-strategy/tests",
       "shared/tests",
       "fantasy/tests"
@@ -29,11 +30,13 @@
     ],
     "collectCoverageFrom": [
       "poker/**/*.js",
+      "high-card-flush/**/*.js",
       "craps-strategy/**/*.js",
       "shared/*.js",
       "fantasy/*.js",
       "!craps-strategy/tests/**",
       "!poker/tests/**",
+      "!high-card-flush/tests/**",
       "!shared/tests/**",
       "!fantasy/tests/**",
       "!**/node_modules/**"

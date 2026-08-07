@@ -36,7 +36,7 @@ Protected local app routes, FastAPI docs/OpenAPI JSON, and protected API routes 
 APP_AUTH_USERNAME=palmer APP_AUTH_PASSWORD=your-password ./start.sh
 ```
 
-Poker, craps, craps strategy, blackjack, login, `/api/poker/*`, `/api/craps/*`, and `/api/analytics/*` remain public. Stock research, Bitcoin chat, `/api/stocks/*`, and `/api/bitcoin/*` run in demo mode without credentials and use live provider-backed data with valid credentials. Admin, FastAPI docs, OpenAPI JSON, and other `/api/*` routes are protected. Protected routes return `503` if `APP_AUTH_PASSWORD` is missing.
+Poker, craps, craps strategy, blackjack, High Card Flush, login, `/api/poker/*`, `/api/craps/*`, and `/api/analytics/*` remain public. Stock research, Bitcoin chat, `/api/stocks/*`, and `/api/bitcoin/*` run in demo mode without credentials and use live provider-backed data with valid credentials. Admin, FastAPI docs, OpenAPI JSON, and other `/api/*` routes are protected. Protected routes return `503` if `APP_AUTH_PASSWORD` is missing.
 
 ## Useful URLs
 
@@ -49,6 +49,7 @@ Poker, craps, craps strategy, blackjack, login, `/api/poker/*`, `/api/craps/*`, 
 - `http://127.0.0.1:8000/craps/` - craps app
 - `http://127.0.0.1:8000/craps-strategy/` - craps strategy simulator
 - `http://127.0.0.1:8000/blackjack/` - blackjack app
+- `http://127.0.0.1:8000/high-card-flush/` - High Card Flush app
 - `http://127.0.0.1:8000/bitcoin-chat/` - Bitcoin chat app
 - `http://127.0.0.1:8000/admin/` - protected admin/log dashboard
 - `http://127.0.0.1:8000/health` - health check

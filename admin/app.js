@@ -32,6 +32,7 @@
         casinoPoker: document.getElementById('casinoPoker'),
         casinoCraps: document.getElementById('casinoCraps'),
         casinoBlackjack: document.getElementById('casinoBlackjack'),
+        casinoHighCardFlush: document.getElementById('casinoHighCardFlush'),
         casinoTotal: document.getElementById('casinoTotal'),
         topEvents: document.getElementById('topEvents'),
         retentionStatus: document.getElementById('retentionStatus'),
@@ -190,7 +191,7 @@
 
     function renderCasinoCards(apps) {
         // casino_app_events entries look like { app: 'poker', count: N }.
-        const counts = { poker: 0, craps: 0, blackjack: 0 };
+        const counts = { poker: 0, craps: 0, blackjack: 0, 'high-card-flush': 0 };
         apps.forEach((entry) => {
             const name = entry?.app || entry?.name || entry?.key;
             const c = Number(entry?.count ?? entry?.events ?? entry?.value ?? 0);
@@ -199,7 +200,12 @@
         if (els.casinoPoker) els.casinoPoker.textContent = number(counts.poker);
         if (els.casinoCraps) els.casinoCraps.textContent = number(counts.craps);
         if (els.casinoBlackjack) els.casinoBlackjack.textContent = number(counts.blackjack);
-        if (els.casinoTotal) els.casinoTotal.textContent = number(counts.poker + counts.craps + counts.blackjack);
+        if (els.casinoHighCardFlush) els.casinoHighCardFlush.textContent = number(counts['high-card-flush']);
+        if (els.casinoTotal) {
+            els.casinoTotal.textContent = number(
+                counts.poker + counts.craps + counts.blackjack + counts['high-card-flush']
+            );
+        }
     }
 
     async function refreshDebugPanels() {

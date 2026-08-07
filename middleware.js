@@ -16,6 +16,7 @@ const PUBLIC_PREFIXES = [
   '/poker',
   '/craps',
   '/craps-strategy',
+  '/high-card-flush',
   '/api/poker',
   '/stock-research',
   '/bitcoin-chat',

@@ -55,6 +55,23 @@ describe('CasinoHeader', () => {
         expect(rebuyBtn.hidden).toBe(true);
     });
 
+    test('supports a game-specific minimum playable bankroll for High Card Flush', () => {
+        profile.setBankroll(7);
+        CasinoHeader.mount({
+            game: 'high-card-flush',
+            label: 'High Card Flush',
+            mount,
+            minimumPlayableBankroll: 10
+        });
+
+        const rebuyBtn = mount.querySelector('[data-role="rebuy"]');
+        expect(rebuyBtn.hidden).toBe(false);
+
+        rebuyBtn.click();
+        expect(profile.getBankroll()).toBe(profile.DEFAULTS.bankroll);
+        expect(rebuyBtn.hidden).toBe(true);
+    });
+
     test('rebuy never appears in chips mode (poker)', () => {
         profile.setBankroll(0);
         CasinoHeader.mount({ game: 'poker', label: 'Poker', mount, chips: true });

@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>High Card Flush — Palmer Gill Casino</title>
+    <meta name="description" content="Play High Card Flush against the dealer with Ante, Raise, Flush Bonus, and Straight Flush Bonus wagers.">
+    <meta name="theme-color" content="#07150f">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://palmergill.com/high-card-flush/">
+    <meta property="og:title" content="High Card Flush — Palmer Gill Casino">
+    <meta property="og:description" content="A seven-card High Card Flush table with fixed bonus paytables and optional strategy guidance.">
+    <meta property="og:image" content="https://palmergill.com/assets/palmer-gill-logo.png">
+    <meta property="og:image:width" content="960">
+    <meta property="og:image:height" content="960">
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="High Card Flush — Palmer Gill Casino">
+    <meta name="twitter:description" content="A seven-card dealer game with flush and straight-flush bonus wagers.">
+    <meta name="twitter:image" content="https://palmergill.com/assets/palmer-gill-logo.png">
+    <link rel="icon" type="image/png" href="/assets/palmer-gill-logo-small.png">
+    <link rel="stylesheet" href="/shared/site-nav.css?v=13">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600;700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/shared/casino-theme.css?v=3">
+    <link rel="stylesheet" href="/shared/rules-viewer.css?v=1">
+    <link rel="manifest" href="./manifest.json">
+    <link rel="stylesheet" href="./style.css?v=1">
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/high-card-flush/sw.js', { scope: '/high-card-flush/' }).catch(() => {});
+            });
+        }
+    </script>
+</head>
+<body class="theme-casino">
+    <div id="casino-header-mount"></div>
+
+    <main class="hcf-shell" data-rules-app>
+        <header class="game-header">
+            <div class="game-title">
+                <span>Palmer Gill Casino</span>
+                <h1>High Card Flush</h1>
+            </div>
+            <nav class="rules-tab-list" aria-label="High Card Flush views">
+                <button class="rules-tab" type="button" data-rules-tab="game" role="tab" aria-selected="true">Table</button>
+                <button class="rules-tab" type="button" data-rules-tab="rules" data-rules-open role="tab" aria-selected="false">Rules</button>
+            </nav>
+            <button class="strategy-toggle" id="strategyToggle" type="button" aria-pressed="false">
+                <span class="strategy-toggle__dot" aria-hidden="true"></span>
+                Strategy hint
+            </button>
+        </header>
+
+        <section class="session-stats" data-rules-game-panel aria-label="Session statistics">
+            <div class="stat"><span>Hands</span><strong id="statHands">0</strong></div>
+            <div class="stat"><span>Wins</span><strong id="statWins">0</strong></div>
+            <div class="stat"><span>Folds</span><strong id="statFolds">0</strong></div>
+            <div class="stat"><span>Session net</span><strong id="statNet">$0</strong></div>
+        </section>
+
+        <section class="table-wrap" data-rules-game-panel aria-label="High Card Flush table">
+            <div class="table-felt">
+                <div class="table-arc" aria-hidden="true"></div>
+
+                <section class="hand-zone dealer-zone" aria-labelledby="dealerHeading">
+                    <div class="hand-heading">
+                        <div>
+                            <span class="hand-kicker">Dealer</span>
+                            <h2 id="dealerHeading">House hand</h2>
+                        </div>
+                        <span class="hand-rank" id="dealerHandLabel">Seven cards hidden</span>
+                    </div>
+                    <div class="card-row" id="dealerCards" aria-label="Dealer cards"></div>
+                </section>
+
+                <div class="table-center">
+                    <div class="qualifier">Dealer qualifies with<br><strong>3-card flush · 9-high</strong></div>
+                    <div class="status-bar" id="statusText" role="status" aria-live="polite">Set your wagers and deal.</div>
+                    <div class="wager-pucks" aria-label="Current table wagers">
+                        <span><small>Ante</small><strong id="tableAnte">$25</strong></span>
+                        <span><small>Raise</small><strong id="tableRaise">—</strong></span>
+                    </div>
+                </div>
+
+                <section class="hand-zone player-zone" aria-labelledby="playerHeading">
+                    <div class="hand-heading">
+                        <div>
+                            <span class="hand-kicker">Player</span>
+                            <h2 id="playerHeading">Your hand</h2>
+                        </div>
+                        <span class="hand-rank" id="playerHandLabel">Waiting for the deal</span>
+                    </div>
+                    <div class="card-row" id="playerCards" aria-label="Player cards"></div>
+                    <div class="hint-panel" id="hintPanel" hidden aria-live="polite"></div>
+                </section>
+            </div>
+        </section>
+
+        <section class="control-deck" data-rules-game-panel aria-label="Game controls">
+            <div class="wager-panel" id="wagerPanel">
+                <div class="wager-panel__intro">
+                    <span class="control-kicker">Before the deal</span>
+                    <h2>Set the table</h2>
+                    <p id="wagerHelp">Ante includes a matching 1× Raise reserve.</p>
+                </div>
+
+                <div class="wager-card wager-card--ante" data-wager-card="ante">
+                    <div><span>Ante</span><small>Required</small></div>
+                    <strong id="anteAmount">$25</strong>
+                    <div class="stepper" aria-label="Ante wager">
+                        <button type="button" data-wager="ante" data-delta="-5" aria-label="Decrease Ante by five dollars">−</button>
+                        <button type="button" data-wager="ante" data-delta="5" aria-label="Increase Ante by five dollars">+</button>
+                    </div>
+                </div>
+
+                <div class="wager-card" data-wager-card="flushBonus">
+                    <div><span>Flush Bonus</span><small>4+ cards · optional</small></div>
+                    <strong id="flushBonusAmount">$0</strong>
+                    <div class="stepper" aria-label="Flush Bonus wager">
+                        <button type="button" data-wager="flushBonus" data-delta="-5" aria-label="Decrease Flush Bonus by five dollars">−</button>
+                        <button type="button" data-wager="flushBonus" data-delta="5" aria-label="Increase Flush Bonus by five dollars">+</button>
+                    </div>
+                </div>
+
+                <div class="wager-card" data-wager-card="straightFlushBonus">
+                    <div><span>Straight Flush</span><small>3+ cards · optional</small></div>
+                    <strong id="straightFlushBonusAmount">$0</strong>
+                    <div class="stepper" aria-label="Straight Flush Bonus wager">
+                        <button type="button" data-wager="straightFlushBonus" data-delta="-5" aria-label="Decrease Straight Flush Bonus by five dollars">−</button>
+                        <button type="button" data-wager="straightFlushBonus" data-delta="5" aria-label="Increase Straight Flush Bonus by five dollars">+</button>
+                    </div>
+                </div>
+
+                <button class="primary-action" id="dealButton" type="button">Deal seven cards</button>
+            </div>
+
+            <div class="decision-panel" id="decisionPanel" hidden>
+                <div>
+                    <span class="control-kicker">Your decision</span>
+                    <h2>Raise or fold</h2>
+                    <p id="raiseHelp">Choose a legal Raise for your flush.</p>
+                </div>
+                <div class="decision-actions">
+                    <button class="fold-action" id="foldButton" type="button">Fold</button>
+                    <button class="raise-action" type="button" data-raise="1">Raise 1× <small id="raise1Amount">$25</small></button>
+                    <button class="raise-action" type="button" data-raise="2">Raise 2× <small id="raise2Amount">$50</small></button>
+                    <button class="raise-action" type="button" data-raise="3">Raise 3× <small id="raise3Amount">$75</small></button>
+                </div>
+            </div>
+
+            <div class="settlement-panel" id="settlementPanel" hidden>
+                <div>
+                    <span class="control-kicker">Round settled</span>
+                    <h2 id="settlementTitle">Result</h2>
+                    <p id="settlementSummary"></p>
+                </div>
+                <div class="settlement-breakdown" id="settlementBreakdown"></div>
+                <button class="primary-action" id="newRoundButton" type="button">Play next hand</button>
+            </div>
+
+            <div class="table-tools">
+                <div class="mini-paytable" aria-label="Flush Bonus paytable">
+                    <span>Flush Bonus</span>
+                    <strong>4 · 1:1</strong><strong>5 · 10:1</strong><strong>6 · 100:1</strong><strong>7 · 300:1</strong>
+                </div>
+                <div class="mini-paytable" aria-label="Straight Flush Bonus paytable">
+                    <span>Straight Flush</span>
+                    <strong>3 · 7:1</strong><strong>4 · 60:1</strong><strong>5 · 100:1</strong><strong>6 · 1,000:1</strong><strong>7 · 8,000:1</strong>
+                </div>
+                <button class="reset-button" id="resetButton" type="button">Reset bankroll</button>
+            </div>
+        </section>
+
+        <section class="rules-panel" data-rules-panel data-rules-source="/casino/high%20card%20flush%20rules%20and%20strategy.txt" data-rules-label="High Card Flush reference" hidden>
+            <div class="rules-panel-toolbar">
+                <button type="button" class="rules-back" data-rules-close>← Back to table</button>
+            </div>
+            <div data-rules-content></div>
+        </section>
+    </main>
+
+    <script src="/shared/casino-profile.js?v=3"></script>
+    <script src="/shared/casino-header.js?v=2"></script>
+    <script>
+        window.CasinoHeaderInstance = CasinoHeader.mount({
+            game: 'high-card-flush',
+            label: 'High Card Flush',
+            mount: '#casino-header-mount',
+            minimumPlayableBankroll: 10
+        });
+    </script>
+    <script src="/shared/analytics.js?v=1"></script>
+    <script src="/shared/rules-viewer.js?v=1"></script>
+    <script src="./highCardFlushGame.js?v=1"></script>
+    <script src="./app.js?v=1"></script>
+    <script src="/shared/site-nav.js?v=13"></script>
+</body>
+</html>

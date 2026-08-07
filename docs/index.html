@@ -410,6 +410,11 @@
                                 <td>Public</td>
                             </tr>
                             <tr>
+                                <td><code>/high-card-flush/</code></td>
+                                <td>Single-player seven-card flush game with fixed bonus paytables.</td>
+                                <td>Public</td>
+                            </tr>
+                            <tr>
                                 <td><code>/bitcoin-chat/</code></td>
                                 <td>Natural-language Bitcoin node explorer and chat interface.</td>
                                 <td>Public demo, authenticated live data</td>
@@ -434,7 +439,7 @@
                 <p>
                     Protected local app routes, FastAPI docs/OpenAPI JSON, and protected API routes require Basic Auth.
                     Stock and Bitcoin app/API routes run in demo mode without credentials and use live providers with valid
-                    credentials. Poker, craps, craps strategy, blackjack, <code>/api/poker/*</code>,
+                    credentials. Poker, craps, craps strategy, blackjack, High Card Flush, <code>/api/poker/*</code>,
                     <code>/api/craps/*</code>, and <code>/api/analytics/*</code> stay public.
                 </p>
                 <pre><code>APP_AUTH_USERNAME=palmer APP_AUTH_PASSWORD=your-password ./start.sh</code></pre>
@@ -522,6 +527,7 @@
                             <li><code>/craps/*</code></li>
                             <li><code>/craps-strategy/*</code></li>
                             <li><code>/blackjack/*</code></li>
+                            <li><code>/high-card-flush/*</code></li>
                             <li><code>/api/poker/*</code></li>
                             <li><code>/api/craps/*</code></li>
                             <li><code>/api/stocks/*</code> demo mode without credentials</li>
@@ -629,6 +635,14 @@
                         <a href="/blackjack/">Open app</a>
                     </article>
                     <article>
+                        <h3>High Card Flush</h3>
+                        <p>
+                            Single-player seven-card dealer table with tiered Raise wagers, dealer qualification,
+                            Flush Bonus and Straight Flush Bonus paytables, shared bankroll sync, and optional strategy guidance.
+                        </p>
+                        <a href="/high-card-flush/">Open app</a>
+                    </article>
+                    <article>
                         <h3>Bitcoin Dashboard</h3>
                         <p>
                             Chat interface connected to mempool.space by default, with an optional read-only
@@ -679,7 +693,7 @@
             <section id="testing" class="doc-section">
                 <p class="section-kicker">Testing</p>
                 <h2>Available test commands</h2>
-                <p>Jest is configured for browser-game logic tests under poker, craps, craps strategy, blackjack, and shared casino modules.</p>
+                <p>Jest is configured for browser-game logic tests under poker, craps, craps strategy, blackjack, High Card Flush, and shared casino modules.</p>
                 <pre><code>npm test</code></pre>
                 <pre><code>npm run test:watch</code></pre>
                 <pre><code>npm run test:coverage</code></pre>
@@ -700,11 +714,12 @@ pytest</code></pre>
                     <code>shared/</code><span>Shared navigation assets used by project pages.</span>
                     <code>backend/</code><span>Active shared FastAPI API service.</span>
                     <code>stock-research/</code><span>Stock research frontend.</span>
-                    <code>casino/</code><span>Casino landing page linking poker, craps, and blackjack.</span>
+                    <code>casino/</code><span>Casino landing page and table-game rules.</span>
                     <code>poker/</code><span>Poker frontend, tests, and docs.</span>
                     <code>craps/</code><span>Craps frontend and tests.</span>
                     <code>craps-strategy/</code><span>Craps strategy simulator frontend, service worker, and tests.</span>
                     <code>blackjack/</code><span>Blackjack frontend and tests.</span>
+                    <code>high-card-flush/</code><span>High Card Flush frontend, service worker, and tests.</span>
                     <code>bitcoin-chat/</code><span>Bitcoin chat frontend.</span>
                     <code>admin/</code><span>Protected log dashboard.</span>
                 </div>

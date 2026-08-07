@@ -32,11 +32,12 @@ The active public site is static:
 - `/bitcoin-chat/` - Bitcoin chat app
 - `/fantasy/` - fantasy football dashboard
 - `/fantasy/draft-order/` - Fourth & Fortune draft-order rooms
-- `/casino/` - casino landing page linking poker, craps, and blackjack
+- `/casino/` - casino landing page linking the browser table games
 - `/poker/` - poker app
 - `/craps/` - craps app
 - `/craps-strategy/` - craps strategy simulator
 - `/blackjack/` - blackjack app
+- `/high-card-flush/` - single-player High Card Flush app
 - `/admin/` - protected backend log dashboard
 
 Shared site chrome defaults to the warm light palette defined in
@@ -86,7 +87,7 @@ logs/backend.log
 - Static site hosting serves the root static files and project directories.
 - Vercel rewrites `/api/*`, `/login/session`, `/login/signup`, and `/login/logout` to the Railway API.
 - Railway runs the Dockerized FastAPI backend from `backend/`.
-- `/`, `/docs/`, `/login/`, `/signup/`, `/casino/`, `/poker/`, `/craps/`, `/craps-strategy/`, `/blackjack/`, `/api/poker/*`, `/api/craps/*`, `/stock-research/`, `/bitcoin-chat/`, `/api/stocks/*`, `/api/bitcoin/*`, and `/api/analytics/*` are public. Stock and Bitcoin routes serve demo data when unauthenticated; any signed-in account unlocks live provider-backed data. Admin, FastAPI docs/OpenAPI JSON, and other API routes require authentication. Protected backend routes return `503` when `APP_AUTH_PASSWORD` is missing.
+- `/`, `/docs/`, `/login/`, `/signup/`, `/casino/`, `/poker/`, `/craps/`, `/craps-strategy/`, `/blackjack/`, `/high-card-flush/`, `/api/poker/*`, `/api/craps/*`, `/stock-research/`, `/bitcoin-chat/`, `/api/stocks/*`, `/api/bitcoin/*`, and `/api/analytics/*` are public. Stock and Bitcoin routes serve demo data when unauthenticated; any signed-in account unlocks live provider-backed data. Admin, FastAPI docs/OpenAPI JSON, and other API routes require authentication. Protected backend routes return `503` when `APP_AUTH_PASSWORD` is missing.
 
 ## Accounts
 

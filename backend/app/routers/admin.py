@@ -466,7 +466,7 @@ def analytics_summary(
         AnalyticsEvent.app,
         cutoff,
         AnalyticsEvent.event_type == "app_event",
-        AnalyticsEvent.app.in_(["poker", "craps", "blackjack"]),
+        AnalyticsEvent.app.in_(["poker", "craps", "blackjack", "high-card-flush"]),
     )
     top_events = _grouped_top(
         db,

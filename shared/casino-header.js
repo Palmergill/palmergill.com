@@ -1,6 +1,7 @@
 // Shared casino identity strip: lobby link, display name, bankroll (or
 // server chip stack for poker), and this-session net P/L. Mounts under
-// /blackjack/, /craps/, and /poker/ so switching games feels continuous.
+// /blackjack/, /craps/, /high-card-flush/, and /poker/ so switching games
+// feels continuous.
 //
 // Usage:
 //   <script src="/shared/casino-profile.js?v=2"></script>
@@ -8,12 +9,13 @@
 //   <div id="casino-header-mount"></div>
 //   <script>
 //     window.CasinoHeaderInstance = CasinoHeader.mount({
-//       game: 'blackjack',      // 'blackjack' | 'craps' | 'poker'
+//       game: 'blackjack',      // casino profile game key
 //       label: 'Blackjack',
 //       mount: '#casino-header-mount',
-//       chips: false            // true for poker: caller drives the number
+//       chips: false,           // true for poker: caller drives the number
 //                                  via instance.setChips(n) instead of the
 //                                  shared bankroll
+//       minimumPlayableBankroll: 1 // show Rebuy below this amount
 //     });
 //   </script>
 //
@@ -51,6 +53,9 @@
             const game = options.game;
             const label = options.label || game;
             const chipsMode = Boolean(options.chips);
+            const minimumPlayableBankroll = Number.isFinite(Number(options.minimumPlayableBankroll))
+                ? Math.max(0, Number(options.minimumPlayableBankroll))
+                : 1;
 
             root.className = 'casino-header';
             root.innerHTML = `
@@ -116,7 +121,7 @@
                         bankrollValueEl.classList.add(flashClass);
                     }
                     lastBankroll = value;
-                    rebuyBtn.hidden = value > 0 || !(game === 'blackjack' || game === 'craps');
+                    rebuyBtn.hidden = value >= minimumPlayableBankroll;
                 } else {
                     rebuyBtn.hidden = true;
                 }

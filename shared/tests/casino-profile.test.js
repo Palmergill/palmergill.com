@@ -59,6 +59,19 @@ describe('CasinoProfile', () => {
         expect(stats.lastPlayed).not.toBeNull();
     });
 
+    test('High Card Flush shares the bankroll and records lifetime hands', () => {
+        profile.setBankroll(1125);
+        profile.recordSession('high-card-flush', { handsPlayed: 2, netProfit: 125, biggestWin: 100 });
+
+        expect(profile.getBankroll()).toBe(1125);
+        expect(profile.getGameStats('high-card-flush')).toMatchObject({
+            handsPlayed: 2,
+            netProfit: 125,
+            biggestWin: 100
+        });
+        expect(profile.KNOWN_GAMES).toContain('high-card-flush');
+    });
+
     test('recordSession ignores unknown game keys', () => {
         profile.recordSession('roulette', { handsPlayed: 1, netProfit: 100 });
         expect(profile.getGameStats('roulette')).toMatchObject({ handsPlayed: 0, netProfit: 0 });
@@ -68,13 +81,15 @@ describe('CasinoProfile', () => {
         profile.recordSession('blackjack', { handsPlayed: 2, netProfit: 50, biggestWin: 50 });
         profile.recordSession('craps', { handsPlayed: 1, netProfit: -20, biggestWin: 0 });
         profile.recordSession('poker', { handsPlayed: 1, netProfit: 300, biggestWin: 300 });
+        profile.recordSession('high-card-flush', { handsPlayed: 1, netProfit: 25, biggestWin: 25 });
 
         const agg = profile.getAggregateStats();
-        expect(agg.totalHands).toBe(4);
-        expect(agg.netProfit).toBe(330);
+        expect(agg.totalHands).toBe(5);
+        expect(agg.netProfit).toBe(355);
         expect(agg.biggestWin).toBe(300);
         expect(agg.biggestWinGame).toBe('poker');
         expect(agg.byGame.blackjack.handsPlayed).toBe(2);
+        expect(agg.byGame['high-card-flush'].handsPlayed).toBe(1);
     });
 
     test('resetAll clears bankroll, stats, and display name', () => {

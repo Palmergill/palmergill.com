@@ -16,6 +16,7 @@ The active static site lives at the repo root:
 - `craps/`
 - `craps-strategy/`
 - `blackjack/`
+- `high-card-flush/`
 - `bitcoin-chat/`
 - `fantasy/`
 - `admin/`
@@ -38,7 +39,7 @@ Vercel middleware keeps `/` public and requires a session (or Basic Auth) for:
 - `/admin/*` — admin role only
 - `/api/*`, except `/api/poker/*`, `/api/craps/*`, `/api/stocks/*`, `/api/bitcoin/*`, `/api/fantasy/*`, and `/api/analytics/*`; `/api/admin/*` and `/api/fantasy/admin/*` are admin role only
 
-`/docs/*`, `/login/*`, `/signup/*`, `/stock-research/*`, `/bitcoin-chat/*`, `/fantasy/*`, `/poker/*`, `/craps/*`, `/craps-strategy/*`, `/blackjack/*`, `/api/poker/*`, `/api/craps/*`, `/api/stocks/*`, `/api/bitcoin/*`, `/api/fantasy/*`, and `/api/analytics/*` are public. Unauthenticated stock, Bitcoin, and fantasy API requests run in demo mode; any signed-in account unlocks the live provider-backed paths, but only the admin can trigger the fantasy admin refresh. Basic Auth remains supported for direct scripted admin access.
+`/docs/*`, `/login/*`, `/signup/*`, `/stock-research/*`, `/bitcoin-chat/*`, `/fantasy/*`, `/poker/*`, `/craps/*`, `/craps-strategy/*`, `/blackjack/*`, `/high-card-flush/*`, `/api/poker/*`, `/api/craps/*`, `/api/stocks/*`, `/api/bitcoin/*`, `/api/fantasy/*`, and `/api/analytics/*` are public. Unauthenticated stock, Bitcoin, and fantasy API requests run in demo mode; any signed-in account unlocks the live provider-backed paths, but only the admin can trigger the fantasy admin refresh. Basic Auth remains supported for direct scripted admin access.
 
 Configure these environment variables in Vercel:
 
@@ -73,7 +74,7 @@ Health check:
 /health
 ```
 
-The backend owns the auth model: it authenticates sign-ins, creates member accounts, mints the `pg_session` cookie, and enforces the same path rules for locally served app folders. Poker, craps, craps-strategy, blackjack, login, signup, `/api/poker/*`, `/api/craps/*`, and `/api/analytics/*` remain public in the backend. Stock research, Bitcoin chat, the fantasy dashboard, `/api/stocks/*`, `/api/bitcoin/*`, and `/api/fantasy/*` allow unauthenticated demo-mode responses and use live providers for any signed-in account. Admin, `/api/admin/*`, `/api/fantasy/admin/*`, and FastAPI docs/OpenAPI JSON require the admin role and return `403` for members. Protected routes return `503` if `APP_AUTH_PASSWORD` is missing, so set the same `APP_AUTH_USERNAME` and `APP_AUTH_PASSWORD` values in Railway to keep direct backend access usable and protected.
+The backend owns the auth model: it authenticates sign-ins, creates member accounts, mints the `pg_session` cookie, and enforces the same path rules for locally served app folders. Poker, craps, craps-strategy, blackjack, High Card Flush, login, signup, `/api/poker/*`, `/api/craps/*`, and `/api/analytics/*` remain public in the backend. Stock research, Bitcoin chat, the fantasy dashboard, `/api/stocks/*`, `/api/bitcoin/*`, and `/api/fantasy/*` allow unauthenticated demo-mode responses and use live providers for any signed-in account. Admin, `/api/admin/*`, `/api/fantasy/admin/*`, and FastAPI docs/OpenAPI JSON require the admin role and return `403` for members. Protected routes return `503` if `APP_AUTH_PASSWORD` is missing, so set the same `APP_AUTH_USERNAME` and `APP_AUTH_PASSWORD` values in Railway to keep direct backend access usable and protected.
 
 The root Railway deployment uses the root `Dockerfile`, which copies only `backend/`.
 
@@ -111,4 +112,4 @@ This runs the API and active static pages together at:
 http://127.0.0.1:8000
 ```
 
-`LOCAL_SITE_ROOT=true` currently mounts `assets/`, `shared/`, `about/`, `login/`, `stock-research/`, `poker/`, `craps/`, `craps-strategy/`, `blackjack/`, `bitcoin-chat/`, `fantasy/`, `casino/`, and `admin/` through FastAPI. The local `/docs` path is still FastAPI's generated API docs path; the static website docs page is served by production/static hosting at `/docs/`.
+`LOCAL_SITE_ROOT=true` currently mounts `assets/`, `shared/`, `about/`, `login/`, `stock-research/`, `poker/`, `craps/`, `craps-strategy/`, `blackjack/`, `high-card-flush/`, `bitcoin-chat/`, `fantasy/`, `casino/`, and `admin/` through FastAPI. The local `/docs` path is still FastAPI's generated API docs path; the static website docs page is served by production/static hosting at `/docs/`.

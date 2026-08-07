@@ -4,18 +4,18 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Casino - Palmer Gill</title>
-    <meta name="description" content="Browser-based casino games — Texas Hold'em poker, craps, and blackjack — built by Palmer Gill.">
+    <meta name="description" content="Browser-based casino games — Texas Hold'em poker, craps, blackjack, and High Card Flush — built by Palmer Gill.">
     <meta name="theme-color" content="#08110c">
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://palmergill.com/casino/">
     <meta property="og:title" content="Casino — Palmer Gill">
-    <meta property="og:description" content="Browser-based casino games — Texas Hold'em poker, craps, and blackjack.">
+    <meta property="og:description" content="Browser-based casino games — Texas Hold'em poker, craps, blackjack, and High Card Flush.">
     <meta property="og:image" content="https://palmergill.com/assets/palmer-gill-logo.png">
     <meta property="og:image:width" content="960">
     <meta property="og:image:height" content="960">
     <meta name="twitter:card" content="summary">
     <meta name="twitter:title" content="Casino — Palmer Gill">
-    <meta name="twitter:description" content="Browser-based casino games — Texas Hold'em poker, craps, and blackjack.">
+    <meta name="twitter:description" content="Browser-based casino games — Texas Hold'em poker, craps, blackjack, and High Card Flush.">
     <meta name="twitter:image" content="https://palmergill.com/assets/palmer-gill-logo.png">
     <link rel="icon" type="image/png" href="/assets/palmer-gill-logo-small.png">
     <link rel="stylesheet" href="/shared/site-nav.css?v=13">
@@ -328,6 +328,11 @@
             height: 14px;
         }
 
+        .tile--utility {
+            grid-column: 1 / -1;
+            min-height: 190px;
+        }
+
         .tile:hover .tile-go,
         .tile:focus-visible .tile-go {
             border-color: var(--gold);
@@ -376,6 +381,7 @@
         @media (max-width: 640px) {
             .tiles { grid-template-columns: minmax(0, 1fr); }
             .tile { min-height: 0; gap: 30px; }
+            .tile--utility { grid-column: auto; }
             .tile-mark { width: 132px; height: 132px; top: 18px; }
         }
 
@@ -481,7 +487,24 @@
                     </div>
                 </a>
 
-                <a href="/craps-strategy/" class="tile" data-game="craps-strategy">
+                <a href="/high-card-flush/" class="tile" data-game="high-card-flush">
+                    <svg class="tile-mark" viewBox="0 0 100 100" aria-hidden="true">
+                        <path d="M20 20h42a7 7 0 0 1 7 7v58H27a7 7 0 0 1-7-7V20Z" opacity=".65"/>
+                        <path d="M34 12h42a7 7 0 0 1 7 7v58H69V27a7 7 0 0 0-7-7H34v-8Z"/>
+                    </svg>
+                    <div>
+                        <h3 class="tile-title">High Card Flush</h3>
+                        <p class="tile-meta">Seven cards · Bonus wagers</p>
+                    </div>
+                    <div class="tile-foot">
+                        <span class="tile-go" aria-hidden="true">
+                            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 8h11M9 3.5 13.5 8 9 12.5"/></svg>
+                        </span>
+                        <span class="tile-record" data-record></span>
+                    </div>
+                </a>
+
+                <a href="/craps-strategy/" class="tile tile--utility" data-game="craps-strategy">
                     <svg class="tile-mark" viewBox="0 0 100 100" aria-hidden="true"><use href="#suit-diamond"/></svg>
                     <div>
                         <h3 class="tile-title">Strategy Lab</h3>
@@ -507,7 +530,7 @@
 
     <script src="/shared/site-nav.js?v=13"></script>
     <script src="/shared/analytics.js?v=1"></script>
-    <script src="/shared/casino-profile.js?v=2"></script>
+    <script src="/shared/casino-profile.js?v=3"></script>
     <script>
         (function () {
             const profile = window.CasinoProfile;
@@ -549,7 +572,7 @@
                     const game = el.closest('.tile').dataset.game;
                     const s = stats.byGame[game];
                     el.textContent = s && s.handsPlayed > 0
-                        ? `${s.handsPlayed.toLocaleString()} hands · ${fmtMoney(s.netProfit)}`
+                        ? `${s.handsPlayed.toLocaleString()} ${s.handsPlayed === 1 ? 'hand' : 'hands'} · ${fmtMoney(s.netProfit)}`
                         : '';
                 });
             }
