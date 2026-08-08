@@ -930,6 +930,20 @@ if local_site_root_enabled:
         if os.path.exists(directory):
             app.mount(route, StaticFiles(directory=directory, html=True), name=folder)
 
+    # Some pages are plain files at the repo root rather than folders — the
+    # Fourth & Fortune kickoff deck, for one — and production serves them as
+    # static hosting. The mounts above only cover directories, so a root-level
+    # page 404s locally while working fine deployed. Serve them here so local
+    # dev tells the truth about the live site.
+    @app.get("/{page}.html", include_in_schema=False)
+    async def local_root_page(page: str):
+        # A path parameter never contains "/", but resolve and confine the path
+        # anyway rather than trusting that to stay true.
+        path = os.path.realpath(os.path.join(repo_root, f"{page}.html"))
+        if os.path.dirname(path) != repo_root or not os.path.isfile(path):
+            return JSONResponse({"detail": "Not Found"}, status_code=404)
+        return FileResponse(path)
+
 @app.get("/")
 async def root():
     if local_site_root_enabled:
