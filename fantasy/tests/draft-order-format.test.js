@@ -82,6 +82,25 @@ describe('DraftOrderFormat', () => {
         }, { isSelf: true })).toBe('1 point banked.');
     });
 
+    test('turnEventMessage says what a multiplied bank is actually worth', () => {
+        // The raw card total is not what lands on the score in the doubled last
+        // round, so both numbers are spoken rather than leaving a manager to
+        // wonder why the standings moved further than the line they just read.
+        expect(DraftOrderFormat.turnEventMessage({
+            type: 'bank', displayName: 'Blitz Bot', round: 5, score: 24, multiplier: 2,
+            turnComplete: true,
+        })).toBe('Blitz Bot banked 24 at 2× — 48 points.');
+        expect(DraftOrderFormat.turnEventMessage({
+            type: 'bank', displayName: 'Palmer', round: 5, score: 24, multiplier: 2,
+            turnComplete: true,
+        }, { isSelf: true })).toBe('24 banked at 2× — 48 points.');
+        // A round that pays once still reads the plain way.
+        expect(DraftOrderFormat.turnEventMessage({
+            type: 'bank', displayName: 'Palmer', round: 3, score: 24, multiplier: 1,
+            turnComplete: true,
+        }, { isSelf: true })).toBe('24 points banked.');
+    });
+
     test('turnEventMessage hides the card value in the sealed final round', () => {
         expect(DraftOrderFormat.turnEventMessage({
             type: 'flip', displayName: 'Ace Bot', round: 5, sealed: true, card: null, cardCount: 2,

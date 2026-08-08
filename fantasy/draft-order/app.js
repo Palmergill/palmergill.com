@@ -85,6 +85,7 @@
         cardsHeld: byId("cardsHeld"),
         currentPot: byId("currentPot"),
         currentPotUnit: byId("currentPotUnit"),
+        potMultiplier: byId("potMultiplier"),
         bustChance: byId("bustChance"),
         bankPosition: byId("bankPosition"),
         scoreToBeat: byId("scoreToBeat"),
@@ -559,8 +560,8 @@
         els.startHelp.textContent = room.isHost
             ? (room.canStart
                 ? (isTest
-                    ? `${duration} Bots play automatically. Everyone finishes each round before the standings leader starts the next one.`
-                    : `${duration} Everyone finishes Round 1 in the seeded order. The standings leader starts each following round.`)
+                    ? `${duration} Bots play automatically. Everyone finishes each round before the standings leader starts the next one. Round ${room.roundsPerPlayer} pays double.`
+                    : `${duration} Everyone finishes Round 1 in the seeded order. The standings leader starts each following round, and the sealed Round ${room.roundsPerPlayer} pays double.`)
                 : `${duration} One more manager must join before you can start.`)
             : `${duration} Waiting for the host to lock the roster and start.`;
     }
@@ -648,12 +649,23 @@
         const round = room.currentRound || { number: 1, cards: [], pot: 0, bustChance: 0 };
         const decision = room.decision || {};
         const concealed = Boolean(round.concealed && !room.canPlay);
+        // What this round pays. The pot reads what banking is worth rather than
+        // what the cards add up to, so the doubling is visible on the decision
+        // itself and not only in the standings afterwards.
+        const multiplier = Number(round.multiplier) || 1;
         els.currentPlayerName.textContent = room.currentPlayer?.displayName || "—";
-        els.roundBadge.textContent = `Round ${round.number} of ${room.roundsPerPlayer}`;
+        els.roundBadge.textContent = multiplier > 1
+            ? `Round ${round.number} of ${room.roundsPerPlayer} · pays ${multiplier}×`
+            : `Round ${round.number} of ${room.roundsPerPlayer}`;
         const cardScope = `${room.id}:${room.currentPlayer?.id || "none"}:${round.number}:${concealed ? "sealed" : "open"}`;
         renderCards(round.cards || [], concealed ? (round.cardCount || 0) : null, cardScope);
-        els.currentPot.textContent = concealed ? "Sealed" : (round.pot || 0);
+        const rawPot = round.pot || 0;
+        els.currentPot.textContent = concealed ? "Sealed" : rawPot * multiplier;
         els.currentPotUnit.textContent = concealed ? "" : " pts";
+        els.potMultiplier.hidden = multiplier <= 1;
+        els.potMultiplier.textContent = concealed
+            ? `Final round · ${multiplier}×`
+            : `${rawPot} on the table × ${multiplier}`;
         els.bustChance.textContent = concealed
             ? "Hidden"
             : F.bustCopy(round.bustChance, (round.cards || []).length);
@@ -1040,9 +1052,10 @@
             proof.algorithm.canonicalDeck,
             proof.algorithm.derivation,
             proof.algorithm.shuffle,
+            proof.algorithm.scoring,
             `Contexts: ${proof.algorithm.contexts.turnOrder}; ${proof.algorithm.contexts.playerDeck}.`,
             `Ties: ${proof.algorithm.tieBreakRule}`,
-        ].forEach((copy) => {
+        ].filter(Boolean).forEach((copy) => {
             const paragraph = document.createElement("p");
             paragraph.textContent = copy;
             els.algorithmCopy.appendChild(paragraph);
@@ -1109,7 +1122,13 @@
                     : "no cards dealt";
                 const score = document.createElement("span");
                 score.className = "round-points";
-                score.textContent = `${round.score} pts`;
+                // The proof publishes raw card totals; only the final round's
+                // contribution to the total is multiplied. Show the working so
+                // the round lines still add up to the score beside the name.
+                const multiplier = Number(round.multiplier) || 1;
+                score.textContent = multiplier > 1
+                    ? `${round.score} × ${multiplier} = ${round.score * multiplier} pts`
+                    : `${round.score} pts`;
                 item.append(label, outcome, cards, score);
                 rounds.appendChild(item);
             });

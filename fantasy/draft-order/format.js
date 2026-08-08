@@ -93,6 +93,16 @@
                 : `${who} takes card ${event.cardCount}, face down.`;
         }
         if (event.type === "bank") {
+            // A multiplied round banks a raw card total that is not what lands
+            // on the score, so say both numbers rather than leaving a manager to
+            // wonder why the standings moved further than the line they read.
+            const multiplier = Number(event.multiplier) || 1;
+            if (multiplier > 1) {
+                const worth = plural(event.score * multiplier, "point");
+                return isSelf
+                    ? `${event.score} banked at ${multiplier}× — ${worth}.`
+                    : `${who} banked ${event.score} at ${multiplier}× — ${worth}.`;
+            }
             return isSelf
                 ? `${plural(event.score, "point")} banked.`
                 : `${who} banked ${plural(event.score, "point")}.`;

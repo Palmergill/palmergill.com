@@ -3,6 +3,7 @@
 import copy
 import hashlib
 import json
+from collections import defaultdict
 from datetime import timedelta
 
 from fastapi.testclient import TestClient
@@ -466,6 +467,9 @@ def test_spectators_see_live_cards_until_the_final_round_is_sealed(monkeypatch):
         "cardCount": 1,
         "concealed": True,
         "pot": None,
+        # The multiplier survives the seal: what the last round pays is a rule
+        # the whole room knows, and only this hand's value is hidden.
+        "multiplier": draft_order_game.FINAL_ROUND_MULTIPLIER,
         "bustChance": None,
         "deckRemaining": None,
     }
@@ -595,6 +599,198 @@ def test_full_game_reveals_seed_and_reproducible_decks(monkeypatch):
         "AS" if original_code != "AS" else "KH"
     )
     assert any("full deck" in error for error in verify_proof(proof))
+
+
+def play_out(clients, rid, cards_per_round=1):
+    """Run a two-manager room to completion, banking the same hand every round."""
+    view = settled(next(iter(clients.values())), rid)
+    while view["state"] == "active":
+        name = next(player["username"] for player in view["players"] if player["isCurrent"])
+        current = clients[name]
+        for _ in range(cards_per_round):
+            current.post(f"/api/fantasy/draft/sessions/{rid}/flip")
+        current.post(f"/api/fantasy/draft/sessions/{rid}/bank")
+        view = settled(current, rid)
+    return view
+
+
+def test_final_round_pays_double_but_the_best_round_tiebreak_stays_raw(monkeypatch):
+    """The last round counts twice toward the total and once toward the tiebreak.
+
+    Doubling round five is what keeps it live for managers who fell behind. Left
+    unqualified it would also walk into the first tiebreak, where a doubled round
+    beats any honest round and the tiebreak stops separating level managers — so
+    _best_round reads raw scores and this pins both halves of that rule.
+    """
+    host = member_client(monkeypatch, "host-player")
+    guest = member_client(monkeypatch, "road-warrior")
+    room = create_room(host)
+    join_room(guest, room["joinCode"])
+    rid = room["id"]
+    view = host.post(f"/api/fantasy/draft/sessions/{rid}/start").json()
+    view = play_out(clients_by_player(view, host, guest), rid)
+
+    assert view["state"] == "complete"
+    host.post(f"/api/fantasy/draft/sessions/{rid}/reveal")
+    proof = host.get(f"/api/fantasy/draft/sessions/{rid}/verify").json()
+    assert proof["finalRoundMultiplier"] == draft_order_game.FINAL_ROUND_MULTIPLIER
+
+    for player in proof["players"]:
+        rounds = {row["number"]: row for row in player["rounds"]}
+        raw = {number: row["score"] for number, row in rounds.items()}
+        final_raw = raw[ROUNDS_PER_PLAYER]
+        # The published round score is the face value of the cards; only the
+        # multiplier field says what it is worth.
+        assert rounds[ROUNDS_PER_PLAYER]["multiplier"] == draft_order_game.FINAL_ROUND_MULTIPLIER
+        assert all(rounds[n]["multiplier"] == 1 for n in range(1, ROUNDS_PER_PLAYER))
+        assert player["finalScore"] == sum(raw.values()) + final_raw
+        entry = next(row for row in proof["draftOrder"] if row["playerId"] == player["playerId"])
+        assert entry["bestRound"] == max(raw.values())
+        # The doubled value is never what the tiebreak sees.
+        assert entry["bestRound"] <= max(raw.values())
+
+    assert verify_proof(proof) == []
+
+
+def test_a_doubled_final_round_can_overturn_the_standings(monkeypatch):
+    """The point of the multiplier: four flat rounds no longer settle the draft."""
+    host = member_client(monkeypatch, "host-player")
+    guest = member_client(monkeypatch, "road-warrior")
+    room = create_room(host)
+    join_room(guest, room["joinCode"])
+    rid = room["id"]
+    view = host.post(f"/api/fantasy/draft/sessions/{rid}/start").json()
+    clients = clients_by_player(view, host, guest)
+
+    # Everyone plays the same shape of round, then the standings are rewritten by
+    # hand so one manager carries a lead into round five that a flat last round
+    # could not close but a doubled one can.
+    while view["state"] == "active" and view["currentRound"]["number"] < ROUNDS_PER_PLAYER:
+        name = next(player["username"] for player in view["players"] if player["isCurrent"])
+        current = clients[name]
+        current.post(f"/api/fantasy/draft/sessions/{rid}/flip")
+        current.post(f"/api/fantasy/draft/sessions/{rid}/bank")
+        view = settled(current, rid)
+
+    db = SessionLocal()
+    try:
+        rows = db.query(FantasyDraftRound).filter(FantasyDraftRound.session_id == rid).all()
+        by_player = defaultdict(list)
+        for row in rows:
+            by_player[row.player_id].append(row)
+        players = db.query(FantasyDraftPlayer).filter(
+            FantasyDraftPlayer.session_id == rid
+        ).order_by(FantasyDraftPlayer.id).all()
+        # Flatten rounds one to three and put the whole lead in round four, the
+        # last round both managers have finished, so the frozen round-five order
+        # still comes off standings the room actually played to.
+        leader, chaser = players[0], players[1]
+        for player, fourth in ((leader, 30), (chaser, 6)):
+            for row in by_player[player.id]:
+                row.score = fourth if row.round_number == 4 else 0
+            player.final_score = sum(row.score for row in by_player[player.id])
+        db.commit()
+        lead = leader.final_score - chaser.final_score
+        chaser_name, leader_name = chaser.username, leader.username
+    finally:
+        db.close()
+
+    assert lead == 24
+    view = settled(host, rid)
+    assert view["currentRound"]["number"] == ROUNDS_PER_PLAYER
+
+    # Against a 24-point lead the chaser banks 14 and the leader 1. At face value
+    # 14 still loses by 11; doubled, 28 wins by 3.
+    final_scores = {chaser_name: 14, leader_name: 1}
+    while view["state"] == "active":
+        name = next(player["username"] for player in view["players"] if player["isCurrent"])
+        current = clients[name]
+        current.post(f"/api/fantasy/draft/sessions/{rid}/flip")
+        db = SessionLocal()
+        try:
+            row = db.query(FantasyDraftRound).filter(
+                FantasyDraftRound.session_id == rid,
+                FantasyDraftRound.round_number == ROUNDS_PER_PLAYER,
+                FantasyDraftRound.state == "active",
+            ).one()
+            row.score = final_scores[name]
+            db.commit()
+        finally:
+            db.close()
+        current.post(f"/api/fantasy/draft/sessions/{rid}/bank")
+        view = settled(current, rid)
+
+    view = host.post(f"/api/fantasy/draft/sessions/{rid}/reveal").json()
+    by_name = {entry["displayName"]: entry for entry in view["draftOrder"]}
+    assert by_name[chaser_name]["score"] == 6 + 2 * 14
+    assert by_name[leader_name]["score"] == 30 + 2 * 1
+    assert by_name[chaser_name]["pick"] == 1, (
+        "a doubled final round should overturn a 24-point lead"
+    )
+
+
+def test_a_version_two_room_still_scores_its_final_round_flat(monkeypatch):
+    """A room mid-draft when the multiplier shipped keeps the rules it committed to."""
+    host = member_client(monkeypatch, "host-player")
+    guest = member_client(monkeypatch, "road-warrior")
+    room = create_room(host)
+    join_room(guest, room["joinCode"])
+    rid = room["id"]
+
+    db = SessionLocal()
+    try:
+        row = db.query(FantasyDraftSession).filter(FantasyDraftSession.id == rid).one()
+        row.game_version = draft_order_game.FRESH_DECK_GAME_VERSION
+        db.commit()
+    finally:
+        db.close()
+
+    view = host.post(f"/api/fantasy/draft/sessions/{rid}/start").json()
+    view = play_out(clients_by_player(view, host, guest), rid)
+    host.post(f"/api/fantasy/draft/sessions/{rid}/reveal")
+    proof = host.get(f"/api/fantasy/draft/sessions/{rid}/verify").json()
+
+    assert proof["game"] == draft_order_game.FRESH_DECK_GAME_VERSION
+    assert proof["finalRoundMultiplier"] == 1
+    for player in proof["players"]:
+        # Still one deck per round, but every round is worth its face value.
+        assert len(player["decks"]) == ROUNDS_PER_PLAYER
+        assert player["finalScore"] == sum(row["score"] for row in player["rounds"])
+        assert all(row["multiplier"] == 1 for row in player["rounds"])
+    assert verify_proof(proof) == []
+
+
+def test_a_proof_cannot_declare_its_own_final_round_multiplier(monkeypatch):
+    """The verifier derives the multiplier from the game version, never the field.
+
+    A room that could name its own multiplier could name whichever one makes a
+    rewritten final score add up.
+    """
+    host = member_client(monkeypatch, "host-player")
+    guest = member_client(monkeypatch, "road-warrior")
+    room = create_room(host)
+    join_room(guest, room["joinCode"])
+    rid = room["id"]
+    view = host.post(f"/api/fantasy/draft/sessions/{rid}/start").json()
+    play_out(clients_by_player(view, host, guest), rid)
+    host.post(f"/api/fantasy/draft/sessions/{rid}/reveal")
+    proof = host.get(f"/api/fantasy/draft/sessions/{rid}/verify").json()
+    assert verify_proof(proof) == []
+
+    lying = copy.deepcopy(proof)
+    lying["finalRoundMultiplier"] = 3
+    assert any("multiplier" in error for error in verify_proof(lying))
+
+    # Inflating a final score by re-reading round five at triple stays caught,
+    # because the multiplier the verifier applies comes from the version.
+    inflated = copy.deepcopy(proof)
+    inflated["finalRoundMultiplier"] = 3
+    for player in inflated["players"]:
+        final_round = next(
+            row for row in player["rounds"] if row["number"] == ROUNDS_PER_PLAYER
+        )
+        player["finalScore"] += final_round["score"]
+    assert any("final score should be" in error for error in verify_proof(inflated))
 
 
 def test_existing_version_one_room_keeps_its_continuous_verifiable_deck(monkeypatch):
@@ -1070,8 +1266,13 @@ def test_final_round_makes_no_claim_about_where_banking_lands(monkeypatch):
     assert decision["scoreToBeat"] is None
     assert decision["isLeadingIfBanked"] is None
     # Their own running total is theirs to know; only the comparison is sealed.
+    # The projection counts the last round at what it actually pays.
     mine = next(p for p in played["players"] if p["id"] == played["viewerPlayerId"])
-    assert decision["projectedScore"] == mine["score"] + played["currentRound"]["pot"]
+    assert played["currentRound"]["multiplier"] == draft_order_game.FINAL_ROUND_MULTIPLIER
+    assert decision["projectedScore"] == (
+        mine["score"]
+        + played["currentRound"]["pot"] * draft_order_game.FINAL_ROUND_MULTIPLIER
+    )
 
 
 def test_host_cannot_skip_a_manager_who_just_sat_down(monkeypatch):

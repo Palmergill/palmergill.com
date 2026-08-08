@@ -17,7 +17,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&amp;family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/shared/site-nav.css?v=13">
-    <link rel="stylesheet" href="style.css?v=11">
+    <link rel="stylesheet" href="style.css?v=12">
 </head>
 <body>
     <main class="draft-shell">
@@ -201,6 +201,7 @@
                         <div class="pot-block">
                             <span>Current pot</span>
                             <strong><span id="currentPot">0</span><small id="currentPotUnit"> pts</small></strong>
+                            <small id="potMultiplier" class="pot-multiplier" hidden></small>
                         </div>
                         <div class="decision-stat decision-stat--risk">
                             <span>Next flip</span>
@@ -298,15 +299,20 @@
                 <strong>Bank</strong>
                 <p>Lock your points. Everyone finishes the round before the next begins; every player gets a fresh shuffled deck each round.</p>
             </div>
-            <p class="fairness-note"><span>SHA-256</span> Rounds 1–4 are open-table. Only final-round cards and scores stay sealed until the host reveals them. The seed proves every deal; ties go to the best round, then a seeded tiebreak.</p>
+            <div>
+                <span class="rule-no">04</span>
+                <strong>Round 5 pays double</strong>
+                <p>The sealed last round counts twice, so nobody is out of it before the cards are turned over.</p>
+            </div>
+            <p class="fairness-note"><span>SHA-256</span> Rounds 1–4 are open-table. Only final-round cards and scores stay sealed until the host reveals them. The seed proves every deal; ties go to the best single round at face value — the doubling never counts here — then a seeded tiebreak.</p>
         </section>
     </main>
 
     <script src="/shared/site-nav.js?v=14"></script>
     <script src="/shared/analytics.js?v=1"></script>
     <script src="/shared/api-base.js?v=1"></script>
-    <script src="format.js?v=6"></script>
-    <script src="verify.js?v=1"></script>
-    <script src="app.js?v=16"></script>
+    <script src="format.js?v=7"></script>
+    <script src="verify.js?v=2"></script>
+    <script src="app.js?v=17"></script>
 </body>
 </html>

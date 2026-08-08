@@ -31,8 +31,21 @@ from app.database import (
 )
 
 LEGACY_GAME_VERSION = "fourth-and-fortune-v1"
-GAME_VERSION = "fourth-and-fortune-v2"
+FRESH_DECK_GAME_VERSION = "fourth-and-fortune-v2"
+GAME_VERSION = "fourth-and-fortune-v3"
+# Every version from v2 on deals a fresh 52-card deck for each round. Version 1
+# committed to one continuous deck and is still played and proved that way.
+FRESH_ROUND_DECK_VERSIONS = frozenset({FRESH_DECK_GAME_VERSION, GAME_VERSION})
 ROUNDS_PER_PLAYER = 5
+# Version 3 pays the sealed final round double. A round tops out near 40 points,
+# so under flat scoring anyone more than about 25 behind going into round 5 was
+# already mathematically out while still being asked to play it behind the seal.
+# Doubling keeps the last round live for the whole table without handing the
+# draft to it: it is worth roughly a third of a winning total, not all of it.
+# Only the total is doubled — the best-round tiebreak stays on raw scores, or a
+# doubled round 5 would win it outright and the tiebreak would stop separating
+# anyone. See _best_round.
+FINAL_ROUND_MULTIPLIER = 2
 # A round is over once it is banked, busted, written off by the host when a
 # manager walks away mid-draft, or left with no deck to deal from. Forfeited and
 # exhausted rounds both score zero.
@@ -178,7 +191,24 @@ def _game_version(room: FantasyDraftSession) -> str:
 
 
 def _uses_fresh_round_decks(room: FantasyDraftSession) -> bool:
-    return _game_version(room) == GAME_VERSION
+    return _game_version(room) in FRESH_ROUND_DECK_VERSIONS
+
+
+def _final_round_multiplier(room: FantasyDraftSession) -> int:
+    """What the last round pays in this room, by the version it committed to."""
+    return FINAL_ROUND_MULTIPLIER if _game_version(room) == GAME_VERSION else 1
+
+
+def _round_value(room: FantasyDraftSession, round_row: FantasyDraftRound) -> int:
+    """What a finished round contributes to a manager's total.
+
+    A stored round score is always the raw card total — the proof, the round
+    lines, and every client read it that way — so the final-round multiplier is
+    applied here, at the one place scores are added up.
+    """
+    if round_row.round_number == ROUNDS_PER_PLAYER:
+        return round_row.score * _final_round_multiplier(room)
+    return round_row.score
 
 
 def _deck_for_round(
@@ -328,11 +358,23 @@ def _cards(round_row: FantasyDraftRound) -> list[str]:
     return [str(card) for card in value if isinstance(card, str)]
 
 
-def _round_score_total(rounds: list[FantasyDraftRound]) -> int:
-    return sum(row.score for row in rounds if row.state in FINISHED_ROUND_STATES)
+def _round_score_total(
+    room: FantasyDraftSession,
+    rounds: list[FantasyDraftRound],
+) -> int:
+    return sum(
+        _round_value(room, row) for row in rounds if row.state in FINISHED_ROUND_STATES
+    )
 
 
 def _best_round(rounds: list[FantasyDraftRound]) -> int:
+    """The best raw round, deliberately ignoring the final-round multiplier.
+
+    This is the first tiebreak after total score. Counting a doubled round five
+    here would hand it to whoever had the best final round in nearly every game
+    — the same thing the doubled total already rewards — so the tiebreak would
+    stop separating managers who genuinely finished level.
+    """
     return max(
         (row.score for row in rounds if row.state in FINISHED_ROUND_STATES),
         default=0,
@@ -347,8 +389,14 @@ def _round_payload(
     round_row: FantasyDraftRound,
     *,
     concealed: bool = False,
+    final_multiplier: int = 1,
 ) -> dict[str, Any]:
     cards = _cards(round_row)
+    # "score" stays the raw card total in every payload — it is what the cards
+    # on the table add up to and what any verifier recomputes. "multiplier" is
+    # what that round is then worth, so a reader never has to know the rules to
+    # follow the arithmetic.
+    multiplier = final_multiplier if round_row.round_number == ROUNDS_PER_PLAYER else 1
     if concealed:
         return {
             "number": round_row.round_number,
@@ -356,6 +404,7 @@ def _round_payload(
             "cardCount": len(cards),
             "concealed": True,
             "score": None,
+            "multiplier": multiplier,
             "busted": None,
             "state": "active" if round_row.state == "active" else "sealed",
         }
@@ -365,6 +414,7 @@ def _round_payload(
         "cardCount": len(cards),
         "concealed": False,
         "score": round_row.score,
+        "multiplier": multiplier,
         "busted": bool(round_row.busted),
         "state": round_row.state,
     }
@@ -433,10 +483,12 @@ def _round_play_order(
             if row.round_number < round_number and row.state in FINISHED_ROUND_STATES
         ]
 
+    # Round five's multiplier never reaches this: the order for round N is built
+    # from rounds before N, so the last round is only ever the one being ordered.
     return sorted(
         players,
         key=lambda player: standing_key(
-            _round_score_total(prior_rounds(player)),
+            _round_score_total(room, prior_rounds(player)),
             _best_round(prior_rounds(player)),
             room.master_seed,
             player.username,
@@ -504,6 +556,7 @@ def serialize_session(
     final_round_sealed = not results_revealed and (
         room.state == "complete" or current_round_number == ROUNDS_PER_PLAYER
     )
+    final_multiplier = _final_round_multiplier(room)
     player_payloads = []
     scores: dict[str, int] = {}
     best_rounds: dict[str, int] = {}
@@ -517,7 +570,7 @@ def serialize_session(
         score = (
             player.final_score
             if room.state == "complete" and results_revealed
-            else _round_score_total(scoring_rounds)
+            else _round_score_total(room, scoring_rounds)
         )
         best_round = _best_round(scoring_rounds)
         final_round_finished = any(
@@ -545,6 +598,7 @@ def serialize_session(
                         and player.username != viewer_normalized
                         and not results_revealed
                     ),
+                    final_multiplier=final_multiplier,
                 )
                 for row in player_rounds
             ],
@@ -582,6 +636,11 @@ def serialize_session(
             and current_player.username != viewer_normalized
             and not results_revealed
         )
+        # What the hand on the table is worth if it is banked. Public: the whole
+        # room knows the last round pays double, sealed or not.
+        current_multiplier = (
+            final_multiplier if current_round_number == ROUNDS_PER_PLAYER else 1
+        )
         if current_round is None:
             current_round_payload = {
                 "number": current_round_number,
@@ -589,6 +648,7 @@ def serialize_session(
                 "cardCount": 0,
                 "concealed": spectator_final_round,
                 "pot": None if spectator_final_round else 0,
+                "multiplier": current_multiplier,
                 "bustChance": None if spectator_final_round else 0.0,
                 "deckRemaining": None if spectator_final_round else 52 - deck_position,
             }
@@ -599,6 +659,7 @@ def serialize_session(
                 "cardCount": len(_cards(current_round)),
                 "concealed": True,
                 "pot": None,
+                "multiplier": current_multiplier,
                 "bustChance": None,
                 "deckRemaining": None,
             }
@@ -609,6 +670,7 @@ def serialize_session(
                 "cardCount": len(current_cards),
                 "concealed": False,
                 "pot": current_round.score,
+                "multiplier": current_multiplier,
                 # A hand that has already resolved has no next flip to price.
                 "bustChance": (
                     None
@@ -619,7 +681,10 @@ def serialize_session(
             }
 
         if not spectator_final_round and not holding:
-            projected_score = scores[current_player.id] + current_round_payload["pot"]
+            projected_score = (
+                scores[current_player.id]
+                + current_round_payload["pot"] * current_multiplier
+            )
             decision = {
                 "projectedScore": projected_score,
                 # While the last hands are sealed, every other total here is
@@ -1113,6 +1178,7 @@ def _play_event(
     *,
     card: dict[str, Any] | None = None,
     turn_complete: bool = False,
+    final_multiplier: int = 1,
 ) -> dict[str, Any]:
     """One shape for every action, so actor and spectator render the same line."""
     cards = _cards(round_row) if round_row is not None else []
@@ -1128,6 +1194,14 @@ def _play_event(
         "card": card,
         "cardCount": len(cards),
         "score": round_row.score if round_row is not None else 0,
+        # Raw score plus what the round pays, so "24 points banked" can become
+        # "24 doubled to 48" in the last round without the client re-deriving
+        # which round the multiplier lands on.
+        "multiplier": (
+            final_multiplier
+            if round_row is not None and round_row.round_number == ROUNDS_PER_PLAYER
+            else 1
+        ),
         "busted": bool(round_row.busted) if round_row is not None else False,
         "turnComplete": turn_complete,
     }
@@ -1173,7 +1247,7 @@ def _record_event(
         FantasyDraftRound.player_id == player.id,
         FantasyDraftRound.state.in_(tuple(FINISHED_ROUND_STATES)),
     ).all()
-    player.final_score = sum(row.score for row in finished)
+    player.final_score = sum(_round_value(room, row) for row in finished)
     room.turn_state = TURN_STATE_RESOLVED
     room.resolved_at = utc_now()
 
@@ -1228,9 +1302,7 @@ def _close_unplayable_rounds(
             existing.ended_at = utc_now()
             closed = True
         if closed:
-            player.final_score = sum(
-                row.score for row in player_rounds if row.state in FINISHED_ROUND_STATES
-            )
+            player.final_score = _round_score_total(room, player_rounds)
             db.flush()
 
 
@@ -1360,6 +1432,7 @@ def flip_card(
         round_row,
         card=card_payload(code, deck_index),
         turn_complete=busted,
+        final_multiplier=_final_round_multiplier(room),
     ))
 
     try:
@@ -1395,6 +1468,7 @@ def bank_round(
         player,
         round_row,
         turn_complete=True,
+        final_multiplier=_final_round_multiplier(room),
     ))
     db.commit()
     return room
@@ -1484,6 +1558,12 @@ def _bot_should_bank(
     cards = _cards(round_row)
     context = f"bot-strategy:v1:{player.username}:{round_row.round_number}"
     target = 18 + (int.from_bytes(_context_key(room.master_seed, context)[:2], "big") % 10)
+    # A doubled last round is worth pressing for. Left on the normal line, bots
+    # bank their usual ~22 in the one round where the bigger half of the prize
+    # is still on the table, and a test room would flatter the leader's odds of
+    # holding on compared with a table of managers who can see the multiplier.
+    if round_row.round_number == ROUNDS_PER_PLAYER and _final_round_multiplier(room) > 1:
+        return len(cards) >= 5 or (len(cards) >= 3 and round_row.score >= target + 6)
     return len(cards) >= 4 or (len(cards) >= 2 and round_row.score >= target)
 
 
@@ -1526,8 +1606,9 @@ def play_test_bot_step(
     held = _cards(active_round) if active_round is not None else []
     banking = bool(held) and (
         _bot_should_bank(room, player, active_round)
-        # Defensive only: the strategy always banks by card four.
-        or len(held) >= 5
+        # Defensive only: the strategy always banks by card four, or by card
+        # five in a doubled final round.
+        or len(held) >= 6
     )
 
     # Both paths publish their own event, and the room's own concealment rules
@@ -1643,6 +1724,7 @@ def verification(db: Session, room: FantasyDraftSession) -> dict[str, Any]:
         rounds_by_player[round_row.player_id].append(round_row)
 
     fresh_round_decks = _uses_fresh_round_decks(room)
+    final_multiplier = _final_round_multiplier(room)
     verification_players = []
     for player in players:
         flips = _player_flips(db, player.id)
@@ -1667,7 +1749,10 @@ def verification(db: Session, room: FantasyDraftSession) -> dict[str, Any]:
             "finalScore": player.final_score,
             "tieBreakValue": f"{tie_break_value(room.master_seed, player.username):016x}",
             "draws": draw_payloads,
-            "rounds": [_round_payload(row) for row in rounds_by_player[player.id]],
+            "rounds": [
+                _round_payload(row, final_multiplier=final_multiplier)
+                for row in rounds_by_player[player.id]
+            ],
         }
         if fresh_round_decks:
             player_payload["decks"] = [
@@ -1708,6 +1793,10 @@ def verification(db: Session, room: FantasyDraftSession) -> dict[str, Any]:
         "sessionId": room.id,
         "leagueName": room.league_name,
         "roundsPerPlayer": ROUNDS_PER_PLAYER,
+        # Published for readers, but a verifier should derive this from "game"
+        # rather than believe it — a room that could name its own multiplier
+        # could name one that flatters the result.
+        "finalRoundMultiplier": final_multiplier,
         "masterSeed": room.master_seed,
         "publishedSeedHash": room.seed_hash,
         "computedSeedHash": seed_commitment(room.master_seed),
@@ -1735,7 +1824,18 @@ def verification(db: Session, room: FantasyDraftSession) -> dict[str, Any]:
                 ),
                 "tieBreak": "first 8 bytes of HMAC-SHA256(master_seed, tiebreak:v1:{normalized account name})",
             },
-            "tieBreakRule": "Total score, then best round, then higher seeded tie-break value.",
+            "scoring": (
+                f"Every round's published score is the raw card total. Round {ROUNDS_PER_PLAYER} "
+                f"then counts {final_multiplier}× toward the final score."
+                if final_multiplier > 1
+                else "Every round's published score is the raw card total and counts once."
+            ),
+            "tieBreakRule": (
+                "Total score (final round doubled), then the best raw round score with no "
+                "multiplier applied, then higher seeded tie-break value."
+                if final_multiplier > 1
+                else "Total score, then best round, then higher seeded tie-break value."
+            ),
             "forfeit": (
                 "A round in state 'forfeited' was written off by the host after the manager "
                 "stopped playing. It scores zero regardless of any cards already dealt."

@@ -5,7 +5,12 @@
 })(typeof globalThis !== "undefined" ? globalThis : this, function () {
     "use strict";
 
-    const GAME_VERSION = "fourth-and-fortune-v2";
+    // Both scoring rules are derived from the committed game version, never read
+    // from the fields the proof publishes for them: a room that could name its
+    // own multiplier could name the one that makes its totals add up.
+    const FRESH_ROUND_DECK_VERSIONS = new Set(["fourth-and-fortune-v2", "fourth-and-fortune-v3"]);
+    const DOUBLE_FINAL_ROUND_VERSIONS = new Set(["fourth-and-fortune-v3"]);
+    const FINAL_ROUND_MULTIPLIER = 2;
     const RANKS = [...Array.from({ length: 9 }, (_, index) => String(index + 2)), "J", "Q", "K", "A"];
     const SUITS = ["C", "D", "H", "S"];
     const RANK_VALUES = Object.fromEntries(RANKS.map((rank, index) => [rank, index + 2]));
@@ -149,7 +154,14 @@
                 errors.push("Published turn-order labels do not match the committed order.");
             }
 
-            const freshRoundDecks = proof.game === GAME_VERSION;
+            const freshRoundDecks = FRESH_ROUND_DECK_VERSIONS.has(proof.game);
+            const finalMultiplier = DOUBLE_FINAL_ROUND_VERSIONS.has(proof.game) ? FINAL_ROUND_MULTIPLIER : 1;
+            if (proof.finalRoundMultiplier != null && Number(proof.finalRoundMultiplier) !== finalMultiplier) {
+                errors.push(
+                    `Proof claims a final-round multiplier of ${proof.finalRoundMultiplier}, `
+                    + `but ${proof.game} scores it ${finalMultiplier}×.`,
+                );
+            }
             const roundsPerPlayer = Number(proof.roundsPerPlayer);
             if (!Number.isInteger(roundsPerPlayer) || roundsPerPlayer < 1) errors.push("Rounds-per-player is invalid.");
             const computedPlayers = [];
@@ -220,7 +232,11 @@
                     if (Number(round.score) !== expected.score || Boolean(round.busted) !== expected.busted) {
                         errors.push(`${label}: round ${number} score or bust flag is wrong.`);
                     }
-                    finalScore += expected.score;
+                    // Published round scores are always the raw card total. Only
+                    // the running total takes the multiplier — the best-round
+                    // tiebreak stays raw so a doubled last round cannot win it
+                    // outright and stop separating level managers.
+                    finalScore += expected.score * (number === roundsPerPlayer ? finalMultiplier : 1);
                     bestRound = Math.max(bestRound, expected.score);
                     dealtByRound.delete(number);
                 }

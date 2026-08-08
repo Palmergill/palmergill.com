@@ -53,7 +53,18 @@ def verify_proof(proof: dict) -> list[str]:
     if actual_names != expected_names:
         errors.append("Turn order does not match the committed seed.")
 
-    fresh_round_decks = proof.get("game") == game.GAME_VERSION
+    # Both rules are read off the committed game version, never off the fields
+    # the proof publishes for them. A room that could declare its own multiplier
+    # could declare whichever one makes its published totals add up.
+    game_version = proof.get("game")
+    fresh_round_decks = game_version in game.FRESH_ROUND_DECK_VERSIONS
+    final_multiplier = game.FINAL_ROUND_MULTIPLIER if game_version == game.GAME_VERSION else 1
+    published_multiplier = proof.get("finalRoundMultiplier")
+    if published_multiplier is not None and int(published_multiplier) != final_multiplier:
+        errors.append(
+            f"Proof claims a final-round multiplier of {published_multiplier}, but "
+            f"{game_version} scores it {final_multiplier}×."
+        )
     rounds_per_player = int(proof.get("roundsPerPlayer", game.ROUNDS_PER_PLAYER))
     computed_players: list[dict[str, Any]] = []
 
@@ -155,7 +166,11 @@ def verify_proof(proof: dict) -> list[str]:
                     continue
             if expected_score != round_row.get("score") or expected_bust != round_row.get("busted"):
                 errors.append(f"{label}: round {round_row.get('number')} score or bust flag is wrong.")
-            final_score += expected_score
+            # The published score is the raw card total in every round. Only the
+            # total is multiplied; the best-round tiebreak stays on raw scores so
+            # a doubled last round cannot win it outright.
+            multiplier = final_multiplier if number == rounds_per_player else 1
+            final_score += expected_score * multiplier
             best_round = max(best_round, expected_score)
         # Anything left over was dealt into a round the proof never lists, which
         # is the same tampering seen from the other side.
