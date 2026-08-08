@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fourth &amp; Fortune — 2026 Season Kickoff</title>
+<style>
+:root{
+  --ink:#17251d; --forest:#20382a; --forest-deep:#112019; --mint:#bcd4b0;
+  --gold:#e7b95f; --gold-bright:#f6d98f; --cream:#fbf6e9; --paper:#fffdf8;
+  --line:#ded5c5; --muted:#766f63; --danger:#b9483d; --red:#bd3f3f;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  background:var(--forest-deep);
+  color:var(--ink);
+  font-family:"Plus Jakarta Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  overflow:hidden;
+}
+.stage{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding:2.5rem 1.5rem 4.5rem}
+.slide{
+  display:none; width:min(1080px,100%); max-height:100%; overflow-y:auto;
+  background:
+    radial-gradient(circle at 88% 2%, rgba(231,185,95,.16), transparent 26rem),
+    var(--cream);
+  border-radius:18px; padding:3.2rem 3.4rem;
+  box-shadow:0 30px 90px rgba(0,0,0,.45);
+  border:1px solid rgba(231,185,95,.35);
+}
+.slide.active{display:block;animation:in .28s ease}
+@keyframes in{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+
+.eyebrow{font-size:.72rem;letter-spacing:.18em;text-transform:uppercase;color:var(--gold);font-weight:800;margin-bottom:.9rem}
+h1{font-size:3.6rem;line-height:1.02;letter-spacing:-.02em;margin-bottom:1rem}
+h1 span{color:var(--gold)}
+h2{font-size:2.15rem;line-height:1.1;letter-spacing:-.015em;margin-bottom:.6rem}
+h3{font-size:1.05rem;margin-bottom:.35rem}
+p{color:var(--muted);line-height:1.55;font-size:1.02rem}
+.lede{font-size:1.22rem;color:var(--forest);max-width:62ch;margin-bottom:1.6rem}
+.kicker{color:var(--forest);font-weight:700}
+
+.grid{display:grid;gap:1rem;margin-top:1.7rem}
+.g2{grid-template-columns:1fr 1fr}
+.g3{grid-template-columns:repeat(3,1fr)}
+.card{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:1.15rem 1.25rem}
+.card .no{display:inline-block;font-size:.7rem;font-weight:800;letter-spacing:.14em;color:var(--gold);margin-bottom:.5rem}
+.card p{font-size:.93rem}
+.card.hot{border-color:var(--danger);background:#fdf3f1}
+.card.hot .no{color:var(--danger)}
+.card.win{border-color:var(--gold);background:#fffaee}
+
+ul{margin:1.1rem 0 0 1.1rem}
+li{color:var(--muted);line-height:1.7;font-size:1rem;margin-bottom:.35rem}
+li strong{color:var(--forest)}
+
+.banner{margin-top:1.6rem;background:var(--forest);color:var(--cream);border-radius:12px;padding:1.2rem 1.4rem}
+.banner p{color:rgba(251,246,233,.82)}
+.banner strong{color:var(--gold-bright)}
+
+table{width:100%;border-collapse:collapse;margin-top:1.4rem;background:var(--paper);border-radius:12px;overflow:hidden;border:1px solid var(--line)}
+th{background:var(--forest);color:var(--gold-bright);text-align:left;padding:.65rem .9rem;font-size:.72rem;letter-spacing:.12em;text-transform:uppercase}
+td{padding:.6rem .9rem;border-top:1px solid var(--line);font-size:.95rem;color:var(--forest)}
+td.dim{color:var(--muted)}
+
+.cards-row{display:flex;gap:.55rem;flex-wrap:wrap;margin-top:1.5rem}
+.pc{width:60px;height:82px;background:var(--paper);border:1px solid var(--line);border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;box-shadow:0 3px 10px rgba(0,0,0,.07)}
+.pc b{font-size:1.25rem;color:var(--forest);line-height:1}
+.pc i{font-style:normal;font-size:.72rem;color:var(--gold);font-weight:800;margin-top:.25rem}
+.pc.red b{color:var(--red)}
+
+.hero-mark{position:absolute;right:3rem;top:2.6rem;display:flex;gap:.4rem;align-items:baseline;font-size:3.4rem;color:rgba(32,56,42,.13);font-weight:900}
+
+/* nav */
+.nav{position:fixed;bottom:0;left:0;right:0;height:3.4rem;display:flex;align-items:center;justify-content:center;gap:1.1rem;background:rgba(17,32,25,.92);border-top:1px solid rgba(231,185,95,.22)}
+.nav button{background:none;border:1px solid rgba(231,185,95,.4);color:var(--gold-bright);width:2.1rem;height:2.1rem;border-radius:50%;cursor:pointer;font-size:1rem;line-height:1}
+.nav button:hover{background:rgba(231,185,95,.15)}
+.nav .count{color:rgba(251,246,233,.65);font-size:.82rem;letter-spacing:.1em;font-variant-numeric:tabular-nums}
+.dots{display:flex;gap:.32rem}
+.dot{width:6px;height:6px;border-radius:50%;background:rgba(251,246,233,.25);cursor:pointer}
+.dot.on{background:var(--gold)}
+
+@media print{
+  body{overflow:visible;background:#fff}
+  .stage{position:static;padding:0;display:block}
+  .nav{display:none}
+  .slide{display:block!important;page-break-after:always;box-shadow:none;margin:0 0 1rem;border-radius:0;min-height:98vh}
+}
+@media (max-width:760px){
+  .slide{padding:2rem 1.4rem}
+  h1{font-size:2.4rem} h2{font-size:1.6rem}
+  .g2,.g3{grid-template-columns:1fr}
+  .hero-mark{display:none}
+}
+</style>
+</head>
+<body>
+<div class="stage">
+
+<!-- 1 -->
+<section class="slide active">
+  <p class="eyebrow">League Kickoff · 2026 Season</p>
+  <h1>Fourth <span>&amp;</span> Fortune</h1>
+  <p class="lede">Ten managers. Five rounds — and the last one pays double. One deck of cards standing between you and the 1.01.</p>
+  <div class="banner">
+    <p><strong>Nobody is getting a pick handed to them this year.</strong> No email order, no "commissioner's discretion," no randomizer nobody trusts. You want the top pick, you go take it.</p>
+  </div>
+</section>
+
+<!-- 2 -->
+<section class="slide">
+  <p class="eyebrow">What's on the table</p>
+  <h2>Three things get decided in one night</h2>
+  <p class="lede">Play one game, settle the whole preseason.</p>
+  <div class="grid g3">
+    <div class="card"><span class="no">01</span><h3>Draft order</h3><p>Picks 1 through 10, straight off the final leaderboard. Highest score picks first.</p></div>
+    <div class="card"><span class="no">02</span><h3>Divisions</h3><p>The same order splits the league into two divisions of five. Your seat picks your enemies.</p></div>
+    <div class="card win"><span class="no">03</span><h3>The flex rule</h3><p>Whoever wins decides: 1 flex or 2 flex, league-wide, all season.</p></div>
+  </div>
+  <div class="banner">
+    <p>One bad flip and you're picking 10th, in the division of death, playing a lineup somebody else designed. <strong>Good luck.</strong></p>
+  </div>
+</section>
+
+<!-- 3 -->
+<section class="slide">
+  <p class="eyebrow">The game</p>
+  <h2>It's push-your-luck with a 52-card deck</h2>
+  <p class="lede">Flip cards to build a pot. Bank it and it's yours forever. Flip one too many and it's gone.</p>
+  <div class="grid g3">
+    <div class="card"><span class="no">FLIP</span><h3>Add to your pot</h3><p>Turn over the next card from your deck. Its value goes into this round's pot.</p></div>
+    <div class="card hot"><span class="no">BUST</span><h3>Match a rank, lose it all</h3><p>Flip a rank you already hold this round and the round is over. Zero. Suit doesn't save you — a pair of 3s is a pair of 3s.</p></div>
+    <div class="card win"><span class="no">BANK</span><h3>Lock it in</h3><p>Stop, bank the pot, add it to your total. Banked points can never be taken away.</p></div>
+  </div>
+  <div class="banner"><p><strong>That's the whole game.</strong> Every hard decision you make tonight is just "one more?"</p></div>
+</section>
+
+<!-- 4 -->
+<section class="slide">
+  <p class="eyebrow">Card values</p>
+  <h2>Face cards are worth the risk</h2>
+  <p class="lede">Number cards are face value. The paint is where the points are.</p>
+  <div class="cards-row">
+    <div class="pc"><b>2</b><i>2</i></div>
+    <div class="pc"><b>3</b><i>3</i></div>
+    <div class="pc"><b>4</b><i>4</i></div>
+    <div class="pc"><b>5</b><i>5</i></div>
+    <div class="pc"><b>6</b><i>6</i></div>
+    <div class="pc"><b>7</b><i>7</i></div>
+    <div class="pc"><b>8</b><i>8</i></div>
+    <div class="pc"><b>9</b><i>9</i></div>
+    <div class="pc"><b>10</b><i>10</i></div>
+    <div class="pc red"><b>J</b><i>11</i></div>
+    <div class="pc red"><b>Q</b><i>12</i></div>
+    <div class="pc red"><b>K</b><i>13</i></div>
+    <div class="pc red"><b>A</b><i>14</i></div>
+  </div>
+  <ul>
+    <li><strong>Perfect round:</strong> all 13 ranks, no repeat — <strong>104 points.</strong> It will not happen to you.</li>
+    <li><strong>Realistic round:</strong> 25–45 and a heart rate.</li>
+    <li>Fresh, fully shuffled 52-card deck every round, for every manager. Nobody gets a colder deck than you do.</li>
+    <li>Same values in round 5 — <strong>then the whole banked pot doubles.</strong></li>
+  </ul>
+</section>
+
+<!-- 5 -->
+<section class="slide">
+  <p class="eyebrow">The odds</p>
+  <h2>The math nobody wants to hear at card six</h2>
+  <p class="lede">Every card you hold puts three more busts back in the deck. It gets ugly fast.</p>
+  <table>
+    <thead><tr><th>Cards held</th><th>Cards that bust you</th><th>Chance the next flip kills the round</th></tr></thead>
+    <tbody>
+      <tr><td>3</td><td class="dim">9 of 49</td><td>18%</td></tr>
+      <tr><td>5</td><td class="dim">15 of 47</td><td>32%</td></tr>
+      <tr><td>7</td><td class="dim">21 of 45</td><td>47%</td></tr>
+      <tr><td>9</td><td class="dim">27 of 43</td><td>63%</td></tr>
+      <tr><td>11</td><td class="dim">33 of 41</td><td>80%</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- 6 -->
+<section class="slide">
+  <p class="eyebrow">Structure</p>
+  <h2>Five rounds, and the leader goes first</h2>
+  <p class="lede">Everyone plays a round before anyone starts the next one. No hiding at the back.</p>
+  <ul>
+    <li><strong>Round 1:</strong> turn order comes from the seed. Pure luck, no complaints.</li>
+    <li><strong>Rounds 2–5:</strong> order is frozen from the standings after the previous round — <strong>whoever's leading goes first.</strong></li>
+    <li>That's the punishment for being ahead: you act with no information, and nine people watch you decide.</li>
+    <li>Rounds 1 through 4 are <strong>open table</strong> and pay face value. Every card, every pot, every bank — live, in front of the league.</li>
+    <li><strong>Round 5 is sealed and pays 2×.</strong> Rounds 1–4 are you setting up. Round 5 is the one that hurts.</li>
+  </ul>
+  <div class="banner"><p>Yes, that means the leader banks first and everyone behind them gets a number to chase. <strong>That's the point.</strong> And going into round 5, that lead is worth half what they think it is.</p></div>
+</section>
+
+<!-- 7 -->
+<section class="slide">
+  <p class="eyebrow">Round five</p>
+  <h2>The blackout round — and it pays double</h2>
+  <p class="lede">The last round is played in the dark, and it is worth twice what it says.</p>
+  <div class="grid g2">
+    <div class="card hot"><span class="no">×2</span><h3>Double or nothing</h3><p>Whatever you bank in round 5 counts twice. A strong round lands near 40, so under flat scoring anyone ~25 back was already mathematically out while still being made to play. Now nobody is out.</p></div>
+    <div class="card"><span class="no">HIDDEN</span><h3>You see nothing</h3><p>During round 5 you only see how many cards your opponents have flipped. Not their cards. Not their pot. Not their total.</p></div>
+    <div class="card"><span class="no">FROZEN</span><h3>The board stops</h3><p>The public leaderboard freezes at the round-4 standings. No "score to beat," no bank position. You are flying blind.</p></div>
+    <div class="card win"><span class="no">REVEAL</span><h3>All at once</h3><p>When the last manager finishes, the commissioner triggers the reveal. Final scores and the full draft order drop on everyone at the same second.</p></div>
+  </div>
+  <div class="banner"><p>Do the math before you flip: if you're 30 points down, you don't need 30 — you need to out-bank the leader by <strong>15</strong>. That's a real shot. <strong>Play it like one.</strong></p></div>
+</section>
+
+<!-- 8 -->
+<section class="slide">
+  <p class="eyebrow">Scoring</p>
+  <h2>How ties get broken</h2>
+  <p class="lede">Three steps, in order, no debate.</p>
+  <table>
+    <thead><tr><th>#</th><th>Rule</th><th>Why</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td><strong>Highest total</strong> across all five banked rounds, with round 5 counted twice</td><td class="dim">The whole game</td></tr>
+      <tr><td>2</td><td><strong>Best single round</strong>, at face value — the round-5 doubling does <em>not</em> count here</td><td class="dim">Otherwise round 5 wins this every time and it stops breaking anything</td></tr>
+      <tr><td>3</td><td><strong>Seeded tiebreak</strong> — HMAC-SHA256 off the master seed</td><td class="dim">Locked before a single card was dealt</td></tr>
+    </tbody>
+  </table>
+  <ul>
+    <li>Busted round = <strong>0</strong>. It still counts as one of your five. And zero doubled is still zero — <strong>busting round 5 costs you twice as much as it looks.</strong></li>
+    <li>Sitting out isn't a strategy: if a manager goes dark on the clock, the commissioner can write the round off after a grace period. That round scores <strong>zero</strong>.</li>
+  </ul>
+</section>
+
+<!-- 9 -->
+<section class="slide">
+  <p class="eyebrow">Fairness</p>
+  <h2>You can audit every card I dealt you</h2>
+  <p class="lede">This is the part where I get ahead of the group chat.</p>
+  <ul>
+    <li>The master seed is committed <strong>before the room opens</strong> and published as a SHA-256 hash.</li>
+    <li>Your deck each round is derived from that seed, your account name, and the round number. It existed before you clicked anything.</li>
+    <li>The seed stays sealed until the last score is locked. Nobody — including me — can see or change a deck mid-game.</li>
+    <li>When it's over, the verification page hands you the seed and the recipe. <strong>Reproduce every shuffle yourself.</strong></li>
+  </ul>
+  <div class="banner"><p>So when you bust on card nine holding 61 points, the math is airtight and <strong>it is entirely your fault.</strong></p></div>
+</section>
+
+<!-- 10 -->
+<section class="slide">
+  <p class="eyebrow">Prize 1</p>
+  <h2>Your seat picks your division</h2>
+  <p class="lede">The finishing order alternates straight down the list into two divisions of five.</p>
+  <div class="grid g2">
+    <div class="card"><span class="no">DIVISION A</span><h3>Seeds 1 · 3 · 5 · 7 · 9</h3><p>The winner's division. You got the pick — now go beat the guy who finished right behind you, twice a year.</p></div>
+    <div class="card"><span class="no">DIVISION B</span><h3>Seeds 2 · 4 · 6 · 8 · 10</h3><p>Runner-up's division. One flip from the top seat, and now a completely different schedule.</p></div>
+  </div>
+</section>
+
+<!-- 11 -->
+<section class="slide">
+  <p class="eyebrow">Prize 2</p>
+  <h2>The winner writes the lineup rule</h2>
+  <p class="lede">First place makes one call that binds all ten of us for the entire season.</p>
+  <div class="grid g2">
+    <div class="card"><span class="no">OPTION A</span><h3>One flex</h3><p>Tighter lineups. Elite RB1/WR1 talent matters more. Depth sits on your bench where it belongs.</p></div>
+    <div class="card"><span class="no">OPTION B</span><h3>Two flex</h3><p>More starters, more waiver-wire relevance, more Sunday morning agony. Depth becomes a weapon.</p></div>
+  </div>
+  <div class="banner"><p>Decision is <strong>locked before the draft</strong> so everybody boards accordingly. No changing it in week 3 because your RB2 got hurt.</p></div>
+</section>
+
+<!-- 12 -->
+<section class="slide">
+  <p class="eyebrow">Game night</p>
+  <h2>How to show up ready</h2>
+  <ul>
+    <li><strong>Step 1 — make your account.</strong> Sign up with the invite code I sent you. One manager, one account — your seat and your turns are tied to it.</li>
+    <li><strong>Step 2 — join the room</strong> with the six-character room code I send out that night. Different code, don't mix them up.</li>
+    <li><strong>Run the practice table first.</strong> Solo, private, full five rounds — including the sealed 2× finish. Practice scores never touch the real room.</li>
+    <li><strong>Be on time.</strong> The clock is real and the forfeit is real.</li>
+    <li><strong>Phone is fine.</strong> Disconnect and you can resume — your account holds your seat.</li>
+  </ul>
+  <div class="banner"><p><strong>Learn to bust in practice, not in front of the league.</strong></p></div>
+</section>
+
+<!-- 13 -->
+<section class="slide">
+  <p class="eyebrow">See you at the table</p>
+  <h1>Flip. Bank. <span>Or bust.</span></h1>
+  <p class="lede">Five rounds decide your pick, your division, and whose lineup rules you live under. The deck is already sealed. All that's left is nerve.</p>
+  <div class="banner"><p><strong>Nine of you are going to bank too early in round five. One of you isn't.</strong></p></div>
+</section>
+
+</div>
+
+<nav class="nav">
+  <button id="prev" aria-label="Previous slide">‹</button>
+  <div class="dots" id="dots"></div>
+  <span class="count" id="count"></span>
+  <button id="next" aria-label="Next slide">›</button>
+</nav>
+
+<script>
+(function(){
+  var slides=[].slice.call(document.querySelectorAll('.slide'));
+  var dots=document.getElementById('dots');
+  var count=document.getElementById('count');
+  var i=0;
+  slides.forEach(function(_,n){
+    var d=document.createElement('span');
+    d.className='dot'; d.onclick=function(){go(n)};
+    dots.appendChild(d);
+  });
+  function go(n){
+    i=Math.max(0,Math.min(slides.length-1,n));
+    slides.forEach(function(s,k){s.classList.toggle('active',k===i);});
+    [].forEach.call(dots.children,function(d,k){d.classList.toggle('on',k===i);});
+    count.textContent=(i+1)+' / '+slides.length;
+  }
+  document.getElementById('prev').onclick=function(){go(i-1)};
+  document.getElementById('next').onclick=function(){go(i+1)};
+  document.addEventListener('keydown',function(e){
+    if(e.key==='ArrowRight'||e.key==='PageDown'||e.key===' ')  {e.preventDefault();go(i+1);}
+    if(e.key==='ArrowLeft' ||e.key==='PageUp')                 {e.preventDefault();go(i-1);}
+    if(e.key==='Home'){go(0);} if(e.key==='End'){go(slides.length-1);}
+  });
+  go(0);
+})();
+</script>
+</body>
+</html>
