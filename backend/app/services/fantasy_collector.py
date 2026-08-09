@@ -75,7 +75,16 @@ JOB_INTERVALS_SECONDS = {
     "odds_lines": {"in_season": 2 * 24 * 3600, "off_season": 7 * 24 * 3600},
     "odds_props": {"in_season": 3 * 24 * 3600, "off_season": 30 * 24 * 3600},
     "odds_futures": {"in_season": 7 * 24 * 3600, "off_season": 7 * 24 * 3600},
+    # ESPN league hub (spec 17). Season-scoped, so these use per-season timer
+    # keys rather than the bare job name — see _league_due_job.
+    "league_sync": {"in_season": 6 * 3600, "off_season": 24 * 3600},
+    "league_rosters": {"in_season": 6 * 3600, "off_season": 24 * 3600},
+    "league_rankings": {"in_season": 6 * 3600, "off_season": 7 * 24 * 3600},
 }
+
+# A finished season never changes, so polling it on the live cadence is pure
+# waste. Applied to every season before the current one.
+COMPLETED_SEASON_INTERVAL_SECONDS = 30 * 24 * 3600
 
 _STATE_META_KEY = "nfl_state"
 _DUE_META_PREFIX = "due:"
@@ -129,7 +138,7 @@ def is_in_season(season_type: Optional[str]) -> bool:
 # ── run-log helpers ─────────────────────────────────────────────────────
 
 
-def _start_run(
+def start_run(
     db: Session,
     job: str,
     source: Optional[str] = None,
@@ -152,7 +161,7 @@ def _start_run(
     return run
 
 
-def _finish_run(
+def finish_run(
     db: Session,
     run: FantasyCollectionRun,
     status: str,
@@ -168,6 +177,12 @@ def _finish_run(
     db.commit()
     db.refresh(run)
     return run
+
+
+# The run-log helpers are shared with fantasy_league_collector. The private
+# aliases stay so the many call sites below (and their tests) are untouched.
+_start_run = start_run
+_finish_run = finish_run
 
 
 def latest_successful_run(
@@ -839,6 +854,36 @@ def _provider_due_job(source: str, season: int, week: int) -> str:
     return f"projections:{source}:{season}:{week}"
 
 
+def _league_due_job(job: str, season: int) -> str:
+    """Per-season timer key for the league jobs.
+
+    The league is collected for several seasons at once, and each needs its
+    own next-due stamp: a completed season polls monthly while the live one
+    polls every few hours.
+    """
+    return f"{job}:{season}"
+
+
+def _mark_league_next_due(
+    db: Session,
+    job: str,
+    season: int,
+    now: datetime,
+    in_season: bool,
+    completed_season: bool = False,
+) -> None:
+    cadence = JOB_INTERVALS_SECONDS.get(job)
+    if not cadence:
+        return
+    if completed_season:
+        seconds = COMPLETED_SEASON_INTERVAL_SECONDS
+    else:
+        seconds = cadence["in_season" if in_season else "off_season"]
+    key = f"{_DUE_META_PREFIX}{_league_due_job(job, season)}"
+    set_meta(db, key, (now + timedelta(seconds=seconds)).isoformat())
+    db.commit()
+
+
 def _mark_provider_next_due(
     db: Session, source: str, season: int, week: int, now: datetime, in_season: bool
 ) -> None:
@@ -923,15 +968,54 @@ def run_scheduled(db: Session, now: Optional[datetime] = None) -> List[Dict[str,
         summaries.append(_summary(collect_odds_props(db)))
         _mark_next_due(db, "odds_props", now, in_season)
 
+    # ESPN league hub. Imported locally to keep the dependency one-way — the
+    # league collector imports the run-log helpers from this module.
+    from app.services import fantasy_league_collector
+
+    current_league = fantasy_league_collector.current_league_season(db)
+    for league_season in fantasy_league_collector.league_seasons():
+        due_job = _league_due_job("league_sync", league_season)
+        if not _job_due(db, due_job, now):
+            continue
+        completed = current_league is not None and league_season < current_league
+        runs = fantasy_league_collector.collect_season(db, league_season)
+        summaries.extend(_summary(run) for run in runs)
+        for job in ("league_sync", "league_rosters", "league_rankings"):
+            # A private season is polled on the slow cadence too: it is a
+            # stable state, not something worth rechecking four times a day.
+            slow = completed or runs[0].status == "skipped"
+            _mark_league_next_due(db, job, league_season, now, in_season, slow)
+
     return summaries
 
 
-def run_job(db: Session, job: str) -> FantasyCollectionRun:
-    """Run a single named job on demand (admin refresh). Uses current state."""
+def run_job(
+    db: Session, job: str, season: Optional[int] = None
+) -> FantasyCollectionRun:
+    """Run a single named job on demand (admin refresh). Uses current state.
+
+    ``season`` only applies to the league jobs, which are collected for
+    several seasons; every other job derives its season from cached state.
+    """
     ctx = current_season_week(db)
-    season, week = ctx["season"], ctx["week"]
+    week = ctx["week"]
+    league_season = season
+    season = ctx["season"]
     if not is_in_season(ctx["season_type"]):
         week = SEASON_LONG_WEEK  # offseason -> season-long snapshots
+
+    if job in ("league_sync", "league_rosters", "league_rankings"):
+        from app.services import fantasy_league_collector
+
+        target = league_season or fantasy_league_collector.current_league_season(db)
+        if not target:
+            raise ValueError("no league season configured")
+        if job == "league_sync":
+            return fantasy_league_collector.collect_league_sync(db, target)
+        if job == "league_rosters":
+            return fantasy_league_collector.collect_league_rosters(db, target)
+        return fantasy_league_collector.build_league_power_rankings(db, target)
+
     if job == "state":
         return collect_state(db)
     if job == "players":
@@ -984,6 +1068,9 @@ REFRESHABLE_JOBS = (
     "odds_lines",
     "odds_props",
     "odds_futures",
+    "league_sync",
+    "league_rosters",
+    "league_rankings",
 )
 
 

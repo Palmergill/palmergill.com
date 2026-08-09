@@ -55,7 +55,9 @@ everything fetched is persisted as timestamped snapshots so history
 ## Non-goals
 
 - No league integration (no Sleeper/ESPN/Yahoo login, rosters, matchups,
-  waivers). League-agnostic only.
+  waivers). League-agnostic only. **Superseded Aug 2026 by Spec 17 for ESPN
+  league 225965 specifically; `/fantasy/` itself stays league-agnostic and
+  public.**
 - No betting advice, bet tracking, or EV calculators — odds are displayed as
   information.
 - No custom projection model; we aggregate and store others' projections.
@@ -326,3 +328,10 @@ static mounts in `main.py`, `fantasy/tests` added to jest roots in
   lines/futures/props jobs, event↔game matching, props/futures/movement UI.
 - **P4 — Chat (~2 wks):** `fantasy_ai.py`/`fantasy_tools.py`, guardrails,
   local demo router, chat panel, chat tests.
+
+## Amendments
+
+- **Aug 2026 — league-specific companion:** Spec 17 adds a members-only hub
+  for ESPN league 225965 at `/fantasy/league/`. This does not change this
+  spec's public `/fantasy/` surface or make its rankings, projections, odds,
+  and default chat experience league-dependent.

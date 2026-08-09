@@ -14,6 +14,7 @@ from app.database import FantasyPlayer, FantasyPlayerStat
 from app.services import fantasy_data as fd
 from app.services.fantasy_collector import latest_successful_run
 from app.services.fantasy_common import display_position
+from app.services import fantasy_league_data as league_data
 
 
 def get_nfl_state(db: Session) -> Dict[str, Any]:
@@ -157,3 +158,109 @@ def get_trending(db: Session, kind: str = "add", limit: int = 8) -> Dict[str, An
     kind = "drop" if kind == "drop" else "add"
     limit = max(1, min(int(limit or 8), 15))
     return {"kind": kind, "players": fd.get_trending(db, kind, limit)}
+
+
+def get_league_standings(
+    db: Session, season: Optional[int] = None, limit: int = 12
+) -> Dict[str, Any]:
+    """Compact private-league standings for an authenticated chat turn."""
+    limit = max(1, min(int(limit or 12), 12))
+    data = league_data.get_standings(db, season=season)
+    return {
+        "season": data["season"],
+        "teams": [
+            {
+                "team_id": team["espn_team_id"],
+                "name": team["name"],
+                "owner": team["owner_name"],
+                "record": f'{team["wins"]}-{team["losses"]}-{team["ties"]}',
+                "points_for": round(team["points_for"], 1),
+                "playoff_seed": team["playoff_seed"],
+            }
+            for team in data["teams"][:limit]
+        ],
+    }
+
+
+def get_league_scoreboard(
+    db: Session,
+    season: Optional[int] = None,
+    week: Optional[int] = None,
+    limit: int = 8,
+) -> Dict[str, Any]:
+    """One private-league week, capped before it enters model context."""
+    limit = max(1, min(int(limit or 8), 8))
+    data = league_data.get_scoreboard(db, season=season, week=week)
+    return {
+        "season": data["season"],
+        "week": data["week"],
+        "matchups": [
+            {
+                "home": matchup["home"]["name"],
+                "home_points": matchup["home"]["points"],
+                "away": matchup["away"]["name"] if matchup["away"] else None,
+                "away_points": matchup["away"]["points"] if matchup["away"] else None,
+                "winner": matchup["winner"],
+                "complete": matchup["is_complete"],
+                "bye": matchup["is_bye"],
+            }
+            for matchup in data["matchups"][:limit]
+        ],
+    }
+
+
+def get_league_power_rankings(
+    db: Session,
+    season: Optional[int] = None,
+    week: Optional[int] = None,
+    algorithm: str = "composite",
+    limit: int = 12,
+) -> Dict[str, Any]:
+    limit = max(1, min(int(limit or 12), 12))
+    data = league_data.get_power_rankings(
+        db, season=season, week=week, algorithm=algorithm
+    )
+    return {
+        "season": data["season"],
+        "week": data["week"],
+        "algorithm": data["algorithm"],
+        "teams": [
+            {
+                "rank": team["rank"],
+                "name": team["name"],
+                "record": f'{team["wins"]}-{team["losses"]}-{team["ties"]}',
+                "score": round(team["score"], 4) if team["score"] is not None else None,
+                "movement": team["rank_delta"],
+            }
+            for team in data["rankings"][:limit]
+        ],
+    }
+
+
+def get_league_team(
+    db: Session,
+    team_id: int,
+    season: Optional[int] = None,
+) -> Dict[str, Any]:
+    """Team record, recent results and a compact roster preview."""
+    detail = league_data.get_team_detail(db, season, int(team_id))
+    roster = league_data.get_team_roster(db, detail["season"], int(team_id))
+    return {
+        "season": detail["season"],
+        "team_id": detail["espn_team_id"],
+        "name": detail["name"],
+        "owner": detail["owner_name"],
+        "record": f'{detail["wins"]}-{detail["losses"]}-{detail["ties"]}',
+        "points_for": round(detail["points_for"], 1),
+        "power_history": detail["power_history"][-4:],
+        "recent_results": detail["results"][-3:],
+        "roster": [
+            {
+                "name": entry["name"],
+                "slot": entry["lineup_slot"],
+                "projection_ppr": (entry.get("projection") or {}).get("pts_ppr"),
+                "rank": (entry.get("ranking") or {}).get("rank"),
+            }
+            for entry in roster["entries"][:12]
+        ],
+    }

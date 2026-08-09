@@ -153,7 +153,7 @@ def test_model_loop_executes_tool_then_answers(db, monkeypatch):
     monkeypatch.setenv("OPENAI_API_KEY", "test-key")
     calls = {"n": 0}
 
-    def fake_openai(input_items):
+    def fake_openai(input_items, **_kwargs):
         calls["n"] += 1
         if calls["n"] == 1:
             return {"output": [{
@@ -168,6 +168,19 @@ def test_model_loop_executes_tool_then_answers(db, monkeypatch):
     result = fantasy_ai.answer_chat("Who is the best QB this week?")
     assert result["tools_used"] == ["get_rankings"]
     assert "Josh Allen" in result["answer"]
+
+
+def test_demo_chat_has_no_private_league_tool_even_when_asked_directly(db):
+    result = fantasy_ai.answer_demo_chat("Show me the league standings")
+    assert all(not name.startswith("get_league_") for name in result["tools_used"])
+    assert all(
+        not schema["name"].startswith("get_league_")
+        for schema in fantasy_ai.tool_schemas(False)
+    )
+    assert any(
+        schema["name"] == "get_league_standings"
+        for schema in fantasy_ai.tool_schemas(True)
+    )
 
 
 # ── endpoint contract ───────────────────────────────────────────────────

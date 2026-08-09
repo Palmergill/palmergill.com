@@ -1038,3 +1038,26 @@ def test_poker_rate_limit_uses_shared_rightmost_hop_helper(monkeypatch):
     # still trips.
     assert last_status == 429
     assert list(poker._rate_limit_store.keys()) == ["9.9.9.9"]
+
+
+def test_league_hub_does_not_inherit_demo_access_from_fantasy():
+    """/fantasy and /api/fantasy are demo prefixes and matching is by prefix,
+    so /fantasy/league inherits anonymous demo access unless it is excluded
+    explicitly. Omitting it from DEMO_PATH_PREFIXES is NOT enough.
+
+    The equivalent lists in middleware.js must stay in sync; see
+    MEMBER_PREFIXES there.
+    """
+    from app.main import is_demo_path, is_member_path, is_protected_path
+
+    assert is_member_path("/fantasy/league") is True
+    assert is_member_path("/fantasy/league/") is True
+    assert is_demo_path("/fantasy/league/") is False
+    assert is_protected_path("/fantasy/league/") is True
+
+    # ...without locking the public dashboard that surrounds it.
+    assert is_demo_path("/fantasy/") is True
+    assert is_demo_path("/fantasy/draft-order/") is True
+    assert is_member_path("/fantasy/") is False
+    # A path that merely starts with the same characters is not a member path.
+    assert is_member_path("/fantasy/leaguelike/") is False

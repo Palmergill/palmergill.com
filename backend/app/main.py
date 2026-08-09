@@ -19,7 +19,17 @@ from app.accounts import ROLE_ADMIN, ROLE_MEMBER, AccountError
 from app.database import SessionLocal
 from app.database_migration import init_db_with_migration
 from app.log_handler import install_db_logging
-from app.routers import admin, analytics, bitcoin, stocks, poker, craps, draft_order, fantasy
+from app.routers import (
+    admin,
+    analytics,
+    bitcoin,
+    stocks,
+    poker,
+    craps,
+    draft_order,
+    fantasy,
+    fantasy_league,
+)
 from app.routers.analytics import cleanup_old_analytics, record_analytics_event
 import os
 
@@ -243,11 +253,16 @@ DEMO_PATH_PREFIXES = (
     "/bitcoin-chat",
     "/fantasy",
 )
+# Members-only pages. These sit UNDERNEATH a demo prefix ("/fantasy"), and
+# is_demo_path matches by prefix, so omitting them from DEMO_PATH_PREFIXES is
+# not enough — they inherit demo access and must be excluded explicitly.
+MEMBER_PATH_PREFIXES = ("/fantasy/league",)
 PROTECTED_PATH_PREFIXES = (
     "/docs",
     "/openapi.json",
     "/api",
     "/admin",
+    "/fantasy/league",
 )
 # Signed in is not enough for these — they expose logs, analytics, and the
 # raw API surface, so they require the admin role specifically.
@@ -371,7 +386,18 @@ def is_protected_path(path: str):
     return any(path == prefix or path.startswith(f"{prefix}/") for prefix in PROTECTED_PATH_PREFIXES)
 
 
+def is_member_path(path: str):
+    return any(
+        path == prefix or path.startswith(f"{prefix}/") for prefix in MEMBER_PATH_PREFIXES
+    )
+
+
 def is_demo_path(path: str):
+    # Members-only paths win over the demo prefix they live under, otherwise
+    # /fantasy/league would inherit anonymous demo access from /fantasy.
+    if is_member_path(path):
+        return False
+
     return any(path == prefix or path.startswith(f"{prefix}/") for prefix in DEMO_PATH_PREFIXES)
 
 
@@ -484,7 +510,10 @@ def should_redirect_to_login(request: Request) -> bool:
     path = request.url.path
     if request.method not in {"GET", "HEAD"}:
         return False
-    if not (path == "/admin" or path.startswith("/admin/")):
+    # Page requests get the login form; a Basic-auth challenge on a normal
+    # navigation surfaces as a browser modal, which is a dead end for a
+    # member who simply is not signed in yet.
+    if not (path == "/admin" or path.startswith("/admin/") or is_member_path(path)):
         return False
 
     accept = request.headers.get("accept", "")
@@ -896,6 +925,7 @@ app.include_router(craps.router)
 app.include_router(analytics.router)
 app.include_router(admin.router)
 app.include_router(fantasy.router)
+app.include_router(fantasy_league.router)
 app.include_router(draft_order.router)
 
 @app.get("/health")

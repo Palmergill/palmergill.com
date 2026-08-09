@@ -16,6 +16,7 @@ navigation chrome.
 - `/bitcoin-chat/` - Bitcoin chat app
 - `/fantasy/` - NFL rankings, projections, and league tools
 - `/fantasy/draft-order/` - account-backed, verifiable draft-order game with solo practice and admin bot-test rooms
+- `/fantasy/league/` - members-only ESPN league hub with standings, power rankings, enriched rosters, team overviews, and league-aware chat
 - `/casino/` - landing page linking the casino games
 - `/poker/` - Texas Hold'em poker app
 - `/craps/` - craps app
@@ -112,7 +113,7 @@ about/            About page
 docs/             Website docs and provider/setup markdown docs
 stock-research/   Active stock research frontend
 bitcoin-chat/     Active Bitcoin chat frontend
-fantasy/          Fantasy dashboard and Fourth & Fortune draft-order game
+fantasy/          Fantasy dashboard, Fourth & Fortune draft-order game, and the ESPN league hub
 casino/           Casino landing page and game rules
 poker/            Active poker frontend and supporting docs/tests
 craps/            Active craps frontend

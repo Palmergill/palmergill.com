@@ -5,6 +5,7 @@ from sqlalchemy import (
     DateTime,
     Float,
     ForeignKey,
+    Index,
     Integer,
     LargeBinary,
     String,
@@ -356,6 +357,205 @@ class FantasyMeta(Base):
     key = Column(String, primary_key=True)
     value = Column(Text, nullable=True)
     updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
+
+
+# ── ESPN league hub (spec 17) ──────────────────────────────────────────
+#
+# One configured ESPN league, read keyless. These follow the same two shapes
+# as the spec 16 tables above, but the split lands differently:
+#
+#   * Standings and matchups UPSERT. A final score is immutable and the
+#     standings are a deterministic reduction of the completed schedule, so
+#     any historical view is a recompute, not a lookup — snapshotting them
+#     would store one redundant row per team per run forever.
+#   * Rosters SNAPSHOT. "Who was on this roster in week 5" cannot be
+#     recovered from any ESPN endpoint after the fact, so it has to be
+#     captured. A change digest (ff_meta `league:roster_digest:{season}`)
+#     skips the write when nothing moved, keeping steady-state growth to one
+#     snapshot per real transaction.
+#   * Power rankings SNAPSHOT, recomputed for every week on each run, so a
+#     corrected or backfilled score fixes history instead of freezing a wrong
+#     number in place.
+#
+# Every key is (season, espn_team_id) rather than a bare team id: ESPN team
+# ids are only unique within a season, and this league went 12 teams to 10.
+
+
+class FantasyLeagueSeason(Base):
+    __tablename__ = "ff_league_seasons"
+    __table_args__ = (
+        UniqueConstraint("espn_league_id", "season", name="uq_ff_league_season"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    espn_league_id = Column(String, index=True)
+    season = Column(Integer, index=True)
+    name = Column(String, nullable=True)
+    size = Column(Integer, nullable=True)
+    current_matchup_period = Column(Integer, nullable=True)
+    current_scoring_period = Column(Integer, nullable=True)
+    first_scoring_period = Column(Integer, nullable=True)
+    matchup_period_count = Column(Integer, nullable=True)
+    regular_season_periods = Column(Integer, nullable=True)
+    playoff_team_count = Column(Integer, nullable=True)
+    divisions_json = Column(Text, nullable=True)
+    lineup_slot_counts_json = Column(Text, nullable=True)
+    # ok | unauthorized | error. `unauthorized` is a private season, which is
+    # a stable expected state — the UI labels it rather than hiding it.
+    status = Column(String, index=True, default="ok")
+    last_error = Column(Text, nullable=True)
+    run_id = Column(Integer, nullable=True, index=True)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
+
+
+class FantasyLeagueMember(Base):
+    __tablename__ = "ff_league_members"
+    __table_args__ = (
+        UniqueConstraint("season", "member_guid", name="uq_ff_league_member"),
+    )
+
+    # ESPN puts ownership GUIDs on the team and the human names here, so this
+    # is the crosswalk that turns a team into "whose team". Kept per-season
+    # because managers join and leave.
+    id = Column(Integer, primary_key=True, index=True)
+    season = Column(Integer, index=True)
+    member_guid = Column(String, index=True)
+    display_name = Column(String, nullable=True)
+    first_name = Column(String, nullable=True)
+    last_name = Column(String, nullable=True)
+    run_id = Column(Integer, nullable=True, index=True)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
+
+
+class FantasyLeagueTeam(Base):
+    __tablename__ = "ff_league_teams"
+    __table_args__ = (
+        UniqueConstraint("season", "espn_team_id", name="uq_ff_league_team"),
+        Index("ix_ff_league_teams_season_seed", "season", "playoff_seed"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    season = Column(Integer, index=True)
+    espn_team_id = Column(Integer, index=True)
+    name = Column(String, nullable=True)
+    abbrev = Column(String, nullable=True)
+    logo_url = Column(String, nullable=True)
+    division_id = Column(Integer, nullable=True)
+    division_name = Column(String, nullable=True)
+    owner_guid = Column(String, nullable=True, index=True)
+    owner_name = Column(String, nullable=True)
+    playoff_seed = Column(Integer, nullable=True)
+    wins = Column(Integer, default=0)
+    losses = Column(Integer, default=0)
+    ties = Column(Integer, default=0)
+    points_for = Column(Float, default=0.0)
+    points_against = Column(Float, default=0.0)
+    win_pct = Column(Float, default=0.0)
+    streak_length = Column(Integer, nullable=True)
+    streak_type = Column(String, nullable=True)
+    games_back = Column(Float, nullable=True)
+    current_projected_rank = Column(Integer, nullable=True)  # ESPN's own
+    run_id = Column(Integer, nullable=True, index=True)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
+
+
+class FantasyLeagueMatchup(Base):
+    __tablename__ = "ff_league_matchups"
+    __table_args__ = (
+        UniqueConstraint("season", "espn_matchup_id", name="uq_ff_league_matchup"),
+        Index("ix_ff_league_matchups_season_period", "season", "matchup_period"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    season = Column(Integer, index=True)
+    espn_matchup_id = Column(Integer, index=True)  # stable within a season
+    matchup_period = Column(Integer, index=True)
+    scoring_period = Column(Integer, nullable=True)
+    playoff_tier = Column(String, nullable=True)  # NONE|WINNERS_BRACKET|...
+    winner = Column(String, nullable=True)  # HOME|AWAY|TIE|UNDECIDED
+    home_team_id = Column(Integer, index=True)
+    home_points = Column(Float, nullable=True)
+    home_points_by_period_json = Column(Text, nullable=True)
+    # A bye has no away side. The row is kept so the scoreboard can show it,
+    # but flagged so the ranking math never invents a phantom opponent.
+    away_team_id = Column(Integer, nullable=True, index=True)
+    away_points = Column(Float, nullable=True)
+    away_points_by_period_json = Column(Text, nullable=True)
+    is_bye = Column(Boolean, default=False)
+    is_complete = Column(Boolean, default=False)
+    run_id = Column(Integer, nullable=True, index=True)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
+
+
+class FantasyLeagueRosterEntry(Base):
+    __tablename__ = "ff_league_roster_entries"
+    __table_args__ = (
+        Index("ix_ff_league_roster_run_team", "run_id", "espn_team_id"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    run_id = Column(Integer, index=True)
+    season = Column(Integer, index=True)
+    scoring_period = Column(Integer, index=True)  # 0 in the preseason
+    espn_team_id = Column(Integer, index=True)
+    espn_player_id = Column(Integer, nullable=True)  # negative for D/ST
+    # player_id is nullable for the same reason as ff_prop_snapshots: an
+    # unmatched player is kept with its raw name rather than dropped.
+    player_id = Column(String, nullable=True, index=True)
+    player_name_raw = Column(String, nullable=True)
+    lineup_slot_id = Column(Integer, nullable=True)
+    lineup_slot = Column(String, nullable=True)  # QB|RB|FLEX|BENCH|IR|...
+    position = Column(String, nullable=True)
+    pro_team_id = Column(Integer, nullable=True)
+    pro_team = Column(String, nullable=True)
+    acquisition_type = Column(String, nullable=True)
+    injury_status = Column(String, nullable=True)
+    fetched_at = Column(DateTime, default=utc_now, index=True)
+
+
+class FantasyLeaguePowerRanking(Base):
+    __tablename__ = "ff_league_power_rankings"
+    __table_args__ = (
+        Index(
+            "ix_ff_league_power_run_ctx", "run_id", "season", "week", "algorithm"
+        ),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    run_id = Column(Integer, index=True)
+    season = Column(Integer, index=True)
+    week = Column(Integer, index=True)  # cumulative through this matchup period
+    algorithm = Column(String, index=True)  # composite|record|consistency|...
+    espn_team_id = Column(Integer, index=True)
+    rank = Column(Integer)
+    score = Column(Float, nullable=True)
+    previous_rank = Column(Integer, nullable=True)
+    # Materialized within the run (week N vs N-1) so the front end never joins.
+    # Positive means the team moved up.
+    rank_delta = Column(Integer, nullable=True)
+    computed_at = Column(DateTime, default=utc_now, index=True)
+
+
+class FantasyLeagueTeamOverview(Base):
+    __tablename__ = "ff_league_team_overviews"
+    __table_args__ = (
+        UniqueConstraint(
+            "season", "espn_team_id", "week", name="uq_ff_league_team_overview"
+        ),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    season = Column(Integer, index=True)
+    espn_team_id = Column(Integer, index=True)
+    week = Column(Integer, index=True)
+    overview_md = Column(Text, nullable=True)
+    model = Column(String, nullable=True)
+    source = Column(String, nullable=True)  # model|local
+    # Hash of the context the overview was written from. Regenerating when
+    # this changes invalidates the cache on real movement instead of on a
+    # timer that is always either too eager or too stale.
+    prompt_digest = Column(String, nullable=True)
+    generated_at = Column(DateTime, default=utc_now, index=True)
 
 
 # ── Fantasy football draft-order game ──────────────────────────────────

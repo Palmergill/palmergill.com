@@ -120,6 +120,57 @@ body {
 
 /* ── draft-order game feature ───────────────────────────────────────── */
 
+/* Companion to the draft feature above. Deliberately lighter: two dark
+   heroes stacked would fight each other for the top of the page. */
+.league-feature {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    margin-bottom: 28px;
+    padding: clamp(20px, 4vw, 28px);
+    border: 1px solid var(--line, #ece4d8);
+    border-radius: 18px;
+    background: var(--card, #fff);
+}
+
+.league-feature h2 {
+    margin: 6px 0 8px;
+    font-size: clamp(1.2rem, 3vw, 1.5rem);
+    letter-spacing: -0.02em;
+}
+
+.league-feature p {
+    margin: 0;
+    max-width: 62ch;
+    color: var(--soft, #5d574e);
+    font-size: 0.92rem;
+    line-height: 1.6;
+}
+
+.league-feature__link {
+    display: inline-flex;
+    align-items: center;
+    gap: 9px;
+    flex-shrink: 0;
+    padding: 11px 18px;
+    border-radius: 9px;
+    background: var(--sage, #5b7152);
+    color: #fff;
+    font-size: 0.82rem;
+    font-weight: 700;
+    text-decoration: none;
+    transition: background 0.15s ease;
+}
+
+.league-feature__link:hover { background: var(--sage-dim, #4c6044); }
+
+.league-feature__link:focus-visible {
+    outline: none;
+    box-shadow: var(--focus-ring, 0 0 0 3px rgba(91, 113, 82, 0.24));
+}
+
 .draft-feature {
     position: relative;
     display: flex;

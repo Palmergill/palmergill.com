@@ -32,6 +32,7 @@ The active public site is static:
 - `/bitcoin-chat/` - Bitcoin chat app
 - `/fantasy/` - fantasy football dashboard
 - `/fantasy/draft-order/` - Fourth & Fortune draft-order rooms
+- `/fantasy/league/` - ESPN league hub (members only; see `MEMBER_PATH_PREFIXES`)
 - `/casino/` - casino landing page linking the browser table games
 - `/poker/` - poker app
 - `/craps/` - craps app
@@ -55,6 +56,7 @@ Important routes:
 - `/api/craps/*`
 - `/api/bitcoin/*`
 - `/api/fantasy/*` (public fantasy reads plus account-gated persistent draft rooms)
+- `/api/fantasy/league/*` (members-only ESPN league reads and digest-cached team overviews; 403 for anonymous callers)
 - `/api/analytics/*` (public client analytics ingest)
 - `/api/admin/*`
 - `/health`

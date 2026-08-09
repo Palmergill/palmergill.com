@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>League Hub — Fantasy Football</title>
+    <meta name="description" content="Standings, power rankings, rosters, and results for a private ESPN fantasy football league.">
+    <meta name="theme-color" content="#faf6f0">
+    <!-- Members-only and about real people: keep it out of search results. -->
+    <meta name="robots" content="noindex, nofollow">
+    <link rel="icon" type="image/png" href="/assets/palmer-gill-logo-small.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/shared/site-nav.css?v=13">
+    <link rel="stylesheet" href="style.css?v=2">
+</head>
+<body>
+    <main class="app-shell">
+        <header class="page-head">
+            <div class="page-head__titles">
+                <span class="eyebrow">Private league</span>
+                <h1 id="leagueName">League Hub</h1>
+                <p class="lede" id="leagueLede">
+                    Standings, power rankings, and rosters for the league.
+                </p>
+            </div>
+            <div class="week-badge" id="modeBadge" aria-live="polite">
+                <span class="week-badge__label" id="modeLabel">Season</span>
+                <span class="week-badge__value" id="seasonValue">—</span>
+                <span class="week-badge__season" id="freshnessValue"></span>
+            </div>
+        </header>
+
+        <p id="errorBanner" class="banner banner--error" hidden></p>
+        <p id="modeBanner" class="banner" hidden></p>
+
+        <!-- Shown when the API returns 403: not signed in. -->
+        <section id="signedOutView" class="signed-out" hidden>
+            <h2>Members only</h2>
+            <p>
+                The league hub is limited to league managers. Sign in to see standings,
+                power rankings, and rosters.
+            </p>
+            <div class="signed-out__actions">
+                <a class="button" id="signInLink" href="/login/">Sign in</a>
+                <a class="button button--quiet" href="/signup/">Create an account</a>
+            </div>
+        </section>
+
+        <section id="emptyView" class="signed-out" hidden>
+            <h2>No league data yet</h2>
+            <p>The collector has not stored a season for this league yet.</p>
+        </section>
+
+        <div id="leagueView" hidden>
+            <nav class="season-bar" aria-label="Season">
+                <div class="chip-row" id="seasonChips" role="group" aria-label="Choose a season"></div>
+            </nav>
+
+            <!-- Team detail replaces the league sections; it is a routed view
+                 on this page (?team=N) rather than a second HTML file. -->
+            <section id="teamView" class="team-view" hidden aria-labelledby="teamName">
+                <button type="button" class="back-link" id="teamBack">← All teams</button>
+                <header class="team-head">
+                    <img class="team-head__logo" id="teamLogo" alt="" hidden>
+                    <div>
+                        <h2 id="teamName">—</h2>
+                        <p class="team-head__sub" id="teamOwner"></p>
+                    </div>
+                    <dl class="team-stats" id="teamStats"></dl>
+                    <div class="team-power" id="teamPower"></div>
+                </header>
+
+                <section class="team-overview" aria-labelledby="teamOverviewTitle">
+                    <div class="team-overview__head">
+                        <div>
+                            <h3 id="teamOverviewTitle">Team overview</h3>
+                            <span class="team-overview__meta" id="teamOverviewMeta"></span>
+                        </div>
+                        <button type="button" class="button button--quiet" id="teamOverviewRefresh">
+                            Check for updates
+                        </button>
+                    </div>
+                    <div class="team-overview__body" id="teamOverviewBody" aria-live="polite"></div>
+                </section>
+
+                <div class="team-columns">
+                    <section aria-labelledby="teamResultsTitle">
+                        <h3 id="teamResultsTitle">Results</h3>
+                        <ol class="results" id="teamResults"></ol>
+                    </section>
+                    <section aria-labelledby="teamRosterTitle">
+                        <h3 id="teamRosterTitle">Roster</h3>
+                        <p class="roster__note" id="rosterNote"></p>
+                        <div id="teamRoster"></div>
+                    </section>
+                </div>
+            </section>
+
+            <div id="leagueSections">
+                <section class="board" data-board="standings" aria-labelledby="standingsTitle">
+                    <div class="board__head">
+                        <h2 id="standingsTitle">Standings</h2>
+                        <span class="board__note" id="standingsNote"></span>
+                    </div>
+                    <div id="standings" class="standings"></div>
+                </section>
+
+                <section class="board" data-board="power" aria-labelledby="powerTitle">
+                    <div class="board__head">
+                        <h2 id="powerTitle">Power rankings</h2>
+                        <span class="board__note" id="powerNote"></span>
+                    </div>
+                    <div class="controls">
+                        <div class="chip-row" id="algorithmChips" role="group" aria-label="Ranking method"></div>
+                        <label class="select-field">
+                            <span class="sr-only">Week</span>
+                            <select id="powerWeek"></select>
+                        </label>
+                    </div>
+                    <div id="powerRankings" class="power"></div>
+                </section>
+
+                <section class="board" data-board="scoreboard" aria-labelledby="scoreboardTitle">
+                    <div class="board__head">
+                        <h2 id="scoreboardTitle">Scoreboard</h2>
+                        <label class="select-field">
+                            <span class="sr-only">Scoreboard week</span>
+                            <select id="scoreboardWeek"></select>
+                        </label>
+                    </div>
+                    <div id="scoreboard" class="scoreboard"></div>
+                </section>
+
+                <section class="board" data-board="teams" aria-labelledby="teamsTitle">
+                    <div class="board__head">
+                        <h2 id="teamsTitle">Teams</h2>
+                    </div>
+                    <div id="teamsGrid" class="teams-grid"></div>
+                </section>
+            </div>
+
+            <section class="chat" aria-label="Fantasy assistant">
+                <div class="chat__head">
+                    <h2>Ask the fantasy assistant</h2>
+                    <span class="chat__note">Answers use only the data this site has collected.</span>
+                </div>
+                <div id="chatMessages" class="chat__messages" aria-live="polite">
+                    <div class="chat__starts" id="chatStarts">
+                        <button type="button" class="chat-chip" data-prompt="Show me this league's power rankings.">League power rankings</button>
+                        <button type="button" class="chat-chip" data-prompt="Who are the top 10 PPR running backs this week?">Top 10 PPR RBs</button>
+                        <button type="button" class="chat-chip" data-prompt="Who's trending on waivers right now?">Waiver trends</button>
+                        <button type="button" class="chat-chip" data-prompt="Compare Josh Allen and Jalen Hurts.">Compare two QBs</button>
+                    </div>
+                </div>
+                <form id="chatForm" class="chat__composer">
+                    <label class="sr-only" for="chatInput">Ask a fantasy question</label>
+                    <textarea id="chatInput" rows="1" maxlength="1000" placeholder="Ask about this league, a player, props, or lines…" required></textarea>
+                    <button type="submit" aria-label="Send message">↑</button>
+                </form>
+            </section>
+        </div>
+    </main>
+
+    <script src="/shared/site-nav.js?v=14"></script>
+    <script src="/shared/analytics.js?v=1"></script>
+    <script src="/shared/api-base.js?v=1"></script>
+    <script src="format.js?v=1"></script>
+    <script src="/fantasy/chat.js?v=1"></script>
+    <script src="app.js?v=2"></script>
+</body>
+</html>

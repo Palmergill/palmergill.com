@@ -25,9 +25,19 @@ const PUBLIC_PREFIXES = [
   '/api/fantasy',
 ];
 
+// Members-only pages. These live underneath a public prefix ('/api/fantasy'
+// is public here, and the origin treats '/fantasy' as demo), so they have to
+// be checked BEFORE the public short-circuit in isProtectedPath — otherwise
+// they inherit anonymous access from their parent.
+// Keep in sync with MEMBER_PATH_PREFIXES in backend/app/main.py.
+const MEMBER_PREFIXES = [
+  '/fantasy/league',
+];
+
 const PROTECTED_PREFIXES = [
   '/admin',
   '/api',
+  '/fantasy/league',
 ];
 
 // Signed in is not enough here: these expose logs, analytics, and collector
@@ -146,7 +156,19 @@ async function sessionIdentity(request, adminUsername, password) {
   return null;
 }
 
+function isMemberPath(pathname) {
+  return MEMBER_PREFIXES.some((prefix) => (
+    pathname === prefix || pathname.startsWith(`${prefix}/`)
+  ));
+}
+
 function isProtectedPath(pathname) {
+  // Checked first: a members-only page nested under a public prefix must not
+  // be exempted by its parent.
+  if (isMemberPath(pathname)) {
+    return true;
+  }
+
   if (PUBLIC_PREFIXES.some((prefix) => (
     pathname === prefix || pathname.startsWith(`${prefix}/`)
   ))) {
@@ -192,7 +214,13 @@ function withOriginAuth(request, identity, username, password) {
 function shouldRedirectToLogin(request) {
   const url = new URL(request.url);
   if (request.method !== 'GET' && request.method !== 'HEAD') return false;
-  if (!(url.pathname === '/admin' || url.pathname.startsWith('/admin/'))) return false;
+  // Page requests get the login form. A Basic-auth challenge on a normal
+  // navigation surfaces as a browser modal, which is a dead end for a member
+  // who simply is not signed in yet.
+  const isPage = url.pathname === '/admin'
+    || url.pathname.startsWith('/admin/')
+    || isMemberPath(url.pathname);
+  if (!isPage) return false;
 
   const accept = request.headers.get('accept') || '';
   return accept.includes('text/html') || accept.includes('*/*');
@@ -456,5 +484,8 @@ export const config = {
     '/bitcoin-chat/:path*',
     '/admin/:path*',
     '/api/:path*',
+    // The rest of /fantasy is public and deliberately unmatched; only the
+    // members-only league hub runs through the edge.
+    '/fantasy/league/:path*',
   ],
 };

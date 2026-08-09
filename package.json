@@ -34,6 +34,7 @@
       "craps-strategy/**/*.js",
       "shared/*.js",
       "fantasy/*.js",
+    "fantasy/league/*.js",
       "!craps-strategy/tests/**",
       "!poker/tests/**",
       "!high-card-flush/tests/**",

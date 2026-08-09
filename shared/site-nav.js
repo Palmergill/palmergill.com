@@ -28,6 +28,9 @@
             label: "Fantasy",
             hint: "NFL rankings",
             href: "/fantasy/",
+            // The league hub and draft room live under /fantasy/ rather than
+            // getting their own nav entries; keep this item current on both.
+            matches: ["/fantasy/"],
             icon: "football"
         },
         {

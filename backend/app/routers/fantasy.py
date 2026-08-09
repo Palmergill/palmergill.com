@@ -45,6 +45,9 @@ class RefreshResponse(BaseModel):
     job: str
     status: str
     rows_written: int
+    # Echoed back so a caller can see which season actually ran rather than
+    # assuming the one they asked for.
+    season: Optional[int] = None
     detail: Optional[str] = None
 
 
@@ -211,7 +214,14 @@ async def fantasy_chat(http_request: Request, request: FantasyChatRequest):
     if is_demo_request(http_request):
         result = await run_blocking(fantasy_ai.answer_demo_chat, request.message, session_id, request.timezone)
     else:
-        result = await run_blocking(fantasy_ai.answer_chat, request.message, session_id, request.timezone)
+        league_access = is_authenticated(http_request) and not is_demo_request(http_request)
+        result = await run_blocking(
+            fantasy_ai.answer_chat,
+            request.message,
+            session_id,
+            request.timezone,
+            league_access=league_access,
+        )
 
     cookie_session_id = result["session_id"]
     body = {key: value for key, value in result.items() if key != "session_id"}
@@ -229,7 +239,13 @@ async def fantasy_chat(http_request: Request, request: FantasyChatRequest):
 
 
 @router.post("/admin/refresh", response_model=RefreshResponse)
-async def admin_refresh(http_request: Request, job: str = Query(...)):
+async def admin_refresh(
+    http_request: Request,
+    job: str = Query(...),
+    # Only the league jobs are season-scoped; every other job takes its
+    # season from cached NFL state and ignores this.
+    season: Optional[int] = Query(None),
+):
     # This endpoint performs writes/network fetches; it must never run for an
     # anonymous demo caller even though /api/fantasy is a demo prefix.
     if is_demo_request(http_request) or not is_admin(http_request):
@@ -243,11 +259,12 @@ async def admin_refresh(http_request: Request, job: str = Query(...)):
     def _run() -> RefreshResponse:
         db = SessionLocal()
         try:
-            run = fantasy_collector.run_job(db, job)
+            run = fantasy_collector.run_job(db, job, season=season)
             return RefreshResponse(
                 job=run.job,
                 status=run.status,
                 rows_written=run.rows_written or 0,
+                season=run.season,
                 detail=run.detail,
             )
         finally:
