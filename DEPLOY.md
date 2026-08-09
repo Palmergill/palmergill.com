@@ -32,7 +32,7 @@ Production static hosting should serve those files directly. `vercel.json` rewri
 
 There is deliberately no admin row in the database: nothing that can write to `app_users` can mint an account that reads the logs.
 
-Sign-in, sign-up, and sign-out are served by the API service, not the edge, because member accounts live in its database. Vercel middleware only *verifies* the `pg_session` cookie that service issues and enforces the role gate. Both platforms must therefore agree on the token signing secret — they already do, since both read `APP_AUTH_PASSWORD`, but setting `APP_SESSION_SECRET` in both places decouples sessions from the password.
+Sign-in, sign-up, and sign-out are served by the API service, not the edge, because member accounts live in its database. Vercel middleware normally verifies the `pg_session` cookie locally and enforces the role gate. Both platforms should agree on the token signing secret — they already do when both fall back to `APP_AUTH_PASSWORD`, while setting the same `APP_SESSION_SECRET` in both places decouples sessions from the password. If those settings temporarily drift during a deployment, the edge asks the API's no-store session-status endpoint to validate an otherwise unrecognized cookie; this prevents a successful sign-in from looping back to the login page while keeping the API service authoritative.
 
 Vercel middleware keeps `/` public and requires a session (or Basic Auth) for:
 

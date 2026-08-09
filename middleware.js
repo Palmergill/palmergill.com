@@ -156,6 +156,44 @@ async function sessionIdentity(request, adminUsername, password) {
   return null;
 }
 
+// The API service owns member accounts and mints every session cookie. The
+// edge normally verifies the cookie locally to avoid a network round trip,
+// but the two deployments can temporarily disagree while environment changes
+// roll out (most notably APP_SESSION_SECRET). In that case, ask the authority
+// that issued the cookie before treating a successful login as signed out.
+//
+// Only callers with a pg_session cookie reach this fallback, and the status
+// endpoint is explicitly no-store, so anonymous page loads remain local and a
+// stale identity cannot be cached at the edge.
+async function sessionIdentityFromApi(request) {
+  const cookieHeader = request.headers.get('cookie') || '';
+  if (!parseCookies(cookieHeader).has(SESSION_COOKIE_NAME)) return null;
+
+  try {
+    const response = await fetch(new URL('/login/session', request.url), {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+        'Cookie': cookieHeader,
+      },
+      cache: 'no-store',
+      redirect: 'manual',
+    });
+    if (!response.ok) return null;
+
+    const data = await response.json();
+    const username = String(data?.username || '');
+    if (!data?.authenticated || !username) return null;
+    if (data.role !== ROLE_ADMIN && data.role !== ROLE_MEMBER) return null;
+
+    return { username, role: data.role };
+  } catch {
+    // A failed authority check is a failed authentication check. The normal
+    // redirect/challenge below remains the safe failure mode.
+    return null;
+  }
+}
+
 function isMemberPath(pathname) {
   return MEMBER_PREFIXES.some((prefix) => (
     pathname === prefix || pathname.startsWith(`${prefix}/`)
@@ -429,7 +467,10 @@ export default async function middleware(request) {
   const username = process.env.APP_AUTH_USERNAME || 'palmer';
   const password = process.env.APP_AUTH_PASSWORD;
 
-  const identity = password ? await sessionIdentity(request, username, password) : null;
+  let identity = password ? await sessionIdentity(request, username, password) : null;
+  if (!identity && isProtectedPath(url.pathname)) {
+    identity = await sessionIdentityFromApi(request);
+  }
 
   if (identity && isAdminPath(url.pathname)) {
     clearAuthFailures(request);
