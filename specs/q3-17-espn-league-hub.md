@@ -56,8 +56,10 @@ site's member gate even though its URL lives below the otherwise-public
 ## Requirements
 
 - **R1. ESPN collection:** Read configured public seasons through a thin
-  `urllib` client and pure parsers. An unset `ESPN_LEAGUE_ID` disables league
-  scheduling and collection without touching the network.
+  `urllib` client and pure parsers. An explicit `ESPN_LEAGUE_ID` enables
+  collection anywhere; the Railway deployment also enables this site's built-in
+  default league through its platform project marker. Unconfigured local and
+  test environments disable league scheduling without touching the network.
 - **R2. Private-season handling:** Record unreadable ESPN seasons as
   `unauthorized`, close their run as `skipped`, surface them as labeled gaps,
   and continue collecting other seasons.

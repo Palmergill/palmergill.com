@@ -120,12 +120,18 @@ def configured_league_id() -> str:
 def league_collection_enabled() -> bool:
     """Whether the scheduler should collect the league at all.
 
-    Gated on an explicit ``ESPN_LEAGUE_ID`` rather than defaulting to on, for
-    the same reason the odds jobs self-skip without ``ODDS_API_KEY``: a fresh
-    clone or a test run must never quietly start fetching a stranger's league
-    over the network. Production sets the variable in Railway.
+    An explicit ``ESPN_LEAGUE_ID`` opts any environment in. Railway deployments
+    also opt in because this service owns the built-in default league and
+    Railway supplies ``RAILWAY_PROJECT_ID`` to every deployment. Fresh clones,
+    local runs, and tests still stay network-off unless they explicitly opt in.
+
+    Keying the production default to the platform marker avoids a silent empty
+    hub when a newly introduced variable has not been added to Railway yet.
     """
-    return bool((os.getenv("ESPN_LEAGUE_ID") or "").strip())
+    return bool(
+        (os.getenv("ESPN_LEAGUE_ID") or "").strip()
+        or (os.getenv("RAILWAY_PROJECT_ID") or "").strip()
+    )
 
 
 def configured_seasons() -> List[int]:

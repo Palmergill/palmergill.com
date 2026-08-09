@@ -569,22 +569,35 @@ def defer_non_league_jobs(db):
     db.commit()
 
 
-def test_league_collection_is_off_unless_a_league_id_is_configured(monkeypatch):
-    """Without ESPN_LEAGUE_ID the scheduler must not touch the league.
+def test_league_collection_is_off_locally_unless_a_league_id_is_configured(monkeypatch):
+    """Without ESPN_LEAGUE_ID a local scheduler must not touch the league.
 
     This is what keeps a fresh clone (or a test run) from quietly fetching a
     stranger's league over the network — the same self-skip the odds jobs do
     without ODDS_API_KEY.
     """
     monkeypatch.delenv("ESPN_LEAGUE_ID", raising=False)
+    monkeypatch.delenv("RAILWAY_PROJECT_ID", raising=False)
     assert lc.league_seasons() == []
 
     monkeypatch.setenv("ESPN_LEAGUE_ID", "225965")
     assert lc.league_seasons() == [2023, 2024, 2025, 2026]
 
 
+def test_railway_deployment_collects_the_default_league(monkeypatch):
+    """Production must not silently skip collection because a redundant
+    ESPN_LEAGUE_ID variable was omitted from the service configuration."""
+    monkeypatch.delenv("ESPN_LEAGUE_ID", raising=False)
+    monkeypatch.setenv("RAILWAY_PROJECT_ID", "site-project")
+
+    assert lc.league_collection_enabled() is True
+    assert lc.configured_league_id() == "225965"
+    assert lc.league_seasons() == [2023, 2024, 2025, 2026]
+
+
 def test_run_scheduled_skips_the_league_when_disabled(db, monkeypatch):
     monkeypatch.delenv("ESPN_LEAGUE_ID", raising=False)
+    monkeypatch.delenv("RAILWAY_PROJECT_ID", raising=False)
     defer_non_league_jobs(db)
 
     def explode(*args, **kwargs):

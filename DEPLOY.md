@@ -98,6 +98,8 @@ OPENAI_API_KEY=<OpenAI API key for natural-language chat>
 
 Set `BITCOIN_DATA_PROVIDER=rpc` plus `BITCOIN_RPC_URL`, `BITCOIN_RPC_USER`, and `BITCOIN_RPC_PASSWORD` only when routing live Bitcoin reads through the private Bitcoin Core node.
 
+The fantasy league collector uses league `225965` and seasons 2023–2026 by default on Railway, detected through Railway's built-in `RAILWAY_PROJECT_ID`. Set `ESPN_LEAGUE_ID` and `ESPN_LEAGUE_SEASONS` to override those values. Outside Railway, collection remains disabled until `ESPN_LEAGUE_ID` is explicitly set, so local and test runs do not make surprise ESPN requests.
+
 ## Local
 
 Use:
