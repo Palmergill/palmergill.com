@@ -160,12 +160,25 @@ def get_trending(db: Session, kind: str = "add", limit: int = 8) -> Dict[str, An
     return {"kind": kind, "players": fd.get_trending(db, kind, limit)}
 
 
+def _chat_season(db: Session, season: Optional[int]) -> Optional[int]:
+    """Season a league chat answer should use when the caller named none.
+
+    Prefers the newest season that has been played. The hub's own default is
+    the current season even in the preseason (drafted rosters are interesting);
+    for chat that would mean answering "no rankings collected yet" while last
+    season's are sitting right there.
+    """
+    if season is not None:
+        return season
+    return league_data.resolve_played_season(db)
+
+
 def get_league_standings(
     db: Session, season: Optional[int] = None, limit: int = 12
 ) -> Dict[str, Any]:
     """Compact private-league standings for an authenticated chat turn."""
     limit = max(1, min(int(limit or 12), 12))
-    data = league_data.get_standings(db, season=season)
+    data = league_data.get_standings(db, season=_chat_season(db, season))
     return {
         "season": data["season"],
         "teams": [
@@ -190,7 +203,7 @@ def get_league_scoreboard(
 ) -> Dict[str, Any]:
     """One private-league week, capped before it enters model context."""
     limit = max(1, min(int(limit or 8), 8))
-    data = league_data.get_scoreboard(db, season=season, week=week)
+    data = league_data.get_scoreboard(db, season=_chat_season(db, season), week=week)
     return {
         "season": data["season"],
         "week": data["week"],
@@ -218,7 +231,7 @@ def get_league_power_rankings(
 ) -> Dict[str, Any]:
     limit = max(1, min(int(limit or 12), 12))
     data = league_data.get_power_rankings(
-        db, season=season, week=week, algorithm=algorithm
+        db, season=_chat_season(db, season), week=week, algorithm=algorithm
     )
     return {
         "season": data["season"],
@@ -243,7 +256,7 @@ def get_league_team(
     season: Optional[int] = None,
 ) -> Dict[str, Any]:
     """Team record, recent results and a compact roster preview."""
-    detail = league_data.get_team_detail(db, season, int(team_id))
+    detail = league_data.get_team_detail(db, _chat_season(db, season), int(team_id))
     roster = league_data.get_team_roster(db, detail["season"], int(team_id))
     return {
         "season": detail["season"],

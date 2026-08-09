@@ -139,6 +139,23 @@ def resolve_default_season(db: Session) -> Dict[str, Any]:
     return {"season": newest.season, "mode": "preseason"}
 
 
+def resolve_played_season(db: Session) -> Optional[int]:
+    """Newest readable season that has actually been played.
+
+    The hub deliberately lands on the current season even in the preseason,
+    because drafted rosters are worth looking at. Chat has the opposite need:
+    "what are the power rankings?" during the preseason should answer from the
+    most recent season that has any, not report that none exist while several
+    thousand rows sit in the table for last year.
+    """
+    for row in _season_rows(db):
+        if row.status != "ok":
+            continue
+        if _completed_matchup_count(db, row.season) > 0:
+            return row.season
+    return None
+
+
 def _require_season(db: Session, season: Optional[int]) -> int:
     if season is None:
         resolved = resolve_default_season(db)["season"]
@@ -642,16 +659,28 @@ def get_team_roster(
 
     actuals_by_player: Dict[str, List[Dict[str, Any]]] = {}
     if player_ids:
-        stat_rows = (
-            db.query(FantasyPlayerStat)
-            .filter(FantasyPlayerStat.player_id.in_(player_ids))
-            .order_by(
-                FantasyPlayerStat.player_id,
-                FantasyPlayerStat.season.desc(),
-                FantasyPlayerStat.week.desc(),
-            )
-            .all()
+        # Only the newest few weeks per player are shown, so bound the scan by
+        # season instead of pulling every stat line ever recorded and throwing
+        # most of them away in Python. Two seasons covers "last 3 games" even
+        # across an offseason boundary.
+        newest_stat_season = (
+            db.query(FantasyPlayerStat.season)
+            .order_by(FantasyPlayerStat.season.desc())
+            .limit(1)
+            .scalar()
         )
+        stat_query = db.query(FantasyPlayerStat).filter(
+            FantasyPlayerStat.player_id.in_(player_ids)
+        )
+        if newest_stat_season is not None:
+            stat_query = stat_query.filter(
+                FantasyPlayerStat.season >= newest_stat_season - 1
+            )
+        stat_rows = stat_query.order_by(
+            FantasyPlayerStat.player_id,
+            FantasyPlayerStat.season.desc(),
+            FantasyPlayerStat.week.desc(),
+        ).all()
         for stat in stat_rows:
             recent = actuals_by_player.setdefault(stat.player_id, [])
             if len(recent) < 3:

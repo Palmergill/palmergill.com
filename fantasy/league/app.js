@@ -566,10 +566,29 @@
     }
 
     function renderTeamOverview(payload) {
+        // "missing" means nothing has been written for this team/week yet.
+        // Generating costs a model call, so it stays an explicit choice
+        // rather than something a page view triggers.
+        if (payload.status === "missing") {
+            els.teamOverviewBody.replaceChildren(
+                el("p", "empty-note", "No overview written for this team yet.")
+            );
+            els.teamOverviewMeta.textContent = "";
+            els.teamOverviewRefresh.textContent = "Write overview";
+            return;
+        }
+
         renderMarkdown(els.teamOverviewBody, payload.overview_md || "No overview available.");
         const source = payload.source === "model" ? "Model summary" : "Local summary";
-        const cache = payload.cache_hit ? "cached" : "updated";
-        els.teamOverviewMeta.textContent = `${source} · Week ${payload.week} · ${cache}`;
+        const parts = [source, `Week ${payload.week}`];
+        if (payload.status === "stale") {
+            parts.push("team data has changed");
+        } else if (!payload.cache_hit) {
+            parts.push("updated");
+        }
+        els.teamOverviewMeta.textContent = parts.join(" · ");
+        els.teamOverviewRefresh.textContent =
+            payload.status === "stale" ? "Refresh overview" : "Check for updates";
     }
 
     // ── loading ─────────────────────────────────────────────────────────
@@ -631,22 +650,26 @@
         }
     }
 
-    async function loadTeamOverview(refresh) {
+    // write=false is a plain read and never generates; write=true POSTs and
+    // may spend a model call, so it only ever runs from an explicit click.
+    async function loadTeamOverview(write) {
         const generation = state.generation;
         const params = new URLSearchParams();
         if (state.season) params.set("season", state.season);
         els.teamOverviewRefresh.disabled = true;
-        els.teamOverviewMeta.textContent = refresh ? "Checking for changes…" : "Loading…";
+        els.teamOverviewMeta.textContent = write ? "Writing…" : "Loading…";
         try {
             const payload = await fetchJson(`${API_BASE}/teams/${state.teamId}/overview?${params}`, {
-                method: refresh ? "POST" : "GET",
+                method: write ? "POST" : "GET",
             });
             if (stale(generation)) return;
             renderTeamOverview(payload);
         } catch (error) {
             if (!stale(generation)) {
                 els.teamOverviewMeta.textContent = "";
-                els.teamOverviewBody.textContent = error.message || "Overview unavailable.";
+                els.teamOverviewBody.replaceChildren(
+                    el("p", "empty-note", error.message || "Overview unavailable.")
+                );
             }
         } finally {
             if (!stale(generation)) els.teamOverviewRefresh.disabled = false;

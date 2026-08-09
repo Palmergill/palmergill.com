@@ -1,7 +1,7 @@
 # Spec 17 — ESPN League Hub
 
 - **Quarter:** Q3 2026 (Jul–Sep)
-- **Status:** draft — P1–P4 implemented; live member-flow verification remains
+- **Status:** in progress — P1–P4 implemented; model-backed overview still needs a live `OPENAI_API_KEY`
 - **Depends on:** Spec 16 (fantasy data, player crosswalk, chat plumbing), site member accounts
 - **Areas:** `fantasy/league/`, `backend/app/services/fantasy_league_*.py`,
   `backend/app/routers/fantasy_league.py`, `backend/app/services/fantasy_ai.py`,
@@ -89,7 +89,11 @@ site's member gate even though its URL lives below the otherwise-public
 - **R11. Team overviews:** Generate Markdown from team facts, results, power
   history, and enriched roster context; cache on `(season, team, week)` plus a
   SHA-256 context digest. Use the existing Responses API path when configured
-  and a deterministic local template otherwise.
+  and a deterministic local template otherwise. Reads (`GET`) never generate —
+  writing there would put a paid model call behind an ordinary page view — so
+  a miss returns `status: "missing"` and the client offers to write one. A
+  stored *local* overview is treated as stale once a model becomes available,
+  so a transient model failure cannot pin the fallback template permanently.
 - **R12. Operational safety:** Collection tests never reach the network; the
   auth prefix lists in FastAPI and Vercel middleware stay synchronized; season
   is accepted and echoed by manual league refreshes.
@@ -122,6 +126,13 @@ ask the model to call a tool it never received. Team overviews reuse
 `_openai_response`, `_extract_output_text`, `OpenAIModelError`, and
 `DEFAULT_MODEL` with an empty tool list. Canonical context JSON—not elapsed
 time—drives invalidation.
+
+The topic guard also matches league team and owner names, but only for a
+member turn: gating it on `league_access` stops an anonymous caller using the
+refusal boundary as an oracle for whether a string names one of the teams.
+League chat tools default to the newest *played* season rather than the hub's
+landing season, so a preseason question about power rankings answers from last
+year instead of reporting that none exist.
 
 ### Ranking prior art and corrected defects
 
@@ -171,7 +182,7 @@ and weights but fixed five defects, each locked by a regression test:
 - [x] Team overviews work without an OpenAI key and reuse the digest cache when
       factual context is unchanged.
 - [ ] Model-backed overview is verified live with an `OPENAI_API_KEY`.
-- [ ] Signed-out/member desktop and mobile preview checklist is complete with
+- [x] Signed-out/member desktop and mobile preview checklist is complete with
       no console errors or page-level horizontal scroll.
 - [x] Full pytest and Jest suites are green after final implementation.
 

@@ -19,7 +19,13 @@ import urllib.request
 from collections import OrderedDict
 from typing import Any, Dict, List, Optional
 
-from app.database import FantasyLeagueTeamOverview, FantasyPlayer, SessionLocal, utc_now
+from app.database import (
+    FantasyLeagueTeam,
+    FantasyLeagueTeamOverview,
+    FantasyPlayer,
+    SessionLocal,
+    utc_now,
+)
 from app.services import fantasy_league_data, fantasy_tools
 from app.services.fantasy_common import normalize_name
 
@@ -268,7 +274,7 @@ def answer_chat(message: str, session_id: str | None = None, timezone_name: str 
     session_id = session_id or str(uuid.uuid4())
     db = SessionLocal()
     try:
-        if not _is_fantasy_related(db, message):
+        if not _is_fantasy_related(db, message, league_access=league_access):
             return _response(OUT_OF_SCOPE_ANSWER, session_id, [], {}, [])
         if os.getenv("OPENAI_API_KEY"):
             try:
@@ -289,7 +295,7 @@ def answer_demo_chat(message: str, session_id: str | None = None, timezone_name:
     session_id = session_id or str(uuid.uuid4())
     db = SessionLocal()
     try:
-        if not _is_fantasy_related(db, message):
+        if not _is_fantasy_related(db, message, league_access=False):
             return _response(OUT_OF_SCOPE_ANSWER, session_id, [], {}, [DEMO_WARNING])
         response = _answer_with_local_router(db, message, session_id, league_access=False)
         response["warnings"] = _unique([DEMO_WARNING] + response.get("warnings", []))
@@ -432,6 +438,15 @@ def _answer_with_local_router(
         return _response(
             _league_team_answer(data), session_id, ["get_league_team"], data, []
         )
+
+    # Managers name their team, not its id: "How is 4th and 20 doing?".
+    if league_access:
+        named_team = _first_league_team_match(db, message)
+        if named_team is not None:
+            data = fantasy_tools.get_league_team(db, named_team.espn_team_id)
+            return _response(
+                _league_team_answer(data), session_id, ["get_league_team"], data, []
+            )
 
     if any(t in normalized for t in ("trending", "waiver", "most added", "most dropped", "pick up", "pickup")):
         kind = "drop" if ("drop" in normalized and "add" not in normalized) else "add"
@@ -767,24 +782,79 @@ def _team_overview_payload(
     }
 
 
+def _overview_row(db, season: int, team_id: int, week: int):
+    return (
+        db.query(FantasyLeagueTeamOverview)
+        .filter(
+            FantasyLeagueTeamOverview.season == season,
+            FantasyLeagueTeamOverview.espn_team_id == team_id,
+            FantasyLeagueTeamOverview.week == week,
+        )
+        .first()
+    )
+
+
+def _overview_digest(context: Dict[str, Any]) -> tuple[str, str]:
+    """Return (canonical JSON, sha256) — the JSON doubles as the model input."""
+    canonical = json.dumps(context, sort_keys=True, separators=(",", ":"), default=str)
+    return canonical, hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def _is_fresh(row, digest: str) -> bool:
+    """Whether a stored overview can be served without regenerating.
+
+    A stored *local* overview is only fresh while there is no model to do
+    better. Without this, one transient model failure would pin the fallback
+    template forever: it gets written with the current digest, so every later
+    read is a cache hit and only an explicit force would ever retry.
+    """
+    if row is None or row.prompt_digest != digest:
+        return False
+    if row.source == "local" and os.getenv("OPENAI_API_KEY"):
+        return False
+    return True
+
+
+def read_team_overview(
+    db, season: int, team_id: int, week: Optional[int]
+) -> Dict[str, Any]:
+    """Return a stored overview, or a `missing` placeholder. Never generates.
+
+    Reads must stay free and fast: generating here would put a paid model call
+    and a database write behind an ordinary page load.
+    """
+    context = _team_overview_context(db, season, team_id, week)
+    _, digest = _overview_digest(context)
+    row = _overview_row(db, context["season"], team_id, context["week"])
+    if row is None:
+        return {
+            "season": context["season"],
+            "espn_team_id": team_id,
+            "week": context["week"],
+            "overview_md": None,
+            "model": None,
+            "source": None,
+            "generated_at": None,
+            "cache_hit": False,
+            "status": "missing",
+            "warnings": [],
+        }
+    payload = _team_overview_payload(row, cache_hit=True)
+    payload["status"] = "current" if _is_fresh(row, digest) else "stale"
+    return payload
+
+
 def generate_team_overview(
     db, season: int, team_id: int, week: Optional[int], force: bool = False
 ) -> Dict[str, Any]:
     """Generate or reuse a team overview keyed by its factual context."""
     context = _team_overview_context(db, season, team_id, week)
-    canonical = json.dumps(context, sort_keys=True, separators=(",", ":"), default=str)
-    digest = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
-    row = (
-        db.query(FantasyLeagueTeamOverview)
-        .filter(
-            FantasyLeagueTeamOverview.season == context["season"],
-            FantasyLeagueTeamOverview.espn_team_id == team_id,
-            FantasyLeagueTeamOverview.week == context["week"],
-        )
-        .first()
-    )
-    if row is not None and row.prompt_digest == digest and not force:
-        return _team_overview_payload(row, cache_hit=True)
+    canonical, digest = _overview_digest(context)
+    row = _overview_row(db, context["season"], team_id, context["week"])
+    if _is_fresh(row, digest) and not force:
+        payload = _team_overview_payload(row, cache_hit=True)
+        payload["status"] = "current"
+        return payload
 
     warnings: List[str] = []
     source = "local"
@@ -820,13 +890,15 @@ def generate_team_overview(
     row.generated_at = utc_now()
     db.commit()
     db.refresh(row)
-    return _team_overview_payload(row, cache_hit=False, warnings=warnings)
+    payload = _team_overview_payload(row, cache_hit=False, warnings=warnings)
+    payload["status"] = "current"
+    return payload
 
 
 # ── topic guard ─────────────────────────────────────────────────────────
 
 
-def _is_fantasy_related(db, message: str) -> bool:
+def _is_fantasy_related(db, message: str, league_access: bool = False) -> bool:
     normalized = message.strip().lower()
     if any(term in normalized for term in FANTASY_TOPIC_TERMS):
         return True
@@ -834,6 +906,12 @@ def _is_fantasy_related(db, message: str) -> bool:
     if any(term in tokens for term in POSITION_TERMS):
         return True
     if _first_player_match(db, message) is not None:
+        return True
+    # Only for signed-in members: "How is 4th and 20 doing?" is the most
+    # natural way to ask about your own team, and it matches no NFL player or
+    # topic term. Gated on league_access so an anonymous caller can never use
+    # the guard to probe whether a string is one of the league's team names.
+    if league_access and _first_league_team_match(db, message) is not None:
         return True
     if any(term in normalized for term in OUT_OF_SCOPE_TERMS):
         return False
@@ -870,6 +948,44 @@ def _first_player_match(db, message: str) -> Optional[FantasyPlayer]:
         .filter(FantasyPlayer.search_name.in_(list(candidates)))
         .first()
     )
+
+
+# League team names are arbitrary phrases ("4th and 20", "Password is Taco"),
+# not capitalized personal names, so the player matcher's candidate-slice
+# approach does not apply. Substring matching over a ten-team list is cheap
+# and catches the natural phrasings.
+_LEAGUE_NAME_MIN_LENGTH = 4
+
+
+def _flatten(text: str) -> str:
+    return re.sub(r"[^a-z0-9]+", " ", str(text or "").lower()).strip()
+
+
+def _first_league_team_match(db, message: str) -> Optional[FantasyLeagueTeam]:
+    """Return the league team whose name or owner appears in the message.
+
+    Callers must already have confirmed league access — see the note in
+    _is_fantasy_related. Prefers the newest season so a team that has since
+    been renamed still resolves to its current row.
+    """
+    haystack = f" {_flatten(message)} "
+    if not haystack.strip():
+        return None
+    rows = (
+        db.query(FantasyLeagueTeam)
+        .order_by(FantasyLeagueTeam.season.desc())
+        .all()
+    )
+    for row in rows:
+        for candidate in (row.name, row.owner_name):
+            flat = _flatten(candidate)
+            # Short names would match half the dictionary; require a little
+            # substance before treating a hit as intentional.
+            if len(flat) < _LEAGUE_NAME_MIN_LENGTH:
+                continue
+            if f" {flat} " in haystack:
+                return row
+    return None
 
 
 # ── shared plumbing (mirrors bitcoin_ai) ────────────────────────────────

@@ -17,10 +17,11 @@ from typing import Any, Dict, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
 
-from app.database import get_db
+from app.database import SessionLocal, get_db
 from app.services import fantasy_ai, fantasy_league_data
 from app.services.fantasy_league_data import UnknownSeasonError, UnknownTeamError
 from app.services.fantasy_league_rankings import ALGORITHMS
+from app.routers.fantasy import run_blocking
 
 router = APIRouter(prefix="/api/fantasy/league", tags=["fantasy-league"])
 
@@ -131,14 +132,9 @@ def team_roster(
         raise HTTPException(status_code=404, detail=str(exc))
 
 
-def _team_overview(
-    db: Session, season: Optional[int], team_id: int, week: Optional[int], force: bool
-) -> Dict[str, Any]:
+def _resolved_season(db: Session, season: Optional[int], team_id: int) -> int:
     try:
-        detail = fantasy_league_data.get_team_detail(db, season, team_id)
-        return fantasy_ai.generate_team_overview(
-            db, detail["season"], team_id, week, force=force
-        )
+        return fantasy_league_data.get_team_detail(db, season, team_id)["season"]
     except UnknownSeasonError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
     except UnknownTeamError as exc:
@@ -153,11 +149,18 @@ def team_overview(
     _: Dict[str, Any] = Depends(require_member),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
-    return _team_overview(db, season, team_id, week, force=False)
+    """Read a stored overview. Never generates.
+
+    Writing here would put a paid model call and a database write behind an
+    ordinary page load — every first visit to a team page would bill. A miss
+    returns status "missing" and the client offers to generate.
+    """
+    resolved = _resolved_season(db, season, team_id)
+    return fantasy_ai.read_team_overview(db, resolved, team_id, week)
 
 
-@router.post("/teams/{team_id}/overview")
-def regenerate_team_overview(
+@router.post("/teams/{team_id}/overview", status_code=201)
+async def regenerate_team_overview(
     team_id: int,
     season: Optional[int] = None,
     week: Optional[int] = None,
@@ -165,4 +168,23 @@ def regenerate_team_overview(
     _: Dict[str, Any] = Depends(require_member),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
-    return _team_overview(db, season, team_id, week, force=force)
+    """Generate an overview (or reuse an unchanged one).
+
+    The model call is blocking, so it runs off the event loop like the other
+    model-backed endpoints.
+    """
+    resolved = _resolved_season(db, season, team_id)
+
+    def _generate() -> Dict[str, Any]:
+        # Own session: the request-scoped one belongs to the event loop, and
+        # SQLAlchemy sessions are not safe to hand to another thread. Mirrors
+        # how admin_refresh runs its collector work.
+        worker = SessionLocal()
+        try:
+            return fantasy_ai.generate_team_overview(
+                worker, resolved, team_id, week, force=force
+            )
+        finally:
+            worker.close()
+
+    return await run_blocking(_generate)

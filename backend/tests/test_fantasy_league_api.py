@@ -319,30 +319,86 @@ def test_team_roster_joins_dashboard_player_data(seeded_db):
     assert body["player_data"]["season"] == 2026
 
 
-def test_team_overview_uses_digest_cache_without_an_api_key(seeded_db, monkeypatch):
-    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
-    route = "/api/fantasy/league/teams/1/overview?season=2024&week=2"
-    first = member_client().get(route).json()
-    second = member_client().get(route).json()
+OVERVIEW_ROUTE = "/api/fantasy/league/teams/1/overview?season=2024&week=2"
 
-    assert first["source"] == "local"
-    assert first["cache_hit"] is False
-    assert second["cache_hit"] is True
-    assert second["overview_md"] == first["overview_md"]
+
+def test_reading_an_overview_never_generates_one(seeded_db, monkeypatch):
+    """A GET must not write or spend.
+
+    Regression: GET used to call the generator, so simply opening a team page
+    billed a model call and inserted a row. Browsing every team across every
+    season would have generated dozens of overviews nobody asked for.
+    """
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    body = member_client().get(OVERVIEW_ROUTE).json()
+
+    assert body["status"] == "missing"
+    assert body["overview_md"] is None
+    assert seeded_db.query(FantasyLeagueTeamOverview).count() == 0
+
+    # Repeated reads stay free.
+    member_client().get(OVERVIEW_ROUTE)
+    assert seeded_db.query(FantasyLeagueTeamOverview).count() == 0
+
+
+def test_writing_an_overview_requires_a_post(seeded_db, monkeypatch):
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    written = member_client().post(OVERVIEW_ROUTE).json()
+
+    assert written["source"] == "local"
+    assert written["status"] == "current"
+    assert written["overview_md"]
     assert seeded_db.query(FantasyLeagueTeamOverview).count() == 1
 
+    read_back = member_client().get(OVERVIEW_ROUTE).json()
+    assert read_back["status"] == "current"
+    assert read_back["cache_hit"] is True
+    assert read_back["overview_md"] == written["overview_md"]
 
-def test_team_overview_digest_changes_with_team_data(seeded_db, monkeypatch):
+
+def test_overview_goes_stale_when_team_data_changes(seeded_db, monkeypatch):
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
-    route = "/api/fantasy/league/teams/1/overview?season=2024&week=2"
-    member_client().get(route)
+    member_client().post(OVERVIEW_ROUTE)
     team = seeded_db.query(FantasyLeagueTeam).filter_by(season=2024, espn_team_id=1).one()
     team.points_for += 5
     seeded_db.commit()
 
-    refreshed = member_client().get(route).json()
+    # The read reports staleness rather than silently regenerating.
+    assert member_client().get(OVERVIEW_ROUTE).json()["status"] == "stale"
+
+    refreshed = member_client().post(OVERVIEW_ROUTE).json()
     assert refreshed["cache_hit"] is False
     assert seeded_db.query(FantasyLeagueTeamOverview).count() == 1
+
+
+def test_a_local_fallback_is_replaced_once_a_model_is_available(seeded_db, monkeypatch):
+    """Regression: a transient model failure used to pin the local template.
+
+    The fallback was stored with the current digest, so every later read was a
+    cache hit and the UI's non-forcing refresh button could never recover it.
+    """
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    first = member_client().post(OVERVIEW_ROUTE).json()
+    assert first["source"] == "local"
+
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    monkeypatch.setattr(
+        fantasy_ai,
+        "_openai_response",
+        lambda *a, **k: {"output_text": "**Model overview.**"},
+    )
+
+    # A plain read still does not generate, but it does report the staleness.
+    assert member_client().get(OVERVIEW_ROUTE).json()["status"] == "stale"
+
+    # And a non-forcing refresh now upgrades it.
+    upgraded = member_client().post(OVERVIEW_ROUTE).json()
+    assert upgraded["source"] == "model"
+    assert upgraded["overview_md"] == "**Model overview.**"
+
+    # A model-written overview is a genuine cache hit; it is not rewritten.
+    assert member_client().get(OVERVIEW_ROUTE).json()["status"] == "current"
+    assert member_client().post(OVERVIEW_ROUTE).json()["cache_hit"] is True
 
 
 def test_team_overview_reuses_model_plumbing_without_tools(seeded_db, monkeypatch):
@@ -445,3 +501,77 @@ def test_private_season_is_404_not_empty(seeded_db):
     assert (
         member_client().get("/api/fantasy/league/standings?season=2025").status_code == 404
     )
+
+
+# ── topic guard and chat season defaults ────────────────────────────────
+
+
+def test_members_may_ask_about_a_team_by_name(seeded_db, monkeypatch):
+    """Regression: "How is 4th and 20 doing?" was refused as off-topic.
+
+    The guard matched topic terms, positions and NFL player names — a league
+    team name matched none of those, so the most natural question a manager
+    asks about their own team never reached the model or the router.
+    """
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+
+    refused = fantasy_ai.answer_demo_chat("How is 4th and 20 doing?")
+    assert refused["answer"] == fantasy_ai.OUT_OF_SCOPE_ANSWER
+
+    allowed = fantasy_ai.answer_chat("How is 4th and 20 doing?", league_access=True)
+    assert allowed["answer"] != fantasy_ai.OUT_OF_SCOPE_ANSWER
+    # ...and it actually answers about that team rather than falling through
+    # to the generic "here is what I can do" reply.
+    assert allowed["tools_used"] == ["get_league_team"]
+    assert "4th and 20" in allowed["answer"]
+
+    by_owner = fantasy_ai.answer_chat("how did Palmer Gill do", league_access=True)
+    assert by_owner["tools_used"] == ["get_league_team"]
+
+
+def test_team_name_matching_is_gated_on_league_access(seeded_db):
+    """Anonymous callers must not be able to use the guard as an oracle for
+    whether a given string is one of the league's team names."""
+    matched = fantasy_ai._first_league_team_match(seeded_db, "How is 4th and 20 doing?")
+    assert matched is not None and matched.espn_team_id == 1
+
+    db_session = seeded_db
+    assert (
+        fantasy_ai._is_fantasy_related(db_session, "How is 4th and 20 doing?", league_access=False)
+        is False
+    )
+    assert (
+        fantasy_ai._is_fantasy_related(db_session, "How is 4th and 20 doing?", league_access=True)
+        is True
+    )
+
+
+def test_team_name_matching_ignores_incidental_short_words(seeded_db):
+    assert fantasy_ai._first_league_team_match(seeded_db, "what is the weather") is None
+    assert fantasy_ai._first_league_team_match(seeded_db, "") is None
+
+
+def test_chat_falls_back_to_the_last_played_season(seeded_db, monkeypatch):
+    """Regression: during the preseason the league tools defaulted to the
+    current season and reported "not collected yet" while a full set of
+    rankings sat in the table for the previous season."""
+    client = FakeEspnLeagueClient()
+    # 2026 exists but has no completed games — the hub's default landing spot.
+    lc.collect_league_sync(seeded_db, 2026, client)
+    seeded_db.query(FantasyLeagueMatchup).filter_by(season=2026).update(
+        {"is_complete": False, "winner": "UNDECIDED"}
+    )
+    seeded_db.commit()
+
+    from app.services import fantasy_league_data as ld
+
+    assert ld.resolve_default_season(seeded_db)["season"] == 2026
+    assert ld.resolve_default_season(seeded_db)["mode"] == "preseason"
+    # Chat prefers the season that actually has results.
+    assert ld.resolve_played_season(seeded_db) == 2024
+
+    from app.services import fantasy_tools
+
+    assert fantasy_tools.get_league_power_rankings(seeded_db)["season"] == 2024
+    assert fantasy_tools.get_league_standings(seeded_db)["season"] == 2024
+    assert fantasy_tools.get_league_scoreboard(seeded_db)["season"] == 2024
