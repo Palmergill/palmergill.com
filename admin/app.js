@@ -9,6 +9,7 @@
         dashboardView: document.getElementById('dashboardView'),
         analyticsView: document.getElementById('analyticsView'),
         logsView: document.getElementById('logsView'),
+        membersView: document.getElementById('membersView'),
         status: document.getElementById('status'),
         windowSelect: document.getElementById('windowSelect'),
         refreshBtn: document.getElementById('refreshBtn'),
@@ -55,6 +56,14 @@
         autoRefresh: document.getElementById('autoRefreshToggle'),
         clearBtn: document.getElementById('clearBtn'),
         exportLogsBtn: document.getElementById('exportLogsBtn'),
+        metricMembers: document.getElementById('metricMembers'),
+        metricMembersActive: document.getElementById('metricMembersActive'),
+        metricMembersInactive: document.getElementById('metricMembersInactive'),
+        metricMembersNew: document.getElementById('metricMembersNew'),
+        memberSearch: document.getElementById('memberSearch'),
+        memberStatusFilter: document.getElementById('memberStatusFilter'),
+        memberLimit: document.getElementById('memberLimit'),
+        membersBody: document.getElementById('membersBody'),
     };
 
     let currentView = 'dashboard';
@@ -480,7 +489,6 @@
             await refreshApps();
             const data = await fetchJson(`/api/admin/analytics/events?${params.toString()}`, 'analytics');
             if (!data) return;
-            lastAnalyticsEntries = data.entries || [];
             renderAnalyticsRows(data.entries || []);
             setStatus(`${number(data.entries.length)} of ${number(data.total)} analytics events · updated ${new Date().toLocaleTimeString()}`);
         } catch (error) {
@@ -555,6 +563,69 @@
         `;
     }
 
+    async function refreshMembers() {
+        const params = new URLSearchParams();
+        if (els.memberSearch.value.trim()) params.set('q', els.memberSearch.value.trim());
+        if (els.memberStatusFilter.value) params.set('status', els.memberStatusFilter.value);
+        params.set('limit', els.memberLimit.value || '200');
+
+        try {
+            const data = await fetchJson(`/api/admin/users?${params.toString()}`, 'members');
+            if (!data) return;
+            renderMembers(data);
+            setStatus(`${number(data.accounts.length)} of ${number(data.total)} member accounts · updated ${new Date().toLocaleTimeString()}`);
+        } catch (error) {
+            setStatus(`Failed to load accounts: ${error.message}`, true);
+        }
+    }
+
+    function renderMembers(data) {
+        const accounts = data.accounts || [];
+        const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+        const newThisWeek = accounts.filter((account) => {
+            const created = new Date(account.created_at).getTime();
+            return !Number.isNaN(created) && created >= weekAgo;
+        }).length;
+
+        els.metricMembers.textContent = number(data.total);
+        els.metricMembersActive.textContent = number(data.active);
+        els.metricMembersInactive.textContent = number(data.inactive);
+        els.metricMembersNew.textContent = number(newThisWeek);
+
+        // The env-configured admin is pinned to the top and is never part of
+        // the filtered member rows — it has no row in app_users to filter.
+        const rows = [data.admin ? memberRow(data.admin, true) : ''].concat(
+            accounts.length
+                ? accounts.map((account) => memberRow(account, false))
+                : ['<tr><td colspan="7" class="empty">No member accounts match.</td></tr>']
+        );
+        els.membersBody.innerHTML = rows.join('');
+    }
+
+    function memberRow(account, pinned) {
+        const status = account.is_active ? 'success' : 'error';
+        const statusLabel = account.is_active ? 'active' : 'deactivated';
+        const displayName = account.display_name || account.username;
+        const showsDisplayName = displayName !== account.username;
+        return `
+            <tr${pinned ? ' class="pinned-row"' : ''}>
+                <td class="col-msg">
+                    ${escapeHtml(account.username)}
+                    ${showsDisplayName ? `<small>${escapeHtml(displayName)}</small>` : ''}
+                </td>
+                <td><span class="level-badge role-${escapeHtml(account.role)}">${escapeHtml(account.role)}</span></td>
+                <td>
+                    <span class="level-badge outcome-${status}">${statusLabel}</span>
+                    ${account.source === 'env' ? '<small>env config</small>' : ''}
+                </td>
+                <td class="col-time">${escapeHtml(formatTime(account.created_at) || '--')}</td>
+                <td class="col-time">${escapeHtml(formatTime(account.last_login_at) || 'never')}</td>
+                <td class="col-time">${escapeHtml(formatTime(account.last_seen_at) || '--')}</td>
+                <td>${number(account.events)}</td>
+            </tr>
+        `;
+    }
+
     async function fetchDbLogs() {
         const params = new URLSearchParams();
         if (els.levelFilter.value) params.set('level', els.levelFilter.value);
@@ -565,7 +636,6 @@
         try {
             const data = await fetchJson(`/api/admin/logs?${params.toString()}`, 'dbLogs');
             if (!data) return;
-            lastLogEntries = data.entries || [];
             renderDbLogs(data);
             if (currentView === 'logs' && currentLogTab === 'db') {
                 setStatus(`${number(data.entries.length)} of ${number(data.total)} log entries · updated ${new Date().toLocaleTimeString()}`);
@@ -693,6 +763,7 @@
         if (currentView === 'dashboard') refreshDashboard();
         if (currentView === 'analytics') refreshAnalytics();
         if (currentView === 'logs') refreshLogs();
+        if (currentView === 'members') refreshMembers();
     }
 
     function switchView(view) {
@@ -701,6 +772,7 @@
         els.dashboardView.classList.toggle('hidden', view !== 'dashboard');
         els.analyticsView.classList.toggle('hidden', view !== 'analytics');
         els.logsView.classList.toggle('hidden', view !== 'logs');
+        els.membersView.classList.toggle('hidden', view !== 'members');
         refreshCurrent();
         setupAutoRefresh();
     }
@@ -773,6 +845,10 @@
         el.addEventListener('change', refreshAnalytics);
     });
     els.analyticsSearch.addEventListener('input', debounce(refreshAnalytics, 250));
+    [els.memberStatusFilter, els.memberLimit].forEach((el) => {
+        el.addEventListener('change', refreshMembers);
+    });
+    els.memberSearch.addEventListener('input', debounce(refreshMembers, 250));
     els.exportAnalyticsBtn.addEventListener('click', () => {
         window.location.assign(`/api/admin/analytics/export?${analyticsParams().toString()}`);
     });

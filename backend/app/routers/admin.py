@@ -20,7 +20,8 @@ from pydantic import BaseModel, ConfigDict
 from sqlalchemy.orm import Session
 from sqlalchemy import case, desc, func, or_
 
-from app.database import AnalyticsEvent, LogEntry, get_db, is_postgres, utc_now
+from app.accounts import ROLE_ADMIN, ROLE_MEMBER, admin_username, normalize_username
+from app.database import AnalyticsEvent, AppUser, LogEntry, get_db, is_postgres, utc_now
 from app.routers.analytics import RETENTION_DAYS, cleanup_old_analytics, classify_outcome
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
@@ -91,6 +92,28 @@ class AnalyticsEventOut(BaseModel):
 class AnalyticsEventsResponse(BaseModel):
     entries: List[AnalyticsEventOut]
     total: int
+
+
+class AccountOut(BaseModel):
+    # id/created_at are None for the env-configured admin, which has no row.
+    id: Optional[int] = None
+    username: str
+    display_name: str
+    role: str
+    source: str
+    is_active: bool = True
+    created_at: Optional[str] = None
+    last_login_at: Optional[str] = None
+    last_seen_at: Optional[str] = None
+    events: int = 0
+
+
+class AccountsResponse(BaseModel):
+    accounts: List[AccountOut]
+    admin: AccountOut
+    total: int
+    active: int
+    inactive: int
 
 
 class RetentionResponse(BaseModel):
@@ -730,6 +753,93 @@ def analytics_apps(
 def prune_analytics(db: Session = Depends(get_db)):
     deleted = cleanup_old_analytics(db)
     return {"deleted": deleted, "retention_days": RETENTION_DAYS}
+
+
+def _account_activity(db: Session) -> dict[str, tuple]:
+    """Map lowercased username -> (last_seen, event_count) over retained analytics.
+
+    Analytics rows carry the *display* name from the session token while
+    `app_users.username` is the normalized (casefolded) one, so both sides are
+    lowercased to join. lower() gives up the index on `username`, but this is
+    one grouped query returning one row per signed-in identity rather than a
+    per-account query in a loop.
+    """
+    name = func.lower(AnalyticsEvent.username)
+    rows = (
+        db.query(name, func.max(AnalyticsEvent.timestamp), func.count())
+        .filter(AnalyticsEvent.username.isnot(None), AnalyticsEvent.username != "")
+        .group_by(name)
+        .all()
+    )
+    return {key: (last_seen, count) for key, last_seen, count in rows}
+
+
+@router.get("/users", response_model=AccountsResponse)
+def list_users(
+    q: Optional[str] = Query(None, description="Substring search over username / display name"),
+    status: Optional[str] = Query(None, description="Filter by status: active/inactive"),
+    limit: int = Query(200, ge=1, le=1000),
+    db: Session = Depends(get_db),
+):
+    """List member accounts, newest signup first.
+
+    Password hashes are never included. The admin identity is returned
+    separately because it lives in APP_AUTH_* env vars, not in `app_users`.
+    """
+    query = db.query(AppUser)
+    if q:
+        like = f"%{q.strip()}%"
+        query = query.filter(or_(AppUser.username.ilike(like), AppUser.display_name.ilike(like)))
+    if status == "active":
+        query = query.filter(AppUser.is_active.is_(True))
+    elif status == "inactive":
+        query = query.filter(AppUser.is_active.is_(False))
+
+    total = query.count()
+    active = query.filter(AppUser.is_active.is_(True)).count()
+    rows = query.order_by(desc(AppUser.created_at), desc(AppUser.id)).limit(limit).all()
+
+    activity = _account_activity(db)
+
+    def account_out(username: str, **fields) -> AccountOut:
+        last_seen, events = activity.get(username.lower(), (None, 0))
+        return AccountOut(
+            username=username,
+            last_seen_at=_iso(last_seen) or None,
+            events=events,
+            **fields,
+        )
+
+    accounts = [
+        account_out(
+            row.username,
+            id=row.id,
+            display_name=row.display_name or row.username,
+            role=ROLE_MEMBER,
+            source="database",
+            is_active=bool(row.is_active),
+            created_at=_iso(row.created_at) or None,
+            last_login_at=_iso(row.last_login_at) or None,
+        )
+        for row in rows
+    ]
+
+    configured_admin = admin_username()
+    admin = account_out(
+        normalize_username(configured_admin) or configured_admin,
+        display_name=configured_admin,
+        role=ROLE_ADMIN,
+        source="env",
+        is_active=True,
+    )
+
+    return AccountsResponse(
+        accounts=accounts,
+        admin=admin,
+        total=total,
+        active=active,
+        inactive=total - active,
+    )
 
 
 @router.get("/retention", response_model=RetentionResponse)

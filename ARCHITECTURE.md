@@ -58,7 +58,7 @@ Important routes:
 - `/api/fantasy/*` (public fantasy reads plus account-gated persistent draft rooms)
 - `/api/fantasy/league/*` (members-only ESPN league reads and digest-cached team overviews; 403 for anonymous callers)
 - `/api/analytics/*` (public client analytics ingest)
-- `/api/admin/*`
+- `/api/admin/*` (logs, analytics aggregates, retention, and `GET /api/admin/users` — the member account roster)
 - `/health`
 - `/docs` - protected FastAPI docs when accessing the backend service directly
 

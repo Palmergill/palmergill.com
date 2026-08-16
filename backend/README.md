@@ -62,6 +62,6 @@ Poker, craps, craps strategy, blackjack, High Card Flush, login, `/api/poker/*`,
 - `/api/craps/*` - public craps strategy translation API.
 - `/api/bitcoin/*` - Bitcoin provider status, block/transaction/mempool lookups, and chat.
 - `/api/analytics/*` - public client analytics ingest (`POST /api/analytics/events`).
-- `/api/admin/*` - protected structured log and file-tail endpoints, including the analytics summary surfaced in the admin dashboard.
+- `/api/admin/*` - protected structured log and file-tail endpoints, including the analytics summary surfaced in the admin dashboard and `GET /api/admin/users`, the member account roster behind the console's Members tab.
 
 The root deployment runs this shared backend. Poker is served by `app/routers/poker.py` plus the shared game and AI modules.

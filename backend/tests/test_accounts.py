@@ -5,7 +5,7 @@ from fastapi.testclient import TestClient
 
 from app import accounts
 from app.accounts import AccountError, ROLE_ADMIN, ROLE_MEMBER
-from app.database import AppUser, Base, SessionLocal, engine
+from app.database import AnalyticsEvent, AppUser, Base, SessionLocal, engine
 from app.main import (
     SESSION_COOKIE_NAME,
     _auth_failure_store,
@@ -24,6 +24,9 @@ def setup_function():
     db = SessionLocal()
     try:
         db.query(AppUser).delete()
+        # Analytics rows carry usernames; a leftover row from another test
+        # would show up as activity on a freshly created account.
+        db.query(AnalyticsEvent).delete()
         db.commit()
     finally:
         db.close()
@@ -408,6 +411,93 @@ def test_check_invite_code_rejects_non_ascii_without_crashing(monkeypatch):
     for wrong in ["café☕", "пароль", "🎲🎲🎲"]:
         with pytest.raises(AccountError):
             accounts.check_invite_code(wrong)
+
+
+# --- the admin accounts list ------------------------------------------------
+
+
+def test_admin_users_list_shows_members_without_password_hashes(configured):
+    signup(configured, username="taylor", password="a-good-password")
+    signup(TestClient(app), username="jordan", password="another-good-password")
+
+    response = admin_client().get("/api/admin/users")
+    body = response.json()
+
+    assert [account["username"] for account in body["accounts"]] == ["jordan", "taylor"]
+    assert body["total"] == 2
+    assert body["active"] == 2
+    assert body["inactive"] == 0
+    assert "password" not in response.text
+
+
+def test_admin_users_list_reports_the_env_admin_separately(configured):
+    signup(configured)
+
+    body = admin_client().get("/api/admin/users").json()
+
+    assert body["admin"]["username"] == ADMIN_USERNAME
+    assert body["admin"]["role"] == ROLE_ADMIN
+    assert body["admin"]["source"] == "env"
+    assert body["admin"]["id"] is None
+    # The admin is not a row in app_users, so it must not inflate the counts.
+    assert body["total"] == 1
+    assert ADMIN_USERNAME not in [account["username"] for account in body["accounts"]]
+
+
+def test_admin_users_list_marks_deactivated_accounts(configured):
+    signup(configured, username="taylor", password="a-good-password")
+
+    db = SessionLocal()
+    try:
+        db.query(AppUser).filter(AppUser.username == "taylor").one().is_active = False
+        db.commit()
+    finally:
+        db.close()
+
+    body = admin_client().get("/api/admin/users").json()
+    assert body["accounts"][0]["is_active"] is False
+    assert body["active"] == 0
+    assert body["inactive"] == 1
+
+    filtered = admin_client().get("/api/admin/users", params={"status": "active"}).json()
+    assert filtered["accounts"] == []
+
+
+def test_admin_users_list_filters_by_search(configured):
+    signup(configured, username="taylor", password="a-good-password")
+    signup(TestClient(app), username="jordan", password="another-good-password")
+
+    body = admin_client().get("/api/admin/users", params={"q": "jord"}).json()
+
+    assert [account["username"] for account in body["accounts"]] == ["jordan"]
+    assert body["total"] == 1
+
+
+def test_admin_users_list_joins_analytics_activity_case_insensitively(configured):
+    """Analytics rows carry the display name ("Taylor") while app_users holds
+    the normalized one ("taylor"); the activity join has to bridge that."""
+    signup(configured, username="Taylor", password="a-good-password")
+
+    db = SessionLocal()
+    try:
+        db.add_all([
+            AnalyticsEvent(event_type="page_view", path="/fantasy", username="Taylor"),
+            AnalyticsEvent(event_type="request", path="/api/fantasy", username="Taylor"),
+        ])
+        db.commit()
+    finally:
+        db.close()
+
+    account = admin_client().get("/api/admin/users").json()["accounts"][0]
+
+    assert account["username"] == "taylor"
+    assert account["display_name"] == "Taylor"
+    assert account["events"] == 2
+    assert account["last_seen_at"]
+
+
+def test_member_session_cannot_list_users(configured, monkeypatch):
+    assert member_client(monkeypatch).get("/api/admin/users").status_code == 403
 
 
 def test_signup_rejects_non_ascii_invite_code(configured):

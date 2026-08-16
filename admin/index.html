@@ -9,7 +9,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/shared/site-nav.css?v=13">
-    <link rel="stylesheet" href="/admin/style.css?v=6">
+    <link rel="stylesheet" href="/admin/style.css?v=7">
 </head>
 <body>
     <div class="container">
@@ -39,6 +39,7 @@
                 <button class="tab-btn active" data-view="dashboard"><span>01</span> Overview</button>
                 <button class="tab-btn" data-view="analytics"><span>02</span> Analytics</button>
                 <button class="tab-btn" data-view="logs"><span>03</span> Logs</button>
+                <button class="tab-btn" data-view="members"><span>04</span> Members</button>
             </nav>
 
             <div id="status" class="status"></div>
@@ -292,12 +293,70 @@
                     <pre id="fileLogsPre" class="file-logs">Loading...</pre>
                 </section>
             </section>
+
+            <section id="membersView" class="view hidden">
+                <div class="metric-grid">
+                    <article class="metric-card">
+                        <span>Member accounts</span>
+                        <strong id="metricMembers">--</strong>
+                    </article>
+                    <article class="metric-card">
+                        <span>Active</span>
+                        <strong id="metricMembersActive">--</strong>
+                    </article>
+                    <article class="metric-card warning">
+                        <span>Deactivated</span>
+                        <strong id="metricMembersInactive">--</strong>
+                    </article>
+                    <article class="metric-card">
+                        <span>New this week</span>
+                        <strong id="metricMembersNew">--</strong>
+                    </article>
+                </div>
+
+                <section class="controls">
+                    <div class="control-group flex-grow">
+                        <label for="memberSearch">Search</label>
+                        <input type="text" id="memberSearch" placeholder="Username or display name">
+                    </div>
+                    <div class="control-group">
+                        <label for="memberStatusFilter">Status</label>
+                        <select id="memberStatusFilter">
+                            <option value="">All</option>
+                            <option value="active">Active</option>
+                            <option value="inactive">Deactivated</option>
+                        </select>
+                    </div>
+                    <div class="control-group">
+                        <label for="memberLimit">Limit</label>
+                        <input type="number" id="memberLimit" value="200" min="1" max="1000">
+                    </div>
+                </section>
+
+                <table class="logs-table">
+                    <thead>
+                        <tr>
+                            <th>Account</th>
+                            <th>Role</th>
+                            <th>Status</th>
+                            <th class="col-time">Created</th>
+                            <th class="col-time">Last login</th>
+                            <th class="col-time">Last seen</th>
+                            <th>Events</th>
+                        </tr>
+                    </thead>
+                    <tbody id="membersBody">
+                        <tr><td colspan="7" class="empty">Loading...</td></tr>
+                    </tbody>
+                </table>
+                <p class="table-note">The admin account is configured through <code>APP_AUTH_USERNAME</code> / <code>APP_AUTH_PASSWORD</code>, not stored in the members table. &ldquo;Last seen&rdquo; and event counts come from retained analytics, so they only reach back as far as the retention window.</p>
+            </section>
         </main>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" integrity="sha384-9nhczxUqK87bcKHh20fSQcTGD4qq5GhayNYSYWqwBkINBhOfQLg/P5HG5lF1urn4" crossorigin="anonymous"></script>
     <script src="/shared/site-nav.js?v=14"></script>
     <script src="/shared/analytics.js?v=1"></script>
-    <script src="/admin/app.js?v=3"></script>
+    <script src="/admin/app.js?v=4"></script>
 </body>
 </html>

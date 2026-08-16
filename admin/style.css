@@ -711,6 +711,26 @@ main {
 .outcome-success { background: #ddefe3; color: #286144; }
 .outcome-warning { background: #f8ecd3; color: #835c13; }
 .outcome-error { background: #f9dfd9; color: #91392d; }
+.role-admin { background: #e6ded1; color: #6c5427; }
+.role-member { background: #dce7fb; color: #2c55a0; }
+
+/* The env-configured admin, pinned above the member rows. */
+.pinned-row td {
+    background: var(--ops-paper);
+    font-weight: 600;
+}
+
+.table-note {
+    margin: 12px 2px 0;
+    color: var(--ops-muted);
+    font-size: 0.76rem;
+    line-height: 1.6;
+}
+
+.table-note code {
+    font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
+    font-size: 0.72rem;
+}
 
 .empty {
     padding: 28px !important;
