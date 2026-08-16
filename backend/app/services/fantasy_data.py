@@ -19,6 +19,7 @@ from app.database import (
     FantasyProjection,
     FantasyPropSnapshot,
     FantasyRanking,
+    FantasySeasonPropSnapshot,
     FantasyTrendingSnapshot,
 )
 from app.services.fantasy_collector import (
@@ -52,6 +53,16 @@ TRACKED_JOBS = (
     "odds_lines",
     "odds_props",
     "odds_futures",
+    "season_props",
+)
+
+SEASON_PROP_MARKETS = (
+    ("season_pass_yds", "Passing yards"),
+    ("season_rush_yds", "Rushing yards"),
+    ("season_rec_yds", "Receiving yards"),
+    ("season_pass_tds", "Passing touchdowns"),
+    ("season_rush_tds", "Rushing touchdowns"),
+    ("season_rec_tds", "Receiving touchdowns"),
 )
 
 
@@ -1021,6 +1032,111 @@ def _player_props(db, player_id: str) -> list:
         }
         for entry in reduced.values()
     ]
+
+
+def _implied_probability(american: Optional[int]) -> Optional[float]:
+    """American odds -> break-even win probability (vig included)."""
+    if american is None or american == 0:
+        return None
+    if american > 0:
+        return 100 / (american + 100)
+    return -american / (-american + 100)
+
+
+def _season_market_summary(rows, market: str, label: str) -> Dict[str, Any]:
+    market_rows = [row for row in rows if row.market == market and row.point is not None]
+    if not market_rows:
+        return {
+            "market": market,
+            "label": label,
+            "line": None,
+            "over_price": None,
+            "under_price": None,
+            "books": [],
+        }
+
+    # Sportsbooks can hang nearby numbers. Use the line posted by the most
+    # books as the headline consensus, then line-shop prices only among books
+    # offering that exact total.
+    #
+    # Ties break toward the most balanced price. That matters most for an
+    # exchange ladder, where a single source posts many thresholds for one
+    # player: every threshold has one "book", so without this the headline
+    # falls on whichever strike sits mid-ladder rather than the one the market
+    # actually straddles — quoting Justin Jefferson at 1499.5 receiving yards
+    # (+426) instead of the near-even number just below it. A median tie-break
+    # still settles anything the price cannot.
+    by_point: Dict[float, set] = {}
+    imbalance: Dict[float, float] = {}
+    for row in market_rows:
+        by_point.setdefault(row.point, set()).add(row.bookmaker)
+        if row.outcome == "Over":
+            implied = _implied_probability(row.price)
+            if implied is not None:
+                distance = abs(implied - 0.5)
+                if distance < imbalance.get(row.point, 1.0):
+                    imbalance[row.point] = distance
+    ordered_points = sorted(by_point)
+    midpoint = ordered_points[len(ordered_points) // 2]
+    point = max(
+        ordered_points,
+        key=lambda value: (
+            len(by_point[value]),
+            -imbalance.get(value, 1.0),
+            -abs(value - midpoint),
+        ),
+    )
+    consensus_rows = [row for row in market_rows if row.point == point]
+
+    books: Dict[str, Dict[str, Any]] = {}
+    for row in consensus_rows:
+        entry = books.setdefault(row.bookmaker, {"bookmaker": row.bookmaker, "over_price": None, "under_price": None})
+        if row.outcome == "Over":
+            entry["over_price"] = row.price
+        elif row.outcome == "Under":
+            entry["under_price"] = row.price
+    book_list = sorted(books.values(), key=lambda entry: entry["bookmaker"])
+    over_prices = [entry["over_price"] for entry in book_list if entry["over_price"] is not None]
+    under_prices = [entry["under_price"] for entry in book_list if entry["under_price"] is not None]
+    return {
+        "market": market,
+        "label": label,
+        "line": point,
+        "over_price": max(over_prices) if over_prices else None,
+        "under_price": max(under_prices) if under_prices else None,
+        "books": book_list,
+    }
+
+
+def get_player_season_props(
+    db: Session, player_id: str, season: Optional[int] = None
+) -> Optional[Dict[str, Any]]:
+    player = db.get(FantasyPlayer, player_id)
+    if player is None:
+        return None
+    if season is None:
+        season = default_context(db)["season"]
+    run = latest_successful_run(db, "season_props", season=season)
+    rows = []
+    if run is not None:
+        rows = (
+            db.query(FantasySeasonPropSnapshot)
+            .filter(
+                FantasySeasonPropSnapshot.run_id == run.id,
+                FantasySeasonPropSnapshot.player_id == player_id,
+            )
+            .all()
+        )
+    return {
+        "season": season,
+        "player": _player_public(player),
+        "as_of": run.finished_at.isoformat() if run and run.finished_at else None,
+        "source": "Kalshi" if run is not None else None,
+        "markets": [
+            _season_market_summary(rows, market, label)
+            for market, label in SEASON_PROP_MARKETS
+        ],
+    }
 
 
 def get_futures(db: Session, market: Optional[str] = None, limit: int = 20) -> Dict[str, Any]:

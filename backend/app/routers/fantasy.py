@@ -156,6 +156,18 @@ async def player_news(player_id: str, db: Session = Depends(get_db)) -> Dict[str
     return news
 
 
+@router.get("/players/{player_id}/season-props")
+def player_season_props(
+    player_id: str,
+    season: Optional[int] = None,
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    result = fantasy_data.get_player_season_props(db, player_id, season=season)
+    if result is None:
+        raise HTTPException(status_code=404, detail="Unknown player")
+    return result
+
+
 @router.get("/trending")
 def trending(
     kind: str = Query("add", pattern="^(add|drop)$"),

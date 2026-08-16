@@ -337,6 +337,26 @@ class FantasyPropSnapshot(Base):
     point = Column(Float, nullable=True)
 
 
+class FantasySeasonPropSnapshot(Base):
+    __tablename__ = "ff_season_prop_snapshots"
+
+    # Regular-season player totals are a different market from the weekly
+    # event props above. Keeping them separate prevents a season line from
+    # being attached to (or hidden behind) a single game's event id.
+    id = Column(Integer, primary_key=True, index=True)
+    run_id = Column(Integer, index=True)
+    fetched_at = Column(DateTime, default=utc_now, index=True)
+    season = Column(Integer, index=True)
+    player_id = Column(String, nullable=True, index=True)
+    player_name_raw = Column(String)
+    provider_player_id = Column(String, nullable=True, index=True)
+    bookmaker = Column(String)
+    market = Column(String, index=True)
+    outcome = Column(String)  # Over|Under
+    price = Column(Integer, nullable=True)  # normalized American odds
+    point = Column(Float, nullable=True)
+
+
 class FantasyFutureSnapshot(Base):
     __tablename__ = "ff_futures_snapshots"
 

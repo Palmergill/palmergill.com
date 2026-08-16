@@ -171,6 +171,116 @@ body {
     box-shadow: var(--focus-ring, 0 0 0 3px rgba(91, 113, 82, 0.24));
 }
 
+/* ── season player lines ─────────────────────────────────────────────── */
+
+.season-props {
+    margin-bottom: 28px;
+    overflow: visible;
+    border: 1px solid #2d4436;
+    border-radius: 18px;
+    background: #17251d;
+    box-shadow: 0 14px 36px rgba(23, 37, 29, 0.12);
+    padding: clamp(20px, 4vw, 28px);
+    color: #fff;
+}
+
+.season-props .eyebrow { color: #b7cbb9; }
+
+.season-props__intro {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 24px;
+}
+
+.season-props h2 { margin: 5px 0 7px; font-size: clamp(1.25rem, 3vw, 1.65rem); }
+.season-props__intro p { max-width: 58ch; margin: 0; color: #b8c5bb; font-size: 0.9rem; }
+
+.season-props__search { position: relative; flex: 0 1 330px; width: 100%; }
+
+.season-props__input {
+    width: 100%;
+    border: 1px solid #506657;
+    border-radius: 12px;
+    background: #fffdf8;
+    padding: 12px 14px;
+    color: var(--ink, #23201c);
+    font: inherit;
+    font-size: 0.88rem;
+}
+
+.season-props__input:focus-visible {
+    outline: none;
+    border-color: #e7b95f;
+    box-shadow: 0 0 0 3px rgba(231, 185, 95, 0.25);
+}
+
+.season-props__results { top: calc(100% + 7px); right: 0; left: 0; }
+.search-results__empty { padding: 12px 14px; color: var(--muted, #928a7d); font-size: 0.82rem; }
+
+.season-props__panel {
+    margin-top: 20px;
+    border-top: 1px solid rgba(255, 255, 255, 0.14);
+    padding-top: 18px;
+}
+
+.season-props__player {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 12px;
+}
+
+.season-props__player h3 { margin: 0; font-size: 1.05rem; }
+.season-props__player p { margin: 2px 0 0; color: #aebcaf; font-size: 0.76rem; }
+.season-props__asof { flex-shrink: 0; color: #93a596; font-size: 0.72rem; }
+
+.season-props__grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.season-line {
+    min-width: 0;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.07);
+    padding: 13px 14px;
+}
+
+.season-line__label {
+    margin: 0;
+    color: #bac7bc;
+    font-size: 0.68rem;
+    font-weight: 600;
+    letter-spacing: 0.055em;
+    text-transform: uppercase;
+}
+
+.season-line__total {
+    margin: 3px 0 9px;
+    color: #f0c978;
+    font-size: 1.55rem;
+    font-weight: 700;
+    letter-spacing: -0.025em;
+    line-height: 1.2;
+    font-variant-numeric: tabular-nums;
+}
+
+.season-line__prices { display: flex; gap: 18px; }
+.season-price { display: flex; align-items: baseline; gap: 5px; }
+.season-price small { color: #94a497; font-size: 0.65rem; }
+.season-price b { color: #f5f2eb; font-size: 0.82rem; font-variant-numeric: tabular-nums; }
+.season-line__books { margin: 7px 0 0; color: #839586; font-size: 0.64rem; }
+
+.season-line--empty { display: flex; min-height: 108px; flex-direction: column; justify-content: space-between; opacity: 0.66; }
+.season-line__missing { margin: 10px 0 0; color: #aebcaf; font-size: 0.82rem; }
+.season-props__status { margin: 0; border-radius: 10px; background: rgba(255, 255, 255, 0.07); padding: 14px; color: #c3cec5; font-size: 0.86rem; }
+.season-props__status--error { color: #f2c4b3; }
+.season-props .betting-disclaimer { color: #839586; }
+
 .draft-feature {
     position: relative;
     display: flex;
@@ -962,6 +1072,9 @@ body.drawer-open { overflow: hidden; }
     .trending { grid-template-columns: 1fr; }
     .week-badge { flex-direction: row; gap: 8px; align-items: baseline; }
     .player-search { max-width: none; }
+    .season-props__intro { align-items: stretch; flex-direction: column; gap: 16px; }
+    .season-props__search { flex-basis: auto; }
+    .season-props__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .compare-tray { left: 8px; right: 8px; transform: none; max-width: none; }
     .compare-tray__actions { margin-left: 0; }
 }

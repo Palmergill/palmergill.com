@@ -37,6 +37,9 @@
         positionChips: document.getElementById("positionChips"),
         scoringChips: document.getElementById("scoringChips"),
         sourceChips: document.getElementById("sourceChips"),
+        seasonPropsSearch: document.getElementById("seasonPropsSearch"),
+        seasonPropsResults: document.getElementById("seasonPropsResults"),
+        seasonPropsPanel: document.getElementById("seasonPropsPanel"),
         rankingsSource: document.getElementById("rankingsSource"),
         rankingsAsOf: document.getElementById("rankingsAsOf"),
         rankBody: document.getElementById("rankBody"),
@@ -153,7 +156,7 @@
                 syncChips();
                 writeUrlState();
                 loadRankings();
-                window.pgAnalytics?.track?.("app_event", "fantasy_filter", { position: pos });
+                window.pgAnalytics?.track?.("fantasy_filter", { position: pos });
             });
             els.positionChips.appendChild(chip);
         });
@@ -206,7 +209,7 @@
                 writeUrlState();
                 loadRankings();
                 if (state.drawerPlayerId && !els.drawer.hidden) openPlayer(state.drawerPlayerId);
-                window.pgAnalytics?.track?.("app_event", "fantasy_source", { source: source.id });
+                window.pgAnalytics?.track?.("fantasy_source", { source: source.id });
             });
             els.sourceChips.appendChild(chip);
         });
@@ -324,6 +327,152 @@
         els.searchResults.hidden = true;
         els.searchResults.innerHTML = "";
         els.playerSearch.setAttribute("aria-expanded", "false");
+    }
+
+    // ── season player lines lookup ─────────────────────────────────────
+
+    let seasonPropsTimer = null;
+    let seasonPropsSeq = 0;
+
+    function initSeasonPropsSearch() {
+        if (!els.seasonPropsSearch) return;
+        els.seasonPropsSearch.addEventListener("input", () => {
+            const term = els.seasonPropsSearch.value.trim();
+            window.clearTimeout(seasonPropsTimer);
+            if (term.length < 2) {
+                hideSeasonPropsResults();
+                return;
+            }
+            seasonPropsTimer = window.setTimeout(() => runSeasonPropsSearch(term), 180);
+        });
+        els.seasonPropsSearch.addEventListener("keydown", (event) => {
+            if (event.key === "Escape") hideSeasonPropsResults();
+        });
+        document.addEventListener("click", (event) => {
+            if (!event.target.closest(".season-props__search")) hideSeasonPropsResults();
+        });
+    }
+
+    async function runSeasonPropsSearch(term) {
+        const seq = ++seasonPropsSeq;
+        try {
+            const data = await fetchJson(`${API_BASE}/players/search?q=${encodeURIComponent(term)}&limit=8`);
+            if (seq !== seasonPropsSeq) return;
+            renderSeasonPropsResults(data.results || []);
+        } catch (err) {
+            hideSeasonPropsResults();
+        }
+    }
+
+    function renderSeasonPropsResults(results) {
+        els.seasonPropsResults.innerHTML = "";
+        if (results.length === 0) {
+            const li = el("li", "search-results__empty", "No matching players");
+            els.seasonPropsResults.appendChild(li);
+        } else {
+            results.forEach((player) => {
+                const li = el("li", "search-results__item");
+                li.setAttribute("role", "option");
+                li.tabIndex = 0;
+                li.appendChild(el("span", "search-results__name", player.name || player.player_id));
+                li.appendChild(el("span", "search-results__meta",
+                    `${F.positionLabel(player.position) || ""} ${player.team || ""}`.trim()));
+                const pick = () => {
+                    hideSeasonPropsResults();
+                    els.seasonPropsSearch.value = player.name || "";
+                    loadPlayerSeasonProps(player.player_id);
+                };
+                li.addEventListener("click", pick);
+                li.addEventListener("keydown", (event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        pick();
+                    }
+                });
+                els.seasonPropsResults.appendChild(li);
+            });
+        }
+        els.seasonPropsResults.hidden = false;
+        els.seasonPropsSearch.setAttribute("aria-expanded", "true");
+    }
+
+    function hideSeasonPropsResults() {
+        els.seasonPropsResults.hidden = true;
+        els.seasonPropsResults.innerHTML = "";
+        els.seasonPropsSearch.setAttribute("aria-expanded", "false");
+    }
+
+    async function loadPlayerSeasonProps(playerId) {
+        els.seasonPropsPanel.hidden = false;
+        els.seasonPropsPanel.innerHTML = "";
+        els.seasonPropsPanel.appendChild(el("p", "season-props__status", "Loading season lines…"));
+        try {
+            const params = state.season != null ? `?season=${encodeURIComponent(state.season)}` : "";
+            const data = await fetchJson(`${API_BASE}/players/${encodeURIComponent(playerId)}/season-props${params}`);
+            renderPlayerSeasonProps(data);
+            window.pgAnalytics?.track?.("fantasy_season_props", { player_id: playerId });
+        } catch (err) {
+            els.seasonPropsPanel.innerHTML = "";
+            els.seasonPropsPanel.appendChild(el("p", "season-props__status season-props__status--error", "Season lines are unavailable right now."));
+        }
+    }
+
+    function renderPlayerSeasonProps(data) {
+        els.seasonPropsPanel.innerHTML = "";
+        const player = data.player || {};
+        const header = el("div", "season-props__player");
+        const identity = el("div");
+        identity.appendChild(el("h3", null, player.name || "Player lines"));
+        identity.appendChild(el("p", null,
+            `${player.position || ""} ${player.team || ""} · ${data.season || ""} regular season`.trim()));
+        header.appendChild(identity);
+        const source = el("span", "season-props__asof");
+        const asOf = formatAsOf(data.as_of);
+        source.textContent = [data.source, asOf].filter(Boolean).join(" · ");
+        header.appendChild(source);
+        els.seasonPropsPanel.appendChild(header);
+
+        const markets = data.markets || [];
+        const posted = markets.filter((market) => market.line != null).length;
+        if (posted === 0) {
+            els.seasonPropsPanel.appendChild(el(
+                "p",
+                "season-props__status",
+                "No regular-season over/unders are quoted for this player yet. Only a few hundred players have a liquid market — try another player, or check back as the board fills in."
+            ));
+            return;
+        }
+
+        const grid = el("div", "season-props__grid");
+        markets.forEach((market) => grid.appendChild(seasonPropCard(market)));
+        els.seasonPropsPanel.appendChild(grid);
+    }
+
+    function seasonPropCard(market) {
+        const card = el("article", "season-line");
+        card.appendChild(el("h4", "season-line__label", market.label));
+        if (market.line == null) {
+            card.classList.add("season-line--empty");
+            card.appendChild(el("p", "season-line__missing", "Not posted"));
+            return card;
+        }
+        const line = Number(market.line);
+        card.appendChild(el("p", "season-line__total", Number.isFinite(line) ? line.toLocaleString(undefined, { maximumFractionDigits: 1 }) : market.line));
+        const prices = el("div", "season-line__prices");
+        prices.appendChild(seasonPrice("Over", market.over_price));
+        prices.appendChild(seasonPrice("Under", market.under_price));
+        card.appendChild(prices);
+        const bookNames = (market.books || []).map((book) => book.bookmaker);
+        card.appendChild(el("p", "season-line__books",
+            bookNames.length ? bookNames.join(" · ") : "Consensus line"));
+        return card;
+    }
+
+    function seasonPrice(label, price) {
+        const item = el("span", "season-price");
+        item.appendChild(el("small", null, label));
+        item.appendChild(el("b", null, price == null ? "—" : F.americanOdds(price)));
+        return item;
     }
 
     // ── rankings ────────────────────────────────────────────────────────
@@ -689,7 +838,7 @@
         try {
             const data = await fetchJson(`${API_BASE}/compare?${params.toString()}`);
             renderCompare(data);
-            window.pgAnalytics?.track?.("app_event", "fantasy_compare", { count: state.compare.length });
+            window.pgAnalytics?.track?.("fantasy_compare", { count: state.compare.length });
         } catch (err) {
             els.compareSub.textContent = "";
             els.compareBody.appendChild(el("p", "drawer__loading", "Could not load the comparison."));
@@ -764,7 +913,7 @@
         els.drawerSub.textContent = "";
         els.drawerBody.innerHTML = '<p class="drawer__loading">Loading…</p>';
         els.drawerClose.focus();
-        window.pgAnalytics?.track?.("app_event", "fantasy_player_view", { player_id: playerId });
+        window.pgAnalytics?.track?.("fantasy_player_view", { player_id: playerId });
 
         try {
             const params = new URLSearchParams({ source: state.source });
@@ -1061,6 +1210,7 @@
         const urlState = readUrlState();
         buildChips();
         initSearch();
+        initSeasonPropsSearch();
         initCompareControls();
         renderCompareTray();
         els.drawerClose.addEventListener("click", closeDrawer);

@@ -15,6 +15,7 @@ from app.database import (
     FantasyProjection,
     FantasyPropSnapshot,
     FantasyRanking,
+    FantasySeasonPropSnapshot,
     FantasyTrendingSnapshot,
     SessionLocal,
 )
@@ -31,6 +32,7 @@ FF_MODELS = (
     FantasyPlayerStat,
     FantasyFutureSnapshot,
     FantasyPropSnapshot,
+    FantasySeasonPropSnapshot,
     FantasyOddsSnapshot,
     FantasyGame,
     FantasyCollectionRun,
@@ -315,6 +317,13 @@ def test_betting_endpoints_return_well_formed_empty_structures():
     futures = client.get("/api/fantasy/futures").json()
     assert futures["outcomes"] == []
 
+    season_props = client.get("/api/fantasy/players/100/season-props").json()
+    assert season_props["player"]["name"] == "Patrick Mahomes"
+    assert len(season_props["markets"]) == 6
+    assert all(market["line"] is None for market in season_props["markets"])
+
+    assert client.get("/api/fantasy/players/unknown/season-props").status_code == 404
+
 
 def test_props_history_requires_params():
     # player_id and market are required query params.
@@ -334,6 +343,10 @@ def test_admin_refresh_accepts_odds_job(monkeypatch):
     response = auth_client.post("/api/fantasy/admin/refresh", params={"job": "odds_futures"})
     assert response.status_code == 200
     assert response.json()["job"] == "odds_futures"
+
+    season_response = auth_client.post("/api/fantasy/admin/refresh", params={"job": "season_props"})
+    assert season_response.status_code == 200
+    assert season_response.json()["job"] == "season_props"
 
 
 def test_admin_refresh_rejects_anonymous_demo_caller():

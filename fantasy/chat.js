@@ -102,7 +102,7 @@
             placeholder.textContent = "";
             renderMarkdown(placeholder, result.answer || "No answer.");
             (result.warnings || []).forEach((w) => placeholder.appendChild(el("p", "chat-warning", w)));
-            window.pgAnalytics?.track?.("app_event", "fantasy_chat", { tools: (result.tools_used || []).join(",") });
+            window.pgAnalytics?.track?.("fantasy_chat", { tools: (result.tools_used || []).join(",") });
         } catch (err) {
             placeholder.classList.remove("chat-bubble--loading");
             placeholder.textContent = `Sorry — ${err.message}`;

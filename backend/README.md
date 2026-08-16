@@ -64,4 +64,25 @@ Poker, craps, craps strategy, blackjack, High Card Flush, login, `/api/poker/*`,
 - `/api/analytics/*` - public client analytics ingest (`POST /api/analytics/events`).
 - `/api/admin/*` - protected structured log and file-tail endpoints, including the analytics summary surfaced in the admin dashboard and `GET /api/admin/users`, the member account roster behind the console's Members tab.
 
+The fantasy dashboard's regular-season player over/unders come from Kalshi,
+because The Odds API's NFL player props are game-scoped and the sportsbook
+feeds carrying season futures are priced for trading desks. Kalshi's market
+data is public, so the collector needs no key and no configuration.
+
+Kalshi lists threshold contracts ("3500+ passing yards") rather than lines, so
+the parser reads each contract's strike as the over/under point and its YES
+price as the Over. It is an overlay on the projection consensus, not a
+replacement: roughly 110 players clear its quote filter versus a few thousand
+in the Sleeper/FantasyPros/ESPN projections, and thinly quoted contracts are
+dropped rather than shown. Optional overrides:
+
+```text
+KALSHI_MAX_SPREAD=0.20   # widest YES bid/ask still treated as a real quote
+KALSHI_API_URL=https://api.elections.kalshi.com/trade-api/v2
+KALSHI_TIMEOUT_SECONDS=20
+```
+
+Raising `KALSHI_MAX_SPREAD` much past 0.30 admits one-sided books whose
+midpoint is an artifact of the empty order book rather than a market view.
+
 The root deployment runs this shared backend. Poker is served by `app/routers/poker.py` plus the shared game and AI modules.

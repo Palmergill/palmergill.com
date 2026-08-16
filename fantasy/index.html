@@ -4,22 +4,22 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Fantasy Football Dashboard</title>
-    <meta name="description" content="NFL fantasy football dashboard — weekly rankings and point projections by position, plus trending adds and drops. By Palmer Gill.">
+    <meta name="description" content="NFL fantasy football dashboard with season player over/unders, weekly rankings, projections, and waiver trends. By Palmer Gill.">
     <meta name="theme-color" content="#faf6f0">
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://palmergill.com/fantasy/">
     <meta property="og:title" content="Fantasy Football Dashboard — Palmer Gill">
-    <meta property="og:description" content="NFL fantasy football rankings, projections, and trends from free public data.">
+    <meta property="og:description" content="NFL season player lines, fantasy rankings, projections, and waiver trends.">
     <meta property="og:image" content="https://palmergill.com/assets/palmer-gill-logo.png">
     <meta name="twitter:card" content="summary">
     <meta name="twitter:title" content="Fantasy Football Dashboard — Palmer Gill">
-    <meta name="twitter:description" content="NFL fantasy football rankings, projections, and trends from free public data.">
+    <meta name="twitter:description" content="NFL season player lines, fantasy rankings, projections, and waiver trends.">
     <link rel="icon" type="image/png" href="/assets/palmer-gill-logo-small.png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/shared/site-nav.css?v=13">
-    <link rel="stylesheet" href="style.css?v=9">
+    <link rel="stylesheet" href="style.css?v=10">
 </head>
 <body>
     <main class="app-shell">
@@ -64,6 +64,25 @@
                 <p>Standings, power rankings across seven methods, weekly scoreboards, and every roster — synced from ESPN. Sign in with your league account.</p>
             </div>
             <a class="league-feature__link" href="/fantasy/league/">Open the league hub <span aria-hidden="true">→</span></a>
+        </section>
+
+        <section class="season-props" aria-labelledby="seasonPropsTitle">
+            <div class="season-props__intro">
+                <div>
+                    <span class="eyebrow">Draft research</span>
+                    <h2 id="seasonPropsTitle">Season player lines</h2>
+                    <p>Look up an NFL player to see market over/unders for regular-season passing, rushing, receiving, and touchdowns. Prices come from Kalshi's event contracts, so only the more heavily traded players are quoted.</p>
+                </div>
+                <div class="season-props__search">
+                    <label class="sr-only" for="seasonPropsSearch">Look up a player</label>
+                    <input id="seasonPropsSearch" type="search" class="season-props__input"
+                           placeholder="Search Josh Allen, Bijan Robinson…" autocomplete="off"
+                           role="combobox" aria-expanded="false" aria-controls="seasonPropsResults" aria-autocomplete="list">
+                    <ul id="seasonPropsResults" class="search-results season-props__results" role="listbox" hidden></ul>
+                </div>
+            </div>
+            <div id="seasonPropsPanel" class="season-props__panel" hidden aria-live="polite"></div>
+            <p class="betting-disclaimer">Consensus lines and best displayed prices are for information only — not betting advice. Availability varies by player and sportsbook.</p>
         </section>
 
         <section class="chat" aria-label="Fantasy assistant">
@@ -215,7 +234,7 @@
     <script src="/shared/analytics.js?v=1"></script>
     <script src="/shared/api-base.js?v=1"></script>
     <script src="format.js?v=4"></script>
-    <script src="chat.js?v=1"></script>
-    <script src="app.js?v=7"></script>
+    <script src="chat.js?v=2"></script>
+    <script src="app.js?v=8"></script>
 </body>
 </html>

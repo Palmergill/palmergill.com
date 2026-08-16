@@ -14,7 +14,7 @@ import json
 import logging
 import os
 from datetime import datetime, timedelta
-from typing import Any, Dict, Iterable, List, Optional
+from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 from sqlalchemy.orm import Session
 
@@ -29,6 +29,7 @@ from app.database import (
     FantasyProjection,
     FantasyPropSnapshot,
     FantasyRanking,
+    FantasySeasonPropSnapshot,
     FantasyTrendingSnapshot,
     utc_now,
 )
@@ -54,6 +55,11 @@ from app.services.fantasy_odds import (
     parse_game_odds,
 )
 from app.services.fantasy_sleeper import parse_trending_rows, sleeper_client
+from app.services.fantasy_season_props import (
+    DEFAULT_MAX_SPREAD,
+    parse_season_props,
+    season_props_client,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -75,6 +81,10 @@ JOB_INTERVALS_SECONDS = {
     "odds_lines": {"in_season": 2 * 24 * 3600, "off_season": 7 * 24 * 3600},
     "odds_props": {"in_season": 3 * 24 * 3600, "off_season": 30 * 24 * 3600},
     "odds_futures": {"in_season": 7 * 24 * 3600, "off_season": 7 * 24 * 3600},
+    # Season player totals are most useful during draft season, but books can
+    # keep moving them into September. A daily snapshot keeps the lookup fresh
+    # without polling a long-dated market unnecessarily.
+    "season_props": {"in_season": 24 * 3600, "off_season": 24 * 3600},
     # ESPN league hub (spec 17). Season-scoped, so these use per-season timer
     # keys rather than the bare job name — see _league_due_job.
     "league_sync": {"in_season": 6 * 3600, "off_season": 24 * 3600},
@@ -657,6 +667,48 @@ def _prop_player_map(db, *teams) -> Dict[str, str]:
     return {name: pid for pid, name in query.all() if name}
 
 
+# Every quoted season market is a skill-position total, so nothing else can be
+# the subject of one.
+SEASON_PROP_POSITIONS = ("QB", "RB", "WR", "TE")
+
+
+def _season_prop_player_map(db) -> Dict[str, str]:
+    """Normalized-name -> player_id for the skill player a season line means.
+
+    A weekly prop arrives with the two teams playing, so `_prop_player_map`
+    above can scope a name to a roster. A season total carries no game and no
+    team, and the player catalog is full of shared names: it keeps retired
+    players forever, so an active receiver routinely collides with somebody
+    who last played in 2016, and same-name players turn up across positions
+    (Alex Smith the quarterback and Alex Smith the tight end). Matching on
+    name alone hands the line to whichever row was read last.
+
+    Roster status breaks nearly all of it — only one Antonio Williams is on a
+    team — so a contested name goes to the rostered player. A name still
+    claimed by two rostered players is dropped instead of guessed: no line is
+    better than one under the wrong player's face.
+    """
+    candidates: Dict[str, List[Tuple[str, Optional[str]]]] = {}
+    rows = (
+        db.query(FantasyPlayer.player_id, FantasyPlayer.search_name, FantasyPlayer.team)
+        .filter(FantasyPlayer.position.in_(SEASON_PROP_POSITIONS))
+        .all()
+    )
+    for player_id, name, team in rows:
+        if name:
+            candidates.setdefault(name, []).append((player_id, team))
+
+    resolved: Dict[str, str] = {}
+    for name, entries in candidates.items():
+        if len(entries) == 1:
+            resolved[name] = entries[0][0]
+            continue
+        rostered = [player_id for player_id, team in entries if team]
+        if len(rostered) == 1:
+            resolved[name] = rostered[0]
+    return resolved
+
+
 def collect_odds_lines(db: Session, client=None, markets=GAME_MARKETS) -> FantasyCollectionRun:
     client = client or odds_client
     run = _start_run(db, "odds_lines", "the-odds-api")
@@ -820,6 +872,62 @@ def collect_odds_futures(db: Session, client=None, markets=FUTURES_MARKETS) -> F
     return _finish_run(db, run, "success", rows_written=written, credits_used=credits)
 
 
+def collect_season_props(db: Session, client=None) -> FantasyCollectionRun:
+    """Snapshot regular-season player over/unders from Kalshi.
+
+    This is an overlay on the projection consensus, not a replacement for it:
+    Kalshi lists a few hundred skill players against Sleeper's few thousand,
+    and the parser discards anything too thinly quoted to trust. An empty
+    result is therefore a normal outcome, reported as ``partial`` so a genuine
+    fetch failure still stands out in the run log.
+    """
+    client = client or season_props_client
+    season = current_season_week(db)["season"]
+    run = _start_run(db, "season_props", "kalshi", season=season)
+    if not client.configured:
+        return _finish_run(db, run, "skipped", detail="season props provider is not configured")
+    if not season:
+        return _finish_run(db, run, "skipped", detail="no NFL season known — run the state job first")
+
+    try:
+        rows = parse_season_props(
+            client.get_season_props(),
+            max_spread=getattr(client, "max_spread", DEFAULT_MAX_SPREAD),
+        )
+    except Exception as exc:
+        logger.warning("Season props fetch failed: %s", exc)
+        return _finish_run(db, run, "error", detail=str(exc))
+
+    player_map = _season_prop_player_map(db)
+    now = utc_now()
+    matched = 0
+    for row in rows:
+        player_id = player_map.get(normalize_name(row["player_name_raw"]))
+        if player_id:
+            matched += 1
+        db.add(
+            FantasySeasonPropSnapshot(
+                run_id=run.id,
+                fetched_at=now,
+                season=season,
+                player_id=player_id,
+                player_name_raw=row["player_name_raw"],
+                provider_player_id=row["provider_player_id"],
+                bookmaker=row["bookmaker"],
+                market=row["market"],
+                outcome=row["outcome"],
+                price=row["price"],
+                point=row["point"],
+            )
+        )
+    db.commit()
+    if not rows:
+        return _finish_run(db, run, "partial", detail="no market cleared the quote filter")
+    status = "success" if matched else "partial"
+    detail = None if matched else "no quoted player matched a known player"
+    return _finish_run(db, run, status, rows_written=len(rows), detail=detail)
+
+
 # ── scheduling ──────────────────────────────────────────────────────────
 
 
@@ -955,9 +1063,12 @@ def run_scheduled(db: Session, now: Optional[datetime] = None) -> List[Dict[str,
                     db, "fantasypros", season, proj_week, now, in_season
                 )
 
-    # Betting jobs. They self-skip when ODDS_API_KEY is unset or the monthly
-    # budget is spent. Futures are live year-round; lines/props only in-season
-    # (there are no games to price in the offseason).
+    # Betting jobs. Season player totals and futures are live year-round;
+    # game lines/props only run in-season (there are no games to price in the
+    # offseason). Each provider self-skips when its API key is unset.
+    if _job_due(db, "season_props", now):
+        summaries.append(_summary(collect_season_props(db)))
+        _mark_next_due(db, "season_props", now, in_season)
     if _job_due(db, "odds_futures", now):
         summaries.append(_summary(collect_odds_futures(db)))
         _mark_next_due(db, "odds_futures", now, in_season)
@@ -1052,6 +1163,8 @@ def run_job(
         return collect_odds_props(db)
     if job == "odds_futures":
         return collect_odds_futures(db)
+    if job == "season_props":
+        return collect_season_props(db)
     raise ValueError(f"unknown job: {job}")
 
 
@@ -1068,6 +1181,7 @@ REFRESHABLE_JOBS = (
     "odds_lines",
     "odds_props",
     "odds_futures",
+    "season_props",
     "league_sync",
     "league_rosters",
     "league_rankings",
