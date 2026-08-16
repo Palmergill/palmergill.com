@@ -108,9 +108,14 @@ with the scoring leader first. Five rounds can consume up to 65 cards from a
 52-card deck, so a round with no deck left to deal from is recorded as
 `exhausted` and scores zero rather than stranding the room on a manager who can
 neither flip nor bank. A room has an explicit mode: `league` rooms accept
-account-backed invites, `practice` rooms are private solo warm-ups, and
-admin-only `test` rooms contain marked bot players that advance one round at a
-time through the same scoring and verification path as a real draft.
+account-backed invites, `practice` rooms are private solo warm-ups, `bots` rooms
+are a full five-round game any account can open against marked bot players, and
+admin-only `test` rooms are the same table used to exercise a release. Both bot
+modes advance one bot action at a time — the host's client paces them — through
+the same scoring and verification path as a real draft. `record/mine` reports an
+account's highest score across every finished game whose scores are open; a
+completed league draft is left out until its reveal, since the final round is
+sealed until then.
 
 A turn that ends is not handed straight to the next manager. The room enters
 `turn_state = 'resolved'`, keeps the finished hand and the acting player on the

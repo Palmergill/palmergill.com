@@ -68,8 +68,21 @@
 
     function roomModeName(mode) {
         if (mode === "practice") return "Practice";
+        if (mode === "bots") return "Bot table";
         if (mode === "test") return "Bot test";
         return "Draft order game";
+    }
+
+    // Where a personal best was set, in the manager's own words.
+    function bestScoreContext(best) {
+        if (!best) return "";
+        if (best.mode === "practice") return "Set in a solo practice run.";
+        const opponents = Math.max(0, (Number(best.playerCount) || 1) - 1);
+        const table = best.mode === "bots" || best.mode === "test"
+            ? `against ${plural(opponents, "bot")}`
+            : `in ${best.leagueName}`;
+        if (!best.pick) return `Set ${table}.`;
+        return `${ordinal(best.pick)} of ${best.playerCount} ${table}.`;
     }
 
     function plural(count, word) {
@@ -135,6 +148,7 @@
         verificationUrl,
         gameLengthCopy,
         roomModeName,
+        bestScoreContext,
         turnEventMessage,
         turnEventTone,
     };

@@ -51,10 +51,28 @@ describe('DraftOrderFormat', () => {
         );
     });
 
-    test('roomModeName keeps practice and bot tests distinct from league rooms', () => {
+    test('roomModeName keeps practice, bot tables, and bot tests distinct from league rooms', () => {
         expect(DraftOrderFormat.roomModeName('league')).toBe('Draft order game');
         expect(DraftOrderFormat.roomModeName('practice')).toBe('Practice');
+        expect(DraftOrderFormat.roomModeName('bots')).toBe('Bot table');
         expect(DraftOrderFormat.roomModeName('test')).toBe('Bot test');
+    });
+
+    test('bestScoreContext says where a personal best was set', () => {
+        expect(DraftOrderFormat.bestScoreContext(null)).toBe('');
+        expect(DraftOrderFormat.bestScoreContext({
+            mode: 'practice', score: 71, pick: 1, playerCount: 1,
+        })).toBe('Set in a solo practice run.');
+        expect(DraftOrderFormat.bestScoreContext({
+            mode: 'bots', score: 88, pick: 1, playerCount: 4,
+        })).toBe('1st of 4 against 3 bots.');
+        expect(DraftOrderFormat.bestScoreContext({
+            mode: 'league', score: 84, pick: 3, playerCount: 10, leagueName: 'Sunday Legends',
+        })).toBe('3rd of 10 in Sunday Legends.');
+        // A room whose final order could not be resolved still says something.
+        expect(DraftOrderFormat.bestScoreContext({
+            mode: 'bots', score: 60, pick: null, playerCount: 2,
+        })).toBe('Set against 1 bot.');
     });
 
     test('turnEventMessage narrates a spectator view of each card, bank, and bust', () => {

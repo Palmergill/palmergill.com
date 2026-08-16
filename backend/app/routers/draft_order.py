@@ -21,7 +21,7 @@ class JoinRoomRequest(BaseModel):
     join_code: str = Field(..., min_length=6, max_length=12)
 
 
-class CreateTestRoomRequest(BaseModel):
+class CreateBotRoomRequest(BaseModel):
     league_name: str = Field(..., min_length=3, max_length=60)
     bot_count: int = Field(5, ge=1, le=len(draft_order_game.BOT_NAMES))
 
@@ -45,6 +45,12 @@ def all_sessions(request: Request, db: Session = Depends(get_db)) -> dict[str, A
     return {"sessions": draft_order_game.list_all_sessions(db, identity)}
 
 
+@router.get("/record/mine")
+def my_record(request: Request, db: Session = Depends(get_db)) -> dict[str, Any]:
+    identity = _identity(request)
+    return draft_order_game.career_record(db, identity)
+
+
 @router.post("/sessions", status_code=201)
 def create_room(
     payload: CreateRoomRequest,
@@ -66,9 +72,25 @@ def create_practice(
     return draft_order_game.serialize_session(db, room, identity["username"])
 
 
+@router.post("/sessions/bots", status_code=201)
+def create_bot_room(
+    payload: CreateBotRoomRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    identity = _identity(request)
+    room = draft_order_game.create_bot_session(
+        db,
+        identity,
+        payload.league_name,
+        payload.bot_count,
+    )
+    return draft_order_game.serialize_session(db, room, identity["username"])
+
+
 @router.post("/sessions/test", status_code=201)
 def create_test_room(
-    payload: CreateTestRoomRequest,
+    payload: CreateBotRoomRequest,
     request: Request,
     db: Session = Depends(get_db),
 ) -> dict[str, Any]:
@@ -196,7 +218,7 @@ def play_bot_step(
     db: Session = Depends(get_db),
 ) -> dict[str, Any]:
     identity = _identity(request)
-    room = draft_order_game.play_test_bot_step(db, identity, session_id)
+    room = draft_order_game.play_bot_step(db, identity, session_id)
     return draft_order_game.serialize_session(db, room, identity["username"])
 
 

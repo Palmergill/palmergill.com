@@ -41,6 +41,10 @@
         generation: 0,
     };
 
+    // Bot rooms come in two flavours — the bot table any manager can open and
+    // the admin test lab — and every table rule below applies to both.
+    const hasBots = (room) => room?.mode === "bots" || room?.mode === "test";
+
     const byId = (id) => document.getElementById(id);
     const els = {
         globalStatus: byId("globalStatus"),
@@ -51,7 +55,13 @@
         signInLink: byId("signInLink"),
         createAccountLink: byId("createAccountLink"),
         accountName: byId("accountName"),
+        personalBestCard: byId("personalBestCard"),
+        personalBestScore: byId("personalBestScore"),
+        personalBestWhere: byId("personalBestWhere"),
+        personalBestMeta: byId("personalBestMeta"),
         startPracticeButton: byId("startPracticeButton"),
+        botRoomForm: byId("botRoomForm"),
+        botCount: byId("botCount"),
         createRoomForm: byId("createRoomForm"),
         leagueName: byId("leagueName"),
         joinRoomForm: byId("joinRoomForm"),
@@ -70,7 +80,10 @@
         copyHashButton: byId("copyHashButton"),
         lobbyPanel: byId("lobbyPanel"),
         roomCodeCard: byId("roomCodeCard"),
-        testRoomCard: byId("testRoomCard"),
+        botRoomCard: byId("botRoomCard"),
+        botRoomKicker: byId("botRoomKicker"),
+        botRoomTitle: byId("botRoomTitle"),
+        botRoomCopy: byId("botRoomCopy"),
         roomCode: byId("roomCode"),
         copyCodeButton: byId("copyCodeButton"),
         copyLinkButton: byId("copyLinkButton"),
@@ -109,6 +122,7 @@
         verifyButton: byId("verifyButton"),
         copyResultsButton: byId("copyResultsButton"),
         practiceAgainButton: byId("practiceAgainButton"),
+        botsAgainButton: byId("botsAgainButton"),
         verifyPanel: byId("verifyPanel"),
         closeVerifyButton: byId("closeVerifyButton"),
         proofTitle: byId("proofTitle"),
@@ -337,26 +351,58 @@
             title.textContent = room.leagueName;
             const details = document.createElement("span");
             const managers = room.playerCount;
+            const isBotRoom = room.mode === "bots";
+            const bots = Math.max(0, managers - 1);
             const stateLabel = room.state === "complete"
                 ? (room.resultsRevealed ? "Draft order final" : "Final reveal ready")
                 : room.state === "active"
                     ? `${room.currentPlayerName || "Player"} is up`
-                    : `${managers} manager${managers === 1 ? "" : "s"} in lobby`;
-            details.textContent = stateLabel;
+                    : isBotRoom
+                        ? `${bots} bot${bots === 1 ? "" : "s"} staged`
+                        : `${managers} manager${managers === 1 ? "" : "s"} in lobby`;
+            details.textContent = isBotRoom ? `Bot table · ${stateLabel}` : stateLabel;
             const status = document.createElement("small");
-            // /sessions/mine only returns league rooms — practice and bot test
-            // rooms stay out of the launcher — so the state label always applies.
+            // The launcher carries league drafts and bot tables; the solo
+            // practice warm-up stays out, so the state label always applies.
             status.textContent = ROOM_STATE_LABELS[room.state] || room.state;
             button.append(title, details, status);
             button.addEventListener("click", () => openRoom(room.id));
             slot.appendChild(button);
             // A host can clear a lobby nobody has played yet — otherwise an
-            // account that fills its room cap has no way to open another.
-            if (isAdmin || (room.isHost && room.state === "lobby")) {
+            // account that fills its room cap has no way to open another. A bot
+            // table holds nobody else's hands, so it goes at any point.
+            if (isAdmin || (room.isHost && (room.state === "lobby" || isBotRoom))) {
                 slot.classList.add("has-delete");
                 slot.appendChild(deleteRoomButton(room));
             }
             els.recentRooms.appendChild(slot);
+        });
+    }
+
+    // The one number a manager carries between rooms. Practice, bot table, or
+    // league draft — a score comes only from the cards you took and when you
+    // stopped, so there is a single personal best rather than one per mode.
+    function renderRecord(record) {
+        const best = record?.best;
+        els.personalBestCard.hidden = !best;
+        if (!best) return;
+        els.personalBestScore.textContent = best.score;
+        els.personalBestWhere.textContent = F.bestScoreContext(best);
+        const games = record.gamesCompleted || 0;
+        els.personalBestMeta.textContent = [
+            `Best single round ${best.bestRound} pts`,
+            `${games} game${games === 1 ? "" : "s"} finished`,
+            shortDate(best.completedAt),
+        ].filter(Boolean).join(" · ");
+    }
+
+    function shortDate(value) {
+        const when = value ? new Date(value) : null;
+        if (!when || Number.isNaN(when.getTime())) return "";
+        return when.toLocaleDateString(undefined, {
+            month: "short",
+            day: "numeric",
+            year: "numeric",
         });
     }
 
@@ -434,8 +480,18 @@
             renderHome([]);
             showStatus(error.message, true);
         }
-        // Its own request so a failure here leaves the launcher standing.
+        // Each of these is its own request so a failure leaves the launcher
+        // standing rather than blanking the whole screen.
+        await loadRecord();
         if (state.identity.role === "admin") await loadAdminRooms();
+    }
+
+    async function loadRecord() {
+        try {
+            renderRecord(await requestJson("/record/mine"));
+        } catch {
+            els.personalBestCard.hidden = true;
+        }
     }
 
     async function loadAdminRooms() {
@@ -511,9 +567,17 @@
     }
 
     function renderLobby(room) {
+        const botTable = hasBots(room);
         const isTest = room.mode === "test";
-        els.roomCodeCard.hidden = isTest;
-        els.testRoomCard.hidden = !isTest;
+        els.roomCodeCard.hidden = botTable;
+        els.botRoomCard.hidden = !botTable;
+        if (botTable) {
+            els.botRoomKicker.textContent = isTest ? "Production test room" : "Bot table";
+            els.botRoomTitle.textContent = "Bot managers are staged.";
+            els.botRoomCopy.textContent = isTest
+                ? "This room cannot be joined or used for a real draft. Start it to test turns, scoring, results, and verification end to end."
+                : "Nobody else can join this room. Start it whenever you’re ready — the bots take their turns on their own, and the result proves itself like any draft.";
+        }
         els.roomCode.textContent = room.joinCode || "—";
         els.rosterCount.textContent = room.players.length;
         els.lobbyRoster.innerHTML = "";
@@ -552,14 +616,16 @@
         els.startGameButton.disabled = !room.canStart || state.actionBusy;
         els.startGameButton.textContent = isTest
             ? "Start full-flow test"
-            : "Lock roster & reveal turn order";
+            : botTable
+                ? "Deal the first round"
+                : "Lock roster & reveal turn order";
         // A manager who typed the wrong code used to be stuck in the room for
         // good: the roster locks on start and only the host could remove them.
         els.leaveRoomButton.hidden = room.isHost;
         const duration = F.gameLengthCopy(room.players.length, room.roundsPerPlayer);
         els.startHelp.textContent = room.isHost
             ? (room.canStart
-                ? (isTest
+                ? (botTable
                     ? `${duration} Bots play automatically. Everyone finishes each round before the standings leader starts the next one. Round ${room.roundsPerPlayer} pays double.`
                     : `${duration} Everyone finishes Round 1 in the seeded order. The standings leader starts each following round, and the sealed Round ${room.roundsPerPlayer} pays double.`)
                 : `${duration} One more manager must join before you can start.`)
@@ -700,7 +766,13 @@
         // out of reach for the first stretch of a turn so it can't be used on a
         // rival who is simply still thinking; the note counts that down.
         const stalledOn = room.currentPlayer?.displayName;
-        const hostIsWaiting = room.isHost && !room.canRunBot && !room.canPlay;
+        // A bot between steps is not a manager who has walked away, and offering
+        // to skip one reads as a bug. The offer comes back if the bots stop,
+        // which is the one case where a bot really can stall the table.
+        const waitingOnOwnBot = hasBots(room)
+            && Boolean(room.currentPlayer?.isBot)
+            && !state.botPaused;
+        const hostIsWaiting = room.isHost && !room.canRunBot && !room.canPlay && !waitingOnOwnBot;
         const skipIn = room.forfeitAvailableIn;
         els.forfeitButton.hidden = !hostIsWaiting || !room.canForfeit;
         els.forfeitButton.disabled = state.actionBusy;
@@ -711,7 +783,7 @@
         if (!els.forfeitNote.hidden) {
             els.forfeitNote.textContent = `If ${stalledOn} never plays, you can skip them in ${skipIn}s.`;
         }
-        els.resumeBotsButton.hidden = !(state.botPaused && room.mode === "test" && room.isHost);
+        els.resumeBotsButton.hidden = !(state.botPaused && hasBots(room) && room.isHost);
         els.resumeBotsButton.disabled = state.actionBusy;
 
         // Bring the table to the manager the moment the turn becomes theirs.
@@ -752,7 +824,7 @@
             });
             return;
         }
-        if (state.botPaused && room.mode === "test" && room.isHost) {
+        if (state.botPaused && hasBots(room) && room.isHost) {
             els.turnMessage.textContent = "Bots are paused. Resume them when you’re ready.";
             return;
         }
@@ -830,15 +902,19 @@
     function renderResults(room) {
         els.draftOrder.innerHTML = "";
         const isPractice = room.mode === "practice";
+        const botTable = room.mode === "bots";
         const serverRevealed = isPractice || room.resultsRevealed;
         els.practiceAgainButton.hidden = !isPractice;
+        els.botsAgainButton.hidden = !botTable;
         els.copyResultsButton.hidden = isPractice;
         els.verifyButton.textContent = isPractice ? "Verify practice deal" : "Verify every deal";
         if (!serverRevealed) {
             els.resultKicker.textContent = "Final round complete · scores sealed";
             els.resultTitle.textContent = "The final table is locked.";
             els.resultCopy.textContent = room.canReveal
-                ? "Every final-round score is hidden. Reveal the final draft order when everyone is ready."
+                ? (botTable
+                    ? "Every final-round score is hidden, the bots’ and yours. Turn the table over."
+                    : "Every final-round score is hidden. Reveal the final draft order when everyone is ready.")
                 : "Every final-round score is hidden. Waiting for the host to begin the reveal.";
             els.revealButton.textContent = "Reveal final draft order";
             els.revealButton.hidden = !room.canReveal;
@@ -847,11 +923,16 @@
             return;
         }
 
+        const mine = (room.draftOrder || []).find(
+            (entry) => entry.playerId === room.viewerPlayerId,
+        );
         els.resultKicker.textContent = isPractice ? "Practice complete · seed revealed" : "Scores revealed · seed unlocked";
         els.resultTitle.textContent = isPractice ? "Five practice rounds complete." : "The draft order is ready.";
         els.resultCopy.textContent = isPractice
             ? `You scored ${room.draftOrder?.[0]?.score || 0} points. Run it again whenever you want another warm-up.`
-            : "Revealing from the last pick to the first, followed by the proof behind every card.";
+            : botTable && mine
+                ? `You scored ${mine.score} points — pick #${mine.pick} of ${room.draftOrder.length}. Your highest score is on the draft control screen.`
+                : "Revealing from the last pick to the first, followed by the proof behind every card.";
         els.revealButton.hidden = true;
         if (isPractice) state.resultsRevealed = true;
         els.resultActions.hidden = !state.resultsRevealed;
@@ -941,6 +1022,45 @@
             state.actionBusy = false;
             setButtonBusy(button, false, "Shuffling practice");
             if (state.room?.state === "active") renderGame(state.room);
+        }
+    }
+
+    // A bot table is named for the manager who opened it, so their room list
+    // reads the same way their league rooms do.
+    function botRoomName() {
+        return `${String(state.identity?.username || "Manager").trim()} vs the bots`.slice(0, 60);
+    }
+
+    async function startBotGame(button, botCount) {
+        if (state.actionBusy) return;
+        state.actionBusy = true;
+        state.botPaused = false;
+        stopPolling();
+        stopBotTimer();
+        setButtonBusy(button, true, "Staging bots");
+        try {
+            const room = await requestJson("/sessions/bots", {
+                method: "POST",
+                body: JSON.stringify({
+                    league_name: botRoomName(),
+                    bot_count: botCount,
+                }),
+            });
+            state.generation += 1;
+            state.room = room;
+            state.resultsRevealed = false;
+            state.revealTimers.forEach(window.clearTimeout);
+            state.revealTimers = [];
+            updateRoomUrl(room.id);
+            renderRoom();
+            schedulePoll();
+            window.pgAnalytics?.track?.("draft_bot_game_created", { bots: botCount });
+        } catch (error) {
+            handleActionError(error);
+        } finally {
+            state.actionBusy = false;
+            setButtonBusy(button, false, "Staging bots");
+            if (state.room?.state === "lobby") renderLobby(state.room);
         }
     }
 
@@ -1236,6 +1356,21 @@
 
     els.startPracticeButton.addEventListener("click", () => startPractice(els.startPracticeButton));
     els.practiceAgainButton.addEventListener("click", () => startPractice(els.practiceAgainButton));
+
+    els.botRoomForm.addEventListener("submit", (event) => {
+        event.preventDefault();
+        startBotGame(
+            els.botRoomForm.querySelector("button[type='submit']"),
+            Number(els.botCount.value),
+        );
+    });
+
+    // A rematch keeps the table the manager just played rather than sending
+    // them back to the launcher to set it up again.
+    els.botsAgainButton.addEventListener("click", () => {
+        const opponents = (state.room?.players || []).filter((player) => player.isBot).length;
+        startBotGame(els.botsAgainButton, opponents || Number(els.botCount.value));
+    });
 
     els.testRoomForm.addEventListener("submit", async (event) => {
         event.preventDefault();

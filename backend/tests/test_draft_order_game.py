@@ -178,6 +178,108 @@ def test_practice_is_private_replayable_and_does_not_fill_recent_rooms(monkeypat
     assert replay["state"] == "active"
 
 
+def play_bot_room_to_completion(client, room_id, view):
+    """Drive a bot table the way the browser does: the human banks, bots step."""
+    while view["state"] == "active":
+        if view["currentPlayer"]["isBot"]:
+            assert view["canRunBot"] is True
+            while True:
+                view = client.post(
+                    f"/api/fantasy/draft/sessions/{room_id}/bots/step"
+                ).json()
+                if view["lastEvent"]["turnComplete"]:
+                    break
+        else:
+            assert view["canPlay"] is True
+            client.post(f"/api/fantasy/draft/sessions/{room_id}/flip")
+            client.post(f"/api/fantasy/draft/sessions/{room_id}/bank")
+        view = settled(client, room_id)
+    return view
+
+
+def test_any_manager_can_play_a_full_game_against_bots(monkeypatch):
+    player = member_client(monkeypatch, "road-warrior")
+    created = player.post(
+        "/api/fantasy/draft/sessions/bots",
+        json={"league_name": "road-warrior vs the bots", "bot_count": 3},
+    )
+
+    assert created.status_code == 201
+    view = created.json()
+    room_id = view["id"]
+    assert view["mode"] == draft_order_game.MODE_BOTS
+    # Nobody else is coming, so there is no code to hand out and no wait: the
+    # table is full the moment it is created.
+    assert view["joinCode"] is None
+    assert sum(seat["isBot"] for seat in view["players"]) == 3
+    assert view["canStart"] is True
+
+    # Unlike the admin test lab, a bot table belongs in the launcher — it is a
+    # real five-round game the manager can walk away from and come back to.
+    listed = player.get("/api/fantasy/draft/sessions/mine").json()["sessions"]
+    assert [room["id"] for room in listed] == [room_id]
+    assert listed[0]["mode"] == draft_order_game.MODE_BOTS
+
+    view = player.post(f"/api/fantasy/draft/sessions/{room_id}/start").json()
+    view = play_bot_room_to_completion(player, room_id, view)
+
+    assert view["state"] == "complete"
+    # The final round stays sealed for the manager's own reveal, bots included.
+    assert view["resultsRevealed"] is False
+    assert view["draftOrder"] is None
+
+    view = player.post(f"/api/fantasy/draft/sessions/{room_id}/reveal").json()
+    assert view["resultsRevealed"] is True
+    assert len(view["draftOrder"]) == 4
+    proof = player.get(f"/api/fantasy/draft/sessions/{room_id}/verify").json()
+    assert proof["hashMatches"] is True
+    assert verify_proof(proof) == []
+
+    # A bot table holds nobody else's hands, so its host can clear it even
+    # after it has been played — a league draft still cannot be.
+    assert player.delete(f"/api/fantasy/draft/sessions/{room_id}").status_code == 204
+    assert player.get("/api/fantasy/draft/sessions/mine").json()["sessions"] == []
+
+
+def test_bots_only_answer_to_the_host_of_their_own_table(monkeypatch):
+    host = member_client(monkeypatch, "road-warrior")
+    outsider = member_client(monkeypatch, "nosy-manager")
+    room_id = host.post(
+        "/api/fantasy/draft/sessions/bots",
+        json={"league_name": "road-warrior vs the bots", "bot_count": 2},
+    ).json()["id"]
+    host.post(f"/api/fantasy/draft/sessions/{room_id}/start")
+
+    assert outsider.post(
+        f"/api/fantasy/draft/sessions/{room_id}/bots/step"
+    ).status_code == 403
+
+    # A league draft has no bots to step, whoever asks.
+    league = create_room(host)
+    assert host.post(
+        f"/api/fantasy/draft/sessions/{league['id']}/bots/step"
+    ).status_code == 409
+
+
+def test_open_bot_tables_are_capped_on_their_own(monkeypatch):
+    player = member_client(monkeypatch, "road-warrior")
+    for index in range(draft_order_game.MAX_OPEN_BOT_ROOMS_PER_HOST):
+        assert player.post(
+            "/api/fantasy/draft/sessions/bots",
+            json={"league_name": f"Bot table {index:02d}", "bot_count": 1},
+        ).status_code == 201
+
+    refused = player.post(
+        "/api/fantasy/draft/sessions/bots",
+        json={"league_name": "One Too Many", "bot_count": 1},
+    )
+    assert refused.status_code == 409
+    assert "bot games" in refused.json()["detail"]
+    # The league cap is counted separately, so a full bot bench never blocks a
+    # real draft.
+    assert create_room(player)["leagueName"] == "Sunday Legends"
+
+
 def test_only_admin_can_create_bot_test_room_and_bots_finish_full_flow(monkeypatch):
     member = member_client(monkeypatch, "road-warrior")
     forbidden = member.post(
@@ -1085,6 +1187,80 @@ def test_room_list_excludes_practice_and_test_rooms(monkeypatch):
     assert [room["id"] for room in listed] == [league["id"]]
     assert practice["id"] not in {room["id"] for room in listed}
     assert test_room["id"] not in {room["id"] for room in listed}
+
+
+def test_personal_best_reports_the_highest_score_across_finished_games(monkeypatch):
+    player = member_client(monkeypatch, "road-warrior")
+
+    empty = player.get("/api/fantasy/draft/record/mine").json()
+    assert empty == {"gamesCompleted": 0, "best": None}
+
+    practice_id = player.post("/api/fantasy/draft/practice").json()["id"]
+    view = settled(player, practice_id)
+    while view["state"] == "active":
+        player.post(f"/api/fantasy/draft/sessions/{practice_id}/flip")
+        player.post(f"/api/fantasy/draft/sessions/{practice_id}/bank")
+        view = settled(player, practice_id)
+    practice_score = view["draftOrder"][0]["score"]
+
+    record = player.get("/api/fantasy/draft/record/mine").json()
+    assert record["gamesCompleted"] == 1
+    assert record["best"]["score"] == practice_score
+    assert record["best"]["mode"] == draft_order_game.MODE_PRACTICE
+    assert record["best"]["sessionId"] == practice_id
+    assert record["best"]["pick"] == 1
+    assert record["best"]["playerCount"] == 1
+
+    bots_id = player.post(
+        "/api/fantasy/draft/sessions/bots",
+        json={"league_name": "road-warrior vs the bots", "bot_count": 2},
+    ).json()["id"]
+    view = player.post(f"/api/fantasy/draft/sessions/{bots_id}/start").json()
+    view = play_bot_room_to_completion(player, bots_id, view)
+    view = player.post(f"/api/fantasy/draft/sessions/{bots_id}/reveal").json()
+    bots_score = next(
+        entry["score"]
+        for entry in view["draftOrder"]
+        if entry["playerId"] == view["viewerPlayerId"]
+    )
+
+    record = player.get("/api/fantasy/draft/record/mine").json()
+    assert record["gamesCompleted"] == 2
+    # One record across every mode: a score is only ever the cards you took and
+    # when you stopped, so a bot table and a league draft are the same feat.
+    assert record["best"]["score"] == max(practice_score, bots_score)
+    assert record["best"]["sessionId"] == (
+        bots_id if bots_score >= practice_score else practice_id
+    )
+    assert record["best"]["playerCount"] == (
+        3 if bots_score >= practice_score else 1
+    )
+
+
+def test_personal_best_waits_for_the_reveal_that_unseals_the_score(monkeypatch):
+    host = member_client(monkeypatch, "host-player")
+    guest = member_client(monkeypatch, "road-warrior")
+    room = create_room(host)
+    join_room(guest, room["joinCode"])
+    rid = room["id"]
+    view = host.post(f"/api/fantasy/draft/sessions/{rid}/start").json()
+    clients = clients_by_player(view, host, guest)
+    play_out(clients, rid)
+
+    # The final round is sealed until the host opens the table. A personal best
+    # drawn from a completed-but-unrevealed room would be a way around it.
+    assert settled(host, rid)["state"] == "complete"
+    assert host.get("/api/fantasy/draft/record/mine").json() == {
+        "gamesCompleted": 0,
+        "best": None,
+    }
+
+    host.post(f"/api/fantasy/draft/sessions/{rid}/reveal")
+    record = host.get("/api/fantasy/draft/record/mine").json()
+    assert record["gamesCompleted"] == 1
+    assert record["best"]["mode"] == draft_order_game.MODE_LEAGUE
+    assert record["best"]["playerCount"] == 2
+    assert record["best"]["pick"] in {1, 2}
 
 
 def test_only_admin_can_delete_a_room_and_the_deal_goes_with_it(monkeypatch):

@@ -17,7 +17,7 @@ from collections import defaultdict
 from typing import Any, Iterable
 
 from fastapi import HTTPException
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -69,10 +69,27 @@ MAX_PLAYERS = 16
 # Rooms are cheap to open and, until a host could clear their own lobby, nothing
 # ever removed one. This is a guard rail, not a quota: a league runs one draft.
 MAX_OPEN_ROOMS_PER_HOST = 10
+# A bot game is opened on a whim and abandoned just as easily, so it gets a
+# tighter guard rail than a league draft — and the host can clear their own at
+# any point, so the cap is never a dead end. See delete_session.
+MAX_OPEN_BOT_ROOMS_PER_HOST = 3
 MODE_LEAGUE = "league"
 MODE_PRACTICE = "practice"
 MODE_TEST = "test"
-ROOM_MODES = frozenset({MODE_LEAGUE, MODE_PRACTICE, MODE_TEST})
+# Any manager can open one of these: them against a table of bots, played under
+# the same rules, scoring, and proof as a league draft.
+MODE_BOTS = "bots"
+ROOM_MODES = frozenset({MODE_LEAGUE, MODE_PRACTICE, MODE_TEST, MODE_BOTS})
+# Rooms where bots sit at the table and the host's client drives their turns.
+BOT_ROOM_MODES = frozenset({MODE_TEST, MODE_BOTS})
+# Rooms with no other human in them. Nobody else's played hands are lost when
+# the host clears one, so they can be deleted at any point in their life.
+SOLO_ROOM_MODES = frozenset({MODE_PRACTICE, MODE_BOTS})
+OPEN_ROOM_CAPS = {
+    MODE_LEAGUE: MAX_OPEN_ROOMS_PER_HOST,
+    MODE_BOTS: MAX_OPEN_BOT_ROOMS_PER_HOST,
+}
+OPEN_ROOM_CAP_NOUNS = {MODE_LEAGUE: "draft rooms", MODE_BOTS: "bot games"}
 BOT_NAMES = (
     "Ace Bot",
     "Blitz Bot",
@@ -803,7 +820,7 @@ def serialize_session(
         ),
         "canRunBot": bool(
             viewer_normalized == room.created_by
-            and room.mode == MODE_TEST
+            and room.mode in BOT_ROOM_MODES
             and room.state == "active"
             and current_player is not None
             and current_player.is_bot
@@ -841,17 +858,18 @@ def create_session(
         raise HTTPException(status_code=400, detail="League name must be 3–60 characters.")
     if mode not in ROOM_MODES:
         raise ValueError(f"Unsupported draft room mode: {mode}")
-    if mode == MODE_LEAGUE:
+    cap = OPEN_ROOM_CAPS.get(mode)
+    if cap is not None:
         open_rooms = db.query(func.count(FantasyDraftSession.id)).filter(
             FantasyDraftSession.created_by == username,
-            FantasyDraftSession.mode == MODE_LEAGUE,
+            FantasyDraftSession.mode == mode,
             FantasyDraftSession.state.in_(("lobby", "active")),
         ).scalar() or 0
-        if open_rooms >= MAX_OPEN_ROOMS_PER_HOST:
+        if open_rooms >= cap:
             raise HTTPException(
                 status_code=409,
                 detail=(
-                    f"You already have {MAX_OPEN_ROOMS_PER_HOST} draft rooms open. "
+                    f"You already have {cap} {OPEN_ROOM_CAP_NOUNS[mode]} open. "
                     "Finish or delete one before starting another."
                 ),
             )
@@ -936,22 +954,20 @@ def create_practice_session(db: Session, identity: dict[str, str]) -> FantasyDra
     return room
 
 
-def create_test_session(
+def _seat_bots(
     db: Session,
     identity: dict[str, str],
     league_name: str,
     bot_count: int,
+    mode: str,
 ) -> FantasyDraftSession:
-    """Create an admin-only production test room with marked bot players."""
-    if identity.get("role") != accounts.ROLE_ADMIN:
-        raise HTTPException(status_code=403, detail="Only the site admin can create bot test rooms.")
     if bot_count < 1 or bot_count > len(BOT_NAMES):
         raise HTTPException(
             status_code=400,
             detail=f"Choose between 1 and {len(BOT_NAMES)} bot opponents.",
         )
 
-    room = create_session(db, identity, league_name, mode=MODE_TEST)
+    room = create_session(db, identity, league_name, mode=mode)
     for index, display_name in enumerate(BOT_NAMES[:bot_count], start=1):
         db.add(FantasyDraftPlayer(
             id=str(uuid.uuid4()),
@@ -963,6 +979,34 @@ def create_test_session(
     db.commit()
     db.refresh(room)
     return room
+
+
+def create_bot_session(
+    db: Session,
+    identity: dict[str, str],
+    league_name: str,
+    bot_count: int,
+) -> FantasyDraftSession:
+    """Create a room where one manager plays a full draft against bots.
+
+    Identical to a league draft in every way that matters — same decks, same
+    scoring, same sealed final round, same proof — so a manager can learn the
+    game against opponents who press their luck back, without needing a league
+    to show up. Practice is the solo warm-up; this is the whole game.
+    """
+    return _seat_bots(db, identity, league_name, bot_count, MODE_BOTS)
+
+
+def create_test_session(
+    db: Session,
+    identity: dict[str, str],
+    league_name: str,
+    bot_count: int,
+) -> FantasyDraftSession:
+    """Create an admin-only production test room with marked bot players."""
+    if identity.get("role") != accounts.ROLE_ADMIN:
+        raise HTTPException(status_code=403, detail="Only the site admin can create bot test rooms.")
+    return _seat_bots(db, identity, league_name, bot_count, MODE_TEST)
 
 
 def join_session(db: Session, identity: dict[str, str], join_code: str) -> FantasyDraftSession:
@@ -1072,6 +1116,9 @@ def delete_session(db: Session, identity: dict[str, str], session_id: str) -> No
     from under the managers who played it — and without this, an account that
     filled MAX_OPEN_ROOMS_PER_HOST would have no way to open another.
 
+    A practice run or a bot game is the exception at any point in its life: the
+    only human hands in it are the host's own.
+
     The child tables declare ON DELETE CASCADE, but SQLite only honours that
     with foreign keys switched on per connection, so the rows are cleared here
     rather than trusting the database to do it.
@@ -1084,7 +1131,7 @@ def delete_session(db: Session, identity: dict[str, str], session_id: str) -> No
                 status_code=403,
                 detail="Only the host or the site admin can delete a room.",
             )
-        if room.state != "lobby":
+        if room.state != "lobby" and room.mode not in SOLO_ROOM_MODES:
             raise HTTPException(
                 status_code=409,
                 detail="Cards have already been dealt here. Ask the site admin to clear it.",
@@ -1560,14 +1607,14 @@ def _bot_should_bank(
     target = 18 + (int.from_bytes(_context_key(room.master_seed, context)[:2], "big") % 10)
     # A doubled last round is worth pressing for. Left on the normal line, bots
     # bank their usual ~22 in the one round where the bigger half of the prize
-    # is still on the table, and a test room would flatter the leader's odds of
+    # is still on the table, and a bot table would flatter the leader's odds of
     # holding on compared with a table of managers who can see the multiplier.
     if round_row.round_number == ROUNDS_PER_PLAYER and _final_round_multiplier(room) > 1:
         return len(cards) >= 5 or (len(cards) >= 3 and round_row.score >= target + 6)
     return len(cards) >= 4 or (len(cards) >= 2 and round_row.score >= target)
 
 
-def play_test_bot_step(
+def play_bot_step(
     db: Session,
     identity: dict[str, str],
     session_id: str,
@@ -1584,12 +1631,12 @@ def play_test_bot_step(
     release_due_turn(db, session_id)
     room = _session_or_404(db, session_id, lock=True)
     _reject_if_held(room)
-    if room.mode != MODE_TEST:
-        raise HTTPException(status_code=409, detail="Bots only play inside test rooms.")
+    if room.mode not in BOT_ROOM_MODES:
+        raise HTTPException(status_code=409, detail="There are no bots at this table.")
     if username != room.created_by:
-        raise HTTPException(status_code=403, detail="Only the test-room host can run bots.")
+        raise HTTPException(status_code=403, detail="Only the host can run the bots.")
     if room.state != "active" or not room.current_player_id:
-        raise HTTPException(status_code=409, detail="This test room isn't waiting on a bot.")
+        raise HTTPException(status_code=409, detail="This room isn't waiting on a bot.")
 
     player = db.query(FantasyDraftPlayer).filter(
         FantasyDraftPlayer.id == room.current_player_id,
@@ -1629,7 +1676,10 @@ def list_sessions_for_user(db: Session, identity: dict[str, str]) -> list[dict[s
         .join(FantasyDraftPlayer, FantasyDraftPlayer.session_id == FantasyDraftSession.id)
         .filter(
             FantasyDraftPlayer.username == username,
-            FantasyDraftSession.mode == MODE_LEAGUE,
+            # A bot game belongs here for the same reason a league draft does:
+            # it is a full five-round game the manager can walk away from and
+            # come back to. The solo practice warm-up still stays out.
+            FantasyDraftSession.mode.in_((MODE_LEAGUE, MODE_BOTS)),
         )
         .order_by(FantasyDraftSession.created_at.desc())
         .limit(12)
@@ -1704,6 +1754,68 @@ def list_all_sessions(db: Session, identity: dict[str, str]) -> list[dict[str, A
         }
         for room in rooms
     ]
+
+
+def career_record(db: Session, identity: dict[str, str]) -> dict[str, Any]:
+    """What an account has to show for every game it has finished.
+
+    Only rooms whose scores are open count. A completed league draft keeps every
+    final-round score sealed until the host reveals it, and a personal best on
+    the home screen would be a way around that seal.
+
+    Score is the one number that compares cleanly across modes: it comes only
+    from the cards a manager took and when they chose to stop, never from who
+    else was at the table. A best set against bots is the same feat as one set
+    on draft night.
+    """
+    username, _ = _identity_names(identity)
+    finished = (
+        db.query(FantasyDraftPlayer, FantasyDraftSession)
+        .join(FantasyDraftSession, FantasyDraftSession.id == FantasyDraftPlayer.session_id)
+        .filter(
+            FantasyDraftPlayer.username == username,
+            FantasyDraftSession.state == "complete",
+            or_(
+                FantasyDraftSession.revealed_at.isnot(None),
+                FantasyDraftSession.mode == MODE_PRACTICE,
+            ),
+        )
+        .all()
+    )
+    if not finished:
+        return {"gamesCompleted": 0, "best": None}
+
+    # Ties on score go to the most recent run, so a repeat of a personal best
+    # reads as something that just happened rather than old news.
+    player, room = max(
+        finished,
+        key=lambda row: (row[0].final_score, row[1].completed_at or row[1].created_at),
+    )
+    players = _players(db, room.id)
+    rounds_by_player: dict[str, list[FantasyDraftRound]] = defaultdict(list)
+    for round_row in _rounds(db, room.id):
+        rounds_by_player[round_row.player_id].append(round_row)
+    final_order = _final_order(players, rounds_by_player, room.master_seed)
+    return {
+        "gamesCompleted": len(finished),
+        "best": {
+            "score": player.final_score,
+            "bestRound": _best_round(rounds_by_player[player.id]),
+            "pick": next(
+                (
+                    place
+                    for place, row in enumerate(final_order, start=1)
+                    if row.id == player.id
+                ),
+                None,
+            ),
+            "playerCount": len(players),
+            "sessionId": room.id,
+            "leagueName": room.league_name,
+            "mode": room.mode or MODE_LEAGUE,
+            "completedAt": (room.completed_at or room.created_at).isoformat(),
+        },
+    }
 
 
 def verification(db: Session, room: FantasyDraftSession) -> dict[str, Any]:
