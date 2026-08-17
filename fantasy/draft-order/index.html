@@ -17,7 +17,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&amp;family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/shared/site-nav.css?v=13">
-    <link rel="stylesheet" href="style.css?v=13">
+    <link rel="stylesheet" href="style.css?v=14">
 </head>
 <body>
     <main class="draft-shell">
@@ -72,6 +72,18 @@
                     <p id="personalBestWhere">—</p>
                     <p id="personalBestMeta" class="fine-print"></p>
                 </div>
+            </section>
+
+            <section id="scoreLeaderboardCard" class="state-card score-leaderboard" hidden>
+                <div class="section-heading section-heading--compact">
+                    <div>
+                        <p class="section-kicker">Hall of fortune</p>
+                        <h3>Top 10 runs</h3>
+                    </div>
+                    <p class="score-leaderboard__note">Practice, bot tables, and revealed league games</p>
+                </div>
+                <ol id="scoreLeaderboard" class="score-leaderboard__list"></ol>
+                <p id="scoreLeaderboardEmpty" class="score-leaderboard__empty" hidden>Finish the first run to set the score to beat.</p>
             </section>
 
             <section class="state-card practice-card">
@@ -345,6 +357,6 @@
     <script src="/shared/api-base.js?v=1"></script>
     <script src="format.js?v=8"></script>
     <script src="verify.js?v=2"></script>
-    <script src="app.js?v=18"></script>
+    <script src="app.js?v=19"></script>
 </body>
 </html>

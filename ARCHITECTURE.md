@@ -115,7 +115,10 @@ modes advance one bot action at a time — the host's client paces them — thro
 the same scoring and verification path as a real draft. `record/mine` reports an
 account's highest score across every finished game whose scores are open; a
 completed league draft is left out until its reveal, since the final round is
-sealed until then.
+sealed until then. `leaderboard` ranks the ten highest human runs across
+practice, bot-table, and revealed league games. It keeps repeated runs by the
+same account, excludes bot seats and admin test rooms, and honors the same
+final-score seal.
 
 A turn that ends is not handed straight to the next manager. The room enters
 `turn_state = 'resolved'`, keeps the finished hand and the acting player on the

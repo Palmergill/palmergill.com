@@ -59,6 +59,9 @@
         personalBestScore: byId("personalBestScore"),
         personalBestWhere: byId("personalBestWhere"),
         personalBestMeta: byId("personalBestMeta"),
+        scoreLeaderboardCard: byId("scoreLeaderboardCard"),
+        scoreLeaderboard: byId("scoreLeaderboard"),
+        scoreLeaderboardEmpty: byId("scoreLeaderboardEmpty"),
         startPracticeButton: byId("startPracticeButton"),
         botRoomForm: byId("botRoomForm"),
         botCount: byId("botCount"),
@@ -396,6 +399,39 @@
         ].filter(Boolean).join(" · ");
     }
 
+    function renderScoreLeaderboard(payload) {
+        const runs = payload?.runs || [];
+        els.scoreLeaderboardCard.hidden = false;
+        els.scoreLeaderboardEmpty.hidden = runs.length > 0;
+        els.scoreLeaderboard.replaceChildren();
+        runs.forEach((run) => {
+            const row = document.createElement("li");
+            if (run.isViewer) row.className = "is-viewer";
+
+            const rank = document.createElement("span");
+            rank.className = "score-leaderboard__rank";
+            rank.textContent = String(run.rank).padStart(2, "0");
+
+            const player = document.createElement("div");
+            player.className = "score-leaderboard__player";
+            const name = document.createElement("strong");
+            name.textContent = run.displayName;
+            const detail = document.createElement("span");
+            detail.textContent = `${F.roomModeName(run.mode)} · ${shortDate(run.completedAt)}`;
+            player.append(name, detail);
+
+            const round = document.createElement("span");
+            round.className = "score-leaderboard__round";
+            round.textContent = `Best round ${run.bestRound}`;
+
+            const score = document.createElement("strong");
+            score.className = "score-leaderboard__score";
+            score.textContent = `${run.score} pts`;
+            row.append(rank, player, round, score);
+            els.scoreLeaderboard.appendChild(row);
+        });
+    }
+
     function shortDate(value) {
         const when = value ? new Date(value) : null;
         if (!when || Number.isNaN(when.getTime())) return "";
@@ -483,6 +519,7 @@
         // Each of these is its own request so a failure leaves the launcher
         // standing rather than blanking the whole screen.
         await loadRecord();
+        await loadScoreLeaderboard();
         if (state.identity.role === "admin") await loadAdminRooms();
     }
 
@@ -491,6 +528,14 @@
             renderRecord(await requestJson("/record/mine"));
         } catch {
             els.personalBestCard.hidden = true;
+        }
+    }
+
+    async function loadScoreLeaderboard() {
+        try {
+            renderScoreLeaderboard(await requestJson("/leaderboard"));
+        } catch {
+            els.scoreLeaderboardCard.hidden = true;
         }
     }
 

@@ -1818,6 +1818,65 @@ def career_record(db: Session, identity: dict[str, str]) -> dict[str, Any]:
     }
 
 
+def score_leaderboard(db: Session, identity: dict[str, str]) -> dict[str, Any]:
+    """The ten highest human runs across every public game mode.
+
+    A run is a player's result in one completed room, so the same manager may
+    appear more than once. Practice belongs here: the cards and scoring are the
+    same even though no league room is affected. Bot seats and admin test rooms
+    are operational noise rather than player achievements, and a league or bot
+    game's score remains private until its final reveal.
+    """
+    username, _ = _identity_names(identity)
+    rows = (
+        db.query(FantasyDraftPlayer, FantasyDraftSession)
+        .join(FantasyDraftSession, FantasyDraftSession.id == FantasyDraftPlayer.session_id)
+        .filter(
+            FantasyDraftPlayer.is_bot.is_(False),
+            FantasyDraftSession.state == "complete",
+            or_(
+                FantasyDraftSession.mode.is_(None),
+                FantasyDraftSession.mode != MODE_TEST,
+            ),
+            or_(
+                FantasyDraftSession.revealed_at.isnot(None),
+                FantasyDraftSession.mode == MODE_PRACTICE,
+            ),
+        )
+        .order_by(
+            FantasyDraftPlayer.final_score.desc(),
+            FantasyDraftSession.completed_at.desc(),
+            FantasyDraftSession.created_at.desc(),
+        )
+        .limit(10)
+        .all()
+    )
+    if not rows:
+        return {"runs": []}
+
+    player_ids = [player.id for player, _room in rows]
+    best_rounds = dict(
+        db.query(FantasyDraftRound.player_id, func.max(FantasyDraftRound.score))
+        .filter(FantasyDraftRound.player_id.in_(player_ids))
+        .group_by(FantasyDraftRound.player_id)
+        .all()
+    )
+    return {
+        "runs": [
+            {
+                "rank": rank,
+                "displayName": player.display_name,
+                "score": player.final_score,
+                "bestRound": best_rounds.get(player.id, 0),
+                "mode": room.mode or MODE_LEAGUE,
+                "completedAt": (room.completed_at or room.created_at).isoformat(),
+                "isViewer": player.username == username,
+            }
+            for rank, (player, room) in enumerate(rows, start=1)
+        ],
+    }
+
+
 def verification(db: Session, room: FantasyDraftSession) -> dict[str, Any]:
     if room.state != "complete":
         raise HTTPException(

@@ -1263,6 +1263,102 @@ def test_personal_best_waits_for_the_reveal_that_unseals_the_score(monkeypatch):
     assert record["best"]["pick"] in {1, 2}
 
 
+def test_score_leaderboard_includes_practice_and_every_human_run(monkeypatch):
+    viewer = member_client(monkeypatch, "road-warrior")
+    now = utc_now()
+
+    def add_run(
+        db,
+        index,
+        score,
+        *,
+        username=None,
+        mode=draft_order_game.MODE_PRACTICE,
+        revealed=True,
+        is_bot=False,
+    ):
+        room_id = f"leader-room-{index}"
+        player_id = f"leader-player-{index}"
+        completed_at = now + timedelta(minutes=index)
+        db.add(FantasyDraftSession(
+            id=room_id,
+            league_name=f"Leaderboard run {index}",
+            join_code=f"L{index:05d}",
+            master_seed=f"seed-{index}",
+            seed_hash=f"hash-{index}",
+            mode=mode,
+            state="complete",
+            created_by=username or f"runner-{index}",
+            created_at=completed_at,
+            completed_at=completed_at,
+            revealed_at=completed_at if revealed else None,
+        ))
+        db.add(FantasyDraftPlayer(
+            id=player_id,
+            session_id=room_id,
+            username=username or f"runner-{index}",
+            display_name=(username or f"Runner {index}").replace("-", " ").title(),
+            is_bot=is_bot,
+            final_score=score,
+        ))
+        db.add(FantasyDraftRound(
+            id=f"leader-round-{index}",
+            session_id=room_id,
+            player_id=player_id,
+            round_number=1,
+            score=score // 2,
+            state="banked",
+            ended_at=completed_at,
+        ))
+
+    db = SessionLocal()
+    try:
+        # Twelve eligible results prove the board is a top ten of runs, not a
+        # one-row-per-account list. The viewer earns two independent places.
+        for index in range(12):
+            add_run(
+                db,
+                index,
+                120 - index,
+                username="road-warrior" if index in {0, 5} else None,
+                mode=(
+                    draft_order_game.MODE_PRACTICE
+                    if index % 3 == 0
+                    else draft_order_game.MODE_BOTS
+                    if index % 3 == 1
+                    else draft_order_game.MODE_LEAGUE
+                ),
+            )
+        add_run(db, 20, 999, mode=draft_order_game.MODE_LEAGUE, revealed=False)
+        add_run(db, 21, 998, mode=draft_order_game.MODE_TEST)
+        add_run(db, 22, 997, mode=draft_order_game.MODE_BOTS, is_bot=True)
+        db.commit()
+    finally:
+        db.close()
+
+    response = viewer.get("/api/fantasy/draft/leaderboard")
+    assert response.status_code == 200
+    runs = response.json()["runs"]
+    assert len(runs) == 10
+    assert [run["rank"] for run in runs] == list(range(1, 11))
+    assert [run["score"] for run in runs] == list(range(120, 110, -1))
+    assert {run["mode"] for run in runs} == {
+        draft_order_game.MODE_PRACTICE,
+        draft_order_game.MODE_BOTS,
+        draft_order_game.MODE_LEAGUE,
+    }
+    assert sum(run["isViewer"] for run in runs) == 2
+    assert runs[0]["bestRound"] == 60
+
+
+def test_score_leaderboard_requires_an_account(monkeypatch):
+    monkeypatch.setenv("APP_AUTH_USERNAME", "palmer")
+    monkeypatch.setenv("APP_AUTH_PASSWORD", ADMIN_PASSWORD)
+    client = TestClient(app)
+
+    assert client.get("/api/fantasy/draft/leaderboard").status_code == 401
+
+
 def test_only_admin_can_delete_a_room_and_the_deal_goes_with_it(monkeypatch):
     admin = admin_client(monkeypatch)
     guest = member_client(monkeypatch, "road-warrior")

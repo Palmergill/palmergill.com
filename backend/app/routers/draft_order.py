@@ -51,6 +51,12 @@ def my_record(request: Request, db: Session = Depends(get_db)) -> dict[str, Any]
     return draft_order_game.career_record(db, identity)
 
 
+@router.get("/leaderboard")
+def leaderboard(request: Request, db: Session = Depends(get_db)) -> dict[str, Any]:
+    identity = _identity(request)
+    return draft_order_game.score_leaderboard(db, identity)
+
+
 @router.post("/sessions", status_code=201)
 def create_room(
     payload: CreateRoomRequest,
