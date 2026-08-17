@@ -54,6 +54,23 @@ describe('FantasyFormat', () => {
         expect(flat.points).toBe('0,20 50,20 100,20');
     });
 
+    test('seasonLine keeps the half point and separates thousands', () => {
+        expect(FantasyFormat.seasonLine(999.5)).toBe('999.5');
+        expect(FantasyFormat.seasonLine(3499.5)).toBe('3,499.5');
+        expect(FantasyFormat.seasonLine(13.5)).toBe('13.5');
+        // A whole-number threshold should not grow a bogus ".0".
+        expect(FantasyFormat.seasonLine(12)).toBe('12');
+        expect(FantasyFormat.seasonLine(null)).toBe('—');
+        expect(FantasyFormat.seasonLine(undefined)).toBe('—');
+    });
+
+    test('impliedChance reads a quote as a whole percent', () => {
+        expect(FantasyFormat.impliedChance(0.735)).toBe('74%');
+        expect(FantasyFormat.impliedChance(0.11)).toBe('11%');
+        expect(FantasyFormat.impliedChance(0)).toBe('0%');
+        expect(FantasyFormat.impliedChance(null)).toBe('—');
+    });
+
     test('americanOdds signs positive prices and dashes empties', () => {
         expect(FantasyFormat.americanOdds(150)).toBe('+150');
         expect(FantasyFormat.americanOdds(-110)).toBe('-110');

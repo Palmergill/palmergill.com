@@ -168,6 +168,18 @@ def player_season_props(
     return result
 
 
+@router.get("/season-props")
+def season_prop_leaders(
+    market: Optional[str] = None,
+    season: Optional[int] = None,
+    limit: int = Query(60, ge=1, le=200),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    return fantasy_data.get_season_prop_leaders(
+        db, market=market, season=season, limit=limit
+    )
+
+
 @router.get("/trending")
 def trending(
     kind: str = Query("add", pattern="^(add|drop)$"),

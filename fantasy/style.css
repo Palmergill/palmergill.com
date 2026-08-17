@@ -281,6 +281,66 @@ body {
 .season-props__status--error { color: #f2c4b3; }
 .season-props .betting-disclaimer { color: #839586; }
 
+/* The section runs on a dark card, so the chips and table that the rest of
+   the page renders on parchment need their own palette here. */
+.season-props .chip-row { margin: 18px 0 4px; }
+
+.season-props .chip {
+    border-color: rgba(255, 255, 255, 0.16);
+    background: rgba(255, 255, 255, 0.06);
+    color: #c3cec5;
+}
+
+.season-props .chip:hover:not(:disabled) { border-color: #8fb08f; color: #fff; }
+
+.season-props .chip[aria-pressed="true"] {
+    border-color: #8fb08f;
+    background: #8fb08f;
+    color: #16241c;
+}
+
+.season-props .chip:disabled { cursor: default; opacity: 0.38; }
+
+/* The card keeps overflow visible so the search dropdown can escape it, so
+   the table gets its own scroller: five columns do not fit a phone, and
+   without this it spills out past the card's rounded edge. */
+.season-props__table { margin-top: 6px; min-width: 340px; }
+
+.season-props__table thead th {
+    color: #93a596;
+    border-bottom-color: rgba(255, 255, 255, 0.14);
+}
+
+.season-leader td {
+    padding: 9px 10px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.season-leader { cursor: pointer; transition: background 0.12s; }
+.season-leader:hover { background: rgba(255, 255, 255, 0.06); }
+.season-leader:focus-visible {
+    outline: none;
+    box-shadow: inset 0 0 0 2px rgba(143, 176, 143, 0.6);
+}
+
+.season-leader .col-rank { color: #7f9284; font-variant-numeric: tabular-nums; }
+.season-leader .col-proj { font-variant-numeric: tabular-nums; }
+
+.season-leader__name { display: block; font-weight: 600; }
+.season-leader__meta { display: block; margin-top: 1px; color: #8ea08f; font-size: 0.72rem; }
+
+/* The line is the headline number; the chance is the qualifier that keeps a
+   long shot on the top rung from reading as the market's favourite. */
+.season-leader__chance { color: #b8c5bb; }
+
+.season-props__note {
+    margin: 12px 0 0;
+    color: #839586;
+    font-size: 0.72rem;
+    line-height: 1.5;
+}
+
+
 .draft-feature {
     position: relative;
     display: flex;

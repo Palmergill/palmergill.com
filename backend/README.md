@@ -74,7 +74,9 @@ the parser reads each contract's strike as the over/under point and its YES
 price as the Over. It is an overlay on the projection consensus, not a
 replacement: roughly 110 players clear its quote filter versus a few thousand
 in the Sleeper/FantasyPros/ESPN projections, and thinly quoted contracts are
-dropped rather than shown. Optional overrides:
+dropped rather than shown. `GET /api/fantasy/season-props` ranks everyone
+quoted in one category — the entry point, since a bare name lookup only helps
+once you already know who has a market. Optional overrides:
 
 ```text
 KALSHI_MAX_SPREAD=0.20   # widest YES bid/ask still treated as a real quote

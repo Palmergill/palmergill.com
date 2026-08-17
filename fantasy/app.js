@@ -40,6 +40,9 @@
         seasonPropsSearch: document.getElementById("seasonPropsSearch"),
         seasonPropsResults: document.getElementById("seasonPropsResults"),
         seasonPropsPanel: document.getElementById("seasonPropsPanel"),
+        seasonPropsTabs: document.getElementById("seasonPropsTabs"),
+        seasonPropsLeaders: document.getElementById("seasonPropsLeaders"),
+        seasonPropsNote: document.getElementById("seasonPropsNote"),
         rankingsSource: document.getElementById("rankingsSource"),
         rankingsAsOf: document.getElementById("rankingsAsOf"),
         rankBody: document.getElementById("rankBody"),
@@ -473,6 +476,86 @@
         item.appendChild(el("small", null, label));
         item.appendChild(el("b", null, price == null ? "—" : F.americanOdds(price)));
         return item;
+    }
+
+    // The exchange quotes barely a hundred of the several thousand players in
+    // the catalog, so a bare search box is a guessing game: most names a
+    // manager thinks to type have no market at all. The board leads with who
+    // is actually quoted, and the search is there to jump to one of them.
+    async function loadSeasonPropLeaders(market) {
+        if (!els.seasonPropsLeaders) return;
+        try {
+            const query = market ? `?market=${encodeURIComponent(market)}` : "";
+            const data = await fetchJson(`${API_BASE}/season-props${query}`);
+            renderSeasonPropTabs(data);
+            renderSeasonPropLeaders(data);
+        } catch (err) {
+            els.seasonPropsLeaders.innerHTML = "";
+            els.seasonPropsNote.textContent = "Season lines are unavailable right now.";
+        }
+    }
+
+    function renderSeasonPropTabs(data) {
+        els.seasonPropsTabs.innerHTML = "";
+        (data.markets || []).forEach((entry) => {
+            const tab = el("button", "chip", entry.label);
+            tab.type = "button";
+            tab.setAttribute("aria-pressed", String(entry.market === data.market));
+            // A category with nothing trading stays visible but unclickable,
+            // so the board reads as "not quoted" rather than "not built".
+            tab.disabled = entry.players === 0;
+            tab.title = entry.players === 0
+                ? `${entry.label} — nothing quoted`
+                : `${entry.label} — ${entry.players} players quoted`;
+            tab.addEventListener("click", () => loadSeasonPropLeaders(entry.market));
+            els.seasonPropsTabs.appendChild(tab);
+        });
+    }
+
+    function renderSeasonPropLeaders(data) {
+        const leaders = data.leaders || [];
+        els.seasonPropsLeaders.innerHTML = "";
+        leaders.forEach((entry, index) => {
+            const player = entry.player || {};
+            const tr = el("tr", "season-leader");
+            tr.tabIndex = 0;
+            tr.setAttribute("role", "button");
+            tr.setAttribute("aria-label", `Open ${player.name || "player"} season lines`);
+            tr.appendChild(el("td", "col-rank", index + 1));
+            const who = el("td", "col-player");
+            who.appendChild(el("span", "season-leader__name", player.name || player.player_id));
+            who.appendChild(el("span", "season-leader__meta",
+                `${player.position || ""} ${player.team || ""}`.trim()));
+            tr.appendChild(who);
+            tr.appendChild(el("td", "col-proj", F.seasonLine(entry.line)));
+            tr.appendChild(el("td", "col-proj", entry.over_price == null ? "—" : F.americanOdds(entry.over_price)));
+            tr.appendChild(el("td", "col-proj season-leader__chance", F.impliedChance(entry.over_chance)));
+            const open = () => {
+                if (player.player_id) loadPlayerSeasonProps(player.player_id);
+            };
+            tr.addEventListener("click", open);
+            tr.addEventListener("keydown", (event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    open();
+                }
+            });
+            els.seasonPropsLeaders.appendChild(tr);
+        });
+
+        const asOf = formatAsOf(data.as_of);
+        if (!leaders.length) {
+            els.seasonPropsNote.textContent = "Nothing is quoted in this category yet.";
+            return;
+        }
+        // Say out loud that the board clusters. The exchange posts three to
+        // five thresholds per category, so most of a category sits on one
+        // number and the chance beside it is what separates those players.
+        els.seasonPropsNote.textContent = [
+            `${leaders.length} player${leaders.length === 1 ? "" : "s"} quoted`,
+            "the market posts only a handful of thresholds, so players cluster on the same line — the chance separates them",
+            [data.source, asOf].filter(Boolean).join(" · "),
+        ].filter(Boolean).join(" · ");
     }
 
     // ── rankings ────────────────────────────────────────────────────────
@@ -1211,6 +1294,7 @@
         buildChips();
         initSearch();
         initSeasonPropsSearch();
+        loadSeasonPropLeaders();
         initCompareControls();
         renderCompareTray();
         els.drawerClose.addEventListener("click", closeDrawer);

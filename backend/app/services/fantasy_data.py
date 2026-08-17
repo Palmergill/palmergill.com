@@ -1139,6 +1139,96 @@ def get_player_season_props(
     }
 
 
+def get_season_prop_leaders(
+    db: Session,
+    market: Optional[str] = None,
+    season: Optional[int] = None,
+    limit: int = 60,
+) -> Dict[str, Any]:
+    """Every player the exchange quotes in one market, ranked by their line.
+
+    The per-player lookup answers "what is this player's number", which is
+    only useful once you already know he has one — and barely a hundred of
+    the several thousand players in the catalog do. This answers the question
+    that has to come first: who is quoted at all.
+
+    Each player's headline number comes from `_season_market_summary`, the
+    same routine behind the player card, so a leader's line always matches
+    what opening that player shows.
+    """
+    if season is None:
+        season = default_context(db)["season"]
+    run = latest_successful_run(db, "season_props", season=season)
+    labels = dict(SEASON_PROP_MARKETS)
+
+    rows_by_market: Dict[str, Dict[str, list]] = {key: {} for key, _ in SEASON_PROP_MARKETS}
+    if run is not None:
+        snapshots = (
+            db.query(FantasySeasonPropSnapshot)
+            .filter(
+                FantasySeasonPropSnapshot.run_id == run.id,
+                FantasySeasonPropSnapshot.player_id.isnot(None),
+            )
+            .all()
+        )
+        for row in snapshots:
+            if row.market in rows_by_market:
+                rows_by_market[row.market].setdefault(row.player_id, []).append(row)
+
+    # A market nobody is quoted in is still reported, with a count of zero, so
+    # the client can show the whole board and grey out what is not trading
+    # rather than silently offering a tab that turns up empty.
+    markets = [
+        {"market": key, "label": label, "players": len(rows_by_market[key])}
+        for key, label in SEASON_PROP_MARKETS
+    ]
+    if market not in rows_by_market:
+        market = max(markets, key=lambda entry: entry["players"])["market"]
+
+    leaders = []
+    players = _player_index(db, list(rows_by_market[market]))
+    for player_id, rows in rows_by_market[market].items():
+        summary = _season_market_summary(rows, market, labels[market])
+        if summary["line"] is None:
+            continue
+        chance = _implied_probability(summary["over_price"])
+        leaders.append({
+            "player": _player_public(players.get(player_id)),
+            "line": summary["line"],
+            "over_price": summary["over_price"],
+            "under_price": summary["under_price"],
+            "over_chance": round(chance, 3) if chance is not None else None,
+        })
+    # Biggest number first, then how likely the market thinks it is to be
+    # cleared. The exchange posts only three to five thresholds per category,
+    # so a bare line sort is mostly one long tie — thirty of the fifty-four
+    # receivers quoted sit on the same 999.5 — and the tie would fall out
+    # alphabetically. The price is what separates them, so it ranks them.
+    #
+    # This orders within a threshold, not across one: a player quoted at the
+    # next rung up still leads the board even when the market gives him little
+    # chance of getting there. The published chance beside each line is what
+    # tells that story, and inventing a blended score to bury it would be
+    # asserting a number the exchange never quoted.
+    leaders.sort(
+        key=lambda entry: (
+            -entry["line"],
+            -(entry["over_chance"] if entry["over_chance"] is not None else 0),
+            entry["player"]["name"] or "",
+        )
+    )
+
+    return {
+        "season": season,
+        "as_of": run.finished_at.isoformat() if run and run.finished_at else None,
+        "source": "Kalshi" if run is not None else None,
+        "market": market,
+        "label": labels[market],
+        "markets": markets,
+        "leaders": leaders[:limit],
+    }
+
+
 def get_futures(db: Session, market: Optional[str] = None, limit: int = 20) -> Dict[str, Any]:
     run = latest_successful_run(db, "odds_futures")
     if run is None:

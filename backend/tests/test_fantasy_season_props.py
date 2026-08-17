@@ -217,3 +217,58 @@ def test_collector_skips_when_provider_unavailable(db):
     run = fc.collect_season_props(db, client=Unavailable())
     assert run.status == "skipped"
     assert "not configured" in run.detail
+
+
+def test_leaderboard_lists_who_is_quoted_and_ranks_them(db):
+    fc.collect_season_props(db, client=FakeKalshi())
+
+    board = fd.get_season_prop_leaders(db, season=2026)
+
+    # Passing yards is the only category with anyone in it, so it leads.
+    assert board["market"] == "season_pass_yds"
+    assert board["source"] == "Kalshi"
+    assert [entry["player"]["name"] for entry in board["leaders"]] == ["Josh Allen"]
+    counts = {entry["market"]: entry["players"] for entry in board["markets"]}
+    assert counts["season_pass_yds"] == 1
+    # Categories nobody trades are still reported, so the client can show the
+    # whole board and mark them rather than hiding a tab that turns up empty.
+    assert counts["season_rush_yds"] == 0
+    assert len(board["markets"]) == 6
+
+
+def test_leaderboard_breaks_a_shared_line_on_the_market_chance(db):
+    class TwoReceivers:
+        configured = True
+        max_spread = 0.20
+
+        def get_season_props(self):
+            return {
+                "KXNFLSEASONRECYDS": [
+                    # Both quoted on the same threshold. Only the price says
+                    # which one the market actually likes.
+                    market("KXNFLSEASONRECYDS-27C1000-LONGSHOT", "Zeta Receiver", 999.5, 0.20, 0.26),
+                    market("KXNFLSEASONRECYDS-27C1000-FAVORITE", "Alpha Receiver", 999.5, 0.70, 0.76),
+                ]
+            }
+
+    db.add(named_player("wr_fav", "Alpha Receiver", "WR", "SEA"))
+    db.add(named_player("wr_dog", "Zeta Receiver", "WR", "NYJ"))
+    db.commit()
+    fc.collect_season_props(db, client=TwoReceivers())
+
+    leaders = fd.get_season_prop_leaders(db, market="season_rec_yds", season=2026)["leaders"]
+
+    assert [entry["player"]["name"] for entry in leaders] == ["Alpha Receiver", "Zeta Receiver"]
+    assert leaders[0]["line"] == leaders[1]["line"] == 999.5
+    assert leaders[0]["over_chance"] == 0.73
+    # Alphabetical order would have put Alpha first by luck; make sure the
+    # price is doing the work.
+    assert leaders[0]["over_chance"] > leaders[1]["over_chance"]
+
+
+def test_leaderboard_is_empty_before_any_collection_run(db):
+    board = fd.get_season_prop_leaders(db, season=2026)
+
+    assert board["leaders"] == []
+    assert board["source"] is None
+    assert all(entry["players"] == 0 for entry in board["markets"])

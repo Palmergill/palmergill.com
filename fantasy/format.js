@@ -97,6 +97,26 @@
         return n > 0 ? `+${n}` : String(n);
     }
 
+    // A season threshold. These run to four figures, so they get separators;
+    // the trailing .5 is the point of the number and always survives.
+    function seasonLine(point) {
+        if (point === null || point === undefined || Number.isNaN(Number(point))) return "—";
+        return Number(point).toLocaleString(undefined, {
+            minimumFractionDigits: Number.isInteger(Number(point)) ? 0 : 1,
+            maximumFractionDigits: 1,
+        });
+    }
+
+    // The market's own probability that a line is cleared. Shown as a whole
+    // percent: the quote it came from is a midpoint of a bid and an ask, and
+    // a decimal place would dress that up as more precision than it has.
+    function impliedChance(probability) {
+        if (probability === null || probability === undefined) return "—";
+        const value = Number(probability);
+        if (Number.isNaN(value)) return "—";
+        return `${Math.round(value * 100)}%`;
+    }
+
     // Spread from the home team's perspective. 0 is a pick'em ("PK").
     function formatSpread(point) {
         if (point === null || point === undefined || Number.isNaN(Number(point))) return "—";
@@ -166,6 +186,8 @@
         rankDelta,
         sparkline,
         americanOdds,
+        seasonLine,
+        impliedChance,
         formatSpread,
         formatSigned,
         formatArticleDate,
