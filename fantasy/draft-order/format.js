@@ -73,6 +73,27 @@
         return "Draft order game";
     }
 
+    // Fourth & Fortune timestamps are stored in UTC. Older API responses did
+    // not include the trailing Z, so accept those as UTC too instead of letting
+    // the browser reinterpret them as local wall-clock time. The board belongs
+    // to a Central-time league, and America/Chicago handles CST/CDT for us.
+    function centralDateTime(value) {
+        if (!value) return "";
+        const text = String(value).trim();
+        const hasOffset = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(text);
+        const when = new Date(hasOffset ? text : `${text}Z`);
+        if (Number.isNaN(when.getTime())) return "";
+        return when.toLocaleString("en-US", {
+            timeZone: "America/Chicago",
+            month: "short",
+            day: "numeric",
+            year: "numeric",
+            hour: "numeric",
+            minute: "2-digit",
+            timeZoneName: "short",
+        });
+    }
+
     // Where a personal best was set, in the manager's own words.
     function bestScoreContext(best) {
         if (!best) return "";
@@ -148,6 +169,7 @@
         verificationUrl,
         gameLengthCopy,
         roomModeName,
+        centralDateTime,
         bestScoreContext,
         turnEventMessage,
         turnEventTone,

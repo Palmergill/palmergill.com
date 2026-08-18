@@ -58,6 +58,17 @@ describe('DraftOrderFormat', () => {
         expect(DraftOrderFormat.roomModeName('test')).toBe('Bot test');
     });
 
+    test('centralDateTime treats API timestamps as UTC and displays Central time', () => {
+        expect(DraftOrderFormat.centralDateTime('2026-07-10T01:30:00')).toBe(
+            'Jul 9, 2026, 8:30 PM CDT'
+        );
+        expect(DraftOrderFormat.centralDateTime('2026-01-10T12:00:00Z')).toBe(
+            'Jan 10, 2026, 6:00 AM CST'
+        );
+        expect(DraftOrderFormat.centralDateTime('not-a-date')).toBe('');
+        expect(DraftOrderFormat.centralDateTime(null)).toBe('');
+    });
+
     test('bestScoreContext says where a personal best was set', () => {
         expect(DraftOrderFormat.bestScoreContext(null)).toBe('');
         expect(DraftOrderFormat.bestScoreContext({

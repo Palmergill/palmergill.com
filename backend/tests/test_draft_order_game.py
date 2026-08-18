@@ -1349,6 +1349,7 @@ def test_score_leaderboard_includes_practice_and_every_human_run(monkeypatch):
     }
     assert sum(run["isViewer"] for run in runs) == 2
     assert runs[0]["bestRound"] == 60
+    assert all(run["completedAt"].endswith("Z") for run in runs)
 
 
 def test_score_leaderboard_requires_an_account(monkeypatch):

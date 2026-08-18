@@ -395,7 +395,7 @@
         els.personalBestMeta.textContent = [
             `Best single round ${best.bestRound} pts`,
             `${games} game${games === 1 ? "" : "s"} finished`,
-            shortDate(best.completedAt),
+            F.centralDateTime(best.completedAt),
         ].filter(Boolean).join(" · ");
     }
 
@@ -417,7 +417,7 @@
             const name = document.createElement("strong");
             name.textContent = run.displayName;
             const detail = document.createElement("span");
-            detail.textContent = `${F.roomModeName(run.mode)} · ${shortDate(run.completedAt)}`;
+            detail.textContent = `${F.roomModeName(run.mode)} · ${F.centralDateTime(run.completedAt)}`;
             player.append(name, detail);
 
             const round = document.createElement("span");
@@ -429,16 +429,6 @@
             score.textContent = `${run.score} pts`;
             row.append(rank, player, round, score);
             els.scoreLeaderboard.appendChild(row);
-        });
-    }
-
-    function shortDate(value) {
-        const when = value ? new Date(value) : null;
-        if (!when || Number.isNaN(when.getTime())) return "";
-        return when.toLocaleDateString(undefined, {
-            month: "short",
-            day: "numeric",
-            year: "numeric",
         });
     }
 
