@@ -33,6 +33,7 @@ One spec per roadmap item. Status legend: `draft` → `accepted` → `in progres
 | 5 | [Casino shell unification](q4-05-casino-shell-unification.md) | in progress — header/lobby/rebuy/responsive fixes shipped, chip/card CSS consolidation remains |
 | 16 | [Fantasy football dashboard](q3-16-fantasy-football-dashboard.md) | in progress — P1–P4 built (data, UI, betting, chat); needs live OpenAI/Odds keys for prod verification |
 | 17 | [ESPN league hub](q3-17-espn-league-hub.md) | in progress — P1–P4 built (data, hub, rosters, AI); needs a live OpenAI key to verify model-backed overviews |
+| 18 | [Personal rankings](q3-18-personal-rankings.md) | implemented — private boards, tiers, public sharing, and published-board site consensus |
 
 ## Q4 2026 (Oct–Dec) — Casino as a coherent product
 

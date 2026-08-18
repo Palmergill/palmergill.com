@@ -698,6 +698,128 @@ class FantasyDraftFlip(Base):
     timestamp = Column(DateTime, default=utc_now, nullable=False)
 
 
+# ── Personal ranking boards (spec 18) ────────────────────────────────────────
+# A member's own fantasy rankings. The load-bearing decision is that a board
+# stores ONE order, not five: the QB list is the overall list filtered to QBs.
+# The product rule is "positional order is authoritative, and an overall drag
+# reorders within the position", which means the positional lists carry no
+# information the overall list does not already have. Storing a second key per
+# position would double every write and turn that rule into something enforced
+# rather than something true by construction.
+
+
+class FantasyRankBoard(Base):
+    """One member's ranking board for a (season, scoring, roster) combination."""
+
+    __tablename__ = "ff_rank_boards"
+    __table_args__ = (
+        UniqueConstraint(
+            "username", "season", "scoring", "roster", name="uq_ff_rank_board_owner"
+        ),
+        Index("ix_ff_rank_boards_public", "published", "season", "scoring", "roster"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    # Normalized account name is the durable identity, matching ff_draft_players:
+    # a ForeignKey to app_users would exclude the admin, who authenticates from
+    # env vars and has no row there.
+    username = Column(String, index=True, nullable=False)
+    display_name = Column(String, nullable=False)
+    season = Column(Integer, index=True, nullable=False)
+    scoring = Column(String, nullable=False)
+    # "1qb" | "superflex". Deliberately a separate axis from scoring rather than
+    # a fourth scoring value: superflex changes replacement level, not how points
+    # are awarded, and `scoring` has to stay a real ppr/half/std because
+    # normalize_scoring() validates it and the seed passes it straight into
+    # fantasy_data.get_rankings(). A string leaves room for "2qb" later.
+    roster = Column(String, default="1qb", server_default="1qb", nullable=False)
+    title = Column(String, nullable=True)
+    # Minted at create time, not at publish, so publishing is a pure boolean flip
+    # and re-publishing restores the same link. Opaque so boards are not
+    # enumerable.
+    share_slug = Column(String, unique=True, index=True, nullable=False)
+    published = Column(Boolean, default=False, server_default=false(), nullable=False)
+    published_at = Column(DateTime, nullable=True)
+    # Provenance of the seed, so a board can say what it was built from.
+    seeded_from = Column(String, nullable=True)
+    seed_run_id = Column(Integer, nullable=True)
+    # Optimistic-concurrency token. Every write carries the revision the client
+    # last saw; a mismatch means another tab moved something and the client is
+    # told to reload rather than silently interleaving two people's intent.
+    revision = Column(Integer, default=1, server_default="1", nullable=False)
+    # SQLAlchemy includes the loaded revision in every UPDATE/DELETE predicate
+    # and increments it atomically. A read-then-compare in application code is
+    # not sufficient: two request sessions can both observe the same revision.
+    __mapper_args__ = {"version_id_col": revision}
+    created_at = Column(DateTime, default=utc_now, nullable=False)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now, nullable=False)
+
+
+class FantasyRankEntry(Base):
+    """One player's place on a board."""
+
+    __tablename__ = "ff_rank_entries"
+    __table_args__ = (
+        UniqueConstraint("board_id", "player_id", name="uq_ff_rank_entry_player"),
+        Index("ix_ff_rank_entries_board_key", "board_id", "sort_key"),
+        Index("ix_ff_rank_entries_board_pos", "board_id", "position", "sort_key"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    board_id = Column(
+        Integer,
+        ForeignKey("ff_rank_boards.id", ondelete="CASCADE"),
+        index=True,
+        nullable=False,
+    )
+    # References ff_players.player_id but deliberately WITHOUT a ForeignKey.
+    # ff_players is a collector-owned snapshot table; a constraint with a cascade
+    # would let a scheduled collection run mutate a member's hand-built board.
+    # The join happens in Python, and a player who vanishes renders as a tombstone
+    # row the owner can remove.
+    player_id = Column(String, index=True, nullable=False)
+    # Snapshotted at seed/add time. If the catalog reclassifies a player, the
+    # board must not silently reshuffle between page loads.
+    position = Column(String, index=True, nullable=False)
+    # Sparse: seeded at 1000, 2000, ... so a drag writes one row (the midpoint of
+    # its new neighbors) instead of renumbering 300. Display rank is never stored
+    # — it is derived densely on read.
+    sort_key = Column(Float, nullable=False)
+    # Where the seed originally put this player overall. Kept so the board can
+    # show "you have him 14 spots higher than the consensus did" without
+    # recomputing the seed.
+    seed_rank = Column(Integer, nullable=True)
+    note = Column(String, nullable=True)
+    added_at = Column(DateTime, default=utc_now, nullable=False)
+
+
+class FantasyRankTier(Base):
+    """A named cut point in a board's ordering.
+
+    A tier is not an attribute of an entry — it is a divider living in the same
+    float key space, so dragging a player past one changes his tier for free and
+    there is no membership column to orphan.
+    """
+
+    __tablename__ = "ff_rank_tiers"
+    __table_args__ = (
+        Index("ix_ff_rank_tiers_board_scope", "board_id", "scope", "sort_key"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    board_id = Column(
+        Integer,
+        ForeignKey("ff_rank_boards.id", ondelete="CASCADE"),
+        index=True,
+        nullable=False,
+    )
+    # OVERALL | QB | RB | WR | TE. A QB-scope divider is simply never merged into
+    # the overall or RB lists.
+    scope = Column(String, nullable=False)
+    label = Column(String, nullable=False)
+    sort_key = Column(Float, nullable=False)
+
+
 def get_db():
     db = SessionLocal()
     try:

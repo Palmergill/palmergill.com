@@ -29,6 +29,7 @@ from app.routers import (
     draft_order,
     fantasy,
     fantasy_league,
+    fantasy_rankings,
 )
 from app.routers.analytics import cleanup_old_analytics, record_analytics_event
 import os
@@ -926,6 +927,7 @@ app.include_router(analytics.router)
 app.include_router(admin.router)
 app.include_router(fantasy.router)
 app.include_router(fantasy_league.router)
+app.include_router(fantasy_rankings.router)
 app.include_router(draft_order.router)
 
 @app.get("/health")

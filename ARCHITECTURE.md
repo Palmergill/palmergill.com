@@ -33,6 +33,7 @@ The active public site is static:
 - `/fantasy/` - fantasy football dashboard
 - `/fantasy/draft-order/` - Fourth & Fortune draft-order rooms
 - `/fantasy/league/` - ESPN league hub (members only; see `MEMBER_PATH_PREFIXES`)
+- `/fantasy/rankings/` - personal ranking boards (spec 18). Deliberately NOT a member path: published boards are shared by URL and the consensus is public, so the page must load for anonymous visitors. The board API gates itself per endpoint instead.
 - `/casino/` - casino landing page linking the browser table games
 - `/poker/` - poker app
 - `/craps/` - craps app
@@ -57,6 +58,7 @@ Important routes:
 - `/api/bitcoin/*`
 - `/api/fantasy/*` (public fantasy reads plus account-gated persistent draft rooms)
 - `/api/fantasy/league/*` (members-only ESPN league reads and digest-cached team overviews; 403 for anonymous callers)
+- `/api/fantasy/rankings/*` (personal ranking boards; every `/boards` route is account-owned and returns JSON 403 to anonymous callers, 404 for someone else's board — including to the admin)
 - `/api/analytics/*` (public client analytics ingest)
 - `/api/admin/*` (logs, analytics aggregates, retention, and `GET /api/admin/users` — the member account roster)
 - `/health`

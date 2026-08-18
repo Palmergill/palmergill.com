@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Rankings — Fantasy Football</title>
+    <meta name="description" content="Build and keep your own fantasy football rankings: quarterbacks, running backs, receivers, tight ends, and one overall board.">
+    <meta name="theme-color" content="#faf6f0">
+    <!-- Personal boards and query-param views make poor search results. -->
+    <meta name="robots" content="noindex, nofollow">
+    <link rel="icon" type="image/png" href="/assets/palmer-gill-logo-small.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/shared/site-nav.css?v=13">
+    <link rel="stylesheet" href="style.css?v=4">
+</head>
+<body>
+    <main class="app-shell">
+        <header class="page-head">
+            <div class="page-head__titles">
+                <span class="eyebrow">Your board</span>
+                <h1>My Rankings</h1>
+                <p class="lede">
+                    Your own order, position by position, kept all season. Start from the
+                    site's consensus and move people until it reads like your list.
+                </p>
+            </div>
+            <button type="button" class="button button--quiet" id="siteConsensusButton">Site consensus</button>
+        </header>
+
+        <p id="errorBanner" class="banner banner--error" hidden></p>
+        <p id="noticeBanner" class="banner" hidden></p>
+
+        <section id="loadingView" class="empty-state">
+            <p>Loading your boards…</p>
+        </section>
+
+        <!-- Shown when the board API returns 403: not signed in. -->
+        <section id="signedOutView" class="signed-out" hidden>
+            <h2>Sign in to build your rankings</h2>
+            <p>
+                Ranking boards belong to an account, so yours is waiting wherever you
+                sign in. Boards are private unless you publish them.
+            </p>
+            <div class="signed-out__actions">
+                <a class="button" id="signInLink" href="/login/">Sign in</a>
+                <a class="button button--quiet" id="createAccountLink" href="/signup/">Create an account</a>
+                <button type="button" class="button button--quiet" id="signedOutConsensusButton">View site consensus</button>
+            </div>
+        </section>
+
+        <!-- Board picker: every board this account owns, plus the create form. -->
+        <section id="boardsView" hidden>
+            <div class="board-list" id="boardList"></div>
+
+            <section class="new-board" aria-labelledby="newBoardHeading">
+                <h2 id="newBoardHeading">Start a board</h2>
+                <p class="new-board__hint">
+                    Scoring and roster format are separate choices — superflex lifts
+                    quarterbacks up the overall board, so it gets its own list.
+                </p>
+                <div class="new-board__row">
+                    <span class="new-board__label" id="scoringLabel">Scoring</span>
+                    <div class="chip-row" id="scoringChips" role="group" aria-labelledby="scoringLabel"></div>
+                </div>
+                <div class="new-board__row">
+                    <span class="new-board__label" id="rosterLabel">Roster</span>
+                    <div class="chip-row" id="rosterChips" role="group" aria-labelledby="rosterLabel"></div>
+                </div>
+                <div class="new-board__actions">
+                    <button type="button" class="button" id="createBoardButton">Create board</button>
+                </div>
+            </section>
+        </section>
+
+        <!-- The editor. -->
+        <section id="editorView" hidden>
+            <div class="board-head">
+                <div class="board-head__titles">
+                    <h2 id="boardTitle">Board</h2>
+                    <p class="board-head__meta" id="boardMeta"></p>
+                </div>
+                <div class="board-head__actions">
+                    <span class="save-pill" id="savePill" aria-live="polite"></span>
+                    <button type="button" class="button button--quiet" id="publishButton">Publish</button>
+                    <a class="button button--quiet" id="shareLink" href="#" target="_blank" rel="noopener" hidden>View shared board</a>
+                    <button type="button" class="button button--quiet" id="resetButton">Reset to consensus</button>
+                    <button type="button" class="button button--quiet" id="backButton">All boards</button>
+                </div>
+            </div>
+
+            <nav class="scope-bar" aria-label="Which list to edit">
+                <div class="chip-row" id="scopeChips" role="group" aria-label="Choose a list"></div>
+            </nav>
+
+            <div class="board-tools">
+                <div class="player-search">
+                    <label class="sr-only" for="playerSearch">Add a player</label>
+                    <input
+                        type="text"
+                        id="playerSearch"
+                        class="player-search__input"
+                        placeholder="Add a player by name…"
+                        autocomplete="off"
+                        role="combobox"
+                        aria-expanded="false"
+                        aria-controls="playerSearchResults"
+                        aria-autocomplete="list">
+                    <ul class="search-results" id="playerSearchResults" role="listbox" hidden></ul>
+                </div>
+                <button type="button" class="button button--quiet" id="addTierButton">Add tier</button>
+                <p class="board-tools__legend"><span aria-hidden="true">±</span> vs site consensus</p>
+                <p class="board-tools__count" id="boardCount"></p>
+            </div>
+
+            <p class="keyboard-hint" id="keyboardHint">
+                Drag the handle to reorder, or focus a row and use Alt with the arrow
+                keys. Press Enter to pick a player up, arrow keys to place him, Enter
+                again to drop. Type a number in the rank box to send someone straight
+                there.
+            </p>
+
+            <ol class="rank-list" id="rankList"></ol>
+
+            <p class="empty-state" id="boardEmptyState" hidden>
+                Nothing here yet. Add players by name above, or reset to the site
+                consensus to start from a full board.
+            </p>
+        </section>
+
+        <!-- Published boards and the public site consensus share one read-only view. -->
+        <section id="readerView" hidden>
+            <div class="board-head">
+                <div class="board-head__titles">
+                    <span class="eyebrow" id="readerEyebrow">Shared board</span>
+                    <h2 id="readerTitle">Rankings</h2>
+                    <p class="board-head__meta" id="readerMeta"></p>
+                </div>
+                <button type="button" class="button button--quiet" id="readerBackButton">My boards</button>
+            </div>
+            <nav class="scope-bar" aria-label="Which ranking list to view">
+                <div class="chip-row" id="readerScopeChips" role="group" aria-label="Choose a list"></div>
+            </nav>
+            <div class="consensus-controls" id="consensusControls" hidden>
+                <div class="new-board__row">
+                    <span class="new-board__label">Scoring</span>
+                    <div class="chip-row" id="consensusScoringChips" role="group" aria-label="Consensus scoring"></div>
+                </div>
+                <div class="new-board__row">
+                    <span class="new-board__label">Roster</span>
+                    <div class="chip-row" id="consensusRosterChips" role="group" aria-label="Consensus roster"></div>
+                </div>
+            </div>
+            <p class="reader-note" id="readerNote"></p>
+            <ol class="rank-list rank-list--reader" id="readerList"></ol>
+            <p class="empty-state" id="readerEmptyState" hidden>No published rankings are available for this format yet.</p>
+        </section>
+
+        <!-- One region announces every move, however it was made. -->
+        <p class="sr-only" id="liveRegion" aria-live="polite" role="status"></p>
+    </main>
+
+    <script src="/shared/api-base.js?v=1"></script>
+    <script src="/shared/site-nav.js?v=14"></script>
+    <script src="format.js?v=2"></script>
+    <script src="app.js?v=4"></script>
+</body>
+</html>
