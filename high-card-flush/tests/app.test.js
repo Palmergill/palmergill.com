@@ -83,6 +83,19 @@ describe('High Card Flush table app', () => {
         expect(document.getElementById('decisionPanel').hidden).toBe(false);
     });
 
+    test('groups the dealt hand by suit with the high card first', () => {
+        loadApp();
+
+        document.getElementById('dealButton').click();
+
+        const dealt = [...document.querySelectorAll('#playerCards .playing-card')].map((card) => card.dataset.card);
+        expect(dealt).toEqual([
+            '2-spades',
+            '9-hearts', '8-hearts', '7-hearts', '6-hearts', '5-hearts',
+            'K-clubs'
+        ]);
+    });
+
     test('shows optional strategy guidance for the current hand', () => {
         loadApp();
         document.getElementById('dealButton').click();
@@ -130,7 +143,9 @@ describe('High Card Flush table app', () => {
         expect(document.getElementById('settlementTitle').textContent).toBe('Hand folded');
         expect(document.getElementById('settlementSummary').textContent).toContain('Flush Bonus pays 10:1');
         expect(document.getElementById('settlementSummary').textContent).toContain('Straight Flush Bonus pays 100:1');
-        expect(document.getElementById('dealerHandLabel').textContent).toBe('Not revealed after fold');
+        // The dealer is revealed on a fold too, sorted the same way as the player's hand.
+        expect(document.querySelectorAll('#dealerCards .playing-card--back')).toHaveLength(0);
+        expect(document.getElementById('dealerHandLabel').textContent).toBe('3-card, K-high clubs · would have qualified');
     });
 
     test('keeps a dealt hand alive when the bankroll changes mid-round', () => {

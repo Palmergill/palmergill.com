@@ -43,6 +43,7 @@
     };
 
     const SUIT_SYMBOLS = { spades: "♠", hearts: "♥", diamonds: "♦", clubs: "♣" };
+    const SUIT_ORDER = Object.fromEntries(game.SUITS.map((suit, index) => [suit, index]));
     const SUIT_NAMES = { spades: "spades", hearts: "hearts", diamonds: "diamonds", clubs: "clubs" };
     const RANK_NAMES = {
         A: "ace", K: "king", Q: "queen", J: "jack", "10": "ten", "9": "nine",
@@ -59,6 +60,13 @@
 
     function cardKey(card) {
         return `${card.rank}-${card.suit}`;
+    }
+
+    // Deal order hides the flushes, so the hand is grouped by suit with the
+    // high card first inside each suit.
+    function sortHand(cards) {
+        return [...cards].sort((a, b) =>
+            SUIT_ORDER[a.suit] - SUIT_ORDER[b.suit] || game.cardValue(b) - game.cardValue(a));
     }
 
     function createCardElement(card, options = {}) {
@@ -123,9 +131,10 @@
     }
 
     function renderHands() {
-        const dealerRevealed = state.status === "roundOver" && state.decision === "raise";
-        renderCards(els.playerCards, state.playerCards, { evaluation: state.playerFlush });
-        renderCards(els.dealerCards, state.dealerCards, {
+        // The dealer is shown after a fold too, so you can see what you dodged.
+        const dealerRevealed = state.status === "roundOver";
+        renderCards(els.playerCards, sortHand(state.playerCards), { evaluation: state.playerFlush });
+        renderCards(els.dealerCards, dealerRevealed ? sortHand(state.dealerCards) : state.dealerCards, {
             hidden: state.dealerCards.length > 0 && !dealerRevealed,
             evaluation: dealerRevealed ? state.dealerFlush : null
         });
@@ -134,9 +143,12 @@
         if (!state.dealerCards.length) {
             els.dealerHandLabel.textContent = "Seven cards hidden";
         } else if (!dealerRevealed) {
-            els.dealerHandLabel.textContent = state.decision === "fold" ? "Not revealed after fold" : "Decision pending";
+            els.dealerHandLabel.textContent = "Decision pending";
         } else {
-            const qualifier = state.dealerQualified ? "qualifies" : "does not qualify";
+            const folded = state.decision === "fold";
+            const qualifier = state.dealerQualified
+                ? (folded ? "would have qualified" : "qualifies")
+                : (folded ? "would not have qualified" : "does not qualify");
             els.dealerHandLabel.textContent = `${flushLabel(state.dealerFlush)} · ${qualifier}`;
         }
     }
