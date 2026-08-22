@@ -384,3 +384,54 @@ def test_admin_refresh_rejects_unknown_job(monkeypatch):
 
     response = auth_client.post("/api/fantasy/admin/refresh", params={"job": "bogus"})
     assert response.status_code == 400
+
+
+@pytest.mark.parametrize(
+    "route",
+    (
+        "/api/fantasy/state",
+        "/api/fantasy/rankings",
+        "/api/fantasy/projections",
+        "/api/fantasy/trending",
+    ),
+)
+def test_dashboard_timestamps_are_marked_utc(route):
+    """"as of" labels are rendered from these, so they must carry the offset.
+
+    Stored timestamps are naive UTC; without a 'Z' the browser reads them as
+    local time and the rendered date slips a day for any collector run that
+    finished within the viewer's offset of midnight UTC.
+    """
+    import re
+
+    payload = client.get(route).json()
+    stamps = []
+
+    def walk(node, path=""):
+        if isinstance(node, dict):
+            for key, value in node.items():
+                walk(value, f"{path}.{key}")
+        elif isinstance(node, list):
+            for index, value in enumerate(node):
+                walk(value, f"{path}[{index}]")
+        elif isinstance(node, str) and re.match(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}", node):
+            stamps.append((path, node))
+
+    walk(payload)
+    offsetless = [(path, value) for path, value in stamps if not value.endswith("Z")]
+    assert not offsetless, f"{route} returned unmarked timestamps: {offsetless}"
+
+
+@pytest.mark.parametrize("kind", ("add", "drop"))
+def test_trending_route_returns_200(kind):
+    """The route echoes `kind` back as a string.
+
+    A `Dict[str, List[...]]` return annotation is validated by FastAPI as the
+    response model, which turned every call here into a 500.
+    """
+    response = client.get("/api/fantasy/trending", params={"kind": kind})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["kind"] == kind
+    assert isinstance(body["results"], list)

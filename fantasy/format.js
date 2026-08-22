@@ -136,6 +136,16 @@
         return date.toLocaleDateString("en-US", options);
     }
 
+    // Collector run timestamp -> "as of Jul 10". Unparseable/missing -> "".
+    // The server marks these UTC (see `iso_utc`); without the offset the
+    // rendered day slips for any run that finished near midnight UTC.
+    function formatAsOf(iso) {
+        if (!iso) return "";
+        const date = new Date(iso);
+        if (Number.isNaN(date.getTime())) return "";
+        return `as of ${date.toLocaleDateString(undefined, { month: "short", day: "numeric" })}`;
+    }
+
     // Injury status -> a compact badge {code, label, severity}. Returns null
     // for healthy/unknown players so callers can skip rendering.
     const INJURY_CODES = {
@@ -191,6 +201,7 @@
         formatSpread,
         formatSigned,
         formatArticleDate,
+        formatAsOf,
         injuryBadge,
         formatMatchup,
     };

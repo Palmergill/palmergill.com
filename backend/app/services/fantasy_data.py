@@ -249,7 +249,7 @@ def get_state(db: Session) -> Dict[str, Any]:
         jobs.append(
             {
                 "job": job,
-                "last_success": run.finished_at.isoformat() if run and run.finished_at else None,
+                "last_success": iso_utc(run.finished_at) if run else None,
                 "rows_written": run.rows_written if run else None,
             }
         )
@@ -369,7 +369,7 @@ def _build_rankings(
         "position": position,
         "scoring": scoring,
         "source": run.source,
-        "as_of": run.finished_at.isoformat() if run.finished_at else None,
+        "as_of": iso_utc(run.finished_at),
         "rankings": rankings,
     }
 
@@ -431,7 +431,7 @@ def get_projections(
         "week": week,
         "scoring": scoring,
         "source": run.source,
-        "as_of": run.finished_at.isoformat() if run.finished_at else None,
+        "as_of": iso_utc(run.finished_at),
         "projections": projections[:limit],
     }
 
@@ -468,7 +468,7 @@ def _consensus_projections(
         "week": week,
         "scoring": scoring,
         "source": CONSENSUS_SOURCE,
-        "as_of": as_of.isoformat() if as_of else None,
+        "as_of": iso_utc(as_of),
         "projections": projections[:limit],
     }
 
@@ -511,7 +511,7 @@ def get_projection_sources(
                 "id": run.source,
                 "label": meta["label"],
                 "url": meta["url"],
-                "as_of": run.finished_at.isoformat() if run.finished_at else None,
+                "as_of": iso_utc(run.finished_at),
             }
         )
     sources.sort(key=lambda item: (item["id"] != "sleeper", item["label"]))
@@ -580,7 +580,7 @@ def get_player_detail(
                 "pts_half_ppr": values["pts_half_ppr"],
                 "pts_std": values["pts_std"],
                 "providers": values["providers"],
-                "as_of": as_of.isoformat() if as_of else None,
+                "as_of": iso_utc(as_of),
             }
         history_source = "sleeper"
     else:
@@ -603,7 +603,7 @@ def get_player_detail(
                     "pts_ppr": proj.pts_ppr,
                     "pts_half_ppr": proj.pts_half_ppr,
                     "pts_std": proj.pts_std,
-                    "as_of": proj.fetched_at.isoformat() if proj.fetched_at else None,
+                    "as_of": iso_utc(proj.fetched_at),
                 }
 
     # This week's opponent (or bye) from the schedule.
@@ -627,7 +627,7 @@ def get_player_detail(
         {
             "week": h.week,
             "pts_ppr": h.pts_ppr,
-            "fetched_at": h.fetched_at.isoformat() if h.fetched_at else None,
+            "fetched_at": iso_utc(h.fetched_at),
         }
         for h in history
     ]
@@ -834,7 +834,7 @@ def get_games(db: Session, season: Optional[int] = None, week: Optional[int] = N
             "week": game.week,
             "home_team": game.home_team,
             "away_team": game.away_team,
-            "kickoff": game.kickoff.isoformat() if game.kickoff else None,
+            "kickoff": iso_utc(game.kickoff),
         }
         rows = latest_by_game.get(game.game_id, [])
         if rows:
@@ -851,7 +851,7 @@ def get_games(db: Session, season: Optional[int] = None, week: Optional[int] = N
     return {
         "season": season,
         "week": week,
-        "as_of": latest.finished_at.isoformat() if latest and latest.finished_at else None,
+        "as_of": iso_utc(latest.finished_at) if latest else None,
         "games": result,
     }
 
@@ -911,7 +911,7 @@ def get_game_lines_history(db, game_id: str, market: str = "spreads") -> Dict[st
             value = _consensus_point(run_rows, market, outcome)
         if value is None:
             continue
-        series.append({"fetched_at": run_rows[0].fetched_at.isoformat() if run_rows[0].fetched_at else None, "point": value})
+        series.append({"fetched_at": iso_utc(run_rows[0].fetched_at), "point": value})
     series.sort(key=lambda item: item["fetched_at"] or "")
     return {"game_id": game_id, "market": market, "outcome": outcome, "history": series}
 
@@ -982,7 +982,7 @@ def get_props(db: Session, week: Optional[int] = None) -> Dict[str, Any]:
                 "markets": market_list,
             }
         )
-    return {"as_of": run.finished_at.isoformat() if run.finished_at else None, "featured": featured}
+    return {"as_of": iso_utc(run.finished_at), "featured": featured}
 
 
 def get_prop_history(db, player_id: str, market: str) -> Dict[str, Any]:
@@ -1007,7 +1007,7 @@ def get_prop_history(db, player_id: str, market: str) -> Dict[str, Any]:
             continue
         series.append(
             {
-                "fetched_at": run_rows[0].fetched_at.isoformat() if run_rows[0].fetched_at else None,
+                "fetched_at": iso_utc(run_rows[0].fetched_at),
                 "point": round(sum(points) / len(points), 1),
             }
         )
@@ -1195,7 +1195,7 @@ def get_player_season_props(
     return {
         "season": season,
         "player": _player_public(player),
-        "as_of": run.finished_at.isoformat() if run and run.finished_at else None,
+        "as_of": iso_utc(run.finished_at) if run else None,
         "source": "Kalshi" if run is not None else None,
         "markets": [
             _season_market_summary(rows, market, label)
@@ -1277,7 +1277,7 @@ def get_season_prop_leaders(
 
     return {
         "season": season,
-        "as_of": run.finished_at.isoformat() if run and run.finished_at else None,
+        "as_of": iso_utc(run.finished_at) if run else None,
         "source": "Kalshi" if run is not None else None,
         "market": market,
         "label": labels[market],
@@ -1421,7 +1421,7 @@ def get_futures(db: Session, market: Optional[str] = None, limit: int = 20) -> D
             best[row.outcome] = row.price
     outcomes = sorted(best.items(), key=lambda item: item[1])[:limit]
     return {
-        "as_of": run.finished_at.isoformat() if run.finished_at else None,
+        "as_of": iso_utc(run.finished_at),
         "market": market,
         "markets": markets,
         "outcomes": [{"outcome": name, "price": price} for name, price in outcomes],

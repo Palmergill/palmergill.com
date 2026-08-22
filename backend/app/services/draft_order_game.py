@@ -14,7 +14,6 @@ import json
 import secrets
 import uuid
 from collections import defaultdict
-from datetime import timezone
 from typing import Any, Iterable
 
 from fastapi import HTTPException
@@ -28,6 +27,7 @@ from app.database import (
     FantasyDraftPlayer,
     FantasyDraftRound,
     FantasyDraftSession,
+    iso_utc,
     utc_now,
 )
 
@@ -119,15 +119,6 @@ RANK_VALUES = {str(value): value for value in range(2, 11)} | {
 }
 SUIT_NAMES = {"C": "clubs", "D": "diamonds", "H": "hearts", "S": "spades"}
 SUIT_SYMBOLS = {"C": "♣", "D": "♦", "H": "♥", "S": "♠"}
-
-
-def _iso_utc(value):
-    """Serialize the database's naive UTC timestamps unambiguously."""
-    if value is None:
-        return None
-    if value.tzinfo is None:
-        return f"{value.isoformat()}Z"
-    return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
 def _identity_names(identity: dict[str, str]) -> tuple[str, str]:
@@ -785,10 +776,10 @@ def serialize_session(
         "seedHash": room.seed_hash,
         "state": room.state,
         "roundsPerPlayer": ROUNDS_PER_PLAYER,
-        "createdAt": _iso_utc(room.created_at),
-        "startedAt": _iso_utc(room.started_at),
-        "completedAt": _iso_utc(room.completed_at),
-        "revealedAt": _iso_utc(room.revealed_at),
+        "createdAt": iso_utc(room.created_at),
+        "startedAt": iso_utc(room.started_at),
+        "completedAt": iso_utc(room.completed_at),
+        "revealedAt": iso_utc(room.revealed_at),
         "resultsRevealed": results_revealed,
         "isHost": viewer_normalized == room.created_by,
         "isMember": member is not None,
@@ -1722,7 +1713,7 @@ def list_sessions_for_user(db: Session, identity: dict[str, str]) -> list[dict[s
             "isHost": username == room.created_by,
             "playerCount": counts.get(room.id, 0),
             "currentPlayerName": current_names.get(room.current_player_id),
-            "createdAt": _iso_utc(room.created_at),
+            "createdAt": iso_utc(room.created_at),
         }
         for room in rooms
     ]
@@ -1760,7 +1751,7 @@ def list_all_sessions(db: Session, identity: dict[str, str]) -> list[dict[str, A
             "state": room.state,
             "createdBy": room.created_by,
             "playerCount": counts.get(room.id, 0),
-            "createdAt": _iso_utc(room.created_at),
+            "createdAt": iso_utc(room.created_at),
         }
         for room in rooms
     ]
@@ -1823,7 +1814,7 @@ def career_record(db: Session, identity: dict[str, str]) -> dict[str, Any]:
             "sessionId": room.id,
             "leagueName": room.league_name,
             "mode": room.mode or MODE_LEAGUE,
-            "completedAt": _iso_utc(room.completed_at or room.created_at),
+            "completedAt": iso_utc(room.completed_at or room.created_at),
         },
     }
 
@@ -1879,7 +1870,7 @@ def score_leaderboard(db: Session, identity: dict[str, str]) -> dict[str, Any]:
                 "score": player.final_score,
                 "bestRound": best_rounds.get(player.id, 0),
                 "mode": room.mode or MODE_LEAGUE,
-                "completedAt": _iso_utc(room.completed_at or room.created_at),
+                "completedAt": iso_utc(room.completed_at or room.created_at),
                 "isViewer": player.username == username,
             }
             for rank, (player, room) in enumerate(rows, start=1)

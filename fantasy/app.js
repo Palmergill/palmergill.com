@@ -93,13 +93,6 @@
         els.errorBanner.hidden = false;
     }
 
-    function formatAsOf(iso) {
-        if (!iso) return "";
-        const date = new Date(iso);
-        if (Number.isNaN(date.getTime())) return "";
-        return `as of ${date.toLocaleDateString(undefined, { month: "short", day: "numeric" })}`;
-    }
-
     function el(tag, className, text) {
         const node = document.createElement(tag);
         if (className) node.className = className;
@@ -433,7 +426,7 @@
             `${player.position || ""} ${player.team || ""} · ${data.season || ""} regular season`.trim()));
         header.appendChild(identity);
         const source = el("span", "season-props__asof");
-        const asOf = formatAsOf(data.as_of);
+        const asOf = F.formatAsOf(data.as_of);
         source.textContent = [data.source, asOf].filter(Boolean).join(" · ");
         header.appendChild(source);
         els.seasonPropsPanel.appendChild(header);
@@ -545,7 +538,7 @@
             els.seasonPropsLeaders.appendChild(tr);
         });
 
-        const asOf = formatAsOf(data.as_of);
+        const asOf = F.formatAsOf(data.as_of);
         if (!leaders.length) {
             els.seasonPropsNote.textContent = "Nothing is quoted in this category yet.";
             return;
@@ -563,7 +556,7 @@
             const data = await fetchJson(`${API_BASE}/season-offenses?limit=10`);
             renderSeasonOffenseList(els.seasonOffenseYards, data.yards, "yards");
             renderSeasonOffenseList(els.seasonOffenseTouchdowns, data.touchdowns, "TDs");
-            const asOf = formatAsOf(data.as_of);
+            const asOf = F.formatAsOf(data.as_of);
             els.seasonOffensesNote.textContent = [
                 "Market-derived totals use quoted player thresholds, with bounded last trades filling one-sided books; this is not an official team projection",
                 [data.source, asOf].filter(Boolean).join(" · "),
@@ -640,7 +633,7 @@
                 els.rankingsSource.append(provider.label);
             }
         }
-        els.rankingsAsOf.textContent = formatAsOf(data.as_of);
+        els.rankingsAsOf.textContent = F.formatAsOf(data.as_of);
         els.rankBody.innerHTML = "";
 
         const rows = data.rankings || [];
@@ -782,7 +775,7 @@
                 els.gamesSection.hidden = true;
                 return;
             }
-            els.gamesAsOf.textContent = formatAsOf(data.as_of);
+            els.gamesAsOf.textContent = F.formatAsOf(data.as_of);
             els.gamesStrip.innerHTML = "";
             withLines.forEach((game) => els.gamesStrip.appendChild(gameCard(game)));
             els.gamesSection.hidden = false;
@@ -825,7 +818,7 @@
             const data = await fetchJson(`${API_BASE}/props`);
             const featured = data.featured || [];
             if (featured.length === 0) return;
-            els.propsAsOf.textContent = formatAsOf(data.as_of);
+            els.propsAsOf.textContent = F.formatAsOf(data.as_of);
             els.propGameTabs.innerHTML = "";
             featured.forEach((game, index) => {
                 const label = `${game.away_team || "?"} @ ${game.home_team || "?"}`;
@@ -870,7 +863,7 @@
         try {
             const data = await fetchJson(`${API_BASE}/futures`);
             if (!data.outcomes || data.outcomes.length === 0) return;
-            els.futuresAsOf.textContent = formatAsOf(data.as_of);
+            els.futuresAsOf.textContent = F.formatAsOf(data.as_of);
             renderFutures(data);
             els.futuresTabs.innerHTML = "";
             (data.markets || []).forEach((marketKey) => {
@@ -1111,7 +1104,7 @@
             if (proj.source === "consensus" && Array.isArray(proj.providers)) {
                 source.append(` (avg of ${proj.providers.join(", ")})`);
             }
-            const asOf = formatAsOf(proj.as_of);
+            const asOf = F.formatAsOf(proj.as_of);
             if (asOf) source.append(` · ${asOf}`);
             card.appendChild(source);
             els.drawerBody.appendChild(card);

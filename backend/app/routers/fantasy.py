@@ -194,7 +194,10 @@ def trending(
     kind: str = Query("add", pattern="^(add|drop)$"),
     limit: int = Query(10, ge=1, le=25),
     db: Session = Depends(get_db),
-) -> Dict[str, List[Dict[str, Any]]]:
+    # Deliberately Dict[str, Any], not Dict[str, List[...]]: FastAPI validates
+    # the response against the return annotation, and `kind` echoes back a
+    # string, so the narrower annotation made every call to this route a 500.
+) -> Dict[str, Any]:
     return {"kind": kind, "results": fantasy_data.get_trending(db, kind, limit)}
 
 

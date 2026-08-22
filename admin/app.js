@@ -573,7 +573,7 @@
             const data = await fetchJson(`/api/admin/users?${params.toString()}`, 'members');
             if (!data) return;
             renderMembers(data);
-            setStatus(`${number(data.accounts.length)} of ${number(data.total)} member accounts · updated ${new Date().toLocaleTimeString()}`);
+            setStatus(`${number(data.accounts.length)} of ${number(data.matched)} member accounts · updated ${new Date().toLocaleTimeString()}`);
         } catch (error) {
             setStatus(`Failed to load accounts: ${error.message}`, true);
         }

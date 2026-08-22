@@ -21,7 +21,15 @@ from sqlalchemy.orm import Session
 from sqlalchemy import case, desc, func, or_
 
 from app.accounts import ROLE_ADMIN, ROLE_MEMBER, admin_username, normalize_username
-from app.database import AnalyticsEvent, AppUser, LogEntry, get_db, is_postgres, utc_now
+from app.database import (
+    AnalyticsEvent,
+    AppUser,
+    LogEntry,
+    get_db,
+    is_postgres,
+    iso_utc,
+    utc_now,
+)
 from app.routers.analytics import RETENTION_DAYS, cleanup_old_analytics, classify_outcome
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
@@ -111,9 +119,13 @@ class AccountOut(BaseModel):
 class AccountsResponse(BaseModel):
     accounts: List[AccountOut]
     admin: AccountOut
+    # Roster-wide counts, unaffected by the q/status filter — the metric tiles
+    # describe the whole membership.
     total: int
     active: int
     inactive: int
+    # Rows matching the current filter, which `accounts` is a page of.
+    matched: int
 
 
 class RetentionResponse(BaseModel):
@@ -129,15 +141,10 @@ def _cutoff(hours: int):
 
 
 def _iso(value):
+    """`iso_utc`, but empty string rather than None for the admin payloads."""
     if not value:
         return ""
-    # Stored timestamps come from utc_now() which is naive UTC. Append 'Z'
-    # so the admin frontend's `new Date(value)` parses them as UTC instead
-    # of local time.
-    text = value.isoformat()
-    if getattr(value, "tzinfo", None) is None:
-        return f"{text}Z"
-    return text
+    return iso_utc(value)
 
 
 def _top(counter: Counter, limit: int = 8):
@@ -294,7 +301,7 @@ def list_logs(
     entries = [
         LogEntryOut(
             id=r.id,
-            timestamp=r.timestamp.isoformat() if r.timestamp else "",
+            timestamp=_iso(r.timestamp),
             level=r.level or "",
             logger_name=r.logger_name,
             message=r.message or "",
@@ -795,8 +802,13 @@ def list_users(
     elif status == "inactive":
         query = query.filter(AppUser.is_active.is_(False))
 
-    total = query.count()
-    active = query.filter(AppUser.is_active.is_(True)).count()
+    # Roster-wide, deliberately NOT off `query`: these three feed the metric
+    # tiles, which describe the whole membership. Counting them through the
+    # filter made "Inactive" read 0 whenever the admin filtered to active.
+    total = db.query(AppUser).count()
+    active = db.query(AppUser).filter(AppUser.is_active.is_(True)).count()
+    # How many rows the current filter matches, for the "N of M shown" line.
+    matched = query.count()
     rows = query.order_by(desc(AppUser.created_at), desc(AppUser.id)).limit(limit).all()
 
     activity = _account_activity(db)
@@ -839,6 +851,7 @@ def list_users(
         total=total,
         active=active,
         inactive=total - active,
+        matched=matched,
     )
 
 

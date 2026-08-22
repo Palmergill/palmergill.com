@@ -3,7 +3,7 @@ const CACHE_PREFIX = 'high-card-flush-app-';
 const STATIC_ASSETS = [
     '/high-card-flush/',
     '/high-card-flush/index.html',
-    '/high-card-flush/app.js?v=1',
+    '/high-card-flush/app.js?v=2',
     '/high-card-flush/highCardFlushGame.js?v=1',
     '/high-card-flush/style.css?v=1',
     '/high-card-flush/manifest.json',

@@ -18,6 +18,9 @@ Closed items are trimmed quarterly.
 
 ## Low
 
+- [ ] (fantasy API) `GET /api/fantasy/trending` has no caller on the site — it was 500ing unnoticed until 2026-08-22. Decide whether it is public API surface worth keeping or dead code to delete. — found 2026-08-22
+- [ ] (repo) `fourth-and-fortune-kickoff.html` is a tracked deck at the repository root rather than under a directory; move it under `fantasy/` or `docs/`. — found 2026-08-22
+- [ ] (fantasy) `formatAsOf` is duplicated between `fantasy/format.js` and `fantasy/league/format.js`. Per-page format modules are the deliberate convention (`formatPoints`, `sparkline`, `injuryBadge` are duplicated the same way), so this is only worth revisiting if a genuinely shared module ever appears. — found 2026-08-22
 - [ ] (auth redirect) `safe_next_path` accepts backslash-schemed redirects against the FastAPI endpoint directly; reject any `next` value containing `\` before parsing. — found 2026-07-01
 - [ ] (craps strategy) `everyRoll: false` is inert for one-roll bets because resolved stakes are zeroed before the re-arm check; either remove the flag or track one-time placement separately. — found 2026-07-01
 - [ ] (craps) The `$5` floor in `legalOddsAmount` silently drops small odds bets that snap below the floor; allow one legal increment or surface that odds were not placed. — found 2026-07-01
@@ -29,6 +32,12 @@ Closed items are trimmed quarterly.
 - [ ] (poker engine) Busted cash-game players can be dealt in with zero chips and occupy a live seat; skip zero-chip players at deal time. — found 2026-07-01
 
 ## Closed
+
+- (fantasy API) `GET /api/fantasy/trending` returned a 500 on every call: the route's `-> Dict[str, List[Dict[str, Any]]]` return annotation is used by FastAPI as the response model, but the body echoes `kind` back as a string. Nothing on the site called the route, so it failed silently since it was written. Annotation widened to `Dict[str, Any]`; regression test in `backend/tests/test_fantasy_api.py`. — closed 2026-08-22
+- (backend) Naive-UTC timestamps were serialized without a `Z` outside the draft-order game, so `new Date()` parsed them as local time. Worst case was the rankings board: `formatSavedAt` clamps negative ages to zero, so every board read "Saved just now" for the first ~5 hours in US Central. Added `iso_utc` beside `utc_now` in `backend/app/database.py` and routed `fantasy_rankings_board.py`, `fantasy_league_data.py`, `fantasy_data.py` and the admin log rows through it; `draft_order_game._iso_utc` and `admin._iso` now delegate to it rather than reimplementing it. Regression tests walk whole response payloads so a newly added timestamp field is covered too. — closed 2026-08-22
+- (casino PWAs) Service-worker `STATIC_ASSETS` drifted from the versions the pages request, so those assets were never actually precached: `/shared/casino-theme.css` (pages v=3, workers v=2) across poker/craps/blackjack/craps-strategy, plus `blackjack/style.css` (v=15 vs v=13), `craps/style.css` (v=28 vs v=26) and `craps-strategy/style.css` (v=3 vs v=2). This is the third time this drift has shipped. Realigned every worker and added `shared/tests/asset-versions.test.js` to fail the build on any future mismatch. — closed 2026-08-22
+- (high card flush) `da64cb7` changed `app.js` without bumping its `?v=1`, so the stale-while-revalidate worker served the old script on the first load after deploy and the dealer-reveal fix appeared only on a second visit. Bumped to `?v=2` in both the page and the worker. — closed 2026-08-22
+- (admin) The Members metric tiles were computed from the filtered query, so filtering to "active" made the Inactive tile read 0 as though no deactivated accounts existed. `total`/`active`/`inactive` are now roster-wide and a new `matched` field carries the filter count for the "N of M" status line. — closed 2026-08-22
 
 - Shared nav cache version drift across poker and blackjack was resolved by bumping all shared nav stylesheet references to `?v=11`. — closed 2026-07-03
 - Original 2026-05-27 audit findings not listed above were resolved by the `Fix audit bugs`, `Fix bug audit regressions`, and `bugs` commits.

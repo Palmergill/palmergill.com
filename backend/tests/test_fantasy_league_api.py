@@ -575,3 +575,34 @@ def test_chat_falls_back_to_the_last_played_season(seeded_db, monkeypatch):
     assert fantasy_tools.get_league_power_rankings(seeded_db)["season"] == 2024
     assert fantasy_tools.get_league_standings(seeded_db)["season"] == 2024
     assert fantasy_tools.get_league_scoreboard(seeded_db)["season"] == 2024
+
+
+@pytest.mark.parametrize("route", LEAGUE_ROUTES)
+def test_every_league_timestamp_is_marked_utc(seeded_db, route):
+    """No route may hand the client an offsetless stored timestamp.
+
+    Naive UTC without a 'Z' is parsed as local time by `new Date()`, which
+    shifts every "as of" label by the viewer's offset. Walking the whole
+    payload catches a new timestamp field added to any of these responses,
+    not just the ones that existed when this was written.
+    """
+    payload = member_client().get(route).json()
+
+    def walk(node, path=""):
+        if isinstance(node, dict):
+            for key, value in node.items():
+                walk(value, f"{path}.{key}")
+        elif isinstance(node, list):
+            for index, value in enumerate(node):
+                walk(value, f"{path}[{index}]")
+        elif isinstance(node, str) and _looks_like_timestamp(node):
+            assert node.endswith("Z"), f"{route}{path} is not marked UTC: {node!r}"
+
+    walk(payload)
+
+
+def _looks_like_timestamp(value: str) -> bool:
+    """An ISO date-time, as opposed to a plain date or arbitrary text."""
+    import re
+
+    return bool(re.match(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}", value))

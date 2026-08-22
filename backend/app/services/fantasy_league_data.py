@@ -24,6 +24,7 @@ from app.database import (
     FantasyPlayer,
     FantasyPlayerStat,
     FantasyRanking,
+    iso_utc,
 )
 from app.services import fantasy_data
 from app.services.fantasy_collector import latest_successful_run
@@ -70,7 +71,9 @@ def _season_rows(db: Session) -> List[FantasyLeagueSeason]:
 
 
 def _iso(value) -> Optional[str]:
-    return value.isoformat() if value else None
+    # Stored timestamps are naive UTC; iso_utc marks them so the browser does
+    # not read them as local time.
+    return iso_utc(value) if value else None
 
 
 def list_seasons(db: Session) -> Dict[str, Any]:

@@ -116,4 +116,12 @@ describe('FantasyFormat', () => {
         expect(FantasyFormat.formatMatchup({ opponent: null })).toBe('');
         expect(FantasyFormat.formatMatchup(null)).toBe('');
     });
+    test('formatAsOf renders a UTC-marked collector timestamp', () => {
+        // Server-marked UTC: the label must reflect the instant, not the
+        // string's digits read as local time.
+        expect(FantasyFormat.formatAsOf('2026-07-10T15:30:00Z')).toBe('as of Jul 10');
+        expect(FantasyFormat.formatAsOf(null)).toBe('');
+        expect(FantasyFormat.formatAsOf('')).toBe('');
+        expect(FantasyFormat.formatAsOf('not a date')).toBe('');
+    });
 });

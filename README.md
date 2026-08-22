@@ -17,6 +17,7 @@ navigation chrome.
 - `/fantasy/` - NFL rankings, projections, and league tools
 - `/fantasy/draft-order/` - account-backed, verifiable draft-order game with solo practice, games against bots, personal records, a top-10 all-runs leaderboard, and admin bot-test rooms
 - `/fantasy/league/` - members-only ESPN league hub with standings, power rankings, enriched rosters, team overviews, and league-aware chat
+- `/fantasy/rankings/` - personal ranking boards with tiers, publishable share links, and a site consensus built from published boards
 - `/casino/` - landing page linking the casino games
 - `/poker/` - Texas Hold'em poker app
 - `/craps/` - craps app
@@ -33,6 +34,8 @@ navigation chrome.
 - `/api/analytics/*` - public client analytics ingest (`POST /api/analytics/events`)
 - `/api/craps/*` - public craps strategy translation API
 - `/api/fantasy/*` - fantasy data and account-gated draft rooms
+- `/api/fantasy/league/*` - members-only ESPN league reads (403 for anonymous callers)
+- `/api/fantasy/rankings/*` - personal ranking boards; `/boards` routes are account-owned, shared/consensus reads are public
 - `/api/admin/*` - protected admin/log APIs
 - `/health` - backend health check
 - `/docs` - protected FastAPI docs when accessing the backend service directly
@@ -82,8 +85,9 @@ source venv/bin/activate  # or: pip install -r requirements-dev.txt
 pytest
 ```
 
-Frontend game suites (Jest, covers `poker/tests`, `craps/tests`,
-`blackjack/tests`, `high-card-flush/tests`, and `craps-strategy/tests`):
+Frontend suites (Jest, covers `poker/tests`, `craps/tests`,
+`blackjack/tests`, `high-card-flush/tests`, `craps-strategy/tests`,
+`fantasy/tests`, and `shared/tests`):
 
 ```bash
 npm install

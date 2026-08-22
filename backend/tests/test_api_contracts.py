@@ -83,3 +83,33 @@ def test_health_check_is_public_and_unauthenticated(monkeypatch):
     response = auth_client.get("/health")
 
     assert response.status_code == 200
+
+
+# ── timestamp serialization ────────────────────────────────────────────
+
+def test_iso_utc_marks_naive_stored_timestamps_as_utc():
+    """Every stored timestamp is naive UTC (see `utc_now`).
+
+    An offsetless date-time string is read by JavaScript's `new Date()` as
+    *local* time, so a browser west of UTC parses it hours into the future.
+    Serializing through `iso_utc` is what keeps a stored timestamp meaning
+    the same instant on the client.
+    """
+    from datetime import datetime, timedelta, timezone
+
+    from app.database import iso_utc, utc_now
+
+    assert iso_utc(None) is None
+
+    naive = datetime(2026, 8, 22, 14, 26, 8)
+    assert iso_utc(naive) == "2026-08-22T14:26:08Z"
+
+    # An aware value is normalized to UTC rather than trusted as-is.
+    aware = datetime(2026, 8, 22, 9, 26, 8, tzinfo=timezone(timedelta(hours=-5)))
+    assert iso_utc(aware) == "2026-08-22T14:26:08Z"
+
+    # The round trip a client actually performs must land back on the
+    # instant that was stored.
+    stored = utc_now()
+    parsed = datetime.fromisoformat(iso_utc(stored).replace("Z", "+00:00"))
+    assert parsed == stored.replace(tzinfo=timezone.utc)

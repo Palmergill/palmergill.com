@@ -1,6 +1,7 @@
 # Feature Specs — 12-Month Roadmap (Jul 2026 – Jun 2027)
 
-One spec per roadmap item. Status legend: `draft` → `accepted` → `in progress` → `shipped`.
+One spec per roadmap item. Status legend: `draft` → `accepted` →
+`in progress` → `implemented` (built, pending a later phase) → `shipped`.
 
 ## Calibration (decided Jul 2026)
 
@@ -21,6 +22,13 @@ One spec per roadmap item. Status legend: `draft` → `accepted` → `in progres
 - **Spec 16 added Jul 2026:** fantasy football dashboard, a net-new app
   spanning Q3→Q4 using the roadmap's stated slack. Timed to the NFL
   season (kickoff early Sep).
+- **Specs 19–20 added Aug 2026, retroactively.** Fourth & Fortune and High
+  Card Flush were both built and shipped without specs. The specs were
+  written afterwards so the roadmap describes the site as it stands. Worth
+  noting as a process observation rather than a rule: the roadmap is a
+  planning aid for a personal playground, and building first is allowed —
+  but a shipped feature with no spec has nowhere to record *why* it works
+  the way it does, which is the expensive part to reconstruct.
 
 ## Q3 2026 (Jul–Sep) — Finish what's in flight, stabilize
 
@@ -34,6 +42,8 @@ One spec per roadmap item. Status legend: `draft` → `accepted` → `in progres
 | 16 | [Fantasy football dashboard](q3-16-fantasy-football-dashboard.md) | in progress — P1–P4 built (data, UI, betting, chat); needs live OpenAI/Odds keys for prod verification |
 | 17 | [ESPN league hub](q3-17-espn-league-hub.md) | in progress — P1–P4 built (data, hub, rosters, AI); needs a live OpenAI key to verify model-backed overviews |
 | 18 | [Personal rankings](q3-18-personal-rankings.md) | implemented — private boards, tiers, public sharing, and published-board site consensus |
+| 19 | [Fourth & Fortune](q3-19-fourth-and-fortune.md) | shipped — commit-reveal draft-order game; spec written retroactively |
+| 20 | [High Card Flush](q3-20-high-card-flush.md) | shipped — casino table game on the shared shell; spec written retroactively |
 
 ## Q4 2026 (Oct–Dec) — Casino as a coherent product
 

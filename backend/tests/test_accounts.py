@@ -470,7 +470,9 @@ def test_admin_users_list_filters_by_search(configured):
     body = admin_client().get("/api/admin/users", params={"q": "jord"}).json()
 
     assert [account["username"] for account in body["accounts"]] == ["jordan"]
-    assert body["total"] == 1
+    # `matched` is the filter's result count; `total` stays roster-wide.
+    assert body["matched"] == 1
+    assert body["total"] == 2
 
 
 def test_admin_users_list_joins_analytics_activity_case_insensitively(configured):
@@ -509,3 +511,27 @@ def test_signup_rejects_non_ascii_invite_code(configured):
 
     assert response.status_code == 403
     assert response.json()["error"] == "That invite code isn't valid."
+
+
+def test_admin_users_metrics_ignore_the_active_filter(configured):
+    """The metric tiles describe the whole roster, not the current filter.
+
+    Counting them through the filtered query made "Inactive" read 0 the
+    moment an admin filtered to active accounts — the tiles are rendered as
+    membership totals, so they must not move when the filter does.
+    """
+    signup(configured, username="taylor", password="a-good-password")
+    signup(TestClient(app), username="jordan", password="another-good-password")
+
+    db = SessionLocal()
+    try:
+        db.query(AppUser).filter(AppUser.username == "taylor").one().is_active = False
+        db.commit()
+    finally:
+        db.close()
+
+    for params in ({}, {"status": "active"}, {"status": "inactive"}, {"q": "jord"}):
+        body = admin_client().get("/api/admin/users", params=params).json()
+        assert (body["total"], body["active"], body["inactive"]) == (2, 1, 1), params
+
+    assert admin_client().get("/api/admin/users", params={"status": "active"}).json()["matched"] == 1

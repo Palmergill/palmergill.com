@@ -45,6 +45,24 @@ Base = declarative_base()
 def utc_now():
     return datetime.now(timezone.utc).replace(tzinfo=None)
 
+
+def iso_utc(value):
+    """Serialize a stored timestamp unambiguously, as `utc_now`'s inverse.
+
+    Every timestamp column on this site is filled by `utc_now`, which stores
+    naive UTC. `datetime.isoformat()` on a naive value emits no offset, and
+    JavaScript's `new Date()` reads an offsetless date-time string as *local*
+    time — so a browser west of UTC parses every stored timestamp hours into
+    the future. Anything serializing a stored datetime for a client should go
+    through here rather than calling `.isoformat()` directly.
+    """
+    if value is None:
+        return None
+    if getattr(value, "tzinfo", None) is None:
+        return f"{value.isoformat()}Z"
+    return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
 class EarningsRecord(Base):
     __tablename__ = "earnings"
     

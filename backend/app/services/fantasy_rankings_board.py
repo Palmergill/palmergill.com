@@ -35,6 +35,7 @@ from app.database import (
     FantasyRankBoard,
     FantasyRankEntry,
     FantasyRankTier,
+    iso_utc,
     utc_now,
 )
 from app.services import fantasy_data
@@ -256,7 +257,7 @@ def serialize_board(db: Session, board: FantasyRankBoard) -> Dict[str, Any]:
         "seededFrom": board.seeded_from,
         "entries": payload,
         "tiers": _serialize_tiers(_tiers(db, board.id), entries),
-        "updatedAt": board.updated_at.isoformat() if board.updated_at else None,
+        "updatedAt": iso_utc(board.updated_at),
     }
 
 
@@ -316,7 +317,7 @@ def summarize_boards(db: Session, username: str) -> List[Dict[str, Any]]:
                 "positionCounts": counts,
                 "published": bool(board.published),
                 "shareUrl": f"/fantasy/rankings/?share={board.share_slug}",
-                "updatedAt": board.updated_at.isoformat() if board.updated_at else None,
+                "updatedAt": iso_utc(board.updated_at),
             }
         )
     return summaries
@@ -807,17 +808,10 @@ def _midpoint(
 ) -> Optional[float]:
     """The key between two rows, or None when the gap has been used up."""
     keys = {e.player_id: e.sort_key for e in entries}
-    low = keys.get(prev_id) if prev_id else None
-    high = keys.get(next_id) if next_id else None
-    if low is None and high is None:
-        return KEY_STEP
-    if low is None:
-        return high - KEY_STEP
-    if high is None:
-        return low + KEY_STEP
-    if high - low < MIN_GAP:
-        return None
-    return (low + high) / 2.0
+    return _midpoint_values(
+        keys.get(prev_id) if prev_id else None,
+        keys.get(next_id) if next_id else None,
+    )
 
 
 def _midpoint_values(low: Optional[float], high: Optional[float]) -> Optional[float]:

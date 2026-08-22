@@ -999,3 +999,21 @@ def test_consensus_uses_an_appearance_floor(seeded_db):
     ).json()
     assert consensus["appearanceFloor"] == 2
     assert rare not in {row["player_id"] for row in consensus["entries"]}
+
+
+def test_board_timestamps_are_marked_utc(seeded_db):
+    """`updatedAt` has to say it is UTC, or the client reads it as local time.
+
+    The board list and the save pill both compute an age from this field.
+    Stored timestamps are naive UTC, so an offsetless string parses hours
+    into the future in any browser west of UTC, and the clamped age pins to
+    "Saved just now" for as long as the offset lasts.
+    """
+    client = member_client()
+    board = make_board(client)
+
+    assert board["updatedAt"].endswith("Z")
+    assert read_board(client, board["id"])["updatedAt"].endswith("Z")
+
+    listed = client.get("/api/fantasy/rankings/boards/mine").json()["boards"]
+    assert [entry["updatedAt"].endswith("Z") for entry in listed] == [True]
