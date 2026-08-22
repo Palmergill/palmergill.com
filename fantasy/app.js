@@ -21,6 +21,7 @@
         scoring: "ppr",
         source: "sleeper",
         sources: [],
+        seasonFantasyScoring: "std",
         drawerPlayerId: null,
         compare: [], // [{ player_id, name }]
     };
@@ -43,6 +44,9 @@
         seasonPropsTabs: document.getElementById("seasonPropsTabs"),
         seasonPropsLeaders: document.getElementById("seasonPropsLeaders"),
         seasonPropsNote: document.getElementById("seasonPropsNote"),
+        seasonFantasyLeaders: document.getElementById("seasonFantasyLeaders"),
+        seasonFantasyNote: document.getElementById("seasonFantasyNote"),
+        seasonFantasyScoring: document.getElementById("seasonFantasyScoring"),
         seasonOffenseYards: document.getElementById("seasonOffenseYards"),
         seasonOffenseTouchdowns: document.getElementById("seasonOffenseTouchdowns"),
         seasonOffensesNote: document.getElementById("seasonOffensesNote"),
@@ -548,6 +552,96 @@
             "implied value is the interpolated 50% point of each player's available contract prices",
             [data.source, asOf].filter(Boolean).join(" · "),
         ].filter(Boolean).join(" · ");
+    }
+
+    async function loadSeasonFantasyLeaders() {
+        if (!els.seasonFantasyLeaders) return;
+        try {
+            const params = new URLSearchParams({
+                limit: "100",
+                scoring: state.seasonFantasyScoring,
+            });
+            const data = await fetchJson(`${API_BASE}/season-fantasy-points?${params.toString()}`);
+            renderSeasonFantasyLeaders(data);
+        } catch (err) {
+            els.seasonFantasyLeaders.innerHTML = "";
+            els.seasonFantasyNote.textContent = "Implied fantasy points are unavailable right now.";
+        }
+    }
+
+    function renderSeasonFantasyLeaders(data) {
+        const leaders = data.leaders || [];
+        els.seasonFantasyLeaders.innerHTML = "";
+        leaders.forEach((entry, index) => {
+            const player = entry.player || {};
+            const tr = el("tr", "season-leader");
+            tr.tabIndex = 0;
+            tr.setAttribute("role", "button");
+            tr.setAttribute("aria-label", `Open ${player.name || "player"} season lines`);
+            tr.appendChild(el("td", "col-rank", index + 1));
+            const who = el("td", "col-player");
+            who.appendChild(el("span", "season-leader__name", player.name || player.player_id));
+            const receptionDetail = data.scoring !== "std" && entry.projected_receptions != null
+                ? ` · ${F.seasonLine(entry.projected_receptions)} rec proj`
+                : "";
+            who.appendChild(el("span", "season-leader__meta",
+                `${player.position || ""} ${player.team || ""} · ${entry.markets_used || 0} markets${receptionDetail}`.trim()));
+            tr.appendChild(who);
+            tr.appendChild(el("td", "col-proj", F.formatPoints(entry.yard_points)));
+            tr.appendChild(el("td", "col-proj", F.formatPoints(entry.touchdown_points)));
+            tr.appendChild(el("td", "col-proj", F.formatPoints(entry.reception_points)));
+            tr.appendChild(el("td", "col-proj season-fantasy__total", F.formatPoints(entry.fantasy_points)));
+            const open = () => {
+                if (player.player_id) loadPlayerSeasonProps(player.player_id);
+            };
+            tr.addEventListener("click", open);
+            tr.addEventListener("keydown", (event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    open();
+                }
+            });
+            els.seasonFantasyLeaders.appendChild(tr);
+        });
+
+        const asOf = F.formatAsOf(data.as_of);
+        const scoringLabel = data.scoring === "ppr"
+            ? "PPR"
+            : data.scoring === "half" ? "Half PPR" : "Standard";
+        const receptionSource = data.scoring === "std"
+            ? ""
+            : `receptions from ${data.reception_source || "season projections"}`;
+        els.seasonFantasyNote.textContent = leaders.length
+            ? [
+                `${leaders.length} players with complete yardage/TD market pairs`,
+                `${scoringLabel} scoring from every available complete pair`,
+                receptionSource,
+                [data.source, asOf].filter(Boolean).join(" · "),
+            ].filter(Boolean).join(" · ")
+            : "No players have a complete yardage and touchdown market pair yet.";
+    }
+
+    function initSeasonFantasyScoring() {
+        if (!els.seasonFantasyScoring) return;
+        const options = [
+            { key: "std", label: "Standard" },
+            { key: "half", label: "Half PPR" },
+            { key: "ppr", label: "PPR" },
+        ];
+        options.forEach((option) => {
+            const chip = el("button", "chip", option.label);
+            chip.type = "button";
+            chip.dataset.scoring = option.key;
+            chip.setAttribute("aria-pressed", String(option.key === state.seasonFantasyScoring));
+            chip.addEventListener("click", () => {
+                state.seasonFantasyScoring = option.key;
+                els.seasonFantasyScoring.querySelectorAll(".chip").forEach((item) => {
+                    item.setAttribute("aria-pressed", String(item.dataset.scoring === option.key));
+                });
+                loadSeasonFantasyLeaders();
+            });
+            els.seasonFantasyScoring.appendChild(chip);
+        });
     }
 
     async function loadSeasonOffenses() {
@@ -1323,6 +1417,8 @@
         initSearch();
         initSeasonPropsSearch();
         loadSeasonPropLeaders();
+        initSeasonFantasyScoring();
+        loadSeasonFantasyLeaders();
         loadSeasonOffenses();
         initCompareControls();
         renderCompareTray();

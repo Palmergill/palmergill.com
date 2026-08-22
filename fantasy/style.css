@@ -392,6 +392,36 @@ body {
     line-height: 1.5;
 }
 
+.season-fantasy {
+    margin-top: 24px;
+    border-top: 1px solid rgba(255, 255, 255, 0.14);
+    padding-top: 22px;
+}
+
+.season-fantasy__head {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 24px;
+    margin-bottom: 10px;
+}
+
+.season-fantasy__head h3 { margin: 4px 0 0; font-size: 1.15rem; }
+.season-fantasy__head p,
+.season-fantasy__caveat {
+    max-width: 62ch;
+    margin: 0;
+    color: #9eafa1;
+    font-size: 0.72rem;
+    line-height: 1.5;
+}
+
+.season-fantasy__controls { display: flex; align-items: flex-end; flex-direction: column; gap: 10px; }
+.season-fantasy__controls .chip-row { margin: 0; }
+.season-fantasy__table { min-width: 640px; }
+.season-leader .season-fantasy__total { color: #e7b95f; font-weight: 700; }
+.season-fantasy__caveat { margin-top: 8px; color: #718477; }
+
 .season-offenses {
     margin-top: 24px;
     border-top: 1px solid rgba(255, 255, 255, 0.14);
@@ -1242,7 +1272,9 @@ body.drawer-open { overflow: hidden; }
     .season-props__intro { align-items: stretch; flex-direction: column; gap: 16px; }
     .season-props__search { flex-basis: auto; }
     .season-props__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    .season-offenses__head { align-items: flex-start; flex-direction: column; gap: 8px; }
+    .season-offenses__head,
+    .season-fantasy__head { align-items: flex-start; flex-direction: column; gap: 8px; }
+    .season-fantasy__controls { align-items: flex-start; }
     .season-offenses__grid { grid-template-columns: 1fr; }
     .compare-tray { left: 8px; right: 8px; transform: none; max-width: none; }
     .compare-tray__actions { margin-left: 0; }

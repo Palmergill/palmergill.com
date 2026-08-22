@@ -7,6 +7,7 @@ from app.database import (
     FantasyCollectionRun,
     FantasyMeta,
     FantasyPlayer,
+    FantasyProjection,
     FantasySeasonPropSnapshot,
     SessionLocal,
 )
@@ -62,6 +63,7 @@ class FakeKalshi:
 def db():
     session = SessionLocal()
     session.query(FantasySeasonPropSnapshot).delete()
+    session.query(FantasyProjection).delete()
     session.query(FantasyCollectionRun).delete()
     session.query(FantasyPlayer).delete()
     session.query(FantasyMeta).delete()
@@ -288,6 +290,100 @@ def test_leaderboard_is_empty_before_any_collection_run(db):
     assert board["leaders"] == []
     assert board["source"] is None
     assert all(entry["players"] == 0 for entry in board["markets"])
+
+
+def test_implied_fantasy_points_combine_yards_and_touchdowns(db):
+    class ReceiverMarkets:
+        configured = True
+        max_spread = 0.20
+
+        def get_season_props(self):
+            return {
+                "KXNFLSEASONRECYDS": [
+                    market("KXNFLSEASONRECYDS-27C1000-ALPHA", "Alpha Receiver", 999.5, 0.48, 0.52),
+                    market("KXNFLSEASONRECYDS-27C750-ZETA", "Zeta Receiver", 749.5, 0.48, 0.52),
+                ],
+                "KXNFLSEASONRECTD": [
+                    market("KXNFLSEASONRECTD-27C10-ALPHA", "Alpha Receiver", 9.5, 0.48, 0.52),
+                    market("KXNFLSEASONRECTD-27C8-ZETA", "Zeta Receiver", 7.5, 0.48, 0.52),
+                ],
+            }
+
+    db.add(named_player("wr_alpha", "Alpha Receiver", "WR", "SEA"))
+    db.add(named_player("wr_zeta", "Zeta Receiver", "WR", "NYJ"))
+    db.commit()
+    fc.collect_season_props(db, client=ReceiverMarkets())
+
+    class SeasonProjections:
+        def get_season_projections(self, season):
+            return [
+                {
+                    "player_id": "wr_alpha",
+                    "pts_ppr": 250.0,
+                    "pts_half_ppr": 205.0,
+                    "pts_std": 160.0,
+                    "stats": {"rec": 90.0},
+                },
+                {
+                    "player_id": "wr_zeta",
+                    "pts_ppr": 190.0,
+                    "pts_half_ppr": 160.0,
+                    "pts_std": 130.0,
+                    "stats": {"rec": 60.0},
+                },
+            ]
+
+    fc.collect_projections(db, 2026, fc.SEASON_LONG_WEEK, client=SeasonProjections())
+
+    board = fd.get_season_fantasy_point_leaders(db, season=2026)
+
+    assert board["scoring"] == "std"
+    assert [entry["player"]["name"] for entry in board["leaders"]] == [
+        "Alpha Receiver", "Zeta Receiver",
+    ]
+    assert board["leaders"][0] == {
+        "player": fd._player_public(db.get(FantasyPlayer, "wr_alpha")),
+        "yard_points": 100.0,
+        "touchdown_points": 57.0,
+        "projected_receptions": 90.0,
+        "reception_points": 0.0,
+        "fantasy_points": 157.0,
+        "markets_used": 2,
+        "pairs_used": ["receiving"],
+        "implied": {"season_rec_yds": 999.5, "season_rec_tds": 9.5},
+    }
+    assert board["leaders"][1]["fantasy_points"] == 120.0
+
+    half = fd.get_season_fantasy_point_leaders(db, season=2026, scoring="half")
+    assert half["scoring"] == "half"
+    assert half["reception_source"] == "sleeper"
+    assert half["leaders"][0]["reception_points"] == 45.0
+    assert half["leaders"][0]["fantasy_points"] == 202.0
+
+    ppr = fd.get_season_fantasy_point_leaders(db, season=2026, scoring="ppr")
+    assert ppr["leaders"][0]["reception_points"] == 90.0
+    assert ppr["leaders"][0]["fantasy_points"] == 247.0
+
+
+def test_implied_fantasy_points_require_the_primary_matching_pair(db):
+    class MismatchedQuarterbackMarkets:
+        configured = True
+        max_spread = 0.20
+
+        def get_season_props(self):
+            return {
+                **PAYLOAD,
+                "KXNFLSEASONRSHTD": [
+                    market("KXNFLSEASONRSHTD-27C8-JALLEN", "Josh Allen", 7.5, 0.48, 0.52),
+                ],
+            }
+
+    fc.collect_season_props(db, client=MismatchedQuarterbackMarkets())
+
+    board = fd.get_season_fantasy_point_leaders(db, season=2026)
+
+    # Passing yards plus a rushing-TD market is not a complete QB projection.
+    assert board["leaders"] == []
 
 
 def test_offense_rankings_combine_air_and_rushing_without_double_counting(db):

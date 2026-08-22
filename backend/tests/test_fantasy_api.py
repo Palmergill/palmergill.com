@@ -325,6 +325,15 @@ def test_betting_endpoints_return_well_formed_empty_structures():
     season_leaders = client.get("/api/fantasy/season-props").json()
     assert season_leaders["leaders"] == []
 
+    fantasy_point_leaders = client.get("/api/fantasy/season-fantasy-points").json()
+    assert fantasy_point_leaders["leaders"] == []
+    assert client.get(
+        "/api/fantasy/season-fantasy-points", params={"scoring": "half"}
+    ).json()["scoring"] == "half"
+    assert client.get(
+        "/api/fantasy/season-fantasy-points", params={"scoring": "invalid"}
+    ).status_code == 422
+
     offense_leaders = client.get("/api/fantasy/season-offenses").json()
     assert offense_leaders["yards"] == []
     assert offense_leaders["touchdowns"] == []

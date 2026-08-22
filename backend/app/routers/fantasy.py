@@ -189,6 +189,18 @@ def season_offense_leaders(
     return fantasy_data.get_season_offense_leaders(db, season=season, limit=limit)
 
 
+@router.get("/season-fantasy-points")
+def season_fantasy_point_leaders(
+    season: Optional[int] = None,
+    scoring: str = Query("std", pattern="^(ppr|half|half_ppr|half-ppr|std|standard)$"),
+    limit: int = Query(100, ge=1, le=200),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    return fantasy_data.get_season_fantasy_point_leaders(
+        db, season=season, scoring=scoring, limit=limit
+    )
+
+
 @router.get("/trending")
 def trending(
     kind: str = Query("add", pattern="^(add|drop)$"),

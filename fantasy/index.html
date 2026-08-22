@@ -19,7 +19,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/shared/site-nav.css?v=13">
-    <link rel="stylesheet" href="style.css?v=13">
+    <link rel="stylesheet" href="style.css?v=14">
 </head>
 <body>
     <main class="app-shell">
@@ -91,6 +91,35 @@
                 </div>
             </div>
             <div id="seasonPropsPanel" class="season-props__panel" hidden aria-live="polite"></div>
+            <div class="season-fantasy" aria-labelledby="seasonFantasyTitle">
+                <div class="season-fantasy__head">
+                    <div>
+                        <span class="eyebrow">Market synthesis</span>
+                        <h3 id="seasonFantasyTitle">Implied fantasy points</h3>
+                    </div>
+                    <div class="season-fantasy__controls">
+                        <p>Market-implied yards and touchdowns, with projected receptions added for PPR formats.</p>
+                        <div id="seasonFantasyScoring" class="chip-row" role="group" aria-label="Implied fantasy points scoring format"></div>
+                    </div>
+                </div>
+                <div class="table-wrap">
+                    <table class="rank-table season-props__table season-fantasy__table">
+                        <thead>
+                            <tr>
+                                <th class="col-rank">#</th>
+                                <th>Player</th>
+                                <th class="col-proj">Yard pts</th>
+                                <th class="col-proj">TD pts</th>
+                                <th class="col-proj">Rec bonus</th>
+                                <th class="col-proj">Total</th>
+                            </tr>
+                        </thead>
+                        <tbody id="seasonFantasyLeaders"></tbody>
+                    </table>
+                </div>
+                <p class="season-props__note" id="seasonFantasyNote"></p>
+                <p class="season-fantasy__caveat">Uses 1 point per 25 passing yards, 4 per passing touchdown, 1 per 10 rushing or receiving yards, and 6 per rushing or receiving touchdown. Half PPR and PPR add 0.5 or 1 point per projected reception. Interceptions, two-point conversions, and fumbles are not included.</p>
+            </div>
             <div class="season-offenses" aria-labelledby="seasonOffensesTitle">
                 <div class="season-offenses__head">
                     <div>
@@ -278,6 +307,6 @@
     <script src="/shared/api-base.js?v=1"></script>
     <script src="format.js?v=6"></script>
     <script src="chat.js?v=2"></script>
-    <script src="app.js?v=11"></script>
+    <script src="app.js?v=13"></script>
 </body>
 </html>

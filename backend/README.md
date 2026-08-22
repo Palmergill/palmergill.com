@@ -80,7 +80,13 @@ dropped. `GET /api/fantasy/season-props` ranks everyone
 quoted in one category — the entry point, since a bare name lookup only helps
 once you already know who has a market. `GET /api/fantasy/season-offenses`
 builds top-10 team yardage and touchdown indicators from non-overlapping air
-and rushing markets. Optional overrides:
+and rushing markets. `GET /api/fantasy/season-fantasy-points` converts every
+available implied yardage and touchdown value into a fantasy points board
+using complete stat pairs; stats without a matching yardage and
+touchdown market are not estimated. Its `scoring` option supports standard,
+half-PPR and PPR; reception bonuses come from the latest season-long projection
+because the exchange does not quote season receptions. Optional
+overrides:
 
 ```text
 KALSHI_MAX_SPREAD=0.20   # widest YES bid/ask still treated as a real quote

@@ -33,6 +33,7 @@ from app.services.fantasy_collector import (
 from app.services.fantasy_common import (
     FLEX_POSITIONS,
     SCORING_POINTS_FIELD,
+    coerce_float,
     display_position,
     normalize_position,
     normalize_scoring,
@@ -66,6 +67,36 @@ SEASON_PROP_MARKETS = (
     ("season_rush_tds", "Rushing touchdowns"),
     ("season_rec_tds", "Receiving touchdowns"),
 )
+
+# Conventional standard-scoring weights for the market stats we collect.
+# Receptions, interceptions, two-point conversions and fumbles are not quoted
+# by this feed, so the resulting total is intentionally narrower than a full
+# season projection.
+SEASON_FANTASY_WEIGHTS = {
+    "season_pass_yds": 1 / 25,
+    "season_pass_tds": 4,
+    "season_rush_yds": 1 / 10,
+    "season_rush_tds": 6,
+    "season_rec_yds": 1 / 10,
+    "season_rec_tds": 6,
+}
+SEASON_YARD_MARKETS = frozenset({
+    "season_pass_yds", "season_rush_yds", "season_rec_yds",
+})
+SEASON_TD_MARKETS = frozenset({
+    "season_pass_tds", "season_rush_tds", "season_rec_tds",
+})
+SEASON_FANTASY_MARKET_PAIRS = {
+    "passing": ("season_pass_yds", "season_pass_tds"),
+    "rushing": ("season_rush_yds", "season_rush_tds"),
+    "receiving": ("season_rec_yds", "season_rec_tds"),
+}
+SEASON_FANTASY_PRIMARY_PAIR = {
+    "QB": "passing",
+    "RB": "rushing",
+    "WR": "receiving",
+    "TE": "receiving",
+}
 
 
 def _player_index(db: Session, player_ids: Optional[List[str]] = None) -> Dict[str, FantasyPlayer]:
@@ -1282,6 +1313,161 @@ def get_season_prop_leaders(
         "market": market,
         "label": labels[market],
         "markets": markets,
+        "leaders": leaders[:limit],
+    }
+
+
+def _season_reception_projection_map(
+    db: Session, season: int
+) -> tuple[Dict[str, float], Optional[str]]:
+    """Latest season reception projections, used only for PPR bonuses."""
+    run = (
+        _resolve_projection_run(db, season, SEASON_LONG_WEEK, "sleeper")
+        or _resolve_projection_run(db, season, SEASON_LONG_WEEK, None)
+    )
+    if run is None:
+        return {}, None
+
+    receptions = {}
+    rows = db.query(FantasyProjection).filter(FantasyProjection.run_id == run.id).all()
+    for row in rows:
+        try:
+            stats = json.loads(row.stats_json) if row.stats_json else {}
+        except (TypeError, json.JSONDecodeError):
+            stats = {}
+        value = None
+        for key in ("rec", "receptions", "receiving_receptions"):
+            value = coerce_float(stats.get(key))
+            if value is not None:
+                break
+        # A provider may omit the component while still publishing all three
+        # scoring totals. Their PPR-standard difference is the reception count.
+        if value is None and row.pts_ppr is not None and row.pts_std is not None:
+            value = max(0.0, row.pts_ppr - row.pts_std)
+        if value is not None:
+            receptions[row.player_id] = value
+    return receptions, run.source
+
+
+def get_season_fantasy_point_leaders(
+    db: Session,
+    season: Optional[int] = None,
+    scoring: str = "std",
+    limit: int = 100,
+) -> Dict[str, Any]:
+    """Rank players by fantasy points implied by quoted markets.
+
+    Every available yardage and touchdown ladder is first converted to its
+    native 50% value by `_season_implied_value`. Those raw values are then
+    scored with conventional standard rules; half-PPR and PPR add the latest
+    season reception projection because the market does not quote receptions.
+    Passing, rushing and receiving contribute only when both halves of that
+    category are quoted, and a row requires the primary pair for the player's
+    position. This prevents passing yards plus rushing touchdowns from
+    masquerading as a complete QB projection when passing-TD data is absent.
+    """
+    if season is None:
+        season = default_context(db)["season"]
+    scoring = normalize_scoring(scoring)
+    run = latest_successful_run(db, "season_props", season=season)
+    if run is None:
+        return {
+            "season": season,
+            "as_of": None,
+            "source": None,
+            "scoring": scoring,
+            "reception_source": None,
+            "leaders": [],
+        }
+
+    snapshots = (
+        db.query(FantasySeasonPropSnapshot)
+        .filter(
+            FantasySeasonPropSnapshot.run_id == run.id,
+            FantasySeasonPropSnapshot.player_id.isnot(None),
+        )
+        .all()
+    )
+    rows_by_market: Dict[str, Dict[str, list]] = {
+        key: {} for key, _ in SEASON_PROP_MARKETS
+    }
+    rows_by_player: Dict[str, Dict[str, list]] = {}
+    for row in snapshots:
+        if row.market not in rows_by_market:
+            continue
+        rows_by_market[row.market].setdefault(row.player_id, []).append(row)
+        rows_by_player.setdefault(row.player_id, {}).setdefault(row.market, []).append(row)
+
+    drop_rates = {
+        market: _season_market_drop_rate(player_rows, market)
+        for market, player_rows in rows_by_market.items()
+    }
+    players = _player_index(db, list(rows_by_player))
+    reception_projections, reception_source = _season_reception_projection_map(db, season)
+    reception_multiplier = {"std": 0.0, "half": 0.5, "ppr": 1.0}[scoring]
+    leaders = []
+    for player_id, market_rows in rows_by_player.items():
+        implied = {
+            market: _season_implied_value(rows, market, drop_rates[market])
+            for market, rows in market_rows.items()
+        }
+        implied = {market: value for market, value in implied.items() if value is not None}
+        player = players.get(player_id)
+        primary_pair = SEASON_FANTASY_PRIMARY_PAIR.get(player.position if player else None)
+        complete_pairs = {
+            name: pair
+            for name, pair in SEASON_FANTASY_MARKET_PAIRS.items()
+            if all(market in implied for market in pair)
+        }
+        if primary_pair not in complete_pairs:
+            continue
+        projected_receptions = reception_projections.get(player_id)
+        if reception_multiplier and projected_receptions is None:
+            continue
+
+        used_markets = {
+            market
+            for pair in complete_pairs.values()
+            for market in pair
+        }
+        implied = {market: implied[market] for market in used_markets}
+        yard_markets = SEASON_YARD_MARKETS.intersection(used_markets)
+        touchdown_markets = SEASON_TD_MARKETS.intersection(used_markets)
+
+        yard_points = sum(implied[market] * SEASON_FANTASY_WEIGHTS[market] for market in yard_markets)
+        touchdown_points = sum(
+            implied[market] * SEASON_FANTASY_WEIGHTS[market]
+            for market in touchdown_markets
+        )
+        yard_points = round(yard_points, 1)
+        touchdown_points = round(touchdown_points, 1)
+        reception_points = round((projected_receptions or 0) * reception_multiplier, 1)
+        leaders.append({
+            "player": _player_public(player),
+            "yard_points": yard_points,
+            "touchdown_points": touchdown_points,
+            "projected_receptions": (
+                round(projected_receptions, 1)
+                if projected_receptions is not None
+                else None
+            ),
+            "reception_points": reception_points,
+            "fantasy_points": round(yard_points + touchdown_points + reception_points, 1),
+            "markets_used": len(implied),
+            "pairs_used": sorted(complete_pairs),
+            "implied": implied,
+        })
+
+    leaders.sort(key=lambda entry: (
+        -entry["fantasy_points"],
+        entry["player"]["name"] or "",
+    ))
+    return {
+        "season": season,
+        "as_of": iso_utc(run.finished_at),
+        "source": "Kalshi",
+        "scoring": scoring,
+        "reception_source": reception_source,
         "leaders": leaders[:limit],
     }
 
