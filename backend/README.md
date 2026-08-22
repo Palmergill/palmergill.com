@@ -73,10 +73,14 @@ Kalshi lists threshold contracts ("3500+ passing yards") rather than lines, so
 the parser reads each contract's strike as the over/under point and its YES
 price as the Over. It is an overlay on the projection consensus, not a
 replacement: roughly 110 players clear its quote filter versus a few thousand
-in the Sleeper/FantasyPros/ESPN projections, and thinly quoted contracts are
-dropped rather than shown. `GET /api/fantasy/season-props` ranks everyone
+in the Sleeper/FantasyPros/ESPN projections. A tight two-sided midpoint is
+preferred; when the book is one-sided, a last trade is used only when it has
+real volume and remains inside the live book. Contracts with neither are
+dropped. `GET /api/fantasy/season-props` ranks everyone
 quoted in one category — the entry point, since a bare name lookup only helps
-once you already know who has a market. Optional overrides:
+once you already know who has a market. `GET /api/fantasy/season-offenses`
+builds top-10 team yardage and touchdown indicators from non-overlapping air
+and rushing markets. Optional overrides:
 
 ```text
 KALSHI_MAX_SPREAD=0.20   # widest YES bid/ask still treated as a real quote

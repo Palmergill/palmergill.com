@@ -392,6 +392,61 @@ body {
     line-height: 1.5;
 }
 
+.season-offenses {
+    margin-top: 24px;
+    border-top: 1px solid rgba(255, 255, 255, 0.14);
+    padding-top: 22px;
+}
+
+.season-offenses__head {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 24px;
+    margin-bottom: 14px;
+}
+
+.season-offenses__head h3 { margin: 4px 0 0; font-size: 1.15rem; }
+.season-offenses__head p { max-width: 56ch; margin: 0; color: #9eafa1; font-size: 0.78rem; line-height: 1.5; }
+
+.season-offenses__grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.season-offense-board {
+    min-width: 0;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.05);
+    padding: 14px;
+}
+
+.season-offense-board h4 {
+    margin: 0 0 7px;
+    color: #f0c978;
+    font-size: 0.72rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+.season-offense-list { margin: 0; padding: 0; list-style: none; }
+.season-offense {
+    display: grid;
+    grid-template-columns: 24px 42px minmax(0, 1fr) auto;
+    align-items: baseline;
+    gap: 8px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    padding: 8px 0;
+}
+.season-offense:last-child { border-bottom: 0; }
+.season-offense__rank { color: #7f9284; font-size: 0.76rem; text-align: right; }
+.season-offense__team { color: #fff; font-size: 0.86rem; }
+.season-offense__detail { overflow: hidden; color: #8ea08f; font-size: 0.68rem; text-overflow: ellipsis; white-space: nowrap; }
+.season-offense__total { color: #d8e1d9; font-size: 0.78rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.season-offense-list__empty { padding: 14px 0 6px; color: #8ea08f; font-size: 0.78rem; }
+
 
 .draft-feature {
     position: relative;
@@ -1187,6 +1242,8 @@ body.drawer-open { overflow: hidden; }
     .season-props__intro { align-items: stretch; flex-direction: column; gap: 16px; }
     .season-props__search { flex-basis: auto; }
     .season-props__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .season-offenses__head { align-items: flex-start; flex-direction: column; gap: 8px; }
+    .season-offenses__grid { grid-template-columns: 1fr; }
     .compare-tray { left: 8px; right: 8px; transform: none; max-width: none; }
     .compare-tray__actions { margin-left: 0; }
 }

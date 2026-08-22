@@ -322,6 +322,13 @@ def test_betting_endpoints_return_well_formed_empty_structures():
     assert len(season_props["markets"]) == 6
     assert all(market["line"] is None for market in season_props["markets"])
 
+    season_leaders = client.get("/api/fantasy/season-props").json()
+    assert season_leaders["leaders"] == []
+
+    offense_leaders = client.get("/api/fantasy/season-offenses").json()
+    assert offense_leaders["yards"] == []
+    assert offense_leaders["touchdowns"] == []
+
     assert client.get("/api/fantasy/players/unknown/season-props").status_code == 404
 
 

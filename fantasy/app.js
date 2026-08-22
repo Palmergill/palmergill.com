@@ -43,6 +43,9 @@
         seasonPropsTabs: document.getElementById("seasonPropsTabs"),
         seasonPropsLeaders: document.getElementById("seasonPropsLeaders"),
         seasonPropsNote: document.getElementById("seasonPropsNote"),
+        seasonOffenseYards: document.getElementById("seasonOffenseYards"),
+        seasonOffenseTouchdowns: document.getElementById("seasonOffenseTouchdowns"),
+        seasonOffensesNote: document.getElementById("seasonOffensesNote"),
         rankingsSource: document.getElementById("rankingsSource"),
         rankingsAsOf: document.getElementById("rankingsAsOf"),
         rankBody: document.getElementById("rankBody"),
@@ -441,7 +444,7 @@
             els.seasonPropsPanel.appendChild(el(
                 "p",
                 "season-props__status",
-                "No regular-season over/unders are quoted for this player yet. Only a few hundred players have a liquid market — try another player, or check back as the board fills in."
+                "No usable regular-season market data is available for this player yet. Only a few hundred players have a quote or bounded last trade — try another player, or check back as the board fills in."
             ));
             return;
         }
@@ -478,15 +481,16 @@
         return item;
     }
 
-    // The exchange quotes barely a hundred of the several thousand players in
+    // The exchange covers barely a hundred of the several thousand players in
     // the catalog, so a bare search box is a guessing game: most names a
     // manager thinks to type have no market at all. The board leads with who
-    // is actually quoted, and the search is there to jump to one of them.
+    // actually has usable data, and the search is there to jump to one of them.
     async function loadSeasonPropLeaders(market) {
         if (!els.seasonPropsLeaders) return;
         try {
-            const query = market ? `?market=${encodeURIComponent(market)}` : "";
-            const data = await fetchJson(`${API_BASE}/season-props${query}`);
+            const params = new URLSearchParams({ limit: "200" });
+            if (market) params.set("market", market);
+            const data = await fetchJson(`${API_BASE}/season-props?${params.toString()}`);
             renderSeasonPropTabs(data);
             renderSeasonPropLeaders(data);
         } catch (err) {
@@ -505,8 +509,8 @@
             // so the board reads as "not quoted" rather than "not built".
             tab.disabled = entry.players === 0;
             tab.title = entry.players === 0
-                ? `${entry.label} — nothing quoted`
-                : `${entry.label} — ${entry.players} players quoted`;
+                ? `${entry.label} — no usable market data`
+                : `${entry.label} — ${entry.players} players with market data`;
             tab.addEventListener("click", () => loadSeasonPropLeaders(entry.market));
             els.seasonPropsTabs.appendChild(tab);
         });
@@ -552,10 +556,46 @@
         // five thresholds per category, so most of a category sits on one
         // number and the chance beside it is what separates those players.
         els.seasonPropsNote.textContent = [
-            `${leaders.length} player${leaders.length === 1 ? "" : "s"} quoted`,
+            `${leaders.length} player${leaders.length === 1 ? "" : "s"} with usable market data`,
             "the market posts only a handful of thresholds, so players cluster on the same line — the chance separates them",
             [data.source, asOf].filter(Boolean).join(" · "),
         ].filter(Boolean).join(" · ");
+    }
+
+    async function loadSeasonOffenses() {
+        if (!els.seasonOffenseYards || !els.seasonOffenseTouchdowns) return;
+        try {
+            const data = await fetchJson(`${API_BASE}/season-offenses?limit=10`);
+            renderSeasonOffenseList(els.seasonOffenseYards, data.yards, "yards");
+            renderSeasonOffenseList(els.seasonOffenseTouchdowns, data.touchdowns, "TDs");
+            const asOf = formatAsOf(data.as_of);
+            els.seasonOffensesNote.textContent = [
+                "Market-derived totals use quoted player thresholds, with bounded last trades filling one-sided books; this is not an official team projection",
+                [data.source, asOf].filter(Boolean).join(" · "),
+            ].filter(Boolean).join(" · ");
+        } catch (err) {
+            renderSeasonOffenseList(els.seasonOffenseYards, [], "yards");
+            renderSeasonOffenseList(els.seasonOffenseTouchdowns, [], "TDs");
+            els.seasonOffensesNote.textContent = "Team offense rankings are unavailable right now.";
+        }
+    }
+
+    function renderSeasonOffenseList(target, rows, unit) {
+        target.innerHTML = "";
+        (rows || []).forEach((entry, index) => {
+            const item = el("li", "season-offense");
+            item.appendChild(el("span", "season-offense__rank", index + 1));
+            item.appendChild(el("b", "season-offense__team", entry.team));
+            const detail = el("span", "season-offense__detail");
+            const source = entry.air_source === "receiving" ? "receiving fallback" : "passing";
+            detail.textContent = `${F.seasonLine(entry.air)} air + ${F.seasonLine(entry.ground)} rush · ${source}`;
+            item.appendChild(detail);
+            item.appendChild(el("strong", "season-offense__total", `${F.seasonLine(entry.total)} ${unit}`));
+            target.appendChild(item);
+        });
+        if (!rows || rows.length === 0) {
+            target.appendChild(el("li", "season-offense-list__empty", "Not enough quoted markets yet."));
+        }
     }
 
     // ── rankings ────────────────────────────────────────────────────────
@@ -1295,6 +1335,7 @@
         initSearch();
         initSeasonPropsSearch();
         loadSeasonPropLeaders();
+        loadSeasonOffenses();
         initCompareControls();
         renderCompareTray();
         els.drawerClose.addEventListener("click", closeDrawer);

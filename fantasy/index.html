@@ -19,7 +19,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/shared/site-nav.css?v=13">
-    <link rel="stylesheet" href="style.css?v=12">
+    <link rel="stylesheet" href="style.css?v=13">
 </head>
 <body>
     <main class="app-shell">
@@ -80,7 +80,7 @@
                 <div>
                     <span class="eyebrow">Draft research</span>
                     <h2 id="seasonPropsTitle">Season player lines</h2>
-                    <p>Every player the market quotes for regular-season passing, rushing, receiving, and touchdowns, ranked within each category. Prices come from Kalshi's event contracts, so only the more heavily traded players appear — search to pull up one player's full card.</p>
+                    <p>Every player with a usable Kalshi quote or executed trade for regular-season passing, rushing, receiving, and touchdowns, ranked within each category. Search to pull up one player's full card.</p>
                 </div>
                 <div class="season-props__search">
                     <label class="sr-only" for="seasonPropsSearch">Look up a player</label>
@@ -91,6 +91,26 @@
                 </div>
             </div>
             <div id="seasonPropsPanel" class="season-props__panel" hidden aria-live="polite"></div>
+            <div class="season-offenses" aria-labelledby="seasonOffensesTitle">
+                <div class="season-offenses__head">
+                    <div>
+                        <span class="eyebrow">Team outlook</span>
+                        <h3 id="seasonOffensesTitle">Top 10 offenses</h3>
+                    </div>
+                    <p>Passing plus rushing markets. Receiving is used only when a team has no quoted passer, so production is not counted twice.</p>
+                </div>
+                <div class="season-offenses__grid">
+                    <article class="season-offense-board">
+                        <h4>Yards</h4>
+                        <ol id="seasonOffenseYards" class="season-offense-list"></ol>
+                    </article>
+                    <article class="season-offense-board">
+                        <h4>Touchdowns</h4>
+                        <ol id="seasonOffenseTouchdowns" class="season-offense-list"></ol>
+                    </article>
+                </div>
+                <p id="seasonOffensesNote" class="season-props__note"></p>
+            </div>
             <div class="chip-row" id="seasonPropsTabs" role="group" aria-label="Season market"></div>
             <div class="table-wrap">
                 <table class="rank-table season-props__table">
@@ -260,6 +280,6 @@
     <script src="/shared/api-base.js?v=1"></script>
     <script src="format.js?v=5"></script>
     <script src="chat.js?v=2"></script>
-    <script src="app.js?v=9"></script>
+    <script src="app.js?v=10"></script>
 </body>
 </html>

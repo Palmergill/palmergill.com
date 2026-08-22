@@ -21,6 +21,7 @@ from app.database import (
     FantasyRanking,
     FantasySeasonPropSnapshot,
     FantasyTrendingSnapshot,
+    iso_utc,
 )
 from app.services.fantasy_collector import (
     SEASON_LONG_WEEK,
@@ -1226,6 +1227,122 @@ def get_season_prop_leaders(
         "label": labels[market],
         "markets": markets,
         "leaders": leaders[:limit],
+    }
+
+
+def get_season_offense_leaders(
+    db: Session,
+    season: Optional[int] = None,
+    limit: int = 10,
+) -> Dict[str, Any]:
+    """Rank team offenses from non-overlapping Kalshi player markets.
+
+    Passing and receiving describe much of the same yardage/touchdowns, so
+    they must never be added together. A team's primary air component is its
+    highest quoted passing line; summed receiving lines are only a fallback
+    when no passer is quoted. Rushing lines are additive across players and
+    form the ground component.
+
+    These are market-derived offense indicators, not official team totals:
+    Kalshi only lists selected players and the values are contract thresholds.
+    The response exposes the components so the UI can say exactly what each
+    number contains instead of presenting it as a projection model.
+    """
+    if season is None:
+        season = default_context(db)["season"]
+    run = latest_successful_run(db, "season_props", season=season)
+    if run is None:
+        return {
+            "season": season,
+            "as_of": None,
+            "source": None,
+            "yards": [],
+            "touchdowns": [],
+        }
+
+    snapshots = (
+        db.query(FantasySeasonPropSnapshot)
+        .filter(
+            FantasySeasonPropSnapshot.run_id == run.id,
+            FantasySeasonPropSnapshot.player_id.isnot(None),
+        )
+        .all()
+    )
+    by_player_market: Dict[tuple, list] = {}
+    for row in snapshots:
+        by_player_market.setdefault((row.player_id, row.market), []).append(row)
+
+    players = _player_index(db, list({player_id for player_id, _ in by_player_market}))
+    by_team: Dict[str, Dict[str, List[Dict[str, Any]]]] = {}
+    labels = dict(SEASON_PROP_MARKETS)
+    for (player_id, market), rows in by_player_market.items():
+        player = players.get(player_id)
+        team = (player.team or "").upper() if player else ""
+        if not team or team in {"FA", "UNK"} or market not in labels:
+            continue
+        summary = _season_market_summary(rows, market, labels[market])
+        if summary["line"] is None:
+            continue
+        by_team.setdefault(team, {}).setdefault(market, []).append({
+            "player_id": player_id,
+            "name": player.full_name,
+            "line": summary["line"],
+        })
+
+    def build(metric: str) -> List[Dict[str, Any]]:
+        if metric == "yards":
+            pass_market, receive_market, rush_market = (
+                "season_pass_yds", "season_rec_yds", "season_rush_yds"
+            )
+        else:
+            pass_market, receive_market, rush_market = (
+                "season_pass_tds", "season_rec_tds", "season_rush_tds"
+            )
+
+        rankings = []
+        for team, markets in by_team.items():
+            passers = markets.get(pass_market, [])
+            receivers = markets.get(receive_market, [])
+            rushers = markets.get(rush_market, [])
+            primary_passer = max(passers, key=lambda row: row["line"]) if passers else None
+            if primary_passer:
+                air_total = primary_passer["line"]
+                air_source = "passing"
+                air_players = 1
+            elif receivers:
+                air_total = sum(row["line"] for row in receivers)
+                air_source = "receiving"
+                air_players = len(receivers)
+            else:
+                air_total = None
+                air_source = None
+                air_players = 0
+            ground_total = sum(row["line"] for row in rushers) if rushers else None
+
+            # A partial offense would unfairly outrank or underrank teams on
+            # coverage alone. Only compare teams with both air and ground
+            # components; the response can legitimately contain fewer than
+            # ten until Kalshi quotes enough players.
+            if air_total is None or ground_total is None:
+                continue
+            rankings.append({
+                "team": team,
+                "total": round(air_total + ground_total, 1),
+                "air": round(air_total, 1),
+                "ground": round(ground_total, 1),
+                "air_source": air_source,
+                "players": air_players + len(rushers),
+            })
+
+        rankings.sort(key=lambda row: (-row["total"], row["team"]))
+        return rankings[:limit]
+
+    return {
+        "season": season,
+        "as_of": iso_utc(run.finished_at),
+        "source": "Kalshi",
+        "yards": build("yards"),
+        "touchdowns": build("touchdowns"),
     }
 
 

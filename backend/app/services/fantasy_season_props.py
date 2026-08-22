@@ -18,8 +18,9 @@ The catch is liquidity. Coverage in August 2026 was 30 QBs / 50 RBs / 87
 WR-TEs, and much of it is quoted so wide that the midpoint is meaningless —
 several RB1s sat at bid 0.02 / ask 0.84, whose "43%" midpoint is an artifact
 of the empty book rather than a market view. Everything below therefore
-treats this as an *overlay* on the projection consensus: it filters hard and
-returns nothing rather than something untrustworthy.
+treats this as an *overlay* on the projection consensus: it prefers tight
+two-sided quotes and uses an executed trade only when it remains bounded by
+the live book.
 """
 import json
 import os
@@ -84,19 +85,36 @@ def _player_key(ticker: Any) -> Optional[str]:
 
 
 def _quote(raw: Dict[str, Any], max_spread: float) -> Optional[float]:
-    """Mid-price of a two-sided YES quote, or None if it fails the filter.
+    """Best defensible YES price from the current Kalshi market.
 
-    A missing side is not a wide market, it is no market: an ask with no bid
-    still produces a midpoint, and that midpoint is what puts phantom players
-    at the top of a ranking.
+    Prefer the midpoint of a tight two-sided book. When the book is one-sided
+    or too wide, accept the last executed trade only if the contract has real
+    volume and that trade still falls inside the current bid/ask bounds. This
+    recovers categories such as passing touchdowns, whose live board can have
+    no tight quotes at all, without inventing a midpoint from an empty side.
     """
     bid = coerce_float(raw.get("yes_bid_dollars"))
     ask = coerce_float(raw.get("yes_ask_dollars"))
-    if bid is None or ask is None or bid <= 0 or ask <= 0 or ask <= bid:
+    if (
+        bid is not None
+        and ask is not None
+        and bid > 0
+        and ask > bid
+        and ask - bid <= max_spread
+    ):
+        return (bid + ask) / 2
+
+    last = coerce_float(raw.get("last_price_dollars"))
+    volume = coerce_float(raw.get("volume_fp"))
+    if last is None or volume is None or not 0 < last < 1 or volume <= 0:
         return None
-    if ask - bid > max_spread:
+    # A one-cent allowance covers Kalshi's tick while rejecting a stale trade
+    # that now sits outside the observable book.
+    if bid is not None and bid > 0 and last < bid - 0.01:
         return None
-    return (bid + ask) / 2
+    if ask is not None and ask > 0 and last > ask + 0.01:
+        return None
+    return last
 
 
 def _monotonic(strikes: List[Tuple[float, float]]) -> bool:

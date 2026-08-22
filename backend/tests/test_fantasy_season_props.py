@@ -128,6 +128,21 @@ def test_parser_spread_filter_is_configurable():
     assert len(parse_season_props(wide, max_spread=0.30)) == 2
 
 
+def test_parser_uses_a_real_last_trade_when_the_live_book_is_one_sided():
+    traded = market(
+        "KXNFLSEASONPASSTDS-27C30-JALLEN", "Josh Allen", 29.5, 0.0, 0.62
+    )
+    traded.update({"last_price_dollars": "0.5800", "volume_fp": "14.25"})
+    rows = parse_season_props({"KXNFLSEASONPASSTDS": [traded]})
+
+    assert len(rows) == 2
+    assert next(row for row in rows if row["outcome"] == "Over")["price"] == -138
+
+    # A displayed last price with no executed volume is not market evidence.
+    traded["volume_fp"] = "0.00"
+    assert parse_season_props({"KXNFLSEASONPASSTDS": [traded]}) == []
+
+
 def test_collector_matches_player_and_read_returns_six_categories(db):
     run = fc.collect_season_props(db, client=FakeKalshi())
     assert run.status == "success"
@@ -272,3 +287,75 @@ def test_leaderboard_is_empty_before_any_collection_run(db):
     assert board["leaders"] == []
     assert board["source"] is None
     assert all(entry["players"] == 0 for entry in board["markets"])
+
+
+def test_offense_rankings_combine_air_and_rushing_without_double_counting(db):
+    class TeamMarkets:
+        configured = True
+        max_spread = 0.20
+
+        def get_season_props(self):
+            return {
+                "KXNFLSEASONPASSYDS": [
+                    market("KXNFLSEASONPASSYDS-27C4000-JALLEN", "Josh Allen", 3999.5, 0.48, 0.52),
+                    market("KXNFLSEASONPASSYDS-27C4500-KCQB", "Kansas City QB", 4499.5, 0.48, 0.52),
+                ],
+                "KXNFLSEASONRSHYDS": [
+                    market("KXNFLSEASONRSHYDS-27C1000-BUFRB", "Buffalo Runner", 999.5, 0.48, 0.52),
+                    market("KXNFLSEASONRSHYDS-27C800-KCRB", "Kansas City Runner", 799.5, 0.48, 0.52),
+                    market("KXNFLSEASONRSHYDS-27C900-CHIRB", "Chicago Runner", 899.5, 0.48, 0.52),
+                ],
+                "KXNFLSEASONRECYDS": [
+                    # KC's receiving line must not be added on top of its
+                    # passing line. Chicago uses receiving as an air fallback.
+                    market("KXNFLSEASONRECYDS-27C1500-KCWR", "Kansas City Receiver", 1499.5, 0.48, 0.52),
+                    market("KXNFLSEASONRECYDS-27C1200-CHIWR", "Chicago Receiver", 1199.5, 0.48, 0.52),
+                ],
+                "KXNFLSEASONPASSTDS": [
+                    market("KXNFLSEASONPASSTDS-27C30-JALLEN", "Josh Allen", 29.5, 0.48, 0.52),
+                    market("KXNFLSEASONPASSTDS-27C35-KCQB", "Kansas City QB", 34.5, 0.48, 0.52),
+                ],
+                "KXNFLSEASONRSHTD": [
+                    market("KXNFLSEASONRSHTD-27C12-BUFRB", "Buffalo Runner", 11.5, 0.48, 0.52),
+                    market("KXNFLSEASONRSHTD-27C10-KCRB", "Kansas City Runner", 9.5, 0.48, 0.52),
+                ],
+                "KXNFLSEASONRECTD": [
+                    market("KXNFLSEASONRECTD-27C14-KCWR", "Kansas City Receiver", 13.5, 0.48, 0.52),
+                ],
+            }
+
+    for player_id, name, position, team in (
+        ("buf_rb", "Buffalo Runner", "RB", "BUF"),
+        ("kc_qb", "Kansas City QB", "QB", "KC"),
+        ("kc_rb", "Kansas City Runner", "RB", "KC"),
+        ("kc_wr", "Kansas City Receiver", "WR", "KC"),
+        ("chi_rb", "Chicago Runner", "RB", "CHI"),
+        ("chi_wr", "Chicago Receiver", "WR", "CHI"),
+    ):
+        db.add(named_player(player_id, name, position, team))
+    db.commit()
+    fc.collect_season_props(db, client=TeamMarkets())
+
+    board = fd.get_season_offense_leaders(db, season=2026)
+
+    assert [row["team"] for row in board["yards"]] == ["KC", "BUF", "CHI"]
+    assert board["yards"][0] == {
+        "team": "KC",
+        "total": 5299.0,
+        "air": 4499.5,
+        "ground": 799.5,
+        "air_source": "passing",
+        "players": 2,
+    }
+    assert board["yards"][2]["air_source"] == "receiving"
+    assert board["yards"][2]["total"] == 2099.0
+    assert [row["team"] for row in board["touchdowns"]] == ["KC", "BUF"]
+    assert [row["total"] for row in board["touchdowns"]] == [44.0, 41.0]
+
+
+def test_offense_rankings_are_empty_before_any_collection_run(db):
+    board = fd.get_season_offense_leaders(db, season=2026)
+
+    assert board["source"] is None
+    assert board["yards"] == []
+    assert board["touchdowns"] == []
