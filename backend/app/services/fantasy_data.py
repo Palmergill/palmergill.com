@@ -5,6 +5,7 @@ same in demo and authenticated modes. "Latest" for a snapshot table resolves
 through the newest successful FantasyCollectionRun (see fantasy_collector).
 """
 import json
+from statistics import median
 from typing import Any, Dict, List, Optional
 
 from sqlalchemy.orm import Session
@@ -1044,6 +1045,69 @@ def _implied_probability(american: Optional[int]) -> Optional[float]:
     return -american / (-american + 100)
 
 
+def _season_probability_curve(rows, market: str) -> List[tuple]:
+    """One consensus P(over) quote per threshold, ordered low to high."""
+    by_point: Dict[float, List[float]] = {}
+    for row in rows:
+        if row.market != market or row.outcome != "Over" or row.point is None:
+            continue
+        probability = _implied_probability(row.price)
+        if probability is not None:
+            by_point.setdefault(row.point, []).append(probability)
+    return [
+        (point, sum(probabilities) / len(probabilities))
+        for point, probabilities in sorted(by_point.items())
+    ]
+
+
+def _season_market_drop_rate(rows_by_player: Dict[str, list], market: str) -> Optional[float]:
+    """Typical probability drop per raw unit across the market's ladders.
+
+    A shared rate lets a one-contract player receive the same kind of implied
+    value as a player whose ladder happens to contain the 50% crossing. The
+    median is deliberately used here: a thin quote can distort one interval,
+    but should not move every sparse player in the category.
+    """
+    rates = []
+    for rows in rows_by_player.values():
+        curve = _season_probability_curve(rows, market)
+        for (low, low_probability), (high, high_probability) in zip(curve, curve[1:]):
+            if high > low and low_probability > high_probability:
+                rates.append((low_probability - high_probability) / (high - low))
+    return median(rates) if rates else None
+
+
+def _season_implied_value(rows, market: str, market_drop_rate: Optional[float]) -> Optional[float]:
+    """Estimate the raw stat at which the market's over chance reaches 50%.
+
+    Kalshi quotes a survival curve -- P(player exceeds threshold) -- rather
+    than a conventional projection. Interpolating its 50% crossing turns the
+    available contracts into one value in yards or touchdowns. When the
+    crossing sits outside a player's sparse ladder, the category's typical
+    curve slope supplies the small extrapolation.
+    """
+    curve = _season_probability_curve(rows, market)
+    if not curve:
+        return None
+
+    for point, probability in curve:
+        if abs(probability - 0.5) < 1e-9:
+            return round(point, 1)
+    for (low, low_probability), (high, high_probability) in zip(curve, curve[1:]):
+        if low_probability >= 0.5 >= high_probability and low_probability > high_probability:
+            share = (low_probability - 0.5) / (low_probability - high_probability)
+            return round(low + share * (high - low), 1)
+
+    # No quoted threshold straddles 50%. Use the quote nearest to even and
+    # the typical slope from all usable ladders in this category. Falling back
+    # to that threshold keeps a very sparse category useful without pretending
+    # an unsupported probability adjustment is precise.
+    point, probability = min(curve, key=lambda quote: abs(quote[1] - 0.5))
+    if not market_drop_rate or market_drop_rate <= 0:
+        return round(point, 1)
+    return round(max(0.0, point + (probability - 0.5) / market_drop_rate), 1)
+
+
 def _season_market_summary(rows, market: str, label: str) -> Dict[str, Any]:
     market_rows = [row for row in rows if row.market == market and row.point is not None]
     if not market_rows:
@@ -1146,16 +1210,15 @@ def get_season_prop_leaders(
     season: Optional[int] = None,
     limit: int = 60,
 ) -> Dict[str, Any]:
-    """Every player the exchange quotes in one market, ranked by their line.
+    """Every quoted player, ranked by the market-implied raw stat value.
 
     The per-player lookup answers "what is this player's number", which is
     only useful once you already know he has one — and barely a hundred of
     the several thousand players in the catalog do. This answers the question
     that has to come first: who is quoted at all.
 
-    Each player's headline number comes from `_season_market_summary`, the
-    same routine behind the player card, so a leader's line always matches
-    what opening that player shows.
+    Each value is the 50% crossing of the player's quoted probability curve,
+    expressed in the category's native yards or touchdowns.
     """
     if season is None:
         season = default_context(db)["season"]
@@ -1186,6 +1249,7 @@ def get_season_prop_leaders(
     if market not in rows_by_market:
         market = max(markets, key=lambda entry: entry["players"])["market"]
 
+    market_drop_rate = _season_market_drop_rate(rows_by_market[market], market)
     leaders = []
     players = _player_index(db, list(rows_by_market[market]))
     for player_id, rows in rows_by_market[market].items():
@@ -1195,26 +1259,18 @@ def get_season_prop_leaders(
         chance = _implied_probability(summary["over_price"])
         leaders.append({
             "player": _player_public(players.get(player_id)),
+            "implied_value": _season_implied_value(rows, market, market_drop_rate),
             "line": summary["line"],
             "over_price": summary["over_price"],
             "under_price": summary["under_price"],
             "over_chance": round(chance, 3) if chance is not None else None,
         })
-    # Biggest number first, then how likely the market thinks it is to be
-    # cleared. The exchange posts only three to five thresholds per category,
-    # so a bare line sort is mostly one long tie — thirty of the fifty-four
-    # receivers quoted sit on the same 999.5 — and the tie would fall out
-    # alphabetically. The price is what separates them, so it ranks them.
-    #
-    # This orders within a threshold, not across one: a player quoted at the
-    # next rung up still leads the board even when the market gives him little
-    # chance of getting there. The published chance beside each line is what
-    # tells that story, and inventing a blended score to bury it would be
-    # asserting a number the exchange never quoted.
+    # The derived raw value combines the threshold and price, so it can rank
+    # players across the exchange's coarse strike clusters instead of treating
+    # the threshold as primary and the probability as only a tiebreak.
     leaders.sort(
         key=lambda entry: (
-            -entry["line"],
-            -(entry["over_chance"] if entry["over_chance"] is not None else 0),
+            -(entry["implied_value"] if entry["implied_value"] is not None else -1),
             entry["player"]["name"] or "",
         )
     )

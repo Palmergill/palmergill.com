@@ -243,6 +243,8 @@ def test_leaderboard_lists_who_is_quoted_and_ranks_them(db):
     assert board["market"] == "season_pass_yds"
     assert board["source"] == "Kalshi"
     assert [entry["player"]["name"] for entry in board["leaders"]] == ["Josh Allen"]
+    # P(over 3499.5)=65% and P(over 3999.5)=39%; interpolate the 50% crossing.
+    assert board["leaders"][0]["implied_value"] == pytest.approx(3788.9, abs=0.2)
     counts = {entry["market"]: entry["players"] for entry in board["markets"]}
     assert counts["season_pass_yds"] == 1
     # Categories nobody trades are still reported, so the client can show the
@@ -251,7 +253,7 @@ def test_leaderboard_lists_who_is_quoted_and_ranks_them(db):
     assert len(board["markets"]) == 6
 
 
-def test_leaderboard_breaks_a_shared_line_on_the_market_chance(db):
+def test_leaderboard_ranks_on_implied_raw_value(db):
     class TwoReceivers:
         configured = True
         max_spread = 0.20
@@ -259,10 +261,11 @@ def test_leaderboard_breaks_a_shared_line_on_the_market_chance(db):
         def get_season_props(self):
             return {
                 "KXNFLSEASONRECYDS": [
-                    # Both quoted on the same threshold. Only the price says
-                    # which one the market actually likes.
-                    market("KXNFLSEASONRECYDS-27C1000-LONGSHOT", "Zeta Receiver", 999.5, 0.20, 0.26),
-                    market("KXNFLSEASONRECYDS-27C1000-FAVORITE", "Alpha Receiver", 999.5, 0.70, 0.76),
+                    market("KXNFLSEASONRECYDS-27C750-FAVORITE", "Alpha Receiver", 749.5, 0.76, 0.84),
+                    market("KXNFLSEASONRECYDS-27C1000-FAVORITE", "Alpha Receiver", 999.5, 0.36, 0.44),
+                    # A sparse player still gets a raw value from this quote
+                    # and the category slope established by Alpha's ladder.
+                    market("KXNFLSEASONRECYDS-27C750-LONGSHOT", "Zeta Receiver", 749.5, 0.56, 0.64),
                 ]
             }
 
@@ -274,11 +277,9 @@ def test_leaderboard_breaks_a_shared_line_on_the_market_chance(db):
     leaders = fd.get_season_prop_leaders(db, market="season_rec_yds", season=2026)["leaders"]
 
     assert [entry["player"]["name"] for entry in leaders] == ["Alpha Receiver", "Zeta Receiver"]
-    assert leaders[0]["line"] == leaders[1]["line"] == 999.5
-    assert leaders[0]["over_chance"] == 0.73
-    # Alphabetical order would have put Alpha first by luck; make sure the
-    # price is doing the work.
-    assert leaders[0]["over_chance"] > leaders[1]["over_chance"]
+    assert leaders[0]["implied_value"] == pytest.approx(937.0, abs=0.2)
+    assert leaders[1]["implied_value"] == pytest.approx(812.0, abs=0.2)
+    assert leaders[0]["implied_value"] > leaders[1]["implied_value"]
 
 
 def test_leaderboard_is_empty_before_any_collection_run(db):

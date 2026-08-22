@@ -531,9 +531,7 @@
             who.appendChild(el("span", "season-leader__meta",
                 `${player.position || ""} ${player.team || ""}`.trim()));
             tr.appendChild(who);
-            tr.appendChild(el("td", "col-proj", F.seasonLine(entry.line)));
-            tr.appendChild(el("td", "col-proj", entry.over_price == null ? "—" : F.americanOdds(entry.over_price)));
-            tr.appendChild(el("td", "col-proj season-leader__chance", F.impliedChance(entry.over_chance)));
+            tr.appendChild(el("td", "col-proj", F.seasonLine(entry.implied_value)));
             const open = () => {
                 if (player.player_id) loadPlayerSeasonProps(player.player_id);
             };
@@ -552,12 +550,9 @@
             els.seasonPropsNote.textContent = "Nothing is quoted in this category yet.";
             return;
         }
-        // Say out loud that the board clusters. The exchange posts three to
-        // five thresholds per category, so most of a category sits on one
-        // number and the chance beside it is what separates those players.
         els.seasonPropsNote.textContent = [
             `${leaders.length} player${leaders.length === 1 ? "" : "s"} with usable market data`,
-            "the market posts only a handful of thresholds, so players cluster on the same line — the chance separates them",
+            "implied value is the interpolated 50% point of each player's available contract prices",
             [data.source, asOf].filter(Boolean).join(" · "),
         ].filter(Boolean).join(" · ");
     }

@@ -80,7 +80,7 @@
                 <div>
                     <span class="eyebrow">Draft research</span>
                     <h2 id="seasonPropsTitle">Season player lines</h2>
-                    <p>Every player with a usable Kalshi quote or executed trade for regular-season passing, rushing, receiving, and touchdowns, ranked within each category. Search to pull up one player's full card.</p>
+                    <p>Every player with a usable Kalshi quote or executed trade for regular-season passing, rushing, receiving, and touchdowns, ranked by the raw value implied by the market. Search to pull up one player's full card.</p>
                 </div>
                 <div class="season-props__search">
                     <label class="sr-only" for="seasonPropsSearch">Look up a player</label>
@@ -118,16 +118,14 @@
                         <tr>
                             <th class="col-rank">#</th>
                             <th>Player</th>
-                            <th class="col-proj">Line</th>
-                            <th class="col-proj">Over</th>
-                            <th class="col-proj">Chance</th>
+                            <th class="col-proj">Implied value</th>
                         </tr>
                     </thead>
                     <tbody id="seasonPropsLeaders"></tbody>
                 </table>
             </div>
             <p class="season-props__note" id="seasonPropsNote"></p>
-            <p class="betting-disclaimer">Consensus lines and best displayed prices are for information only — not betting advice. Availability varies by player and sportsbook.</p>
+            <p class="betting-disclaimer">Market-implied values, contract lines, and displayed prices are for information only — not betting advice. Availability varies by player and sportsbook.</p>
         </section>
 
         <section class="chat" aria-label="Fantasy assistant">
@@ -280,6 +278,6 @@
     <script src="/shared/api-base.js?v=1"></script>
     <script src="format.js?v=5"></script>
     <script src="chat.js?v=2"></script>
-    <script src="app.js?v=10"></script>
+    <script src="app.js?v=11"></script>
 </body>
 </html>
