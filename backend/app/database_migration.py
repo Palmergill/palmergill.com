@@ -157,6 +157,17 @@ def migrate_database():
             "game_version",
             "VARCHAR NOT NULL DEFAULT 'fourth-and-fortune-v1'",
         )
+        # Season prop rows used to carry only the fetch time. NULL is right
+        # for every row already stored: those runs never recorded when the
+        # market itself last moved, and guessing it from the fetch time is the
+        # exact overstatement the column exists to correct.
+        _add_column_if_missing(
+            inspector,
+            "ff_season_prop_snapshots",
+            "quoted_at",
+            "TIMESTAMP" if is_postgres else "DATETIME",
+        )
+
         refreshed = inspect(engine)
         if (
             "ff_draft_sessions" in refreshed.get_table_names()

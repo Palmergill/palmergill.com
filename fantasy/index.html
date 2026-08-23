@@ -19,7 +19,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/shared/site-nav.css?v=13">
-    <link rel="stylesheet" href="style.css?v=14">
+    <link rel="stylesheet" href="style.css?v=15">
 </head>
 <body>
     <main class="app-shell">
@@ -80,7 +80,7 @@
                 <div>
                     <span class="eyebrow">Draft research</span>
                     <h2 id="seasonPropsTitle">Season player lines</h2>
-                    <p>Every player with a usable Kalshi quote or executed trade for regular-season passing, rushing, receiving, and touchdowns, ranked by the raw value implied by the market. Search to pull up one player's full card.</p>
+                    <p>Every player with a usable quote or executed trade for regular-season passing, rushing, receiving, and touchdowns, ranked by the raw value implied by the market. Three sources are read — the Kalshi and Polymarket exchanges and Underdog's posted lines — and where they overlap the number is their median. Search to pull up one player's full card.</p>
                 </div>
                 <div class="season-props__search">
                     <label class="sr-only" for="seasonPropsSearch">Look up a player</label>
@@ -126,7 +126,7 @@
                         <span class="eyebrow">Team outlook</span>
                         <h3 id="seasonOffensesTitle">Top 10 offenses</h3>
                     </div>
-                    <p>Passing plus rushing markets. Receiving is used only when a team has no quoted passer, so production is not counted twice.</p>
+                    <p>Passing plus rushing markets, each player's implied season value summed. Receiving is used only when a team has no quoted passer, so production is not counted twice.</p>
                 </div>
                 <div class="season-offenses__grid">
                     <article class="season-offense-board">
@@ -148,13 +148,14 @@
                             <th class="col-rank">#</th>
                             <th>Player</th>
                             <th class="col-proj">Implied value</th>
+                            <th class="col-books" title="How many of the three market sources quote this player">Sources</th>
                         </tr>
                     </thead>
                     <tbody id="seasonPropsLeaders"></tbody>
                 </table>
             </div>
             <p class="season-props__note" id="seasonPropsNote"></p>
-            <p class="betting-disclaimer">Market-implied values, contract lines, and displayed prices are for information only — not betting advice. Availability varies by player and sportsbook.</p>
+            <p class="betting-disclaimer">Market-implied values, contract lines, and displayed prices are for information only — not betting advice. Availability varies by player and source, and each source is shown with when it last moved a price: a season-long market can sit untouched for weeks.</p>
         </section>
 
         <section class="chat" aria-label="Fantasy assistant">
@@ -305,8 +306,8 @@
     <script src="/shared/site-nav.js?v=14"></script>
     <script src="/shared/analytics.js?v=1"></script>
     <script src="/shared/api-base.js?v=1"></script>
-    <script src="format.js?v=6"></script>
+    <script src="format.js?v=7"></script>
     <script src="chat.js?v=2"></script>
-    <script src="app.js?v=13"></script>
+    <script src="app.js?v=14"></script>
 </body>
 </html>

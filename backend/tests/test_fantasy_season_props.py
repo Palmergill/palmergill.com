@@ -15,6 +15,7 @@ from app.services import fantasy_collector as fc
 from app.services import fantasy_data as fd
 from app.services.fantasy_common import normalize_name
 from app.services.fantasy_season_props import (
+    KalshiClient,
     parse_season_props,
     probability_to_american,
 )
@@ -51,9 +52,8 @@ PAYLOAD = {
 }
 
 
-class FakeKalshi:
-    configured = True
-    max_spread = 0.20
+class FakeKalshi(KalshiClient):
+    """The real client with its one network call stubbed out."""
 
     def get_season_props(self):
         return PAYLOAD
@@ -211,10 +211,7 @@ def test_collector_drops_a_name_two_rostered_players_share(db):
 
 
 def test_collector_reports_partial_when_nothing_clears_the_filter(db):
-    class NoLiquidity:
-        configured = True
-        max_spread = 0.20
-
+    class NoLiquidity(KalshiClient):
         def get_season_props(self):
             return {
                 "KXNFLSEASONPASSYDS": [
@@ -228,12 +225,12 @@ def test_collector_reports_partial_when_nothing_clears_the_filter(db):
 
 
 def test_collector_skips_when_provider_unavailable(db):
-    class Unavailable:
+    class Unavailable(KalshiClient):
         configured = False
 
     run = fc.collect_season_props(db, client=Unavailable())
     assert run.status == "skipped"
-    assert "not configured" in run.detail
+    assert run.detail == "no season props provider is configured"
 
 
 def test_leaderboard_lists_who_is_quoted_and_ranks_them(db):
@@ -256,10 +253,7 @@ def test_leaderboard_lists_who_is_quoted_and_ranks_them(db):
 
 
 def test_leaderboard_ranks_on_implied_raw_value(db):
-    class TwoReceivers:
-        configured = True
-        max_spread = 0.20
-
+    class TwoReceivers(KalshiClient):
         def get_season_props(self):
             return {
                 "KXNFLSEASONRECYDS": [
@@ -293,10 +287,7 @@ def test_leaderboard_is_empty_before_any_collection_run(db):
 
 
 def test_implied_fantasy_points_combine_yards_and_touchdowns(db):
-    class ReceiverMarkets:
-        configured = True
-        max_spread = 0.20
-
+    class ReceiverMarkets(KalshiClient):
         def get_season_props(self):
             return {
                 "KXNFLSEASONRECYDS": [
@@ -350,6 +341,7 @@ def test_implied_fantasy_points_combine_yards_and_touchdowns(db):
         "fantasy_points": 157.0,
         "markets_used": 2,
         "pairs_used": ["receiving"],
+        "books": ["Kalshi"],
         "implied": {"season_rec_yds": 999.5, "season_rec_tds": 9.5},
     }
     assert board["leaders"][1]["fantasy_points"] == 120.0
@@ -366,10 +358,7 @@ def test_implied_fantasy_points_combine_yards_and_touchdowns(db):
 
 
 def test_implied_fantasy_points_require_the_primary_matching_pair(db):
-    class MismatchedQuarterbackMarkets:
-        configured = True
-        max_spread = 0.20
-
+    class MismatchedQuarterbackMarkets(KalshiClient):
         def get_season_props(self):
             return {
                 **PAYLOAD,
@@ -387,10 +376,7 @@ def test_implied_fantasy_points_require_the_primary_matching_pair(db):
 
 
 def test_offense_rankings_combine_air_and_rushing_without_double_counting(db):
-    class TeamMarkets:
-        configured = True
-        max_spread = 0.20
-
+    class TeamMarkets(KalshiClient):
         def get_season_props(self):
             return {
                 "KXNFLSEASONPASSYDS": [

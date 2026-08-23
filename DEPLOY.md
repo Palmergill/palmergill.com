@@ -101,9 +101,14 @@ Set `BITCOIN_DATA_PROVIDER=rpc` plus `BITCOIN_RPC_URL`, `BITCOIN_RPC_USER`, and 
 The fantasy league collector uses league `225965` and seasons 2023–2026 by default on Railway, detected through Railway's built-in `RAILWAY_PROJECT_ID`. Set `ESPN_LEAGUE_ID` and `ESPN_LEAGUE_SEASONS` to override those values. Outside Railway, collection remains disabled until `ESPN_LEAGUE_ID` is explicitly set, so local and test runs do not make surprise ESPN requests.
 
 Season-long NFL player over/unders are collected separately from the existing
-weekly Odds API props, and come from Kalshi's public market data. No key or
-Railway variable is required. `KALSHI_MAX_SPREAD` (default `0.20`) tunes how
-thinly quoted a contract may be before it is dropped; see `backend/README.md`.
+weekly Odds API props, and come from three public market sources: the Kalshi
+and Polymarket exchanges and Underdog's posted lines. None needs a key or a
+Railway variable, and each is fetched independently — one going dark records a
+`partial` run and costs only the coverage it had. `KALSHI_MAX_SPREAD` and
+`POLYMARKET_MAX_SPREAD` (both default `0.20`) tune how thinly quoted a
+contract may be before it is dropped, and `UNDERDOG_ENABLED=false` or
+`POLYMARKET_ENABLED=false` switches a provider off without a deploy; see
+`backend/README.md`.
 
 ## Local
 

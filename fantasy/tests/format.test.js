@@ -124,4 +124,28 @@ describe('FantasyFormat', () => {
         expect(FantasyFormat.formatAsOf('')).toBe('');
         expect(FantasyFormat.formatAsOf('not a date')).toBe('');
     });
+
+    test('quoteAge measures how long ago a provider last moved a price', () => {
+        const days = (n) => new Date(Date.now() - n * 86400000).toISOString();
+        expect(FantasyFormat.quoteAge(days(0))).toBe('today');
+        expect(FantasyFormat.quoteAge(days(1))).toBe('1 day ago');
+        expect(FantasyFormat.quoteAge(days(11))).toBe('11 days ago');
+        expect(FantasyFormat.quoteAge(null)).toBe('');
+        expect(FantasyFormat.quoteAge('not a date')).toBe('');
+    });
+
+    test('marketSources names each provider beside its own age', () => {
+        // The providers go stale at very different rates, so one combined
+        // timestamp would hide whichever source is actually current.
+        const days = (n) => new Date(Date.now() - n * 86400000).toISOString();
+        expect(FantasyFormat.marketSources([
+            { bookmaker: 'Kalshi', quoted_at: days(11) },
+            { bookmaker: 'Polymarket', quoted_at: days(0) },
+        ])).toBe('Kalshi (11 days ago) · Polymarket (today)');
+        // A provider that never reported a quote time is still named.
+        expect(FantasyFormat.marketSources([{ bookmaker: 'Underdog', quoted_at: null }]))
+            .toBe('Underdog');
+        expect(FantasyFormat.marketSources([])).toBe('');
+        expect(FantasyFormat.marketSources(null)).toBe('');
+    });
 });

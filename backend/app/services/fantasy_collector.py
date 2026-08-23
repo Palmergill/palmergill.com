@@ -55,10 +55,17 @@ from app.services.fantasy_odds import (
     parse_game_odds,
 )
 from app.services.fantasy_sleeper import parse_trending_rows, sleeper_client
-from app.services.fantasy_season_props import (
-    DEFAULT_MAX_SPREAD,
-    parse_season_props,
+from app.services.fantasy_season_props import season_props_client
+from app.services.fantasy_underdog_props import underdog_props_client
+from app.services.fantasy_polymarket_props import polymarket_props_client
+
+# Every season-long over/under source, in the order their rows are stored.
+# Each is public and keyless, and each fails independently: one provider
+# going dark costs coverage in the categories only it quoted, not the board.
+SEASON_PROP_PROVIDERS = (
     season_props_client,
+    underdog_props_client,
+    polymarket_props_client,
 )
 
 logger = logging.getLogger(__name__)
@@ -872,31 +879,58 @@ def collect_odds_futures(db: Session, client=None, markets=FUTURES_MARKETS) -> F
     return _finish_run(db, run, "success", rows_written=written, credits_used=credits)
 
 
-def collect_season_props(db: Session, client=None) -> FantasyCollectionRun:
-    """Snapshot regular-season player over/unders from Kalshi.
+def collect_season_props(
+    db: Session, client=None, providers=None
+) -> FantasyCollectionRun:
+    """Snapshot regular-season player over/unders from every market source.
 
     This is an overlay on the projection consensus, not a replacement for it:
-    Kalshi lists a few hundred skill players against Sleeper's few thousand,
-    and the parser discards anything too thinly quoted to trust. An empty
-    result is therefore a normal outcome, reported as ``partial`` so a genuine
-    fetch failure still stands out in the run log.
+    the three providers together list a few hundred skill players against
+    Sleeper's few thousand, and each parser discards anything too thinly
+    quoted to trust. An empty result is therefore a normal outcome, reported
+    as ``partial`` so a genuine fetch failure still stands out in the run log.
+
+    Providers are collected independently and their rows pooled. Losing one
+    is survivable and expected -- these are public endpoints nobody promised
+    us -- so a failure is recorded in the run detail while the others still
+    write, and only losing all of them is an error. ``client`` collects from
+    exactly one provider, which is how the tests and one-off runs pin the
+    source.
     """
-    client = client or season_props_client
+    if client is not None:
+        providers = (client,)
+    elif providers is None:
+        providers = SEASON_PROP_PROVIDERS
+
     season = current_season_week(db)["season"]
-    run = _start_run(db, "season_props", "kalshi", season=season)
-    if not client.configured:
-        return _finish_run(db, run, "skipped", detail="season props provider is not configured")
+    run = _start_run(db, "season_props", None, season=season)
     if not season:
         return _finish_run(db, run, "skipped", detail="no NFL season known — run the state job first")
 
-    try:
-        rows = parse_season_props(
-            client.get_season_props(),
-            max_spread=getattr(client, "max_spread", DEFAULT_MAX_SPREAD),
-        )
-    except Exception as exc:
-        logger.warning("Season props fetch failed: %s", exc)
-        return _finish_run(db, run, "error", detail=str(exc))
+    available = [provider for provider in providers if getattr(provider, "configured", False)]
+    if not available:
+        return _finish_run(db, run, "skipped", detail="no season props provider is configured")
+
+    rows: List[Dict[str, Any]] = []
+    collected: List[str] = []
+    failures: List[str] = []
+    for provider in available:
+        name = getattr(provider, "name", type(provider).__name__)
+        try:
+            provider_rows = provider.collect(season)
+        except Exception as exc:
+            logger.warning("Season props fetch failed for %s: %s", name, exc)
+            failures.append(f"{name}: {exc}")
+            continue
+        collected.append(name)
+        rows.extend(provider_rows)
+
+    if not collected:
+        return _finish_run(db, run, "error", detail="; ".join(failures))
+
+    # The run log names the sources that actually answered, so a board built
+    # from two providers is not mistaken later for one built from three.
+    run.source = ",".join(name.lower() for name in collected)
 
     player_map = _season_prop_player_map(db)
     now = utc_now()
@@ -918,14 +952,24 @@ def collect_season_props(db: Session, client=None) -> FantasyCollectionRun:
                 outcome=row["outcome"],
                 price=row["price"],
                 point=row["point"],
+                quoted_at=row.get("quoted_at"),
             )
         )
     db.commit()
+
+    lost = "; ".join(failures)
     if not rows:
-        return _finish_run(db, run, "partial", detail="no market cleared the quote filter")
-    status = "success" if matched else "partial"
-    detail = None if matched else "no quoted player matched a known player"
-    return _finish_run(db, run, status, rows_written=len(rows), detail=detail)
+        detail = "no market cleared the quote filter"
+        return _finish_run(db, run, "partial", detail=f"{detail}; {lost}" if lost else detail)
+    if not matched:
+        detail = "no quoted player matched a known player"
+        return _finish_run(
+            db, run, "partial", rows_written=len(rows),
+            detail=f"{detail}; {lost}" if lost else detail,
+        )
+    if failures:
+        return _finish_run(db, run, "partial", rows_written=len(rows), detail=lost)
+    return _finish_run(db, run, "success", rows_written=len(rows))
 
 
 # ── scheduling ──────────────────────────────────────────────────────────

@@ -325,7 +325,10 @@ body {
 .season-price { display: flex; align-items: baseline; gap: 5px; }
 .season-price small { color: #94a497; font-size: 0.65rem; }
 .season-price b { color: #f5f2eb; font-size: 0.82rem; font-variant-numeric: tabular-nums; }
-.season-line__books { margin: 7px 0 0; color: #839586; font-size: 0.64rem; }
+/* The implied 50% value, which is what the boards rank on. The headline
+   number above it is the threshold a provider happened to post. */
+.season-line__implied { margin: 8px 0 0; color: #cfd9d0; font-size: 0.72rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+.season-line__books { margin: 4px 0 0; color: #839586; font-size: 0.64rem; }
 
 .season-line--empty { display: flex; min-height: 108px; flex-direction: column; justify-content: space-between; opacity: 0.66; }
 .season-line__missing { margin: 10px 0 0; color: #aebcaf; font-size: 0.82rem; }
@@ -377,6 +380,10 @@ body {
 
 .season-leader .col-rank { color: #7f9284; font-variant-numeric: tabular-nums; }
 .season-leader .col-proj { font-variant-numeric: tabular-nums; }
+/* How many providers agree. Narrow and quiet on purpose: it qualifies the
+   value beside it rather than competing with it. */
+.col-books { width: 62px; text-align: right; }
+.season-leader .col-books { color: #839586; font-variant-numeric: tabular-nums; }
 
 .season-leader__name { display: block; font-weight: 600; }
 .season-leader__meta { display: block; margin-top: 1px; color: #8ea08f; font-size: 0.72rem; }

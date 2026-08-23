@@ -139,6 +139,31 @@
     // Collector run timestamp -> "as of Jul 10". Unparseable/missing -> "".
     // The server marks these UTC (see `iso_utc`); without the offset the
     // rendered day slips for any run that finished near midnight UTC.
+    // How long ago a provider last moved a quote, in the coarsest honest
+    // unit. Season-long boards are the reason this exists: one exchange sat
+    // eleven days without a tick while the run that fetched it was minutes
+    // old, and only the first of those numbers tells you anything.
+    function quoteAge(iso) {
+        if (!iso) return "";
+        const then = new Date(iso);
+        if (Number.isNaN(then.getTime())) return "";
+        const days = Math.floor((Date.now() - then.getTime()) / 86400000);
+        if (days <= 0) return "today";
+        if (days === 1) return "1 day ago";
+        return `${days} days ago`;
+    }
+
+    // "Kalshi (11 days ago) · Polymarket (today)". Naming each provider next
+    // to its own age is the point: they go stale at very different rates, so
+    // one combined timestamp would hide the only source that is current.
+    function marketSources(sources) {
+        if (!Array.isArray(sources) || !sources.length) return "";
+        return sources.map((entry) => {
+            const age = quoteAge(entry.quoted_at);
+            return age ? `${entry.bookmaker} (${age})` : entry.bookmaker;
+        }).join(" · ");
+    }
+
     function formatAsOf(iso) {
         if (!iso) return "";
         const date = new Date(iso);
@@ -202,6 +227,8 @@
         formatSigned,
         formatArticleDate,
         formatAsOf,
+        quoteAge,
+        marketSources,
         injuryBadge,
         formatMatchup,
     };

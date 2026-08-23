@@ -430,8 +430,9 @@
             `${player.position || ""} ${player.team || ""} · ${data.season || ""} regular season`.trim()));
         header.appendChild(identity);
         const source = el("span", "season-props__asof");
-        const asOf = F.formatAsOf(data.as_of);
-        source.textContent = [data.source, asOf].filter(Boolean).join(" · ");
+        // Each provider's own last movement, not the fetch time. A board can
+        // be collected minutes ago and still be quoting eleven-day-old prices.
+        source.textContent = F.marketSources(data.sources) || data.source || "";
         header.appendChild(source);
         els.seasonPropsPanel.appendChild(header);
 
@@ -465,9 +466,17 @@
         prices.appendChild(seasonPrice("Over", market.over_price));
         prices.appendChild(seasonPrice("Under", market.under_price));
         card.appendChild(prices);
-        const bookNames = (market.books || []).map((book) => book.bookmaker);
-        card.appendChild(el("p", "season-line__books",
-            bookNames.length ? bookNames.join(" · ") : "Consensus line"));
+        if (market.implied_value != null) {
+            card.appendChild(el("p", "season-line__implied",
+                `${F.seasonLine(market.implied_value)} implied`));
+        }
+        const books = market.books || [];
+        const detail = books
+            .map((book) => book.implied_value == null
+                ? book.bookmaker
+                : `${book.bookmaker} ${F.seasonLine(book.implied_value)}`)
+            .join(" · ");
+        card.appendChild(el("p", "season-line__books", detail || "Consensus line"));
         return card;
     }
 
@@ -529,6 +538,7 @@
                 `${player.position || ""} ${player.team || ""}`.trim()));
             tr.appendChild(who);
             tr.appendChild(el("td", "col-proj", F.seasonLine(entry.implied_value)));
+            tr.appendChild(seasonBookCell(entry.books, entry.book_values));
             const open = () => {
                 if (player.player_id) loadPlayerSeasonProps(player.player_id);
             };
@@ -542,16 +552,31 @@
             els.seasonPropsLeaders.appendChild(tr);
         });
 
-        const asOf = F.formatAsOf(data.as_of);
         if (!leaders.length) {
             els.seasonPropsNote.textContent = "Nothing is quoted in this category yet.";
             return;
         }
         els.seasonPropsNote.textContent = [
             `${leaders.length} player${leaders.length === 1 ? "" : "s"} with usable market data`,
-            "implied value is the interpolated 50% point of each player's available contract prices",
-            [data.source, asOf].filter(Boolean).join(" · "),
+            "implied value is the median across the providers quoting each player, taken at the 50% point of their prices",
+            F.marketSources(data.sources),
         ].filter(Boolean).join(" · ");
+    }
+
+    // How many providers stand behind a number, with the spread between them
+    // on hover. One source and three sources are different claims, and the
+    // board has no other way to say which one it is making.
+    function seasonBookCell(books, values) {
+        const list = books || [];
+        const cell = el("td", "col-books", list.length ? String(list.length) : "—");
+        if (list.length) {
+            cell.title = list
+                .map((book) => values && values[book] != null
+                    ? `${book} ${F.seasonLine(values[book])}`
+                    : book)
+                .join("\n");
+        }
+        return cell;
     }
 
     async function loadSeasonFantasyLeaders() {
@@ -584,8 +609,11 @@
             const receptionDetail = data.scoring !== "std" && entry.projected_receptions != null
                 ? ` · ${F.seasonLine(entry.projected_receptions)} rec proj`
                 : "";
+            const bookDetail = (entry.books || []).length
+                ? ` · ${entry.books.length} source${entry.books.length === 1 ? "" : "s"}`
+                : "";
             who.appendChild(el("span", "season-leader__meta",
-                `${player.position || ""} ${player.team || ""} · ${entry.markets_used || 0} markets${receptionDetail}`.trim()));
+                `${player.position || ""} ${player.team || ""} · ${entry.markets_used || 0} markets${bookDetail}${receptionDetail}`.trim()));
             tr.appendChild(who);
             tr.appendChild(el("td", "col-proj", F.formatPoints(entry.yard_points)));
             tr.appendChild(el("td", "col-proj", F.formatPoints(entry.touchdown_points)));
@@ -604,7 +632,6 @@
             els.seasonFantasyLeaders.appendChild(tr);
         });
 
-        const asOf = F.formatAsOf(data.as_of);
         const scoringLabel = data.scoring === "ppr"
             ? "PPR"
             : data.scoring === "half" ? "Half PPR" : "Standard";
@@ -616,7 +643,7 @@
                 `${leaders.length} players with complete yardage/TD market pairs`,
                 `${scoringLabel} scoring from every available complete pair`,
                 receptionSource,
-                [data.source, asOf].filter(Boolean).join(" · "),
+                F.marketSources(data.sources),
             ].filter(Boolean).join(" · ")
             : "No players have a complete yardage and touchdown market pair yet.";
     }
@@ -650,10 +677,9 @@
             const data = await fetchJson(`${API_BASE}/season-offenses?limit=10`);
             renderSeasonOffenseList(els.seasonOffenseYards, data.yards, "yards");
             renderSeasonOffenseList(els.seasonOffenseTouchdowns, data.touchdowns, "TDs");
-            const asOf = F.formatAsOf(data.as_of);
             els.seasonOffensesNote.textContent = [
-                "Market-derived totals use quoted player thresholds, with bounded last trades filling one-sided books; this is not an official team projection",
-                [data.source, asOf].filter(Boolean).join(" · "),
+                "Market-derived totals add each quoted player's implied season value, taken as the median across the providers quoting him; this is not an official team projection",
+                F.marketSources(data.sources),
             ].filter(Boolean).join(" · ");
         } catch (err) {
             renderSeasonOffenseList(els.seasonOffenseYards, [], "yards");

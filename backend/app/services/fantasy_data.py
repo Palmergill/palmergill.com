@@ -6,7 +6,7 @@ through the newest successful FantasyCollectionRun (see fantasy_collector).
 """
 import json
 from statistics import median
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from sqlalchemy.orm import Session
 
@@ -30,6 +30,7 @@ from app.services.fantasy_collector import (
     is_in_season,
     latest_successful_run,
 )
+from app.services.fantasy_season_props import probability_to_american
 from app.services.fantasy_common import (
     FLEX_POSITIONS,
     SCORING_POINTS_FIELD,
@@ -1108,14 +1109,151 @@ def _season_market_drop_rate(rows_by_player: Dict[str, list], market: str) -> Op
     return median(rates) if rates else None
 
 
+def _latest_season_prop_run(db: Session, season: int):
+    """The newest run that actually produced a board.
+
+    A run is ``partial`` when one provider failed, which is degraded but is
+    still a board: the others wrote their rows. Serving only ``success``
+    would freeze the dashboard on the last complete snapshot for as long as a
+    provider stayed down — and these are public endpoints nobody promised us,
+    so "down" can mean forever.
+
+    The other kind of partial — nothing cleared the quote filter, or nothing
+    matched the player catalog — is skipped, and the test for it is direct:
+    a run qualifies only if it left behind rows attached to a real player,
+    which is exactly what every board below queries for. A run that stored
+    quotes under names the catalog does not know has a row count but no
+    board, and must not replace one.
+    """
+    with_players = (
+        db.query(FantasySeasonPropSnapshot.run_id)
+        .filter(FantasySeasonPropSnapshot.player_id.isnot(None))
+        .distinct()
+    )
+    return (
+        db.query(FantasyCollectionRun)
+        .filter(
+            FantasyCollectionRun.job == "season_props",
+            FantasyCollectionRun.season == season,
+            FantasyCollectionRun.status.in_(("success", "partial")),
+            FantasyCollectionRun.id.in_(with_players),
+        )
+        .order_by(FantasyCollectionRun.id.desc())
+        .first()
+    )
+
+
+def _season_drop_rates(snapshots) -> Dict[Tuple[str, str], float]:
+    """Typical curve slope for each (provider, market) pair on the board.
+
+    The slope belongs to a provider's ladder, not to the category. Underdog
+    posts one balanced line per player and so has no slope at all, while the
+    two exchanges quote strikes at their own spacings; pooling them would
+    hand a provider an extrapolation rate its own board never showed.
+
+    Only rows matched to a player contribute. Unmatched rows all share a null
+    player id, and averaging every unidentified quote at a shared threshold
+    into one "player" produces a curve that describes nobody.
+    """
+    grouped: Dict[Tuple[str, str], Dict[str, list]] = {}
+    for row in snapshots:
+        if row.player_id is None:
+            continue
+        grouped.setdefault((row.bookmaker, row.market), {}).setdefault(
+            row.player_id, []
+        ).append(row)
+
+    rates: Dict[Tuple[str, str], float] = {}
+    for key, rows_by_player in grouped.items():
+        rate = _season_market_drop_rate(rows_by_player, key[1])
+        if rate is not None:
+            rates[key] = rate
+    return rates
+
+
+def _season_book_values(
+    rows, market: str, drop_rates: Dict[Tuple[str, str], float]
+) -> Dict[str, float]:
+    """The 50% crossing each provider's own quotes imply for this market.
+
+    Providers are kept apart on purpose. Their ladders sit at different
+    thresholds, so interpolating through the pooled points would trace a
+    curve neither of them posted.
+    """
+    by_book: Dict[str, list] = {}
+    for row in rows:
+        if row.market == market:
+            by_book.setdefault(row.bookmaker, []).append(row)
+
+    values: Dict[str, float] = {}
+    for book, book_rows in by_book.items():
+        value = _season_implied_value(book_rows, market, drop_rates.get((book, market)))
+        if value is not None:
+            values[book] = value
+    return values
+
+
+def _season_consensus_value(
+    rows, market: str, drop_rates: Dict[Tuple[str, str], float]
+) -> Optional[float]:
+    """One implied value per player: the median across providers quoting him.
+
+    The median rather than the mean, because these boards go stale at
+    different rates. Two providers give their midpoint, and a third stops a
+    ladder that has not traded in a week from dragging the number on its own.
+    """
+    values = _season_book_values(rows, market, drop_rates)
+    if not values:
+        return None
+    return round(median(sorted(values.values())), 1)
+
+
+def _season_sources(rows) -> List[Dict[str, Any]]:
+    """Per-provider coverage and freshness for the board these rows describe.
+
+    ``quoted_at`` is the provider's own last movement, which is the honest
+    number to show: the collection run can be an hour old while the quotes
+    behind it have not changed in eleven days.
+    """
+    books: Dict[str, Dict[str, Any]] = {}
+    for row in rows:
+        entry = books.setdefault(
+            row.bookmaker, {"quoted_at": None, "players": set()}
+        )
+        if row.player_id is not None:
+            entry["players"].add(row.player_id)
+        quoted_at = getattr(row, "quoted_at", None)
+        if quoted_at is not None and (
+            entry["quoted_at"] is None or quoted_at > entry["quoted_at"]
+        ):
+            entry["quoted_at"] = quoted_at
+    return [
+        {
+            "bookmaker": bookmaker,
+            "quoted_at": iso_utc(entry["quoted_at"]),
+            "players": len(entry["players"]),
+        }
+        for bookmaker, entry in sorted(books.items())
+    ]
+
+
+def _season_source_label(sources: List[Dict[str, Any]]) -> Optional[str]:
+    return ", ".join(entry["bookmaker"] for entry in sources) or None
+
+
 def _season_implied_value(rows, market: str, market_drop_rate: Optional[float]) -> Optional[float]:
     """Estimate the raw stat at which the market's over chance reaches 50%.
 
-    Kalshi quotes a survival curve -- P(player exceeds threshold) -- rather
-    than a conventional projection. Interpolating its 50% crossing turns the
-    available contracts into one value in yards or touchdowns. When the
-    crossing sits outside a player's sparse ladder, the category's typical
-    curve slope supplies the small extrapolation.
+    An exchange quotes a survival curve -- P(player exceeds threshold) --
+    rather than a conventional projection. Interpolating its 50% crossing
+    turns the available contracts into one value in yards or touchdowns. When
+    the crossing sits outside a player's sparse ladder, the provider's typical
+    curve slope supplies the small extrapolation; a source that posts a single
+    balanced line has no slope, and its posted number stands as it is.
+
+    ``rows`` must come from one provider. Their ladders sit at different
+    thresholds, so a curve traced through the pooled points is one nobody
+    posted.
     """
     curve = _season_probability_curve(rows, market)
     if not curve:
@@ -1139,20 +1277,27 @@ def _season_implied_value(rows, market: str, market_drop_rate: Optional[float]) 
     return round(max(0.0, point + (probability - 0.5) / market_drop_rate), 1)
 
 
-def _season_market_summary(rows, market: str, label: str) -> Dict[str, Any]:
+def _season_market_summary(
+    rows,
+    market: str,
+    label: str,
+    drop_rates: Optional[Dict[Tuple[str, str], float]] = None,
+) -> Dict[str, Any]:
+    drop_rates = drop_rates or {}
     market_rows = [row for row in rows if row.market == market and row.point is not None]
     if not market_rows:
         return {
             "market": market,
             "label": label,
             "line": None,
+            "implied_value": None,
             "over_price": None,
             "under_price": None,
             "books": [],
         }
 
-    # Sportsbooks can hang nearby numbers. Use the line posted by the most
-    # books as the headline consensus, then line-shop prices only among books
+    # Providers hang nearby numbers. Use the line posted by the most of them
+    # as the headline consensus, then report prices only among the providers
     # offering that exact total.
     #
     # Ties break toward the most balanced price. That matters most for an
@@ -1184,24 +1329,65 @@ def _season_market_summary(rows, market: str, label: str) -> Dict[str, Any]:
     )
     consensus_rows = [row for row in market_rows if row.point == point]
 
-    books: Dict[str, Dict[str, Any]] = {}
+    # Every provider with a read on this market appears, not only the ones
+    # posting the headline number. The implied value below is a median across
+    # all of them, so listing a subset beside it would credit the wrong
+    # sources — a value three providers agree on must not read as one's.
+    # Prices stay empty for a provider quoting some other threshold, which is
+    # the honest answer to "what do they have at this line".
+    book_values = _season_book_values(rows, market, drop_rates)
+    books: Dict[str, Dict[str, Any]] = {
+        bookmaker: {
+            "bookmaker": bookmaker,
+            "over_price": None,
+            "under_price": None,
+            "implied_value": value,
+        }
+        for bookmaker, value in book_values.items()
+    }
     for row in consensus_rows:
-        entry = books.setdefault(row.bookmaker, {"bookmaker": row.bookmaker, "over_price": None, "under_price": None})
+        entry = books.setdefault(row.bookmaker, {
+            "bookmaker": row.bookmaker,
+            "over_price": None,
+            "under_price": None,
+            "implied_value": book_values.get(row.bookmaker),
+        })
         if row.outcome == "Over":
             entry["over_price"] = row.price
         elif row.outcome == "Under":
             entry["under_price"] = row.price
     book_list = sorted(books.values(), key=lambda entry: entry["bookmaker"])
-    over_prices = [entry["over_price"] for entry in book_list if entry["over_price"] is not None]
-    under_prices = [entry["under_price"] for entry in book_list if entry["under_price"] is not None]
+
+    # Every provider's prices reach here already de-vigged into complements,
+    # so they are estimates of the same probability rather than competing
+    # offers. Taking the best of them would not be line shopping, it would be
+    # picking whichever source is most optimistic; the median is the estimate.
+    # Per-provider prices stay in ``books`` for anyone who wants to compare.
     return {
         "market": market,
         "label": label,
         "line": point,
-        "over_price": max(over_prices) if over_prices else None,
-        "under_price": max(under_prices) if under_prices else None,
+        "implied_value": _season_consensus_value(rows, market, drop_rates),
+        "over_price": _consensus_price(entry["over_price"] for entry in book_list),
+        "under_price": _consensus_price(entry["under_price"] for entry in book_list),
         "books": book_list,
     }
+
+
+def _consensus_price(prices) -> Optional[int]:
+    """Median of several American prices, taken in probability space.
+
+    American odds jump from +100 to -100 across even money, so the median of
+    the integers is not the median of the chances they describe.
+    """
+    probabilities = [
+        probability
+        for probability in (_implied_probability(price) for price in prices)
+        if probability is not None
+    ]
+    if not probabilities:
+        return None
+    return probability_to_american(median(sorted(probabilities)))
 
 
 def get_player_season_props(
@@ -1212,9 +1398,18 @@ def get_player_season_props(
         return None
     if season is None:
         season = default_context(db)["season"]
-    run = latest_successful_run(db, "season_props", season=season)
+    run = _latest_season_prop_run(db, season)
     rows = []
+    drop_rates: Dict[Tuple[str, str], float] = {}
     if run is not None:
+        # Slopes are read from the whole board, not from this player's own
+        # ladder: a player quoted at a single threshold has no slope of his
+        # own, which is exactly when the extrapolation is needed.
+        drop_rates = _season_drop_rates(
+            db.query(FantasySeasonPropSnapshot)
+            .filter(FantasySeasonPropSnapshot.run_id == run.id)
+            .all()
+        )
         rows = (
             db.query(FantasySeasonPropSnapshot)
             .filter(
@@ -1223,13 +1418,15 @@ def get_player_season_props(
             )
             .all()
         )
+    sources = _season_sources(rows)
     return {
         "season": season,
         "player": _player_public(player),
         "as_of": iso_utc(run.finished_at) if run else None,
-        "source": "Kalshi" if run is not None else None,
+        "source": _season_source_label(sources),
+        "sources": sources,
         "markets": [
-            _season_market_summary(rows, market, label)
+            _season_market_summary(rows, market, label, drop_rates)
             for market, label in SEASON_PROP_MARKETS
         ],
     }
@@ -1244,19 +1441,21 @@ def get_season_prop_leaders(
     """Every quoted player, ranked by the market-implied raw stat value.
 
     The per-player lookup answers "what is this player's number", which is
-    only useful once you already know he has one — and barely a hundred of
-    the several thousand players in the catalog do. This answers the question
-    that has to come first: who is quoted at all.
+    only useful once you already know he has one — and barely a few hundred
+    of the several thousand players in the catalog do. This answers the
+    question that has to come first: who is quoted at all.
 
     Each value is the 50% crossing of the player's quoted probability curve,
-    expressed in the category's native yards or touchdowns.
+    expressed in the category's native yards or touchdowns, and taken as the
+    median across every provider quoting him.
     """
     if season is None:
         season = default_context(db)["season"]
-    run = latest_successful_run(db, "season_props", season=season)
+    run = _latest_season_prop_run(db, season)
     labels = dict(SEASON_PROP_MARKETS)
 
     rows_by_market: Dict[str, Dict[str, list]] = {key: {} for key, _ in SEASON_PROP_MARKETS}
+    snapshots = []
     if run is not None:
         snapshots = (
             db.query(FantasySeasonPropSnapshot)
@@ -1280,21 +1479,27 @@ def get_season_prop_leaders(
     if market not in rows_by_market:
         market = max(markets, key=lambda entry: entry["players"])["market"]
 
-    market_drop_rate = _season_market_drop_rate(rows_by_market[market], market)
+    drop_rates = _season_drop_rates(snapshots)
     leaders = []
     players = _player_index(db, list(rows_by_market[market]))
     for player_id, rows in rows_by_market[market].items():
-        summary = _season_market_summary(rows, market, labels[market])
+        summary = _season_market_summary(rows, market, labels[market], drop_rates)
         if summary["line"] is None:
             continue
         chance = _implied_probability(summary["over_price"])
+        book_values = _season_book_values(rows, market, drop_rates)
         leaders.append({
             "player": _player_public(players.get(player_id)),
-            "implied_value": _season_implied_value(rows, market, market_drop_rate),
+            "implied_value": summary["implied_value"],
             "line": summary["line"],
             "over_price": summary["over_price"],
             "under_price": summary["under_price"],
             "over_chance": round(chance, 3) if chance is not None else None,
+            # Which providers stand behind the number, and where they differ.
+            # Two sources agreeing is a far stronger read than one, and the
+            # board has no other way to say so.
+            "books": sorted(book_values),
+            "book_values": {book: book_values[book] for book in sorted(book_values)},
         })
     # The derived raw value combines the threshold and price, so it can rank
     # players across the exchange's coarse strike clusters instead of treating
@@ -1306,10 +1511,12 @@ def get_season_prop_leaders(
         )
     )
 
+    sources = _season_sources(snapshots)
     return {
         "season": season,
         "as_of": iso_utc(run.finished_at) if run else None,
-        "source": "Kalshi" if run is not None else None,
+        "source": _season_source_label(sources),
+        "sources": sources,
         "market": market,
         "label": labels[market],
         "markets": markets,
@@ -1358,23 +1565,25 @@ def get_season_fantasy_point_leaders(
     """Rank players by fantasy points implied by quoted markets.
 
     Every available yardage and touchdown ladder is first converted to its
-    native 50% value by `_season_implied_value`. Those raw values are then
-    scored with conventional standard rules; half-PPR and PPR add the latest
-    season reception projection because the market does not quote receptions.
-    Passing, rushing and receiving contribute only when both halves of that
-    category are quoted, and a row requires the primary pair for the player's
-    position. This prevents passing yards plus rushing touchdowns from
-    masquerading as a complete QB projection when passing-TD data is absent.
+    native 50% value, taken as the median across the providers quoting it.
+    Those raw values are then scored with conventional standard rules;
+    half-PPR and PPR add the latest season reception projection because no
+    market quotes receptions. Passing, rushing and receiving contribute only
+    when both halves of that category are quoted, and a row requires the
+    primary pair for the player's position. This prevents passing yards plus
+    rushing touchdowns from masquerading as a complete QB projection when
+    passing-TD data is absent.
     """
     if season is None:
         season = default_context(db)["season"]
     scoring = normalize_scoring(scoring)
-    run = latest_successful_run(db, "season_props", season=season)
+    run = _latest_season_prop_run(db, season)
     if run is None:
         return {
             "season": season,
             "as_of": None,
             "source": None,
+            "sources": [],
             "scoring": scoring,
             "reception_source": None,
             "leaders": [],
@@ -1388,27 +1597,20 @@ def get_season_fantasy_point_leaders(
         )
         .all()
     )
-    rows_by_market: Dict[str, Dict[str, list]] = {
-        key: {} for key, _ in SEASON_PROP_MARKETS
-    }
     rows_by_player: Dict[str, Dict[str, list]] = {}
     for row in snapshots:
-        if row.market not in rows_by_market:
+        if row.market not in SEASON_FANTASY_WEIGHTS:
             continue
-        rows_by_market[row.market].setdefault(row.player_id, []).append(row)
         rows_by_player.setdefault(row.player_id, {}).setdefault(row.market, []).append(row)
 
-    drop_rates = {
-        market: _season_market_drop_rate(player_rows, market)
-        for market, player_rows in rows_by_market.items()
-    }
+    drop_rates = _season_drop_rates(snapshots)
     players = _player_index(db, list(rows_by_player))
     reception_projections, reception_source = _season_reception_projection_map(db, season)
     reception_multiplier = {"std": 0.0, "half": 0.5, "ppr": 1.0}[scoring]
     leaders = []
     for player_id, market_rows in rows_by_player.items():
         implied = {
-            market: _season_implied_value(rows, market, drop_rates[market])
+            market: _season_consensus_value(rows, market, drop_rates)
             for market, rows in market_rows.items()
         }
         implied = {market: value for market, value in implied.items() if value is not None}
@@ -1442,6 +1644,11 @@ def get_season_fantasy_point_leaders(
         yard_points = round(yard_points, 1)
         touchdown_points = round(touchdown_points, 1)
         reception_points = round((projected_receptions or 0) * reception_multiplier, 1)
+        books = sorted({
+            row.bookmaker
+            for market in used_markets
+            for row in market_rows.get(market, [])
+        })
         leaders.append({
             "player": _player_public(player),
             "yard_points": yard_points,
@@ -1455,6 +1662,7 @@ def get_season_fantasy_point_leaders(
             "fantasy_points": round(yard_points + touchdown_points + reception_points, 1),
             "markets_used": len(implied),
             "pairs_used": sorted(complete_pairs),
+            "books": books,
             "implied": implied,
         })
 
@@ -1462,10 +1670,12 @@ def get_season_fantasy_point_leaders(
         -entry["fantasy_points"],
         entry["player"]["name"] or "",
     ))
+    sources = _season_sources(snapshots)
     return {
         "season": season,
         "as_of": iso_utc(run.finished_at),
-        "source": "Kalshi",
+        "source": _season_source_label(sources),
+        "sources": sources,
         "scoring": scoring,
         "reception_source": reception_source,
         "leaders": leaders[:limit],
@@ -1477,27 +1687,35 @@ def get_season_offense_leaders(
     season: Optional[int] = None,
     limit: int = 10,
 ) -> Dict[str, Any]:
-    """Rank team offenses from non-overlapping Kalshi player markets.
+    """Rank team offenses from non-overlapping market-implied player values.
 
     Passing and receiving describe much of the same yardage/touchdowns, so
     they must never be added together. A team's primary air component is its
-    highest quoted passing line; summed receiving lines are only a fallback
-    when no passer is quoted. Rushing lines are additive across players and
-    form the ground component.
+    highest implied passing value; summed receiving values are only a
+    fallback when no passer is quoted. Rushing is additive across players and
+    forms the ground component.
+
+    Each player contributes his implied 50% value rather than whichever
+    threshold happened to be the headline line. With one exchange that
+    distinction was cosmetic; with three providers it is required, because a
+    Kalshi rung at 1,099.5 and an Underdog line at 1,247.5 are not the same
+    kind of number and summing them would rank teams on which source quoted
+    them.
 
     These are market-derived offense indicators, not official team totals:
-    Kalshi only lists selected players and the values are contract thresholds.
-    The response exposes the components so the UI can say exactly what each
-    number contains instead of presenting it as a projection model.
+    the providers list only selected players. The response exposes the
+    components so the UI can say exactly what each number contains instead of
+    presenting it as a projection model.
     """
     if season is None:
         season = default_context(db)["season"]
-    run = latest_successful_run(db, "season_props", season=season)
+    run = _latest_season_prop_run(db, season)
     if run is None:
         return {
             "season": season,
             "as_of": None,
             "source": None,
+            "sources": [],
             "yards": [],
             "touchdowns": [],
         }
@@ -1510,6 +1728,7 @@ def get_season_offense_leaders(
         )
         .all()
     )
+    drop_rates = _season_drop_rates(snapshots)
     by_player_market: Dict[tuple, list] = {}
     for row in snapshots:
         by_player_market.setdefault((row.player_id, row.market), []).append(row)
@@ -1522,13 +1741,13 @@ def get_season_offense_leaders(
         team = (player.team or "").upper() if player else ""
         if not team or team in {"FA", "UNK"} or market not in labels:
             continue
-        summary = _season_market_summary(rows, market, labels[market])
-        if summary["line"] is None:
+        value = _season_consensus_value(rows, market, drop_rates)
+        if value is None:
             continue
         by_team.setdefault(team, {}).setdefault(market, []).append({
             "player_id": player_id,
             "name": player.full_name,
-            "line": summary["line"],
+            "value": value,
         })
 
     def build(metric: str) -> List[Dict[str, Any]]:
@@ -1546,25 +1765,25 @@ def get_season_offense_leaders(
             passers = markets.get(pass_market, [])
             receivers = markets.get(receive_market, [])
             rushers = markets.get(rush_market, [])
-            primary_passer = max(passers, key=lambda row: row["line"]) if passers else None
+            primary_passer = max(passers, key=lambda row: row["value"]) if passers else None
             if primary_passer:
-                air_total = primary_passer["line"]
+                air_total = primary_passer["value"]
                 air_source = "passing"
                 air_players = 1
             elif receivers:
-                air_total = sum(row["line"] for row in receivers)
+                air_total = sum(row["value"] for row in receivers)
                 air_source = "receiving"
                 air_players = len(receivers)
             else:
                 air_total = None
                 air_source = None
                 air_players = 0
-            ground_total = sum(row["line"] for row in rushers) if rushers else None
+            ground_total = sum(row["value"] for row in rushers) if rushers else None
 
             # A partial offense would unfairly outrank or underrank teams on
             # coverage alone. Only compare teams with both air and ground
             # components; the response can legitimately contain fewer than
-            # ten until Kalshi quotes enough players.
+            # ten until enough players are quoted.
             if air_total is None or ground_total is None:
                 continue
             rankings.append({
@@ -1579,10 +1798,12 @@ def get_season_offense_leaders(
         rankings.sort(key=lambda row: (-row["total"], row["team"]))
         return rankings[:limit]
 
+    sources = _season_sources(snapshots)
     return {
         "season": season,
         "as_of": iso_utc(run.finished_at),
-        "source": "Kalshi",
+        "source": _season_source_label(sources),
+        "sources": sources,
         "yards": build("yards"),
         "touchdowns": build("touchdowns"),
     }

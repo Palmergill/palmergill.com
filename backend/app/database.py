@@ -373,6 +373,10 @@ class FantasySeasonPropSnapshot(Base):
     outcome = Column(String)  # Over|Under
     price = Column(Integer, nullable=True)  # normalized American odds
     point = Column(Float, nullable=True)
+    # When the provider last moved this quote, as opposed to when we last
+    # fetched it. A season-long board can sit untouched for weeks, so the
+    # collection time on its own overstates how current the prices are.
+    quoted_at = Column(DateTime, nullable=True)
 
 
 class FantasyFutureSnapshot(Base):
