@@ -19,7 +19,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/shared/site-nav.css?v=13">
-    <link rel="stylesheet" href="style.css?v=16">
+    <link rel="stylesheet" href="style.css?v=17">
 </head>
 <body>
     <main class="app-shell">
@@ -55,36 +55,36 @@
             </header>
 
             <div class="tool-grid">
-                <article class="tool-card rankings-feature" aria-labelledby="rankingsFeatureTitle">
+                <article class="tool-card tool-card--rankings" aria-labelledby="rankingsFeatureTitle">
                     <span class="tool-card__mark" aria-hidden="true">R</span>
                     <div>
                         <span class="eyebrow">Personal</span>
                         <h3 id="rankingsFeatureTitle">My rankings</h3>
                         <p>Create a private draft board from consensus rankings, then drag or type players into your order.</p>
                     </div>
-                    <a class="tool-card__link rankings-feature__link" href="/fantasy/rankings/">Build your board <span aria-hidden="true">→</span></a>
+                    <a class="tool-card__link" href="/fantasy/rankings/">Build your board <span aria-hidden="true">→</span></a>
                 </article>
 
-                <article class="tool-card league-feature" aria-labelledby="leagueFeatureTitle">
+                <article class="tool-card tool-card--league" aria-labelledby="leagueFeatureTitle">
                     <span class="tool-card__mark" aria-hidden="true">L</span>
                     <div>
                         <span class="eyebrow">Members only</span>
                         <h3 id="leagueFeatureTitle">League hub</h3>
                         <p>See ESPN standings, seven power-ranking methods, weekly scores, and every roster.</p>
                     </div>
-                    <a class="tool-card__link league-feature__link" href="/fantasy/league/">Open league hub <span aria-hidden="true">→</span></a>
+                    <a class="tool-card__link" href="/fantasy/league/">Open league hub <span aria-hidden="true">→</span></a>
                 </article>
 
-                <article class="tool-card tool-card--draft draft-feature" aria-labelledby="draftFeatureTitle">
+                <article class="tool-card tool-card--draft" aria-labelledby="draftFeatureTitle">
                     <span class="tool-card__mark tool-card__mark--cards" aria-hidden="true">A♠</span>
-                    <div class="draft-feature__copy">
+                    <div class="tool-card__copy">
                         <span class="eyebrow">Draft night</span>
                         <h3 id="draftFeatureTitle">Fourth &amp; Fortune</h3>
                         <p>Turn draft order into a live, verifiable push-your-luck card game for the whole league.</p>
                     </div>
-                    <div class="draft-feature__actions">
-                        <a class="tool-card__link draft-feature__link" href="/fantasy/draft-order/">Open draft room <span aria-hidden="true">→</span></a>
-                        <a class="tool-card__text-link draft-feature__link--quiet" href="/fourth-and-fortune-kickoff.html">Rules</a>
+                    <div class="tool-card__actions">
+                        <a class="tool-card__link" href="/fantasy/draft-order/">Open draft room <span aria-hidden="true">→</span></a>
+                        <a class="tool-card__text-link" href="/fourth-and-fortune-kickoff.html">Rules</a>
                     </div>
                 </article>
             </div>
@@ -196,7 +196,7 @@
                 </section>
             </div>
 
-            <div class="market-group" aria-labelledby="weeklyMarketsTitle">
+            <section class="market-group" id="marketGroup" aria-labelledby="weeklyMarketsTitle" hidden>
                 <div class="panel-head panel-head--compact">
                     <div>
                         <span class="eyebrow">Extra context</span>
@@ -221,7 +221,7 @@
                     <div class="chip-row" id="propGameTabs" role="group" aria-label="Featured game"></div>
                     <div id="propsBoard"></div>
                 </section>
-            </div>
+            </section>
         </section>
 
         <section class="dashboard-zone" id="season-research" aria-labelledby="seasonResearchTitle">
@@ -233,116 +233,120 @@
                 <p>Market-implied player value, team offense outlooks, and season futures—grouped by the decision each view helps you make.</p>
             </header>
 
-        <section class="season-props" aria-labelledby="seasonPropsTitle">
-            <div class="season-props__intro">
-                <div>
-                    <span class="eyebrow">Player outlook</span>
-                    <h2 id="seasonPropsTitle">Season player lines</h2>
-                    <p>Search any player for a full card, or open one of the focused views below. Values combine available Kalshi, Polymarket, and Underdog markets.</p>
-                </div>
-                <div class="season-props__search">
-                    <label class="sr-only" for="seasonPropsSearch">Look up a player</label>
-                    <input id="seasonPropsSearch" type="search" class="season-props__input"
-                           placeholder="Search Josh Allen, Bijan Robinson…" autocomplete="off"
-                           role="combobox" aria-expanded="false" aria-controls="seasonPropsResults" aria-autocomplete="list">
-                    <ul id="seasonPropsResults" class="search-results season-props__results" role="listbox" hidden></ul>
-                </div>
-            </div>
-            <div id="seasonPropsPanel" class="season-props__panel" hidden aria-live="polite"></div>
-            <details class="research-panel season-fantasy" name="season-research-panels" open>
-                <summary class="research-panel__summary">
-                    <span class="research-panel__number">01</span>
-                    <span><small>Draft board</small><strong id="seasonFantasyTitle">Implied fantasy points</strong></span>
-                    <span class="research-panel__hint">Compare total value</span>
-                </summary>
-                <div class="research-panel__body">
-                <div class="season-fantasy__head">
-                    <div class="season-fantasy__controls">
-                        <p>Market-implied yards and touchdowns, with projected receptions added for PPR formats.</p>
-                        <div id="seasonFantasyScoring" class="chip-row" role="group" aria-label="Implied fantasy points scoring format"></div>
+            <section class="season-props" aria-labelledby="seasonPropsTitle">
+                <div class="season-props__intro">
+                    <div>
+                        <span class="eyebrow">Player outlook</span>
+                        <h3 id="seasonPropsTitle">Season player lines</h3>
+                        <p>Search any player for a full card, or open one of the focused views below. Values combine available Kalshi, Polymarket, and Underdog markets.</p>
+                    </div>
+                    <div class="season-props__search">
+                        <label class="sr-only" for="seasonPropsSearch">Look up a player</label>
+                        <input id="seasonPropsSearch" type="search" class="season-props__input"
+                               placeholder="Search Josh Allen, Bijan Robinson…" autocomplete="off"
+                               role="combobox" aria-expanded="false" aria-controls="seasonPropsResults" aria-autocomplete="list">
+                        <ul id="seasonPropsResults" class="search-results season-props__results" role="listbox" hidden></ul>
                     </div>
                 </div>
-                <div class="table-wrap">
-                    <table class="rank-table season-props__table season-fantasy__table">
-                        <thead>
-                            <tr>
-                                <th class="col-rank">#</th>
-                                <th>Player</th>
-                                <th class="col-proj">Yard pts</th>
-                                <th class="col-proj">TD pts</th>
-                                <th class="col-proj">Rec bonus</th>
-                                <th class="col-proj">Total</th>
-                            </tr>
-                        </thead>
-                        <tbody id="seasonFantasyLeaders"></tbody>
-                    </table>
-                </div>
-                <p class="season-props__note" id="seasonFantasyNote"></p>
-                <p class="season-fantasy__caveat">Uses 1 point per 25 passing yards, 4 per passing touchdown, 1 per 10 rushing or receiving yards, and 6 per rushing or receiving touchdown. Half PPR and PPR add 0.5 or 1 point per projected reception. Interceptions, two-point conversions, and fumbles are not included.</p>
-                </div>
-            </details>
-            <details class="research-panel season-offenses" name="season-research-panels">
-                <summary class="research-panel__summary">
-                    <span class="research-panel__number">02</span>
-                    <span><small>Team outlook</small><strong id="seasonOffensesTitle">Top 10 offenses</strong></span>
-                    <span class="research-panel__hint">Compare team totals</span>
-                </summary>
-                <div class="research-panel__body">
-                <div class="season-offenses__head">
-                    <p>Passing plus rushing markets, each player's implied season value summed. Receiving is used only when a team has no quoted passer, so production is not counted twice.</p>
-                </div>
-                <div class="season-offenses__grid">
-                    <article class="season-offense-board">
-                        <h4>Yards</h4>
-                        <ol id="seasonOffenseYards" class="season-offense-list"></ol>
-                    </article>
-                    <article class="season-offense-board">
-                        <h4>Touchdowns</h4>
-                        <ol id="seasonOffenseTouchdowns" class="season-offense-list"></ol>
-                    </article>
-                </div>
-                <p id="seasonOffensesNote" class="season-props__note"></p>
-                </div>
-            </details>
-            <details class="research-panel season-leaders-panel" name="season-research-panels">
-                <summary class="research-panel__summary">
-                    <span class="research-panel__number">03</span>
-                    <span><small>Category leaders</small><strong>Player market boards</strong></span>
-                    <span class="research-panel__hint">Browse raw market value</span>
-                </summary>
-                <div class="research-panel__body">
-                    <p class="research-panel__intro">Rank players within passing, rushing, receiving, and touchdown markets.</p>
-                    <div class="chip-row" id="seasonPropsTabs" role="group" aria-label="Season market"></div>
-                    <div class="table-wrap">
-                        <table class="rank-table season-props__table">
-                            <thead>
-                                <tr>
-                                    <th class="col-rank">#</th>
-                                    <th>Player</th>
-                                    <th class="col-proj">Implied value</th>
-                                    <th class="col-books" title="How many of the three market sources quote this player">Sources</th>
-                                </tr>
-                            </thead>
-                            <tbody id="seasonPropsLeaders"></tbody>
-                        </table>
-                    </div>
-                    <p class="season-props__note" id="seasonPropsNote"></p>
-                </div>
-            </details>
-            <p class="betting-disclaimer">Market-implied values, contract lines, and displayed prices are for information only — not betting advice. Availability varies by player and source, and each source is shown with when it last moved a price: a season-long market can sit untouched for weeks.</p>
-        </section>
+                <div id="seasonPropsPanel" class="season-props__panel" hidden aria-live="polite"></div>
 
-        <section class="betting" id="futuresSection" aria-label="Season futures" hidden>
-            <div class="section-head">
-                <h2>Season futures</h2>
-                <span class="section-note" id="futuresAsOf"></span>
-            </div>
-            <div class="chip-row" id="futuresTabs" role="group" aria-label="Futures market"></div>
-            <table class="rank-table futures-table">
-                <thead><tr><th class="col-rank">#</th><th>Outcome</th><th class="col-proj">Odds</th></tr></thead>
-                <tbody id="futuresBody"></tbody>
-            </table>
-        </section>
+                <details class="research-panel season-fantasy" name="season-research-panels" open>
+                    <summary class="research-panel__summary">
+                        <span class="research-panel__number">01</span>
+                        <h4 class="research-panel__title"><small>Draft board</small>Implied fantasy points</h4>
+                        <span class="research-panel__hint">Compare total value</span>
+                    </summary>
+                    <div class="research-panel__body">
+                        <div class="season-fantasy__head">
+                            <div class="season-fantasy__controls">
+                                <p>Market-implied yards and touchdowns, with projected receptions added for PPR formats.</p>
+                                <div id="seasonFantasyScoring" class="chip-row" role="group" aria-label="Implied fantasy points scoring format"></div>
+                            </div>
+                        </div>
+                        <div class="table-wrap">
+                            <table class="rank-table season-props__table season-fantasy__table">
+                                <thead>
+                                    <tr>
+                                        <th class="col-rank">#</th>
+                                        <th>Player</th>
+                                        <th class="col-proj">Yard pts</th>
+                                        <th class="col-proj">TD pts</th>
+                                        <th class="col-proj">Rec bonus</th>
+                                        <th class="col-proj">Total</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="seasonFantasyLeaders"></tbody>
+                            </table>
+                        </div>
+                        <p class="season-props__note" id="seasonFantasyNote"></p>
+                        <p class="season-fantasy__caveat">Uses 1 point per 25 passing yards, 4 per passing touchdown, 1 per 10 rushing or receiving yards, and 6 per rushing or receiving touchdown. Half PPR and PPR add 0.5 or 1 point per projected reception. Interceptions, two-point conversions, and fumbles are not included.</p>
+                    </div>
+                </details>
+
+                <details class="research-panel season-offenses" name="season-research-panels">
+                    <summary class="research-panel__summary">
+                        <span class="research-panel__number">02</span>
+                        <h4 class="research-panel__title"><small>Team outlook</small>Top 10 offenses</h4>
+                        <span class="research-panel__hint">Compare team totals</span>
+                    </summary>
+                    <div class="research-panel__body">
+                        <div class="season-offenses__head">
+                            <p>Passing plus rushing markets, each player's implied season value summed. Receiving is used only when a team has no quoted passer, so production is not counted twice.</p>
+                        </div>
+                        <div class="season-offenses__grid">
+                            <article class="season-offense-board">
+                                <h5>Yards</h5>
+                                <ol id="seasonOffenseYards" class="season-offense-list"></ol>
+                            </article>
+                            <article class="season-offense-board">
+                                <h5>Touchdowns</h5>
+                                <ol id="seasonOffenseTouchdowns" class="season-offense-list"></ol>
+                            </article>
+                        </div>
+                        <p id="seasonOffensesNote" class="season-props__note"></p>
+                    </div>
+                </details>
+
+                <details class="research-panel season-leaders-panel" name="season-research-panels">
+                    <summary class="research-panel__summary">
+                        <span class="research-panel__number">03</span>
+                        <h4 class="research-panel__title"><small>Category leaders</small>Player market boards</h4>
+                        <span class="research-panel__hint">Browse raw market value</span>
+                    </summary>
+                    <div class="research-panel__body">
+                        <p class="research-panel__intro">Rank players within passing, rushing, receiving, and touchdown markets.</p>
+                        <div class="chip-row" id="seasonPropsTabs" role="group" aria-label="Season market"></div>
+                        <div class="table-wrap">
+                            <table class="rank-table season-props__table">
+                                <thead>
+                                    <tr>
+                                        <th class="col-rank">#</th>
+                                        <th>Player</th>
+                                        <th class="col-proj">Implied value</th>
+                                        <th class="col-books" title="How many of the three market sources quote this player">Sources</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="seasonPropsLeaders"></tbody>
+                            </table>
+                        </div>
+                        <p class="season-props__note" id="seasonPropsNote"></p>
+                    </div>
+                </details>
+
+                <p class="betting-disclaimer">Market-implied values, contract lines, and displayed prices are for information only — not betting advice. Availability varies by player and source, and each source is shown with when it last moved a price: a season-long market can sit untouched for weeks.</p>
+            </section>
+
+            <section class="betting" id="futuresSection" aria-label="Season futures" hidden>
+                <div class="section-head">
+                    <h3>Season futures</h3>
+                    <span class="section-note" id="futuresAsOf"></span>
+                </div>
+                <div class="chip-row" id="futuresTabs" role="group" aria-label="Futures market"></div>
+                <table class="rank-table futures-table">
+                    <thead><tr><th class="col-rank">#</th><th>Outcome</th><th class="col-proj">Odds</th></tr></thead>
+                    <tbody id="futuresBody"></tbody>
+                </table>
+            </section>
         </section>
     </main>
 
@@ -388,6 +392,6 @@
     <script src="/shared/api-base.js?v=1"></script>
     <script src="format.js?v=7"></script>
     <script src="chat.js?v=2"></script>
-    <script src="app.js?v=14"></script>
+    <script src="app.js?v=15"></script>
 </body>
 </html>

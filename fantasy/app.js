@@ -58,6 +58,7 @@
         gamesSection: document.getElementById("gamesSection"),
         gamesStrip: document.getElementById("gamesStrip"),
         gamesAsOf: document.getElementById("gamesAsOf"),
+        marketGroup: document.getElementById("marketGroup"),
         propsSection: document.getElementById("propsSection"),
         propGameTabs: document.getElementById("propGameTabs"),
         propsBoard: document.getElementById("propsBoard"),
@@ -425,7 +426,7 @@
         const player = data.player || {};
         const header = el("div", "season-props__player");
         const identity = el("div");
-        identity.appendChild(el("h3", null, player.name || "Player lines"));
+        identity.appendChild(el("h4", null, player.name || "Player lines"));
         identity.appendChild(el("p", null,
             `${player.position || ""} ${player.team || ""} · ${data.season || ""} regular season`.trim()));
         header.appendChild(identity);
@@ -454,7 +455,7 @@
 
     function seasonPropCard(market) {
         const card = el("article", "season-line");
-        card.appendChild(el("h4", "season-line__label", market.label));
+        card.appendChild(el("h5", "season-line__label", market.label));
         if (market.line == null) {
             card.classList.add("season-line--empty");
             card.appendChild(el("p", "season-line__missing", "Not posted"));
@@ -885,6 +886,12 @@
 
     // ── betting: games, props, futures ──────────────────────────────────
 
+    /* The group wraps game lines and player props behind one heading, so it
+       stays hidden until at least one of them has something to show. */
+    function syncMarketGroup() {
+        els.marketGroup.hidden = els.gamesSection.hidden && els.propsSection.hidden;
+    }
+
     async function loadGames() {
         try {
             const params = new URLSearchParams();
@@ -899,7 +906,7 @@
             els.gamesStrip.innerHTML = "";
             withLines.forEach((game) => els.gamesStrip.appendChild(gameCard(game)));
             els.gamesSection.hidden = false;
-        } catch (err) { /* leave hidden */ }
+        } catch (err) { /* leave hidden */ } finally { syncMarketGroup(); }
     }
 
     function gameCard(game) {
@@ -955,14 +962,14 @@
             });
             renderPropsBoard(featured[0]);
             els.propsSection.hidden = false;
-        } catch (err) { /* leave hidden */ }
+        } catch (err) { /* leave hidden */ } finally { syncMarketGroup(); }
     }
 
     function renderPropsBoard(game) {
         els.propsBoard.innerHTML = "";
         (game.markets || []).forEach((market) => {
             const block = el("div", "prop-market");
-            block.appendChild(el("h3", "prop-market__title", market.label));
+            block.appendChild(el("h5", "prop-market__title", market.label));
             const table = el("table", "mini-table");
             const tbody = el("tbody");
             market.lines.slice(0, 8).forEach((line) => {
