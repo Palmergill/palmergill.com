@@ -19,7 +19,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/shared/site-nav.css?v=13">
-    <link rel="stylesheet" href="style.css?v=17">
+    <link rel="stylesheet" href="style.css?v=18">
 </head>
 <body>
     <main class="app-shell">
@@ -262,6 +262,10 @@
                                 <p>Market-implied yards and touchdowns, with projected receptions added for PPR formats.</p>
                                 <div id="seasonFantasyScoring" class="chip-row" role="group" aria-label="Implied fantasy points scoring format"></div>
                             </div>
+                            <div class="season-filter">
+                                <span class="season-filter__label" id="seasonFantasyPositionLabel">Position</span>
+                                <div id="seasonFantasyPositions" class="chip-row" role="group" aria-labelledby="seasonFantasyPositionLabel"></div>
+                            </div>
                         </div>
                         <div class="table-wrap">
                             <table class="rank-table season-props__table season-fantasy__table">
@@ -316,6 +320,10 @@
                     <div class="research-panel__body">
                         <p class="research-panel__intro">Rank players within passing, rushing, receiving, and touchdown markets.</p>
                         <div class="chip-row" id="seasonPropsTabs" role="group" aria-label="Season market"></div>
+                        <div class="season-filter">
+                            <span class="season-filter__label" id="seasonPropsPositionLabel">Position</span>
+                            <div id="seasonPropsPositions" class="chip-row" role="group" aria-labelledby="seasonPropsPositionLabel"></div>
+                        </div>
                         <div class="table-wrap">
                             <table class="rank-table season-props__table">
                                 <thead>
@@ -390,8 +398,8 @@
     <script src="/shared/site-nav.js?v=14"></script>
     <script src="/shared/analytics.js?v=1"></script>
     <script src="/shared/api-base.js?v=1"></script>
-    <script src="format.js?v=7"></script>
+    <script src="format.js?v=8"></script>
     <script src="chat.js?v=2"></script>
-    <script src="app.js?v=15"></script>
+    <script src="app.js?v=16"></script>
 </body>
 </html>

@@ -22,6 +22,8 @@
         source: "sleeper",
         sources: [],
         seasonFantasyScoring: "std",
+        seasonFantasyPosition: "ALL",
+        seasonPropsPosition: "ALL",
         drawerPlayerId: null,
         compare: [], // [{ player_id, name }]
     };
@@ -43,10 +45,12 @@
         seasonPropsPanel: document.getElementById("seasonPropsPanel"),
         seasonPropsTabs: document.getElementById("seasonPropsTabs"),
         seasonPropsLeaders: document.getElementById("seasonPropsLeaders"),
+        seasonPropsPositions: document.getElementById("seasonPropsPositions"),
         seasonPropsNote: document.getElementById("seasonPropsNote"),
         seasonFantasyLeaders: document.getElementById("seasonFantasyLeaders"),
         seasonFantasyNote: document.getElementById("seasonFantasyNote"),
         seasonFantasyScoring: document.getElementById("seasonFantasyScoring"),
+        seasonFantasyPositions: document.getElementById("seasonFantasyPositions"),
         seasonOffenseYards: document.getElementById("seasonOffenseYards"),
         seasonOffenseTouchdowns: document.getElementById("seasonOffenseTouchdowns"),
         seasonOffensesNote: document.getElementById("seasonOffensesNote"),
@@ -523,10 +527,55 @@
         });
     }
 
+    // Both season boards rank the same market data, so they share one
+    // position filter. The rows are already in hand, so a chip re-renders
+    // locally — the request would only return the identical payload.
+    function renderSeasonPositionChips(container, leaders, active, onPick) {
+        if (!container) return;
+        container.innerHTML = "";
+        const options = [
+            { position: "ALL", count: leaders.length },
+            ...F.seasonPositionCounts(leaders),
+        ];
+        options.forEach(({ position, count }) => {
+            const chip = el("button", "chip",
+                position === "ALL" ? "All" : F.positionLabel(position));
+            chip.type = "button";
+            chip.dataset.position = position;
+            chip.setAttribute("aria-pressed", String(position === active));
+            chip.title = `${count} player${count === 1 ? "" : "s"}`;
+            chip.addEventListener("click", () => onPick(position));
+            container.appendChild(chip);
+        });
+    }
+
+    // Changing scoring or market category swaps the player set underneath the
+    // filter, so one the new set cannot satisfy falls back to the whole board
+    // rather than leaving the user looking at an empty table.
+    function resolveSeasonPosition(leaders, position) {
+        if (!position || position === "ALL") return "ALL";
+        return leaders.some((entry) => F.seasonPositionMatches(entry, position))
+            ? position
+            : "ALL";
+    }
+
     function renderSeasonPropLeaders(data) {
-        const leaders = data.leaders || [];
+        const all = data.leaders || [];
+        const position = resolveSeasonPosition(all, state.seasonPropsPosition);
+        state.seasonPropsPosition = position;
+        renderSeasonPositionChips(els.seasonPropsPositions, all, position, (pick) => {
+            state.seasonPropsPosition = pick;
+            renderSeasonPropLeaders(data);
+        });
+
+        // Rank within the filtered view, keeping the board-wide rank so a
+        // positional board still says where its players sit overall.
+        const rows = all
+            .map((entry, index) => ({ entry, overall: index + 1 }))
+            .filter(({ entry }) => F.seasonPositionMatches(entry, position));
+
         els.seasonPropsLeaders.innerHTML = "";
-        leaders.forEach((entry, index) => {
+        rows.forEach(({ entry, overall }, index) => {
             const player = entry.player || {};
             const tr = el("tr", "season-leader");
             tr.tabIndex = 0;
@@ -535,8 +584,9 @@
             tr.appendChild(el("td", "col-rank", index + 1));
             const who = el("td", "col-player");
             who.appendChild(el("span", "season-leader__name", player.name || player.player_id));
+            const overallDetail = position === "ALL" ? "" : ` · ${overall} overall`;
             who.appendChild(el("span", "season-leader__meta",
-                `${player.position || ""} ${player.team || ""}`.trim()));
+                `${player.position || ""} ${player.team || ""}${overallDetail}`.trim()));
             tr.appendChild(who);
             tr.appendChild(el("td", "col-proj", F.seasonLine(entry.implied_value)));
             tr.appendChild(seasonBookCell(entry.books, entry.book_values));
@@ -553,12 +603,14 @@
             els.seasonPropsLeaders.appendChild(tr);
         });
 
-        if (!leaders.length) {
+        if (!rows.length) {
             els.seasonPropsNote.textContent = "Nothing is quoted in this category yet.";
             return;
         }
         els.seasonPropsNote.textContent = [
-            `${leaders.length} player${leaders.length === 1 ? "" : "s"} with usable market data`,
+            position === "ALL"
+                ? `${rows.length} player${rows.length === 1 ? "" : "s"} with usable market data`
+                : `${rows.length} of ${all.length} quoted players are ${position}s`,
             "implied value is the median across the providers quoting each player, taken at the 50% point of their prices",
             F.marketSources(data.sources),
         ].filter(Boolean).join(" · ");
@@ -596,9 +648,20 @@
     }
 
     function renderSeasonFantasyLeaders(data) {
-        const leaders = data.leaders || [];
+        const all = data.leaders || [];
+        const position = resolveSeasonPosition(all, state.seasonFantasyPosition);
+        state.seasonFantasyPosition = position;
+        renderSeasonPositionChips(els.seasonFantasyPositions, all, position, (pick) => {
+            state.seasonFantasyPosition = pick;
+            renderSeasonFantasyLeaders(data);
+        });
+
+        const rows = all
+            .map((entry, index) => ({ entry, overall: index + 1 }))
+            .filter(({ entry }) => F.seasonPositionMatches(entry, position));
+
         els.seasonFantasyLeaders.innerHTML = "";
-        leaders.forEach((entry, index) => {
+        rows.forEach(({ entry, overall }, index) => {
             const player = entry.player || {};
             const tr = el("tr", "season-leader");
             tr.tabIndex = 0;
@@ -613,8 +676,9 @@
             const bookDetail = (entry.books || []).length
                 ? ` · ${entry.books.length} source${entry.books.length === 1 ? "" : "s"}`
                 : "";
+            const overallDetail = position === "ALL" ? "" : ` · ${overall} overall`;
             who.appendChild(el("span", "season-leader__meta",
-                `${player.position || ""} ${player.team || ""} · ${entry.markets_used || 0} markets${bookDetail}${receptionDetail}`.trim()));
+                `${player.position || ""} ${player.team || ""}${overallDetail} · ${entry.markets_used || 0} markets${bookDetail}${receptionDetail}`.trim()));
             tr.appendChild(who);
             tr.appendChild(el("td", "col-proj", F.formatPoints(entry.yard_points)));
             tr.appendChild(el("td", "col-proj", F.formatPoints(entry.touchdown_points)));
@@ -639,9 +703,11 @@
         const receptionSource = data.scoring === "std"
             ? ""
             : `receptions from ${data.reception_source || "season projections"}`;
-        els.seasonFantasyNote.textContent = leaders.length
+        els.seasonFantasyNote.textContent = rows.length
             ? [
-                `${leaders.length} players with complete yardage/TD market pairs`,
+                position === "ALL"
+                    ? `${rows.length} players with complete yardage/TD market pairs`
+                    : `${rows.length} of ${all.length} players with complete pairs are ${position}s`,
                 `${scoringLabel} scoring from every available complete pair`,
                 receptionSource,
                 F.marketSources(data.sources),

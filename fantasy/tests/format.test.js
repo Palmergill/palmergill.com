@@ -8,6 +8,46 @@ describe('FantasyFormat', () => {
         expect(FantasyFormat.positionQuery('RB')).toBe('RB');
     });
 
+    test('seasonPositionCounts orders by depth chart and counts each position', () => {
+        const leaders = [
+            { player: { position: 'WR' } },
+            { player: { position: 'QB' } },
+            { player: { position: 'WR' } },
+            { player: { position: 'RB' } },
+        ];
+        expect(FantasyFormat.seasonPositionCounts(leaders)).toEqual([
+            { position: 'QB', count: 1 },
+            { position: 'RB', count: 1 },
+            { position: 'WR', count: 2 },
+        ]);
+    });
+
+    test('seasonPositionCounts skips rows with no position and sorts unknowns last', () => {
+        const leaders = [
+            { player: { position: 'fb' } },
+            { player: {} },
+            {},
+            { player: { position: 'QB' } },
+            { player: { position: 'DST' } },
+        ];
+        expect(FantasyFormat.seasonPositionCounts(leaders)).toEqual([
+            { position: 'QB', count: 1 },
+            { position: 'DST', count: 1 },
+            { position: 'FB', count: 1 },
+        ]);
+        expect(FantasyFormat.seasonPositionCounts([])).toEqual([]);
+        expect(FantasyFormat.seasonPositionCounts(undefined)).toEqual([]);
+    });
+
+    test('seasonPositionMatches treats ALL and missing filters as no filter', () => {
+        const rb = { player: { position: 'RB' } };
+        expect(FantasyFormat.seasonPositionMatches(rb, 'RB')).toBe(true);
+        expect(FantasyFormat.seasonPositionMatches(rb, 'WR')).toBe(false);
+        expect(FantasyFormat.seasonPositionMatches(rb, 'ALL')).toBe(true);
+        expect(FantasyFormat.seasonPositionMatches(rb, null)).toBe(true);
+        expect(FantasyFormat.seasonPositionMatches({}, 'RB')).toBe(false);
+    });
+
     test('formatPoints renders one decimal and handles missing values', () => {
         expect(FantasyFormat.formatPoints(21)).toBe('21.0');
         expect(FantasyFormat.formatPoints(18.456)).toBe('18.5');

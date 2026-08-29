@@ -1549,6 +1549,27 @@ body.drawer-open { overflow: hidden; }
 
 .research-panel .season-fantasy__controls p { max-width: 58ch; }
 .research-panel .chip-row { margin: 0; }
+
+/* Position filter on the season boards. Sits under the controls it narrows,
+   labelled because a bare QB/RB/WR/TE row beside a scoring row reads as a
+   second scoring choice. */
+.season-filter {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px 12px;
+    margin-top: 12px;
+    border-top: 1px solid rgba(255, 255, 255, 0.09);
+    padding-top: 12px;
+}
+
+.season-filter__label {
+    color: #8ea08f;
+    font-size: 0.68rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
 .season-leaders-panel .chip-row { margin-bottom: 8px; }
 
 #futuresSection {

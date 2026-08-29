@@ -10,6 +10,7 @@
     }
 })(typeof self !== "undefined" ? self : this, function () {
     const POSITIONS = ["ALL", "QB", "RB", "WR", "TE", "FLEX", "K", "DST"];
+    const SEASON_POSITION_ORDER = ["QB", "RB", "WR", "TE"];
     const SCORINGS = [
         { key: "ppr", label: "PPR" },
         { key: "half", label: "Half" },
@@ -23,6 +24,32 @@
 
     function positionQuery(position) {
         return position === "DST" ? "DEF" : position;
+    }
+
+    // Which positions a season board can be filtered to, in depth-chart order
+    // and with a count each. Derived from the rows rather than POSITIONS: the
+    // season markets only quote passing, rushing, receiving and touchdowns, so
+    // kickers and defenses never appear, and which of QB/RB/WR/TE are quoted
+    // shifts with the market and with the category being viewed.
+    function seasonPositionCounts(leaders) {
+        const counts = new Map();
+        (leaders || []).forEach((entry) => {
+            const player = (entry && entry.player) || {};
+            const position = String(player.position || "").toUpperCase();
+            if (!position) return;
+            counts.set(position, (counts.get(position) || 0) + 1);
+        });
+        const ordered = SEASON_POSITION_ORDER.filter((position) => counts.has(position));
+        const extra = [...counts.keys()]
+            .filter((position) => !SEASON_POSITION_ORDER.includes(position))
+            .sort();
+        return [...ordered, ...extra].map((position) => ({ position, count: counts.get(position) }));
+    }
+
+    function seasonPositionMatches(entry, position) {
+        if (!position || position === "ALL") return true;
+        const player = (entry && entry.player) || {};
+        return String(player.position || "").toUpperCase() === position;
     }
 
     function scoringLabel(key) {
@@ -215,6 +242,8 @@
         SCORINGS,
         positionLabel,
         positionQuery,
+        seasonPositionCounts,
+        seasonPositionMatches,
         scoringLabel,
         formatPoints,
         ordinal,
