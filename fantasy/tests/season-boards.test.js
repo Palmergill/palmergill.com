@@ -279,11 +279,10 @@ describe("season board position filter", () => {
         expect(cell.textContent).toContain("No season markets have been collected");
     });
 
-    test("hides the live-markets zone, and its nav link, when nothing is trading", async () => {
+    test("hides the live-markets disclosure when nothing is trading", async () => {
         boot(routes());
         await waitFor(() => document.querySelectorAll("#seasonFantasyLeaders tr").length);
         expect(document.getElementById("live-markets").hidden).toBe(true);
-        expect(document.querySelector('.dashboard-nav a[href="#live-markets"]').hidden).toBe(true);
     });
 
     test("compares on market value, and says when a player has no market", async () => {

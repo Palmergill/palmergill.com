@@ -29,17 +29,6 @@ body {
     padding: clamp(20px, 4vw, 40px) clamp(16px, 4vw, 32px) 80px;
 }
 
-/* ── header ──────────────────────────────────────────────────────────── */
-
-.page-head {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    gap: 20px;
-    flex-wrap: wrap;
-    margin-bottom: 20px;
-}
-
 /* This page scrolls as a document; the shared shell's app-style fixed height
    would otherwise end the sticky section navigation after the first screen. */
 body.has-site-nav .app-shell {
@@ -54,18 +43,6 @@ body.has-site-nav .app-shell {
     letter-spacing: 0.08em;
     text-transform: uppercase;
     color: var(--sage, #5b7152);
-}
-
-.page-head h1 {
-    margin: 6px 0 4px;
-    font-size: clamp(1.5rem, 4vw, 2rem);
-    letter-spacing: -0.02em;
-}
-
-.lede {
-    margin: 0;
-    color: var(--soft, #5d574e);
-    max-width: 46ch;
 }
 
 .source-link {
@@ -140,43 +117,7 @@ body.has-site-nav .app-shell {
 
 .season-props .eyebrow { color: #b7cbb9; }
 
-.season-props__intro {
-    display: flex;
-    align-items: flex-end;
-    justify-content: space-between;
-    gap: 24px;
-}
-
 .season-props h3 { margin: 5px 0 7px; font-size: clamp(1.25rem, 3vw, 1.65rem); }
-.season-props__intro p { max-width: 58ch; margin: 0; color: #b8c5bb; font-size: 0.9rem; }
-
-.season-props__search { position: relative; flex: 0 1 330px; width: 100%; }
-
-.season-props__input {
-    width: 100%;
-    border: 1px solid #506657;
-    border-radius: 12px;
-    background: #fffdf8;
-    padding: 12px 14px;
-    color: var(--ink, #23201c);
-    font: inherit;
-    font-size: 0.88rem;
-}
-
-.season-props__input:focus-visible {
-    outline: none;
-    border-color: #e7b95f;
-    box-shadow: 0 0 0 3px rgba(231, 185, 95, 0.25);
-}
-
-.season-props__results { top: calc(100% + 7px); right: 0; left: 0; }
-.search-results__empty { padding: 12px 14px; color: var(--muted, #928a7d); font-size: 0.82rem; }
-
-.season-props__panel {
-    margin-top: 20px;
-    border-top: 1px solid rgba(255, 255, 255, 0.14);
-    padding-top: 18px;
-}
 
 .season-props__player {
     display: flex;
@@ -292,42 +233,12 @@ body.has-site-nav .app-shell {
 .season-leader__name { display: block; font-weight: 600; }
 .season-leader__meta { display: block; margin-top: 1px; color: #8ea08f; font-size: 0.72rem; }
 
-/* The line is the headline number; the chance is the qualifier that keeps a
-   long shot on the top rung from reading as the market's favourite. */
-.season-leader__chance { color: #b8c5bb; }
-
 .season-props__note {
     margin: 12px 0 0;
     color: #839586;
     font-size: 0.72rem;
     line-height: 1.5;
 }
-
-.season-fantasy {
-    margin-top: 24px;
-    border-top: 1px solid rgba(255, 255, 255, 0.14);
-    padding-top: 22px;
-}
-
-.season-fantasy__head {
-    display: flex;
-    align-items: flex-end;
-    justify-content: space-between;
-    gap: 24px;
-    margin-bottom: 10px;
-}
-
-.season-fantasy__head h3 { margin: 4px 0 0; font-size: 1.15rem; }
-.season-fantasy__head p,
-.season-fantasy__caveat {
-    max-width: 62ch;
-    margin: 0;
-    color: #9eafa1;
-    font-size: 0.72rem;
-    line-height: 1.5;
-}
-
-.season-fantasy__controls { display: flex; align-items: flex-end; flex-direction: column; gap: 10px; }
 .season-fantasy__controls .chip-row { margin: 0; }
 .season-fantasy__table { min-width: 640px; }
 .season-leader .season-fantasy__total { color: #e7b95f; font-weight: 700; }
@@ -336,7 +247,6 @@ body.has-site-nav .app-shell {
    from the rest of the meta line because it qualifies the number rather than
    describing the player. */
 .season-leader__gap { color: #e0a184; font-style: italic; }
-.season-fantasy__caveat { margin-top: 8px; color: #718477; }
 
 .season-offenses {
     margin-top: 24px;
@@ -344,38 +254,7 @@ body.has-site-nav .app-shell {
     padding-top: 22px;
 }
 
-.season-offenses__head {
-    display: flex;
-    align-items: flex-end;
-    justify-content: space-between;
-    gap: 24px;
-    margin-bottom: 14px;
-}
-
-.season-offenses__head h3 { margin: 4px 0 0; font-size: 1.15rem; }
-.season-offenses__head p { max-width: 56ch; margin: 0; color: #9eafa1; font-size: 0.78rem; line-height: 1.5; }
-
-.season-offenses__grid {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 12px;
-}
-
-.season-offense-board {
-    min-width: 0;
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    border-radius: 12px;
-    background: rgba(255, 255, 255, 0.05);
-    padding: 14px;
-}
-
-.season-offense-board h5 {
-    margin: 0 0 7px;
-    color: #f0c978;
-    font-size: 0.72rem;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-}
+.season-offense-board { min-width: 0; }
 
 .season-offense-list { margin: 0; padding: 0; list-style: none; }
 .season-offense {
@@ -388,11 +267,10 @@ body.has-site-nav .app-shell {
 }
 .season-offense:last-child { border-bottom: 0; }
 .season-offense__rank { color: #7f9284; font-size: 0.76rem; text-align: right; }
-.season-offense__team { color: #fff; font-size: 0.86rem; }
+.season-offense__team { font-size: 0.86rem; }
 .season-offense__detail { overflow: hidden; color: #8ea08f; font-size: 0.68rem; text-overflow: ellipsis; white-space: nowrap; }
 .season-offense__total { color: #d8e1d9; font-size: 0.78rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .season-offense-list__empty { padding: 14px 0 6px; color: #8ea08f; font-size: 0.78rem; }
-
 
 /* ── rankings table ──────────────────────────────────────────────────── */
 
@@ -418,18 +296,6 @@ body.has-site-nav .app-shell {
 .col-proj { text-align: right; }
 .rank-table .col-rank, .rank-table .col-proj { text-align: right; }
 
-.rank-row td {
-    padding: 10px;
-    border-bottom: 1px solid var(--line, #ece4d8);
-}
-
-.rank-row { cursor: pointer; transition: background 0.12s; }
-.rank-row:hover { background: var(--surface, #f3eee4); }
-.rank-row:focus-visible {
-    outline: none;
-    box-shadow: inset var(--focus-ring, 0 0 0 3px rgba(91, 113, 82, 0.24));
-}
-
 .rank-row .col-rank { font-variant-numeric: tabular-nums; color: var(--muted, #928a7d); font-weight: 600; }
 .rank-row .col-player { font-weight: 600; }
 .rank-row .col-proj { font-variant-numeric: tabular-nums; font-weight: 600; color: var(--sage, #5b7152); }
@@ -448,25 +314,6 @@ body.has-site-nav .app-shell {
     grid-template-columns: 1fr;
     gap: 10px;
 }
-
-/* Inset wells inside the trending card rather than cards of their own. */
-.trending__col {
-    border-radius: 12px;
-    background: var(--surface, #f3eee4);
-    padding: 13px 15px;
-}
-
-.trending__title {
-    display: flex;
-    align-items: center;
-    gap: 7px;
-    margin: 0 0 6px;
-    font-size: 0.78rem;
-}
-
-.trend-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--muted, #928a7d); }
-.trend-dot--up { background: var(--sage, #5b7152); }
-.trend-dot--down { background: var(--clay, #b96a4b); }
 
 .trending__list {
     list-style: none;
@@ -663,28 +510,9 @@ body.drawer-open { overflow: hidden; }
 .search-results__name { font-weight: 600; font-size: 0.88rem; }
 .search-results__meta { font-size: 0.76rem; color: var(--muted, #928a7d); }
 
-/* ── rankings: movement, matchup, injury, compare toggle ─────────────── */
-
-.col-move { width: 46px; text-align: center; }
-.col-opp { white-space: nowrap; }
-.rank-row .col-opp { color: var(--soft, #5d574e); font-variant-numeric: tabular-nums; }
-.col-opp--bye { color: var(--muted, #928a7d); font-style: italic; }
-
-.move { font-size: 0.74rem; font-weight: 700; font-variant-numeric: tabular-nums; }
-.move--up { color: #3f8f5b; }
-.move--down { color: #c0603f; }
-.move--same { color: var(--muted, #928a7d); font-weight: 500; }
-.move--new {
-    font-size: 0.58rem;
-    letter-spacing: 0.04em;
-    color: var(--sage, #5b7152);
-    background: var(--surface, #f3eee4);
-    border-radius: 5px;
-    padding: 1px 4px;
-}
+/* ── injury badge + compare toggle ───────────────────────────────────── */
 
 .col-player { position: relative; }
-.player-name { font-weight: 600; }
 
 .injury-badge {
     display: inline-block;
@@ -920,7 +748,7 @@ h1, h2, .drawer__head h2 { font-family: "Libre Caslon Display", Georgia, serif; 
 .editorial-hero { display: flex; align-items: flex-end; justify-content: space-between; gap: 28px; padding: 0 2px 28px; border-bottom: 1px solid var(--fantasy-line); }
 .editorial-hero h1 { margin: 8px 0 0; color: var(--fantasy-forest); font-size: clamp(2.65rem, 7vw, 5.7rem); line-height: .92; letter-spacing: -.045em; }
 .hero-snapshot { display: flex; align-items: stretch; overflow: hidden; min-width: min(480px, 48vw); border: 1px solid var(--fantasy-line); border-radius: 3px; background: rgba(255,253,248,.88); box-shadow: 0 12px 28px rgba(47, 40, 29, .06); }
-.week-badge { flex: 0 0 106px; justify-content: center; border: 0; border-right: 1px solid var(--fantasy-line); border-radius: 0; background: var(--fantasy-forest); box-shadow: none; }
+.week-badge { flex: 0 0 auto; min-width: 106px; justify-content: center; border: 0; border-right: 1px solid var(--fantasy-line); border-radius: 0; background: var(--fantasy-forest); box-shadow: none; }
 .week-badge__label,.week-badge__season { color: #c7d0c6; }
 .week-badge__value { color: #fff9eb; font-family: "Libre Caslon Display", Georgia, serif; font-size: 2.25rem; }
 .hero-snapshot__member { display: flex; flex: 1; flex-direction: column; justify-content: center; align-items: flex-start; min-width: 0; padding: 16px 20px; }
@@ -929,9 +757,9 @@ h1, h2, .drawer__head h2 { font-family: "Libre Caslon Display", Georgia, serif; 
 .hero-snapshot__metrics { display: flex; flex-wrap: wrap; gap: 7px 14px; margin-top: 5px; color: var(--fantasy-muted); font-size: .75rem; font-variant-numeric: tabular-nums; }
 
 .tool-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 18px 0 26px; }
-.tool-card { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 13px; min-height: 86px; padding: 14px 17px; border: 1px solid var(--fantasy-line); border-radius: 3px; background: rgba(255,253,248,.82); color: inherit; text-decoration: none; transition: border-color .18s ease, transform .18s ease, box-shadow .18s ease; }
+.tool-card { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 13px; min-height: 86px; padding: 14px 17px; border: 1px solid var(--fantasy-line); border-radius: 3px; background: rgba(255,253,248,.82); color: var(--fantasy-ink); text-decoration: none; transition: border-color .18s ease, transform .18s ease, box-shadow .18s ease; }
 .tool-card:hover { border-color: var(--fantasy-sage); box-shadow: 0 10px 22px rgba(47,40,29,.06); transform: translateY(-2px); }
-.tool-card__mark { display: grid; place-items: center; width: 42px; height: 42px; border-radius: 50%; background: var(--fantasy-forest); color: white; font-family: Georgia, serif; }
+.tool-card__mark { display: grid; place-items: center; width: 42px; height: 42px; border-radius: 50%; background: var(--fantasy-forest); color: white; font-family: Georgia, serif; font-size: 0.88rem; font-weight: 800; }
 .tool-card--league .tool-card__mark { background: var(--fantasy-sage); }
 .tool-card--draft .tool-card__mark { background: var(--fantasy-clay); font-size: .76rem; }
 .tool-card small { display: block; color: var(--fantasy-muted); font-size: .64rem; text-transform: uppercase; letter-spacing: .1em; }
@@ -1012,8 +840,8 @@ h1, h2, .drawer__head h2 { font-family: "Libre Caslon Display", Georgia, serif; 
 .disclosure { margin-top: 18px; }
 .disclosure summary { display: flex; align-items: center; justify-content: space-between; padding: 18px 21px; cursor: pointer; list-style: none; }
 .disclosure summary::-webkit-details-marker { display: none; }
-.disclosure summary small { display: block; color: var(--fantasy-muted); font-size: .62rem; text-transform: uppercase; letter-spacing: .1em; }
-.disclosure summary strong { color: var(--fantasy-forest); font-family: "Libre Caslon Display", Georgia, serif; font-size: 1.25rem; font-weight: 400; }
+.disclosure summary small { display: block; color: var(--fantasy-muted); font-family: "DM Sans", system-ui, sans-serif; font-size: .62rem; font-weight: 400; text-transform: uppercase; letter-spacing: .1em; }
+.disclosure__title { margin: 0; color: var(--fantasy-forest); font-family: "Libre Caslon Display", Georgia, serif; font-size: 1.25rem; font-weight: 400; }
 .disclosure[open] summary { border-bottom: 1px solid var(--fantasy-line); }
 .disclosure__body { padding: 20px; }
 .prose { max-width: none; color: var(--fantasy-muted); font-size: .78rem; }
@@ -1081,280 +909,6 @@ button:focus-visible,a:focus-visible,summary:focus-visible,[tabindex]:focus-visi
     html { scroll-behavior: smooth; }
 }
 
-.page-head {
-    align-items: center;
-    margin-bottom: 16px;
-    padding: clamp(6px, 2vw, 18px) 0;
-}
-
-.page-head h1 {
-    margin-top: 7px;
-    font-size: clamp(1.85rem, 4vw, 2.65rem);
-    line-height: 1.1;
-}
-
-.lede { max-width: 58ch; font-size: 0.96rem; }
-
-.dashboard-nav {
-    position: sticky;
-    z-index: 30;
-    top: calc(var(--site-nav-height, 52px) + 10px);
-    display: flex;
-    gap: 5px;
-    margin: 0 0 54px;
-    border: 1px solid rgba(216, 205, 186, 0.9);
-    border-radius: 14px;
-    background: rgba(255, 255, 255, 0.88);
-    box-shadow: 0 12px 28px rgba(60, 50, 35, 0.09);
-    padding: 5px;
-    margin-top: 6px;
-    backdrop-filter: blur(14px);
-    -webkit-backdrop-filter: blur(14px);
-}
-
-.dashboard-nav a[hidden] { display: none; }
-
-.dashboard-nav a {
-    display: flex;
-    flex: 1;
-    align-items: center;
-    justify-content: center;
-    gap: 9px;
-    border-radius: 9px;
-    padding: 9px 12px;
-    color: var(--soft, #5d574e);
-    font-size: 0.79rem;
-    font-weight: 700;
-    text-decoration: none;
-    transition: background 0.15s ease, color 0.15s ease;
-}
-
-.dashboard-nav a span {
-    color: var(--muted, #928a7d);
-    font-size: 0.64rem;
-    font-variant-numeric: tabular-nums;
-    letter-spacing: 0.05em;
-}
-
-.dashboard-nav a:hover,
-.dashboard-nav a:focus-visible {
-    background: var(--sage-soft, #e7eee2);
-    color: var(--sage, #5b7152);
-    outline: none;
-}
-
-.dashboard-nav a:focus-visible { box-shadow: var(--focus-ring); }
-
-.dashboard-zone {
-    scroll-margin-top: calc(var(--site-nav-height, 52px) + 86px);
-    margin-bottom: 64px;
-}
-
-/* The first zone opens the page — there is nothing above to divide it from. */
-.dashboard-zone:first-of-type .zone-head {
-    border-top: 0;
-    padding-top: 0;
-}
-
-.zone-head {
-    display: flex;
-    align-items: flex-end;
-    justify-content: space-between;
-    gap: 28px;
-    margin-bottom: 22px;
-    border-top: 1px solid var(--line-strong, #d8cdba);
-    padding-top: 20px;
-}
-
-.zone-head h2 {
-    margin: 5px 0 0;
-    font-size: clamp(1.45rem, 3vw, 1.9rem);
-    letter-spacing: -0.03em;
-    line-height: 1.15;
-}
-
-.zone-head > p {
-    max-width: 52ch;
-    margin: 0;
-    color: var(--soft, #5d574e);
-    font-size: 0.86rem;
-    line-height: 1.55;
-}
-
-/* ── league tools ────────────────────────────────────────────────────
-   Three entry points that read as siblings. Two sit on parchment; the
-   draft-night card takes the dark green because it is the one thing in
-   this zone that is a game rather than a table. */
-
-.tool-grid {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 14px;
-}
-
-.tool-card {
-    position: relative;
-    display: flex;
-    min-width: 0;
-    min-height: 280px;
-    flex-direction: column;
-    align-items: stretch;
-    gap: 18px;
-    overflow: hidden;
-    border: 1px solid var(--line, #ece4d8);
-    border-radius: 16px;
-    background: var(--card, #fff);
-    box-shadow: 0 10px 28px rgba(60, 50, 35, 0.055);
-    padding: 22px;
-    color: var(--ink, #23201c);
-}
-
-.tool-card--draft {
-    border-color: #2d4436;
-    background: radial-gradient(circle at 90% 5%, rgba(231, 185, 95, 0.14), transparent 11rem), #17251d;
-    box-shadow: 0 16px 40px rgba(23, 37, 29, 0.14);
-    color: #fff;
-}
-
-.tool-card--draft::after {
-    position: absolute;
-    right: -90px;
-    bottom: -110px;
-    width: 220px;
-    height: 220px;
-    border: 38px solid rgba(255, 255, 255, 0.035);
-    border-radius: 50%;
-    content: "";
-}
-
-.tool-card__mark {
-    display: grid;
-    width: 42px;
-    height: 42px;
-    place-items: center;
-    border-radius: 12px;
-    background: var(--surface, #f3eee4);
-    color: var(--sage, #5b7152);
-    font-size: 0.88rem;
-    font-weight: 800;
-}
-
-.tool-card--rankings .tool-card__mark { background: #f7e9e2; color: var(--clay, #b96a4b); }
-.tool-card__mark--cards { position: relative; z-index: 1; background: #fffdf8; color: #17251d; font-family: Georgia, serif; }
-
-.tool-card h3 {
-    margin: 5px 0 8px;
-    font-size: 1.16rem;
-    letter-spacing: -0.02em;
-}
-
-.tool-card p {
-    margin: 0;
-    color: var(--soft, #5d574e);
-    font-size: 0.82rem;
-    line-height: 1.58;
-}
-
-.tool-card--draft p { color: #b8c5bb; }
-.tool-card--draft .eyebrow { color: #b7cbb9; }
-
-.tool-card__copy { position: relative; z-index: 1; }
-
-.tool-card__link {
-    position: relative;
-    z-index: 1;
-    color: var(--sage, #5b7152);
-    font-size: 0.8rem;
-    font-weight: 800;
-    text-decoration: none;
-    transition: color 0.15s ease;
-}
-
-/* Only a direct child gets pinned to the foot of the card; inside
-   .tool-card__actions the link is baseline-aligned with the text link
-   beside it, and an auto top margin would override that. */
-.tool-card > .tool-card__link { align-self: flex-start; margin-top: auto; }
-
-.tool-card--rankings .tool-card__link { color: var(--clay, #b96a4b); }
-.tool-card--draft .tool-card__link { color: #f0c978; }
-
-.tool-card__link:hover { color: var(--ink, #23201c); }
-.tool-card--draft .tool-card__link:hover { color: #fff; }
-
-/* Two calls to action on the draft card, so they wrap instead of
-   overflowing the copy column on a narrow screen. */
-.tool-card__actions {
-    position: relative;
-    z-index: 1;
-    display: flex;
-    flex-wrap: wrap;
-    align-items: baseline;
-    gap: 14px;
-    margin-top: auto;
-}
-
-.tool-card__text-link {
-    color: #aebcaf;
-    font-size: 0.73rem;
-    font-weight: 700;
-    text-underline-offset: 3px;
-    transition: color 0.15s ease;
-}
-
-.tool-card__text-link:hover { color: #fff; }
-
-.tool-card__link:focus-visible,
-.tool-card__text-link:focus-visible {
-    outline: none;
-    border-radius: 5px;
-    box-shadow: var(--focus-ring, 0 0 0 3px rgba(91, 113, 82, 0.24));
-}
-
-.tool-card--draft .tool-card__link:focus-visible,
-.tool-card--draft .tool-card__text-link:focus-visible {
-    box-shadow: 0 0 0 3px rgba(231, 185, 95, 0.45);
-}
-
-/* Weekly decision workspace */
-
-.panel-head {
-    display: flex;
-    align-items: flex-end;
-    justify-content: space-between;
-    gap: 20px;
-    margin-bottom: 18px;
-}
-
-.panel-head h3 {
-    margin: 4px 0 0;
-    font-size: 1.12rem;
-    letter-spacing: -0.02em;
-}
-
-.panel-head > p {
-    max-width: 46ch;
-    margin: 0;
-    color: var(--muted, #928a7d);
-    font-size: 0.75rem;
-}
-
-.panel-head--compact { align-items: center; margin-bottom: 14px; }
-
-.trend-panel {
-    min-width: 0;
-    margin: 0;
-    border: 1px solid var(--line, #ece4d8);
-    border-radius: 16px;
-    background: var(--card, #fff);
-    box-shadow: 0 10px 28px rgba(60, 50, 35, 0.05);
-    padding: 18px;
-}
-
-/* Full width now that it has no grid partner; two columns of names read
-   better side by side than stacked. */
-.trend-panel .trending { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-
-
 /* ── market board (hero) ─────────────────────────────────────────────────
    The page's front door. It keeps the dark treatment the season panel
    already wore — that shell is the market's visual identity on this site,
@@ -1377,29 +931,6 @@ button:focus-visible,a:focus-visible,summary:focus-visible,[tabindex]:focus-visi
 
 .market-board .eyebrow { color: #b7cbb9; }
 
-.market-board__head {
-    display: flex;
-    align-items: flex-end;
-    justify-content: space-between;
-    gap: 28px;
-    margin-bottom: 22px;
-}
-
-.market-board__head h2 {
-    margin: 6px 0 8px;
-    font-size: clamp(1.5rem, 4vw, 2.1rem);
-    letter-spacing: -0.03em;
-    line-height: 1.15;
-}
-
-.market-board__head p {
-    max-width: 56ch;
-    margin: 0;
-    color: #b8c5bb;
-    font-size: 0.88rem;
-    line-height: 1.55;
-}
-
 .market-board__search { position: relative; flex: 0 1 300px; width: 100%; }
 
 .market-board__search .player-search__input {
@@ -1416,19 +947,6 @@ button:focus-visible,a:focus-visible,summary:focus-visible,[tabindex]:focus-visi
 
 .market-board__search .search-results { top: calc(100% + 7px); right: 0; left: 0; }
 
-.market-board__controls {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 10px 28px;
-    margin-bottom: 4px;
-}
-
-.market-board__controls .season-filter {
-    margin-top: 0;
-    border-top: 0;
-    padding-top: 0;
-}
-
 .market-board .table-wrap {
     max-height: 620px;
     margin-top: 14px;
@@ -1443,36 +961,10 @@ button:focus-visible,a:focus-visible,summary:focus-visible,[tabindex]:focus-visi
     background: #17251d;
 }
 
-.market-board__method {
-    margin-top: 14px;
-    border-top: 1px solid rgba(255, 255, 255, 0.11);
-    padding-top: 12px;
-}
-
-.market-board__method summary {
-    cursor: pointer;
-    color: #8ea08f;
-    font-size: 0.74rem;
-    font-weight: 600;
-}
-
-.market-board__method summary:focus-visible {
-    outline: none;
-    box-shadow: 0 0 0 3px rgba(143, 176, 143, 0.45);
-}
-
 .market-board .betting-disclaimer {
     max-width: 78ch;
     margin-top: 12px;
     color: #718477;
-}
-
-.market-board__method p {
-    max-width: 78ch;
-    margin: 10px 0 0;
-    color: #718477;
-    font-size: 0.74rem;
-    line-height: 1.55;
 }
 
 /* Sortable headers. The button carries the click so the control is reachable
@@ -1543,12 +1035,8 @@ button:focus-visible,a:focus-visible,summary:focus-visible,[tabindex]:focus-visi
     margin-bottom: 16px;
     padding: clamp(20px, 4vw, 32px);
 }
-
-.season-props__intro { align-items: center; margin-bottom: 22px; }
 .season-props h3 { font-size: clamp(1.4rem, 3vw, 1.8rem); }
-.season-props__intro p { max-width: 54ch; line-height: 1.55; }
 
-.research-panel.season-fantasy,
 .research-panel.season-offenses,
 .research-panel.season-leaders-panel {
     margin: 8px 0 0;
@@ -1558,115 +1046,10 @@ button:focus-visible,a:focus-visible,summary:focus-visible,[tabindex]:focus-visi
     padding: 0;
 }
 
-.research-panel[open] { background: rgba(255, 255, 255, 0.065); }
-
-.research-panel__summary {
-    display: grid;
-    grid-template-columns: auto minmax(0, 1fr) auto auto;
-    align-items: center;
-    gap: 13px;
-    min-height: 66px;
-    padding: 12px 15px;
-    cursor: pointer;
-    list-style: none;
-}
-
-.research-panel__summary::-webkit-details-marker { display: none; }
-
-.research-panel__summary::after {
-    display: grid;
-    width: 26px;
-    height: 26px;
-    place-items: center;
-    border: 1px solid rgba(255, 255, 255, 0.16);
-    border-radius: 50%;
-    color: #aebcaf;
-    content: "+";
-    font-size: 1rem;
-    line-height: 1;
-}
-
-.research-panel[open] > .research-panel__summary::after { content: "−"; }
-
-.research-panel__summary:hover,
-.research-panel__summary:focus-visible {
-    background: rgba(255, 255, 255, 0.045);
-    outline: none;
-}
-
-.research-panel__summary:focus-visible { box-shadow: inset 0 0 0 2px rgba(143, 176, 143, 0.65); }
-
-.research-panel__number {
-    color: #7f9284;
-    font-size: 0.66rem;
-    font-variant-numeric: tabular-nums;
-    letter-spacing: 0.08em;
-}
-
-.research-panel__summary small,
-.research-panel__title { display: block; }
-
-.research-panel__summary small {
-    margin-bottom: 1px;
-    color: #8ea08f;
-    font-size: 0.63rem;
-    font-weight: 600;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-}
-
-.research-panel__title { margin: 0; color: #f5f2eb; font-size: 0.9rem; font-weight: 700; }
-.research-panel__hint { color: #8ea08f; font-size: 0.7rem; }
-
-.research-panel__body {
-    border-top: 1px solid rgba(255, 255, 255, 0.11);
-    padding: 18px 16px 16px;
-}
-
 .research-panel__body > .table-wrap { max-height: 600px; overflow: auto; }
 .research-panel__body > .table-wrap .rank-table thead { background: #203128; }
-
-.research-panel__intro {
-    margin: 0 0 10px;
-    color: #9eafa1;
-    font-size: 0.76rem;
-}
-
-.research-panel .season-fantasy__head,
-.research-panel .season-offenses__head {
-    display: block;
-    margin: 0 0 12px;
-}
-
-.research-panel .season-fantasy__controls {
-    align-items: flex-start;
-    flex-direction: row;
-    justify-content: space-between;
-}
-
-.research-panel .season-fantasy__controls p { max-width: 58ch; }
 .research-panel .chip-row { margin: 0; }
 
-/* Position filter on the season boards. Sits under the controls it narrows,
-   labelled because a bare QB/RB/WR/TE row beside a scoring row reads as a
-   second scoring choice. */
-.season-filter {
-    display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 8px 12px;
-    margin-top: 12px;
-    border-top: 1px solid rgba(255, 255, 255, 0.09);
-    padding-top: 12px;
-}
-
-.season-filter__label {
-    color: #8ea08f;
-    font-size: 0.68rem;
-    font-weight: 600;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-}
 .season-leaders-panel .chip-row { margin-bottom: 8px; }
 
 #futuresSection {
@@ -1696,74 +1079,17 @@ button:focus-visible,a:focus-visible,summary:focus-visible,[tabindex]:focus-visi
 
 @media (max-width: 620px) {
     .app-shell { padding-bottom: 56px; }
-
-    .page-head { align-items: flex-start; }
-
-    .dashboard-nav {
-        top: calc(var(--site-nav-height, 52px) + 7px);
-        gap: 2px;
-        margin-bottom: 42px;
-        padding: 4px;
-    }
-
-    .dashboard-nav a { gap: 0; padding: 9px 5px; font-size: 0.68rem; }
-    .dashboard-nav a span { display: none; }
-
-    .dashboard-zone { margin-bottom: 50px; }
-
-    .zone-head {
-        align-items: flex-start;
-        flex-direction: column;
-        gap: 8px;
-        margin-bottom: 16px;
-    }
-
-    .tool-card__actions { margin-top: 2px; }
-
-    .panel-head { align-items: flex-start; flex-direction: column; gap: 6px; }
     .panel-head--compact { margin-bottom: 12px; }
     .board { padding: 16px 14px; }
 
-    .trend-panel,
     .market-group { padding: 16px 14px; }
-
-    .research-panel__summary { grid-template-columns: auto minmax(0, 1fr) auto; gap: 10px; }
-    .research-panel__hint { display: none; }
-    .research-panel__body { padding: 15px 12px; }
-
-    .research-panel .season-fantasy__controls { flex-direction: column; }
     .season-props__grid { grid-template-columns: 1fr; }
 }
 
-/* Final cascade: the legacy component rules above remain for live-market and
-   drawer internals; these keep the unified shell authoritative. */
-.tool-grid { margin: 18px 0 26px; gap: 12px; }
-.tool-card {
-    display: grid;
-    grid-template-columns: auto 1fr auto;
-    align-items: center;
-    min-height: 86px;
-    padding: 14px 17px;
-    gap: 13px;
-    overflow: visible;
-    border: 1px solid var(--fantasy-line);
-    border-radius: 3px;
-    background: rgba(255,253,248,.82);
-    box-shadow: none;
-    color: var(--fantasy-ink);
-    text-decoration: none;
-}
-.tool-card--draft { border-color: var(--fantasy-line); background: rgba(255,253,248,.82); color: var(--fantasy-ink); }
-.tool-card--draft::after { display: none; }
-.tool-card__mark,.tool-card--rankings .tool-card__mark,.tool-card__mark--cards { border-radius: 50%; background: var(--fantasy-forest); color: white; }
-.tool-card--league .tool-card__mark { background: var(--fantasy-sage); }
-.tool-card--draft .tool-card__mark { background: var(--fantasy-clay); color: white; }
-.tool-card small { display: block; color: var(--fantasy-muted); font-size: .64rem; text-transform: uppercase; letter-spacing: .1em; }
-.tool-card strong { display: block; color: var(--fantasy-forest); font-family: "Libre Caslon Display", Georgia, serif; font-size: 1.2rem; font-weight: 400; }
-.season-offenses__grid { padding: 0; }
-.season-offense-board { border: 0; border-radius: 0; background: transparent; }
-.season-offense-board h3 { margin: 0 0 7px; color: var(--fantasy-muted); font-size: .66rem; text-transform: uppercase; letter-spacing: .1em; }
-.season-offense__team { color: var(--fantasy-forest); }
+/* Shell rules that the live-market and drawer internals above do not cover. */
+.tool-card--rankings .tool-card__mark,
+.tool-card__mark--cards { border-radius: 50%; background: var(--fantasy-forest); color: white; }
+.tool-card--draft .tool-card__mark { color: white; }
 .season-offense__detail { color: var(--fantasy-muted); }
 .season-offense__total { color: var(--fantasy-clay); }
 #market-board .col-sort { color: inherit; }
@@ -1775,7 +1101,6 @@ button:focus-visible,a:focus-visible,summary:focus-visible,[tabindex]:focus-visi
 .drawer-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
 .drawer-actions .drawer-compare { margin: 0; }
 .sparkline--market { width: 100%; color: var(--fantasy-clay); }
-.dashboard-nav[hidden] { display: none !important; }
 .drawer { z-index: 10001; }
 
 @media (max-width: 960px) {

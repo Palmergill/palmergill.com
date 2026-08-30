@@ -1223,6 +1223,107 @@ def _season_drop_rates(snapshots) -> Dict[Tuple[str, str], float]:
     return rates
 
 
+# Returned instead of a row when a half/PPR total would need a reception
+# projection the feed does not have. The board counts these so it can say how
+# many players a scoring format hides.
+_EXCLUDED_NO_PROJECTION = object()
+
+
+def _score_season_player(
+    market_rows,
+    drop_rates: Dict[Tuple[str, str], float],
+    player: Optional[FantasyPlayer],
+    projection: Dict[str, Any],
+    reception_multiplier: float,
+    scoring_field: str,
+):
+    """One player's row on the implied-points board.
+
+    Split out of ``get_season_fantasy_point_leaders`` so a single player can be
+    priced against a historical run without building — and then discarding —
+    every other player on that board. Drop rates stay a caller argument because
+    they are a board-wide statistic: the slope comes from every player quoted by
+    a provider, so one player's history still has to be read against the whole
+    run to reproduce the number the board showed.
+    """
+    implied = {
+        market: _season_consensus_value(rows, market, drop_rates)
+        for market, rows in market_rows.items()
+    }
+    implied = {market: value for market, value in implied.items() if value is not None}
+    primary_pair = SEASON_FANTASY_PRIMARY_PAIR.get(player.position if player else None)
+    complete_pairs = {
+        name: pair
+        for name, pair in SEASON_FANTASY_MARKET_PAIRS.items()
+        if all(market in implied for market in pair)
+    }
+    # A category with only one half quoted is dropped from the total.
+    # Reported separately because "scored on passing alone" means two
+    # very different things depending on whether a rushing market exists.
+    partial_pairs = sorted(
+        name
+        for name, pair in SEASON_FANTASY_MARKET_PAIRS.items()
+        if name not in complete_pairs and any(market in implied for market in pair)
+    )
+    if primary_pair not in complete_pairs:
+        return None
+    # Keyed on every projection row, not only rows a reception count could be
+    # derived from, so presence of the key does not imply a usable figure.
+    projected_receptions = projection.get("receptions")
+    if reception_multiplier and projected_receptions is None:
+        # A PPR total without a reception projection would understate the
+        # player rather than merely omit a detail, so the row is dropped.
+        return _EXCLUDED_NO_PROJECTION
+
+    used_markets = {
+        market
+        for pair in complete_pairs.values()
+        for market in pair
+    }
+    implied = {market: implied[market] for market in used_markets}
+    yard_markets = SEASON_YARD_MARKETS.intersection(used_markets)
+    touchdown_markets = SEASON_TD_MARKETS.intersection(used_markets)
+
+    yard_points = round(
+        sum(implied[market] * SEASON_FANTASY_WEIGHTS[market] for market in yard_markets), 1
+    )
+    touchdown_points = round(
+        sum(implied[market] * SEASON_FANTASY_WEIGHTS[market] for market in touchdown_markets), 1
+    )
+    reception_points = round((projected_receptions or 0) * reception_multiplier, 1)
+    fantasy_points_total = round(yard_points + touchdown_points + reception_points, 1)
+    # Rounded before the subtraction: 157.0 - 160.0 in float is
+    # -3.0000000000000114, and the delta is read as a headline number.
+    projected_points = projection.get(scoring_field)
+    projected_points = round(projected_points, 1) if projected_points is not None else None
+    books = sorted({
+        row.bookmaker
+        for market in used_markets
+        for row in market_rows.get(market, [])
+    })
+    return {
+        "player": _player_public(player),
+        "yard_points": yard_points,
+        "touchdown_points": touchdown_points,
+        "projected_receptions": (
+            round(projected_receptions, 1) if projected_receptions is not None else None
+        ),
+        "reception_points": reception_points,
+        "fantasy_points": fantasy_points_total,
+        "markets_used": len(implied),
+        "pairs_used": sorted(complete_pairs),
+        "partial_pairs": partial_pairs,
+        "projected_points": projected_points,
+        "projection_delta": (
+            round(fantasy_points_total - projected_points, 1)
+            if projected_points is not None
+            else None
+        ),
+        "books": books,
+        "implied": implied,
+    }
+
+
 def _season_book_values(
     rows, market: str, drop_rates: Dict[Tuple[str, str], float]
 ) -> Dict[str, float]:
@@ -1751,90 +1852,19 @@ def get_season_fantasy_point_leaders(
     excluded_without_projection = 0
     leaders = []
     for player_id, market_rows in rows_by_player.items():
-        implied = {
-            market: _season_consensus_value(rows, market, drop_rates)
-            for market, rows in market_rows.items()
-        }
-        implied = {market: value for market, value in implied.items() if value is not None}
-        player = players.get(player_id)
-        primary_pair = SEASON_FANTASY_PRIMARY_PAIR.get(player.position if player else None)
-        complete_pairs = {
-            name: pair
-            for name, pair in SEASON_FANTASY_MARKET_PAIRS.items()
-            if all(market in implied for market in pair)
-        }
-        # A category with only one half quoted is dropped from the total.
-        # Reported separately because "scored on passing alone" means two
-        # very different things depending on whether a rushing market exists.
-        partial_pairs = sorted(
-            name
-            for name, pair in SEASON_FANTASY_MARKET_PAIRS.items()
-            if name not in complete_pairs and any(market in implied for market in pair)
+        row = _score_season_player(
+            market_rows,
+            drop_rates,
+            players.get(player_id),
+            projections.get(player_id) or {},
+            reception_multiplier,
+            scoring_field,
         )
-        if primary_pair not in complete_pairs:
-            continue
-        projection = projections.get(player_id) or {}
-        # Keyed on every projection row now, not only rows a reception count
-        # could be derived from, so presence of the key no longer implies a
-        # usable reception figure.
-        projected_receptions = projection.get("receptions")
-        if reception_multiplier and projected_receptions is None:
-            # A PPR total without a reception projection would understate the
-            # player rather than merely omit a detail, so the row is dropped —
-            # but counted, so the board can say the shortfall out loud.
+        if row is _EXCLUDED_NO_PROJECTION:
             excluded_without_projection += 1
             continue
-
-        used_markets = {
-            market
-            for pair in complete_pairs.values()
-            for market in pair
-        }
-        implied = {market: implied[market] for market in used_markets}
-        yard_markets = SEASON_YARD_MARKETS.intersection(used_markets)
-        touchdown_markets = SEASON_TD_MARKETS.intersection(used_markets)
-
-        yard_points = sum(implied[market] * SEASON_FANTASY_WEIGHTS[market] for market in yard_markets)
-        touchdown_points = sum(
-            implied[market] * SEASON_FANTASY_WEIGHTS[market]
-            for market in touchdown_markets
-        )
-        yard_points = round(yard_points, 1)
-        touchdown_points = round(touchdown_points, 1)
-        reception_points = round((projected_receptions or 0) * reception_multiplier, 1)
-        fantasy_points_total = round(yard_points + touchdown_points + reception_points, 1)
-        # Rounded before the subtraction: 157.0 - 160.0 in float is -3.0000000000000114,
-        # and the delta is read as a headline number, not an intermediate.
-        projected_points = projection.get(scoring_field)
-        projected_points = round(projected_points, 1) if projected_points is not None else None
-        books = sorted({
-            row.bookmaker
-            for market in used_markets
-            for row in market_rows.get(market, [])
-        })
-        leaders.append({
-            "player": _player_public(player),
-            "yard_points": yard_points,
-            "touchdown_points": touchdown_points,
-            "projected_receptions": (
-                round(projected_receptions, 1)
-                if projected_receptions is not None
-                else None
-            ),
-            "reception_points": reception_points,
-            "fantasy_points": fantasy_points_total,
-            "markets_used": len(implied),
-            "pairs_used": sorted(complete_pairs),
-            "partial_pairs": partial_pairs,
-            "projected_points": projected_points,
-            "projection_delta": (
-                round(fantasy_points_total - projected_points, 1)
-                if projected_points is not None
-                else None
-            ),
-            "books": books,
-            "implied": implied,
-        })
+        if row is not None:
+            leaders.append(row)
 
     leaders.sort(key=lambda entry: (
         -entry["fantasy_points"],
@@ -1962,22 +1992,48 @@ def get_player_season_fantasy_history(
         .limit(32)
         .all()
     )
+    # Everything that does not vary per run is resolved once. The projection
+    # map is keyed on season alone, so recomputing it inside the loop meant
+    # scanning the whole projection table up to 32 times per drawer open.
+    projections, _, _ = _season_projection_map(db, season)
+    projection = projections.get(player_id) or {}
+    reception_multiplier = {"std": 0.0, "half": 0.5, "ppr": 1.0}[scoring]
+    scoring_field = _SEASON_SCORING_FIELD[scoring]
+
     points = []
     for run in reversed(runs):
-        board = get_season_fantasy_point_leaders(
-            db, season=season, scoring=scoring, limit=10000, _run=run
+        # The whole run is loaded because drop rates are a board-wide slope,
+        # but only the requested player is priced from it.
+        snapshots = (
+            db.query(FantasySeasonPropSnapshot)
+            .filter(
+                FantasySeasonPropSnapshot.run_id == run.id,
+                FantasySeasonPropSnapshot.player_id.isnot(None),
+            )
+            .all()
         )
-        row = next(
-            (entry for entry in board["leaders"] if entry["player"]["player_id"] == player_id),
-            None,
+        market_rows: Dict[str, list] = {}
+        for snapshot in snapshots:
+            if snapshot.player_id == player_id and snapshot.market in SEASON_FANTASY_WEIGHTS:
+                market_rows.setdefault(snapshot.market, []).append(snapshot)
+        if not market_rows:
+            continue
+        row = _score_season_player(
+            market_rows,
+            _season_drop_rates(snapshots),
+            player,
+            projection,
+            reception_multiplier,
+            scoring_field,
         )
-        if row is not None:
-            points.append({
-                "as_of": board["as_of"],
-                "market": row["fantasy_points"],
-                "projection": row["projected_points"],
-                "edge": row["projection_delta"],
-            })
+        if row is None or row is _EXCLUDED_NO_PROJECTION:
+            continue
+        points.append({
+            "as_of": iso_utc(run.finished_at),
+            "market": row["fantasy_points"],
+            "projection": row["projected_points"],
+            "edge": row["projection_delta"],
+        })
     return {
         "season": season,
         "scoring": scoring,

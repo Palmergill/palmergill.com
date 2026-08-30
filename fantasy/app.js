@@ -1049,9 +1049,6 @@
         if (!els.liveMarkets) return;
         const empty = els.marketGroup.hidden && els.futuresSection.hidden;
         els.liveMarkets.hidden = empty;
-        // A nav entry that scrolls to nothing is worse than one that is absent.
-        const link = document.querySelector('.dashboard-nav a[href="#live-markets"]');
-        if (link) link.hidden = empty;
     }
 
     async function loadGames() {
@@ -1659,13 +1656,15 @@
     function renderWeekBadge() {
         const seasonLong = state.week === 0;
         if (seasonLong) {
+            // "Season" over the year already says season-long; the badge is a
+            // narrow column and the old third line wrapped to three rows in it.
             els.weekLabel.textContent = "Season";
             els.weekValue.textContent = state.season != null ? state.season : "—";
-            els.seasonValue.textContent = "season-long rankings";
+            els.seasonValue.textContent = "";
         } else {
             els.weekLabel.textContent = "Week";
             els.weekValue.textContent = state.week != null ? state.week : "—";
-            els.seasonValue.textContent = state.season ? `${state.season} season` : "";
+            els.seasonValue.textContent = state.season ? String(state.season) : "";
         }
     }
 

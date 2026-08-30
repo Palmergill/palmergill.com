@@ -382,6 +382,42 @@ def test_implied_fantasy_points_require_the_primary_matching_pair(db):
     assert board["leaders"] == []
 
 
+def test_player_history_prices_one_player_without_rebuilding_the_board(db):
+    """The drawer's sparkline must not cost a full board build per run.
+
+    Each historical run is scored for the requested player only, and anything
+    that does not vary per run is resolved once. The projection map is keyed on
+    season alone, so calling it inside the loop meant scanning the projection
+    table once per run on every drawer open.
+    """
+    _two_receivers_with_markets(db)
+    fc.collect_projections(db, 2026, fc.SEASON_LONG_WEEK, client=_sleeper_season_projections([
+        {"player_id": "wr_alpha", "pts_ppr": 250.0, "pts_half_ppr": 205.0,
+         "pts_std": 160.0, "stats": {"rec": 90.0}},
+    ]))
+
+    calls = []
+    original = fd._season_projection_map
+    fd._season_projection_map = lambda *a, **k: (calls.append(1), original(*a, **k))[1]
+    try:
+        history = fd.get_player_season_fantasy_history(db, "wr_alpha", season=2026, days=30)
+    finally:
+        fd._season_projection_map = original
+
+    assert len(calls) == 1, f"projection map resolved {len(calls)} times, expected once"
+
+    # And the history has to agree with the board it is a history of.
+    board = fd.get_season_fantasy_point_leaders(db, season=2026, limit=10000)
+    row = next(e for e in board["leaders"] if e["player"]["player_id"] == "wr_alpha")
+    assert history["points"][-1]["market"] == row["fantasy_points"]
+    assert history["points"][-1]["projection"] == row["projected_points"]
+    assert history["points"][-1]["edge"] == row["projection_delta"]
+
+
+def test_player_history_is_404_shaped_for_an_unknown_player(db):
+    assert fd.get_player_season_fantasy_history(db, "nobody", season=2026) is None
+
+
 def test_implied_fantasy_points_name_the_categories_behind_each_total(db):
     """A dropped half-quoted category is reported, not silently omitted."""
 
