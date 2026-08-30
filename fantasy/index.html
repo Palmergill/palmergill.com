@@ -19,7 +19,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/shared/site-nav.css?v=13">
-    <link rel="stylesheet" href="style.css?v=20">
+    <link rel="stylesheet" href="style.css?v=21">
 </head>
 <body>
     <main class="app-shell">
@@ -38,6 +38,57 @@
 
         <p id="offseasonBanner" class="banner" hidden></p>
         <p id="errorBanner" class="banner banner--error" hidden></p>
+
+        <section class="dashboard-zone dashboard-zone--tools" id="league-tools" aria-labelledby="leagueToolsTitle">
+            <header class="zone-head">
+                <div>
+                    <span class="eyebrow">League tools</span>
+                    <h2 id="leagueToolsTitle">Run your league</h2>
+                </div>
+                <p>Build your board, check the league, or settle draft order. Each tool has its own focused workspace.</p>
+            </header>
+
+            <div class="tool-grid">
+                <article class="tool-card tool-card--rankings" aria-labelledby="rankingsFeatureTitle">
+                    <span class="tool-card__mark" aria-hidden="true">R</span>
+                    <div>
+                        <span class="eyebrow">Personal</span>
+                        <h3 id="rankingsFeatureTitle">My rankings</h3>
+                        <p>Create a private draft board from consensus rankings, then drag or type players into your order.</p>
+                    </div>
+                    <a class="tool-card__link" href="/fantasy/rankings/">Build your board <span aria-hidden="true">→</span></a>
+                </article>
+
+                <article class="tool-card tool-card--league" aria-labelledby="leagueFeatureTitle">
+                    <span class="tool-card__mark" aria-hidden="true">L</span>
+                    <div>
+                        <span class="eyebrow">Members only</span>
+                        <h3 id="leagueFeatureTitle">League hub</h3>
+                        <p>See ESPN standings, seven power-ranking methods, weekly scores, and every roster.</p>
+                    </div>
+                    <a class="tool-card__link" href="/fantasy/league/">Open league hub <span aria-hidden="true">→</span></a>
+                </article>
+
+                <article class="tool-card tool-card--draft" aria-labelledby="draftFeatureTitle">
+                    <span class="tool-card__mark tool-card__mark--cards" aria-hidden="true">A♠</span>
+                    <div class="tool-card__copy">
+                        <span class="eyebrow">Draft night</span>
+                        <h3 id="draftFeatureTitle">Fourth &amp; Fortune</h3>
+                        <p>Turn draft order into a live, verifiable push-your-luck card game for the whole league.</p>
+                    </div>
+                    <div class="tool-card__actions">
+                        <a class="tool-card__link" href="/fantasy/draft-order/">Open draft room <span aria-hidden="true">→</span></a>
+                        <a class="tool-card__text-link" href="/fourth-and-fortune-kickoff.html">Rules</a>
+                    </div>
+                </article>
+            </div>
+        </section>
+
+        <nav class="dashboard-nav" aria-label="Fantasy dashboard sections">
+            <a href="#market-board">Market board</a>
+            <a href="#research">Research</a>
+            <a href="#live-markets">Live markets</a>
+        </nav>
 
         <section class="market-board" id="market-board" aria-labelledby="marketBoardTitle">
             <header class="market-board__head">
@@ -93,12 +144,6 @@
             </details>
             <p class="betting-disclaimer">Market-implied values, contract lines, and displayed prices are for information only — not betting advice. Availability varies by player and source, and each source is shown with when it last moved a price: a season-long market can sit untouched for weeks.</p>
         </section>
-
-        <nav class="dashboard-nav" aria-label="Fantasy dashboard sections">
-            <a href="#research">Research</a>
-            <a href="#live-markets">Live markets</a>
-            <a href="#league-tools">League tools</a>
-        </nav>
 
         <section class="dashboard-zone" id="research" aria-labelledby="researchTitle">
             <header class="zone-head">
@@ -232,51 +277,6 @@
                     <tbody id="futuresBody"></tbody>
                 </table>
             </section>
-        </section>
-
-        <section class="dashboard-zone dashboard-zone--tools" id="league-tools" aria-labelledby="leagueToolsTitle">
-            <header class="zone-head">
-                <div>
-                    <span class="eyebrow">League tools</span>
-                    <h2 id="leagueToolsTitle">Run your league</h2>
-                </div>
-                <p>Build your board, check the league, or settle draft order. Each tool has its own focused workspace.</p>
-            </header>
-
-            <div class="tool-grid">
-                <article class="tool-card tool-card--rankings" aria-labelledby="rankingsFeatureTitle">
-                    <span class="tool-card__mark" aria-hidden="true">R</span>
-                    <div>
-                        <span class="eyebrow">Personal</span>
-                        <h3 id="rankingsFeatureTitle">My rankings</h3>
-                        <p>Create a private draft board from consensus rankings, then drag or type players into your order.</p>
-                    </div>
-                    <a class="tool-card__link" href="/fantasy/rankings/">Build your board <span aria-hidden="true">→</span></a>
-                </article>
-
-                <article class="tool-card tool-card--league" aria-labelledby="leagueFeatureTitle">
-                    <span class="tool-card__mark" aria-hidden="true">L</span>
-                    <div>
-                        <span class="eyebrow">Members only</span>
-                        <h3 id="leagueFeatureTitle">League hub</h3>
-                        <p>See ESPN standings, seven power-ranking methods, weekly scores, and every roster.</p>
-                    </div>
-                    <a class="tool-card__link" href="/fantasy/league/">Open league hub <span aria-hidden="true">→</span></a>
-                </article>
-
-                <article class="tool-card tool-card--draft" aria-labelledby="draftFeatureTitle">
-                    <span class="tool-card__mark tool-card__mark--cards" aria-hidden="true">A♠</span>
-                    <div class="tool-card__copy">
-                        <span class="eyebrow">Draft night</span>
-                        <h3 id="draftFeatureTitle">Fourth &amp; Fortune</h3>
-                        <p>Turn draft order into a live, verifiable push-your-luck card game for the whole league.</p>
-                    </div>
-                    <div class="tool-card__actions">
-                        <a class="tool-card__link" href="/fantasy/draft-order/">Open draft room <span aria-hidden="true">→</span></a>
-                        <a class="tool-card__text-link" href="/fourth-and-fortune-kickoff.html">Rules</a>
-                    </div>
-                </article>
-            </div>
         </section>
     </main>
 

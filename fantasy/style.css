@@ -925,6 +925,7 @@ body.drawer-open { overflow: hidden; }
     background: rgba(255, 255, 255, 0.88);
     box-shadow: 0 12px 28px rgba(60, 50, 35, 0.09);
     padding: 5px;
+    margin-top: 6px;
     backdrop-filter: blur(14px);
     -webkit-backdrop-filter: blur(14px);
 }
@@ -965,6 +966,12 @@ body.drawer-open { overflow: hidden; }
 .dashboard-zone {
     scroll-margin-top: calc(var(--site-nav-height, 52px) + 86px);
     margin-bottom: 64px;
+}
+
+/* The first zone opens the page — there is nothing above to divide it from. */
+.dashboard-zone:first-of-type .zone-head {
+    border-top: 0;
+    padding-top: 0;
 }
 
 .zone-head {
@@ -1173,6 +1180,7 @@ body.drawer-open { overflow: hidden; }
 
 .market-board {
     position: relative;
+    scroll-margin-top: calc(var(--site-nav-height, 52px) + 86px);
     overflow: visible;
     margin-bottom: 46px;
     border: 1px solid #2d4436;
