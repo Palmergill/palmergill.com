@@ -1122,3 +1122,179 @@ button:focus-visible,a:focus-visible,summary:focus-visible,[tabindex]:focus-visi
     .week-badge__season { display: none; }
     .hero-snapshot__member { overflow: hidden; }
 }
+
+/* Mobile composition
+   Keep the editorial character, but make the phone layout a deliberate
+   hierarchy instead of a squeezed desktop canvas. */
+@media (max-width: 620px) {
+    body.has-site-nav .app-shell,
+    .app-shell {
+        padding-right: 12px;
+        padding-left: 12px;
+        padding-bottom: 56px;
+    }
+
+    .editorial-card { border-radius: 10px; }
+
+    .value-board__toolbar {
+        gap: 8px 6px;
+        padding: 12px 14px 14px;
+    }
+
+    .value-board__toolbar .segmented,
+    .value-board__toolbar .chip-row { flex: 1 1 auto; }
+
+    .value-board__toolbar .chip { min-height: 34px; }
+
+    /* The desktop table reserves 640px for its full market breakdown. On a
+       phone the detail columns are already hidden, so let the five decision
+       columns share the card width instead of pushing the numbers off-screen. */
+    #market-board .table-wrap {
+        width: 100%;
+        overflow-x: hidden;
+    }
+
+    #market-board .season-fantasy__table {
+        width: 100%;
+        min-width: 0;
+        table-layout: fixed;
+        font-size: .68rem;
+    }
+
+    #market-board .season-fantasy__table th,
+    #market-board .season-fantasy__table td {
+        padding-right: 5px;
+        padding-left: 5px;
+    }
+
+    #market-board .season-fantasy__table th:first-child { width: 27px; }
+    #market-board .season-fantasy__table th:nth-child(6) { width: 51px; }
+    #market-board .season-fantasy__table th:nth-child(7) { width: 62px; }
+    #market-board .season-fantasy__table th:nth-child(8) { width: 48px; }
+
+    #market-board .season-fantasy__table th:nth-child(n+6) .col-sort {
+        gap: 2px;
+        font-size: 0;
+    }
+
+    #market-board .season-fantasy__table th:nth-child(n+6) .col-sort::before {
+        content: attr(data-mobile-label);
+        font-size: .58rem;
+    }
+
+    #market-board .season-fantasy__table th:nth-child(n+6) .col-sort::after {
+        font-size: .46rem;
+    }
+
+    #market-board .season-leader__name,
+    #market-board .season-leader__meta {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    #market-board .season-leader__name { font-size: .72rem; }
+    #market-board .season-leader__meta { font-size: .61rem; }
+    #market-board .season-leader td { height: 58px; }
+
+    .value-board__foot {
+        align-items: flex-start;
+        padding: 10px 14px;
+    }
+
+    .value-board__foot .text-action { flex: 0 0 auto; }
+
+    .drawer__panel,
+    .drawer__panel--wide,
+    .drawer--modal .drawer__panel {
+        padding: 18px 16px max(28px, env(safe-area-inset-bottom));
+    }
+
+    .compare-tray {
+        bottom: max(8px, env(safe-area-inset-bottom));
+        align-items: stretch;
+        padding: 10px;
+        border-radius: 12px;
+    }
+
+    .compare-tray__chips,
+    .compare-tray__actions { width: 100%; }
+
+    .compare-tray__actions { justify-content: flex-end; }
+}
+
+@media (max-width: 520px) {
+    .editorial-hero {
+        padding-right: 2px;
+        padding-bottom: 22px;
+        padding-left: 2px;
+    }
+
+    .editorial-hero h1 {
+        font-size: min(12vw, 3rem);
+        line-height: .96;
+        white-space: nowrap;
+    }
+
+    .hero-snapshot {
+        grid-template-columns: 88px minmax(0, 1fr);
+        margin-top: 17px;
+        border-radius: 8px;
+    }
+
+    .week-badge {
+        flex-direction: column;
+        align-items: center;
+        gap: 0;
+        min-width: 0;
+        padding: 10px 6px;
+    }
+
+    .week-badge__value { font-size: 1.85rem; }
+    .week-badge__label { font-size: .6rem; }
+    .hero-snapshot__member { padding: 12px 13px; }
+    .hero-snapshot__member > strong { font-size: 1.22rem; }
+
+    .tool-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+        margin: 14px 0 20px;
+    }
+
+    .tool-card {
+        grid-template-columns: 36px minmax(0, 1fr) auto;
+        gap: 9px;
+        min-height: 66px;
+        padding: 10px;
+        border-radius: 8px;
+    }
+
+    .tool-card--draft { grid-column: 1 / -1; }
+    .tool-card__mark { width: 36px; height: 36px; }
+    .tool-card small { font-size: .57rem; }
+    .tool-card strong { font-size: 1.02rem; line-height: 1.05; }
+
+    .card-head { padding: 18px 14px 14px; }
+    .card-head h2 { font-size: 1.8rem; }
+    .card-head--compact h2 { font-size: 1.45rem; }
+    .market-board__search { flex-basis: auto; }
+
+    .trending { padding-right: 14px; padding-left: 14px; }
+    .compact-list,
+    .freshness-list { padding-right: 14px; padding-left: 14px; }
+
+    .season-offense-board { padding-right: 14px; padding-left: 14px; }
+    .season-offense {
+        grid-template-columns: 20px 38px minmax(0, 1fr) auto;
+        gap: 6px;
+    }
+}
+
+@media (max-width: 350px) {
+    #market-board .season-fantasy__table th:first-child,
+    #market-board .season-fantasy__table td:first-child { display: none; }
+
+    #market-board .season-fantasy__table th:nth-child(6) { width: 47px; }
+    #market-board .season-fantasy__table th:nth-child(7) { width: 55px; }
+    #market-board .season-fantasy__table th:nth-child(8) { width: 44px; }
+}
