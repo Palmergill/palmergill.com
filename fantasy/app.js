@@ -9,7 +9,6 @@
 
     const API_BASE = `${window.API_ORIGIN || ""}/api/fantasy`;
     const F = window.FantasyFormat;
-    const RANK_COLSPAN = 7;
     const MAX_COMPARE = 4;
 
     const state = {
@@ -17,12 +16,11 @@
         week: null,
         defaultWeek: null,
         inSeason: false,
-        position: "ALL",
-        scoring: "ppr",
-        source: "sleeper",
-        sources: [],
         seasonFantasyScoring: "std",
         seasonFantasyPosition: "ALL",
+        // The board's last payload, so a chip, a sort, or clearing the compare
+        // tray repaints from memory instead of refetching the same rows.
+        seasonFantasyData: null,
         seasonPropsPosition: "ALL",
         drawerPlayerId: null,
         compare: [], // [{ player_id, name }]
@@ -34,15 +32,8 @@
         seasonValue: document.getElementById("seasonValue"),
         offseasonBanner: document.getElementById("offseasonBanner"),
         errorBanner: document.getElementById("errorBanner"),
-        weekSelect: document.getElementById("weekSelect"),
         playerSearch: document.getElementById("playerSearch"),
         searchResults: document.getElementById("searchResults"),
-        positionChips: document.getElementById("positionChips"),
-        scoringChips: document.getElementById("scoringChips"),
-        sourceChips: document.getElementById("sourceChips"),
-        seasonPropsSearch: document.getElementById("seasonPropsSearch"),
-        seasonPropsResults: document.getElementById("seasonPropsResults"),
-        seasonPropsPanel: document.getElementById("seasonPropsPanel"),
         seasonPropsTabs: document.getElementById("seasonPropsTabs"),
         seasonPropsLeaders: document.getElementById("seasonPropsLeaders"),
         seasonPropsPositions: document.getElementById("seasonPropsPositions"),
@@ -51,18 +42,17 @@
         seasonFantasyNote: document.getElementById("seasonFantasyNote"),
         seasonFantasyScoring: document.getElementById("seasonFantasyScoring"),
         seasonFantasyPositions: document.getElementById("seasonFantasyPositions"),
+        seasonFantasyProjHead: document.getElementById("seasonFantasyProjHead"),
         seasonOffenseYards: document.getElementById("seasonOffenseYards"),
         seasonOffenseTouchdowns: document.getElementById("seasonOffenseTouchdowns"),
         seasonOffensesNote: document.getElementById("seasonOffensesNote"),
-        rankingsSource: document.getElementById("rankingsSource"),
-        rankingsAsOf: document.getElementById("rankingsAsOf"),
-        rankBody: document.getElementById("rankBody"),
         trendingAdd: document.getElementById("trendingAdd"),
         trendingDrop: document.getElementById("trendingDrop"),
         gamesSection: document.getElementById("gamesSection"),
         gamesStrip: document.getElementById("gamesStrip"),
         gamesAsOf: document.getElementById("gamesAsOf"),
         marketGroup: document.getElementById("marketGroup"),
+        liveMarkets: document.getElementById("live-markets"),
         propsSection: document.getElementById("propsSection"),
         propGameTabs: document.getElementById("propGameTabs"),
         propsBoard: document.getElementById("propsBoard"),
@@ -117,8 +107,18 @@
         return link;
     }
 
+    // The picker these labels used to come from is gone, and fetching
+    // /projection-sources purely to caption a drawer heading would be a
+    // network call for a control that no longer exists.
+    const PROVIDERS = {
+        sleeper: { id: "sleeper", label: "Sleeper", url: "https://sleeper.com/" },
+        espn: { id: "espn", label: "ESPN", url: "https://www.espn.com/fantasy/football/" },
+        fantasypros: { id: "fantasypros", label: "FantasyPros", url: "https://www.fantasypros.com/nfl/" },
+        consensus: { id: "consensus", label: "Consensus", url: null },
+    };
+
     function providerFor(sourceId) {
-        return state.sources.find((source) => source.id === sourceId) || {
+        return PROVIDERS[sourceId] || {
             id: sourceId,
             label: sourceId ? sourceId.replace(/\b\w/g, (char) => char.toUpperCase()) : "Unknown",
             url: null,
@@ -127,144 +127,30 @@
 
     // ── URL state (shareable deep links) ────────────────────────────────
 
+    // `pos` and `scoring` keep their names and vocabulary from the retired
+    // projection board, so old deep links still land somewhere sensible; they
+    // now address the market board. `week` is deliberately not read — there is
+    // no week control left, so an old ?week=5 link would pin the game lines to
+    // a week the reader cannot change.
     function readUrlState() {
         const params = new URLSearchParams(window.location.search);
-        if (params.has("pos")) state.position = params.get("pos").toUpperCase();
-        if (params.has("scoring")) state.scoring = params.get("scoring");
-        if (params.has("source")) state.source = params.get("source");
-        if (params.has("week")) {
-            const week = Number(params.get("week"));
-            if (Number.isInteger(week)) state.week = week;
-        }
+        if (params.has("pos")) state.seasonFantasyPosition = params.get("pos").toUpperCase();
+        if (params.has("scoring")) state.seasonFantasyScoring = params.get("scoring");
         return { player: params.get("player") };
     }
 
     function writeUrlState() {
         const params = new URLSearchParams();
-        if (state.position && state.position !== "ALL") params.set("pos", state.position);
-        if (state.scoring && state.scoring !== "ppr") params.set("scoring", state.scoring);
-        if (state.source && state.source !== "sleeper") params.set("source", state.source);
-        if (state.week != null && state.week !== state.defaultWeek) params.set("week", state.week);
+        if (state.seasonFantasyPosition && state.seasonFantasyPosition !== "ALL") {
+            params.set("pos", state.seasonFantasyPosition);
+        }
+        if (state.seasonFantasyScoring && state.seasonFantasyScoring !== "std") {
+            params.set("scoring", state.seasonFantasyScoring);
+        }
         if (state.drawerPlayerId && !els.drawer.hidden) params.set("player", state.drawerPlayerId);
         const query = params.toString();
         const url = query ? `${window.location.pathname}?${query}` : window.location.pathname;
         window.history.replaceState(null, "", url);
-    }
-
-    // ── controls ────────────────────────────────────────────────────────
-
-    function buildChips() {
-        F.POSITIONS.forEach((pos) => {
-            const chip = el("button", "chip", pos);
-            chip.type = "button";
-            chip.dataset.position = pos;
-            chip.setAttribute("aria-pressed", String(pos === state.position));
-            chip.addEventListener("click", () => {
-                state.position = pos;
-                syncChips();
-                writeUrlState();
-                loadRankings();
-                window.pgAnalytics?.track?.("fantasy_filter", { position: pos });
-            });
-            els.positionChips.appendChild(chip);
-        });
-
-        F.SCORINGS.forEach((scoring) => {
-            const chip = el("button", "chip chip--scoring", scoring.label);
-            chip.type = "button";
-            chip.dataset.scoring = scoring.key;
-            chip.setAttribute("aria-pressed", String(scoring.key === state.scoring));
-            chip.addEventListener("click", () => {
-                state.scoring = scoring.key;
-                syncChips();
-                writeUrlState();
-                loadRankings();
-            });
-            els.scoringChips.appendChild(chip);
-        });
-    }
-
-    function syncChips() {
-        els.positionChips.querySelectorAll(".chip").forEach((chip) => {
-            chip.setAttribute("aria-pressed", String(chip.dataset.position === state.position));
-        });
-        els.scoringChips.querySelectorAll(".chip").forEach((chip) => {
-            chip.setAttribute("aria-pressed", String(chip.dataset.scoring === state.scoring));
-        });
-        els.sourceChips.querySelectorAll(".chip").forEach((chip) => {
-            chip.setAttribute("aria-pressed", String(chip.dataset.source === state.source));
-        });
-    }
-
-    function renderSourceChips(sources) {
-        state.sources = sources;
-        if (!sources.some((source) => source.id === state.source)) {
-            state.source = sources[0]?.id || "sleeper";
-        }
-        els.sourceChips.innerHTML = "";
-        sources.forEach((source) => {
-            const chip = el("button", "chip chip--source", source.label);
-            chip.type = "button";
-            chip.dataset.source = source.id;
-            chip.setAttribute("aria-pressed", String(source.id === state.source));
-            if (source.id === "consensus" && source.blended) {
-                chip.title = `Average of ${source.blended.join(", ")}`;
-            }
-            chip.addEventListener("click", () => {
-                if (state.source === source.id) return;
-                state.source = source.id;
-                syncChips();
-                writeUrlState();
-                loadRankings();
-                if (state.drawerPlayerId && !els.drawer.hidden) openPlayer(state.drawerPlayerId);
-                window.pgAnalytics?.track?.("fantasy_source", { source: source.id });
-            });
-            els.sourceChips.appendChild(chip);
-        });
-    }
-
-    async function loadSources() {
-        const params = new URLSearchParams();
-        if (state.season != null) params.set("season", state.season);
-        if (state.week != null) params.set("week", state.week);
-        try {
-            const data = await fetchJson(`${API_BASE}/projection-sources?${params.toString()}`);
-            renderSourceChips(data.sources || []);
-        } catch (err) {
-            renderSourceChips([{ id: "sleeper", label: "Sleeper", url: "https://sleeper.com/" }]);
-        }
-    }
-
-    // ── week switcher ───────────────────────────────────────────────────
-
-    function buildWeekSelector() {
-        els.weekSelect.innerHTML = "";
-        const options = [{ value: 0, label: "Season-long" }];
-        if (state.inSeason) {
-            for (let week = 1; week <= 18; week += 1) {
-                options.push({ value: week, label: `Week ${week}` });
-            }
-        } else if (state.defaultWeek && state.defaultWeek > 0) {
-            // Offseason fallback to a prior in-season week: still let the user
-            // browse that season's weeks.
-            for (let week = 1; week <= 18; week += 1) {
-                options.push({ value: week, label: `Week ${week}` });
-            }
-        }
-        options.forEach((opt) => {
-            const node = el("option", null, opt.label);
-            node.value = String(opt.value);
-            if (opt.value === state.week) node.selected = true;
-            els.weekSelect.appendChild(node);
-        });
-        els.weekSelect.onchange = async () => {
-            state.week = Number(els.weekSelect.value);
-            writeUrlState();
-            renderWeekBadge();
-            await loadSources();
-            syncChips();
-            await Promise.all([loadRankings(), loadGames()]);
-        };
     }
 
     // ── player search ───────────────────────────────────────────────────
@@ -342,119 +228,54 @@
     let seasonPropsTimer = null;
     let seasonPropsSeq = 0;
 
-    function initSeasonPropsSearch() {
-        if (!els.seasonPropsSearch) return;
-        els.seasonPropsSearch.addEventListener("input", () => {
-            const term = els.seasonPropsSearch.value.trim();
-            window.clearTimeout(seasonPropsTimer);
-            if (term.length < 2) {
-                hideSeasonPropsResults();
-                return;
-            }
-            seasonPropsTimer = window.setTimeout(() => runSeasonPropsSearch(term), 180);
-        });
-        els.seasonPropsSearch.addEventListener("keydown", (event) => {
-            if (event.key === "Escape") hideSeasonPropsResults();
-        });
-        document.addEventListener("click", (event) => {
-            if (!event.target.closest(".season-props__search")) hideSeasonPropsResults();
-        });
-    }
-
-    async function runSeasonPropsSearch(term) {
-        const seq = ++seasonPropsSeq;
-        try {
-            const data = await fetchJson(`${API_BASE}/players/search?q=${encodeURIComponent(term)}&limit=8`);
-            if (seq !== seasonPropsSeq) return;
-            renderSeasonPropsResults(data.results || []);
-        } catch (err) {
-            hideSeasonPropsResults();
-        }
-    }
-
-    function renderSeasonPropsResults(results) {
-        els.seasonPropsResults.innerHTML = "";
-        if (results.length === 0) {
-            const li = el("li", "search-results__empty", "No matching players");
-            els.seasonPropsResults.appendChild(li);
-        } else {
-            results.forEach((player) => {
-                const li = el("li", "search-results__item");
-                li.setAttribute("role", "option");
-                li.tabIndex = 0;
-                li.appendChild(el("span", "search-results__name", player.name || player.player_id));
-                li.appendChild(el("span", "search-results__meta",
-                    `${F.positionLabel(player.position) || ""} ${player.team || ""}`.trim()));
-                const pick = () => {
-                    hideSeasonPropsResults();
-                    els.seasonPropsSearch.value = player.name || "";
-                    loadPlayerSeasonProps(player.player_id);
-                };
-                li.addEventListener("click", pick);
-                li.addEventListener("keydown", (event) => {
-                    if (event.key === "Enter" || event.key === " ") {
-                        event.preventDefault();
-                        pick();
-                    }
-                });
-                els.seasonPropsResults.appendChild(li);
-            });
-        }
-        els.seasonPropsResults.hidden = false;
-        els.seasonPropsSearch.setAttribute("aria-expanded", "true");
-    }
-
-    function hideSeasonPropsResults() {
-        els.seasonPropsResults.hidden = true;
-        els.seasonPropsResults.innerHTML = "";
-        els.seasonPropsSearch.setAttribute("aria-expanded", "false");
-    }
-
+    // Fetched separately from the player record so a slow season-props lookup
+    // never delays the rest of the drawer — the card drops into its reserved
+    // slot when it arrives, the same way news does.
     async function loadPlayerSeasonProps(playerId) {
-        els.seasonPropsPanel.hidden = false;
-        els.seasonPropsPanel.innerHTML = "";
-        els.seasonPropsPanel.appendChild(el("p", "season-props__status", "Loading season lines…"));
+        const slot = els.drawerMarket;
+        if (!slot) return;
+        slot.innerHTML = "";
+        slot.appendChild(el("p", "drawer__loading", "Loading season lines…"));
         try {
             const params = state.season != null ? `?season=${encodeURIComponent(state.season)}` : "";
             const data = await fetchJson(`${API_BASE}/players/${encodeURIComponent(playerId)}/season-props${params}`);
-            renderPlayerSeasonProps(data);
+            if (state.drawerPlayerId !== playerId || els.drawer.hidden) return;
+            slot.innerHTML = "";
+            slot.appendChild(seasonMarketCard(data));
             window.pgAnalytics?.track?.("fantasy_season_props", { player_id: playerId });
         } catch (err) {
-            els.seasonPropsPanel.innerHTML = "";
-            els.seasonPropsPanel.appendChild(el("p", "season-props__status season-props__status--error", "Season lines are unavailable right now."));
+            if (state.drawerPlayerId !== playerId || els.drawer.hidden) return;
+            slot.innerHTML = "";
+            slot.appendChild(el("p", "season-props__status season-props__status--error", "Season lines are unavailable right now."));
         }
     }
 
-    function renderPlayerSeasonProps(data) {
-        els.seasonPropsPanel.innerHTML = "";
-        const player = data.player || {};
-        const header = el("div", "season-props__player");
-        const identity = el("div");
-        identity.appendChild(el("h4", null, player.name || "Player lines"));
-        identity.appendChild(el("p", null,
-            `${player.position || ""} ${player.team || ""} · ${data.season || ""} regular season`.trim()));
-        header.appendChild(identity);
-        const source = el("span", "season-props__asof");
+    function seasonMarketCard(data) {
+        const card = el("div", "drawer-card");
+        const head = el("div", "season-props__player");
+        head.appendChild(el("h3", "drawer-card__title",
+            `${data.season || ""} season market lines`.trim()));
         // Each provider's own last movement, not the fetch time. A board can
         // be collected minutes ago and still be quoting eleven-day-old prices.
-        source.textContent = F.marketSources(data.sources) || data.source || "";
-        header.appendChild(source);
-        els.seasonPropsPanel.appendChild(header);
+        head.appendChild(el("span", "season-props__asof",
+            F.marketSources(data.sources) || data.source || ""));
+        card.appendChild(head);
 
         const markets = data.markets || [];
         const posted = markets.filter((market) => market.line != null).length;
         if (posted === 0) {
-            els.seasonPropsPanel.appendChild(el(
+            card.appendChild(el(
                 "p",
                 "season-props__status",
-                "No usable regular-season market data is available for this player yet. Only a few hundred players have a quote or bounded last trade — try another player, or check back as the board fills in."
+                "No usable regular-season market data for this player yet. Only a few hundred players have a quote or bounded last trade."
             ));
-            return;
+            return card;
         }
 
         const grid = el("div", "season-props__grid");
         markets.forEach((market) => grid.appendChild(seasonPropCard(market)));
-        els.seasonPropsPanel.appendChild(grid);
+        card.appendChild(grid);
+        return card;
     }
 
     function seasonPropCard(market) {
@@ -587,11 +408,12 @@
             const overallDetail = position === "ALL" ? "" : ` · ${overall} overall`;
             who.appendChild(el("span", "season-leader__meta",
                 `${player.position || ""} ${player.team || ""}${overallDetail}`.trim()));
+            attachRowCompare(who, player);
             tr.appendChild(who);
             tr.appendChild(el("td", "col-proj", F.seasonLine(entry.implied_value)));
             tr.appendChild(seasonBookCell(entry.books, entry.book_values));
             const open = () => {
-                if (player.player_id) loadPlayerSeasonProps(player.player_id);
+                if (player.player_id) openPlayer(player.player_id);
             };
             tr.addEventListener("click", open);
             tr.addEventListener("keydown", (event) => {
@@ -619,6 +441,29 @@
     // How many providers stand behind a number, with the spread between them
     // on hover. One source and three sources are different claims, and the
     // board has no other way to say which one it is making.
+    // Adds the compare toggle (and injury flag) to a market row's player cell.
+    // Stops the row's own click so adding to the tray does not also open the
+    // drawer over the board you are picking from.
+    function attachRowCompare(cell, player) {
+        const badge = F.injuryBadge(player.injury_status);
+        if (badge) {
+            cell.appendChild(el("span", `injury-badge injury-badge--${badge.severity}`, badge.label));
+        }
+        if (!player.player_id) return;
+        const button = el("button", "row-compare", inCompare(player.player_id) ? "✓" : "+");
+        button.type = "button";
+        button.setAttribute("aria-label", `Compare ${player.name || "player"}`);
+        if (inCompare(player.player_id)) button.classList.add("row-compare--on");
+        button.addEventListener("click", (event) => {
+            event.stopPropagation();
+            toggleCompare(player);
+            const on = inCompare(player.player_id);
+            button.classList.toggle("row-compare--on", on);
+            button.textContent = on ? "✓" : "+";
+        });
+        cell.appendChild(button);
+    }
+
     function seasonBookCell(books, values) {
         const list = books || [];
         const cell = el("td", "col-books", list.length ? String(list.length) : "—");
@@ -640,10 +485,13 @@
                 scoring: state.seasonFantasyScoring,
             });
             const data = await fetchJson(`${API_BASE}/season-fantasy-points?${params.toString()}`);
+            state.seasonFantasyData = data;
             renderSeasonFantasyLeaders(data);
         } catch (err) {
             els.seasonFantasyLeaders.innerHTML = "";
-            els.seasonFantasyNote.textContent = "Implied fantasy points are unavailable right now.";
+            els.seasonFantasyNote.textContent = "";
+            // This board is the page now, so its failure is the page's.
+            showError("Could not load the market board.");
         }
     }
 
@@ -653,6 +501,7 @@
         state.seasonFantasyPosition = position;
         renderSeasonPositionChips(els.seasonFantasyPositions, all, position, (pick) => {
             state.seasonFantasyPosition = pick;
+            writeUrlState();
             renderSeasonFantasyLeaders(data);
         });
 
@@ -677,15 +526,29 @@
                 ? ` · ${entry.books.length} source${entry.books.length === 1 ? "" : "s"}`
                 : "";
             const overallDetail = position === "ALL" ? "" : ` · ${overall} overall`;
-            who.appendChild(el("span", "season-leader__meta",
-                `${player.position || ""} ${player.team || ""}${overallDetail} · ${entry.markets_used || 0} markets${bookDetail}${receptionDetail}`.trim()));
+            // A discarded category is a caveat about the total, not another
+            // fact about the player, so it is marked rather than run in.
+            const pairs = F.seasonPairDetail(entry.pairs_used, entry.partial_pairs);
+            const scoredDetail = pairs.scored ? ` · ${pairs.scored}` : "";
+            const meta = el("span", "season-leader__meta",
+                `${player.position || ""} ${player.team || ""}${overallDetail}${scoredDetail}`.trim());
+            // Directly after the categories it qualifies, ahead of the source
+            // count, so it reads as a note on them rather than a trailing aside.
+            if (pairs.missing) meta.appendChild(el("span", "season-leader__gap", ` · ${pairs.missing}`));
+            if (bookDetail || receptionDetail) {
+                meta.appendChild(document.createTextNode(`${bookDetail}${receptionDetail}`));
+            }
+            who.appendChild(meta);
+            attachRowCompare(who, player);
             tr.appendChild(who);
-            tr.appendChild(el("td", "col-proj", F.formatPoints(entry.yard_points)));
-            tr.appendChild(el("td", "col-proj", F.formatPoints(entry.touchdown_points)));
-            tr.appendChild(el("td", "col-proj", F.formatPoints(entry.reception_points)));
+            tr.appendChild(el("td", "col-proj col-detail", F.formatPoints(entry.yard_points)));
+            tr.appendChild(el("td", "col-proj col-detail", F.formatPoints(entry.touchdown_points)));
+            tr.appendChild(el("td", "col-proj col-detail", F.formatPoints(entry.reception_points)));
             tr.appendChild(el("td", "col-proj season-fantasy__total", F.formatPoints(entry.fantasy_points)));
+            tr.appendChild(el("td", "col-proj season-fantasy__proj", F.formatPoints(entry.projected_points)));
+            tr.appendChild(deltaCell(entry));
             const open = () => {
-                if (player.player_id) loadPlayerSeasonProps(player.player_id);
+                if (player.player_id) openPlayer(player.player_id);
             };
             tr.addEventListener("click", open);
             tr.addEventListener("keydown", (event) => {
@@ -697,12 +560,23 @@
             els.seasonFantasyLeaders.appendChild(tr);
         });
 
+        // "Consensus" is only true when more than one provider has a
+        // season-long run; with one it is that provider's number, and saying
+        // otherwise would overstate the column.
+        if (els.seasonFantasyProjHead) {
+            const src = data.projection_source;
+            els.seasonFantasyProjHead.textContent = src ? providerFor(src).label : "Proj";
+            els.seasonFantasyProjHead.title = Array.isArray(data.projection_providers)
+                ? `Projected points, averaged across ${data.projection_providers.join(", ")}`
+                : "Season-long projected points";
+        }
+
         const scoringLabel = data.scoring === "ppr"
             ? "PPR"
             : data.scoring === "half" ? "Half PPR" : "Standard";
         const receptionSource = data.scoring === "std"
             ? ""
-            : `receptions from ${data.reception_source || "season projections"}`;
+            : `receptions from ${data.projection_source || "season projections"}`;
         els.seasonFantasyNote.textContent = rows.length
             ? [
                 position === "ALL"
@@ -710,9 +584,44 @@
                     : `${rows.length} of ${all.length} players with complete pairs are ${position}s`,
                 `${scoringLabel} scoring from every available complete pair`,
                 receptionSource,
+                // Flipping to a PPR format silently shrinks the board without
+                // this, because the reception bonus needs a projection.
+                data.excluded_without_projection
+                    ? `${data.excluded_without_projection} quoted player${data.excluded_without_projection === 1 ? "" : "s"} hidden — no reception projection`
+                    : "",
                 F.marketSources(data.sources),
             ].filter(Boolean).join(" · ")
-            : "No players have a complete yardage and touchdown market pair yet.";
+            : "";
+        if (!rows.length) renderMarketBoardEmpty(all.length, position);
+    }
+
+    // How far the market sits from consensus. The signed number is the point
+    // of the column; the percentage rides along in the tooltip because +30 on
+    // a 320-point quarterback and +30 on a 95-point tight end are not the
+    // same claim.
+    function deltaCell(entry) {
+        const delta = entry.projection_delta;
+        if (delta == null) return el("td", "col-proj season-fantasy__delta");
+        const cell = el("td", "col-proj season-fantasy__delta", F.formatSigned(delta, 1));
+        cell.classList.add(delta >= 0 ? "is-over" : "is-under");
+        if (entry.projected_points) {
+            const pct = (delta / entry.projected_points) * 100;
+            cell.title = `${F.formatSigned(delta, 1)} vs ${F.formatPoints(entry.projected_points)} projected (${F.formatSigned(pct, 1)}%)`;
+        }
+        return cell;
+    }
+
+    // The board is the page's front door; a bare table with no rows reads as
+    // broken rather than as "not collected yet".
+    function renderMarketBoardEmpty(total, position) {
+        const row = el("tr");
+        const cell = el("td", "table-empty");
+        cell.colSpan = 8;
+        cell.textContent = total
+            ? `No ${position} has a complete yardage and touchdown market pair yet.`
+            : "No season markets have been collected yet. The research panels below and your league tools still work.";
+        row.appendChild(cell);
+        els.seasonFantasyLeaders.appendChild(row);
     }
 
     function initSeasonFantasyScoring() {
@@ -729,6 +638,7 @@
             chip.setAttribute("aria-pressed", String(option.key === state.seasonFantasyScoring));
             chip.addEventListener("click", () => {
                 state.seasonFantasyScoring = option.key;
+                writeUrlState();
                 els.seasonFantasyScoring.querySelectorAll(".chip").forEach((item) => {
                     item.setAttribute("aria-pressed", String(item.dataset.scoring === option.key));
                 });
@@ -771,140 +681,6 @@
         if (!rows || rows.length === 0) {
             target.appendChild(el("li", "season-offense-list__empty", "Not enough quoted markets yet."));
         }
-    }
-
-    // ── rankings ────────────────────────────────────────────────────────
-
-    async function loadRankings() {
-        const requestedSource = state.source;
-        const requestedWeek = state.week;
-        els.rankBody.innerHTML = "";
-        els.rankBody.appendChild(rowMessage("Loading rankings…"));
-        const params = new URLSearchParams({
-            position: F.positionQuery(state.position),
-            scoring: state.scoring,
-            limit: "100",
-        });
-        if (state.season != null) params.set("season", state.season);
-        if (state.week != null) params.set("week", state.week); // 0 = season-long
-        if (state.source) params.set("source", state.source);
-
-        try {
-            const data = await fetchJson(`${API_BASE}/rankings?${params.toString()}`);
-            if (state.source !== requestedSource || state.week !== requestedWeek) return;
-            renderRankings(data);
-        } catch (err) {
-            if (state.source !== requestedSource || state.week !== requestedWeek) return;
-            els.rankBody.innerHTML = "";
-            els.rankBody.appendChild(rowMessage("Rankings unavailable right now."));
-            showError(err.message);
-        }
-    }
-
-    function rowMessage(text) {
-        const tr = el("tr");
-        const td = el("td", "table-empty", text);
-        td.colSpan = RANK_COLSPAN;
-        tr.appendChild(td);
-        return tr;
-    }
-
-    function renderRankings(data) {
-        els.rankingsSource.innerHTML = "";
-        if (data.source) {
-            const provider = providerFor(data.source);
-            els.rankingsSource.append("Projections by ");
-            if (provider.url) {
-                els.rankingsSource.appendChild(providerLink(provider));
-            } else {
-                els.rankingsSource.append(provider.label);
-            }
-        }
-        els.rankingsAsOf.textContent = F.formatAsOf(data.as_of);
-        els.rankBody.innerHTML = "";
-
-        const rows = data.rankings || [];
-        if (rows.length === 0) {
-            els.rankBody.appendChild(rowMessage("No rankings for this filter yet."));
-            return;
-        }
-        rows.forEach((row) => {
-            const tr = el("tr", "rank-row");
-            tr.tabIndex = 0;
-            tr.setAttribute("role", "button");
-            tr.appendChild(el("td", "col-rank", row.rank));
-            tr.appendChild(moveCell(row));
-            tr.appendChild(playerCell(row));
-            tr.appendChild(el("td", "col-pos", F.positionLabel(row.position) || "—"));
-            tr.appendChild(el("td", "col-team", row.team || "—"));
-            tr.appendChild(opponentCell(row));
-            tr.appendChild(el("td", "col-proj", F.formatPoints(row.projected_points)));
-            const open = () => openPlayer(row.player_id);
-            tr.addEventListener("click", open);
-            tr.addEventListener("keydown", (e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    open();
-                }
-            });
-            els.rankBody.appendChild(tr);
-        });
-    }
-
-    function moveCell(row) {
-        const td = el("td", "col-move");
-        const delta = F.rankDelta(row.prev_rank, row.rank);
-        if (!delta) {
-            // No prior-week rank: newly ranked this week (dot), or season-long
-            // view where movement doesn't apply (blank).
-            if ("prev_rank" in row && row.prev_rank == null) {
-                const dot = el("span", "move move--new", "NEW");
-                dot.title = "Newly ranked this week";
-                td.appendChild(dot);
-            }
-            return td;
-        }
-        if (delta.direction === "same") {
-            td.appendChild(el("span", "move move--same", "–"));
-        } else {
-            const glyph = delta.direction === "up" ? "▲" : "▼";
-            const span = el("span", `move move--${delta.direction}`, `${glyph}${delta.amount}`);
-            span.title = `${delta.direction === "up" ? "Up" : "Down"} ${delta.amount} vs last week`;
-            td.appendChild(span);
-        }
-        return td;
-    }
-
-    function playerCell(row) {
-        const td = el("td", "col-player");
-        td.appendChild(el("span", "player-name", row.name || "—"));
-        const badge = F.injuryBadge(row.injury_status);
-        if (badge) {
-            const chip = el("span", `injury-badge injury-badge--${badge.severity}`, badge.code);
-            chip.title = badge.label;
-            td.appendChild(chip);
-        }
-        const compareBtn = el("button", "row-compare", inCompare(row.player_id) ? "✓" : "+");
-        compareBtn.type = "button";
-        compareBtn.title = inCompare(row.player_id) ? "Remove from compare" : "Add to compare";
-        compareBtn.setAttribute("aria-label", compareBtn.title);
-        if (inCompare(row.player_id)) compareBtn.classList.add("row-compare--on");
-        compareBtn.addEventListener("click", (e) => {
-            e.stopPropagation();
-            toggleCompare({ player_id: row.player_id, name: row.name });
-            compareBtn.textContent = inCompare(row.player_id) ? "✓" : "+";
-            compareBtn.classList.toggle("row-compare--on", inCompare(row.player_id));
-            compareBtn.title = inCompare(row.player_id) ? "Remove from compare" : "Add to compare";
-        });
-        td.appendChild(compareBtn);
-        return td;
-    }
-
-    function opponentCell(row) {
-        const text = F.formatMatchup(row);
-        const td = el("td", "col-opp", text || "—");
-        if (text === "BYE") td.classList.add("col-opp--bye");
-        return td;
     }
 
     // ── trending ────────────────────────────────────────────────────────
@@ -956,6 +732,18 @@
        stays hidden until at least one of them has something to show. */
     function syncMarketGroup() {
         els.marketGroup.hidden = els.gamesSection.hidden && els.propsSection.hidden;
+        syncLiveMarkets();
+    }
+
+    // The zone has no content of its own, so an empty one is just a heading
+    // over nothing — which is what the offseason looks like.
+    function syncLiveMarkets() {
+        if (!els.liveMarkets) return;
+        const empty = els.marketGroup.hidden && els.futuresSection.hidden;
+        els.liveMarkets.hidden = empty;
+        // A nav entry that scrolls to nothing is worse than one that is absent.
+        const link = document.querySelector('.dashboard-nav a[href="#live-markets"]');
+        if (link) link.hidden = empty;
     }
 
     async function loadGames() {
@@ -1072,6 +860,7 @@
                 els.futuresTabs.appendChild(tab);
             });
             els.futuresSection.hidden = false;
+            syncLiveMarkets();
         } catch (err) { /* leave hidden */ }
     }
 
@@ -1134,11 +923,13 @@
         els.compareSub.textContent = "Loading…";
         els.compareBody.innerHTML = "";
         els.compareDrawerClose.focus();
+        // Same ppr|half|std vocabulary as the market board's toggle, applied
+        // to a different subject — the reader's league format does not change
+        // between the two, so one control is right.
         const params = new URLSearchParams({
             ids: state.compare.map((p) => p.player_id).join(","),
-            scoring: state.scoring,
+            scoring: state.seasonFantasyScoring,
         });
-        if (state.source) params.set("source", state.source);
         try {
             const data = await fetchJson(`${API_BASE}/compare?${params.toString()}`);
             renderCompare(data);
@@ -1147,6 +938,13 @@
             els.compareSub.textContent = "";
             els.compareBody.appendChild(el("p", "drawer__loading", "Could not load the comparison."));
         }
+    }
+
+    // The board's payload holds every quoted player, so absence from it is
+    // the answer "this player has no season market", not a cache miss.
+    function marketRowFor(playerId) {
+        const leaders = (state.seasonFantasyData || {}).leaders || [];
+        return leaders.find((entry) => (entry.player || {}).player_id === playerId) || null;
     }
 
     function renderCompare(data) {
@@ -1161,6 +959,8 @@
             return;
         }
         const best = Math.max(...players.map((p) => p.projected_points || 0));
+        const bestMarket = Math.max(...players.map(
+            (p) => (marketRowFor(p.player_id) || {}).fantasy_points || 0));
         const grid = el("div", "compare-grid");
         grid.style.gridTemplateColumns = `repeat(${players.length}, minmax(0, 1fr))`;
         players.forEach((player) => {
@@ -1170,11 +970,40 @@
                 .filter(Boolean).join(" · ");
             col.appendChild(el("p", "compare-col__meta", meta));
 
-            const projWrap = el("div", "compare-col__proj");
+            // Market value first: it is what this page ranks on. The rows are
+            // already loaded for the board, so no second request is needed —
+            // and a player absent from that payload has no market at all,
+            // which is a fact worth stating rather than hiding.
+            const marketEntry = marketRowFor(player.player_id);
+            const marketWrap = el("div", "compare-col__proj");
+            const marketValue = el("span", "compare-col__proj-value",
+                marketEntry ? F.formatPoints(marketEntry.fantasy_points) : "—");
+            if (marketEntry && (marketEntry.fantasy_points || 0) === bestMarket && bestMarket > 0) {
+                marketValue.classList.add("is-best");
+            }
+            marketWrap.appendChild(marketValue);
+            marketWrap.appendChild(el("span", "compare-col__proj-label",
+                marketEntry ? "market pts" : "not quoted"));
+            col.appendChild(marketWrap);
+
+            if (marketEntry) {
+                const pairs = F.seasonPairDetail(marketEntry.pairs_used, marketEntry.partial_pairs);
+                const detail = [pairs.scored, pairs.missing].filter(Boolean).join(" · ");
+                if (detail) col.appendChild(el("p", "compare-col__market-detail", detail));
+                if (marketEntry.projection_delta != null) {
+                    const delta = el("p", "compare-col__delta",
+                        `${F.formatSigned(marketEntry.projection_delta, 1)} vs ${F.formatPoints(marketEntry.projected_points)} proj`);
+                    delta.classList.add(marketEntry.projection_delta >= 0 ? "is-over" : "is-under");
+                    col.appendChild(delta);
+                }
+            }
+
+            const projWrap = el("div", "compare-col__proj compare-col__proj--weekly");
             const projValue = el("span", "compare-col__proj-value", F.formatPoints(player.projected_points));
             if ((player.projected_points || 0) === best && best > 0) projValue.classList.add("is-best");
             projWrap.appendChild(projValue);
-            projWrap.appendChild(el("span", "compare-col__proj-label", "proj pts"));
+            projWrap.appendChild(el("span", "compare-col__proj-label",
+                data.week === 0 ? "season proj" : `wk ${data.week} proj`));
             col.appendChild(projWrap);
 
             const badge = F.injuryBadge(player.injury_status);
@@ -1208,7 +1037,6 @@
 
     async function openPlayer(playerId) {
         if (!playerId) return;
-        const requestedSource = state.source;
         state.drawerPlayerId = playerId;
         els.drawer.hidden = false;
         document.body.classList.add("drawer-open");
@@ -1220,16 +1048,20 @@
         window.pgAnalytics?.track?.("fantasy_player_view", { player_id: playerId });
 
         try {
-            const params = new URLSearchParams({ source: state.source });
-            const player = await fetchJson(`${API_BASE}/players/${encodeURIComponent(playerId)}?${params.toString()}`);
-            if (state.drawerPlayerId !== playerId || state.source !== requestedSource) return;
+            // No source parameter: the server resolves Sleeper-first then any
+            // provider, which is the same run the market board compares its
+            // projection column against — so drawer and board agree by
+            // construction rather than by passing the same value around.
+            const player = await fetchJson(`${API_BASE}/players/${encodeURIComponent(playerId)}`);
+            if (state.drawerPlayerId !== playerId) return;
             renderPlayer(player);
         } catch (err) {
-            if (state.drawerPlayerId !== playerId || state.source !== requestedSource) return;
+            if (state.drawerPlayerId !== playerId) return;
             els.drawerBody.innerHTML = "";
             els.drawerBody.appendChild(el("p", "drawer__loading", "Could not load this player."));
             return;
         }
+        loadPlayerSeasonProps(playerId);
         loadPlayerNews(playerId);
     }
 
@@ -1275,6 +1107,10 @@
 
         els.drawerBody.innerHTML = "";
         els.drawerBody.appendChild(compareToggleButton(player));
+        // Reserved up front so the market card can sit first despite being
+        // the last thing to arrive.
+        els.drawerMarket = el("div", "drawer-market");
+        els.drawerBody.appendChild(els.drawerMarket);
 
         if (player.projection) {
             const proj = player.projection;
@@ -1503,7 +1339,8 @@
         els.compareClear.addEventListener("click", () => {
             state.compare = [];
             renderCompareTray();
-            loadRankings();
+            // Repaint the board's row buttons from the payload already in hand.
+            if (state.seasonFantasyData) renderSeasonFantasyLeaders(state.seasonFantasyData);
         });
         els.compareGo.addEventListener("click", openCompare);
         els.compareDrawerClose.addEventListener("click", closeCompare);
@@ -1512,9 +1349,7 @@
 
     async function init() {
         const urlState = readUrlState();
-        buildChips();
         initSearch();
-        initSeasonPropsSearch();
         loadSeasonPropLeaders();
         initSeasonFantasyScoring();
         loadSeasonFantasyLeaders();
@@ -1532,16 +1367,11 @@
         try {
             const stateData = await fetchJson(`${API_BASE}/state`);
             renderHeader(stateData);
-            buildWeekSelector();
-            await loadSources();
-            syncChips();
         } catch (err) {
             showError("Could not load the current NFL week.");
-            renderSourceChips([{ id: "sleeper", label: "Sleeper", url: "https://sleeper.com/" }]);
         }
 
         await Promise.all([
-            loadRankings(),
             loadDashboard(),
             loadGames(),
             loadProps(),

@@ -1524,19 +1524,41 @@ def get_season_prop_leaders(
     }
 
 
-def _season_reception_projection_map(
+# The scoring format the board is asked for picks the projection field to
+# compare against. Resolved here rather than client-side so the column can
+# never disagree with the toggle that produced it.
+_SEASON_SCORING_FIELD = {
+    "std": "pts_std",
+    "half": "pts_half_ppr",
+    "ppr": "pts_ppr",
+}
+
+
+def _season_projection_map(
     db: Session, season: int
-) -> tuple[Dict[str, float], Optional[str]]:
-    """Latest season reception projections, used only for PPR bonuses."""
+) -> tuple[Dict[str, Dict[str, Any]], Optional[str], Optional[List[str]]]:
+    """Season-long projections per player: receptions, and points per scoring.
+
+    Receptions come from one run because they are read out of ``stats_json``,
+    which the consensus blend does not carry. Points prefer the blend across
+    providers and fall back to that same run, so a single-provider install
+    still gets a column rather than an empty one. The returned source names
+    what the *points* came from, since that is what the board displays.
+    """
     run = (
         _resolve_projection_run(db, season, SEASON_LONG_WEEK, "sleeper")
         or _resolve_projection_run(db, season, SEASON_LONG_WEEK, None)
     )
-    if run is None:
-        return {}, None
+    consensus, _ = _consensus_projection_map(db, season, SEASON_LONG_WEEK)
+    if run is None and not consensus:
+        return {}, None, None
 
-    receptions = {}
-    rows = db.query(FantasyProjection).filter(FantasyProjection.run_id == run.id).all()
+    projections: Dict[str, Dict[str, Any]] = {}
+    rows = (
+        db.query(FantasyProjection).filter(FantasyProjection.run_id == run.id).all()
+        if run is not None
+        else []
+    )
     for row in rows:
         try:
             stats = json.loads(row.stats_json) if row.stats_json else {}
@@ -1551,9 +1573,29 @@ def _season_reception_projection_map(
         # scoring totals. Their PPR-standard difference is the reception count.
         if value is None and row.pts_ppr is not None and row.pts_std is not None:
             value = max(0.0, row.pts_ppr - row.pts_std)
-        if value is not None:
-            receptions[row.player_id] = value
-    return receptions, run.source
+        projections[row.player_id] = {
+            "receptions": value,
+            "pts_std": row.pts_std,
+            "pts_half_ppr": row.pts_half_ppr,
+            "pts_ppr": row.pts_ppr,
+        }
+
+    for player_id, blended in consensus.items():
+        entry = projections.setdefault(player_id, {"receptions": None})
+        for field in _SEASON_SCORING_FIELD.values():
+            if blended.get(field) is not None:
+                entry[field] = blended[field]
+
+    providers = None
+    source = run.source if run is not None else None
+    if consensus:
+        source = "consensus"
+        providers = sorted({
+            provider
+            for blended in consensus.values()
+            for provider in blended.get("providers", [])
+        })
+    return projections, source, providers
 
 
 def get_season_fantasy_point_leaders(
@@ -1573,6 +1615,18 @@ def get_season_fantasy_point_leaders(
     primary pair for the player's position. This prevents passing yards plus
     rushing touchdowns from masquerading as a complete QB projection when
     passing-TD data is absent.
+
+    Each row reports both the categories it scored (``pairs_used``) and the
+    ones it had to discard for want of a second half (``partial_pairs``): a
+    running quarterback scored on passing alone is short by his rushing, and
+    that is only visible if the dropped category is named.
+
+    Rows also carry the season-long consensus projection for the requested
+    scoring (``projected_points``) and the gap to it (``projection_delta``),
+    so the market number can be read against consensus rather than in place
+    of it. Half-PPR and PPR still drop players with no reception projection,
+    but the count is reported as ``excluded_without_projection`` rather than
+    quietly shrinking the board when the scoring toggle moves.
     """
     if season is None:
         season = default_context(db)["season"]
@@ -1585,7 +1639,9 @@ def get_season_fantasy_point_leaders(
             "source": None,
             "sources": [],
             "scoring": scoring,
-            "reception_source": None,
+            "projection_source": None,
+            "projection_providers": None,
+            "excluded_without_projection": 0,
             "leaders": [],
         }
 
@@ -1605,8 +1661,10 @@ def get_season_fantasy_point_leaders(
 
     drop_rates = _season_drop_rates(snapshots)
     players = _player_index(db, list(rows_by_player))
-    reception_projections, reception_source = _season_reception_projection_map(db, season)
+    projections, projection_source, projection_providers = _season_projection_map(db, season)
     reception_multiplier = {"std": 0.0, "half": 0.5, "ppr": 1.0}[scoring]
+    scoring_field = _SEASON_SCORING_FIELD[scoring]
+    excluded_without_projection = 0
     leaders = []
     for player_id, market_rows in rows_by_player.items():
         implied = {
@@ -1621,10 +1679,26 @@ def get_season_fantasy_point_leaders(
             for name, pair in SEASON_FANTASY_MARKET_PAIRS.items()
             if all(market in implied for market in pair)
         }
+        # A category with only one half quoted is dropped from the total.
+        # Reported separately because "scored on passing alone" means two
+        # very different things depending on whether a rushing market exists.
+        partial_pairs = sorted(
+            name
+            for name, pair in SEASON_FANTASY_MARKET_PAIRS.items()
+            if name not in complete_pairs and any(market in implied for market in pair)
+        )
         if primary_pair not in complete_pairs:
             continue
-        projected_receptions = reception_projections.get(player_id)
+        projection = projections.get(player_id) or {}
+        # Keyed on every projection row now, not only rows a reception count
+        # could be derived from, so presence of the key no longer implies a
+        # usable reception figure.
+        projected_receptions = projection.get("receptions")
         if reception_multiplier and projected_receptions is None:
+            # A PPR total without a reception projection would understate the
+            # player rather than merely omit a detail, so the row is dropped —
+            # but counted, so the board can say the shortfall out loud.
+            excluded_without_projection += 1
             continue
 
         used_markets = {
@@ -1644,6 +1718,11 @@ def get_season_fantasy_point_leaders(
         yard_points = round(yard_points, 1)
         touchdown_points = round(touchdown_points, 1)
         reception_points = round((projected_receptions or 0) * reception_multiplier, 1)
+        fantasy_points_total = round(yard_points + touchdown_points + reception_points, 1)
+        # Rounded before the subtraction: 157.0 - 160.0 in float is -3.0000000000000114,
+        # and the delta is read as a headline number, not an intermediate.
+        projected_points = projection.get(scoring_field)
+        projected_points = round(projected_points, 1) if projected_points is not None else None
         books = sorted({
             row.bookmaker
             for market in used_markets
@@ -1659,9 +1738,16 @@ def get_season_fantasy_point_leaders(
                 else None
             ),
             "reception_points": reception_points,
-            "fantasy_points": round(yard_points + touchdown_points + reception_points, 1),
+            "fantasy_points": fantasy_points_total,
             "markets_used": len(implied),
             "pairs_used": sorted(complete_pairs),
+            "partial_pairs": partial_pairs,
+            "projected_points": projected_points,
+            "projection_delta": (
+                round(fantasy_points_total - projected_points, 1)
+                if projected_points is not None
+                else None
+            ),
             "books": books,
             "implied": implied,
         })
@@ -1677,7 +1763,9 @@ def get_season_fantasy_point_leaders(
         "source": _season_source_label(sources),
         "sources": sources,
         "scoring": scoring,
-        "reception_source": reception_source,
+        "projection_source": projection_source,
+        "projection_providers": projection_providers,
+        "excluded_without_projection": excluded_without_projection,
         "leaders": leaders[:limit],
     }
 

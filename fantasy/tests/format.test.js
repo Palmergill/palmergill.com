@@ -39,6 +39,25 @@ describe('FantasyFormat', () => {
         expect(FantasyFormat.seasonPositionCounts(undefined)).toEqual([]);
     });
 
+    test('seasonPairDetail names the scored categories and the dropped one', () => {
+        expect(FantasyFormat.seasonPairDetail(['passing', 'rushing'], [])).toEqual({
+            scored: 'passing + rushing',
+            missing: '',
+        });
+        expect(FantasyFormat.seasonPairDetail(['passing'], ['rushing'])).toEqual({
+            scored: 'passing',
+            missing: 'rushing not fully quoted',
+        });
+        expect(FantasyFormat.seasonPairDetail(['receiving'], ['passing', 'rushing'])).toEqual({
+            scored: 'receiving',
+            missing: 'passing and rushing not fully quoted',
+        });
+        expect(FantasyFormat.seasonPairDetail(undefined, undefined)).toEqual({
+            scored: '',
+            missing: '',
+        });
+    });
+
     test('seasonPositionMatches treats ALL and missing filters as no filter', () => {
         const rb = { player: { position: 'RB' } };
         expect(FantasyFormat.seasonPositionMatches(rb, 'RB')).toBe(true);
@@ -63,15 +82,6 @@ describe('FantasyFormat', () => {
         expect(FantasyFormat.ordinal(12)).toBe('12th');
         expect(FantasyFormat.ordinal(21)).toBe('21st');
         expect(FantasyFormat.ordinal(113)).toBe('113th');
-    });
-
-    test('rankDelta: lower rank number is an upward move', () => {
-        // Was ranked 8th, now 3rd -> moved up 5.
-        expect(FantasyFormat.rankDelta(8, 3)).toEqual({ direction: 'up', amount: 5 });
-        // Was 3rd, now 8th -> moved down 5.
-        expect(FantasyFormat.rankDelta(3, 8)).toEqual({ direction: 'down', amount: 5 });
-        expect(FantasyFormat.rankDelta(4, 4)).toEqual({ direction: 'same', amount: 0 });
-        expect(FantasyFormat.rankDelta(null, 4)).toBeNull();
     });
 
     test('sparkline scales points and reports endpoints', () => {

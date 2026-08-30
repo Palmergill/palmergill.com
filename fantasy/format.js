@@ -46,6 +46,20 @@
         return [...ordered, ...extra].map((position) => ({ position, count: counts.get(position) }));
     }
 
+    // What a market-implied total was actually built from. A category scores
+    // only when both its yardage and touchdown markets are quoted, so "4
+    // markets" told the reader nothing: naming the categories is the
+    // difference between a running quarterback whose rushing is in the number
+    // and one whose rushing was dropped for want of a touchdown ladder.
+    function seasonPairDetail(pairsUsed, partialPairs) {
+        const used = (pairsUsed || []).filter(Boolean);
+        const partial = (partialPairs || []).filter(Boolean);
+        return {
+            scored: used.join(" + "),
+            missing: partial.length ? `${partial.join(" and ")} not fully quoted` : "",
+        };
+    }
+
     function seasonPositionMatches(entry, position) {
         if (!position || position === "ALL") return true;
         const player = (entry && entry.player) || {};
@@ -80,13 +94,6 @@
     // Rank movement between two weeks. A *smaller* rank number is better, so a
     // drop in rank value is an upward ("up") move. Returns null when either
     // rank is missing (e.g. a newly ranked player).
-    function rankDelta(previousRank, currentRank) {
-        if (previousRank == null || currentRank == null) return null;
-        const change = Number(previousRank) - Number(currentRank);
-        if (change === 0) return { direction: "same", amount: 0 };
-        return { direction: change > 0 ? "up" : "down", amount: Math.abs(change) };
-    }
-
     // Build an SVG polyline `points` string for a sparkline of the given
     // series, scaled to fit [0,width] x [0,height] with the newest value on
     // the right. Flat series render as a centered horizontal line. Returns
@@ -244,10 +251,10 @@
         positionQuery,
         seasonPositionCounts,
         seasonPositionMatches,
+        seasonPairDetail,
         scoringLabel,
         formatPoints,
         ordinal,
-        rankDelta,
         sparkline,
         americanOdds,
         seasonLine,

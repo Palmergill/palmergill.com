@@ -341,6 +341,10 @@ def test_implied_fantasy_points_combine_yards_and_touchdowns(db):
         "fantasy_points": 157.0,
         "markets_used": 2,
         "pairs_used": ["receiving"],
+        "partial_pairs": [],
+        # Sleeper's season-long pts_std for wr_alpha; the market is 3.0 under it.
+        "projected_points": 160.0,
+        "projection_delta": -3.0,
         "books": ["Kalshi"],
         "implied": {"season_rec_yds": 999.5, "season_rec_tds": 9.5},
     }
@@ -348,7 +352,9 @@ def test_implied_fantasy_points_combine_yards_and_touchdowns(db):
 
     half = fd.get_season_fantasy_point_leaders(db, season=2026, scoring="half")
     assert half["scoring"] == "half"
-    assert half["reception_source"] == "sleeper"
+    # Only Sleeper has a week-0 run here, so there is no blend to make.
+    assert half["projection_source"] == "sleeper"
+    assert half["projection_providers"] is None
     assert half["leaders"][0]["reception_points"] == 45.0
     assert half["leaders"][0]["fantasy_points"] == 202.0
 
@@ -373,6 +379,164 @@ def test_implied_fantasy_points_require_the_primary_matching_pair(db):
 
     # Passing yards plus a rushing-TD market is not a complete QB projection.
     assert board["leaders"] == []
+
+
+def test_implied_fantasy_points_name_the_categories_behind_each_total(db):
+    """A dropped half-quoted category is reported, not silently omitted."""
+
+    class RunningQuarterbackMarkets(KalshiClient):
+        def get_season_props(self):
+            return {
+                "KXNFLSEASONPASSYDS": [
+                    market("KXNFLSEASONPASSYDS-27C4000-JALLEN", "Josh Allen", 3999.5, 0.48, 0.52),
+                    market("KXNFLSEASONPASSYDS-27C4000-POCKET", "Pocket Passer", 3999.5, 0.48, 0.52),
+                ],
+                "KXNFLSEASONPASSTDS": [
+                    market("KXNFLSEASONPASSTDS-27C30-JALLEN", "Josh Allen", 29.5, 0.48, 0.52),
+                    market("KXNFLSEASONPASSTDS-27C30-POCKET", "Pocket Passer", 29.5, 0.48, 0.52),
+                ],
+                # Allen has both halves of the rushing pair, so it scores.
+                "KXNFLSEASONRSHYDS": [
+                    market("KXNFLSEASONRSHYDS-27C500-JALLEN", "Josh Allen", 499.5, 0.48, 0.52),
+                    market("KXNFLSEASONRSHYDS-27C200-POCKET", "Pocket Passer", 199.5, 0.48, 0.52),
+                ],
+                # The pocket passer has rushing yards but no rushing-TD ladder,
+                # so his rushing yards are discarded rather than counted alone.
+                "KXNFLSEASONRSHTD": [
+                    market("KXNFLSEASONRSHTD-27C6-JALLEN", "Josh Allen", 5.5, 0.48, 0.52),
+                ],
+            }
+
+    # Josh Allen is already seeded by the fixture; a second row with the same
+    # name would make the collector's name lookup ambiguous.
+    db.add(named_player("qb_pocket", "Pocket Passer", "QB", "NYG"))
+    db.commit()
+    fc.collect_season_props(db, client=RunningQuarterbackMarkets())
+
+    board = fd.get_season_fantasy_point_leaders(db, season=2026)
+    rows = {entry["player"]["name"]: entry for entry in board["leaders"]}
+
+    allen = rows["Josh Allen"]
+    assert allen["pairs_used"] == ["passing", "rushing"]
+    assert allen["partial_pairs"] == []
+    # 3999.5/25 + 499.5/10 = 159.98 + 49.95; 29.5*4 + 5.5*6 = 118 + 33.
+    assert allen["yard_points"] == 209.9
+    assert allen["touchdown_points"] == 151.0
+    assert allen["fantasy_points"] == 360.9
+
+    pocket = rows["Pocket Passer"]
+    assert pocket["pairs_used"] == ["passing"]
+    assert pocket["partial_pairs"] == ["rushing"]
+    # The 199.5 rushing yards are not in the total, and the row says so.
+    assert pocket["yard_points"] == 160.0
+    assert pocket["fantasy_points"] == 278.0
+
+
+def _two_receivers_with_markets(db):
+    """Two quoted receivers, so projection coverage can differ between them."""
+
+    class ReceiverMarkets(KalshiClient):
+        def get_season_props(self):
+            return {
+                "KXNFLSEASONRECYDS": [
+                    market("KXNFLSEASONRECYDS-27C1000-ALPHA", "Alpha Receiver", 999.5, 0.48, 0.52),
+                    market("KXNFLSEASONRECYDS-27C750-ZETA", "Zeta Receiver", 749.5, 0.48, 0.52),
+                ],
+                "KXNFLSEASONRECTD": [
+                    market("KXNFLSEASONRECTD-27C10-ALPHA", "Alpha Receiver", 9.5, 0.48, 0.52),
+                    market("KXNFLSEASONRECTD-27C8-ZETA", "Zeta Receiver", 7.5, 0.48, 0.52),
+                ],
+            }
+
+    db.add(named_player("wr_alpha", "Alpha Receiver", "WR", "SEA"))
+    db.add(named_player("wr_zeta", "Zeta Receiver", "WR", "NYJ"))
+    db.commit()
+    fc.collect_season_props(db, client=ReceiverMarkets())
+
+
+def _sleeper_season_projections(rows):
+    class SeasonProjections:
+        def get_season_projections(self, season):
+            return rows
+
+    return SeasonProjections()
+
+
+def test_projected_points_follow_the_requested_scoring(db):
+    _two_receivers_with_markets(db)
+    fc.collect_projections(db, 2026, fc.SEASON_LONG_WEEK, client=_sleeper_season_projections([
+        {
+            "player_id": "wr_alpha",
+            "pts_ppr": 250.0, "pts_half_ppr": 205.0, "pts_std": 160.0,
+            "stats": {"rec": 90.0},
+        },
+    ]))
+
+    def alpha(scoring):
+        board = fd.get_season_fantasy_point_leaders(db, season=2026, scoring=scoring)
+        return next(e for e in board["leaders"] if e["player"]["player_id"] == "wr_alpha")
+
+    # The column has to track the toggle, not sit on one field.
+    assert alpha("std")["projected_points"] == 160.0
+    assert alpha("half")["projected_points"] == 205.0
+    assert alpha("ppr")["projected_points"] == 250.0
+
+    # 157.0 market vs 160.0 projected, and the delta is clean to one decimal
+    # rather than the -3.0000000000000114 a raw float subtraction would give.
+    assert alpha("std")["projection_delta"] == -3.0
+
+
+def test_a_quoted_player_without_a_projection_still_ranks_in_standard(db):
+    _two_receivers_with_markets(db)
+    # Zeta is quoted by the market but absent from the projection feed.
+    fc.collect_projections(db, 2026, fc.SEASON_LONG_WEEK, client=_sleeper_season_projections([
+        {
+            "player_id": "wr_alpha",
+            "pts_ppr": 250.0, "pts_half_ppr": 205.0, "pts_std": 160.0,
+            "stats": {"rec": 90.0},
+        },
+    ]))
+
+    std = fd.get_season_fantasy_point_leaders(db, season=2026, scoring="std")
+    zeta = next(e for e in std["leaders"] if e["player"]["player_id"] == "wr_zeta")
+    # He keeps his market rank; only the comparison columns are blank.
+    assert zeta["projected_points"] is None
+    assert zeta["projection_delta"] is None
+    assert zeta["fantasy_points"] == 120.0
+    assert std["excluded_without_projection"] == 0
+
+    # PPR needs a reception projection to be honest, so he drops — and says so.
+    ppr = fd.get_season_fantasy_point_leaders(db, season=2026, scoring="ppr")
+    assert [e["player"]["player_id"] for e in ppr["leaders"]] == ["wr_alpha"]
+    assert ppr["excluded_without_projection"] == 1
+
+
+def test_two_providers_blend_into_a_consensus_projection(db):
+    _two_receivers_with_markets(db)
+    fc.collect_projections(db, 2026, fc.SEASON_LONG_WEEK, client=_sleeper_season_projections([
+        {
+            "player_id": "wr_alpha",
+            "pts_ppr": 250.0, "pts_half_ppr": 205.0, "pts_std": 160.0,
+            "stats": {"rec": 90.0},
+        },
+    ]))
+
+    class EspnProjections:
+        def get_projections(self, season, week):
+            return [{"name": "Alpha Receiver", "espn_id": None,
+                     "pts_ppr": 270.0, "pts_half_ppr": 225.0, "pts_std": 180.0,
+                     "stats": {}}]
+
+    fc.collect_espn_projections(db, 2026, fc.SEASON_LONG_WEEK, client=EspnProjections())
+
+    board = fd.get_season_fantasy_point_leaders(db, season=2026, scoring="std")
+    alpha = next(e for e in board["leaders"] if e["player"]["player_id"] == "wr_alpha")
+
+    assert board["projection_source"] == "consensus"
+    assert board["projection_providers"] == ["espn", "sleeper"]
+    # Mean of Sleeper's 160 and ESPN's 180.
+    assert alpha["projected_points"] == 170.0
+    assert alpha["projection_delta"] == -13.0
 
 
 def test_offense_rankings_combine_air_and_rushing_without_double_counting(db):

@@ -327,6 +327,11 @@ def test_betting_endpoints_return_well_formed_empty_structures():
 
     fantasy_point_leaders = client.get("/api/fantasy/season-fantasy-points").json()
     assert fantasy_point_leaders["leaders"] == []
+    # The projection-comparison fields are part of the route's contract even
+    # when there is nothing to rank, so the client can render a stable shape.
+    assert fantasy_point_leaders["projection_source"] is None
+    assert fantasy_point_leaders["projection_providers"] is None
+    assert fantasy_point_leaders["excluded_without_projection"] == 0
     assert client.get(
         "/api/fantasy/season-fantasy-points", params={"scoring": "half"}
     ).json()["scoring"] == "half"

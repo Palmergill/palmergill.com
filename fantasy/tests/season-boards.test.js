@@ -38,10 +38,11 @@ const PROP_LEADERS = [
 
 /** Leaders for the "implied fantasy points" panel, best first. */
 const FANTASY_LEADERS = [
-    { player: player("Passer One", "QB"), fantasy_points: 380, yard_points: 300, touchdown_points: 80, markets_used: 2, books: ["kalshi"] },
-    { player: player("Runner One", "RB"), fantasy_points: 250, yard_points: 140, touchdown_points: 110, markets_used: 2, books: [] },
-    { player: player("Catcher One", "WR"), fantasy_points: 240, yard_points: 130, touchdown_points: 110, markets_used: 2, books: [] },
-    { player: player("Runner Two", "RB"), fantasy_points: 200, yard_points: 120, touchdown_points: 80, markets_used: 2, books: [] },
+    { player: player("Passer One", "QB"), fantasy_points: 380, yard_points: 300, touchdown_points: 80, markets_used: 4, books: ["kalshi"], pairs_used: ["passing", "rushing"], partial_pairs: [], projected_points: 350, projection_delta: 30 },
+    { player: player("Runner One", "RB"), fantasy_points: 250, yard_points: 140, touchdown_points: 110, markets_used: 2, books: [], pairs_used: ["rushing"], partial_pairs: ["receiving"], projected_points: 270, projection_delta: -20 },
+    { player: player("Catcher One", "WR"), fantasy_points: 240, yard_points: 130, touchdown_points: 110, markets_used: 2, books: [], projected_points: 240, projection_delta: 0 },
+    // Quoted by the market, absent from the projection feed.
+    { player: player("Runner Two", "RB"), fantasy_points: 200, yard_points: 120, touchdown_points: 80, markets_used: 2, books: [], projected_points: null, projection_delta: null },
 ];
 
 function routes(overrides = {}) {
@@ -208,6 +209,148 @@ describe("season board position filter", () => {
         await waitFor(() => !chipLabels("seasonFantasyPositions").includes("QB"));
         expect(pressed("seasonFantasyPositions")).toBe("All");
         expect(rows("seasonFantasyLeaders").length).toBe(3);
+    });
+
+    test("names the categories behind each implied total", async () => {
+        boot(routes());
+        await waitFor(() => document.querySelectorAll("#seasonFantasyLeaders tr").length);
+        const meta = [...document.querySelectorAll("#seasonFantasyLeaders .season-leader__meta")]
+            .map((node) => node.textContent);
+        expect(meta[0]).toContain("passing + rushing");
+        expect(meta[0]).not.toContain("markets");
+        expect(meta[1]).toContain("rushing");
+    });
+
+    test("flags a category the market only half quoted, set apart from the rest", async () => {
+        boot(routes());
+        await waitFor(() => document.querySelectorAll("#seasonFantasyLeaders tr").length);
+        const rows = [...document.querySelectorAll("#seasonFantasyLeaders tr")];
+
+        // Passer One has both halves of both pairs, so nothing is flagged.
+        expect(rows[0].querySelector(".season-leader__gap")).toBeNull();
+
+        // Runner One's receiving markets are incomplete and were discarded.
+        const gap = rows[1].querySelector(".season-leader__gap");
+        expect(gap).not.toBeNull();
+        expect(gap.textContent).toContain("receiving not fully quoted");
+    });
+
+    test("shows the market total against the consensus projection", async () => {
+        boot(routes());
+        await waitFor(() => document.querySelectorAll("#seasonFantasyLeaders tr").length);
+        const row = [...document.querySelectorAll("#seasonFantasyLeaders tr")[0].children]
+            .map((cell) => cell.textContent);
+
+        // ... Yard, TD, Rec, Market, Proj, Delta
+        expect(row.slice(-3)).toEqual(["380.0", "350.0", "+30"]);
+    });
+
+    test("a quoted player with no projection keeps his rank and blanks the comparison", async () => {
+        boot(routes());
+        await waitFor(() => document.querySelectorAll("#seasonFantasyLeaders tr").length);
+        const rows = [...document.querySelectorAll("#seasonFantasyLeaders tr")];
+        const runnerTwo = rows.find((r) => r.textContent.includes("Runner Two"));
+
+        const cells = [...runnerTwo.children].map((c) => c.textContent);
+        expect(cells[cells.length - 2]).toBe("\u2014");   // Proj renders an em dash
+        expect(cells[cells.length - 1]).toBe("");          // no delta to show
+        // He is 4th on market value and stays there.
+        expect(rows.indexOf(runnerTwo)).toBe(3);
+        expect(cells[0]).toBe("4");
+    });
+
+    test("marks whether the market sits over or under consensus", async () => {
+        boot(routes());
+        await waitFor(() => document.querySelectorAll("#seasonFantasyLeaders tr").length);
+        const deltas = [...document.querySelectorAll("#seasonFantasyLeaders .season-fantasy__delta")];
+
+        expect(deltas[0].className).toContain("is-over");
+        expect(deltas[1].className).toContain("is-under");
+        expect(deltas[0].title).toContain("%");
+    });
+
+    test("an empty market board explains itself instead of showing a bare table", async () => {
+        boot(routes({ "/season-fantasy-points": { scoring: "std", sources: [], leaders: [] } }));
+        await waitFor(() => document.querySelectorAll("#seasonFantasyLeaders tr").length);
+        const cell = document.querySelector("#seasonFantasyLeaders .table-empty");
+        expect(cell).not.toBeNull();
+        expect(cell.textContent).toContain("No season markets have been collected");
+    });
+
+    test("hides the live-markets zone, and its nav link, when nothing is trading", async () => {
+        boot(routes());
+        await waitFor(() => document.querySelectorAll("#seasonFantasyLeaders tr").length);
+        expect(document.getElementById("live-markets").hidden).toBe(true);
+        expect(document.querySelector('.dashboard-nav a[href="#live-markets"]').hidden).toBe(true);
+    });
+
+    test("compares on market value, and says when a player has no market", async () => {
+        boot(routes({
+            "/compare": {
+                season: 2026, week: 0, scoring: "std", source: "consensus",
+                players: [
+                    { player_id: "passer one", name: "Passer One", position: "QB", team: "SF", projected_points: 350 },
+                    { player_id: "nobody", name: "Nobody", position: "QB", team: "NYG", projected_points: 120 },
+                ],
+            },
+        }));
+        await waitFor(() => document.querySelectorAll("#seasonFantasyLeaders tr").length);
+
+        // The tray needs two before it will open.
+        const buttons = document.querySelectorAll("#seasonFantasyLeaders .row-compare");
+        buttons[0].click();
+        buttons[1].click();
+        expect(document.getElementById("compareTray").hidden).toBe(false);
+        document.getElementById("compareGo").click();
+        await waitFor(() => document.querySelectorAll(".compare-col").length);
+
+        const cols = [...document.querySelectorAll(".compare-col")];
+        const labels = cols.map((c) => [...c.querySelectorAll(".compare-col__proj-label")].map((l) => l.textContent));
+
+        // Market leads; the weekly projection is the supporting number.
+        expect(labels[0]).toEqual(["market pts", "season proj"]);
+        expect(cols[0].querySelector(".compare-col__proj-value").textContent).toBe("380.0");
+        expect(cols[0].querySelector(".compare-col__market-detail").textContent).toContain("passing + rushing");
+
+        // A player the market never quoted says so rather than showing a zero.
+        expect(labels[1]).toEqual(["not quoted", "season proj"]);
+        expect(cols[1].querySelector(".compare-col__proj-value").textContent).toBe("\u2014");
+    });
+
+    test("names the projection source in the column header", async () => {
+        boot(routes({
+            "/season-fantasy-points": {
+                scoring: "std", sources: [], leaders: FANTASY_LEADERS,
+                projection_source: "consensus", projection_providers: ["espn", "sleeper"],
+            },
+        }));
+        await waitFor(() => document.querySelectorAll("#seasonFantasyLeaders tr").length);
+        const head = document.getElementById("seasonFantasyProjHead");
+        expect(head.textContent).toBe("Consensus");
+        expect(head.title).toContain("espn, sleeper");
+    });
+
+    test("a single provider is named, not called a consensus", async () => {
+        boot(routes({
+            "/season-fantasy-points": {
+                scoring: "std", sources: [], leaders: FANTASY_LEADERS,
+                projection_source: "sleeper", projection_providers: null,
+            },
+        }));
+        await waitFor(() => document.querySelectorAll("#seasonFantasyLeaders tr").length);
+        expect(document.getElementById("seasonFantasyProjHead").textContent).toBe("Sleeper");
+    });
+
+    test("says how many players a PPR board had to hide", async () => {
+        boot(routes({
+            "/season-fantasy-points": {
+                scoring: "ppr", sources: [], leaders: FANTASY_LEADERS,
+                excluded_without_projection: 3,
+            },
+        }));
+        await waitFor(() => document.getElementById("seasonFantasyNote").textContent);
+        expect(document.getElementById("seasonFantasyNote").textContent)
+            .toContain("3 quoted players hidden — no reception projection");
     });
 
     test("a board with no leaders builds no position chips", async () => {

@@ -40,8 +40,15 @@ everything fetched is persisted as timestamped snapshots so history
 
 ## Goals
 
-1. One page answers "who do I start this week?" — rankings + projections by
-   position, refreshed automatically.
+1. ~~One page answers "who do I start this week?" — rankings + projections by
+   position, refreshed automatically.~~ **Superseded Aug 2026.** The dashboard
+   was rebuilt around market-implied value: the hero is the season-long
+   implied-fantasy-points board, and the Sleeper/ESPN projections it used to
+   rank on are now a comparison column beside the market number rather than a
+   board of their own. The weekly start/sit board is a known gap — closing it
+   needs a weekly implied-points board, which is blocked on `ODDS_API_KEY`
+   (no `odds_props` run has ever executed) and on choosing an anytime-TD →
+   expected-TD conversion.
 2. Betting context lives next to fantasy context: game lines, featured
    player props, season futures — with movement over time, not just current
    numbers.
