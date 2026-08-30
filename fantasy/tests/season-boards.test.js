@@ -456,4 +456,48 @@ describe("season board position filter", () => {
         expect(document.getElementById("seasonPropsNote").textContent)
             .toBe("Nothing is quoted in this category yet.");
     });
+
+    test("shows ten market rows initially and expands in place", async () => {
+        const leaders = Array.from({ length: 12 }, (_, index) => ({
+            ...FANTASY_LEADERS[index % FANTASY_LEADERS.length],
+            player: player(`Player ${index + 1}`, index % 2 ? "RB" : "WR"),
+            fantasy_points: 300 - index,
+        }));
+        boot(routes({
+            "/season-fantasy-points": { scoring: "std", sources: [], leaders },
+        }));
+        await waitFor(() => document.querySelectorAll("#seasonFantasyLeaders tr").length);
+
+        expect(rows("seasonFantasyLeaders")).toHaveLength(10);
+        const toggle = document.getElementById("showAllMarket");
+        expect(toggle.textContent).toBe("Show all 12");
+        toggle.click();
+        expect(rows("seasonFantasyLeaders")).toHaveLength(12);
+        expect(toggle.textContent).toBe("Show less");
+        expect(toggle.getAttribute("aria-expanded")).toBe("true");
+    });
+
+    test("restores a raw-market drawer from category state and Escape clears it", async () => {
+        document.body.innerHTML = bodySource;
+        window.history.replaceState({}, "", "/fantasy/?category=passing_yards");
+        boot(routes(), { keepUrl: true });
+        await waitFor(() => !document.getElementById("marketsDrawer").hidden);
+
+        expect(window.location.search).toContain("category=passing_yards");
+        expect(document.activeElement).toBe(document.getElementById("marketsClose"));
+        document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+        expect(document.getElementById("marketsDrawer").hidden).toBe(true);
+        expect(window.location.search).not.toContain("category=");
+    });
+
+    test("renders an unconfigured member hero without explanatory copy", async () => {
+        boot(routes({
+            "/state": { default_season: 2026, default_week: 1, season: 2026, week: 1, in_season: true },
+            "/league/me": { season: 2026, week: 1, scoring: "std", status: "unconfigured", selected_team_id: null, teams: [{ espn_team_id: 1, name: "Fourth & Twenty" }], snapshot: null },
+        }));
+        await waitFor(() => document.getElementById("memberTeam").textContent === "Choose your team");
+
+        expect(document.getElementById("chooseTeam").hidden).toBe(false);
+        expect(document.getElementById("memberMetrics").textContent).toBe("");
+    });
 });

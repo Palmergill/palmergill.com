@@ -168,6 +168,22 @@ def player_season_props(
     return result
 
 
+@router.get("/players/{player_id}/season-fantasy-history")
+def player_season_fantasy_history(
+    player_id: str,
+    season: Optional[int] = None,
+    scoring: str = Query("std", pattern="^(ppr|half|half_ppr|half-ppr|std|standard)$"),
+    days: int = Query(30, ge=1, le=365),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    result = fantasy_data.get_player_season_fantasy_history(
+        db, player_id, season=season, scoring=scoring, days=days
+    )
+    if result is None:
+        raise HTTPException(status_code=404, detail="Unknown player")
+    return result
+
+
 @router.get("/season-props")
 def season_prop_leaders(
     market: Optional[str] = None,
@@ -198,6 +214,19 @@ def season_fantasy_point_leaders(
 ) -> Dict[str, Any]:
     return fantasy_data.get_season_fantasy_point_leaders(
         db, season=season, scoring=scoring, limit=limit
+    )
+
+
+@router.get("/season-fantasy-movers")
+def season_fantasy_movers(
+    season: Optional[int] = None,
+    scoring: str = Query("std", pattern="^(ppr|half|half_ppr|half-ppr|std|standard)$"),
+    days: int = Query(7, ge=1, le=365),
+    limit: int = Query(5, ge=1, le=25),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    return fantasy_data.get_season_fantasy_movers(
+        db, season=season, scoring=scoring, days=days, limit=limit
     )
 
 

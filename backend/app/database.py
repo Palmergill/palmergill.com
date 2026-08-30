@@ -494,6 +494,7 @@ class FantasyLeagueTeam(Base):
     owner_guid = Column(String, nullable=True, index=True)
     owner_name = Column(String, nullable=True)
     playoff_seed = Column(Integer, nullable=True)
+    waiver_rank = Column(Integer, nullable=True)
     wins = Column(Integer, default=0)
     losses = Column(Integer, default=0)
     ties = Column(Integer, default=0)
@@ -505,6 +506,20 @@ class FantasyLeagueTeam(Base):
     games_back = Column(Float, nullable=True)
     current_projected_rank = Column(Integer, nullable=True)  # ESPN's own
     run_id = Column(Integer, nullable=True, index=True)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
+
+
+class FantasyLeagueAccountTeam(Base):
+    __tablename__ = "ff_league_account_teams"
+    __table_args__ = (
+        UniqueConstraint("username", "season", name="uq_ff_league_account_team"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    username = Column(String, index=True, nullable=False)
+    season = Column(Integer, index=True, nullable=False)
+    espn_team_id = Column(Integer, index=True, nullable=False)
+    created_at = Column(DateTime, default=utc_now)
     updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
 
 

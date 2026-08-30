@@ -25,6 +25,10 @@
         // of rows already in hand.
         seasonFantasySort: { key: "fantasy_points", dir: "desc" },
         seasonPropsPosition: "ALL",
+        seasonPropsMarket: null,
+        marketExpanded: false,
+        movers: null,
+        moversView: "gainers",
         drawerPlayerId: null,
         compare: [], // [{ player_id, name }]
     };
@@ -49,6 +53,16 @@
         seasonOffenseYards: document.getElementById("seasonOffenseYards"),
         seasonOffenseTouchdowns: document.getElementById("seasonOffenseTouchdowns"),
         seasonOffensesNote: document.getElementById("seasonOffensesNote"),
+        showAllMarket: document.getElementById("showAllMarket"),
+        playerMarkets: document.getElementById("playerMarkets"),
+        marketMovers: document.getElementById("marketMovers"),
+        marketMoversNote: document.getElementById("marketMoversNote"),
+        marketFreshness: document.getElementById("marketFreshness"),
+        memberStatus: document.getElementById("memberStatus"),
+        memberTeam: document.getElementById("memberTeam"),
+        memberMetrics: document.getElementById("memberMetrics"),
+        chooseTeam: document.getElementById("chooseTeam"),
+        teamSelect: document.getElementById("teamSelect"),
         trendingAdd: document.getElementById("trendingAdd"),
         trendingDrop: document.getElementById("trendingDrop"),
         gamesSection: document.getElementById("gamesSection"),
@@ -79,6 +93,10 @@
         compareDrawerClose: document.getElementById("compareDrawerClose"),
         compareSub: document.getElementById("compareSub"),
         compareBody: document.getElementById("compareBody"),
+        marketsDrawer: document.getElementById("marketsDrawer"),
+        marketsBackdrop: document.getElementById("marketsBackdrop"),
+        marketsClose: document.getElementById("marketsClose"),
+        marketsSub: document.getElementById("marketsSub"),
     };
 
     async function fetchJson(url) {
@@ -128,6 +146,42 @@
         };
     }
 
+    let overlayFocus = null;
+
+    function rememberOverlayFocus() {
+        overlayFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    }
+
+    function restoreOverlayFocus() {
+        if (overlayFocus && document.contains(overlayFocus)) overlayFocus.focus();
+        overlayFocus = null;
+    }
+
+    function syncDrawerBody() {
+        const open = !els.drawer.hidden || !els.compareDrawer.hidden || !els.marketsDrawer.hidden;
+        document.body.classList.toggle("drawer-open", open);
+    }
+
+    function visibleDialog() {
+        const overlay = [els.marketsDrawer, els.compareDrawer, els.drawer]
+            .find((node) => node && !node.hidden);
+        return overlay ? overlay.querySelector('[role="dialog"]') : null;
+    }
+
+    function trapDialogFocus(event) {
+        if (event.key !== "Tab") return;
+        const dialog = visibleDialog();
+        if (!dialog) return;
+        const focusable = Array.from(dialog.querySelectorAll(
+            'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
+        )).filter((node) => !node.hidden && node.offsetParent !== null);
+        if (!focusable.length) { event.preventDefault(); dialog.focus(); return; }
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+        else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+    }
+
     // ── URL state (shareable deep links) ────────────────────────────────
 
     // `pos` and `scoring` keep their names and vocabulary from the retired
@@ -147,10 +201,11 @@
                 state.seasonFantasySort = { key, dir: dir === "asc" ? "asc" : "desc" };
             }
         }
-        return { player: params.get("player") };
+        state.seasonPropsMarket = params.get("category");
+        return { player: params.get("player"), category: state.seasonPropsMarket };
     }
 
-    function writeUrlState() {
+    function writeUrlState(push) {
         const params = new URLSearchParams();
         if (state.seasonFantasyPosition && state.seasonFantasyPosition !== "ALL") {
             params.set("pos", state.seasonFantasyPosition);
@@ -163,9 +218,10 @@
             params.set("sort", `${sort.key}:${sort.dir}`);
         }
         if (state.drawerPlayerId && !els.drawer.hidden) params.set("player", state.drawerPlayerId);
+        if (state.seasonPropsMarket && !els.marketsDrawer.hidden) params.set("category", state.seasonPropsMarket);
         const query = params.toString();
         const url = query ? `${window.location.pathname}?${query}` : window.location.pathname;
-        window.history.replaceState(null, "", url);
+        window.history[push ? "pushState" : "replaceState"](null, "", url);
     }
 
     // ── player search ───────────────────────────────────────────────────
@@ -265,6 +321,37 @@
         }
     }
 
+    async function loadPlayerMarketHistory(playerId) {
+        const slot = els.drawerHistory;
+        if (!slot) return;
+        try {
+            const params = new URLSearchParams({ scoring: state.seasonFantasyScoring, days: "30" });
+            if (state.season != null) params.set("season", state.season);
+            const data = await fetchJson(`${API_BASE}/players/${encodeURIComponent(playerId)}/season-fantasy-history?${params}`);
+            if (state.drawerPlayerId !== playerId || els.drawer.hidden || !(data.points || []).length) return;
+            slot.innerHTML = "";
+            const card = el("div", "drawer-card");
+            card.appendChild(el("h3", "drawer-card__title", "30-day value"));
+            const values = data.points.map((point) => point.market).filter((value) => value != null);
+            const spark = F.sparkline(values, 420, 92, 5);
+            if (spark) {
+                const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+                svg.setAttribute("viewBox", "0 0 420 92");
+                svg.setAttribute("class", "sparkline sparkline--market");
+                svg.setAttribute("role", "img");
+                svg.setAttribute("aria-label", `Market value from ${F.formatPoints(spark.first)} to ${F.formatPoints(spark.last)}`);
+                const line = document.createElementNS("http://www.w3.org/2000/svg", "polyline");
+                line.setAttribute("points", spark.points);
+                line.setAttribute("fill", "none");
+                line.setAttribute("stroke", "currentColor");
+                line.setAttribute("stroke-width", "2.5");
+                svg.appendChild(line);
+                card.appendChild(svg);
+            }
+            slot.appendChild(card);
+        } catch (err) { /* history is optional */ }
+    }
+
     function seasonMarketCard(data) {
         const card = el("div", "drawer-card");
         const head = el("div", "season-props__player");
@@ -337,7 +424,10 @@
         try {
             const params = new URLSearchParams({ limit: "200" });
             if (market) params.set("market", market);
+            if (state.season != null) params.set("season", state.season);
             const data = await fetchJson(`${API_BASE}/season-props?${params.toString()}`);
+            state.seasonPropsMarket = data.market;
+            if (!els.marketsDrawer.hidden) writeUrlState();
             renderSeasonPropTabs(data);
             renderSeasonPropLeaders(data);
         } catch (err) {
@@ -358,7 +448,11 @@
             tab.title = entry.players === 0
                 ? `${entry.label} — no usable market data`
                 : `${entry.label} — ${entry.players} players with market data`;
-            tab.addEventListener("click", () => loadSeasonPropLeaders(entry.market));
+            tab.addEventListener("click", () => {
+                state.seasonPropsMarket = entry.market;
+                writeUrlState(true);
+                loadSeasonPropLeaders(entry.market);
+            });
             els.seasonPropsTabs.appendChild(tab);
         });
     }
@@ -423,9 +517,12 @@
             const overallDetail = position === "ALL" ? "" : ` · ${overall} overall`;
             who.appendChild(el("span", "season-leader__meta",
                 `${player.position || ""} ${player.team || ""}${overallDetail}`.trim()));
-            attachRowCompare(who, player);
             tr.appendChild(who);
             tr.appendChild(el("td", "col-proj", F.seasonLine(entry.implied_value)));
+            const movement = el("td", "col-proj season-fantasy__delta",
+                entry.movement == null ? "—" : F.formatSigned(entry.movement, 1));
+            if (entry.movement != null) movement.classList.add(entry.movement >= 0 ? "is-over" : "is-under");
+            tr.appendChild(movement);
             tr.appendChild(seasonBookCell(entry.books, entry.book_values));
             const open = () => {
                 if (player.player_id) openPlayer(player.player_id);
@@ -445,10 +542,8 @@
             return;
         }
         els.seasonPropsNote.textContent = [
-            position === "ALL"
-                ? `${rows.length} player${rows.length === 1 ? "" : "s"} with usable market data`
-                : `${rows.length} of ${all.length} quoted players are ${position}s`,
-            "implied value is the median across the providers quoting each player, taken at the 50% point of their prices",
+            position === "ALL" ? `${rows.length} quoted` : `${rows.length} of ${all.length} ${position}s`,
+            data.baseline_as_of ? `7d baseline ${F.formatAsOf(data.baseline_as_of)}` : "",
             F.marketSources(data.sources),
         ].filter(Boolean).join(" · ");
     }
@@ -502,6 +597,9 @@
             const data = await fetchJson(`${API_BASE}/season-fantasy-points?${params.toString()}`);
             state.seasonFantasyData = data;
             renderSeasonFantasyLeaders(data);
+            if (els.memberStatus?.textContent === "Latest market") {
+                els.memberTeam.textContent = F.formatAsOf(data.as_of) || "—";
+            }
         } catch (err) {
             els.seasonFantasyLeaders.innerHTML = "";
             els.seasonFantasyNote.textContent = "";
@@ -543,7 +641,7 @@
     }
 
     function initMarketSort() {
-        document.querySelectorAll(".market-board .col-sort").forEach((button) => {
+        document.querySelectorAll("#market-board .col-sort").forEach((button) => {
             button.addEventListener("click", () => {
                 const key = button.dataset.sort;
                 const current = state.seasonFantasySort;
@@ -562,7 +660,7 @@
 
     function syncMarketSortHeaders() {
         const { key, dir } = state.seasonFantasySort;
-        document.querySelectorAll(".market-board .col-sort").forEach((button) => {
+        document.querySelectorAll("#market-board .col-sort").forEach((button) => {
             const active = button.dataset.sort === key;
             button.classList.toggle("is-sorted", active);
             button.classList.toggle("is-asc", active && dir === "asc");
@@ -589,8 +687,9 @@
             .filter(({ entry }) => F.seasonPositionMatches(entry, position)));
         syncMarketSortHeaders();
 
+        const visibleRows = state.marketExpanded ? rows : rows.slice(0, 10);
         els.seasonFantasyLeaders.innerHTML = "";
-        rows.forEach(({ entry, overall }, index) => {
+        visibleRows.forEach(({ entry, overall }, index) => {
             const player = entry.player || {};
             const tr = el("tr", "season-leader");
             tr.tabIndex = 0;
@@ -653,28 +752,40 @@
                 : "Season-long projected points";
         }
 
-        const scoringLabel = data.scoring === "ppr"
-            ? "PPR"
-            : data.scoring === "half" ? "Half PPR" : "Standard";
-        const receptionSource = data.scoring === "std"
-            ? ""
-            : `receptions from ${data.projection_source || "season projections"}`;
-        els.seasonFantasyNote.textContent = rows.length
-            ? [
-                position === "ALL"
-                    ? `${rows.length} players with complete yardage/TD market pairs`
-                    : `${rows.length} of ${all.length} players with complete pairs are ${position}s`,
-                `${scoringLabel} scoring from every available complete pair`,
-                receptionSource,
-                // Flipping to a PPR format silently shrinks the board without
-                // this, because the reception bonus needs a projection.
-                data.excluded_without_projection
-                    ? `${data.excluded_without_projection} quoted player${data.excluded_without_projection === 1 ? "" : "s"} hidden — no reception projection`
-                    : "",
-                F.marketSources(data.sources),
-            ].filter(Boolean).join(" · ")
+        const positionMetric = position === "ALL" ? "" : ` · ${rows.length} of ${all.length} ${position}`;
+        const excludedMetric = data.excluded_without_projection
+            ? ` · ${data.excluded_without_projection} quoted player${data.excluded_without_projection === 1 ? "" : "s"} hidden — no reception projection`
             : "";
+        els.seasonFantasyNote.textContent = rows.length
+            ? `${visibleRows.length} of ${rows.length}${positionMetric}${excludedMetric} · ${F.formatAsOf(data.as_of) || "latest"}`
+            : "";
+        if (els.showAllMarket) {
+            els.showAllMarket.hidden = rows.length <= 10;
+            els.showAllMarket.textContent = state.marketExpanded ? "Show less" : `Show all ${rows.length}`;
+            els.showAllMarket.setAttribute("aria-expanded", String(state.marketExpanded));
+        }
+        renderMarketFreshness(data.sources || []);
         if (!rows.length) renderMarketBoardEmpty(all.length, position);
+    }
+
+    function renderMarketFreshness(sources) {
+        if (!els.marketFreshness) return;
+        els.marketFreshness.innerHTML = "";
+        (sources || []).forEach((source) => {
+            const item = el("li");
+            const label = el("span", "freshness-source");
+            const dot = el("span", "freshness-dot");
+            const quoted = source.quoted_at ? new Date(source.quoted_at) : null;
+            if (!quoted || Date.now() - quoted.getTime() > 7 * 86400000) dot.classList.add("is-stale");
+            label.appendChild(dot);
+            label.append(source.bookmaker || "Source");
+            item.appendChild(label);
+            item.appendChild(el("span", "freshness-time", F.formatAsOf(source.quoted_at) || "Unknown"));
+            els.marketFreshness.appendChild(item);
+        });
+        if (!els.marketFreshness.childElementCount) {
+            els.marketFreshness.appendChild(el("li", "empty-row", "Unavailable"));
+        }
     }
 
     // How far the market sits from consensus. The signed number is the point
@@ -725,6 +836,8 @@
                     item.setAttribute("aria-pressed", String(item.dataset.scoring === option.key));
                 });
                 loadSeasonFantasyLeaders();
+                loadMarketMovers();
+                loadMemberSnapshot();
             });
             els.seasonFantasyScoring.appendChild(chip);
         });
@@ -737,7 +850,7 @@
             renderSeasonOffenseList(els.seasonOffenseYards, data.yards, "yards");
             renderSeasonOffenseList(els.seasonOffenseTouchdowns, data.touchdowns, "TDs");
             els.seasonOffensesNote.textContent = [
-                "Market-derived totals add each quoted player's implied season value, taken as the median across the providers quoting him; this is not an official team projection",
+                `${(data.yards || []).length} yards · ${(data.touchdowns || []).length} TD`,
                 F.marketSources(data.sources),
             ].filter(Boolean).join(" · ");
         } catch (err) {
@@ -805,6 +918,119 @@
         } catch (err) {
             renderTrending(els.trendingAdd, []);
             renderTrending(els.trendingDrop, []);
+        }
+    }
+
+    async function loadMarketMovers() {
+        if (!els.marketMovers) return;
+        try {
+            const params = new URLSearchParams({
+                scoring: state.seasonFantasyScoring,
+                days: "7",
+                limit: "5",
+            });
+            if (state.season != null) params.set("season", state.season);
+            state.movers = await fetchJson(`${API_BASE}/season-fantasy-movers?${params}`);
+            renderMarketMovers();
+        } catch (err) {
+            state.movers = null;
+            renderMarketMovers();
+        }
+    }
+
+    function renderMarketMovers() {
+        els.marketMovers.innerHTML = "";
+        const rows = state.movers ? (state.movers[state.moversView] || []) : [];
+        rows.forEach((entry) => {
+            const item = el("li");
+            const left = el("span");
+            left.appendChild(el("span", "mover-name", entry.player.name || entry.player.player_id));
+            left.appendChild(el("span", "mover-value", ` ${F.formatPoints(entry.current_value)}`));
+            item.appendChild(left);
+            const delta = el("strong", "mover-delta", F.formatSigned(entry.delta, 1));
+            if (entry.delta < 0) delta.classList.add("is-down");
+            item.appendChild(delta);
+            item.tabIndex = 0;
+            item.setAttribute("role", "button");
+            item.addEventListener("click", () => openPlayer(entry.player.player_id));
+            item.addEventListener("keydown", (event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    openPlayer(entry.player.player_id);
+                }
+            });
+            els.marketMovers.appendChild(item);
+        });
+        if (!rows.length) els.marketMovers.appendChild(el("li", "empty-row", "No 7-day baseline"));
+        els.marketMoversNote.textContent = state.movers?.baseline_as_of
+            ? `Baseline ${F.formatAsOf(state.movers.baseline_as_of)}` : "";
+    }
+
+    async function loadMemberSnapshot() {
+        if (!els.memberStatus || state.season == null) return;
+        const params = new URLSearchParams({ season: state.season, scoring: state.seasonFantasyScoring });
+        if (state.week != null) params.set("week", state.week);
+        try {
+            const data = await fetchJson(`${API_BASE}/league/me?${params}`);
+            renderMemberSnapshot(data);
+        } catch (err) {
+            els.memberStatus.textContent = "Latest market";
+            els.memberTeam.textContent = state.seasonFantasyData?.as_of
+                ? F.formatAsOf(state.seasonFantasyData.as_of) : "—";
+            els.memberMetrics.innerHTML = "";
+            els.chooseTeam.hidden = true;
+            els.teamSelect.hidden = true;
+        }
+    }
+
+    function renderMemberSnapshot(data) {
+        els.teamSelect.innerHTML = "";
+        els.teamSelect.appendChild(new Option("Choose your team", ""));
+        (data.teams || []).forEach((team) => {
+            els.teamSelect.appendChild(new Option(team.name || team.abbrev, team.espn_team_id));
+        });
+        if (data.status !== "configured" || !data.snapshot) {
+            els.memberStatus.textContent = "League snapshot";
+            els.memberTeam.textContent = "Choose your team";
+            els.memberMetrics.innerHTML = "";
+            els.chooseTeam.hidden = false;
+            els.teamSelect.hidden = true;
+            return;
+        }
+        const snapshot = data.snapshot;
+        const team = snapshot.team || {};
+        els.memberStatus.textContent = team.owner_name || "Your team";
+        els.memberTeam.textContent = team.name || team.abbrev || "Team";
+        els.memberMetrics.innerHTML = "";
+        const record = snapshot.record || {};
+        const values = [
+            `${record.wins || 0}–${record.losses || 0}${record.ties ? `–${record.ties}` : ""}`,
+            snapshot.opponent ? `vs ${snapshot.opponent.abbrev || snapshot.opponent.name}` : (snapshot.is_bye ? "Bye" : ""),
+            snapshot.power_rank ? `Power #${snapshot.power_rank}` : "",
+            snapshot.waiver_rank ? `Waiver #${snapshot.waiver_rank}` : "",
+            snapshot.starter_projection != null ? `${F.formatPoints(snapshot.starter_projection)} proj` : "",
+        ].filter(Boolean);
+        values.forEach((value) => els.memberMetrics.appendChild(el("span", null, value)));
+        els.chooseTeam.hidden = false;
+        els.chooseTeam.textContent = "Change team";
+        els.teamSelect.value = String(data.selected_team_id);
+        els.teamSelect.hidden = true;
+    }
+
+    async function saveMemberTeam() {
+        const teamId = Number(els.teamSelect.value);
+        if (!teamId || state.season == null) return;
+        try {
+            const response = await fetch(`${API_BASE}/league/me`, {
+                method: "PUT",
+                credentials: "include",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ season: state.season, espn_team_id: teamId }),
+            });
+            if (!response.ok) throw new Error("Could not save team");
+            renderMemberSnapshot(await response.json());
+        } catch (err) {
+            showError("Could not save your league team.");
         }
     }
 
@@ -964,7 +1190,28 @@
         });
     }
 
-    // ── compare tray + drawer ───────────────────────────────────────────
+    // ── drawers and comparison ──────────────────────────────────────────
+
+    function openMarkets(category, pushHistory = true) {
+        if (!els.drawer.hidden) closeDrawer(false);
+        if (!els.compareDrawer.hidden) closeCompare();
+        rememberOverlayFocus();
+        state.seasonPropsMarket = category || state.seasonPropsMarket || "season_pass_yds";
+        els.marketsDrawer.hidden = false;
+        document.body.classList.add("drawer-open");
+        writeUrlState(pushHistory);
+        loadSeasonPropLeaders(state.seasonPropsMarket);
+        els.marketsClose.focus();
+    }
+
+    function closeMarkets(pushHistory = true) {
+        if (!els.marketsDrawer || els.marketsDrawer.hidden) return;
+        els.marketsDrawer.hidden = true;
+        state.seasonPropsMarket = null;
+        syncDrawerBody();
+        writeUrlState(pushHistory);
+        restoreOverlayFocus();
+    }
 
     function inCompare(playerId) {
         return state.compare.some((p) => p.player_id === playerId);
@@ -1000,6 +1247,9 @@
 
     async function openCompare() {
         if (state.compare.length < 2) return;
+        closeMarkets(false);
+        if (!els.drawer.hidden) closeDrawer(false);
+        rememberOverlayFocus();
         els.compareDrawer.hidden = false;
         document.body.classList.add("drawer-open");
         els.compareSub.textContent = "Loading…";
@@ -1041,8 +1291,7 @@
             return;
         }
         const best = Math.max(...players.map((p) => p.projected_points || 0));
-        const bestMarket = Math.max(...players.map(
-            (p) => (marketRowFor(p.player_id) || {}).fantasy_points || 0));
+        const bestMarket = Math.max(...players.map((p) => p.market?.total || 0));
         const grid = el("div", "compare-grid");
         grid.style.gridTemplateColumns = `repeat(${players.length}, minmax(0, 1fr))`;
         players.forEach((player) => {
@@ -1056,11 +1305,11 @@
             // already loaded for the board, so no second request is needed —
             // and a player absent from that payload has no market at all,
             // which is a fact worth stating rather than hiding.
-            const marketEntry = marketRowFor(player.player_id);
+            const marketEntry = player.market || marketRowFor(player.player_id);
             const marketWrap = el("div", "compare-col__proj");
             const marketValue = el("span", "compare-col__proj-value",
-                marketEntry ? F.formatPoints(marketEntry.fantasy_points) : "—");
-            if (marketEntry && (marketEntry.fantasy_points || 0) === bestMarket && bestMarket > 0) {
+                marketEntry ? F.formatPoints(marketEntry.total ?? marketEntry.fantasy_points) : "—");
+            if (marketEntry && (marketEntry.total ?? marketEntry.fantasy_points ?? 0) === bestMarket && bestMarket > 0) {
                 marketValue.classList.add("is-best");
             }
             marketWrap.appendChild(marketValue);
@@ -1068,14 +1317,18 @@
                 marketEntry ? "market pts" : "not quoted"));
             col.appendChild(marketWrap);
 
-            if (marketEntry) {
-                const pairs = F.seasonPairDetail(marketEntry.pairs_used, marketEntry.partial_pairs);
+            if (marketEntry && (marketEntry.total ?? marketEntry.fantasy_points) != null) {
+                const pairs = marketEntry.quoted_categories
+                    ? { scored: marketEntry.quoted_categories.map((key) => key.replace(/^season_/, "").replaceAll("_", " ")).join(" · "), missing: "" }
+                    : F.seasonPairDetail(marketEntry.pairs_used, marketEntry.partial_pairs);
                 const detail = [pairs.scored, pairs.missing].filter(Boolean).join(" · ");
                 if (detail) col.appendChild(el("p", "compare-col__market-detail", detail));
-                if (marketEntry.projection_delta != null) {
+                const edge = marketEntry.edge ?? marketEntry.projection_delta;
+                const projection = marketEntry.projection ?? marketEntry.projected_points;
+                if (edge != null) {
                     const delta = el("p", "compare-col__delta",
-                        `${F.formatSigned(marketEntry.projection_delta, 1)} vs ${F.formatPoints(marketEntry.projected_points)} proj`);
-                    delta.classList.add(marketEntry.projection_delta >= 0 ? "is-over" : "is-under");
+                        `${F.formatSigned(edge, 1)} vs ${F.formatPoints(projection)} proj`);
+                    delta.classList.add(edge >= 0 ? "is-over" : "is-under");
                     col.appendChild(delta);
                 }
             }
@@ -1112,17 +1365,21 @@
 
     function closeCompare() {
         els.compareDrawer.hidden = true;
-        if (els.drawer.hidden) document.body.classList.remove("drawer-open");
+        syncDrawerBody();
+        restoreOverlayFocus();
     }
 
     // ── player drawer ───────────────────────────────────────────────────
 
-    async function openPlayer(playerId) {
+    async function openPlayer(playerId, pushHistory = true) {
         if (!playerId) return;
+        closeMarkets(false);
+        if (!els.compareDrawer.hidden) closeCompare();
+        rememberOverlayFocus();
         state.drawerPlayerId = playerId;
         els.drawer.hidden = false;
         document.body.classList.add("drawer-open");
-        writeUrlState();
+        writeUrlState(pushHistory);
         els.drawerName.textContent = "—";
         els.drawerSub.textContent = "";
         els.drawerBody.innerHTML = '<p class="drawer__loading">Loading…</p>';
@@ -1144,6 +1401,7 @@
             return;
         }
         loadPlayerSeasonProps(playerId);
+        loadPlayerMarketHistory(playerId);
         loadPlayerNews(playerId);
     }
 
@@ -1188,11 +1446,29 @@
         els.drawerSub.textContent = bits.join(" · ");
 
         els.drawerBody.innerHTML = "";
-        els.drawerBody.appendChild(compareToggleButton(player));
+        const actions = el("div", "drawer-actions");
+        actions.appendChild(compareToggleButton(player));
+        const rankings = el("a", "drawer-compare__btn", "Open Rankings");
+        rankings.href = `/fantasy/rankings/?player=${encodeURIComponent(player.player_id)}`;
+        actions.appendChild(rankings);
+        els.drawerBody.appendChild(actions);
+        const marketEntry = marketRowFor(player.player_id);
+        if (marketEntry) {
+            const card = el("div", "drawer-card drawer-card--value");
+            card.appendChild(el("h3", "drawer-card__title", "Market value"));
+            const grid = el("div", "proj-grid");
+            grid.appendChild(statBlock("Market", F.formatPoints(marketEntry.fantasy_points)));
+            grid.appendChild(statBlock("Projection", F.formatPoints(marketEntry.projected_points)));
+            grid.appendChild(statBlock("Edge", F.formatSigned(marketEntry.projection_delta, 1)));
+            card.appendChild(grid);
+            els.drawerBody.appendChild(card);
+        }
         // Reserved up front so the market card can sit first despite being
         // the last thing to arrive.
         els.drawerMarket = el("div", "drawer-market");
         els.drawerBody.appendChild(els.drawerMarket);
+        els.drawerHistory = el("div", "drawer-history");
+        els.drawerBody.appendChild(els.drawerHistory);
 
         if (player.projection) {
             const proj = player.projection;
@@ -1370,11 +1646,12 @@
         return track;
     }
 
-    function closeDrawer() {
+    function closeDrawer(pushHistory = true) {
         els.drawer.hidden = true;
         state.drawerPlayerId = null;
-        if (els.compareDrawer.hidden) document.body.classList.remove("drawer-open");
-        writeUrlState();
+        syncDrawerBody();
+        writeUrlState(pushHistory);
+        restoreOverlayFocus();
     }
 
     // ── header / state ──────────────────────────────────────────────────
@@ -1404,15 +1681,9 @@
 
         const seasonLong = state.week === 0;
         if (!data.in_season || data.is_fallback) {
-            let message;
-            if (seasonLong) {
-                message = `It's the NFL offseason — showing season-long rankings for the upcoming ${state.season} season. Weekly rankings start in September.`;
-            } else {
-                const season = data.season || "";
-                const showing = state.season && state.week ? `Showing ${state.season} Week ${state.week} data.` : "";
-                message = `It's the NFL offseason${season ? ` (${season})` : ""} — new-season games start in September. ${showing}`.trim();
-            }
-            els.offseasonBanner.textContent = message;
+            els.offseasonBanner.textContent = seasonLong
+                ? `Offseason · ${state.season} season-long`
+                : `Offseason · ${state.season || ""} Week ${state.week || "—"}`;
             els.offseasonBanner.hidden = false;
         }
     }
@@ -1433,23 +1704,63 @@
         const urlState = readUrlState();
         initSearch();
         initMarketSort();
-        loadSeasonPropLeaders();
+        loadSeasonPropLeaders(state.seasonPropsMarket);
         initSeasonFantasyScoring();
         loadSeasonFantasyLeaders();
         loadSeasonOffenses();
         initCompareControls();
         renderCompareTray();
+        els.showAllMarket.addEventListener("click", () => {
+            state.marketExpanded = !state.marketExpanded;
+            if (state.seasonFantasyData) renderSeasonFantasyLeaders(state.seasonFantasyData);
+        });
+        els.playerMarkets.addEventListener("click", () => openMarkets());
+        els.marketsClose.addEventListener("click", () => closeMarkets());
+        els.marketsBackdrop.addEventListener("click", () => closeMarkets());
+        document.querySelectorAll("[data-movers]").forEach((button) => {
+            button.addEventListener("click", () => {
+                state.moversView = button.dataset.movers;
+                document.querySelectorAll("[data-movers]").forEach((item) => {
+                    const on = item === button;
+                    item.classList.toggle("is-active", on);
+                    item.setAttribute("aria-pressed", String(on));
+                });
+                renderMarketMovers();
+            });
+        });
+        els.chooseTeam.addEventListener("click", () => {
+            els.teamSelect.hidden = false;
+            els.teamSelect.focus();
+        });
+        els.teamSelect.addEventListener("change", saveMemberTeam);
         els.drawerClose.addEventListener("click", closeDrawer);
         els.drawerBackdrop.addEventListener("click", closeDrawer);
         document.addEventListener("keydown", (e) => {
+            trapDialogFocus(e);
             if (e.key !== "Escape") return;
-            if (!els.compareDrawer.hidden) closeCompare();
+            if (!els.marketsDrawer.hidden) closeMarkets();
+            else if (!els.compareDrawer.hidden) closeCompare();
             else if (!els.drawer.hidden) closeDrawer();
+        });
+        window.addEventListener("popstate", () => {
+            const params = new URLSearchParams(window.location.search);
+            const player = params.get("player");
+            const category = params.get("category");
+            els.drawer.hidden = true;
+            els.compareDrawer.hidden = true;
+            els.marketsDrawer.hidden = true;
+            state.drawerPlayerId = null;
+            state.seasonPropsMarket = null;
+            syncDrawerBody();
+            if (player) openPlayer(player, false);
+            else if (category) openMarkets(category, false);
         });
 
         try {
             const stateData = await fetchJson(`${API_BASE}/state`);
             renderHeader(stateData);
+            loadMemberSnapshot();
+            loadMarketMovers();
         } catch (err) {
             showError("Could not load the current NFL week.");
         }
@@ -1461,7 +1772,8 @@
             loadFutures(),
         ]);
 
-        if (urlState.player) openPlayer(urlState.player);
+        if (urlState.player) openPlayer(urlState.player, false);
+        else if (urlState.category) openMarkets(urlState.category, false);
     }
 
     if (document.readyState === "loading") {

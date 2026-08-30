@@ -16,6 +16,7 @@ from typing import Any, Dict, List, Optional
 from sqlalchemy.orm import Session
 
 from app.database import (
+    FantasyLeagueAccountTeam,
     FantasyLeagueMatchup,
     FantasyLeaguePowerRanking,
     FantasyLeagueRosterEntry,
@@ -30,6 +31,7 @@ from app.services import fantasy_data
 from app.services.fantasy_collector import latest_successful_run
 from app.services.fantasy_league_espn import configured_league_id
 from app.services.fantasy_league_rankings import ALGORITHMS
+from app.services.fantasy_common import SCORING_POINTS_FIELD, normalize_scoring
 
 logger = logging.getLogger(__name__)
 
@@ -198,6 +200,7 @@ def _team_payload(row: FantasyLeagueTeam) -> Dict[str, Any]:
         "division_name": row.division_name,
         "owner_name": row.owner_name,
         "playoff_seed": row.playoff_seed,
+        "waiver_rank": row.waiver_rank,
         "wins": row.wins or 0,
         "losses": row.losses or 0,
         "ties": row.ties or 0,
@@ -760,3 +763,114 @@ def get_team_roster(
         "entries": entries,
         "unmatched": sum(1 for entry in entries if not entry["matched"]),
     }
+
+
+def get_member_snapshot(
+    db: Session,
+    username: str,
+    season: Optional[int] = None,
+    week: Optional[int] = None,
+    scoring: str = "std",
+) -> Dict[str, Any]:
+    """Team picker and the signed-in member's compact weekly snapshot."""
+    season = _require_season(db, season)
+    scoring = normalize_scoring(scoring)
+    teams = [_team_payload(row) for row in _team_rows(db, season)]
+    selection = (
+        db.query(FantasyLeagueAccountTeam)
+        .filter(
+            FantasyLeagueAccountTeam.username == username,
+            FantasyLeagueAccountTeam.season == season,
+        )
+        .first()
+    )
+    selected_id = selection.espn_team_id if selection else None
+    if selected_id is None or not any(
+        team["espn_team_id"] == selected_id for team in teams
+    ):
+        return {
+            "season": season,
+            "week": week,
+            "scoring": scoring,
+            "status": "unconfigured",
+            "selected_team_id": None,
+            "teams": teams,
+            "snapshot": None,
+        }
+
+    detail = get_team_detail(db, season, selected_id)
+    roster = get_team_roster(db, season, selected_id)
+    available_weeks = [result["week"] for result in detail["results"]]
+    if week not in available_weeks:
+        incomplete = [
+            result["week"] for result in detail["results"] if not result["is_complete"]
+        ]
+        week = min(incomplete) if incomplete else (max(available_weeks) if available_weeks else None)
+    matchup = next((result for result in detail["results"] if result["week"] == week), None)
+
+    scoring_field = SCORING_POINTS_FIELD[scoring]
+    starter_values = [
+        entry["projection"].get(scoring_field)
+        for entry in roster["entries"]
+        if entry["is_starter"] and entry.get("projection")
+        and entry["projection"].get(scoring_field) is not None
+    ]
+    rankings = get_power_rankings(
+        db, season=season, week=week, algorithm=DEFAULT_ALGORITHM
+    ).get("rankings", [])
+    rank = next(
+        (entry["rank"] for entry in rankings if entry["espn_team_id"] == selected_id),
+        None,
+    )
+    selected_team = next(team for team in teams if team["espn_team_id"] == selected_id)
+    return {
+        "season": season,
+        "week": week,
+        "scoring": scoring,
+        "status": "configured",
+        "selected_team_id": selected_id,
+        "teams": teams,
+        "snapshot": {
+            "team": selected_team,
+            "record": {
+                "wins": detail["wins"],
+                "losses": detail["losses"],
+                "ties": detail["ties"],
+            },
+            "opponent": matchup.get("opponent") if matchup else None,
+            "is_bye": matchup.get("is_bye") if matchup else False,
+            "power_rank": rank,
+            "waiver_rank": selected_team.get("waiver_rank"),
+            "starter_projection": round(sum(starter_values), 1) if starter_values else None,
+            "projection_as_of": roster.get("player_data", {}).get("projection_as_of"),
+        },
+    }
+
+
+def select_member_team(
+    db: Session,
+    username: str,
+    season: int,
+    espn_team_id: int,
+    scoring: str = "std",
+) -> Dict[str, Any]:
+    """Persist one ESPN team per account and season, then return its snapshot."""
+    season = _require_season(db, season)
+    _require_team(db, season, espn_team_id)
+    selection = (
+        db.query(FantasyLeagueAccountTeam)
+        .filter(
+            FantasyLeagueAccountTeam.username == username,
+            FantasyLeagueAccountTeam.season == season,
+        )
+        .first()
+    )
+    if selection is None:
+        selection = FantasyLeagueAccountTeam(
+            username=username, season=season, espn_team_id=espn_team_id
+        )
+        db.add(selection)
+    else:
+        selection.espn_team_id = espn_team_id
+    db.commit()
+    return get_member_snapshot(db, username, season=season, scoring=scoring)

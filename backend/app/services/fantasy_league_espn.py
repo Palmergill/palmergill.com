@@ -339,6 +339,7 @@ def parse_teams(payload: Any, members_by_guid: Optional[Dict[str, str]] = None) 
                 "owner_guid": owner_guid,
                 "owner_name": members_by_guid.get(owner_guid) if owner_guid else None,
                 "playoff_seed": coerce_int(team.get("playoffSeed")),
+                "waiver_rank": coerce_int(team.get("waiverRank")),
                 "wins": coerce_int(record.get("wins")) or 0,
                 "losses": coerce_int(record.get("losses")) or 0,
                 "ties": coerce_int(record.get("ties")) or 0,

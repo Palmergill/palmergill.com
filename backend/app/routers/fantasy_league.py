@@ -16,6 +16,7 @@ from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
+from pydantic import BaseModel
 
 from app.database import SessionLocal, get_db
 from app.services import fantasy_ai, fantasy_league_data
@@ -26,6 +27,11 @@ from app.routers.fantasy import run_blocking
 router = APIRouter(prefix="/api/fantasy/league", tags=["fantasy-league"])
 
 
+class LeagueTeamSelectionRequest(BaseModel):
+    season: int
+    espn_team_id: int
+
+
 def require_member(request: Request) -> Dict[str, Any]:
     """Any signed-in account may read the league; anonymous callers may not."""
     if getattr(request.state, "demo_mode", False):
@@ -34,6 +40,52 @@ def require_member(request: Request) -> Dict[str, Any]:
     if not identity:
         raise HTTPException(status_code=403, detail="Sign in to view the league hub.")
     return identity
+
+
+def _member_username(identity: Dict[str, Any]) -> str:
+    username = identity.get("username") or identity.get("name")
+    if not username:
+        raise HTTPException(status_code=403, detail="Signed-in account has no username.")
+    return str(username)
+
+
+@router.get("/me")
+def member_snapshot(
+    season: Optional[int] = None,
+    week: Optional[int] = None,
+    scoring: str = Query("std", pattern="^(ppr|half|half_ppr|half-ppr|std|standard)$"),
+    identity: Dict[str, Any] = Depends(require_member),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    try:
+        return fantasy_league_data.get_member_snapshot(
+            db,
+            _member_username(identity),
+            season=season,
+            week=week,
+            scoring=scoring,
+        )
+    except UnknownSeasonError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+
+
+@router.put("/me")
+def select_member_team(
+    payload: LeagueTeamSelectionRequest,
+    identity: Dict[str, Any] = Depends(require_member),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    try:
+        return fantasy_league_data.select_member_team(
+            db,
+            _member_username(identity),
+            payload.season,
+            payload.espn_team_id,
+        )
+    except UnknownSeasonError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except UnknownTeamError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
 
 
 @router.get("/seasons")

@@ -5,6 +5,7 @@ same in demo and authenticated modes. "Latest" for a snapshot table resolves
 through the newest successful FantasyCollectionRun (see fantasy_collector).
 """
 import json
+from datetime import timedelta
 from statistics import median
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -749,6 +750,13 @@ def compare_players(
         for entry in projection_data["projections"]
     }
     matchups = _week_matchups(db, season, week)
+    season_market = get_season_fantasy_point_leaders(
+        db, season=season, scoring=scoring, limit=10000
+    )
+    market_by_player = {
+        entry["player"]["player_id"]: entry
+        for entry in season_market.get("leaders", [])
+    }
 
     players = []
     for pid in ids:
@@ -761,13 +769,35 @@ def compare_players(
             db.query(FantasyPlayerStat)
             .filter(FantasyPlayerStat.player_id == pid)
             .order_by(FantasyPlayerStat.season.desc(), FantasyPlayerStat.week.desc())
-            .limit(3)
+            .limit(5)
             .all()
         )
         entry["recent_ppr"] = [
             {"week": s.week, "opponent": s.opponent, "fantasy_points_ppr": s.fantasy_points_ppr}
             for s in recent
         ]
+        market = market_by_player.get(pid)
+        entry["market"] = (
+            {
+                "total": market["fantasy_points"],
+                "projection": market["projected_points"],
+                "edge": market["projection_delta"],
+                "yard_points": market["yard_points"],
+                "touchdown_points": market["touchdown_points"],
+                "reception_points": market["reception_points"],
+                "quoted_categories": sorted(market.get("implied", {})),
+            }
+            if market is not None
+            else {
+                "total": None,
+                "projection": None,
+                "edge": None,
+                "yard_points": None,
+                "touchdown_points": None,
+                "reception_points": None,
+                "quoted_categories": [],
+            }
+        )
         _attach_matchup(entry, matchups)
         players.append(entry)
 
@@ -1143,6 +1173,28 @@ def _latest_season_prop_run(db: Session, season: int):
     )
 
 
+def _season_prop_run_at_or_before(db: Session, season: int, cutoff):
+    """Newest complete market board at or before an exact UTC cutoff."""
+    with_players = (
+        db.query(FantasySeasonPropSnapshot.run_id)
+        .filter(FantasySeasonPropSnapshot.player_id.isnot(None))
+        .distinct()
+    )
+    return (
+        db.query(FantasyCollectionRun)
+        .filter(
+            FantasyCollectionRun.job == "season_props",
+            FantasyCollectionRun.season == season,
+            FantasyCollectionRun.status == "success",
+            FantasyCollectionRun.finished_at.isnot(None),
+            FantasyCollectionRun.finished_at <= cutoff,
+            FantasyCollectionRun.id.in_(with_players),
+        )
+        .order_by(FantasyCollectionRun.finished_at.desc(), FantasyCollectionRun.id.desc())
+        .first()
+    )
+
+
 def _season_drop_rates(snapshots) -> Dict[Tuple[str, str], float]:
     """Typical curve slope for each (provider, market) pair on the board.
 
@@ -1437,6 +1489,8 @@ def get_season_prop_leaders(
     market: Optional[str] = None,
     season: Optional[int] = None,
     limit: int = 60,
+    _run=None,
+    _include_movement: bool = True,
 ) -> Dict[str, Any]:
     """Every quoted player, ranked by the market-implied raw stat value.
 
@@ -1451,7 +1505,7 @@ def get_season_prop_leaders(
     """
     if season is None:
         season = default_context(db)["season"]
-    run = _latest_season_prop_run(db, season)
+    run = _run or _latest_season_prop_run(db, season)
     labels = dict(SEASON_PROP_MARKETS)
 
     rows_by_market: Dict[str, Dict[str, list]] = {key: {} for key, _ in SEASON_PROP_MARKETS}
@@ -1511,10 +1565,39 @@ def get_season_prop_leaders(
         )
     )
 
+    baseline_as_of = None
+    if _include_movement and run is not None and run.finished_at is not None:
+        baseline_run = _season_prop_run_at_or_before(
+            db, season, run.finished_at - timedelta(days=7)
+        )
+        if baseline_run is not None:
+            baseline = get_season_prop_leaders(
+                db,
+                market=market,
+                season=season,
+                limit=10000,
+                _run=baseline_run,
+                _include_movement=False,
+            )
+            baseline_as_of = baseline.get("as_of")
+            baseline_values = {
+                entry["player"]["player_id"]: entry.get("implied_value")
+                for entry in baseline["leaders"]
+            }
+            for entry in leaders:
+                value = baseline_values.get(entry["player"]["player_id"])
+                entry["baseline_value"] = value
+                entry["movement"] = (
+                    round(entry["implied_value"] - value, 1)
+                    if value is not None and entry["implied_value"] is not None
+                    else None
+                )
+
     sources = _season_sources(snapshots)
     return {
         "season": season,
         "as_of": iso_utc(run.finished_at) if run else None,
+        "baseline_as_of": baseline_as_of,
         "source": _season_source_label(sources),
         "sources": sources,
         "market": market,
@@ -1603,6 +1686,7 @@ def get_season_fantasy_point_leaders(
     season: Optional[int] = None,
     scoring: str = "std",
     limit: int = 100,
+    _run=None,
 ) -> Dict[str, Any]:
     """Rank players by fantasy points implied by quoted markets.
 
@@ -1631,7 +1715,7 @@ def get_season_fantasy_point_leaders(
     if season is None:
         season = default_context(db)["season"]
     scoring = normalize_scoring(scoring)
-    run = _latest_season_prop_run(db, season)
+    run = _run or _latest_season_prop_run(db, season)
     if run is None:
         return {
             "season": season,
@@ -1767,6 +1851,139 @@ def get_season_fantasy_point_leaders(
         "projection_providers": projection_providers,
         "excluded_without_projection": excluded_without_projection,
         "leaders": leaders[:limit],
+    }
+
+
+def get_season_fantasy_movers(
+    db: Session,
+    season: Optional[int] = None,
+    scoring: str = "std",
+    days: int = 7,
+    limit: int = 5,
+) -> Dict[str, Any]:
+    """Largest value-board changes against the exact historical cutoff."""
+    if season is None:
+        season = default_context(db)["season"]
+    scoring = normalize_scoring(scoring)
+    current_run = _latest_season_prop_run(db, season)
+    empty = {
+        "season": season,
+        "scoring": scoring,
+        "days": days,
+        "as_of": iso_utc(current_run.finished_at) if current_run else None,
+        "baseline_as_of": None,
+        "gainers": [],
+        "fallers": [],
+    }
+    if current_run is None or current_run.finished_at is None:
+        return empty
+    baseline_run = _season_prop_run_at_or_before(
+        db, season, current_run.finished_at - timedelta(days=days)
+    )
+    if baseline_run is None:
+        return empty
+
+    current = get_season_fantasy_point_leaders(
+        db, season=season, scoring=scoring, limit=10000, _run=current_run
+    )
+    baseline = get_season_fantasy_point_leaders(
+        db, season=season, scoring=scoring, limit=10000, _run=baseline_run
+    )
+    baseline_values = {
+        entry["player"]["player_id"]: entry["fantasy_points"]
+        for entry in baseline["leaders"]
+    }
+    changes = []
+    for entry in current["leaders"]:
+        player_id = entry["player"]["player_id"]
+        if player_id not in baseline_values:
+            continue
+        baseline_value = baseline_values[player_id]
+        delta = round(entry["fantasy_points"] - baseline_value, 1)
+        changes.append({
+            "player": entry["player"],
+            "current_value": entry["fantasy_points"],
+            "baseline_value": baseline_value,
+            "delta": delta,
+            "as_of": current["as_of"],
+            "baseline_as_of": baseline["as_of"],
+        })
+
+    empty.update({
+        "baseline_as_of": baseline["as_of"],
+        "gainers": sorted(
+            (entry for entry in changes if entry["delta"] > 0),
+            key=lambda entry: (-entry["delta"], entry["player"]["name"] or ""),
+        )[:limit],
+        "fallers": sorted(
+            (entry for entry in changes if entry["delta"] < 0),
+            key=lambda entry: (entry["delta"], entry["player"]["name"] or ""),
+        )[:limit],
+    })
+    return empty
+
+
+def get_player_season_fantasy_history(
+    db: Session,
+    player_id: str,
+    season: Optional[int] = None,
+    scoring: str = "std",
+    days: int = 30,
+) -> Optional[Dict[str, Any]]:
+    """Chronological market/projection history, calculated once per run."""
+    player = db.get(FantasyPlayer, player_id)
+    if player is None:
+        return None
+    if season is None:
+        season = default_context(db)["season"]
+    scoring = normalize_scoring(scoring)
+    latest = _latest_season_prop_run(db, season)
+    if latest is None or latest.finished_at is None:
+        return {
+            "season": season, "scoring": scoring, "player": _player_public(player),
+            "days": days, "points": [],
+        }
+    run_ids = (
+        db.query(FantasySeasonPropSnapshot.run_id)
+        .filter(FantasySeasonPropSnapshot.player_id == player_id)
+        .distinct()
+    )
+    runs = (
+        db.query(FantasyCollectionRun)
+        .filter(
+            FantasyCollectionRun.id.in_(run_ids),
+            FantasyCollectionRun.job == "season_props",
+            FantasyCollectionRun.season == season,
+            FantasyCollectionRun.status.in_(("success", "partial")),
+            FantasyCollectionRun.finished_at >= latest.finished_at - timedelta(days=days),
+            FantasyCollectionRun.finished_at <= latest.finished_at,
+        )
+        .order_by(FantasyCollectionRun.finished_at.desc(), FantasyCollectionRun.id.desc())
+        .limit(32)
+        .all()
+    )
+    points = []
+    for run in reversed(runs):
+        board = get_season_fantasy_point_leaders(
+            db, season=season, scoring=scoring, limit=10000, _run=run
+        )
+        row = next(
+            (entry for entry in board["leaders"] if entry["player"]["player_id"] == player_id),
+            None,
+        )
+        if row is not None:
+            points.append({
+                "as_of": board["as_of"],
+                "market": row["fantasy_points"],
+                "projection": row["projected_points"],
+                "edge": row["projection_delta"],
+            })
+    return {
+        "season": season,
+        "scoring": scoring,
+        "player": _player_public(player),
+        "days": days,
+        "points": points,
     }
 
 

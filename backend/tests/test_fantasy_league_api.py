@@ -17,6 +17,7 @@ from app.database import (
     FantasyLeagueRosterEntry,
     FantasyLeagueSeason,
     FantasyLeagueTeam,
+    FantasyLeagueAccountTeam,
     FantasyLeagueTeamOverview,
     FantasyMeta,
     FantasyPlayer,
@@ -38,6 +39,7 @@ ADMIN_USERNAME = "palmer"
 ADMIN_PASSWORD = "secret"
 
 LEAGUE_MODELS = (
+    FantasyLeagueAccountTeam,
     FantasyLeaguePowerRanking,
     FantasyLeagueRosterEntry,
     FantasyLeagueMatchup,
@@ -56,6 +58,7 @@ LEAGUE_MODELS = (
 
 # Every members-only route, used to prove the gate covers all of them.
 LEAGUE_ROUTES = (
+    "/api/fantasy/league/me?season=2024",
     "/api/fantasy/league/seasons",
     "/api/fantasy/league/overview",
     "/api/fantasy/league/standings",
@@ -115,6 +118,62 @@ def admin_client():
         create_app_session_token(ADMIN_USERNAME, ADMIN_PASSWORD, role=ROLE_ADMIN),
     )
     return client
+
+
+def test_member_can_select_a_team_and_reuse_it_for_the_season(seeded_db, monkeypatch):
+    monkeypatch.setattr(
+        "app.services.fantasy_league_data.get_team_roster",
+        lambda *_args, **_kwargs: {
+            "player_data": {"projection_as_of": None},
+            "entries": [
+                {"is_starter": True, "projection": {"pts_std": 10.0}},
+                {"is_starter": True, "projection": {"pts_std": 12.5}},
+                {"is_starter": False, "projection": {"pts_std": 50.0}},
+            ],
+        },
+    )
+    client = member_client()
+
+    initial = client.get("/api/fantasy/league/me?season=2024&scoring=std")
+    assert initial.status_code == 200
+    assert initial.json()["status"] == "unconfigured"
+    assert initial.json()["teams"]
+
+    selected = client.put(
+        "/api/fantasy/league/me",
+        json={"season": 2024, "espn_team_id": 1},
+    )
+    assert selected.status_code == 200
+    payload = selected.json()
+    assert payload["status"] == "configured"
+    assert payload["selected_team_id"] == 1
+    assert set(payload["snapshot"]["record"]) == {"wins", "losses", "ties"}
+    assert payload["snapshot"]["starter_projection"] == 22.5
+
+    again = client.get("/api/fantasy/league/me?season=2024&scoring=std").json()
+    assert again["selected_team_id"] == 1
+
+
+def test_team_selection_validates_team_and_allows_shared_teams(seeded_db):
+    client = member_client()
+    invalid = client.put(
+        "/api/fantasy/league/me",
+        json={"season": 2024, "espn_team_id": 999},
+    )
+    assert invalid.status_code == 422
+
+    assert client.put(
+        "/api/fantasy/league/me",
+        json={"season": 2024, "espn_team_id": 1},
+    ).status_code == 200
+    assert admin_client().put(
+        "/api/fantasy/league/me",
+        json={"season": 2024, "espn_team_id": 1},
+    ).status_code == 200
+    rows = seeded_db.query(FantasyLeagueAccountTeam).filter_by(
+        season=2024, espn_team_id=1
+    ).all()
+    assert {row.username for row in rows} == {"taylor", ADMIN_USERNAME}
 
 
 # ── the gate ────────────────────────────────────────────────────────────

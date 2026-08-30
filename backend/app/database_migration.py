@@ -154,6 +154,12 @@ def migrate_database():
             "quoted_at",
             "TIMESTAMP" if is_postgres else "DATETIME",
         )
+        _add_column_if_missing(
+            inspector,
+            "ff_league_teams",
+            "waiver_rank",
+            "INTEGER",
+        )
 
         refreshed = inspect(engine)
         if (

@@ -1,5 +1,6 @@
 """Season-long NFL player over/under collection and read behavior."""
 import json
+from datetime import datetime, timedelta
 
 import pytest
 
@@ -606,3 +607,93 @@ def test_offense_rankings_are_empty_before_any_collection_run(db):
     assert board["source"] is None
     assert board["yards"] == []
     assert board["touchdowns"] == []
+
+
+def _market_run(db, finished_at, values, include_new=False):
+    run = FantasyCollectionRun(
+        job="season_props",
+        source="fixture",
+        season=2026,
+        status="success",
+        started_at=finished_at - timedelta(minutes=1),
+        finished_at=finished_at,
+        rows_written=4,
+    )
+    db.add(run)
+    db.flush()
+    players = [("qb1", "Josh Allen", values)]
+    if include_new:
+        if db.get(FantasyPlayer, "qb_new") is None:
+            db.add(named_player("qb_new", "New Quarterback", "QB", "NYG"))
+        players.append(("qb_new", "New Quarterback", (3000, 20)))
+    for player_id, name, (yards, touchdowns) in players:
+        for market_key, point in (
+            ("season_pass_yds", yards),
+            ("season_pass_tds", touchdowns),
+        ):
+            db.add(FantasySeasonPropSnapshot(
+                run_id=run.id,
+                season=2026,
+                player_id=player_id,
+                player_name_raw=name,
+                bookmaker="Fixture",
+                market=market_key,
+                outcome="Over",
+                price=100,
+                point=point,
+                quoted_at=finished_at,
+                fetched_at=finished_at,
+            ))
+    db.commit()
+    return run
+
+
+def test_movers_use_the_newest_successful_run_at_or_before_exact_cutoff(db):
+    now = datetime(2026, 8, 20, 12, 0, 0)
+    baseline = _market_run(db, now - timedelta(days=8), (3500, 30))
+    _market_run(db, now - timedelta(days=6), (3700, 32))
+    current = _market_run(db, now, (4000, 35), include_new=True)
+
+    movers = fd.get_season_fantasy_movers(
+        db, season=2026, scoring="std", days=7, limit=5
+    )
+
+    assert movers["as_of"] == fd.iso_utc(current.finished_at)
+    assert movers["baseline_as_of"] == fd.iso_utc(baseline.finished_at)
+    assert [entry["player"]["player_id"] for entry in movers["gainers"]] == ["qb1"]
+    assert movers["gainers"][0]["delta"] == 40.0
+    assert all(entry["player"]["player_id"] != "qb_new" for entry in movers["gainers"])
+
+
+def test_raw_market_movement_and_player_history_are_chronological(db):
+    now = datetime(2026, 8, 20, 12, 0, 0)
+    baseline = _market_run(db, now - timedelta(days=8), (3500, 30))
+    _market_run(db, now - timedelta(days=6), (3700, 32))
+    _market_run(db, now, (4000, 35))
+
+    board = fd.get_season_prop_leaders(
+        db, market="season_pass_yds", season=2026
+    )
+    assert board["baseline_as_of"] == fd.iso_utc(baseline.finished_at)
+    assert board["leaders"][0]["baseline_value"] == 3500.0
+    assert board["leaders"][0]["movement"] == 500.0
+
+    history = fd.get_player_season_fantasy_history(
+        db, "qb1", season=2026, scoring="std", days=30
+    )
+    assert len(history["points"]) == 3
+    assert [point["market"] for point in history["points"]] == [260.0, 276.0, 300.0]
+    assert [point["as_of"] for point in history["points"]] == sorted(
+        point["as_of"] for point in history["points"]
+    )
+
+
+def test_compare_payload_includes_backward_compatible_market_components(db):
+    _market_run(db, datetime(2026, 8, 20, 12, 0, 0), (4000, 35))
+    compared = fd.compare_players(db, ["qb1", "missing"], scoring="std")
+
+    market = compared["players"][0]["market"]
+    assert market["total"] == 300.0
+    assert market["yard_points"] == 160.0
+    assert market["touchdown_points"] == 140.0
+    assert market["quoted_categories"] == ["season_pass_tds", "season_pass_yds"]
