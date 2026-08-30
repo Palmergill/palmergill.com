@@ -17,8 +17,7 @@ def _add_column_if_missing(inspector, table_name, column_name, definition):
     if column_name in existing:
         return False
     if not _SAFE_IDENTIFIER.match(table_name) or not _SAFE_IDENTIFIER.match(column_name):
-        logger.warning("Skipping unsafe migration identifier %s.%s", table_name, column_name)
-        return False
+        raise ValueError(f"Unsafe migration identifier {table_name}.{column_name}")
 
     logger.info("Adding column %s to %s", column_name, table_name)
     with engine.begin() as conn:
@@ -37,53 +36,41 @@ def migrate_database():
             existing_columns = [col['name'] for col in inspector.get_columns('stock_summaries')]
             
             from app.database import StockSummary
-            expected_columns = [col.name for col in StockSummary.__table__.columns]
+            expected_columns = {col.name: col for col in StockSummary.__table__.columns}
             
-            for col_name in expected_columns:
+            for col_name, column in expected_columns.items():
                 if col_name not in existing_columns and col_name != 'id':
                     logger.info(f"Adding column {col_name} to stock_summaries")
                     try:
                         if not _SAFE_IDENTIFIER.match(col_name):
-                            logger.warning(f"Skipping column with invalid name: {col_name!r}")
-                            continue
-                        col_type = "FLOAT"
-                        if col_name in ['ticker', 'name']:
-                            col_type = "VARCHAR"
-                        elif col_name in ['next_earnings_date']:
-                            col_type = "DATE"
-                        elif col_name in ['fetched_at']:
-                            col_type = "TIMESTAMP" if is_postgres else "DATETIME"
+                            raise ValueError(f"Unsafe stock_summaries column name {col_name!r}")
+                        col_type = column.type.compile(dialect=engine.dialect)
 
-                        with engine.connect() as conn:
+                        with engine.begin() as conn:
                             conn.execute(text(f"ALTER TABLE stock_summaries ADD COLUMN {col_name} {col_type}"))
-                            conn.commit()
-                    except Exception as e:
-                        logger.warning(f"Could not add column {col_name}: {e}")
+                    except Exception:
+                        logger.exception("Could not add required column %s", col_name)
+                        raise
         
         if 'earnings' in inspector.get_table_names():
             existing_columns = [col['name'] for col in inspector.get_columns('earnings')]
             
             from app.database import EarningsRecord
-            expected_columns = [col.name for col in EarningsRecord.__table__.columns]
+            expected_columns = {col.name: col for col in EarningsRecord.__table__.columns}
             
-            for col_name in expected_columns:
+            for col_name, column in expected_columns.items():
                 if col_name not in existing_columns and col_name != 'id':
                     logger.info(f"Adding column {col_name} to earnings")
                     try:
                         if not _SAFE_IDENTIFIER.match(col_name):
-                            logger.warning(f"Skipping column with invalid name: {col_name!r}")
-                            continue
-                        col_type = "FLOAT"
-                        if col_name in ['ticker', 'name', 'period']:
-                            col_type = "VARCHAR"
-                        elif col_name in ['fiscal_date', 'fetched_at']:
-                            col_type = "TIMESTAMP" if is_postgres else "DATETIME"
+                            raise ValueError(f"Unsafe earnings column name {col_name!r}")
+                        col_type = column.type.compile(dialect=engine.dialect)
 
-                        with engine.connect() as conn:
+                        with engine.begin() as conn:
                             conn.execute(text(f"ALTER TABLE earnings ADD COLUMN {col_name} {col_type}"))
-                            conn.commit()
-                    except Exception as e:
-                        logger.warning(f"Could not add column {col_name}: {e}")
+                    except Exception:
+                        logger.exception("Could not add required column %s", col_name)
+                        raise
 
         # Fourth & Fortune existed before practice/test modes. These defaults
         # preserve every existing room and player as a real league participant.
@@ -184,8 +171,9 @@ def migrate_database():
 
         logger.info("Database migration complete")
         
-    except Exception as e:
-        logger.error(f"Migration error: {e}")
+    except Exception:
+        logger.exception("Migration failed")
+        raise
 
 def init_db_with_migration():
     """Initialize DB with auto-migration"""
@@ -193,8 +181,6 @@ def init_db_with_migration():
     Base.metadata.create_all(bind=engine)
     logger.info("Database tables created (if not existed)")
     
-    # Then run migrations for existing tables
-    try:
-        migrate_database()
-    except Exception as e:
-        logger.warning(f"Migration step failed (may be OK for fresh DB): {e}")
+    # Then run migrations for existing tables. A partially migrated schema is
+    # not safe to serve, so failures must abort startup and fail readiness.
+    migrate_database()

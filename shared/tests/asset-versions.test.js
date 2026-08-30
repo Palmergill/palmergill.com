@@ -60,4 +60,23 @@ describe.each(APPS)('%s asset versions', (app) => {
 
         expect(mismatches).toEqual([]);
     });
+
+    test('the mutable web manifest is revalidated by the CDN', () => {
+        const vercel = JSON.parse(fs.readFileSync(path.join(ROOT, 'vercel.json'), 'utf8'));
+        const rule = vercel.headers.find(({ source }) => source === `/${app}/(.*\\.json)`);
+        const cacheControl = rule?.headers.find(({ key }) => key === 'Cache-Control')?.value || '';
+
+        expect(cacheControl).toContain('max-age=0');
+        expect(cacheControl).toContain('must-revalidate');
+        expect(cacheControl).not.toContain('immutable');
+    });
+
+    test('the installed app launches inside its own scope', () => {
+        const manifest = JSON.parse(
+            fs.readFileSync(path.join(ROOT, app, 'manifest.json'), 'utf8')
+        );
+
+        expect(manifest.start_url).toBe(`/${app}/`);
+        expect(manifest.scope).toBe(`/${app}/`);
+    });
 });

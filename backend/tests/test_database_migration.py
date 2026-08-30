@@ -1,6 +1,7 @@
 """Backwards-compatible schema changes for persistent deployments."""
 
 from sqlalchemy import create_engine, inspect, text
+import pytest
 
 from app import database_migration
 
@@ -62,3 +63,45 @@ def test_draft_room_modes_are_added_to_an_existing_database(monkeypatch):
         assert connection.execute(text(
             "SELECT game_version FROM ff_draft_sessions WHERE id = 'room-2'"
         )).scalar_one() == "fourth-and-fortune-v2"
+
+
+def test_migration_failure_is_not_swallowed(monkeypatch):
+    legacy_engine = create_engine("sqlite:///:memory:")
+    with legacy_engine.begin() as connection:
+        connection.execute(text("CREATE TABLE ff_draft_sessions (id VARCHAR PRIMARY KEY)"))
+
+    monkeypatch.setattr(database_migration, "engine", legacy_engine)
+    monkeypatch.setattr(database_migration, "is_postgres", False)
+    def fail_migration(*args, **kwargs):
+        raise RuntimeError("migration failed")
+
+    monkeypatch.setattr(database_migration, "_add_column_if_missing", fail_migration)
+
+    with pytest.raises(RuntimeError, match="migration failed"):
+        database_migration.migrate_database()
+
+
+def test_company_profile_columns_are_added_to_legacy_stock_cache(monkeypatch):
+    legacy_engine = create_engine("sqlite:///:memory:")
+    with legacy_engine.begin() as connection:
+        connection.execute(text(
+            "CREATE TABLE stock_summaries ("
+            "id INTEGER PRIMARY KEY, ticker VARCHAR, name VARCHAR, fetched_at DATETIME)"
+        ))
+
+    monkeypatch.setattr(database_migration, "engine", legacy_engine)
+    monkeypatch.setattr(database_migration, "is_postgres", False)
+    database_migration.migrate_database()
+
+    columns = {
+        column["name"] for column in inspect(legacy_engine).get_columns("stock_summaries")
+    }
+    assert {
+        "description",
+        "industry",
+        "sector",
+        "employees",
+        "list_date",
+        "headquarters",
+        "website",
+    } <= columns

@@ -16,6 +16,7 @@ import random
 import pytest
 from fastapi.testclient import TestClient
 
+from app import accounts
 from app.accounts import ROLE_ADMIN, ROLE_MEMBER
 from app.database import (
     FantasyCollectionRun,
@@ -168,6 +169,17 @@ def seeded_db():
 
 
 def client_for(username: str, role: str = ROLE_MEMBER) -> TestClient:
+    if role == ROLE_MEMBER:
+        session = SessionLocal()
+        try:
+            user = accounts.get_user(session, username)
+            if user is None:
+                accounts.create_user(session, username, "fixture-password-123")
+            elif not user.is_active:
+                user.is_active = True
+                session.commit()
+        finally:
+            session.close()
     client = TestClient(app)
     client.cookies.set(
         SESSION_COOKIE_NAME, create_app_session_token(username, ADMIN_PASSWORD, role=role)

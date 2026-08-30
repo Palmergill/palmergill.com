@@ -175,9 +175,12 @@ class StockDataClient:
             return None
         
         cache_age = utc_now() - summary.fetched_at
-        max_ttl = max(CACHE_TTL.values())
+        # StockSummary stores price and slower-moving fundamentals together,
+        # so the row must honor the strictest TTL. Using the longest TTL here
+        # previously left the displayed quote stale for as long as 24 hours.
+        response_ttl = min(CACHE_TTL.values())
         
-        if not accept_stale and cache_age > max_ttl:
+        if not accept_stale and cache_age > response_ttl:
             return None
         
         earnings = db.query(EarningsRecord).filter(
@@ -233,6 +236,13 @@ class StockDataClient:
         summary_values = {
             "ticker": ticker,
             "name": data.get("name", ticker),
+            "description": data.get("description"),
+            "industry": data.get("industry"),
+            "sector": data.get("sector"),
+            "employees": data.get("employees"),
+            "list_date": self._parse_date(data.get("list_date")),
+            "headquarters": data.get("headquarters"),
+            "website": data.get("website"),
             "market_cap": data.get("market_cap"),
             "current_price": data.get("current_price"),
             "pe_ratio": data.get("pe_ratio"),
@@ -306,6 +316,13 @@ class StockDataClient:
         return {
             "ticker": ticker,
             "name": summary.name,
+            "description": summary.description,
+            "industry": summary.industry,
+            "sector": summary.sector,
+            "employees": summary.employees,
+            "list_date": summary.list_date.isoformat() if summary.list_date else None,
+            "headquarters": summary.headquarters,
+            "website": summary.website,
             "summary": {
                 "ticker": ticker,
                 "name": summary.name,

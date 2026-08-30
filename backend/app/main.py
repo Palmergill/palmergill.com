@@ -16,9 +16,10 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTextResponse, RedirectResponse
 from app import accounts
 from app.accounts import ROLE_ADMIN, ROLE_MEMBER, AccountError
-from app.database import SessionLocal
+from app.database import SessionLocal, engine
 from app.database_migration import init_db_with_migration
 from app.log_handler import install_db_logging
+from app.version import APP_VERSION
 from app.routers import (
     admin,
     analytics,
@@ -33,6 +34,7 @@ from app.routers import (
 )
 from app.routers.analytics import cleanup_old_analytics, record_analytics_event
 import os
+from sqlalchemy import text
 
 logger = logging.getLogger(__name__)
 
@@ -214,7 +216,7 @@ async def _periodic_fantasy_collection(interval: int = 15 * 60) -> None:
         await asyncio.sleep(interval)
 
 
-app = FastAPI(title="Palmer Gill API", version="0.2.0-p5", lifespan=lifespan)
+app = FastAPI(title="Palmer Gill API", version=APP_VERSION, lifespan=lifespan)
 
 AUTH_REALM = "Palmer Gill Apps"
 SESSION_COOKIE_NAME = "pg_session"
@@ -498,7 +500,20 @@ def session_identity(request: Request) -> dict | None:
         return {"username": config["username"], "role": ROLE_ADMIN}
 
     if role == ROLE_MEMBER:
-        return {"username": username, "role": ROLE_MEMBER}
+        # Member status is mutable. A valid signature proves the API issued
+        # the cookie, but it must not keep a deactivated/deleted account alive
+        # until the cookie's eight-hour expiry.
+        db = SessionLocal()
+        try:
+            user = accounts.get_user(db, username)
+            if user is None or not user.is_active:
+                return None
+            return {"username": user.display_name, "role": ROLE_MEMBER}
+        except Exception:
+            logger.exception("Could not validate member session for %s", username)
+            return None
+        finally:
+            db.close()
 
     return None
 
@@ -930,9 +945,22 @@ app.include_router(fantasy_league.router)
 app.include_router(fantasy_rankings.router)
 app.include_router(draft_order.router)
 
+def _check_database_readiness() -> None:
+    with engine.connect() as connection:
+        connection.execute(text("SELECT 1"))
+
+
 @app.get("/health")
 async def health():
-    return {"status": "ok", "version": "1.2.1"}
+    try:
+        await asyncio.to_thread(_check_database_readiness)
+    except Exception:
+        logger.exception("Database readiness check failed")
+        return JSONResponse(
+            {"status": "unhealthy", "version": APP_VERSION, "database": "unavailable"},
+            status_code=503,
+        )
+    return {"status": "ok", "version": APP_VERSION, "database": "ok"}
 
 # Static site serving is only enabled for local development. Production should
 # treat this FastAPI app as the API service; the public site is hosted separately.

@@ -124,6 +124,7 @@ class PolygonClient:
             return {
                 "name": details.get("name", ticker),
                 "ticker": ticker,
+                **self._company_metadata(details),
                 "market_cap": market_cap,
                 "current_price": price_data.get("close"),
                 "pe_ratio": self._calculate_pe(details, price_data, earnings),
@@ -173,6 +174,60 @@ class PolygonClient:
             raise ValueError(f"Ticker {ticker} not found")
         
         return data["results"]
+
+    @staticmethod
+    def _company_metadata(details: Dict) -> Dict:
+        """Translate Polygon ticker details into the public company profile."""
+        address = details.get("address")
+        if not isinstance(address, dict):
+            address = {}
+        headquarters = ", ".join(
+            str(value).strip()
+            for value in (
+                address.get("address1"),
+                address.get("city"),
+                address.get("state"),
+                address.get("postal_code"),
+            )
+            if value and str(value).strip()
+        ) or None
+
+        sector = None
+        try:
+            sic = int(str(details.get("sic_code", ""))[:2])
+        except ValueError:
+            sic = None
+        if sic is not None:
+            if 1 <= sic <= 9:
+                sector = "Agriculture"
+            elif 10 <= sic <= 14:
+                sector = "Mining"
+            elif 15 <= sic <= 17:
+                sector = "Construction"
+            elif 20 <= sic <= 39:
+                sector = "Manufacturing"
+            elif 40 <= sic <= 49:
+                sector = "Transportation, Communications & Utilities"
+            elif 50 <= sic <= 51:
+                sector = "Wholesale Trade"
+            elif 52 <= sic <= 59:
+                sector = "Retail Trade"
+            elif 60 <= sic <= 67:
+                sector = "Finance, Insurance & Real Estate"
+            elif 70 <= sic <= 89:
+                sector = "Services"
+            elif 91 <= sic <= 99:
+                sector = "Public Administration"
+
+        return {
+            "description": details.get("description"),
+            "industry": details.get("sic_description"),
+            "sector": sector,
+            "employees": details.get("total_employees"),
+            "list_date": details.get("list_date"),
+            "headquarters": headquarters,
+            "website": details.get("homepage_url"),
+        }
     
     def _get_previous_close(self, ticker: str) -> Dict:
         """Get previous day's close price"""

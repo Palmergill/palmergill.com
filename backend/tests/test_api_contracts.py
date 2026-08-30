@@ -5,8 +5,12 @@ covered in test_security_regressions.py; this file fills the stocks router
 gap and adds a couple of cross-router demo-mode/auth checks.
 """
 from fastapi.testclient import TestClient
+import json
+from pathlib import Path
 
+from app import main
 from app.main import SESSION_COOKIE_NAME, app, create_app_session_token
+from app.version import APP_VERSION
 
 client = TestClient(app)
 
@@ -83,6 +87,36 @@ def test_health_check_is_public_and_unauthenticated(monkeypatch):
     response = auth_client.get("/health")
 
     assert response.status_code == 200
+    assert response.json() == {"status": "ok", "version": APP_VERSION, "database": "ok"}
+
+
+def test_health_check_fails_when_database_is_unavailable(monkeypatch):
+    monkeypatch.setattr(
+        main,
+        "_check_database_readiness",
+        lambda: (_ for _ in ()).throw(RuntimeError("database unavailable")),
+    )
+
+    response = TestClient(app).get("/health")
+
+    assert response.status_code == 503
+    assert response.json() == {
+        "status": "unhealthy",
+        "version": APP_VERSION,
+        "database": "unavailable",
+    }
+
+
+def test_release_version_is_consistent_across_runtime_metadata():
+    root = Path(__file__).resolve().parents[2]
+    package = json.loads((root / "package.json").read_text(encoding="utf-8"))
+    package_lock = json.loads((root / "package-lock.json").read_text(encoding="utf-8"))
+
+    assert (root / "VERSION").read_text(encoding="utf-8").strip() == APP_VERSION
+    assert package["version"] == APP_VERSION
+    assert package_lock["version"] == APP_VERSION
+    assert package_lock["packages"][""]["version"] == APP_VERSION
+    assert app.version == APP_VERSION
 
 
 # ── timestamp serialization ────────────────────────────────────────────

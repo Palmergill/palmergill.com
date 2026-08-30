@@ -49,6 +49,12 @@ def signup(client, username="taylor", password="a-good-password", code=INVITE_CO
 
 def member_client(monkeypatch, username="taylor"):
     """A client holding a signed member session for `username`."""
+    db = SessionLocal()
+    try:
+        if accounts.get_user(db, username) is None:
+            accounts.create_user(db, username, "member-password-123")
+    finally:
+        db.close()
     client = TestClient(app)
     client.cookies.set(
         SESSION_COOKIE_NAME,
@@ -265,6 +271,23 @@ def test_deactivated_member_cannot_log_in(configured):
     assert response.status_code == 401
 
 
+def test_deactivating_member_revokes_an_existing_session(configured):
+    signup(configured, username="taylor", password="a-good-password")
+    assert configured.get("/login/session").json()["authenticated"] is True
+
+    db = SessionLocal()
+    try:
+        db.query(AppUser).filter(AppUser.username == "taylor").one().is_active = False
+        db.commit()
+    finally:
+        db.close()
+
+    session = configured.get("/login/session")
+    assert session.status_code == 200
+    assert session.json()["authenticated"] is False
+    assert configured.get("/api/fantasy/league/seasons").status_code == 403
+
+
 # --- the privilege boundary -------------------------------------------------
 
 
@@ -332,7 +355,7 @@ def test_member_token_naming_the_admin_gets_no_admin_rights(configured):
         create_app_session_token(ADMIN_USERNAME, ADMIN_PASSWORD, role=ROLE_MEMBER),
     )
 
-    assert client.get("/api/admin/logs").status_code == 403
+    assert client.get("/api/admin/logs").status_code in (401, 403)
 
 
 def test_unknown_role_claim_is_rejected(configured):

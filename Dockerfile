@@ -7,6 +7,7 @@ COPY backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy backend code
+COPY VERSION ./VERSION
 COPY backend/ .
 
 # Run as an unprivileged user; give it ownership of the app and SQLite data dir.

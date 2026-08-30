@@ -468,7 +468,15 @@ export default async function middleware(request) {
   const password = process.env.APP_AUTH_PASSWORD;
 
   let identity = password ? await sessionIdentity(request, username, password) : null;
-  if (!identity && isProtectedPath(url.pathname)) {
+  let authorityChecked = false;
+  // A signed member cookie is not sufficient for member-only pages: the
+  // account may have been deactivated since it was issued. Ask the API, which
+  // owns the account database, on every members-only page request.
+  if (identity?.role === ROLE_MEMBER && isMemberPath(url.pathname)) {
+    identity = await sessionIdentityFromApi(request);
+    authorityChecked = true;
+  }
+  if (!identity && !authorityChecked && isProtectedPath(url.pathname)) {
     identity = await sessionIdentityFromApi(request);
   }
 

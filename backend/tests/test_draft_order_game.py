@@ -9,6 +9,7 @@ from datetime import timedelta
 from fastapi.testclient import TestClient
 from sqlalchemy import event
 
+from app import accounts
 from app.accounts import ROLE_ADMIN, ROLE_MEMBER
 from app.database import (
     Base,
@@ -60,6 +61,16 @@ def settled(client, room_id):
 def member_client(monkeypatch, username):
     monkeypatch.setenv("APP_AUTH_USERNAME", "palmer")
     monkeypatch.setenv("APP_AUTH_PASSWORD", ADMIN_PASSWORD)
+    db = SessionLocal()
+    try:
+        user = accounts.get_user(db, username)
+        if user is None:
+            accounts.create_user(db, username, "fixture-password-123")
+        elif not user.is_active:
+            user.is_active = True
+            db.commit()
+    finally:
+        db.close()
     client = TestClient(app)
     client.cookies.set(
         SESSION_COOKIE_NAME,

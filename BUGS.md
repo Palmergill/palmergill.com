@@ -10,29 +10,19 @@ Closed items are trimmed quarterly.
 ## Medium
 
 - [ ] (backend deploy) Railway persistence policy is unresolved; decide whether production must require Postgres or a durable volume instead of accepting the Docker SQLite `/data` fallback. — found 2026-05-27
-- [ ] (poker API) `backend/app/routers/poker.py` duplicates client-IP parsing and trusts the spoofable leftmost `X-Forwarded-For` hop when `TRUST_PROXY_HEADERS` is enabled; use the hardened shared helper from `backend/app/main.py`. — found 2026-07-01
-- [ ] (poker API) `POST /api/poker/games/{id}/buy-back` lacks a tournament guard, allowing eliminated tournament players to buy back into play and corrupt standings. — found 2026-07-01
-- [ ] (craps strategy) Progression bet sizing in `craps-strategy/engine.js` bypasses legal-increment snapping after wins/losses; snap the new size through the bet rules before simulation continues. — found 2026-07-01
-- [ ] (backend rate limits) Public per-IP rate-limit stores in craps, analytics, and poker prune timestamps but never evict expired IP keys, so many one-off IPs can grow memory for the life of the process. — found 2026-07-01
-- [ ] (poker API) Showdown serialization reveals folded players' hole cards to state polling clients; reveal only the requesting player's cards or non-folded showdown hands. — found 2026-07-01
 
 ## Low
 
 - [ ] (fantasy API) `GET /api/fantasy/trending` has no caller on the site — it was 500ing unnoticed until 2026-08-22. Decide whether it is public API surface worth keeping or dead code to delete. — found 2026-08-22
 - [ ] (repo) `fourth-and-fortune-kickoff.html` is a tracked deck at the repository root rather than under a directory; move it under `fantasy/` or `docs/`. — found 2026-08-22
 - [ ] (fantasy) `formatAsOf` is duplicated between `fantasy/format.js` and `fantasy/league/format.js`. Per-page format modules are the deliberate convention (`formatPoints`, `sparkline`, `injuryBadge` are duplicated the same way), so this is only worth revisiting if a genuinely shared module ever appears. — found 2026-08-22
-- [ ] (auth redirect) `safe_next_path` accepts backslash-schemed redirects against the FastAPI endpoint directly; reject any `next` value containing `\` before parsing. — found 2026-07-01
-- [ ] (craps strategy) `everyRoll: false` is inert for one-roll bets because resolved stakes are zeroed before the re-arm check; either remove the flag or track one-time placement separately. — found 2026-07-01
-- [ ] (craps) The `$5` floor in `legalOddsAmount` silently drops small odds bets that snap below the floor; allow one legal increment or surface that odds were not placed. — found 2026-07-01
-- [ ] (frontend security) Chart.js loads from jsDelivr without SRI and is not cached for offline PWA flows; add integrity/crossorigin or vendor the file. — found 2026-07-01
-- [ ] (poker API) `GET /api/poker/games/{game_id}` persists a DB snapshot on every poll even though it is read-only; skip persistence unless state changed. — found 2026-07-01
-- [ ] (bitcoin chat) `_SESSION_MESSAGES` trims messages per session but never evicts sessions; add an LRU cap or timestamped sweep. — found 2026-07-01
-- [ ] (auth) `GET /login/logout` is CSRF-able and clears the session cookie; keep POST and make GET confirm or remove it. — found 2026-07-01
+- [ ] (frontend offline) Chart.js now has SRI, but the CDN script is still unavailable when craps strategy or stock research starts fully offline; vendor the pinned script if first-load offline support becomes a requirement. — found 2026-07-01
 - [ ] (admin analytics) Admin analytics summary endpoints load the full window into Python and aggregate in memory; move counts to SQL `GROUP BY` when traffic makes this slow. — found 2026-07-01
-- [ ] (poker engine) Busted cash-game players can be dealt in with zero chips and occupy a live seat; skip zero-chip players at deal time. — found 2026-07-01
 
 ## Closed
 
+- The 2026-08-23 complete-project review closed fail-open schema migrations/readiness, member-session revocation, 24-hour stale stock quotes, missing live company profiles, immutable unversioned PWA manifests, and release-version drift. Regression coverage was added for each production-only path. — closed 2026-08-23
+- Reconciled the July intake against the implementation: shared hardened client-IP parsing, tournament buy-back guards, legal progression snapping, expired rate-limit key eviction, folded-card privacy, backslash redirect rejection, one-roll placement state, small legal odds, read-only poker polling, bounded chat-session LRU storage, POST-only logout, and zero-chip deal filtering were already shipped and are no longer listed as open. — closed 2026-08-23
 - (fantasy API) `GET /api/fantasy/trending` returned a 500 on every call: the route's `-> Dict[str, List[Dict[str, Any]]]` return annotation is used by FastAPI as the response model, but the body echoes `kind` back as a string. Nothing on the site called the route, so it failed silently since it was written. Annotation widened to `Dict[str, Any]`; regression test in `backend/tests/test_fantasy_api.py`. — closed 2026-08-22
 - (backend) Naive-UTC timestamps were serialized without a `Z` outside the draft-order game, so `new Date()` parsed them as local time. Worst case was the rankings board: `formatSavedAt` clamps negative ages to zero, so every board read "Saved just now" for the first ~5 hours in US Central. Added `iso_utc` beside `utc_now` in `backend/app/database.py` and routed `fantasy_rankings_board.py`, `fantasy_league_data.py`, `fantasy_data.py` and the admin log rows through it; `draft_order_game._iso_utc` and `admin._iso` now delegate to it rather than reimplementing it. Regression tests walk whole response payloads so a newly added timestamp field is covered too. — closed 2026-08-22
 - (casino PWAs) Service-worker `STATIC_ASSETS` drifted from the versions the pages request, so those assets were never actually precached: `/shared/casino-theme.css` (pages v=3, workers v=2) across poker/craps/blackjack/craps-strategy, plus `blackjack/style.css` (v=15 vs v=13), `craps/style.css` (v=28 vs v=26) and `craps-strategy/style.css` (v=3 vs v=2). This is the third time this drift has shipped. Realigned every worker and added `shared/tests/asset-versions.test.js` to fail the build on any future mismatch. — closed 2026-08-22
