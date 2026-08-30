@@ -62,9 +62,11 @@ function routes(overrides = {}) {
     };
 }
 
-function boot(table) {
+function boot(table, { keepUrl = false } = {}) {
     document.body.innerHTML = bodySource;
-    window.history.replaceState({}, "", "/fantasy/");
+    // Deep-link tests set the query before booting; everything else wants a
+    // clean slate, since the app writes its view state back into the URL.
+    if (!keepUrl) window.history.replaceState({}, "", "/fantasy/");
     window.FantasyFormat = F;
     window.API_ORIGIN = "";
     window.fetch = jest.fn((url) => {
@@ -351,6 +353,99 @@ describe("season board position filter", () => {
         await waitFor(() => document.getElementById("seasonFantasyNote").textContent);
         expect(document.getElementById("seasonFantasyNote").textContent)
             .toContain("3 quoted players hidden — no reception projection");
+    });
+
+    describe("sorting", () => {
+        const marketCol = () => [...document.querySelectorAll("#seasonFantasyLeaders tr")]
+            .map((r) => r.children[r.children.length - 3].textContent);
+        const deltaCol = () => [...document.querySelectorAll("#seasonFantasyLeaders tr")]
+            .map((r) => r.children[r.children.length - 1].textContent);
+        const names = () => [...document.querySelectorAll("#seasonFantasyLeaders .season-leader__name")]
+            .map((n) => n.textContent);
+        const head = (key) => document.querySelector(`.col-sort[data-sort="${key}"]`);
+
+        test("opens ranked by market value, with that column marked", async () => {
+            boot(routes());
+            await waitFor(() => document.querySelectorAll("#seasonFantasyLeaders tr").length);
+            expect(marketCol()).toEqual(["380.0", "250.0", "240.0", "200.0"]);
+            expect(head("fantasy_points").closest("th").getAttribute("aria-sort")).toBe("descending");
+        });
+
+        test("sorts by delta, biggest gap over consensus first", async () => {
+            boot(routes());
+            await waitFor(() => document.querySelectorAll("#seasonFantasyLeaders tr").length);
+            head("projection_delta").click();
+
+            // +30, 0, -20 — and Runner Two, who has no projection, last.
+            expect(deltaCol()).toEqual(["+30", "0", "-20", ""]);
+            expect(head("projection_delta").closest("th").getAttribute("aria-sort")).toBe("descending");
+            expect(head("fantasy_points").closest("th").getAttribute("aria-sort")).toBe("none");
+        });
+
+        test("a second click reverses, and blanks stay at the bottom either way", async () => {
+            boot(routes());
+            await waitFor(() => document.querySelectorAll("#seasonFantasyLeaders tr").length);
+            head("projection_delta").click();
+            head("projection_delta").click();
+
+            expect(deltaCol()).toEqual(["-20", "0", "+30", ""]);
+            expect(head("projection_delta").closest("th").getAttribute("aria-sort")).toBe("ascending");
+        });
+
+        test("text sorts A-Z first, numbers biggest-first", async () => {
+            boot(routes());
+            await waitFor(() => document.querySelectorAll("#seasonFantasyLeaders tr").length);
+            head("player").click();
+            expect(names()).toEqual(["Catcher One", "Passer One", "Runner One", "Runner Two"]);
+            head("player").click();
+            expect(names()).toEqual(["Runner Two", "Runner One", "Passer One", "Catcher One"]);
+        });
+
+        test("keeps the board's own rank visible once the view is reordered", async () => {
+            boot(routes());
+            await waitFor(() => document.querySelectorAll("#seasonFantasyLeaders tr").length);
+            // In board order there is nothing to disambiguate.
+            expect(document.querySelector("#seasonFantasyLeaders .season-leader__meta").textContent)
+                .not.toContain("overall");
+
+            head("projection_delta").click();
+            expect(document.querySelector("#seasonFantasyLeaders .season-leader__meta").textContent)
+                .toContain("1 overall");
+        });
+
+        test("sorting never refetches", async () => {
+            boot(routes());
+            await waitFor(() => document.querySelectorAll("#seasonFantasyLeaders tr").length);
+            const before = window.fetch.mock.calls.length;
+            head("projection_delta").click();
+            head("player").click();
+            expect(window.fetch.mock.calls.length).toBe(before);
+        });
+
+        test("survives a position filter, and rides in the URL", async () => {
+            boot(routes());
+            await waitFor(() => document.querySelectorAll("#seasonFantasyLeaders tr").length);
+            head("projection_delta").click();
+            expect(window.location.search).toContain("sort=projection_delta%3Adesc");
+
+            click("seasonFantasyPositions", "RB");
+            // Runner One (-20) still ahead of Runner Two (no projection).
+            expect(names()).toEqual(["Runner One", "Runner Two"]);
+            expect(head("projection_delta").closest("th").getAttribute("aria-sort")).toBe("descending");
+        });
+
+        test("boots from a ?sort deep link, and ignores an unknown column", async () => {
+            document.body.innerHTML = bodySource;
+            window.history.replaceState({}, "", "/fantasy/?sort=player:asc");
+            boot(routes(), { keepUrl: true });
+            await waitFor(() => document.querySelectorAll("#seasonFantasyLeaders tr").length);
+            expect(names()[0]).toBe("Catcher One");
+
+            window.history.replaceState({}, "", "/fantasy/?sort=nonsense:asc");
+            boot(routes(), { keepUrl: true });
+            await waitFor(() => document.querySelectorAll("#seasonFantasyLeaders tr").length);
+            expect(marketCol()[0]).toBe("380.0");
+        });
     });
 
     test("a board with no leaders builds no position chips", async () => {

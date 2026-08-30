@@ -21,6 +21,9 @@
         // The board's last payload, so a chip, a sort, or clearing the compare
         // tray repaints from memory instead of refetching the same rows.
         seasonFantasyData: null,
+        // The server ranks by market value; anything else is a local re-read
+        // of rows already in hand.
+        seasonFantasySort: { key: "fantasy_points", dir: "desc" },
         seasonPropsPosition: "ALL",
         drawerPlayerId: null,
         compare: [], // [{ player_id, name }]
@@ -136,6 +139,14 @@
         const params = new URLSearchParams(window.location.search);
         if (params.has("pos")) state.seasonFantasyPosition = params.get("pos").toUpperCase();
         if (params.has("scoring")) state.seasonFantasyScoring = params.get("scoring");
+        // "delta", "delta:asc" — an unknown column is ignored rather than
+        // leaving the board sorted by nothing.
+        if (params.has("sort")) {
+            const [key, dir] = params.get("sort").split(":");
+            if (MARKET_SORTS[key]) {
+                state.seasonFantasySort = { key, dir: dir === "asc" ? "asc" : "desc" };
+            }
+        }
         return { player: params.get("player") };
     }
 
@@ -146,6 +157,10 @@
         }
         if (state.seasonFantasyScoring && state.seasonFantasyScoring !== "std") {
             params.set("scoring", state.seasonFantasyScoring);
+        }
+        const sort = state.seasonFantasySort;
+        if (sort.key !== "fantasy_points" || sort.dir !== "desc") {
+            params.set("sort", `${sort.key}:${sort.dir}`);
         }
         if (state.drawerPlayerId && !els.drawer.hidden) params.set("player", state.drawerPlayerId);
         const query = params.toString();
@@ -495,6 +510,67 @@
         }
     }
 
+    // Text sorts A–Z on first click, numbers biggest-first — nobody opens a
+    // points column hoping to see the smallest number.
+    const MARKET_SORTS = {
+        player: { value: (e) => (e.player || {}).name || "", text: true },
+        yard_points: { value: (e) => e.yard_points },
+        touchdown_points: { value: (e) => e.touchdown_points },
+        reception_points: { value: (e) => e.reception_points },
+        fantasy_points: { value: (e) => e.fantasy_points },
+        projected_points: { value: (e) => e.projected_points },
+        projection_delta: { value: (e) => e.projection_delta },
+    };
+
+    function sortMarketRows(rows) {
+        const { key, dir } = state.seasonFantasySort;
+        const sort = MARKET_SORTS[key];
+        if (!sort) return rows;
+        const sign = dir === "asc" ? 1 : -1;
+        return rows.slice().sort((a, b) => {
+            const left = sort.value(a.entry);
+            const right = sort.value(b.entry);
+            // A player the market or the projection feed never covered has no
+            // place at either end of the order, so blanks sink either way.
+            const leftMissing = left == null || left === "";
+            const rightMissing = right == null || right === "";
+            if (leftMissing || rightMissing) return leftMissing - rightMissing;
+            if (sort.text) return sign * String(left).localeCompare(String(right));
+            if (left !== right) return sign * (left - right);
+            // Ties keep the board's own ranking rather than shuffling.
+            return a.overall - b.overall;
+        });
+    }
+
+    function initMarketSort() {
+        document.querySelectorAll(".market-board .col-sort").forEach((button) => {
+            button.addEventListener("click", () => {
+                const key = button.dataset.sort;
+                const current = state.seasonFantasySort;
+                const first = MARKET_SORTS[key].text ? "asc" : "desc";
+                state.seasonFantasySort = {
+                    key,
+                    dir: current.key === key && current.dir === first
+                        ? (first === "asc" ? "desc" : "asc")
+                        : first,
+                };
+                writeUrlState();
+                if (state.seasonFantasyData) renderSeasonFantasyLeaders(state.seasonFantasyData);
+            });
+        });
+    }
+
+    function syncMarketSortHeaders() {
+        const { key, dir } = state.seasonFantasySort;
+        document.querySelectorAll(".market-board .col-sort").forEach((button) => {
+            const active = button.dataset.sort === key;
+            button.classList.toggle("is-sorted", active);
+            button.classList.toggle("is-asc", active && dir === "asc");
+            const cell = button.closest("th");
+            if (cell) cell.setAttribute("aria-sort", active ? (dir === "asc" ? "ascending" : "descending") : "none");
+        });
+    }
+
     function renderSeasonFantasyLeaders(data) {
         const all = data.leaders || [];
         const position = resolveSeasonPosition(all, state.seasonFantasyPosition);
@@ -505,9 +581,13 @@
             renderSeasonFantasyLeaders(data);
         });
 
-        const rows = all
+        // `overall` is fixed to the server's market-value ranking before any
+        // local sort, so it keeps meaning "where this player sits on the
+        // board" rather than "where this view happens to put him".
+        const rows = sortMarketRows(all
             .map((entry, index) => ({ entry, overall: index + 1 }))
-            .filter(({ entry }) => F.seasonPositionMatches(entry, position));
+            .filter(({ entry }) => F.seasonPositionMatches(entry, position)));
+        syncMarketSortHeaders();
 
         els.seasonFantasyLeaders.innerHTML = "";
         rows.forEach(({ entry, overall }, index) => {
@@ -525,7 +605,9 @@
             const bookDetail = (entry.books || []).length
                 ? ` · ${entry.books.length} source${entry.books.length === 1 ? "" : "s"}`
                 : "";
-            const overallDetail = position === "ALL" ? "" : ` · ${overall} overall`;
+            const sorted = state.seasonFantasySort;
+            const boardOrder = sorted.key === "fantasy_points" && sorted.dir === "desc";
+            const overallDetail = position === "ALL" && boardOrder ? "" : ` · ${overall} overall`;
             // A discarded category is a caveat about the total, not another
             // fact about the player, so it is marked rather than run in.
             const pairs = F.seasonPairDetail(entry.pairs_used, entry.partial_pairs);
@@ -1350,6 +1432,7 @@
     async function init() {
         const urlState = readUrlState();
         initSearch();
+        initMarketSort();
         loadSeasonPropLeaders();
         initSeasonFantasyScoring();
         loadSeasonFantasyLeaders();

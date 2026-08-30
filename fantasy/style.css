@@ -1293,6 +1293,45 @@ body.drawer-open { overflow: hidden; }
     line-height: 1.55;
 }
 
+/* Sortable headers. The button carries the click so the control is reachable
+   by keyboard and announced as one; the th keeps aria-sort. */
+.col-sort {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    border: 0;
+    border-radius: 5px;
+    background: none;
+    padding: 2px 3px;
+    color: inherit;
+    font: inherit;
+    letter-spacing: inherit;
+    text-transform: inherit;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.col-proj .col-sort { flex-direction: row-reverse; }
+
+.col-sort::after {
+    content: "\2195";
+    opacity: 0;
+    font-size: 0.85em;
+    transition: opacity 0.12s;
+}
+
+.col-sort:hover::after { opacity: 0.55; }
+.col-sort:hover { color: #fff; }
+
+.col-sort.is-sorted { color: #fff; }
+.col-sort.is-sorted::after { content: "\25BC"; opacity: 1; font-size: 0.6em; }
+.col-sort.is-sorted.is-asc::after { content: "\25B2"; }
+
+.col-sort:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(143, 176, 143, 0.7);
+}
+
 /* The market number and what consensus says about it. */
 .market-board .season-fantasy__total { color: #e7b95f; font-weight: 700; }
 .season-fantasy__proj { color: #cfd9d0; font-variant-numeric: tabular-nums; }

@@ -19,7 +19,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/shared/site-nav.css?v=13">
-    <link rel="stylesheet" href="style.css?v=21">
+    <link rel="stylesheet" href="style.css?v=22">
 </head>
 <body>
     <main class="app-shell">
@@ -124,13 +124,13 @@
                     <thead>
                         <tr>
                             <th class="col-rank">#</th>
-                            <th>Player</th>
-                            <th class="col-proj col-detail">Yard pts</th>
-                            <th class="col-proj col-detail">TD pts</th>
-                            <th class="col-proj col-detail">Rec bonus</th>
-                            <th class="col-proj">Market</th>
-                            <th class="col-proj" id="seasonFantasyProjHead">Proj</th>
-                            <th class="col-proj" title="Market value minus the consensus projection">&Delta;</th>
+                            <th aria-sort="none"><button type="button" class="col-sort" data-sort="player">Player</button></th>
+                            <th class="col-proj col-detail" aria-sort="none"><button type="button" class="col-sort" data-sort="yard_points">Yard pts</button></th>
+                            <th class="col-proj col-detail" aria-sort="none"><button type="button" class="col-sort" data-sort="touchdown_points">TD pts</button></th>
+                            <th class="col-proj col-detail" aria-sort="none"><button type="button" class="col-sort" data-sort="reception_points">Rec bonus</button></th>
+                            <th class="col-proj" aria-sort="descending"><button type="button" class="col-sort" data-sort="fantasy_points">Market</button></th>
+                            <th class="col-proj" aria-sort="none"><button type="button" class="col-sort" data-sort="projected_points" id="seasonFantasyProjHead">Proj</button></th>
+                            <th class="col-proj" aria-sort="none"><button type="button" class="col-sort" data-sort="projection_delta" title="Market value minus the consensus projection">&Delta;</button></th>
                         </tr>
                     </thead>
                     <tbody id="seasonFantasyLeaders"></tbody>
@@ -321,6 +321,6 @@
     <script src="/shared/analytics.js?v=1"></script>
     <script src="/shared/api-base.js?v=1"></script>
     <script src="format.js?v=10"></script>
-    <script src="app.js?v=18"></script>
+    <script src="app.js?v=19"></script>
 </body>
 </html>
