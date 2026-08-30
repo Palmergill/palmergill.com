@@ -9,6 +9,7 @@ from datetime import timedelta
 from statistics import median
 from typing import Any, Dict, List, Optional, Tuple
 
+from sqlalchemy import and_, case, null, or_
 from sqlalchemy.orm import Session
 
 from app.database import (
@@ -98,6 +99,18 @@ SEASON_FANTASY_PRIMARY_PAIR = {
     "RB": "rushing",
     "WR": "receiving",
     "TE": "receiving",
+}
+# Categories a position is expected to score in, so a total built without one
+# can say so. Deliberately asymmetric, because a false caveat costs as much as
+# a missing one: a quarterback's rushing and a running back's receiving are
+# routinely tens of points, while receivers and tight ends almost never rush,
+# and flagging their absent rushing market would put a warning on nearly every
+# WR/TE row to no purpose.
+SEASON_FANTASY_EXPECTED_PAIRS = {
+    "QB": ("passing", "rushing"),
+    "RB": ("rushing", "receiving"),
+    "WR": ("receiving",),
+    "TE": ("receiving",),
 }
 
 
@@ -568,14 +581,59 @@ def get_projection_sources(
 
 
 def search_players(db: Session, query: str, limit: int = 10) -> List[Dict[str, Any]]:
+    """Name search ranked by fantasy relevance, not by the alphabet.
+
+    The catalog is Sleeper's whole dump — several thousand players, most of
+    them long retired — so a substring match ordered by name answers the
+    wrong question: "Allen" returned five first-name Allens before Josh
+    Allen, and the UI only asks for eight. Two signals fix it:
+
+    1. Whether the term starts a word in the name. This is deliberately not
+       graded any finer than that: ranking "starts the whole name" above
+       "starts a later word" sounds right and is wrong, because it puts
+       every first-name Allen above Josh Allen. It exists only to stop a
+       buried match — "Hill" inside "Phillips" — from competing at all.
+    2. Season-long projected points. Status and team are not usable here —
+       retired players are still carried as "Active", and a genuine free
+       agent has no team — but a projection is exactly the statement "this
+       player matters", and its size ranks the namesakes. Season-long and
+       not the current week's on purpose: "which Hill do you mean" is a
+       season-scale question, and a weekly run nulls out anyone who is out,
+       which dropped Tyreek Hill below every Hilliard in the catalog.
+    """
     term = (query or "").strip().lower()
     if len(term) < 2:
         return []
-    like = f"%{term}%"
+    # LIKE wildcards in the user's own term would otherwise match everything.
+    escaped = term.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+    name = FantasyPlayer.search_name
+    starts_a_word = or_(
+        name.like(f"{escaped}%", escape="\\"),
+        name.like(f"% {escaped}%", escape="\\"),
+    )
+    match_rank = case((starts_a_word, 0), else_=1)
+
+    ctx = default_context(db)
+    run = (
+        _resolve_projection_run(db, ctx["season"], SEASON_LONG_WEEK, None)
+        or _resolve_projection_run(db, ctx["season"], ctx["week"], None)
+    )
+    points = FantasyProjection.pts_ppr if run is not None else null()
+
     rows = (
         db.query(FantasyPlayer)
-        .filter(FantasyPlayer.search_name.like(like))
-        .order_by(FantasyPlayer.full_name.asc())
+        .outerjoin(
+            FantasyProjection,
+            and_(
+                FantasyProjection.player_id == FantasyPlayer.player_id,
+                FantasyProjection.run_id == (run.id if run is not None else None),
+            ),
+        )
+        .filter(name.like(f"%{escaped}%", escape="\\"))
+        # `IS NULL` sorts False before True on both SQLite and Postgres, which
+        # is how unprojected players land last without a NULLS LAST clause.
+        .order_by(match_rank.asc(), points.is_(None).asc(), points.desc(), FantasyPlayer.full_name.asc())
         .limit(limit)
         .all()
     )
@@ -786,6 +844,11 @@ def compare_players(
                 "touchdown_points": market["touchdown_points"],
                 "reception_points": market["reception_points"],
                 "quoted_categories": sorted(market.get("implied", {})),
+                # Carried so the drawer can qualify its edge the same way the
+                # board does; the same number deserves the same caveat.
+                "partial_pairs": market["partial_pairs"],
+                "missing_pairs": market["missing_pairs"],
+                "edge_is_qualified": market["edge_is_qualified"],
             }
             if market is not None
             else {
@@ -796,6 +859,9 @@ def compare_players(
                 "touchdown_points": None,
                 "reception_points": None,
                 "quoted_categories": [],
+                "partial_pairs": [],
+                "missing_pairs": [],
+                "edge_is_qualified": False,
             }
         )
         _attach_matchup(entry, matchups)
@@ -937,13 +1003,21 @@ def _spread_movement(db, game_id, home_team, current):
     return open_point, round(current - open_point, 1)
 
 
-def _consensus_price(rows, market: str, outcome: str) -> Optional[int]:
+# Named for its (rows, market, outcome) shape like _consensus_point and
+# _best_price beside it. It must NOT be called _consensus_price: that name
+# belongs to the probability-space helper further down, and having both meant
+# the later definition silently shadowed this one and turned every
+# /games/{id}/lines/history?market=h2h call into a TypeError.
+def _consensus_price_for_outcome(rows, market: str, outcome: str) -> Optional[int]:
     prices = [
         r.price
         for r in rows
         if r.market == market and r.outcome == outcome and r.price is not None
     ]
-    return round(sum(prices) / len(prices)) if prices else None
+    # Delegated rather than averaged here: American odds jump from +100 to
+    # -100 across even money, so a mean of the integers is not the consensus
+    # of the chances they describe.
+    return _consensus_price(prices)
 
 
 def get_game_lines_history(db, game_id: str, market: str = "spreads") -> Dict[str, Any]:
@@ -968,7 +1042,7 @@ def get_game_lines_history(db, game_id: str, market: str = "spreads") -> Dict[st
     series = []
     for run_id, run_rows in by_run.items():
         if market == "h2h":
-            value = _consensus_price(run_rows, market, outcome) if outcome else None
+            value = _consensus_price_for_outcome(run_rows, market, outcome) if outcome else None
         else:
             value = _consensus_point(run_rows, market, outcome)
         if value is None:
@@ -1251,7 +1325,8 @@ def _score_season_player(
         for market, rows in market_rows.items()
     }
     implied = {market: value for market, value in implied.items() if value is not None}
-    primary_pair = SEASON_FANTASY_PRIMARY_PAIR.get(player.position if player else None)
+    position = player.position if player else None
+    primary_pair = SEASON_FANTASY_PRIMARY_PAIR.get(position)
     complete_pairs = {
         name: pair
         for name, pair in SEASON_FANTASY_MARKET_PAIRS.items()
@@ -1264,6 +1339,17 @@ def _score_season_player(
         name
         for name, pair in SEASON_FANTASY_MARKET_PAIRS.items()
         if name not in complete_pairs and any(market in implied for market in pair)
+    )
+    # A category with *no* quote at all is the bigger omission and used to be
+    # invisible: partial_pairs only fires when one half is quoted, so a running
+    # back whose receiving market was never posted scored on rushing alone and
+    # said nothing about it, while his projection still counted every catch.
+    # That is the common case, not the rare one, and it made the edge column
+    # read as market disagreement when it was really missing data.
+    missing_pairs = sorted(
+        name
+        for name in SEASON_FANTASY_EXPECTED_PAIRS.get(position, ())
+        if name not in complete_pairs and name not in partial_pairs
     )
     if primary_pair not in complete_pairs:
         return None
@@ -1313,6 +1399,12 @@ def _score_season_player(
         "markets_used": len(implied),
         "pairs_used": sorted(complete_pairs),
         "partial_pairs": partial_pairs,
+        "missing_pairs": missing_pairs,
+        # The edge is market-minus-projection, and the projection counts
+        # categories the market total may not have. Flagged rather than
+        # withheld: the number is still the best comparison available, but it
+        # is not a like-for-like one, and the column should not pretend it is.
+        "edge_is_qualified": bool(missing_pairs or partial_pairs),
         "projected_points": projected_points,
         "projection_delta": (
             round(fantasy_points_total - projected_points, 1)

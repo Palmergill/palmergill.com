@@ -13,13 +13,34 @@ Closed items are trimmed quarterly.
 
 ## Low
 
-- [ ] (fantasy API) `GET /api/fantasy/trending` has no caller on the site — it was 500ing unnoticed until 2026-08-22. Decide whether it is public API surface worth keeping or dead code to delete. — found 2026-08-22
+- [ ] (fantasy API) Three fantasy endpoints have no caller on the site, and two of them were found 500ing only because someone looked: `GET /api/fantasy/trending` (fixed 2026-08-22), `GET /api/fantasy/games/{id}/lines/history` (fixed 2026-08-30), and `POST /api/fantasy/chat`, whose panel moved to the members-only league hub in the dashboard redesign so the demo-mode local router built for spec 16 R16 is now unreachable through the UI. Decide as one question whether these are public API surface worth keeping and testing, or dead code to delete. — found 2026-08-22, widened 2026-08-30
 - [ ] (repo) `fourth-and-fortune-kickoff.html` is a tracked deck at the repository root rather than under a directory; move it under `fantasy/` or `docs/`. — found 2026-08-22
 - [ ] (fantasy) `formatAsOf` is duplicated between `fantasy/format.js` and `fantasy/league/format.js`. Per-page format modules are the deliberate convention (`formatPoints`, `sparkline`, `injuryBadge` are duplicated the same way), so this is only worth revisiting if a genuinely shared module ever appears. — found 2026-08-22
 - [ ] (frontend offline) Chart.js now has SRI, but the CDN script is still unavailable when craps strategy or stock research starts fully offline; vendor the pinned script if first-load offline support becomes a requirement. — found 2026-07-01
 - [ ] (admin analytics) Admin analytics summary endpoints load the full window into Python and aggregate in memory; move counts to SQL `GROUP BY` when traffic makes this slow. — found 2026-07-01
 
 ## Closed
+
+- The 2026-08-30 fantasy review closed three findings (`reviews/2026-08-30-fantasy.md`).
+  (1) `GET /api/fantasy/players/search` ordered a substring match over the whole
+  Sleeper catalog alphabetically, so "Allen" returned five first-name Allens and
+  never Josh Allen inside the dashboard's 8-result limit, and "Hill" returned Andy
+  Phillips but no Tyreek Hill; it now ranks on a word-boundary match then
+  season-long projected points, and escapes LIKE wildcards.
+  (2) The market board's `partial_pairs` caveat only fired when *half* a category
+  was quoted, so a category with no market at all was silently dropped from the
+  implied total while the projection still counted it — 23 of 38 RBs scored on
+  rushing alone with no warning, making the Edge column read as market
+  disagreement when it was missing data. Added `missing_pairs`/`edge_is_qualified`
+  with an asymmetric per-position expectation, distinct copy for the two states,
+  and a marked Edge cell.
+  (3) `_consensus_price` was defined twice in `fantasy_data.py`; the later
+  1-argument definition shadowed the earlier 3-argument one, so
+  `GET /api/fantasy/games/{id}/lines/history?market=h2h` raised a TypeError on
+  every call. Renamed to `_consensus_price_for_outcome` and delegated to the
+  probability-space consensus; contract test now walks all three markets. This is
+  the second dead-endpoint 500 found this way after `/trending` — see the open
+  item below. — closed 2026-08-30
 
 - The 2026-08-23 complete-project review closed fail-open schema migrations/readiness, member-session revocation, 24-hour stale stock quotes, missing live company profiles, immutable unversioned PWA manifests, and release-version drift. Regression coverage was added for each production-only path. — closed 2026-08-23
 - Reconciled the July intake against the implementation: shared hardened client-IP parsing, tournament buy-back guards, legal progression snapping, expired rate-limit key eviction, folded-card privacy, backslash redirect rejection, one-roll placement state, small legal odds, read-only poker polling, bounded chat-session LRU storage, POST-only logout, and zero-chip deal filtering were already shipped and are no longer listed as open. — closed 2026-08-23

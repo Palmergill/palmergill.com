@@ -21,6 +21,7 @@ from app.database import (
 )
 from app.main import SESSION_COOKIE_NAME, app, create_app_session_token
 from app.services import fantasy_collector as fc
+from app.services import fantasy_data as fd
 from app.services.fantasy_sleeper import parse_projection_rows
 
 client = TestClient(app)
@@ -449,3 +450,168 @@ def test_trending_route_returns_200(kind):
     body = response.json()
     assert body["kind"] == kind
     assert isinstance(body["results"], list)
+
+
+def _seed_game_lines():
+    """One game with two snapshot runs across all three line markets."""
+    session = SessionLocal()
+    session.add(FantasyGame(
+        game_id="2025_03_BUF_KC", season=2025, week=3,
+        home_team="KC", away_team="BUF",
+    ))
+    for run_id, (spread, total, home_ml) in enumerate(
+        [(-2.5, 47.5, -140), (-3.5, 48.5, -165)], start=1
+    ):
+        for bookmaker in ("draftkings", "fanduel"):
+            session.add_all([
+                FantasyOddsSnapshot(
+                    run_id=run_id, game_id="2025_03_BUF_KC", bookmaker=bookmaker,
+                    market="spreads", outcome="KC", point=spread, price=-110,
+                ),
+                FantasyOddsSnapshot(
+                    run_id=run_id, game_id="2025_03_BUF_KC", bookmaker=bookmaker,
+                    market="totals", outcome="Over", point=total, price=-110,
+                ),
+                FantasyOddsSnapshot(
+                    run_id=run_id, game_id="2025_03_BUF_KC", bookmaker=bookmaker,
+                    market="h2h", outcome="KC", point=None, price=home_ml,
+                ),
+            ])
+    session.commit()
+    session.close()
+
+
+@pytest.mark.parametrize("market", ("spreads", "totals", "h2h"))
+def test_game_lines_history_returns_200_for_every_market(market):
+    """Every market the route accepts has to actually build its series.
+
+    `h2h` is the reason this is parametrized: its branch called a helper that
+    a later same-named definition in fantasy_data had silently shadowed, so
+    the route raised a TypeError for that market and no other.
+    """
+    _seed_game_lines()
+
+    response = client.get(
+        "/api/fantasy/games/2025_03_BUF_KC/lines/history", params={"market": market}
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["market"] == market
+    assert body["outcome"] == ("Over" if market == "totals" else "KC")
+    assert [point["point"] for point in body["history"]] == {
+        "spreads": [-2.5, -3.5],
+        "totals": [47.5, 48.5],
+        "h2h": [-140, -165],
+    }[market]
+
+
+def test_game_lines_history_is_empty_for_an_unknown_game():
+    response = client.get("/api/fantasy/games/nope/lines/history", params={"market": "h2h"})
+
+    assert response.status_code == 200
+    assert response.json()["history"] == []
+
+
+def _seed_namesakes():
+    """Namesakes for one surname, plus a decoy that only matches mid-word.
+
+    Projected points are attached to the same run the read path resolves, so
+    the ordering under test is the one the endpoint actually computes.
+    """
+    session = SessionLocal()
+    run = fd._resolve_projection_run(session, 2025, 3, None)
+    people = [
+        # (id, name, team, projected points)
+        ("h1", "Aaron Hill", "NYJ", 40.0),
+        ("h2", "Tyreek Hill", "MIA", 310.0),
+        ("h3", "Zeb Hill", "DAL", 120.0),
+        ("h4", "Hill Bradford", "LAR", 15.0),   # surname query, first-name hit
+        ("h5", "Bygone Hill", None, None),      # no projection at all
+        ("h6", "Andy Phillips", "SF", 900.0),   # "hill" only buried mid-word
+    ]
+    for player_id, name, team, points in people:
+        session.add(FantasyPlayer(
+            player_id=player_id, full_name=name, search_name=name.lower(),
+            team=team, position="WR", status="Active",
+        ))
+        if points is not None:
+            session.add(FantasyProjection(
+                run_id=run.id, season=2025, week=3, source="sleeper",
+                player_id=player_id, pts_ppr=points,
+                pts_half_ppr=points, pts_std=points,
+            ))
+    session.commit()
+    session.close()
+
+
+def test_player_search_ranks_by_projection_not_alphabet():
+    """The player anyone means has to be reachable inside the UI's limit.
+
+    Ordering the whole Sleeper catalog by name put five first-name Allens
+    above Josh Allen, and the dashboard only asks for eight results.
+    """
+    _seed_namesakes()
+
+    results = client.get(
+        "/api/fantasy/players/search", params={"q": "hill", "limit": 5}
+    ).json()["results"]
+
+    names = [r["name"] for r in results]
+    # Highest projection first, unprojected last, and a first-name match gets
+    # no special standing over the surname matches.
+    assert names == ["Tyreek Hill", "Zeb Hill", "Aaron Hill", "Hill Bradford", "Bygone Hill"]
+    # "hill" is inside "phillips", but not at a word start, so it never
+    # competes — even though the decoy has the highest projection on the board.
+    assert "Andy Phillips" not in names
+
+
+def test_player_search_escapes_like_wildcards():
+    """A bare "%" matched every player in the catalog."""
+    _seed_namesakes()
+
+    for term in ("%%", "__", "%a"):
+        results = client.get(
+            "/api/fantasy/players/search", params={"q": term}
+        ).json()["results"]
+        assert results == [], f"{term!r} was treated as a wildcard"
+
+
+def test_player_search_ranks_on_season_projection_not_the_current_week():
+    """A star who is out this week must not lose his place in search.
+
+    Ranking on the current week's run nulls out anyone questionable or
+    injured, which dropped Tyreek Hill below every Hilliard in the catalog.
+    "Which Hill do you mean" is a season-scale question, so it is answered
+    from the season-long run.
+    """
+    session = SessionLocal()
+    week_run = fd._resolve_projection_run(session, 2025, 3, None)
+    fc.collect_projections(session, 2025, fd.SEASON_LONG_WEEK, client=FakeSleeper())
+    season_run = fd._resolve_projection_run(session, 2025, fd.SEASON_LONG_WEEK, None)
+
+    for player_id, name, season_points, week_points in [
+        ("s1", "Star Hill", 300.0, None),   # out this week, huge for the season
+        ("s2", "Scrub Hilliard", 20.0, 8.0),
+    ]:
+        session.add(FantasyPlayer(
+            player_id=player_id, full_name=name, search_name=name.lower(),
+            team="NYJ", position="WR", status="Active",
+        ))
+        session.add(FantasyProjection(
+            run_id=season_run.id, season=2025, week=fd.SEASON_LONG_WEEK,
+            source="sleeper", player_id=player_id, pts_ppr=season_points,
+        ))
+        if week_points is not None:
+            session.add(FantasyProjection(
+                run_id=week_run.id, season=2025, week=3, source="sleeper",
+                player_id=player_id, pts_ppr=week_points,
+            ))
+    session.commit()
+    session.close()
+
+    results = client.get(
+        "/api/fantasy/players/search", params={"q": "hill", "limit": 5}
+    ).json()["results"]
+
+    assert [r["name"] for r in results] == ["Star Hill", "Scrub Hilliard"]

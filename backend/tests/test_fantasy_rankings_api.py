@@ -616,11 +616,11 @@ def test_seed_degrades_to_an_empty_board_when_no_rankings_run_exists(seeded_db):
 
 
 def test_board_search_puts_the_best_player_first(seeded_db):
-    """The reason this endpoint exists instead of the shared one.
+    """The highest projected namesake wins, using the board's own scoring.
 
-    /api/fantasy/players/search orders the whole historical catalog
-    alphabetically, so a common surname buries the player anyone actually means
-    behind long-retired namesakes. Here the highest projected player wins.
+    The shared /api/fantasy/players/search ranks by projection as well now;
+    what this endpoint adds is the board's season/scoring and its restriction
+    to rankable positions.
     """
     session = seeded_db
     # Three namesakes: the one who matters is neither first nor last by name.

@@ -343,6 +343,10 @@ def test_implied_fantasy_points_combine_yards_and_touchdowns(db):
         "markets_used": 2,
         "pairs_used": ["receiving"],
         "partial_pairs": [],
+        # A receiver is not expected to rush, so an absent rushing market is
+        # not a gap in his total and must not be flagged as one.
+        "missing_pairs": [],
+        "edge_is_qualified": False,
         # Sleeper's season-long pts_std for wr_alpha; the market is 3.0 under it.
         "projected_points": 160.0,
         "projection_delta": -3.0,
@@ -456,6 +460,8 @@ def test_implied_fantasy_points_name_the_categories_behind_each_total(db):
     allen = rows["Josh Allen"]
     assert allen["pairs_used"] == ["passing", "rushing"]
     assert allen["partial_pairs"] == []
+    assert allen["missing_pairs"] == []
+    assert allen["edge_is_qualified"] is False
     # 3999.5/25 + 499.5/10 = 159.98 + 49.95; 29.5*4 + 5.5*6 = 118 + 33.
     assert allen["yard_points"] == 209.9
     assert allen["touchdown_points"] == 151.0
@@ -464,6 +470,9 @@ def test_implied_fantasy_points_name_the_categories_behind_each_total(db):
     pocket = rows["Pocket Passer"]
     assert pocket["pairs_used"] == ["passing"]
     assert pocket["partial_pairs"] == ["rushing"]
+    # Half-quoted, not absent — the two states read differently in the UI.
+    assert pocket["missing_pairs"] == []
+    assert pocket["edge_is_qualified"] is True
     # The 199.5 rushing yards are not in the total, and the row says so.
     assert pocket["yard_points"] == 160.0
     assert pocket["fantasy_points"] == 278.0
@@ -733,3 +742,69 @@ def test_compare_payload_includes_backward_compatible_market_components(db):
     assert market["yard_points"] == 160.0
     assert market["touchdown_points"] == 140.0
     assert market["quoted_categories"] == ["season_pass_tds", "season_pass_yds"]
+
+
+def test_a_category_with_no_market_at_all_is_reported(db):
+    """The silent case, and the common one.
+
+    partial_pairs only fires when one half of a category is quoted. A running
+    back whose receiving market was never posted therefore scored on rushing
+    alone and said nothing about it, while his projection still counted every
+    catch — so the edge column read as market disagreement when it was
+    missing data. Absent categories now report alongside half-quoted ones.
+    """
+
+    class RushingOnlyMarkets(KalshiClient):
+        def get_season_props(self):
+            return {
+                "KXNFLSEASONRSHYDS": [
+                    market("KXNFLSEASONRSHYDS-27C1500-BACK", "Pass Catching Back", 1499.5, 0.48, 0.52),
+                ],
+                "KXNFLSEASONRSHTD": [
+                    market("KXNFLSEASONRSHTD-27C10-BACK", "Pass Catching Back", 9.5, 0.48, 0.52),
+                ],
+            }
+
+    db.add(named_player("rb_catch", "Pass Catching Back", "RB", "DET"))
+    db.commit()
+    fc.collect_season_props(db, client=RushingOnlyMarkets())
+
+    board = fd.get_season_fantasy_point_leaders(db, season=2026)
+    back = next(e for e in board["leaders"] if e["player"]["player_id"] == "rb_catch")
+
+    assert back["pairs_used"] == ["rushing"]
+    # Nothing was quoted for receiving, so it is absent rather than partial —
+    # and a back is expected to catch passes, so the total has to say so.
+    assert back["partial_pairs"] == []
+    assert back["missing_pairs"] == ["receiving"]
+    assert back["edge_is_qualified"] is True
+
+
+def test_a_receiver_is_not_flagged_for_an_absent_rushing_market(db):
+    """A caveat on every WR row would be worth nothing.
+
+    Receivers and tight ends almost never rush, so an absent rushing market
+    is not a gap in their total. The flag is asymmetric on purpose.
+    """
+
+    class ReceivingOnlyMarkets(KalshiClient):
+        def get_season_props(self):
+            return {
+                "KXNFLSEASONRECYDS": [
+                    market("KXNFLSEASONRECYDS-27C1500-SPLIT", "Split End", 1499.5, 0.48, 0.52),
+                ],
+                "KXNFLSEASONRECTD": [
+                    market("KXNFLSEASONRECTD-27C10-SPLIT", "Split End", 9.5, 0.48, 0.52),
+                ],
+            }
+
+    db.add(named_player("wr_split", "Split End", "WR", "SEA"))
+    db.commit()
+    fc.collect_season_props(db, client=ReceivingOnlyMarkets())
+
+    board = fd.get_season_fantasy_point_leaders(db, season=2026)
+    split = next(e for e in board["leaders"] if e["player"]["player_id"] == "wr_split")
+
+    assert split["pairs_used"] == ["receiving"]
+    assert split["missing_pairs"] == []
+    assert split["edge_is_qualified"] is False

@@ -40,21 +40,40 @@ describe('FantasyFormat', () => {
     });
 
     test('seasonPairDetail names the scored categories and the dropped one', () => {
-        expect(FantasyFormat.seasonPairDetail(['passing', 'rushing'], [])).toEqual({
+        expect(FantasyFormat.seasonPairDetail(['passing', 'rushing'], [], [])).toEqual({
             scored: 'passing + rushing',
             missing: '',
         });
-        expect(FantasyFormat.seasonPairDetail(['passing'], ['rushing'])).toEqual({
+        expect(FantasyFormat.seasonPairDetail(['passing'], ['rushing'], [])).toEqual({
             scored: 'passing',
             missing: 'rushing not fully quoted',
         });
-        expect(FantasyFormat.seasonPairDetail(['receiving'], ['passing', 'rushing'])).toEqual({
+        expect(FantasyFormat.seasonPairDetail(['receiving'], ['passing', 'rushing'], [])).toEqual({
             scored: 'receiving',
             missing: 'passing and rushing not fully quoted',
         });
-        expect(FantasyFormat.seasonPairDetail(undefined, undefined)).toEqual({
+        expect(FantasyFormat.seasonPairDetail(undefined, undefined, undefined)).toEqual({
             scored: '',
             missing: '',
+        });
+    });
+
+    test('seasonPairDetail separates a category with no market from a half-quoted one', () => {
+        // The case that used to render nothing at all: a back scored on
+        // rushing whose receiving line was never posted.
+        expect(FantasyFormat.seasonPairDetail(['rushing'], [], ['receiving'])).toEqual({
+            scored: 'rushing',
+            missing: 'no receiving market',
+        });
+        // "Said nothing" and "said something we could not use" are different
+        // claims about the market and are not collapsed into one phrase.
+        expect(FantasyFormat.seasonPairDetail(['passing'], ['receiving'], ['rushing'])).toEqual({
+            scored: 'passing',
+            missing: 'no rushing market · receiving not fully quoted',
+        });
+        expect(FantasyFormat.seasonPairDetail(['passing'], [], ['rushing', 'receiving'])).toEqual({
+            scored: 'passing',
+            missing: 'no rushing or receiving market',
         });
     });
 

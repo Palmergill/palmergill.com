@@ -582,14 +582,12 @@ def search_rankable_players(
 ) -> List[Dict[str, Any]]:
     """Search the pool a board actually cares about, best players first.
 
-    The shared /api/fantasy/players/search orders the entire historical Sleeper
-    catalog alphabetically by full name, which is fine for a lookup box but
-    useless for adding someone to a draft board: "jefferson" returns Anthony,
-    Bijan and Bo before it ever reaches Justin, who is buried past the limit.
-
-    So order by projected points for the season instead, and drop the positions
-    a board cannot hold. Anyone without a projection still appears, just below
-    everyone who has one, so a deep-league flyer is still addable.
+    The shared /api/fantasy/players/search now ranks by projection too, so the
+    difference is no longer the ordering: this one takes the board's own
+    scoring and season rather than the site default, drops the positions a
+    board cannot hold, and returns the projected points the row renders.
+    Anyone without a projection still appears, just below everyone who has
+    one, so a deep-league flyer is still addable.
     """
     from app.database import FantasyPlayer as _Player  # local: keeps the import list flat
 

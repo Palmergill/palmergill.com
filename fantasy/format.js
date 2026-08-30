@@ -51,12 +51,21 @@
     // markets" told the reader nothing: naming the categories is the
     // difference between a running quarterback whose rushing is in the number
     // and one whose rushing was dropped for want of a touchdown ladder.
-    function seasonPairDetail(pairsUsed, partialPairs) {
+    //
+    // The two ways a category can be absent read differently and are kept
+    // apart. "Not fully quoted" means the market said something we could not
+    // use; "no market" means it said nothing at all — which was the silent
+    // case, and the common one for a running back's receiving line.
+    function seasonPairDetail(pairsUsed, partialPairs, missingPairs) {
         const used = (pairsUsed || []).filter(Boolean);
         const partial = (partialPairs || []).filter(Boolean);
+        const missing = (missingPairs || []).filter(Boolean);
+        const notes = [];
+        if (missing.length) notes.push(`no ${missing.join(" or ")} market`);
+        if (partial.length) notes.push(`${partial.join(" and ")} not fully quoted`);
         return {
             scored: used.join(" + "),
-            missing: partial.length ? `${partial.join(" and ")} not fully quoted` : "",
+            missing: notes.join(" · "),
         };
     }
 

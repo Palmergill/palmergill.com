@@ -127,7 +127,7 @@ def my_boards(
 
 # Board-specific player search. Declared before /boards/{board_id} for the same
 # ordering reason, and separate from /api/fantasy/players/search because a draft
-# board needs the best players first, not the alphabetically first ones.
+# board searches its own scoring and season and only over rankable positions.
 @router.get("/players/search")
 def search_players(
     q: str = Query(..., min_length=2, max_length=60),

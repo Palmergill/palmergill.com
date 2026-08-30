@@ -663,6 +663,12 @@ body.drawer-open { overflow: hidden; }
 
 .compare-col__delta.is-over { color: #3f8f5b; }
 .compare-col__delta.is-under { color: var(--clay, #b96a4b); }
+/* Same marker as the board's Edge column, for the same reason. */
+.compare-col__delta.is-qualified {
+    text-decoration: underline dotted currentColor 1.5px;
+    text-underline-offset: 3px;
+    cursor: help;
+}
 
 .compare-col__section { margin: 12px 0 4px; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted, #928a7d); }
 .compare-col__games { list-style: none; margin: 0; padding: 0; font-size: 0.82rem; }
@@ -1098,6 +1104,18 @@ button:focus-visible,a:focus-visible,summary:focus-visible,[tabindex]:focus-visi
 #market-board .season-fantasy__proj { color: var(--fantasy-muted); }
 .season-fantasy__delta.is-over { color: #4d775a; }
 .season-fantasy__delta.is-under { color: var(--fantasy-clay); }
+
+/* An edge whose market total is missing a category the projection counts.
+   Dotted-underlined rather than recoloured: the sign still has to read at a
+   glance, and the marker has to survive both the is-over and is-under colour.
+   The row's own meta line names the missing category; this says "that number
+   is qualified" without repeating it in every cell. */
+#market-board .season-fantasy__delta.is-qualified {
+    text-decoration: underline dotted currentColor 1.5px;
+    text-underline-offset: 3px;
+    opacity: 0.75;
+    cursor: help;
+}
 .drawer-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
 .drawer-actions .drawer-compare { margin: 0; }
 .sparkline--market { width: 100%; color: var(--fantasy-clay); }

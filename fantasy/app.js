@@ -709,7 +709,7 @@
             const overallDetail = position === "ALL" && boardOrder ? "" : ` · ${overall} overall`;
             // A discarded category is a caveat about the total, not another
             // fact about the player, so it is marked rather than run in.
-            const pairs = F.seasonPairDetail(entry.pairs_used, entry.partial_pairs);
+            const pairs = F.seasonPairDetail(entry.pairs_used, entry.partial_pairs, entry.missing_pairs);
             const scoredDetail = pairs.scored ? ` · ${pairs.scored}` : "";
             const meta = el("span", "season-leader__meta",
                 `${player.position || ""} ${player.team || ""}${overallDetail}${scoredDetail}`.trim());
@@ -797,10 +797,23 @@
         if (delta == null) return el("td", "col-proj season-fantasy__delta");
         const cell = el("td", "col-proj season-fantasy__delta", F.formatSigned(delta, 1));
         cell.classList.add(delta >= 0 ? "is-over" : "is-under");
-        if (entry.projected_points) {
-            const pct = (delta / entry.projected_points) * 100;
-            cell.title = `${F.formatSigned(delta, 1)} vs ${F.formatPoints(entry.projected_points)} projected (${F.formatSigned(pct, 1)}%)`;
+        const detail = entry.projected_points
+            ? [`${F.formatSigned(delta, 1)} vs ${F.formatPoints(entry.projected_points)} projected`,
+               `(${F.formatSigned((delta / entry.projected_points) * 100, 1)}%)`].join(" ")
+            : "";
+        // A total missing a category the projection still counts produces a
+        // gap that looks like market disagreement and is not. Marked, not
+        // hidden — it remains the closest comparison there is, and the reader
+        // can see from the row which categories the market number is built on.
+        const pairs = F.seasonPairDetail(entry.pairs_used, entry.partial_pairs, entry.missing_pairs);
+        if (entry.edge_is_qualified) {
+            cell.classList.add("is-qualified");
+            cell.appendChild(el("span", "sr-only", ` (${pairs.missing})`));
         }
+        const title = [detail, entry.edge_is_qualified
+            ? `Market total covers ${pairs.scored || "nothing"} only — ${pairs.missing}, so this gap is partly missing data, not market disagreement.`
+            : ""].filter(Boolean).join(" · ");
+        if (title) cell.title = title;
         return cell;
     }
 
@@ -1315,17 +1328,31 @@
             col.appendChild(marketWrap);
 
             if (marketEntry && (marketEntry.total ?? marketEntry.fantasy_points) != null) {
-                const pairs = marketEntry.quoted_categories
-                    ? { scored: marketEntry.quoted_categories.map((key) => key.replace(/^season_/, "").replaceAll("_", " ")).join(" · "), missing: "" }
-                    : F.seasonPairDetail(marketEntry.pairs_used, marketEntry.partial_pairs);
-                const detail = [pairs.scored, pairs.missing].filter(Boolean).join(" · ");
+                // The gap note is the same either way: quoted_categories names
+                // the raw markets behind the total, pairs_used names the
+                // scoring categories, but a category the total is missing has
+                // to show up in both shapes or the edge below reads as market
+                // disagreement when it is missing data.
+                const gaps = F.seasonPairDetail(
+                    marketEntry.pairs_used, marketEntry.partial_pairs, marketEntry.missing_pairs);
+                const scored = marketEntry.quoted_categories
+                    ? marketEntry.quoted_categories.map((key) => key.replace(/^season_/, "").replaceAll("_", " ")).join(" · ")
+                    : gaps.scored;
+                const detail = [scored, gaps.missing].filter(Boolean).join(" · ");
                 if (detail) col.appendChild(el("p", "compare-col__market-detail", detail));
                 const edge = marketEntry.edge ?? marketEntry.projection_delta;
                 const projection = marketEntry.projection ?? marketEntry.projected_points;
                 if (edge != null) {
                     const delta = el("p", "compare-col__delta",
-                        `${F.formatSigned(edge, 1)} vs ${F.formatPoints(projection)} proj`);
+                        `${F.formatSigned(edge, 1)} vs ${F.formatPoints(projection)} season proj`);
                     delta.classList.add(edge >= 0 ? "is-over" : "is-under");
+                    if (marketEntry.edge_is_qualified) {
+                        delta.classList.add("is-qualified");
+                        // `scored`, not `gaps.scored`: compare sends the raw
+                        // quoted markets rather than the scoring categories,
+                        // so the resolved string is the one with content.
+                        delta.title = `Market total covers ${scored} only — ${gaps.missing}, so this gap is partly missing data, not market disagreement.`;
+                    }
                     col.appendChild(delta);
                 }
             }
