@@ -1164,31 +1164,33 @@ button:focus-visible,a:focus-visible,summary:focus-visible,[tabindex]:focus-visi
 
     .value-board__toolbar .chip { min-height: 34px; }
 
-    /* The desktop table reserves 640px for its full market breakdown. On a
-       phone the detail columns are already hidden, so let the five decision
-       columns share the card width instead of pushing the numbers off-screen. */
+    /* The five decision columns need more room than a phone card gives them.
+       Hold a legible minimum width and let the card scroll sideways instead of
+       squeezing the numbers together; the detail breakdown stays in the drawer. */
     #market-board .table-wrap {
         width: 100%;
-        overflow-x: hidden;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        overscroll-behavior-x: contain;
     }
 
     #market-board .season-fantasy__table {
         width: 100%;
-        min-width: 0;
+        min-width: 470px;
         table-layout: fixed;
         font-size: .68rem;
     }
 
     #market-board .season-fantasy__table th,
     #market-board .season-fantasy__table td {
-        padding-right: 5px;
-        padding-left: 5px;
+        padding-right: 6px;
+        padding-left: 6px;
     }
 
-    #market-board .season-fantasy__table th:first-child { width: 27px; }
-    #market-board .season-fantasy__table th:nth-child(6) { width: 51px; }
-    #market-board .season-fantasy__table th:nth-child(7) { width: 62px; }
-    #market-board .season-fantasy__table th:nth-child(8) { width: 48px; }
+    #market-board .season-fantasy__table th:first-child { width: 30px; }
+    #market-board .season-fantasy__table th:nth-child(6) { width: 58px; }
+    #market-board .season-fantasy__table th:nth-child(7) { width: 70px; }
+    #market-board .season-fantasy__table th:nth-child(8) { width: 54px; }
 
     #market-board .season-fantasy__table th:nth-child(n+6) .col-sort {
         gap: 2px;
@@ -1306,13 +1308,4 @@ button:focus-visible,a:focus-visible,summary:focus-visible,[tabindex]:focus-visi
         grid-template-columns: 20px 38px minmax(0, 1fr) auto;
         gap: 6px;
     }
-}
-
-@media (max-width: 350px) {
-    #market-board .season-fantasy__table th:first-child,
-    #market-board .season-fantasy__table td:first-child { display: none; }
-
-    #market-board .season-fantasy__table th:nth-child(6) { width: 47px; }
-    #market-board .season-fantasy__table th:nth-child(7) { width: 55px; }
-    #market-board .season-fantasy__table th:nth-child(8) { width: 44px; }
 }
