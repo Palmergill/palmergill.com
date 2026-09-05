@@ -184,6 +184,23 @@ def team_roster(
         raise HTTPException(status_code=404, detail=str(exc))
 
 
+@router.get("/teams/{team_id}/lineup")
+def team_lineup(
+    team_id: int,
+    season: Optional[int] = None,
+    scoring: str = Query("std", pattern="^(ppr|half|half_ppr|half-ppr|std|standard)$"),
+    _: Dict[str, Any] = Depends(require_member),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """The started lineup against the best one this roster could field."""
+    try:
+        return fantasy_league_data.get_team_lineup(db, season, team_id, scoring=scoring)
+    except UnknownSeasonError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except UnknownTeamError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+
+
 def _resolved_season(db: Session, season: Optional[int], team_id: int) -> int:
     try:
         return fantasy_league_data.get_team_detail(db, season, team_id)["season"]

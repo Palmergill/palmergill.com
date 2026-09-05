@@ -29,7 +29,7 @@ from app.database import (
 )
 from app.services import fantasy_data
 from app.services.fantasy_collector import latest_successful_run
-from app.services.fantasy_league_espn import configured_league_id
+from app.services.fantasy_league_espn import ESPN_LINEUP_SLOTS, configured_league_id
 from app.services.fantasy_league_rankings import ALGORITHMS
 from app.services.fantasy_common import SCORING_POINTS_FIELD, normalize_scoring
 
@@ -762,6 +762,207 @@ def get_team_roster(
         },
         "entries": entries,
         "unmatched": sum(1 for entry in entries if not entry["matched"]),
+    }
+
+
+# Which positions may occupy each starting slot. Every set is either nested
+# inside another (QB ⊂ OP, RB/WR/TE ⊂ FLEX ⊂ OP) or disjoint from it, which is
+# what makes the greedy assignment in _optimal_lineup provably optimal.
+SLOT_ELIGIBILITY = {
+    "QB": frozenset({"QB"}),
+    "TQB": frozenset({"QB"}),
+    "RB": frozenset({"RB"}),
+    "WR": frozenset({"WR"}),
+    "TE": frozenset({"TE"}),
+    "K": frozenset({"K"}),
+    "DST": frozenset({"DEF", "DST", "D/ST"}),
+    "RB/WR": frozenset({"RB", "WR"}),
+    "WR/TE": frozenset({"WR", "TE"}),
+    "FLEX": frozenset({"RB", "WR", "TE"}),
+    "OP": frozenset({"QB", "RB", "WR", "TE"}),
+}
+# A player on IR cannot be started at all, whatever he is projected for.
+INELIGIBLE_SLOTS = frozenset({"IR"})
+
+
+def _starting_slots(season_row: Optional[FantasyLeagueSeason]) -> List[str]:
+    """The league's starting lineup, slot by slot, from ESPN's slot counts.
+
+    ESPN keys ``lineupSlotCounts`` by slot id, so 3 QB slots arrive as
+    {"0": 3}; this expands them into one entry per seat, which is what the
+    assignment actually fills.
+    """
+    if season_row is None or not season_row.lineup_slot_counts_json:
+        return []
+    try:
+        counts = json.loads(season_row.lineup_slot_counts_json)
+    except (TypeError, ValueError):
+        return []
+    if not isinstance(counts, dict):
+        return []
+
+    slots: List[str] = []
+    for raw_id, count in counts.items():
+        try:
+            slot = ESPN_LINEUP_SLOTS.get(int(raw_id))
+            seats = int(count)
+        except (TypeError, ValueError):
+            continue
+        # Bench and IR are storage, not a lineup; an unknown slot id is a
+        # league setting this code has never seen and should not guess at.
+        if not slot or slot in BENCH_SLOTS or slot not in SLOT_ELIGIBILITY:
+            continue
+        slots.extend([slot] * max(0, seats))
+    slots.sort(key=lambda slot: (SLOT_ORDER.get(slot, 50), slot))
+    return slots
+
+
+def _lineup_points(entry: Dict[str, Any], scoring_field: str) -> Optional[float]:
+    projection = entry.get("projection") or {}
+    value = projection.get(scoring_field)
+    return None if value is None else float(value)
+
+
+def _optimal_lineup(
+    slots: List[str], candidates: List[Dict[str, Any]]
+) -> List[Dict[str, Any]]:
+    """Assign the highest-scoring legal lineup, one seat at a time.
+
+    Seats are filled most-restrictive first (a QB seat before a superflex),
+    each taking the best projected player still available. Because the
+    eligibility sets form a laminar family — any two are nested or disjoint —
+    filling the narrowest seat first can never strand a player the wider seat
+    needed, so this greedy assignment is the optimum, not an approximation.
+    A brute-force comparison in the tests pins that claim.
+    """
+    remaining = sorted(
+        candidates, key=lambda entry: entry["_points"], reverse=True
+    )
+    ordered = sorted(slots, key=lambda slot: (len(SLOT_ELIGIBILITY[slot]), slot))
+    filled: List[Dict[str, Any]] = []
+    for slot in ordered:
+        eligible = SLOT_ELIGIBILITY[slot]
+        pick = next(
+            (entry for entry in remaining if entry["_position"] in eligible), None
+        )
+        if pick is None:
+            continue
+        remaining = [entry for entry in remaining if entry is not pick]
+        filled.append({**pick, "slot": slot})
+    filled.sort(key=lambda entry: (SLOT_ORDER.get(entry["slot"], 50), -entry["_points"]))
+    return filled
+
+
+def _lineup_player(entry: Dict[str, Any], slot: Optional[str] = None) -> Dict[str, Any]:
+    return {
+        "player_id": entry.get("player_id"),
+        "name": entry.get("name"),
+        "position": entry.get("position"),
+        "pro_team": entry.get("pro_team"),
+        "injury_status": entry.get("injury_status"),
+        "slot": slot if slot is not None else entry.get("lineup_slot"),
+        "projected_points": entry.get("_points"),
+    }
+
+
+def get_team_lineup(
+    db: Session,
+    season: Optional[int],
+    team_id: int,
+    scoring: str = "std",
+) -> Dict[str, Any]:
+    """This week's lineup against the best one the roster could field.
+
+    The roster read already joins every spot to the week's consensus
+    projection, so this is arithmetic on a payload the hub was fetching
+    anyway — no new collection, no second source of truth about who is on
+    the team.
+
+    Only projected players are assigned. A starter the projection feed does
+    not cover is reported rather than silently benched: the answer "start
+    someone else" is worth nothing if the reason is a missing number.
+    """
+    scoring = normalize_scoring(scoring)
+    scoring_field = SCORING_POINTS_FIELD[scoring]
+    roster = get_team_roster(db, season, team_id)
+    season = roster["season"]
+    season_row = next(
+        (row for row in _season_rows(db) if row.season == season), None
+    )
+    slots = _starting_slots(season_row)
+
+    entries = []
+    for entry in roster["entries"]:
+        points = _lineup_points(entry, scoring_field)
+        position = (entry.get("position") or "").upper()
+        entries.append({**entry, "_points": points, "_position": position})
+
+    current = [entry for entry in entries if entry["is_starter"]]
+    candidates = [
+        entry
+        for entry in entries
+        if entry["_points"] is not None
+        and entry["lineup_slot"] not in INELIGIBLE_SLOTS
+        and any(entry["_position"] in SLOT_ELIGIBILITY[slot] for slot in slots)
+    ]
+    optimal = _optimal_lineup(slots, candidates)
+
+    current_total = sum(entry["_points"] or 0.0 for entry in current)
+    optimal_total = sum(entry["_points"] for entry in optimal)
+    optimal_ids = {entry["player_id"] for entry in optimal}
+    current_ids = {entry["player_id"] for entry in current}
+
+    # Pair the players to start with the players to sit, best against worst.
+    # A slot-by-slot diff reads as a shuffle when one player merely changes
+    # seats; this reads as the decision actually being made.
+    bench_in = sorted(
+        (entry for entry in optimal if entry["player_id"] not in current_ids),
+        key=lambda entry: entry["_points"],
+        reverse=True,
+    )
+    bench_out = sorted(
+        (entry for entry in current if entry["player_id"] not in optimal_ids),
+        key=lambda entry: (entry["_points"] is not None, entry["_points"] or 0.0),
+    )
+    swaps = []
+    for start, sit in zip(bench_in, bench_out):
+        swaps.append(
+            {
+                "slot": start["slot"],
+                "start": _lineup_player(start, start["slot"]),
+                "sit": _lineup_player(sit),
+                "gain": (
+                    round(start["_points"] - sit["_points"], 1)
+                    if sit["_points"] is not None
+                    else None
+                ),
+            }
+        )
+
+    return {
+        "season": season,
+        "espn_team_id": team_id,
+        "scoring": scoring,
+        "as_of": roster["as_of"],
+        "week": roster["player_data"]["week"],
+        "projection_as_of": roster["player_data"]["projection_as_of"],
+        "slots": slots,
+        "current": {
+            "total": round(current_total, 1),
+            "entries": [_lineup_player(entry) for entry in current],
+        },
+        "optimal": {
+            "total": round(optimal_total, 1),
+            "entries": [_lineup_player(entry, entry["slot"]) for entry in optimal],
+        },
+        "gain": round(optimal_total - current_total, 1),
+        "swaps": swaps,
+        # Named so the card can say why it may be wrong rather than looking
+        # confidently wrong.
+        "unprojected_starters": sum(
+            1 for entry in current if entry["_points"] is None
+        ),
+        "unfilled_slots": max(0, len(slots) - len(optimal)),
     }
 
 

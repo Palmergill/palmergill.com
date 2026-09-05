@@ -4,6 +4,8 @@ The important assertions here are the negative ones: this is the only part
 of /api/fantasy that is NOT public, and it sits underneath a demo prefix, so
 the gate has to be proven rather than assumed.
 """
+import json
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -66,6 +68,7 @@ LEAGUE_ROUTES = (
     "/api/fantasy/league/scoreboard",
     "/api/fantasy/league/teams/1",
     "/api/fantasy/league/teams/1/roster",
+    "/api/fantasy/league/teams/1/lineup",
     "/api/fantasy/league/teams/1/overview",
 )
 
@@ -676,3 +679,154 @@ def _looks_like_timestamp(value: str) -> bool:
     import re
 
     return bool(re.match(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}", value))
+
+
+# ── start/sit ───────────────────────────────────────────────────────────────
+#
+# The assignment itself is proven in test_fantasy_league_lineup.py; these are
+# the contract: what the route returns for a roster, and the two cases where
+# saying nothing beats saying something confident and wrong.
+
+STARTING_SLOTS = {"0": 1, "2": 2, "4": 2, "6": 1, "23": 1, "20": 6, "21": 1}
+
+
+def _spot(player_id, name, position, slot, points):
+    return {
+        "player_id": player_id,
+        "name": name,
+        "matched": True,
+        "position": position,
+        "lineup_slot": slot,
+        "lineup_slot_id": None,
+        "is_starter": slot not in ("BENCH", "IR"),
+        "pro_team": "SF",
+        "injury_status": None,
+        "acquisition_type": None,
+        "projection": None
+        if points is None
+        else {"pts_std": points, "pts_half_ppr": points, "pts_ppr": points},
+        "ranking": None,
+        "props": [],
+        "recent_actuals": [],
+    }
+
+
+def _roster(entries, season=2024):
+    return {
+        "season": season,
+        "espn_team_id": 1,
+        "as_of": "2026-09-05T12:00:00Z",
+        "player_data": {
+            "season": 2026,
+            "week": 2,
+            "projection_as_of": "2026-09-05T11:00:00Z",
+            "ranking_as_of": None,
+        },
+        "entries": entries,
+        "unmatched": 0,
+    }
+
+
+def _seed_lineup(session, monkeypatch, entries, slots=None):
+    row = session.query(FantasyLeagueSeason).filter_by(season=2024).first()
+    row.lineup_slot_counts_json = json.dumps(slots or STARTING_SLOTS)
+    session.commit()
+    monkeypatch.setattr(
+        "app.services.fantasy_league_data.get_team_roster",
+        lambda *_args, **_kwargs: _roster(entries),
+    )
+
+
+def test_lineup_starts_the_bench_player_who_outprojects_a_starter(seeded_db, monkeypatch):
+    _seed_lineup(seeded_db, monkeypatch, [
+        _spot("qb1", "Passer One", "QB", "QB", 22.0),
+        _spot("rb1", "Runner One", "RB", "RB", 17.0),
+        _spot("rb2", "Runner Two", "RB", "RB", 6.5),
+        _spot("wr1", "Catcher One", "WR", "WR", 14.0),
+        _spot("wr2", "Catcher Two", "WR", "WR", 11.0),
+        _spot("te1", "Tight One", "TE", "TE", 9.0),
+        _spot("wr3", "Catcher Three", "WR", "FLEX", 10.0),
+        _spot("rb3", "Runner Three", "RB", "BENCH", 15.5),
+    ])
+
+    body = member_client().get("/api/fantasy/league/teams/1/lineup").json()
+    assert body["season"] == 2024
+    assert body["week"] == 2
+    assert body["slots"] == ["QB", "RB", "RB", "WR", "WR", "TE", "FLEX"]
+
+    # 22 + 17 + 6.5 + 14 + 11 + 9 + 10 started; the bench back replaces the
+    # 6.5 and pushes the flex around him.
+    assert body["current"]["total"] == 89.5
+    assert body["optimal"]["total"] == 98.5
+    assert body["gain"] == 9.0
+    assert [swap["start"]["name"] for swap in body["swaps"]] == ["Runner Three"]
+    assert [swap["sit"]["name"] for swap in body["swaps"]] == ["Runner Two"]
+    assert body["swaps"][0]["gain"] == 9.0
+    assert body["unprojected_starters"] == 0
+
+
+def test_lineup_leaves_a_correct_lineup_alone(seeded_db, monkeypatch):
+    _seed_lineup(seeded_db, monkeypatch, [
+        _spot("qb1", "Passer One", "QB", "QB", 22.0),
+        _spot("rb1", "Runner One", "RB", "RB", 17.0),
+        _spot("rb2", "Runner Two", "RB", "RB", 16.0),
+        _spot("wr1", "Catcher One", "WR", "WR", 14.0),
+        _spot("wr2", "Catcher Two", "WR", "WR", 11.0),
+        _spot("te1", "Tight One", "TE", "TE", 9.0),
+        _spot("wr3", "Catcher Three", "WR", "FLEX", 10.0),
+        _spot("rb3", "Runner Three", "RB", "BENCH", 4.0),
+    ], slots=STARTING_SLOTS)
+
+    body = member_client().get("/api/fantasy/league/teams/1/lineup").json()
+    assert body["swaps"] == []
+    assert body["gain"] == 0.0
+    assert body["current"]["total"] == body["optimal"]["total"]
+
+
+def test_lineup_never_starts_a_player_on_ir(seeded_db, monkeypatch):
+    _seed_lineup(seeded_db, monkeypatch, [
+        _spot("qb1", "Passer One", "QB", "QB", 12.0),
+        # Injured reserve: not startable at any projection.
+        _spot("qb2", "Passer Two", "QB", "IR", 30.0),
+    ], slots={"0": 1, "20": 6, "21": 1})
+
+    body = member_client().get("/api/fantasy/league/teams/1/lineup").json()
+    assert body["slots"] == ["QB"]
+    assert [entry["name"] for entry in body["optimal"]["entries"]] == ["Passer One"]
+    assert body["swaps"] == []
+
+
+def test_lineup_names_a_starter_it_cannot_grade(seeded_db, monkeypatch):
+    _seed_lineup(seeded_db, monkeypatch, [
+        # No projection: the feed does not cover him this week.
+        _spot("qb1", "Passer One", "QB", "QB", None),
+        _spot("qb2", "Passer Two", "QB", "BENCH", 15.0),
+    ], slots={"0": 1, "20": 6})
+
+    body = member_client().get("/api/fantasy/league/teams/1/lineup").json()
+    assert body["unprojected_starters"] == 1
+    assert body["swaps"][0]["start"]["name"] == "Passer Two"
+    assert body["swaps"][0]["sit"]["name"] == "Passer One"
+    # There is no number to have beaten, so the swap claims no gain.
+    assert body["swaps"][0]["gain"] is None
+    assert body["swaps"][0]["sit"]["projected_points"] is None
+
+
+def test_lineup_without_stored_slot_settings_returns_an_empty_lineup(seeded_db, monkeypatch):
+    row = seeded_db.query(FantasyLeagueSeason).filter_by(season=2024).first()
+    row.lineup_slot_counts_json = None
+    seeded_db.commit()
+    monkeypatch.setattr(
+        "app.services.fantasy_league_data.get_team_roster",
+        lambda *_args, **_kwargs: _roster([_spot("qb1", "Passer One", "QB", "QB", 12.0)]),
+    )
+
+    body = member_client().get("/api/fantasy/league/teams/1/lineup").json()
+    assert body["slots"] == []
+    assert body["optimal"]["entries"] == []
+    assert body["swaps"] == []
+
+
+def test_lineup_404s_for_a_team_the_league_does_not_have(seeded_db):
+    response = member_client().get("/api/fantasy/league/teams/99/lineup")
+    assert response.status_code == 404

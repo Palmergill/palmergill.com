@@ -570,6 +570,147 @@ button:focus-visible {
     stroke-linejoin: round;
 }
 
+/* Start/sit. Louder than the roster list below it: this is the one card on
+   the page that asks for a decision rather than reporting a fact. */
+.lineup {
+    margin-bottom: 20px;
+    padding: 18px 20px;
+    border: 1px solid var(--line, #ece4d8);
+    border-radius: 18px;
+    background: var(--card, #fff);
+}
+
+.lineup__head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 14px;
+}
+
+.lineup__head h3 { margin: 0; font-size: 15px; }
+
+.lineup__meta {
+    margin: 3px 0 0;
+    font-size: 12px;
+    color: var(--muted, #928a7d);
+}
+
+.lineup__totals {
+    display: flex;
+    gap: 18px;
+    margin: 0;
+}
+
+.lineup__total dt {
+    font-size: 11px;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--muted, #928a7d);
+}
+
+.lineup__total dd {
+    margin: 2px 0 0;
+    font-size: 18px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+
+.lineup__total--gain dd { color: #3f6d4a; }
+
+.lineup__swaps {
+    margin: 14px 0 0;
+    padding: 0;
+    list-style: none;
+    display: grid;
+    gap: 8px;
+}
+
+.lineup__swap {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    border: 1px solid var(--line, #ece4d8);
+    border-radius: 12px;
+    background: var(--surface, #f3eee5);
+}
+
+.lineup__slot {
+    flex: 0 0 auto;
+    min-width: 44px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--muted, #928a7d);
+}
+
+.lineup__move {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.lineup__side { min-width: 0; }
+
+.lineup__label {
+    display: block;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--muted, #928a7d);
+}
+
+.lineup__side--start .lineup__label { color: #3f6d4a; }
+.lineup__side--sit .lineup__label { color: #8c3a1f; }
+
+.lineup__name {
+    display: block;
+    font-size: 14px;
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.lineup__points {
+    display: block;
+    font-size: 12px;
+    color: var(--soft, #5d574e);
+}
+
+.lineup__gain {
+    flex: 0 0 auto;
+    font-size: 15px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: #3f6d4a;
+}
+
+.lineup__ok {
+    padding: 10px 12px;
+    border-radius: 12px;
+    background: var(--surface, #f3eee5);
+    font-size: 13px;
+    color: var(--soft, #5d574e);
+}
+
+.lineup__note {
+    margin: 10px 0 0;
+    font-size: 12px;
+    color: var(--muted, #928a7d);
+}
+
+@media (max-width: 620px) {
+    .lineup { padding: 14px; }
+    .lineup__totals { gap: 14px; }
+    .lineup__move { grid-template-columns: 1fr; gap: 6px; }
+}
+
 .team-overview {
     padding: 18px 20px;
     margin-bottom: 20px;

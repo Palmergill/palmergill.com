@@ -57,6 +57,11 @@
         teamResults: byId("teamResults"),
         teamRoster: byId("teamRoster"),
         rosterNote: byId("rosterNote"),
+        lineupCard: byId("lineupCard"),
+        lineupMeta: byId("lineupMeta"),
+        lineupTotals: byId("lineupTotals"),
+        lineupSwaps: byId("lineupSwaps"),
+        lineupNote: byId("lineupNote"),
     };
 
     class ForbiddenError extends Error {}
@@ -565,6 +570,95 @@
         els.rosterNote.textContent = notes.filter(Boolean).join(" · ");
     }
 
+    // ── start/sit ───────────────────────────────────────────────────────
+    //
+    // The roster read already joins every spot to the week's projection and
+    // the league already stores its lineup slot counts, so the best legal
+    // lineup is arithmetic on data the hub was fetching anyway. The card
+    // shows the decision, not the assignment: which player to start over
+    // which, and what it is worth.
+
+    function renderLineup(payload) {
+        // A league whose lineup settings were never collected has no lineup to
+        // grade, and a card that says nothing is worse than no card.
+        if (!payload || !(payload.slots || []).length) {
+            els.lineupCard.hidden = true;
+            return;
+        }
+        els.lineupCard.hidden = false;
+
+        const week = payload.week === 0 ? "season-long" : `week ${payload.week}`;
+        els.lineupMeta.textContent = `Best legal lineup for ${week}, on PPR projections`;
+
+        els.lineupTotals.replaceChildren();
+        els.lineupTotals.appendChild(lineupTotal("Started", F.formatPoints(payload.current.total)));
+        els.lineupTotals.appendChild(lineupTotal("Best possible", F.formatPoints(payload.optimal.total)));
+        const gain = lineupTotal(
+            "On the bench",
+            payload.gain > 0 ? `+${F.formatPoints(payload.gain)}` : "—"
+        );
+        if (payload.gain > 0) gain.classList.add("lineup__total--gain");
+        els.lineupTotals.appendChild(gain);
+
+        els.lineupSwaps.replaceChildren();
+        if (!payload.swaps.length) {
+            els.lineupSwaps.appendChild(
+                el("li", "lineup__ok", "This is the best lineup this roster can field.")
+            );
+        }
+        payload.swaps.forEach((swap) => {
+            const item = el("li", "lineup__swap");
+            item.appendChild(el("span", "lineup__slot", swap.slot || "—"));
+            const move = el("div", "lineup__move");
+            move.appendChild(lineupSide("Start", swap.start));
+            move.appendChild(lineupSide("Sit", swap.sit));
+            item.appendChild(move);
+            item.appendChild(
+                el(
+                    "span",
+                    "lineup__gain",
+                    // No projection on the player coming out means no claim
+                    // about what the change is worth.
+                    swap.gain == null ? "?" : `+${F.formatPoints(swap.gain)}`
+                )
+            );
+            els.lineupSwaps.appendChild(item);
+        });
+
+        const notes = [];
+        if (payload.unprojected_starters) {
+            const count = payload.unprojected_starters;
+            notes.push(
+                `${count} starter${count === 1 ? " has" : "s have"} no projection this week, ` +
+                    `so ${count === 1 ? "he is" : "they are"} not compared`
+            );
+        }
+        if (payload.unfilled_slots) {
+            notes.push(`${payload.unfilled_slots} slot${payload.unfilled_slots === 1 ? "" : "s"} could not be filled`);
+        }
+        notes.push(F.formatAsOf(payload.projection_as_of || payload.as_of));
+        els.lineupNote.textContent = notes.filter(Boolean).join(" · ");
+    }
+
+    function lineupTotal(label, value) {
+        const wrap = el("div", "lineup__total");
+        wrap.appendChild(el("dt", null, label));
+        wrap.appendChild(el("dd", null, value));
+        return wrap;
+    }
+
+    function lineupSide(label, player) {
+        const side = el("div", `lineup__side lineup__side--${label.toLowerCase()}`);
+        side.appendChild(el("span", "lineup__label", label));
+        side.appendChild(el("span", "lineup__name", player.name || "—"));
+        const meta = [player.position, player.pro_team].filter(Boolean).join(" · ");
+        side.appendChild(el("span", "lineup__points",
+            player.projected_points == null
+                ? `${meta} · no projection`
+                : `${meta} · ${F.formatPoints(player.projected_points)}`));
+        return side;
+    }
+
     function renderTeamOverview(payload) {
         // "missing" means nothing has been written for this team/week yet.
         // Generating costs a model call, so it stays an explicit choice
@@ -637,13 +731,23 @@
         els.teamOverviewBody.replaceChildren();
         els.teamOverviewMeta.textContent = "";
         try {
-            const [detail, roster] = await Promise.all([
+            const lineupParams = new URLSearchParams(params);
+            // The roster list below prints PPR projections, so the lineup that
+            // grades them has to be scored the same way.
+            lineupParams.set("scoring", "ppr");
+            const [detail, roster, lineup] = await Promise.all([
                 fetchJson(`${API_BASE}/teams/${state.teamId}?${params}`),
                 fetchJson(`${API_BASE}/teams/${state.teamId}/roster?${params}`),
+                fetchJson(`${API_BASE}/teams/${state.teamId}/lineup?${lineupParams}`).catch(
+                    // Advice is the one part of this page that can be missing
+                    // without the page being broken.
+                    () => null
+                ),
             ]);
             if (stale(generation)) return;
             renderTeamDetail(detail);
             renderRoster(roster);
+            renderLineup(lineup);
             loadTeamOverview(false);
         } catch (error) {
             if (!stale(generation)) handleFailure(error);
