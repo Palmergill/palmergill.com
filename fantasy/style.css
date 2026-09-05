@@ -1105,6 +1105,14 @@ button:focus-visible,a:focus-visible,summary:focus-visible,[tabindex]:focus-visi
 .season-fantasy__delta.is-over { color: #4d775a; }
 .season-fantasy__delta.is-under { color: var(--fantasy-clay); }
 
+/* Week board. Four columns instead of eight, so it needs none of the market
+   table's width tuning — only the opponent, which is the reason to be reading
+   a weekly board at all. */
+.week-table { min-width: 0; }
+.week-table .col-rank { width: 44px; }
+.season-leader__matchup { color: var(--fantasy-forest); font-weight: 600; }
+.season-leader__matchup--bye { color: var(--fantasy-clay); }
+
 /* An edge whose market total is missing a category the projection counts.
    Dotted-underlined rather than recoloured: the sign still has to read at a
    glance, and the marker has to survive both the is-over and is-under colour.

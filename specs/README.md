@@ -39,7 +39,7 @@ One spec per roadmap item. Status legend: `draft` → `accepted` →
 | 3 | [Repo & tracker cleanup](q3-03-repo-cleanup.md) | shipped |
 | 4 | [Backend test baseline](q3-04-backend-test-baseline.md) | shipped |
 | 5 | [Casino shell unification](q4-05-casino-shell-unification.md) | in progress — header/lobby/rebuy/responsive fixes shipped, chip/card CSS consolidation remains |
-| 16 | [Fantasy football dashboard](q3-16-fantasy-football-dashboard.md) | in progress — P1–P4 built (data, UI, betting, chat); needs live OpenAI/Odds keys for prod verification |
+| 16 | [Fantasy football dashboard](q3-16-fantasy-football-dashboard.md) | in progress — P1–P4 built (data, UI, betting, chat) plus the Sep 2026 week board; needs live OpenAI/Odds keys for prod verification |
 | 17 | [ESPN league hub](q3-17-espn-league-hub.md) | in progress — P1–P4 built (data, hub, rosters, AI); needs a live OpenAI key to verify model-backed overviews |
 | 18 | [Personal rankings](q3-18-personal-rankings.md) | implemented — private boards, tiers, public sharing, and published-board site consensus |
 | 19 | [Fourth & Fortune](q3-19-fourth-and-fortune.md) | shipped — commit-reveal draft-order game; spec written retroactively |

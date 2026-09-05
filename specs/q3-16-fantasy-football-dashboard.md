@@ -342,3 +342,23 @@ static mounts in `main.py`, `fantasy/tests` added to jest roots in
   for ESPN league 225965 at `/fantasy/league/`. This does not change this
   spec's public `/fantasy/` surface or make its rankings, projections, odds,
   and default chat experience league-dependent.
+
+- **Sep 2026 — the week board returns:** the Aug 2026 redesign replaced R10's
+  current-week rankings table with the season-long market board and removed the
+  week control, which left the page season-shaped going into Week 1 even though
+  the collector switches to weekly projections and rebuilds the derived
+  rankings weekly in-season. The market board now carries a Season/Week toggle
+  (`#boardMode`), offered only when `/state` reports `in_season` with a real
+  week, so it appears when the season starts and disappears again after it.
+  Week mode renders `GET /api/fantasy/rankings?week=N` — which already attached
+  the opponent from the schedule and the movement against last week's board,
+  and until now had no caller — as its own four-column table: rank, player with
+  opponent or BYE, consensus projection, and rank movement.
+
+  It is a second table rather than a re-columned market table. The two share no
+  column but the player, and the market table's widths are tuned per column
+  down to the phone breakpoints; re-columning in place would mean every one of
+  those rules had to know which board it was in. The two boards do share the
+  position chips, the note and the "show all" control, so only the board on
+  screen paints them — a season payload arriving while the week board is up
+  fills the freshness card and nothing else.

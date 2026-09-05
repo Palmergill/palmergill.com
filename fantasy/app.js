@@ -15,6 +15,9 @@
         season: null,
         week: null,
         defaultWeek: null,
+        // "season" (market value, year-long) or "week" (this week's board).
+        boardMode: "season",
+        weekBoard: null,
         inSeason: false,
         seasonFantasyScoring: "std",
         seasonFantasyPosition: "ALL",
@@ -34,6 +37,13 @@
     };
 
     const els = {
+        boardMode: document.getElementById("boardMode"),
+        marketBoardEyebrow: document.getElementById("marketBoardEyebrow"),
+        marketBoardTitle: document.getElementById("marketBoardTitle"),
+        marketTableWrap: document.getElementById("marketTableWrap"),
+        weekBoardWrap: document.getElementById("weekBoardWrap"),
+        weekLeaders: document.getElementById("weekLeaders"),
+        weekProjHead: document.getElementById("weekProjHead"),
         weekLabel: document.getElementById("weekLabel"),
         weekValue: document.getElementById("weekValue"),
         seasonValue: document.getElementById("seasonValue"),
@@ -193,6 +203,9 @@
         const params = new URLSearchParams(window.location.search);
         if (params.has("pos")) state.seasonFantasyPosition = params.get("pos").toUpperCase();
         if (params.has("scoring")) state.seasonFantasyScoring = params.get("scoring");
+        // Applied once /state says whether there is a week to show; until then
+        // it is only a request.
+        if (params.get("board") === "week") state.boardMode = "week";
         // "delta", "delta:asc" — an unknown column is ignored rather than
         // leaving the board sorted by nothing.
         if (params.has("sort")) {
@@ -213,8 +226,10 @@
         if (state.seasonFantasyScoring && state.seasonFantasyScoring !== "std") {
             params.set("scoring", state.seasonFantasyScoring);
         }
+        if (state.boardMode === "week") params.set("board", "week");
         const sort = state.seasonFantasySort;
-        if (sort.key !== "fantasy_points" || sort.dir !== "desc") {
+        // The sort belongs to the market table; the week board is ranked.
+        if (state.boardMode !== "week" && (sort.key !== "fantasy_points" || sort.dir !== "desc")) {
             params.set("sort", `${sort.key}:${sort.dir}`);
         }
         if (state.drawerPlayerId && !els.drawer.hidden) params.set("player", state.drawerPlayerId);
@@ -596,7 +611,8 @@
             });
             const data = await fetchJson(`${API_BASE}/season-fantasy-points?${params.toString()}`);
             state.seasonFantasyData = data;
-            renderSeasonFantasyLeaders(data);
+            if (state.boardMode === "week") renderMarketFreshness(data.sources || []);
+            else renderSeasonFantasyLeaders(data);
             if (els.memberStatus?.textContent === "Latest market") {
                 els.memberTeam.textContent = F.formatAsOf(data.as_of) || "—";
             }
@@ -768,6 +784,232 @@
         if (!rows.length) renderMarketBoardEmpty(all.length, position);
     }
 
+    // ── week board ──────────────────────────────────────────────────────────
+    //
+    // In-season the collector already snapshots weekly projections and rebuilds
+    // the derived rankings every week, and /rankings already attaches the
+    // opponent from the schedule and the movement since last week's board.
+    // None of it was rendered: the page showed a season-long market board
+    // straight through the games it exists to help with. This is that stored
+    // data, nothing new collected.
+    //
+    // It is a second table rather than a re-columned market table. The two
+    // share no column but the player, and the market table's widths are tuned
+    // per column down to the phone breakpoints — re-columning it in place
+    // would mean every one of those rules had to know which board it was in.
+
+    function weekBoardAvailable() {
+        return !!state.inSeason && state.week != null && state.week > 0;
+    }
+
+    function renderBoardMode() {
+        if (!els.boardMode) return;
+        const available = weekBoardAvailable();
+        els.boardMode.hidden = !available;
+        if (!available) {
+            els.boardMode.innerHTML = "";
+            return;
+        }
+        els.boardMode.innerHTML = "";
+        [
+            { key: "season", label: "Season" },
+            { key: "week", label: `Week ${state.week}` },
+        ].forEach((option) => {
+            const chip = el("button", "chip", option.label);
+            chip.type = "button";
+            chip.dataset.board = option.key;
+            chip.setAttribute("aria-pressed", String(option.key === state.boardMode));
+            chip.addEventListener("click", () => setBoardMode(option.key));
+            els.boardMode.appendChild(chip);
+        });
+    }
+
+    // Clamps to the season board whenever there is no week to show, so an old
+    // ?board=week link in the offseason lands on something real.
+    function setBoardMode(mode) {
+        const week = mode === "week" && weekBoardAvailable();
+        state.boardMode = week ? "week" : "season";
+        if (els.marketBoardEyebrow) {
+            els.marketBoardEyebrow.textContent = week ? `Week ${state.week}` : "Season board";
+        }
+        if (els.marketBoardTitle) {
+            els.marketBoardTitle.textContent = week ? "Week Board" : "Market Value";
+        }
+        if (els.marketTableWrap) els.marketTableWrap.hidden = week;
+        if (els.weekBoardWrap) els.weekBoardWrap.hidden = !week;
+        renderBoardMode();
+        writeUrlState();
+        renderActiveBoard();
+    }
+
+    function renderActiveBoard() {
+        if (state.boardMode === "week") {
+            if (state.weekBoard) renderWeekBoard();
+            else loadWeekBoard();
+            return;
+        }
+        if (state.seasonFantasyData) renderSeasonFantasyLeaders(state.seasonFantasyData);
+    }
+
+    async function loadWeekBoard() {
+        if (!els.weekLeaders || !weekBoardAvailable()) return;
+        try {
+            const params = new URLSearchParams({
+                scoring: state.seasonFantasyScoring,
+                week: String(state.week),
+                limit: "200",
+            });
+            if (state.season != null) params.set("season", state.season);
+            const data = await fetchJson(`${API_BASE}/rankings?${params.toString()}`);
+            state.weekBoard = normalizeWeekBoard(data);
+        } catch (err) {
+            state.weekBoard = { week: state.week, as_of: null, leaders: [] };
+        }
+        // A reply that lands after the reader has gone back to the season
+        // board is kept, not drawn.
+        if (state.boardMode === "week") renderWeekBoard();
+    }
+
+    // The rankings payload is flat — one player per row — while every board
+    // helper here expects {player: {...}}. Reshaping on arrival keeps the
+    // position chips, the injury badge and the compare tray working unchanged.
+    function normalizeWeekBoard(data) {
+        const leaders = (data.rankings || []).map((row) => ({
+            player: {
+                player_id: row.player_id,
+                name: row.name,
+                team: row.team,
+                position: row.position,
+                injury_status: row.injury_status,
+            },
+            rank: row.rank,
+            projected_points: row.projected_points,
+            prev_rank: row.prev_rank,
+            opponent: row.opponent,
+            home: row.home,
+            bye: row.bye,
+        }));
+        return {
+            season: data.season,
+            week: data.week,
+            as_of: data.as_of,
+            source: data.source,
+            leaders,
+        };
+    }
+
+    // "@ BUF", "vs BUF", "BYE", or nothing when no schedule is loaded — the
+    // API distinguishes a team absent from a loaded week (a bye) from a week
+    // it has no schedule for at all, and so does this.
+    function weekMatchupLabel(entry) {
+        if (entry.bye) return "BYE";
+        if (!entry.opponent) return "";
+        return `${entry.home === false ? "@" : "vs"} ${entry.opponent}`;
+    }
+
+    function renderWeekBoard() {
+        if (!els.weekLeaders) return;
+        const data = state.weekBoard || { leaders: [] };
+        const all = data.leaders || [];
+        const position = resolveSeasonPosition(all, state.seasonFantasyPosition);
+        state.seasonFantasyPosition = position;
+        renderSeasonPositionChips(els.seasonFantasyPositions, all, position, (pick) => {
+            state.seasonFantasyPosition = pick;
+            writeUrlState();
+            renderWeekBoard();
+        });
+
+        const rows = all
+            .map((entry, index) => ({ entry, overall: index + 1 }))
+            .filter(({ entry }) => F.seasonPositionMatches(entry, position));
+        const visibleRows = state.marketExpanded ? rows : rows.slice(0, 10);
+
+        els.weekLeaders.innerHTML = "";
+        visibleRows.forEach(({ entry, overall }, index) => {
+            const player = entry.player || {};
+            const tr = el("tr", "season-leader");
+            tr.tabIndex = 0;
+            tr.setAttribute("role", "button");
+            tr.setAttribute("aria-label", `Open ${player.name || "player"} season lines`);
+            tr.appendChild(el("td", "col-rank", index + 1));
+
+            const who = el("td", "col-player");
+            who.appendChild(el("span", "season-leader__name", player.name || player.player_id));
+            const matchup = weekMatchupLabel(entry);
+            const overallDetail = position === "ALL" ? "" : ` · ${overall} overall`;
+            const meta = el("span", "season-leader__meta",
+                `${player.position || ""} ${player.team || ""}${overallDetail}`.trim());
+            // The opponent is the reason to read a weekly board rather than a
+            // season one, so it sits apart from the identity that precedes it.
+            if (matchup) {
+                const opponent = el("span", "season-leader__matchup", ` · ${matchup}`);
+                if (entry.bye) opponent.classList.add("season-leader__matchup--bye");
+                meta.appendChild(opponent);
+            }
+            who.appendChild(meta);
+            attachRowCompare(who, player);
+            tr.appendChild(who);
+
+            tr.appendChild(el("td", "col-proj season-fantasy__total",
+                F.formatPoints(entry.projected_points)));
+            tr.appendChild(weekMoveCell(entry));
+
+            const open = () => {
+                if (player.player_id) openPlayer(player.player_id);
+            };
+            tr.addEventListener("click", open);
+            tr.addEventListener("keydown", (event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    open();
+                }
+            });
+            els.weekLeaders.appendChild(tr);
+        });
+
+        if (els.weekProjHead) {
+            els.weekProjHead.textContent = "Proj";
+            els.weekProjHead.title = `Consensus projected points for week ${data.week ?? state.week}`;
+        }
+        const positionMetric = position === "ALL" ? "" : ` · ${rows.length} of ${all.length} ${position}`;
+        els.seasonFantasyNote.textContent = rows.length
+            ? `${visibleRows.length} of ${rows.length}${positionMetric} · Week ${data.week ?? state.week} · ${F.formatAsOf(data.as_of) || "latest"}`
+            : "";
+        if (els.showAllMarket) {
+            els.showAllMarket.hidden = rows.length <= 10;
+            els.showAllMarket.textContent = state.marketExpanded ? "Show less" : `Show all ${rows.length}`;
+            els.showAllMarket.setAttribute("aria-expanded", String(state.marketExpanded));
+        }
+        if (!rows.length) renderWeekBoardEmpty(all.length, position);
+    }
+
+    // Rank movement against last week's board, which the API computes by
+    // ranking the prior week the same way. A player who was not ranked then
+    // has no move to report rather than a move of zero.
+    function weekMoveCell(entry) {
+        if (entry.prev_rank == null || entry.rank == null) {
+            const blank = el("td", "col-proj season-fantasy__delta", "—");
+            blank.title = "Not on last week's board";
+            return blank;
+        }
+        const move = entry.prev_rank - entry.rank;
+        const cell = el("td", "col-proj season-fantasy__delta", move === 0 ? "—" : F.formatSigned(move, 0));
+        if (move !== 0) cell.classList.add(move > 0 ? "is-over" : "is-under");
+        cell.title = `Was ${entry.prev_rank} last week`;
+        return cell;
+    }
+
+    function renderWeekBoardEmpty(total, position) {
+        const row = el("tr");
+        const cell = el("td", "table-empty");
+        cell.colSpan = 4;
+        cell.textContent = total
+            ? `No ${position} is projected for week ${state.week} yet.`
+            : `Week ${state.week} projections have not been collected yet.`;
+        row.appendChild(cell);
+        els.weekLeaders.appendChild(row);
+    }
+
     function renderMarketFreshness(sources) {
         if (!els.marketFreshness) return;
         els.marketFreshness.innerHTML = "";
@@ -849,6 +1091,8 @@
                     item.setAttribute("aria-pressed", String(item.dataset.scoring === option.key));
                 });
                 loadSeasonFantasyLeaders();
+                state.weekBoard = null;
+                if (state.boardMode === "week") loadWeekBoard();
                 loadMarketMovers();
                 loadMemberSnapshot();
             });
@@ -1704,6 +1948,9 @@
             state.week = state.defaultWeek;
         }
         renderWeekBadge();
+        // Re-applies ?board=week now that there is a week to apply it to, and
+        // falls back to the season board when there is not.
+        setBoardMode(state.boardMode);
 
         const seasonLong = state.week === 0;
         if (!data.in_season || data.is_fallback) {
@@ -1719,7 +1966,7 @@
             state.compare = [];
             renderCompareTray();
             // Repaint the board's row buttons from the payload already in hand.
-            if (state.seasonFantasyData) renderSeasonFantasyLeaders(state.seasonFantasyData);
+            renderActiveBoard();
         });
         els.compareGo.addEventListener("click", openCompare);
         els.compareDrawerClose.addEventListener("click", closeCompare);
@@ -1738,7 +1985,7 @@
         renderCompareTray();
         els.showAllMarket.addEventListener("click", () => {
             state.marketExpanded = !state.marketExpanded;
-            if (state.seasonFantasyData) renderSeasonFantasyLeaders(state.seasonFantasyData);
+            renderActiveBoard();
         });
         els.playerMarkets.addEventListener("click", () => openMarkets());
         els.marketsClose.addEventListener("click", () => closeMarkets());

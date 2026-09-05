@@ -11,7 +11,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Libre+Caslon+Display&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/shared/site-nav.css?v=13">
-    <link rel="stylesheet" href="style.css?v=26">
+    <link rel="stylesheet" href="style.css?v=27">
 </head>
 <body>
     <main class="app-shell">
@@ -41,7 +41,7 @@
                 <article class="editorial-card value-board" id="market-board" aria-labelledby="marketBoardTitle">
                     <header class="card-head value-board__head">
                         <div>
-                            <span class="eyebrow">Season board</span>
+                            <span class="eyebrow" id="marketBoardEyebrow">Season board</span>
                             <h2 id="marketBoardTitle">
                                 Market Value</h2></div>
                         <div class="player-search market-board__search">
@@ -50,10 +50,11 @@
                         </div>
                     </header>
                     <div class="value-board__toolbar">
+                        <div id="boardMode" class="segmented" role="group" aria-label="Which board" hidden></div>
                         <div id="seasonFantasyScoring" class="segmented" role="group" aria-label="Scoring"></div>
                         <div id="seasonFantasyPositions" class="chip-row" role="group" aria-label="Position"></div>
                         <button type="button" class="button button--secondary" id="playerMarkets">Player markets</button></div>
-                    <div class="table-wrap">
+                    <div class="table-wrap" id="marketTableWrap">
                         <table class="rank-table season-fantasy__table">
                             <thead>
                                 <tr>
@@ -74,6 +75,21 @@
                                     <th class="col-proj" aria-sort="none">
                                         <button type="button" class="col-sort" data-sort="projection_delta" data-mobile-label="Edge">Edge</button></th></tr></thead>
                             <tbody id="seasonFantasyLeaders"></tbody>
+                        </table>
+                    </div>
+                    <div class="table-wrap" id="weekBoardWrap" hidden>
+                        <table class="rank-table week-table">
+                            <thead>
+                                <tr>
+                                    <th class="col-rank">
+                                        #</th>
+                                    <th>
+                                        Player</th>
+                                    <th class="col-proj" id="weekProjHead">
+                                        Proj</th>
+                                    <th class="col-proj">
+                                        Move</th></tr></thead>
+                            <tbody id="weekLeaders"></tbody>
                         </table>
                     </div>
                     <footer class="value-board__foot">
@@ -261,6 +277,6 @@
         </aside>
     </div>
 
-    <script src="/shared/site-nav.js?v=14"></script><script src="/shared/analytics.js?v=1"></script><script src="/shared/api-base.js?v=1"></script><script src="format.js?v=11"></script><script src="app.js?v=22"></script>
+    <script src="/shared/site-nav.js?v=14"></script><script src="/shared/analytics.js?v=1"></script><script src="/shared/api-base.js?v=1"></script><script src="format.js?v=11"></script><script src="app.js?v=23"></script>
 </body>
 </html>
