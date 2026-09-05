@@ -51,6 +51,15 @@ function trio() {
     });
 }
 
+function quartet() {
+    const result = trio();
+    result.entries.push({
+        player_id: "d", name: "Delta Runner", team: "BUF", position: "RB",
+        overallRank: 4, positionRank: 4,
+    });
+    return result;
+}
+
 async function waitFor(predicate) {
     for (let attempt = 0; attempt < 50; attempt += 1) {
         if (predicate()) return;
@@ -245,6 +254,65 @@ describe("rankings controller", () => {
         ).toEqual(["Alpha Runner", "Beta Runner", "Gamma Runner"]);
         expect(document.getElementById("helperUndoButton").hidden).toBe(true);
         expect(document.getElementById("helperMeta").textContent).toContain("matchup 1 of");
+    });
+
+    test("a saved pick keeps keyboard focus in the next matchup", async () => {
+        boot((url, options = {}) => {
+            if (url.includes("/consensus?")) {
+                return response({ season: 2026, scoring: "ppr", roster: "1qb", entries: [] });
+            }
+            if (url.endsWith("/boards/1") && (!options.method || options.method === "GET")) {
+                return response(quartet());
+            }
+            if (options.method === "PATCH") {
+                return response({ revision: 2, renormalized: false, tiers: [] });
+            }
+            throw new Error(`Unexpected request: ${options.method || "GET"} ${url}`);
+        });
+        await waitFor(() => !document.getElementById("editorView").hidden);
+
+        document.getElementById("helperButton").click();
+        document.querySelectorAll(".helper-card")[2].click();
+        await waitFor(() => document.getElementById("savePill").textContent !== "Saving…");
+
+        expect(document.activeElement).toBe(document.querySelector(".helper-card"));
+        expect(document.activeElement.dataset.playerId).toBe("a");
+    });
+
+    test("an unrelated reorder invalidates the pending helper undo", async () => {
+        const patches = [];
+        boot((url, options = {}) => {
+            if (url.includes("/consensus?")) {
+                return response({ season: 2026, scoring: "ppr", roster: "1qb", entries: [] });
+            }
+            if (url.endsWith("/boards/1") && (!options.method || options.method === "GET")) {
+                return response(quartet());
+            }
+            if (options.method === "PATCH") {
+                patches.push(JSON.parse(options.body));
+                return response({ revision: patches.length + 1, renormalized: false, tiers: [] });
+            }
+            throw new Error(`Unexpected request: ${options.method || "GET"} ${url}`);
+        });
+        await waitFor(() => !document.getElementById("editorView").hidden);
+
+        document.getElementById("helperButton").click();
+        document.querySelectorAll(".helper-card")[1].click();
+        await waitFor(() => patches.length === 1);
+        expect(document.getElementById("helperUndoButton").hidden).toBe(false);
+
+        const deltaRank = document.querySelector('[data-player-id="d"] .rank-row__jump');
+        deltaRank.value = "1";
+        deltaRank.dispatchEvent(new Event("change"));
+        await waitFor(() => patches.length === 2);
+
+        expect(document.getElementById("helperUndoButton").hidden).toBe(true);
+        document.getElementById("helperUndoButton").click();
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        expect(patches).toHaveLength(2);
+        expect(
+            [...document.querySelectorAll(".rank-row__name")].map((node) => node.textContent)
+        ).toEqual(["Delta Runner", "Beta Runner", "Alpha Runner", "Gamma Runner"]);
     });
 
     test("picking the leader confirms him without a write, and the sweep ends", async () => {

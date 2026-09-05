@@ -473,12 +473,13 @@
 
     // Every move funnels through here: drag, nudge, jump and keyboard all
     // reduce to "put this player at index N of the list I am looking at".
-    function moveToIndex(entry, targetIndex) {
+    function moveToIndex(entry, targetIndex, options) {
         const scoped = scopedEntries();
         const from = scoped.findIndex((e) => e.player_id === entry.player_id);
         const bounded = Math.max(0, Math.min(targetIndex, scoped.length - 1));
         if (from === bounded) return;
 
+        if (!options?.keepHelperUndo) state.helper.last = null;
         const previous = state.entries.slice();
         applyLocalMove(entry, bounded);
         renderList();
@@ -561,6 +562,7 @@
     }
 
     async function removePlayer(entry) {
+        state.helper.last = null;
         const previous = state.entries.slice();
         state.entries = state.entries.filter((e) => e.player_id !== entry.player_id);
         recomputeRanks();
@@ -744,6 +746,7 @@
             state.entries, state.tiers, state.scope, entry.player_id, targetIndex
         );
         if (!plan || plan.unchanged) return;
+        state.helper.last = null;
         const previous = snapshotBoardState();
         applyLocalMove(entry, plan.playerIndex);
 
@@ -849,6 +852,10 @@
 
     function renderHelper() {
         if (!state.helper.open) return;
+        const active = document.activeElement;
+        const focusedPlayerId = els.helperCards.contains(active)
+            ? active.dataset.playerId
+            : null;
         renderChipRow(
             els.helperSizeChips,
             [{ value: 2, label: "Two up" }, { value: 3, label: "Three up" }],
@@ -872,6 +879,11 @@
                   `${state.helper.changes} ${state.helper.changes === 1 ? "change" : "changes"}. ` +
                   "Start over to run the list again, now that it has moved.";
             els.helperMeta.textContent = `${F.scopeLabel(state.scope)} · ${total} ${total === 1 ? "matchup" : "matchups"} in a pass`;
+            if (state.helper.wantsFocus || focusedPlayerId) {
+                state.helper.wantsFocus = false;
+                (scoped.length < 2 ? els.helperCloseButton : els.helperRestartButton)
+                    .focus({ preventScroll: true });
+            }
             return;
         }
 
@@ -889,10 +901,13 @@
             );
         });
 
-        if (state.helper.wantsFocus) {
+        if (state.helper.wantsFocus || focusedPlayerId) {
             state.helper.wantsFocus = false;
-            const first = els.helperCards.querySelector(".helper-card");
-            if (first) first.focus({ preventScroll: true });
+            const previous = focusedPlayerId
+                ? els.helperCards.querySelector(`[data-player-id="${cssEscape(focusedPlayerId)}"]`)
+                : null;
+            const target = previous || els.helperCards.querySelector(".helper-card");
+            if (target) target.focus({ preventScroll: true });
         }
     }
 
@@ -964,7 +979,7 @@
             cursor: matchup.start,
         };
         // Renders the list, and the helper with it.
-        moveToIndex(plan.winner, plan.toIndex);
+        moveToIndex(plan.winner, plan.toIndex, { keepHelperUndo: true });
     }
 
     function skipMatchup() {
@@ -1261,6 +1276,8 @@
     function repositionGrabbed(entry, targetIndex) {
         const scoped = scopedEntries();
         const bounded = Math.max(0, Math.min(targetIndex, scoped.length - 1));
+        const current = scoped.findIndex((row) => row.player_id === entry.player_id);
+        if (current !== bounded) state.helper.last = null;
         applyLocalMove(entry, bounded);
         renderList();
         announce(`${bounded + 1}`);
