@@ -1105,13 +1105,42 @@ button:focus-visible,a:focus-visible,summary:focus-visible,[tabindex]:focus-visi
 .season-fantasy__delta.is-over { color: #4d775a; }
 .season-fantasy__delta.is-under { color: var(--fantasy-clay); }
 
-/* Week board. Four columns instead of eight, so it needs none of the market
-   table's width tuning — only the opponent, which is the reason to be reading
-   a weekly board at all. */
+/* Week board. Four or five columns instead of eight, so it needs none of the
+   market table's width tuning — only the opponent, which is the reason to be
+   reading a weekly board at all. */
 .week-table { min-width: 0; }
 .week-table .col-rank { width: 44px; }
 .season-leader__matchup { color: var(--fantasy-forest); font-weight: 600; }
 .season-leader__matchup--bye { color: var(--fantasy-clay); }
+
+/* Stepping back through played weeks. Sits with the board it steps rather
+   than in the page header, which belongs to the whole dashboard. */
+.week-step { display: inline-flex; align-items: center; gap: 2px; }
+
+.week-step__button {
+    min-width: 28px;
+    min-height: 31px;
+    border: 1px solid transparent;
+    border-radius: 2px;
+    background: transparent;
+    color: var(--fantasy-forest);
+    font: inherit;
+    font-size: .95rem;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.week-step__button:hover:not(:disabled) { background: #f0ebe1; }
+.week-step__button:disabled { color: var(--fantasy-line); cursor: default; }
+
+.week-step__label {
+    min-width: 62px;
+    color: var(--fantasy-muted);
+    font-size: .72rem;
+    font-weight: 700;
+    letter-spacing: .04em;
+    text-align: center;
+}
 
 /* An edge whose market total is missing a category the projection counts.
    Dotted-underlined rather than recoloured: the sign still has to read at a
@@ -1144,6 +1173,7 @@ button:focus-visible,a:focus-visible,summary:focus-visible,[tabindex]:focus-visi
     .season-fantasy__table .col-detail { display: table-cell; }
 }
 @media (max-width: 520px) {
+    .week-table .col-week-proj { display: none; }
     .season-fantasy__table .col-detail { display: none; }
     .week-badge__season { display: none; }
     .hero-snapshot__member { overflow: hidden; }

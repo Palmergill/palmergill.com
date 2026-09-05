@@ -79,6 +79,42 @@ const WEEK_RANKINGS = {
     ],
 };
 
+function played(name, position, overrides = {}) {
+    return {
+        player_id: name.toLowerCase().replace(/ /g, "-"),
+        name,
+        team: "SF",
+        position,
+        injury_status: null,
+        rank: 1,
+        actual_points: 20,
+        projected_points: 18,
+        projection_delta: 2,
+        projected_rank: 4,
+        opponent: "SEA",
+        home: true,
+        bye: false,
+        ...overrides,
+    };
+}
+
+const WEEK_ONE_RESULTS = {
+    season: 2026,
+    week: 1,
+    scoring: "std",
+    as_of: "2026-09-09T12:00:00Z",
+    played: 4,
+    projected: 3,
+    mean_absolute_error: 6.4,
+    entries: [
+        played("Catcher One", "WR", { rank: 1, actual_points: 31.2, projected_points: 15.9, projection_delta: 15.3, projected_rank: 3 }),
+        played("Passer One", "QB", { rank: 2, actual_points: 22.0, projected_points: 24.5, projection_delta: -2.5, projected_rank: 1 }),
+        played("Runner One", "RB", { rank: 3, actual_points: 9.4, projected_points: 18.2, projection_delta: -8.8, projected_rank: 2, home: false, opponent: "ARI" }),
+        // Nobody projected him; he still scored the points.
+        played("Runner Two", "RB", { rank: 4, actual_points: 8.1, projected_points: null, projection_delta: null, projected_rank: null }),
+    ],
+};
+
 const SEASON_LEADERS = [
     {
         player: { player_id: "passer-one", name: "Passer One", position: "QB", team: "SF" },
@@ -90,6 +126,7 @@ const SEASON_LEADERS = [
 function routes(overrides = {}) {
     return {
         "/state": IN_SEASON,
+        "/week-results": WEEK_ONE_RESULTS,
         "/rankings": WEEK_RANKINGS,
         "/season-fantasy-points": { scoring: "std", sources: [], leaders: SEASON_LEADERS },
         ...overrides,
@@ -129,6 +166,7 @@ async function waitFor(predicate) {
 }
 
 const modeChips = () => [...document.querySelectorAll("#boardMode .chip")];
+const headCells = () => [...document.querySelectorAll("#weekBoardHead th")].map((th) => th.textContent);
 const modeLabels = () => modeChips().map((chip) => chip.textContent);
 const pressedMode = () =>
     (modeChips().find((chip) => chip.getAttribute("aria-pressed") === "true") || {}).textContent;
@@ -232,6 +270,75 @@ describe("week board", () => {
 
         expect(weekRows()).toHaveLength(1);
         expect(weekRows()[0].textContent).toBe("Week 2 projections have not been collected yet.");
+    });
+
+    test("stepping back to a played week grades the projections it showed", async () => {
+        await openWeekBoard();
+        expect(headCells()).toEqual(["#", "Player", "Proj", "Move"]);
+
+        document.getElementById("weekStepBack").click();
+        await waitFor(() => headCells().length === 5);
+
+        expect(headCells()).toEqual(["#", "Player", "Proj", "Actual", "+/-"]);
+        expect(document.getElementById("marketBoardTitle").textContent).toBe("Week Results");
+        expect(document.getElementById("marketBoardEyebrow").textContent).toBe("Week 1");
+        expect(document.getElementById("weekStepLabel").textContent).toBe("Week 1");
+        expect(weekCells()).toEqual([
+            ["1", "Catcher One" + "WR SF · vs SEA" + "+", "15.9", "31.2", "+15.3"],
+            ["2", "Passer One" + "QB SF · vs SEA" + "+", "24.5", "22.0", "-2.5"],
+            ["3", "Runner One" + "RB SF · @ ARI" + "+", "18.2", "9.4", "-8.8"],
+            // Never projected, so there is nothing to have been wrong about.
+            ["4", "Runner Two" + "RB SF · vs SEA" + "+", "—", "8.1", "—"],
+        ]);
+        expect(weekRows()[0].children[4].title).toBe("31.2 scored against 15.9 projected");
+        expect(weekRows()[0].children[2].title).toBe("Ranked 3 that week");
+        expect(weekRows()[3].children[4].title).toBe("Not projected that week");
+    });
+
+    test("the results note publishes how far off the board was", async () => {
+        await openWeekBoard();
+        document.getElementById("weekStepBack").click();
+        await waitFor(() => headCells().length === 5);
+
+        expect(document.getElementById("seasonFantasyNote").textContent)
+            .toContain("Week 1 results · projections missed by 6.4 on average across 3 players");
+    });
+
+    test("the stepper stops at week one and at the live week", async () => {
+        await openWeekBoard();
+        const back = document.getElementById("weekStepBack");
+        const next = document.getElementById("weekStepNext");
+        expect(document.getElementById("weekStep").hidden).toBe(false);
+        expect(back.disabled).toBe(false);
+        expect(next.disabled).toBe(true); // week 2 is the live week
+
+        back.click();
+        await waitFor(() => headCells().length === 5);
+        expect(back.disabled).toBe(true);
+        expect(next.disabled).toBe(false);
+
+        next.click();
+        await waitFor(() => headCells().length === 4);
+        expect(document.getElementById("marketBoardTitle").textContent).toBe("Week Board");
+        expect(document.getElementById("weekStepLabel").textContent).toBe("Week 2");
+    });
+
+    test("the stepper is hidden while the season board is showing", async () => {
+        await openWeekBoard();
+        expect(document.getElementById("weekStep").hidden).toBe(false);
+
+        modeChips()[0].click();
+        expect(document.getElementById("weekStep").hidden).toBe(true);
+    });
+
+    test("a played week with nothing collected says so", async () => {
+        await openWeekBoard(routes({
+            "/week-results": { season: 2026, week: 1, entries: [], played: 0, mean_absolute_error: null },
+        }));
+        document.getElementById("weekStepBack").click();
+        await waitFor(() => weekRows().length === 1);
+
+        expect(weekRows()[0].textContent).toBe("Week 1 results have not been collected yet.");
     });
 
     test("a season payload landing under the week board does not repaint its controls", async () => {

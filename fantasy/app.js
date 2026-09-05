@@ -15,9 +15,12 @@
         season: null,
         week: null,
         defaultWeek: null,
-        // "season" (market value, year-long) or "week" (this week's board).
+        // "season" (market value, year-long) or "week" (one week's board).
         boardMode: "season",
         weekBoard: null,
+        // Which week the week board is showing. null follows the live week.
+        weekBoardWeek: null,
+        weekBoardSeq: 0,
         inSeason: false,
         seasonFantasyScoring: "std",
         seasonFantasyPosition: "ALL",
@@ -43,7 +46,11 @@
         marketTableWrap: document.getElementById("marketTableWrap"),
         weekBoardWrap: document.getElementById("weekBoardWrap"),
         weekLeaders: document.getElementById("weekLeaders"),
-        weekProjHead: document.getElementById("weekProjHead"),
+        weekBoardHead: document.getElementById("weekBoardHead"),
+        weekStep: document.getElementById("weekStep"),
+        weekStepBack: document.getElementById("weekStepBack"),
+        weekStepNext: document.getElementById("weekStepNext"),
+        weekStepLabel: document.getElementById("weekStepLabel"),
         weekLabel: document.getElementById("weekLabel"),
         weekValue: document.getElementById("weekValue"),
         seasonValue: document.getElementById("seasonValue"),
@@ -829,15 +836,16 @@
     function setBoardMode(mode) {
         const week = mode === "week" && weekBoardAvailable();
         state.boardMode = week ? "week" : "season";
-        if (els.marketBoardEyebrow) {
-            els.marketBoardEyebrow.textContent = week ? `Week ${state.week}` : "Season board";
-        }
-        if (els.marketBoardTitle) {
-            els.marketBoardTitle.textContent = week ? "Week Board" : "Market Value";
+        if (!week) {
+            // The week board names itself as it renders, once it knows whether
+            // the week it is showing has been played.
+            if (els.marketBoardEyebrow) els.marketBoardEyebrow.textContent = "Season board";
+            if (els.marketBoardTitle) els.marketBoardTitle.textContent = "Market Value";
         }
         if (els.marketTableWrap) els.marketTableWrap.hidden = week;
         if (els.weekBoardWrap) els.weekBoardWrap.hidden = !week;
         renderBoardMode();
+        renderWeekStep();
         writeUrlState();
         renderActiveBoard();
     }
@@ -851,50 +859,121 @@
         if (state.seasonFantasyData) renderSeasonFantasyLeaders(state.seasonFantasyData);
     }
 
+    // Which week the board is on: the live week unless the reader has stepped
+    // back, clamped in case the NFL week has advanced past where they were.
+    function weekBoardWeek() {
+        if (!weekBoardAvailable()) return null;
+        if (state.weekBoardWeek == null) return state.week;
+        return Math.max(1, Math.min(state.weekBoardWeek, state.week));
+    }
+
+    // A week that has already been played grades itself: the collector has
+    // nflverse actuals for it, so the board shows what happened against what
+    // it said would happen. The live week has nothing to grade yet.
+    function weekBoardIsResults() {
+        const week = weekBoardWeek();
+        return week != null && week < state.week;
+    }
+
+    function stepWeekBoard(offset) {
+        const week = weekBoardWeek();
+        if (week == null) return;
+        const next = Math.max(1, Math.min(week + offset, state.week));
+        if (next === week) return;
+        state.weekBoardWeek = next;
+        state.weekBoard = null;
+        renderWeekStep();
+        loadWeekBoard();
+    }
+
+    function renderWeekStep() {
+        if (!els.weekStep) return;
+        const showing = state.boardMode === "week" && weekBoardAvailable();
+        els.weekStep.hidden = !showing;
+        if (!showing) return;
+        const week = weekBoardWeek();
+        els.weekStepLabel.textContent = `Week ${week}`;
+        els.weekStepBack.disabled = week <= 1;
+        els.weekStepNext.disabled = week >= state.week;
+    }
+
     async function loadWeekBoard() {
         if (!els.weekLeaders || !weekBoardAvailable()) return;
+        const week = weekBoardWeek();
+        const results = weekBoardIsResults();
+        const seq = (state.weekBoardSeq += 1);
+        const params = new URLSearchParams({
+            scoring: state.seasonFantasyScoring,
+            week: String(week),
+            limit: "200",
+        });
+        if (state.season != null) params.set("season", state.season);
+        let board;
         try {
-            const params = new URLSearchParams({
-                scoring: state.seasonFantasyScoring,
-                week: String(state.week),
-                limit: "200",
-            });
-            if (state.season != null) params.set("season", state.season);
-            const data = await fetchJson(`${API_BASE}/rankings?${params.toString()}`);
-            state.weekBoard = normalizeWeekBoard(data);
+            const path = results ? "week-results" : "rankings";
+            const data = await fetchJson(`${API_BASE}/${path}?${params.toString()}`);
+            board = results ? normalizeWeekResults(data) : normalizeWeekBoard(data);
         } catch (err) {
-            state.weekBoard = { week: state.week, as_of: null, leaders: [] };
+            board = { kind: results ? "results" : "projected", week, as_of: null, leaders: [] };
         }
-        // A reply that lands after the reader has gone back to the season
-        // board is kept, not drawn.
+        // A reply for a week the reader has already stepped off, or one that
+        // lands after they have gone back to the season board, is discarded.
+        if (seq !== state.weekBoardSeq) return;
+        state.weekBoard = board;
         if (state.boardMode === "week") renderWeekBoard();
     }
 
-    // The rankings payload is flat — one player per row — while every board
-    // helper here expects {player: {...}}. Reshaping on arrival keeps the
-    // position chips, the injury badge and the compare tray working unchanged.
+    // Both payloads are flat — one player per row — while every board helper
+    // here expects {player: {...}}. Reshaping on arrival keeps the position
+    // chips, the injury badge and the compare tray working unchanged.
     function normalizeWeekBoard(data) {
-        const leaders = (data.rankings || []).map((row) => ({
-            player: {
-                player_id: row.player_id,
-                name: row.name,
-                team: row.team,
-                position: row.position,
-                injury_status: row.injury_status,
-            },
-            rank: row.rank,
-            projected_points: row.projected_points,
-            prev_rank: row.prev_rank,
-            opponent: row.opponent,
-            home: row.home,
-            bye: row.bye,
-        }));
         return {
+            kind: "projected",
             season: data.season,
             week: data.week,
             as_of: data.as_of,
-            source: data.source,
-            leaders,
+            leaders: (data.rankings || []).map((row) => ({
+                player: weekPlayer(row),
+                rank: row.rank,
+                projected_points: row.projected_points,
+                prev_rank: row.prev_rank,
+                opponent: row.opponent,
+                home: row.home,
+                bye: row.bye,
+            })),
+        };
+    }
+
+    function normalizeWeekResults(data) {
+        return {
+            kind: "results",
+            season: data.season,
+            week: data.week,
+            as_of: data.as_of,
+            played: data.played,
+            projected: data.projected,
+            meanAbsoluteError: data.mean_absolute_error,
+            leaders: (data.entries || []).map((row) => ({
+                player: weekPlayer(row),
+                rank: row.rank,
+                actual_points: row.actual_points,
+                projected_points: row.projected_points,
+                projection_delta: row.projection_delta,
+                projected_rank: row.projected_rank,
+                opponent: row.opponent,
+                home: row.home,
+                bye: row.bye,
+            })),
+        };
+    }
+
+    function weekPlayer(row) {
+        return {
+            player_id: row.player_id,
+            name: row.name,
+            team: row.team,
+            position: row.position,
+            injury_status: row.injury_status,
         };
     }
 
@@ -907,10 +986,53 @@
         return `${entry.home === false ? "@" : "vs"} ${entry.opponent}`;
     }
 
+    // The two week views answer different questions, so they carry different
+    // columns: what a player is projected to do, or what he did.
+    const WEEK_COLUMNS = {
+        projected: [
+            { label: "#", className: "col-rank" },
+            { label: "Player" },
+            { label: "Proj", className: "col-proj", title: "Consensus projected points" },
+            { label: "Move", className: "col-proj", title: "Rank movement since last week's board" },
+        ],
+        results: [
+            { label: "#", className: "col-rank" },
+            { label: "Player" },
+            {
+                label: "Proj",
+                className: "col-proj col-week-proj",
+                title: "What this board projected before the week was played",
+            },
+            { label: "Actual", className: "col-proj", title: "Points actually scored" },
+            { label: "+/-", className: "col-proj", title: "Actual minus projected" },
+        ],
+    };
+
+    function renderWeekHead(kind) {
+        if (!els.weekBoardHead) return;
+        els.weekBoardHead.innerHTML = "";
+        const row = el("tr");
+        (WEEK_COLUMNS[kind] || WEEK_COLUMNS.projected).forEach((column) => {
+            const cell = el("th", column.className || null, column.label);
+            if (column.title) cell.title = column.title;
+            row.appendChild(cell);
+        });
+        els.weekBoardHead.appendChild(row);
+    }
+
     function renderWeekBoard() {
         if (!els.weekLeaders) return;
-        const data = state.weekBoard || { leaders: [] };
+        const data = state.weekBoard || { kind: weekBoardIsResults() ? "results" : "projected", leaders: [] };
+        const results = data.kind === "results";
+        const week = data.week != null ? data.week : weekBoardWeek();
         const all = data.leaders || [];
+        renderWeekHead(data.kind);
+        renderWeekStep();
+        if (els.marketBoardTitle) {
+            els.marketBoardTitle.textContent = results ? "Week Results" : "Week Board";
+        }
+        if (els.marketBoardEyebrow) els.marketBoardEyebrow.textContent = `Week ${week}`;
+
         const position = resolveSeasonPosition(all, state.seasonFantasyPosition);
         state.seasonFantasyPosition = position;
         renderSeasonPositionChips(els.seasonFantasyPositions, all, position, (pick) => {
@@ -950,9 +1072,19 @@
             attachRowCompare(who, player);
             tr.appendChild(who);
 
-            tr.appendChild(el("td", "col-proj season-fantasy__total",
-                F.formatPoints(entry.projected_points)));
-            tr.appendChild(weekMoveCell(entry));
+            if (results) {
+                const projected = el("td", "col-proj col-week-proj season-fantasy__proj",
+                    F.formatPoints(entry.projected_points));
+                if (entry.projected_rank) projected.title = `Ranked ${entry.projected_rank} that week`;
+                tr.appendChild(projected);
+                tr.appendChild(el("td", "col-proj season-fantasy__total",
+                    F.formatPoints(entry.actual_points)));
+                tr.appendChild(weekDeltaCell(entry));
+            } else {
+                tr.appendChild(el("td", "col-proj season-fantasy__total",
+                    F.formatPoints(entry.projected_points)));
+                tr.appendChild(weekMoveCell(entry));
+            }
 
             const open = () => {
                 if (player.player_id) openPlayer(player.player_id);
@@ -967,20 +1099,21 @@
             els.weekLeaders.appendChild(tr);
         });
 
-        if (els.weekProjHead) {
-            els.weekProjHead.textContent = "Proj";
-            els.weekProjHead.title = `Consensus projected points for week ${data.week ?? state.week}`;
-        }
         const positionMetric = position === "ALL" ? "" : ` · ${rows.length} of ${all.length} ${position}`;
+        // What the board got wrong, said out loud. A projection nobody grades
+        // is just a number, and this page publishes the number.
+        const accuracy = results && data.meanAbsoluteError != null
+            ? ` · projections missed by ${F.formatPoints(data.meanAbsoluteError)} on average across ${data.projected} players`
+            : "";
         els.seasonFantasyNote.textContent = rows.length
-            ? `${visibleRows.length} of ${rows.length}${positionMetric} · Week ${data.week ?? state.week} · ${F.formatAsOf(data.as_of) || "latest"}`
+            ? `${visibleRows.length} of ${rows.length}${positionMetric} · Week ${week}${results ? " results" : ""}${accuracy} · ${F.formatAsOf(data.as_of) || "latest"}`
             : "";
         if (els.showAllMarket) {
             els.showAllMarket.hidden = rows.length <= 10;
             els.showAllMarket.textContent = state.marketExpanded ? "Show less" : `Show all ${rows.length}`;
             els.showAllMarket.setAttribute("aria-expanded", String(state.marketExpanded));
         }
-        if (!rows.length) renderWeekBoardEmpty(all.length, position);
+        if (!rows.length) renderWeekBoardEmpty(all.length, position, week, results);
     }
 
     // Rank movement against last week's board, which the API computes by
@@ -999,13 +1132,30 @@
         return cell;
     }
 
-    function renderWeekBoardEmpty(total, position) {
+    // Actual minus projected. Blank for a player the board never projected —
+    // there is nothing to have been wrong about.
+    function weekDeltaCell(entry) {
+        if (entry.projection_delta == null) {
+            const blank = el("td", "col-proj season-fantasy__delta", "—");
+            blank.title = "Not projected that week";
+            return blank;
+        }
+        const cell = el("td", "col-proj season-fantasy__delta",
+            F.formatSigned(entry.projection_delta, 1));
+        cell.classList.add(entry.projection_delta >= 0 ? "is-over" : "is-under");
+        cell.title = `${F.formatPoints(entry.actual_points)} scored against ${F.formatPoints(entry.projected_points)} projected`;
+        return cell;
+    }
+
+    function renderWeekBoardEmpty(total, position, week, results) {
         const row = el("tr");
         const cell = el("td", "table-empty");
-        cell.colSpan = 4;
+        cell.colSpan = (WEEK_COLUMNS[results ? "results" : "projected"] || []).length;
         cell.textContent = total
-            ? `No ${position} is projected for week ${state.week} yet.`
-            : `Week ${state.week} projections have not been collected yet.`;
+            ? `No ${position} ${results ? `scored in week ${week}` : `is projected for week ${week}`} yet.`
+            : results
+                ? `Week ${week} results have not been collected yet.`
+                : `Week ${week} projections have not been collected yet.`;
         row.appendChild(cell);
         els.weekLeaders.appendChild(row);
     }
@@ -1987,6 +2137,8 @@
             state.marketExpanded = !state.marketExpanded;
             renderActiveBoard();
         });
+        els.weekStepBack.addEventListener("click", () => stepWeekBoard(-1));
+        els.weekStepNext.addEventListener("click", () => stepWeekBoard(1));
         els.playerMarkets.addEventListener("click", () => openMarkets());
         els.marketsClose.addEventListener("click", () => closeMarkets());
         els.marketsBackdrop.addEventListener("click", () => closeMarkets());

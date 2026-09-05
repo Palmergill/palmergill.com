@@ -362,3 +362,25 @@ static mounts in `main.py`, `fantasy/tests` added to jest roots in
   position chips, the note and the "show all" control, so only the board on
   screen paints them — a season payload arriving while the week board is up
   fills the freshness card and nothing else.
+
+- **Sep 2026 — the week board grades itself:** the collector has upserted
+  nflverse weekly actuals into `ff_player_stats` since P1, and they appeared
+  only inside one player's drawer. `GET /api/fantasy/week-results` returns a
+  played week: every ranked player's actual points against the projection that
+  was on screen, ordered by what he actually scored. The week board steps back
+  through played weeks (`‹ Week 1 ›`, bounded by week 1 and the live week) and
+  swaps its columns when it lands on one — `Proj | Actual | +/-` instead of
+  `Proj | Move` — so one board answers both "who should I start" and "who was
+  I wrong about".
+
+  Two decisions worth keeping. The projection graded is the one the derived
+  rankings run for that week held, not a projection rebuilt today from data the
+  week has since produced: grading a forecast against a hindsight forecast says
+  nothing. And the payload carries the board's mean absolute error for the
+  week, which the note publishes verbatim ("projections missed by 6.4 on
+  average across 3 players") — a projection nobody grades is just a number.
+
+  A player with no projection still ranks: he scored the points either way, and
+  the row says `—` rather than inventing a miss. Positions are limited to
+  QB/RB/WR/TE, since nflverse publishes stat lines for punters and returners
+  too and they belong to nobody's board.

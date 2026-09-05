@@ -217,6 +217,20 @@ def season_fantasy_point_leaders(
     )
 
 
+@router.get("/week-results")
+def week_results(
+    season: Optional[int] = None,
+    week: Optional[int] = Query(None, ge=1, le=25),
+    scoring: str = Query("std", pattern="^(ppr|half|half_ppr|half-ppr|std|standard)$"),
+    limit: int = Query(200, ge=1, le=400),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """A played week's actual points against the projections that were shown."""
+    return fantasy_data.get_week_results(
+        db, season=season, week=week, scoring=scoring, limit=limit
+    )
+
+
 @router.get("/season-fantasy-movers")
 def season_fantasy_movers(
     season: Optional[int] = None,

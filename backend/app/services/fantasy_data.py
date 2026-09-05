@@ -9,7 +9,7 @@ from datetime import timedelta
 from statistics import median
 from typing import Any, Dict, List, Optional, Tuple
 
-from sqlalchemy import and_, case, null, or_
+from sqlalchemy import and_, case, func, null, or_
 from sqlalchemy.orm import Session
 
 from app.database import (
@@ -417,6 +417,153 @@ def _build_rankings(
         "source": run.source,
         "as_of": iso_utc(run.finished_at),
         "rankings": rankings,
+    }
+
+
+# ff_player_stats keeps actual points under its own column names;
+# SCORING_POINTS_FIELD names the projection columns, which are different.
+STAT_POINTS_FIELD = {
+    "ppr": "fantasy_points_ppr",
+    "half": "fantasy_points_half",
+    "std": "fantasy_points_std",
+}
+
+# The results board grades the positions the site ranks. nflverse publishes
+# stat lines for punters and returners too, and they belong to nobody's board.
+RESULT_POSITIONS = ("QB", "RB", "WR", "TE")
+
+
+def latest_played_week(db: Session, season: Optional[int]) -> Optional[int]:
+    """Newest week of a season with any recorded stat line."""
+    if not season:
+        return None
+    return (
+        db.query(func.max(FantasyPlayerStat.week))
+        .filter(FantasyPlayerStat.season == season)
+        .scalar()
+    )
+
+
+def get_week_results(
+    db: Session,
+    season: Optional[int] = None,
+    week: Optional[int] = None,
+    scoring: str = "ppr",
+    limit: int = 200,
+) -> Dict[str, Any]:
+    """What a played week actually produced, against what was projected.
+
+    The comparison is against the number that was on screen — the derived
+    rankings run for that week — not a projection rebuilt today from data the
+    week has since produced. Grading a forecast against a hindsight forecast
+    says nothing.
+
+    Rows are ordered by what the player actually scored, so the board answers
+    "who won the week" first and "who was supposed to" second. A player with
+    no projection still ranks: he scored the points either way, and a missing
+    forecast is its own kind of miss.
+    """
+    scoring = normalize_scoring(scoring)
+    if season is None:
+        season = default_context(db)["season"]
+    if week is None:
+        week = latest_played_week(db, season)
+    empty = {
+        "season": season,
+        "week": week,
+        "scoring": scoring,
+        "as_of": None,
+        "entries": [],
+        "played": 0,
+        "projected": 0,
+        "mean_absolute_error": None,
+    }
+    if not season or not week:
+        return empty
+
+    points_column = getattr(FantasyPlayerStat, STAT_POINTS_FIELD[scoring])
+    stats = (
+        db.query(FantasyPlayerStat)
+        .filter(
+            FantasyPlayerStat.season == season,
+            FantasyPlayerStat.week == week,
+            points_column.isnot(None),
+        )
+        .order_by(points_column.desc())
+        .all()
+    )
+    if not stats:
+        return empty
+
+    players = _player_index(db, [stat.player_id for stat in stats])
+    matchups = _week_matchups(db, season, week)
+
+    # The projection the week board showed, from the same derived rankings run
+    # /rankings serves. The overall ("ALL") list covers every ranked player, so
+    # one query answers for all four positions.
+    projected: Dict[str, Optional[float]] = {}
+    projected_rank: Dict[str, int] = {}
+    ranking_run = latest_successful_run(db, "rankings", season, week)
+    if ranking_run is not None:
+        for row in (
+            db.query(FantasyRanking)
+            .filter(
+                FantasyRanking.run_id == ranking_run.id,
+                FantasyRanking.scoring == scoring,
+                FantasyRanking.position == "ALL",
+            )
+            .all()
+        ):
+            projected[row.player_id] = row.ecr
+            projected_rank[row.player_id] = row.rank
+
+    entries: List[Dict[str, Any]] = []
+    errors: List[float] = []
+    for stat in stats:
+        player = players.get(stat.player_id)
+        if player is None or display_position(player.position) not in RESULT_POSITIONS:
+            continue
+        actual = coerce_float(getattr(stat, STAT_POINTS_FIELD[scoring]))
+        if actual is None:
+            continue
+        projection = projected.get(stat.player_id)
+        delta = round(actual - projection, 1) if projection is not None else None
+        if delta is not None:
+            errors.append(abs(delta))
+        entry = _player_public(player)
+        entry.update(
+            {
+                "actual_points": round(actual, 1),
+                "projected_points": round(projection, 1) if projection is not None else None,
+                "projection_delta": delta,
+                "projected_rank": projected_rank.get(stat.player_id),
+            }
+        )
+        _attach_matchup(entry, matchups)
+        # Who he actually played, which beats the schedule map on a week the
+        # schedule has since been rewritten (flex scheduling, a moved game).
+        if stat.opponent:
+            entry["opponent"] = stat.opponent
+        entries.append(entry)
+
+    ranked = entries[:limit]
+    for rank, entry in enumerate(ranked, start=1):
+        entry["rank"] = rank
+
+    as_of = max(
+        (stat.updated_at for stat in stats if stat.updated_at), default=None
+    )
+    return {
+        "season": season,
+        "week": week,
+        "scoring": scoring,
+        "as_of": iso_utc(as_of),
+        "entries": ranked,
+        # Counted over the whole week, not the page of it being returned: the
+        # average miss describes the board, not the top 200 rows of it.
+        "played": len(entries),
+        "projected": len(errors),
+        "mean_absolute_error": round(sum(errors) / len(errors), 1) if errors else None,
     }
 
 

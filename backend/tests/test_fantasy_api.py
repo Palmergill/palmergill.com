@@ -615,3 +615,109 @@ def test_player_search_ranks_on_season_projection_not_the_current_week():
     ).json()["results"]
 
     assert [r["name"] for r in results] == ["Star Hill", "Scrub Hilliard"]
+
+
+def _seed_week_results(rows, season=2025, week=3):
+    """Actual stat lines for a played week, as the nflverse collector writes them."""
+    session = SessionLocal()
+    session.query(FantasyPlayerStat).delete()
+    for row in rows:
+        session.add(FantasyPlayerStat(season=season, week=week, **row))
+    session.commit()
+    session.close()
+
+
+def test_week_results_ranks_by_actual_and_grades_the_projection_that_was_shown():
+    _seed_week_results([
+        {"player_id": "100", "position": "QB", "team": "KC", "opponent": "DEN",
+         "fantasy_points_ppr": 18.0, "fantasy_points_half": 18.0, "fantasy_points_std": 18.0},
+        {"player_id": "200", "position": "WR", "team": "MIN", "opponent": "GB",
+         "fantasy_points_ppr": 33.5, "fantasy_points_half": 30.5, "fantasy_points_std": 27.5},
+        {"player_id": "300", "position": "RB", "team": "ATL", "opponent": "TB",
+         "fantasy_points_ppr": 12.0, "fantasy_points_half": 10.5, "fantasy_points_std": 9.0},
+    ])
+
+    body = client.get("/api/fantasy/week-results").json()
+    assert body["season"] == 2025
+    assert body["week"] == 3  # newest week with stat lines
+    assert [e["player_id"] for e in body["entries"]] == ["200", "100", "300"]
+    assert [e["rank"] for e in body["entries"]] == [1, 2, 3]
+
+    receiver = body["entries"][0]
+    # Projected 16.0 in standard scoring by the derived rankings run for wk3,
+    # where he ranked second overall.
+    assert receiver["projected_points"] == 16.0
+    assert receiver["projected_rank"] == 2
+    assert receiver["actual_points"] == 27.5
+    assert receiver["projection_delta"] == 11.5
+    assert receiver["opponent"] == "GB"
+
+    # 11.5 + 6.0 + 6.0 over three graded players.
+    assert body["played"] == 3
+    assert body["projected"] == 3
+    assert body["mean_absolute_error"] == 7.8
+
+
+def test_week_results_follow_the_requested_scoring_format():
+    _seed_week_results([
+        {"player_id": "200", "position": "WR", "team": "MIN", "opponent": "GB",
+         "fantasy_points_ppr": 33.5, "fantasy_points_half": 30.5, "fantasy_points_std": 27.5},
+    ])
+
+    ppr = client.get("/api/fantasy/week-results", params={"scoring": "ppr"}).json()
+    assert ppr["entries"][0]["actual_points"] == 33.5
+    assert ppr["entries"][0]["projected_points"] == 21.0
+    assert ppr["entries"][0]["projection_delta"] == 12.5
+
+
+def test_week_results_skip_players_the_board_does_not_rank():
+    _seed_week_results([
+        {"player_id": "200", "position": "WR", "team": "MIN", "opponent": "GB",
+         "fantasy_points_ppr": 33.5, "fantasy_points_half": 30.5, "fantasy_points_std": 27.5},
+        # A punter's stat line, and a player who is not in the catalog at all.
+        {"player_id": "900", "position": "P", "team": "MIN", "opponent": "GB",
+         "fantasy_points_ppr": 0.0, "fantasy_points_half": 0.0, "fantasy_points_std": 0.0},
+        {"player_id": "999", "position": "WR", "team": "SEA", "opponent": "SF",
+         "fantasy_points_ppr": 40.0, "fantasy_points_half": 40.0, "fantasy_points_std": 40.0},
+    ])
+
+    body = client.get("/api/fantasy/week-results").json()
+    assert [e["player_id"] for e in body["entries"]] == ["200"]
+    assert body["played"] == 1
+
+
+def test_week_results_grade_only_what_was_projected():
+    session = SessionLocal()
+    session.query(FantasyRanking).delete()
+    session.commit()
+    session.close()
+    _seed_week_results([
+        {"player_id": "200", "position": "WR", "team": "MIN", "opponent": "GB",
+         "fantasy_points_ppr": 33.5, "fantasy_points_half": 30.5, "fantasy_points_std": 27.5},
+    ])
+
+    body = client.get("/api/fantasy/week-results").json()
+    entry = body["entries"][0]
+    # He still ranks — he scored the points either way — but there is nothing
+    # to grade, so the average miss describes nobody.
+    assert entry["actual_points"] == 27.5
+    assert entry["projected_points"] is None
+    assert entry["projection_delta"] is None
+    assert body["played"] == 1
+    assert body["projected"] == 0
+    assert body["mean_absolute_error"] is None
+
+
+def test_week_results_are_empty_before_a_week_is_played():
+    _seed_week_results([])
+
+    body = client.get("/api/fantasy/week-results").json()
+    assert body["entries"] == []
+    assert body["week"] is None
+    assert body["played"] == 0
+    assert body["mean_absolute_error"] is None
+
+    # An explicit week with no stat lines is the same answer, not an error.
+    asked = client.get("/api/fantasy/week-results", params={"week": 2}).json()
+    assert asked["week"] == 2
+    assert asked["entries"] == []
