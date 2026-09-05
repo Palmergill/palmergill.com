@@ -205,6 +205,57 @@
         return { unchanged, playerIndex, tierAnchors, placement, previous, next };
     }
 
+    // ── head-to-head helper ─────────────────────────────────────────────
+    //
+    // Refining a board by answering "who would you draft first?" only works if
+    // the players offered are already neighbours: asked to choose between WR3
+    // and WR58 nobody learns anything, and the pick moves a player fifty slots
+    // on one careless tap. So a matchup is a window of two or three adjacent
+    // players, and the helper sweeps that window down the list — a bubble pass
+    // with a person as the comparator, which always terminates and leaves the
+    // board sorted a little closer to the order in their head.
+
+    const MATCHUP_MIN = 2;
+    const MATCHUP_MAX = 3;
+
+    function matchupSize(count, size) {
+        const requested = Math.max(MATCHUP_MIN, Math.min(size || MATCHUP_MIN, MATCHUP_MAX));
+        return Math.min(requested, count);
+    }
+
+    // How many windows one full pass over this list contains.
+    function matchupTotal(count, size) {
+        if (!count || count < MATCHUP_MIN) return 0;
+        return count - matchupSize(count, size) + 1;
+    }
+
+    // The window at `cursor`, or null once the sweep has run off the bottom.
+    function matchupAt(entries, scope, cursor, size) {
+        const scoped = scopeEntries(entries, scope);
+        if (scoped.length < MATCHUP_MIN) return null;
+        const width = matchupSize(scoped.length, size);
+        const lastStart = scoped.length - width;
+        const start = Math.max(0, Math.round(cursor || 0));
+        if (start > lastStart) return null;
+        return { start, players: scoped.slice(start, start + width) };
+    }
+
+    // A pick means "this one goes first of the three", so the winner lands on
+    // the top slot of the window and the players he beat keep their order below
+    // him. Anyone already on top is a confirmation, not a move.
+    function planMatchupPick(matchup, winnerId) {
+        if (!matchup) return null;
+        const offset = matchup.players.findIndex((player) => player.player_id === winnerId);
+        if (offset === -1) return null;
+        return {
+            winner: matchup.players[offset],
+            beaten: matchup.players.filter((_player, index) => index !== offset),
+            fromIndex: matchup.start + offset,
+            toIndex: matchup.start,
+            unchanged: offset === 0,
+        };
+    }
+
     // The single sentence announced after any move, however it was made.
     function describeMove(name, fromRank, toRank, positionLabel) {
         const who = name || "Player";
@@ -261,6 +312,9 @@
         midpointKey,
         tierBands,
         planCombinedPlayerMove,
+        matchupTotal,
+        matchupAt,
+        planMatchupPick,
         describeMove,
         consensusSpread,
         formatSavedAt,

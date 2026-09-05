@@ -47,6 +47,16 @@
         playerSearch: byId("playerSearch"),
         playerSearchResults: byId("playerSearchResults"),
         addTierButton: byId("addTierButton"),
+        helperButton: byId("helperButton"),
+        helperPanel: byId("helperPanel"),
+        helperMeta: byId("helperMeta"),
+        helperSizeChips: byId("helperSizeChips"),
+        helperCloseButton: byId("helperCloseButton"),
+        helperCards: byId("helperCards"),
+        helperEmpty: byId("helperEmpty"),
+        helperSkipButton: byId("helperSkipButton"),
+        helperUndoButton: byId("helperUndoButton"),
+        helperRestartButton: byId("helperRestartButton"),
         boardCount: byId("boardCount"),
         rankList: byId("rankList"),
         boardEmptyState: byId("boardEmptyState"),
@@ -92,6 +102,8 @@
         // Keyboard "grab mode": a player picked up but not yet dropped.
         grabbed: null,
         focusPlayerId: null,
+        // Head-to-head helper: one sweep of adjacent matchups down the list.
+        helper: { open: false, size: 3, cursor: 0, picks: 0, changes: 0, last: null, wantsFocus: false },
     };
 
     // ── fetch ───────────────────────────────────────────────────────────────
@@ -279,6 +291,7 @@
         state.scope = scope;
         state.grabbed = null;
         state.focusPlayerId = null;
+        resetHelperPass();
         const url = new URL(window.location.href);
         url.searchParams.set("scope", scope);
         window.history.replaceState({}, "", url);
@@ -309,6 +322,10 @@
             const row = els.rankList.querySelector(`[data-player-id="${cssEscape(state.focusPlayerId)}"]`);
             if (row) row.focus({ preventScroll: true });
         }
+
+        // The helper cards are a view of this same order, so they repaint with
+        // it rather than keeping their own copy of who sits where.
+        renderHelper();
     }
 
     function cssEscape(value) {
@@ -361,11 +378,7 @@
         row.appendChild(identity);
 
         const consensus = state.consensusById[entry.player_id];
-        const consensusRank = consensus
-            ? (state.scope === "OVERALL" ? consensus.overallRank : consensus.positionRank)
-            : null;
-        const currentRank = state.scope === "OVERALL" ? entry.overallRank : entry.positionRank;
-        const delta = consensusRank == null ? null : consensusRank - currentRank;
+        const delta = consensusDelta(entry);
         const deltaNode = el("span", "rank-row__delta", F.formatSigned(delta));
         if (delta > 0) deltaNode.classList.add("rank-row__delta--up");
         if (delta < 0) deltaNode.classList.add("rank-row__delta--down");
@@ -400,6 +413,17 @@
             state.focusPlayerId = entry.player_id;
         });
         return row;
+    }
+
+    // How far this player sits from the published site consensus, in the list
+    // currently on screen. null when no consensus has been published yet.
+    function consensusDelta(entry) {
+        const consensus = state.consensusById[entry.player_id];
+        if (!consensus) return null;
+        const consensusRank =
+            state.scope === "OVERALL" ? consensus.overallRank : consensus.positionRank;
+        const currentRank = state.scope === "OVERALL" ? entry.overallRank : entry.positionRank;
+        return consensusRank == null ? null : consensusRank - currentRank;
     }
 
     function renderTier(tier) {
@@ -635,11 +659,20 @@
             });
     }
 
+    // A tier cuts the list where the person is already working: above the row
+    // they last touched, and only at the top when they have not touched one.
+    // Landing every divider at rank 1 meant dragging it back down each time.
     function addTier() {
+        const scoped = scopedEntries();
+        const focused = state.focusPlayerId
+            ? scoped.findIndex((entry) => entry.player_id === state.focusPlayerId)
+            : -1;
+        const rank = focused === -1 ? 1 : focused + 1;
         const suggested = `Tier ${state.tiers.filter((tier) => tier.scope === state.scope).length + 1}`;
         const label = window.prompt("Name this tier", suggested);
         if (label == null || !label.trim()) return;
         const previous = snapshotBoardState();
+        const name = label.trim();
         queueWrite(
             (context) =>
                 requestJson(`/boards/${context.boardId}/tiers`, {
@@ -647,14 +680,19 @@
                     body: JSON.stringify({
                         revision: context.revision,
                         scope: context.scope,
-                        label: label.trim(),
-                        to_rank: 1,
+                        label: name,
+                        to_rank: rank,
                     }),
                 }),
             previous,
             () => {
                 renderList();
-                announce(`${label.trim()} added.`);
+                const below = scoped[rank - 1];
+                announce(
+                    below && below.name
+                        ? `${name} added above ${below.name}.`
+                        : `${name} added.`
+                );
             }
         );
     }
@@ -756,6 +794,230 @@
             previous,
             () => announce(`${tier.label} deleted.`)
         );
+    }
+
+    // ── head-to-head helper ─────────────────────────────────────────────────
+    //
+    // Dragging three hundred rows into order is not how anybody decides what
+    // they think; arguing about two players is. The helper asks "who would you
+    // draft first?" about neighbours in the list currently on screen and lets
+    // the answer do the reordering — one sweep from the top down, so a pass
+    // always ends and every question is between players close enough for the
+    // answer to be worth something.
+    //
+    // A pick is not a special kind of edit: it funnels through moveToIndex like
+    // a drag or a nudge, so it inherits the optimistic render, the serialized
+    // write queue and the announcement without a second code path.
+
+    function currentMatchup() {
+        return F.matchupAt(state.entries, state.scope, state.helper.cursor, state.helper.size);
+    }
+
+    // "players" for the overall board, "receivers" for a positional list — the
+    // scope label itself reads wrong in a sentence ("two overall").
+    function listNoun() {
+        return state.scope === "OVERALL" ? "players" : F.scopeLabel(state.scope).toLowerCase();
+    }
+
+    function resetHelperPass() {
+        state.helper.cursor = 0;
+        state.helper.picks = 0;
+        state.helper.changes = 0;
+        state.helper.last = null;
+    }
+
+    function setHelperOpen(open) {
+        state.helper.open = open;
+        els.helperPanel.hidden = !open;
+        els.helperButton.setAttribute("aria-expanded", String(open));
+        els.helperButton.textContent = open ? "Close helper" : "Rank helper";
+        if (open) {
+            resetHelperPass();
+            state.helper.wantsFocus = true;
+            renderHelper();
+        }
+    }
+
+    function setHelperSize(size) {
+        state.helper.size = size;
+        // A wider window starting from the same cursor asks a different
+        // question, so the pending undo no longer describes what is on screen.
+        state.helper.last = null;
+        state.helper.wantsFocus = true;
+        renderHelper();
+    }
+
+    function renderHelper() {
+        if (!state.helper.open) return;
+        renderChipRow(
+            els.helperSizeChips,
+            [{ value: 2, label: "Two up" }, { value: 3, label: "Three up" }],
+            state.helper.size,
+            setHelperSize
+        );
+        els.helperUndoButton.hidden = !state.helper.last;
+
+        const scoped = scopedEntries();
+        const total = F.matchupTotal(scoped.length, state.helper.size);
+        const matchup = currentMatchup();
+        els.helperCards.innerHTML = "";
+
+        if (!matchup) {
+            els.helperCards.hidden = true;
+            els.helperEmpty.hidden = false;
+            els.helperSkipButton.disabled = true;
+            els.helperEmpty.textContent = scoped.length < 2
+                ? `Add at least two ${listNoun()} to compare them.`
+                : `Pass complete — ${state.helper.picks} ${state.helper.picks === 1 ? "matchup" : "matchups"}, ` +
+                  `${state.helper.changes} ${state.helper.changes === 1 ? "change" : "changes"}. ` +
+                  "Start over to run the list again, now that it has moved.";
+            els.helperMeta.textContent = `${F.scopeLabel(state.scope)} · ${total} ${total === 1 ? "matchup" : "matchups"} in a pass`;
+            return;
+        }
+
+        els.helperCards.hidden = false;
+        els.helperEmpty.hidden = true;
+        els.helperSkipButton.disabled = false;
+        els.helperMeta.textContent =
+            `${F.scopeLabel(state.scope)} · matchup ${matchup.start + 1} of ${total}` +
+            (state.helper.changes ? ` · ${state.helper.changes} moved` : "");
+
+        const labels = F.positionRanks(state.entries);
+        matchup.players.forEach((entry, offset) => {
+            els.helperCards.appendChild(
+                renderMatchupCard(entry, matchup.start + offset, offset, labels[entry.player_id])
+            );
+        });
+
+        if (state.helper.wantsFocus) {
+            state.helper.wantsFocus = false;
+            const first = els.helperCards.querySelector(".helper-card");
+            if (first) first.focus({ preventScroll: true });
+        }
+    }
+
+    function renderMatchupCard(entry, index, offset, positionLabel) {
+        const card = el("button", "helper-card");
+        card.type = "button";
+        card.dataset.playerId = entry.player_id;
+        card.setAttribute(
+            "aria-label",
+            `Pick ${entry.name || "player"}, currently number ${index + 1} of your ${listNoun()}`
+        );
+        card.addEventListener("click", () => pickMatchup(entry.player_id));
+
+        const head = el("span", "helper-card__head");
+        head.appendChild(el("span", "helper-card__key", String(offset + 1)));
+        head.appendChild(el("span", "helper-card__rank", `Your #${index + 1}`));
+        card.appendChild(head);
+
+        card.appendChild(el("span", "helper-card__name", entry.name || "Unknown player"));
+        card.appendChild(
+            el("span", "helper-card__meta", [positionLabel, entry.team].filter(Boolean).join(" · "))
+        );
+
+        const delta = consensusDelta(entry);
+        const note = el(
+            "span",
+            "helper-card__delta",
+            delta == null ? "No site consensus yet" : `${F.formatSigned(delta)} vs consensus`
+        );
+        if (delta > 0) note.classList.add("helper-card__delta--up");
+        if (delta < 0) note.classList.add("helper-card__delta--down");
+        card.appendChild(note);
+
+        if (entry.injury_status) {
+            card.appendChild(el("span", "helper-card__injury", entry.injury_status));
+        }
+        return card;
+    }
+
+    function beatenNames(beaten) {
+        const names = beaten.map((entry) => entry.name || "an unnamed player");
+        if (names.length < 2) return names[0] || "";
+        return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
+    }
+
+    function pickMatchup(winnerId) {
+        const matchup = currentMatchup();
+        const plan = F.planMatchupPick(matchup, winnerId);
+        if (!plan) return;
+
+        state.helper.picks += 1;
+        state.helper.cursor = matchup.start + 1;
+        state.helper.wantsFocus = true;
+        // The pick, not the list, has focus. Without this the re-render pulls
+        // the caret back into the row the person last touched.
+        state.focusPlayerId = null;
+
+        if (plan.unchanged) {
+            state.helper.last = null;
+            announce(`${plan.winner.name || "Player"} stays ahead of ${beatenNames(plan.beaten)}.`);
+            renderHelper();
+            return;
+        }
+
+        state.helper.changes += 1;
+        state.helper.last = {
+            playerId: plan.winner.player_id,
+            fromIndex: plan.fromIndex,
+            cursor: matchup.start,
+        };
+        // Renders the list, and the helper with it.
+        moveToIndex(plan.winner, plan.toIndex);
+    }
+
+    function skipMatchup() {
+        const matchup = currentMatchup();
+        if (!matchup) return;
+        state.helper.cursor = matchup.start + 1;
+        state.helper.last = null;
+        state.helper.wantsFocus = true;
+        renderHelper();
+    }
+
+    // Only ever the pick immediately before: any other edit clears it, so the
+    // index it wants to restore is still the index the player came from.
+    function undoHelperPick() {
+        const last = state.helper.last;
+        if (!last) return;
+        state.helper.last = null;
+        state.helper.cursor = last.cursor;
+        state.helper.picks = Math.max(0, state.helper.picks - 1);
+        state.helper.changes = Math.max(0, state.helper.changes - 1);
+        state.helper.wantsFocus = true;
+        state.focusPlayerId = null;
+
+        const scoped = scopedEntries();
+        const entry = scoped.find((row) => row.player_id === last.playerId);
+        const at = scoped.findIndex((row) => row.player_id === last.playerId);
+        if (entry && at !== -1 && at !== last.fromIndex) {
+            moveToIndex(entry, last.fromIndex);
+            return;
+        }
+        renderHelper();
+    }
+
+    function restartHelperPass() {
+        resetHelperPass();
+        state.helper.wantsFocus = true;
+        renderHelper();
+        announce("Starting the matchups again from the top.");
+    }
+
+    function onHelperKeyDown(event) {
+        if (event.metaKey || event.ctrlKey || event.altKey) return;
+        if (event.key === "Escape") {
+            setHelperOpen(false);
+            els.helperButton.focus();
+            return;
+        }
+        const slot = parseInt(event.key, 10);
+        if (Number.isNaN(slot)) return;
+        const matchup = currentMatchup();
+        if (!matchup || slot < 1 || slot > matchup.players.length) return;
+        event.preventDefault();
+        pickMatchup(matchup.players[slot - 1].player_id);
     }
 
     // ── pointer drag ────────────────────────────────────────────────────────
@@ -1134,6 +1396,9 @@
         state.tiers = (board.tiers || []).slice();
         state.consensusById = {};
         state.savedAt = board.updatedAt ? new Date(board.updatedAt) : null;
+        // A board arriving whole — first open, or a 409 reload — invalidates
+        // both the sweep position and the undo it was holding.
+        resetHelperPass();
         els.boardTitle.textContent = board.title || "My rankings";
         els.boardMeta.textContent = F.boardLabel(board);
         recomputeRanks();
@@ -1513,6 +1778,15 @@
         els.readerBackButton.addEventListener("click", leaveReader);
         els.publishButton.addEventListener("click", togglePublish);
         els.addTierButton.addEventListener("click", addTier);
+        els.helperButton.addEventListener("click", () => setHelperOpen(!state.helper.open));
+        els.helperCloseButton.addEventListener("click", () => {
+            setHelperOpen(false);
+            els.helperButton.focus();
+        });
+        els.helperSkipButton.addEventListener("click", skipMatchup);
+        els.helperUndoButton.addEventListener("click", undoHelperPick);
+        els.helperRestartButton.addEventListener("click", restartHelperPass);
+        els.helperPanel.addEventListener("keydown", onHelperKeyDown);
         els.resetButton.addEventListener("click", resetBoard);
         els.backButton.addEventListener("click", () => {
             state.generation += 1;

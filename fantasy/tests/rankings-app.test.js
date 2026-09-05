@@ -41,6 +41,16 @@ function board(overrides = {}) {
     };
 }
 
+function trio() {
+    return board({
+        entries: [
+            { player_id: "a", name: "Alpha Runner", team: "SF", position: "RB", overallRank: 1, positionRank: 1 },
+            { player_id: "b", name: "Beta Runner", team: "CHI", position: "RB", overallRank: 2, positionRank: 2 },
+            { player_id: "c", name: "Gamma Runner", team: "NYG", position: "RB", overallRank: 3, positionRank: 3 },
+        ],
+    });
+}
+
 async function waitFor(predicate) {
     for (let attempt = 0; attempt < 50; attempt += 1) {
         if (predicate()) return;
@@ -169,6 +179,129 @@ describe("rankings controller", () => {
         expect(patchCount).toBe(1);
         expect(document.querySelector(".rank-row__name").textContent).toBe("Beta Runner");
         expect(document.getElementById("noticeBanner").textContent).toContain("changed somewhere else");
+    });
+
+    test("a matchup pick sends the winner to the top slot of the window", async () => {
+        const patches = [];
+        boot((url, options = {}) => {
+            if (url.includes("/consensus?")) {
+                return response({ season: 2026, scoring: "ppr", roster: "1qb", entries: [] });
+            }
+            if (url.endsWith("/boards/1") && (!options.method || options.method === "GET")) {
+                return response(trio());
+            }
+            if (options.method === "PATCH") {
+                patches.push({ url, body: JSON.parse(options.body) });
+                return response({ revision: 2, renormalized: false, tiers: [] });
+            }
+            throw new Error(`Unexpected request: ${options.method || "GET"} ${url}`);
+        });
+        await waitFor(() => !document.getElementById("editorView").hidden);
+
+        document.getElementById("helperButton").click();
+        const cards = document.querySelectorAll(".helper-card");
+        expect(cards).toHaveLength(3);
+        expect(document.getElementById("helperMeta").textContent).toContain("matchup 1 of 1");
+
+        // The third card is the person's pick, so he leads the window.
+        cards[2].click();
+        await waitFor(() => patches.length === 1);
+
+        expect(patches[0].url).toContain("/entries/c");
+        expect(patches[0].body).toMatchObject({ scope: "OVERALL", to_rank: 1 });
+        expect(
+            [...document.querySelectorAll(".rank-row__name")].map((node) => node.textContent)
+        ).toEqual(["Gamma Runner", "Alpha Runner", "Beta Runner"]);
+    });
+
+    test("undo puts the winner back and re-asks the same matchup", async () => {
+        const patches = [];
+        boot((url, options = {}) => {
+            if (url.includes("/consensus?")) {
+                return response({ season: 2026, scoring: "ppr", roster: "1qb", entries: [] });
+            }
+            if (url.endsWith("/boards/1") && (!options.method || options.method === "GET")) {
+                return response(trio());
+            }
+            if (options.method === "PATCH") {
+                patches.push(JSON.parse(options.body));
+                return response({ revision: patches.length + 1, renormalized: false, tiers: [] });
+            }
+            throw new Error(`Unexpected request: ${options.method || "GET"} ${url}`);
+        });
+        await waitFor(() => !document.getElementById("editorView").hidden);
+
+        document.getElementById("helperButton").click();
+        document.querySelectorAll(".helper-card")[1].click();
+        await waitFor(() => patches.length === 1);
+        expect(document.getElementById("helperUndoButton").hidden).toBe(false);
+
+        document.getElementById("helperUndoButton").click();
+        await waitFor(() => patches.length === 2);
+
+        expect(patches[1]).toMatchObject({ to_rank: 2 });
+        expect(
+            [...document.querySelectorAll(".rank-row__name")].map((node) => node.textContent)
+        ).toEqual(["Alpha Runner", "Beta Runner", "Gamma Runner"]);
+        expect(document.getElementById("helperUndoButton").hidden).toBe(true);
+        expect(document.getElementById("helperMeta").textContent).toContain("matchup 1 of");
+    });
+
+    test("picking the leader confirms him without a write, and the sweep ends", async () => {
+        let patchCount = 0;
+        boot((url, options = {}) => {
+            if (url.includes("/consensus?")) {
+                return response({ season: 2026, scoring: "ppr", roster: "1qb", entries: [] });
+            }
+            if (url.endsWith("/boards/1") && (!options.method || options.method === "GET")) {
+                return response(trio());
+            }
+            if (options.method === "PATCH") {
+                patchCount += 1;
+                return response({ revision: 2, renormalized: false, tiers: [] });
+            }
+            throw new Error(`Unexpected request: ${options.method || "GET"} ${url}`);
+        });
+        await waitFor(() => !document.getElementById("editorView").hidden);
+
+        document.getElementById("helperButton").click();
+        document.querySelectorAll(".helper-card")[0].click();
+        await new Promise((resolve) => setTimeout(resolve, 0));
+
+        expect(patchCount).toBe(0);
+        expect(document.getElementById("liveRegion").textContent)
+            .toBe("Alpha Runner stays ahead of Beta Runner and Gamma Runner.");
+        // One window fits a three-player list, so that pick ends the pass.
+        expect(document.querySelectorAll(".helper-card")).toHaveLength(0);
+        expect(document.getElementById("helperEmpty").textContent).toContain("Pass complete");
+    });
+
+    test("a new tier lands above the row in hand, not always at the top", async () => {
+        let posted = null;
+        boot((url, options = {}) => {
+            if (url.includes("/consensus?")) {
+                return response({ season: 2026, scoring: "ppr", roster: "1qb", entries: [] });
+            }
+            if (url.endsWith("/boards/1") && (!options.method || options.method === "GET")) {
+                return response(trio());
+            }
+            if (options.method === "POST" && url.includes("/tiers")) {
+                posted = JSON.parse(options.body);
+                return response({ revision: 2, renormalized: false, tiers: [] });
+            }
+            throw new Error(`Unexpected request: ${options.method || "GET"} ${url}`);
+        });
+        await waitFor(() => !document.getElementById("editorView").hidden);
+        jest.spyOn(window, "prompt").mockReturnValue("Round 2");
+
+        document.querySelector('[data-player-id="c"]').dispatchEvent(new Event("focus"));
+        document.getElementById("addTierButton").click();
+        await waitFor(() => posted !== null);
+
+        expect(posted).toMatchObject({ scope: "OVERALL", label: "Round 2", to_rank: 3 });
+        await waitFor(
+            () => document.getElementById("liveRegion").textContent === "Round 2 added above Gamma Runner."
+        );
     });
 
     test("an older consensus reply cannot overwrite the latest comparison", async () => {

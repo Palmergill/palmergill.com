@@ -1,7 +1,7 @@
 # Spec 18 — Personal Rankings
 
 - **Quarter:** Q3 2026 (Jul–Sep)
-- **Status:** implemented — P1–P4 shipped; P5 remains future work
+- **Status:** implemented — P1–P4 and P6 shipped; P5 remains future work
 - **Depends on:** Spec 16 (player catalog, derived rankings, projections), site member accounts
 - **Areas:** `fantasy/rankings/`, `backend/app/services/fantasy_rankings_board.py`,
   `backend/app/routers/fantasy_rankings.py`, `backend/app/database.py`,
@@ -33,7 +33,8 @@ in as a fourth `scoring` value.
    a spreadsheet.
 2. Make the overall and positional lists incapable of disagreeing.
 3. Support the way people actually edit rankings: drag, one-slot nudges, big
-   jumps by rank, and (P2) named tiers.
+   jumps by rank, named tiers (P2), and answering "who would you draft first?"
+   about two or three neighbours (P6).
 4. Seed from what the site already knows, so the first screen is useful.
 5. Open it to every member, not just the admin.
 
@@ -140,6 +141,18 @@ New tables only, so `Base.metadata.create_all` covers them; no
   board, applies a 25% appearance floor, and powers the editor's live
   "vs consensus" values.
 - **P5.** Per-player notes, CSV export, position-change reconciliation prompt.
+- **P6 (done).** A head-to-head helper: the editor offers a window of two or
+  three adjacent players from the list on screen, and the pick sends the winner
+  to the top slot of that window. The window then slides down one — a bubble
+  pass with a person as the comparator — so a pass always terminates and every
+  question is between players close enough for the answer to mean something. A
+  pick is not a new kind of edit: it funnels through the same `moveToIndex`,
+  so it inherits the optimistic render, the serialized write queue and the
+  `aria-live` announcement. Undo is offered for the immediately preceding pick
+  only, and any other edit clears it, because the index it restores is only
+  trustworthy while nothing else has moved. Also in P6: a new tier divider is
+  created above the row that last had focus rather than always at rank 1, which
+  had meant dragging every divider down from the top after creating it.
 
 ## Testing
 
@@ -151,8 +164,12 @@ relevance.
 
 `fantasy/tests/rankings-format.test.js` — `projectOverallMove` from both
 directions plus an exhaustive invariant sweep, `moveWithin` non-mutation,
-`midpointKey` exhaustion, `tierBands` edges, and a 500-move permutation check.
+`midpointKey` exhaustion, `tierBands` edges, `matchupAt`/`matchupTotal`/
+`planMatchupPick` including the short-list and end-of-sweep edges, and a
+500-move permutation check.
 
 `fantasy/tests/rankings-app.test.js` — DOM-level controller regressions for
 keyboard-event isolation, board-scoped write cancellation during navigation,
-409 conflict adoption, and out-of-order consensus responses.
+409 conflict adoption, out-of-order consensus responses, the matchup helper
+(the winning pick's write, undo, and a leader confirmed without a write), and
+tier placement relative to the focused row.

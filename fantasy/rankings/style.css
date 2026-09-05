@@ -408,6 +408,144 @@ body {
     margin-left: auto;
 }
 
+/* Head-to-head helper. Deliberately louder than a row: it is a question the
+   page is asking, and the answer is one tap. */
+.helper {
+    margin: 0 0 16px;
+    padding: 16px 18px 14px;
+    border: 1px solid var(--sage, #5b7152);
+    border-radius: 14px;
+    background: var(--sage-soft, #e7eee2);
+}
+
+.helper__head {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    align-items: flex-start;
+    justify-content: space-between;
+}
+
+.helper__head h3 {
+    margin: 2px 0 0;
+    font-size: 1.15rem;
+    color: var(--ink, #23201c);
+}
+
+.helper__meta {
+    margin: 4px 0 0;
+    font-size: 0.85rem;
+    color: var(--soft, #5d574e);
+}
+
+.helper__head-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+}
+
+.helper__cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+    gap: 10px;
+    margin-top: 14px;
+}
+
+.helper-card {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-height: 108px;
+    padding: 12px 14px;
+    border: 1px solid var(--line-strong, #d8cdba);
+    border-radius: 12px;
+    background: var(--card, #ffffff);
+    font: inherit;
+    text-align: left;
+    color: var(--ink, #23201c);
+    cursor: pointer;
+}
+
+.helper-card:hover,
+.helper-card:focus-visible {
+    border-color: var(--sage, #5b7152);
+    box-shadow: 0 6px 18px rgba(35, 32, 28, 0.12);
+}
+
+.helper-card__head {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    justify-content: space-between;
+}
+
+/* The digit that picks this card from the keyboard. */
+.helper-card__key {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    border-radius: 6px;
+    background: var(--sage-soft, #e7eee2);
+    color: var(--sage, #5b7152);
+    font-size: 0.72rem;
+    font-weight: 700;
+}
+
+.helper-card__rank {
+    font-size: 0.72rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--muted, #928a7d);
+}
+
+.helper-card__name {
+    font-size: 1.02rem;
+    font-weight: 600;
+    line-height: 1.2;
+}
+
+.helper-card__meta {
+    font-size: 0.84rem;
+    color: var(--soft, #5d574e);
+}
+
+.helper-card__delta {
+    margin-top: auto;
+    font-size: 0.78rem;
+    color: var(--muted, #928a7d);
+}
+
+.helper-card__delta--up { color: #3f6d4a; }
+.helper-card__delta--down { color: #8c3a1f; }
+
+.helper-card__injury {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #8c3a1f;
+}
+
+.helper__empty {
+    margin: 14px 0 0;
+    font-size: 0.9rem;
+    color: var(--soft, #5d574e);
+}
+
+.helper__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 12px;
+}
+
+.helper__hint {
+    margin: 10px 0 0;
+    font-size: 0.8rem;
+    color: var(--muted, #928a7d);
+}
+
 .keyboard-hint {
     margin: 0 0 16px;
     padding: 12px 16px;
@@ -702,6 +840,18 @@ body {
     .rank-row {
         gap: 8px;
         padding: 8px;
+    }
+
+    .helper {
+        padding: 14px;
+    }
+
+    .helper__cards {
+        grid-template-columns: 1fr;
+    }
+
+    .helper-card {
+        min-height: 0;
     }
 
     .reader-stat--appearances {

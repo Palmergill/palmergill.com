@@ -17,7 +17,7 @@ navigation chrome.
 - `/fantasy/` - NFL rankings, projections, and league tools
 - `/fantasy/draft-order/` - account-backed, verifiable draft-order game with solo practice, games against bots, personal records, a top-10 all-runs leaderboard, and admin bot-test rooms
 - `/fantasy/league/` - members-only ESPN league hub with standings, power rankings, enriched rosters, team overviews, and league-aware chat
-- `/fantasy/rankings/` - personal ranking boards with tiers, publishable share links, and a site consensus built from published boards
+- `/fantasy/rankings/` - personal ranking boards with tiers, a head-to-head "who would you draft first?" helper, publishable share links, and a site consensus built from published boards
 - `/casino/` - landing page linking the casino games
 - `/poker/` - Texas Hold'em poker app
 - `/craps/` - craps app

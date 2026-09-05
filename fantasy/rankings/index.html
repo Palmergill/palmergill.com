@@ -13,7 +13,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/shared/site-nav.css?v=13">
-    <link rel="stylesheet" href="style.css?v=4">
+    <link rel="stylesheet" href="style.css?v=5">
 </head>
 <body>
     <main class="app-shell">
@@ -110,9 +110,34 @@
                     <ul class="search-results" id="playerSearchResults" role="listbox" hidden></ul>
                 </div>
                 <button type="button" class="button button--quiet" id="addTierButton">Add tier</button>
+                <button type="button" class="button button--quiet" id="helperButton" aria-expanded="false" aria-controls="helperPanel">Rank helper</button>
                 <p class="board-tools__legend"><span aria-hidden="true">±</span> vs site consensus</p>
                 <p class="board-tools__count" id="boardCount"></p>
             </div>
+
+            <!-- Head-to-head helper: pick the player you would draft first out of
+                 two or three neighbours, and the board reorders around the answer. -->
+            <section class="helper" id="helperPanel" aria-labelledby="helperHeading" hidden>
+                <div class="helper__head">
+                    <div>
+                        <span class="eyebrow">Head to head</span>
+                        <h3 id="helperHeading">Who would you draft first?</h3>
+                        <p class="helper__meta" id="helperMeta"></p>
+                    </div>
+                    <div class="helper__head-actions">
+                        <div class="chip-row" id="helperSizeChips" role="group" aria-label="Players per matchup"></div>
+                        <button type="button" class="button button--quiet" id="helperCloseButton">Done</button>
+                    </div>
+                </div>
+                <div class="helper__cards" id="helperCards"></div>
+                <p class="helper__empty" id="helperEmpty" hidden></p>
+                <div class="helper__actions">
+                    <button type="button" class="button button--quiet" id="helperSkipButton">Skip</button>
+                    <button type="button" class="button button--quiet" id="helperUndoButton" hidden>Undo last pick</button>
+                    <button type="button" class="button button--quiet" id="helperRestartButton">Start over</button>
+                </div>
+                <p class="helper__hint">Press 1, 2 or 3 to pick without leaving the keyboard.</p>
+            </section>
 
             <p class="keyboard-hint" id="keyboardHint">
                 Drag the handle to reorder, or focus a row and use Alt with the arrow
@@ -163,7 +188,7 @@
 
     <script src="/shared/api-base.js?v=1"></script>
     <script src="/shared/site-nav.js?v=14"></script>
-    <script src="format.js?v=2"></script>
-    <script src="app.js?v=4"></script>
+    <script src="format.js?v=3"></script>
+    <script src="app.js?v=5"></script>
 </body>
 </html>

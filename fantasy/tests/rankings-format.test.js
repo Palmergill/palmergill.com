@@ -298,6 +298,55 @@ describe("labels", () => {
     });
 });
 
+describe("head-to-head matchups", () => {
+    test("a window is adjacent players in the list on screen", () => {
+        const first = F.matchupAt(board(), "OVERALL", 0, 3);
+        expect(first.start).toBe(0);
+        expect(ids(first.players)).toEqual(["rb1", "wr1", "rb2"]);
+
+        // Positional lists compare within the position, not across the board.
+        const backs = F.matchupAt(board(), "RB", 1, 2);
+        expect(ids(backs.players)).toEqual(["rb2", "rb3"]);
+    });
+
+    test("the sweep ends when the window runs off the bottom", () => {
+        expect(F.matchupAt(board(), "OVERALL", 7, 3)).not.toBeNull();
+        expect(F.matchupAt(board(), "OVERALL", 8, 3)).toBeNull();
+        expect(F.matchupTotal(10, 3)).toBe(8);
+        expect(F.matchupTotal(10, 2)).toBe(9);
+    });
+
+    test("a list shorter than the window still asks the question it can", () => {
+        const short = [
+            { player_id: "qb1", position: "QB" },
+            { player_id: "qb2", position: "QB" },
+        ];
+        expect(ids(F.matchupAt(short, "OVERALL", 0, 3).players)).toEqual(["qb1", "qb2"]);
+        expect(F.matchupTotal(2, 3)).toBe(1);
+        expect(F.matchupAt(short.slice(0, 1), "OVERALL", 0, 2)).toBeNull();
+        expect(F.matchupTotal(1, 2)).toBe(0);
+        expect(F.matchupTotal(0, 2)).toBe(0);
+    });
+
+    test("the winner takes the top slot and the players he beat keep their order", () => {
+        const matchup = F.matchupAt(board(), "OVERALL", 2, 3);
+        const plan = F.planMatchupPick(matchup, "wr2");
+        expect(plan.fromIndex).toBe(4);
+        expect(plan.toIndex).toBe(2);
+        expect(plan.unchanged).toBe(false);
+        expect(ids(plan.beaten)).toEqual(["rb2", "qb1"]);
+        expect(F.moveWithin(ids(board()), "wr2", plan.toIndex).slice(2, 5))
+            .toEqual(["wr2", "rb2", "qb1"]);
+    });
+
+    test("picking whoever is already on top is a confirmation, not a move", () => {
+        const matchup = F.matchupAt(board(), "OVERALL", 2, 3);
+        expect(F.planMatchupPick(matchup, "rb2").unchanged).toBe(true);
+        expect(F.planMatchupPick(matchup, "te1")).toBeNull();
+        expect(F.planMatchupPick(null, "rb2")).toBeNull();
+    });
+});
+
 describe("permutation invariant", () => {
     test("500 random moves never lose or duplicate a player", () => {
         // A tiny seeded PRNG so a failure is reproducible.
