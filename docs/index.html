@@ -420,6 +420,31 @@
                                 <td>Public demo, authenticated live data</td>
                             </tr>
                             <tr>
+                                <td><code>/fantasy/</code></td>
+                                <td>Fantasy football dashboard: implied player value from betting markets, weekly boards, and results against projection.</td>
+                                <td>Public</td>
+                            </tr>
+                            <tr>
+                                <td><code>/fantasy/rankings/</code></td>
+                                <td>Personal ranking boards with tiers, a head-to-head helper, publishable share links, and a site consensus.</td>
+                                <td>Public consensus, account-owned boards</td>
+                            </tr>
+                            <tr>
+                                <td><code>/fantasy/league/</code></td>
+                                <td>ESPN league hub: standings, power rankings, rosters, start/sit, league free agents, and league-aware chat.</td>
+                                <td>Members only</td>
+                            </tr>
+                            <tr>
+                                <td><code>/fantasy/draft-order/</code></td>
+                                <td>Fourth &amp; Fortune, the commit-reveal draft-order game.</td>
+                                <td>Account required to play</td>
+                            </tr>
+                            <tr>
+                                <td><code>/signup/</code></td>
+                                <td>Member account creation, subject to a daily cap.</td>
+                                <td>Public</td>
+                            </tr>
+                            <tr>
                                 <td><code>/admin/</code></td>
                                 <td>Backend log dashboard.</td>
                                 <td>Protected</td>
@@ -533,6 +558,8 @@
                             <li><code>/api/stocks/*</code> demo mode without credentials</li>
                             <li><code>/api/bitcoin/*</code> demo mode without credentials</li>
                             <li><code>/api/analytics/*</code></li>
+                            <li><code>/fantasy/*</code> except the league hub</li>
+                            <li><code>/api/fantasy/*</code> reads, except chat and the league and board routes</li>
                         </ul>
                     </div>
                     <div class="panel">
@@ -541,6 +568,9 @@
                             <li>Live <code>/api/stocks/*</code> with valid Basic Auth credentials</li>
                             <li>Live <code>/api/bitcoin/*</code> with valid Basic Auth credentials</li>
                             <li><code>/admin/*</code></li>
+                            <li><code>/fantasy/league/*</code> and <code>/api/fantasy/league/*</code>, members only</li>
+                            <li><code>POST /api/fantasy/chat</code>, members only — it spends model budget per request</li>
+                            <li><code>/api/fantasy/rankings/boards/*</code>, owned by the account that created the board</li>
                             <li><code>/api/*</code> except public demo, poker, craps, and analytics routes</li>
                         </ul>
                     </div>
@@ -566,6 +596,22 @@
                     <article>
                         <h3><code>/api/bitcoin/*</code></h3>
                         <p>Bitcoin health, node status, latest block, block lookup, transaction lookup, mempool summary, and chat.</p>
+                    </article>
+                    <article>
+                        <h3><code>/api/fantasy/*</code></h3>
+                        <p>Public fantasy reads: season and weekly boards, implied value from betting markets, projections, results against projection, player detail and news, game lines, props, and futures. <code>POST /api/fantasy/chat</code> is members only.</p>
+                    </article>
+                    <article>
+                        <h3><code>/api/fantasy/league/*</code></h3>
+                        <p>Members-only ESPN league reads: standings, power rankings, scoreboard, rosters joined to the site's own player data, start/sit lineup advice, league free agents, and digest-cached team overviews. Anonymous callers get a JSON 403 rather than an auth challenge.</p>
+                    </article>
+                    <article>
+                        <h3><code>/api/fantasy/rankings/*</code></h3>
+                        <p>Personal ranking boards. Every <code>/boards</code> route belongs to one account; another member's board is a 404 rather than a 403, so board ids are not enumerable. Published boards and the site consensus are public reads.</p>
+                    </article>
+                    <article>
+                        <h3><code>/api/draft-order/*</code></h3>
+                        <p>Fourth &amp; Fortune sessions: rooms, joins, flips, banking, bots, and the commit-reveal verification endpoint.</p>
                     </article>
                     <article>
                         <h3><code>/api/analytics/*</code></h3>
@@ -650,6 +696,19 @@
                             questions about blocks, transactions, mempool fees, node status, and mined-BTC data.
                         </p>
                         <a href="/bitcoin-chat/">Open app</a>
+                    </article>
+                    <article>
+                        <h3>Fantasy Football</h3>
+                        <p>
+                            Season and weekly boards built from free public data — Sleeper for players,
+                            projections and trending adds, nflverse for the schedule and weekly actuals, and
+                            betting markets for the implied value each player carries. In season the board
+                            steps back through played weeks and grades its own projections against what
+                            actually happened. Signed-in members keep private ranking boards they can publish,
+                            and the ESPN league hub adds standings, rosters, start/sit advice and the free
+                            agents nobody in that league has rostered.
+                        </p>
+                        <a href="/fantasy/">Open app</a>
                     </article>
                     <article>
                         <h3>Admin</h3>
