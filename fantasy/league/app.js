@@ -60,7 +60,7 @@
         lineupCard: byId("lineupCard"),
         lineupMeta: byId("lineupMeta"),
         lineupTotals: byId("lineupTotals"),
-        lineupSwaps: byId("lineupSwaps"),
+        lineupChanges: byId("lineupChanges"),
         lineupNote: byId("lineupNote"),
     };
 
@@ -575,13 +575,14 @@
     // The roster read already joins every spot to the week's projection and
     // the league already stores its lineup slot counts, so the best legal
     // lineup is arithmetic on data the hub was fetching anyway. The card
-    // shows the decision, not the assignment: which player to start over
-    // which, and what it is worth.
+    // shows the decision, not the assignment: who belongs in and who belongs
+    // out. Those are separate sets because a multi-slot lineup does not imply
+    // a legal or meaningful one-for-one swap pairing.
 
     function renderLineup(payload) {
         // A league whose lineup settings were never collected has no lineup to
         // grade, and a card that says nothing is worse than no card.
-        if (!payload || !(payload.slots || []).length) {
+        if (!payload || payload.available === false || !(payload.slots || []).length) {
             els.lineupCard.hidden = true;
             return;
         }
@@ -595,42 +596,35 @@
         els.lineupTotals.appendChild(lineupTotal("Best possible", F.formatPoints(payload.optimal.total)));
         const gain = lineupTotal(
             "On the bench",
-            payload.gain > 0 ? `+${F.formatPoints(payload.gain)}` : "—"
+            payload.gain != null && payload.gain > 0 ? `+${F.formatPoints(payload.gain)}` : "—"
         );
-        if (payload.gain > 0) gain.classList.add("lineup__total--gain");
+        if (payload.gain != null && payload.gain > 0) gain.classList.add("lineup__total--gain");
         els.lineupTotals.appendChild(gain);
 
-        els.lineupSwaps.replaceChildren();
-        if (!payload.swaps.length) {
-            els.lineupSwaps.appendChild(
-                el("li", "lineup__ok", "This is the best lineup this roster can field.")
-            );
-        }
-        payload.swaps.forEach((swap) => {
-            const item = el("li", "lineup__swap");
-            item.appendChild(el("span", "lineup__slot", swap.slot || "—"));
-            const move = el("div", "lineup__move");
-            move.appendChild(lineupSide("Start", swap.start));
-            move.appendChild(lineupSide("Sit", swap.sit));
-            item.appendChild(move);
-            item.appendChild(
+        const starts = payload.starts || [];
+        const sits = payload.sits || [];
+        els.lineupChanges.replaceChildren();
+        if (!starts.length && !sits.length) {
+            const complete = !payload.unprojected_starters && !payload.unfilled_slots;
+            els.lineupChanges.appendChild(
                 el(
-                    "span",
-                    "lineup__gain",
-                    // No projection on the player coming out means no claim
-                    // about what the change is worth.
-                    swap.gain == null ? "?" : `+${F.formatPoints(swap.gain)}`
+                    "li",
+                    "lineup__ok",
+                    complete
+                        ? "This is the best lineup this roster can field."
+                        : "A complete lineup comparison is not available."
                 )
             );
-            els.lineupSwaps.appendChild(item);
-        });
+        }
+        starts.forEach((player) => els.lineupChanges.appendChild(lineupChange("Start", player)));
+        sits.forEach((player) => els.lineupChanges.appendChild(lineupChange("Sit", player)));
 
         const notes = [];
         if (payload.unprojected_starters) {
             const count = payload.unprojected_starters;
             notes.push(
                 `${count} starter${count === 1 ? " has" : "s have"} no projection this week, ` +
-                    `so ${count === 1 ? "he is" : "they are"} not compared`
+                    "so the overall gain cannot be calculated"
             );
         }
         if (payload.unfilled_slots) {
@@ -652,11 +646,18 @@
         side.appendChild(el("span", "lineup__label", label));
         side.appendChild(el("span", "lineup__name", player.name || "—"));
         const meta = [player.position, player.pro_team].filter(Boolean).join(" · ");
-        side.appendChild(el("span", "lineup__points",
-            player.projected_points == null
-                ? `${meta} · no projection`
-                : `${meta} · ${F.formatPoints(player.projected_points)}`));
+        const points = player.projected_points == null
+            ? "no projection"
+            : F.formatPoints(player.projected_points);
+        side.appendChild(el("span", "lineup__points", [meta, points].filter(Boolean).join(" · ")));
         return side;
+    }
+
+    function lineupChange(label, player) {
+        const item = el("li", "lineup__change");
+        item.appendChild(el("span", "lineup__slot", player.slot || player.current_slot || "—"));
+        item.appendChild(lineupSide(label, player));
+        return item;
     }
 
     function renderTeamOverview(payload) {

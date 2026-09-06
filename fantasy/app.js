@@ -902,6 +902,7 @@
         const week = weekBoardWeek();
         const results = weekBoardIsResults();
         const seq = (state.weekBoardSeq += 1);
+        if (state.boardMode === "week") renderWeekBoardLoading(week, results);
         const params = new URLSearchParams({
             scoring: state.seasonFantasyScoring,
             week: String(week),
@@ -1018,6 +1019,25 @@
             row.appendChild(cell);
         });
         els.weekBoardHead.appendChild(row);
+    }
+
+    function renderWeekBoardLoading(week, results) {
+        const kind = results ? "results" : "projected";
+        renderWeekHead(kind);
+        renderWeekStep();
+        if (els.marketBoardTitle) {
+            els.marketBoardTitle.textContent = results ? "Week Results" : "Week Board";
+        }
+        if (els.marketBoardEyebrow) els.marketBoardEyebrow.textContent = `Week ${week}`;
+        if (els.seasonFantasyPositions) els.seasonFantasyPositions.replaceChildren();
+        els.weekLeaders.replaceChildren();
+        const row = el("tr", "week-board__loading");
+        const cell = el("td", "table-empty", `Loading week ${week}…`);
+        cell.colSpan = WEEK_COLUMNS[kind].length;
+        row.appendChild(cell);
+        els.weekLeaders.appendChild(row);
+        if (els.seasonFantasyNote) els.seasonFantasyNote.textContent = "";
+        if (els.showAllMarket) els.showAllMarket.hidden = true;
     }
 
     function renderWeekBoard() {

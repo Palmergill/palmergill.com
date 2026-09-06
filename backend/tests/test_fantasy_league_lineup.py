@@ -1,12 +1,4 @@
-"""The start/sit assignment (spec 17 P5).
-
-The interesting claim in ``_optimal_lineup`` is that a greedy fill — narrowest
-seat first, best available player — is the *optimum* rather than a decent
-approximation. That holds because the eligibility sets are laminar: any two are
-nested or disjoint. It is not obvious, and it would fail quietly if someone
-added a slot that overlaps two others partially (say a "QB/WR" flex), so it is
-pinned here against brute force rather than asserted in a comment.
-"""
+"""The exact start/sit assignment (spec 17 P5), checked against brute force."""
 import json
 import random
 import pytest
@@ -114,10 +106,25 @@ class TestOptimalLineup:
         )
         assert [entry["slot"] for entry in filled] == ["QB"]
 
+    def test_partially_overlapping_hybrid_slots_still_find_the_optimum(self):
+        filled = ld._optimal_lineup(
+            ["RB/WR", "WR/TE"],
+            [
+                candidate("wr1", "WR", 10.0),
+                candidate("rb1", "RB", 8.0),
+                candidate("te1", "TE", 1.0),
+            ],
+        )
+        assert {(entry["player_id"], entry["slot"]) for entry in filled} == {
+            ("rb1", "RB/WR"),
+            ("wr1", "WR/TE"),
+        }
+        assert sum(entry["_points"] for entry in filled) == 18.0
+
     @pytest.mark.parametrize("seed", range(25))
-    def test_greedy_matches_brute_force(self, seed):
+    def test_exact_assignment_matches_brute_force(self, seed):
         rng = random.Random(seed)
-        pool = ["QB", "RB", "WR", "TE", "FLEX", "OP"]
+        pool = ["QB", "RB", "WR", "TE", "RB/WR", "WR/TE", "FLEX", "OP"]
         slots = [rng.choice(pool) for _ in range(rng.randint(2, 5))]
         candidates = [
             candidate(f"p{index}", rng.choice(["QB", "RB", "WR", "TE"]), rng.randint(0, 30) / 1.0)

@@ -765,9 +765,8 @@ def get_team_roster(
     }
 
 
-# Which positions may occupy each starting slot. Every set is either nested
-# inside another (QB ⊂ OP, RB/WR/TE ⊂ FLEX ⊂ OP) or disjoint from it, which is
-# what makes the greedy assignment in _optimal_lineup provably optimal.
+# Which positions may occupy each starting slot. RB/WR and WR/TE partially
+# overlap, so this is a general assignment problem rather than a greedy one.
 SLOT_ELIGIBILITY = {
     "QB": frozenset({"QB"}),
     "TQB": frozenset({"QB"}),
@@ -826,29 +825,46 @@ def _lineup_points(entry: Dict[str, Any], scoring_field: str) -> Optional[float]
 def _optimal_lineup(
     slots: List[str], candidates: List[Dict[str, Any]]
 ) -> List[Dict[str, Any]]:
-    """Assign the highest-scoring legal lineup, one seat at a time.
+    """Return the maximum-point legal assignment.
 
-    Seats are filled most-restrictive first (a QB seat before a superflex),
-    each taking the best projected player still available. Because the
-    eligibility sets form a laminar family — any two are nested or disjoint —
-    filling the narrowest seat first can never strand a player the wider seat
-    needed, so this greedy assignment is the optimum, not an approximation.
-    A brute-force comparison in the tests pins that claim.
+    The state mask records which seats have been filled after considering each
+    player once. A fantasy lineup has only a handful of seats, so this exact
+    dynamic program stays tiny while correctly handling partially overlapping
+    slots such as RB/WR and WR/TE.
     """
-    remaining = sorted(
-        candidates, key=lambda entry: entry["_points"], reverse=True
+    ordered = sorted(slots, key=lambda slot: (SLOT_ORDER.get(slot, 50), slot))
+    players = sorted(
+        candidates,
+        key=lambda entry: (
+            -entry["_points"],
+            str(entry.get("player_id") or entry.get("name") or ""),
+        ),
     )
-    ordered = sorted(slots, key=lambda slot: (len(SLOT_ELIGIBILITY[slot]), slot))
-    filled: List[Dict[str, Any]] = []
-    for slot in ordered:
-        eligible = SLOT_ELIGIBILITY[slot]
-        pick = next(
-            (entry for entry in remaining if entry["_position"] in eligible), None
-        )
-        if pick is None:
-            continue
-        remaining = [entry for entry in remaining if entry is not pick]
-        filled.append({**pick, "slot": slot})
+    # mask -> (points, ((slot index, player index), ...))
+    states = {0: (0.0, tuple())}
+    for player_index, entry in enumerate(players):
+        for mask, (points, assignments) in list(states.items()):
+            for slot_index, slot in enumerate(ordered):
+                bit = 1 << slot_index
+                if mask & bit or entry["_position"] not in SLOT_ELIGIBILITY[slot]:
+                    continue
+                next_mask = mask | bit
+                proposal = (
+                    points + entry["_points"],
+                    assignments + ((slot_index, player_index),),
+                )
+                current = states.get(next_mask)
+                if current is None or proposal[0] > current[0]:
+                    states[next_mask] = proposal
+
+    _mask, (_points, assignments) = max(
+        states.items(),
+        key=lambda item: (item[1][0], bin(item[0]).count("1")),
+    )
+    filled = [
+        {**players[player_index], "slot": ordered[slot_index]}
+        for slot_index, player_index in assignments
+    ]
     filled.sort(key=lambda entry: (SLOT_ORDER.get(entry["slot"], 50), -entry["_points"]))
     return filled
 
@@ -886,10 +902,39 @@ def get_team_lineup(
     scoring_field = SCORING_POINTS_FIELD[scoring]
     roster = get_team_roster(db, season, team_id)
     season = roster["season"]
+    player_data = roster.get("player_data") or {}
     season_row = next(
         (row for row in _season_rows(db) if row.season == season), None
     )
     slots = _starting_slots(season_row)
+
+    # Roster enrichment deliberately uses the dashboard's newest projections,
+    # even while somebody is browsing an older league season. That is useful in
+    # the roster view, but it cannot become start/sit advice for a past team.
+    unavailable_reason = None
+    if player_data.get("season") != season:
+        unavailable_reason = "projection_season_mismatch"
+    elif not slots:
+        unavailable_reason = "missing_lineup_settings"
+    if unavailable_reason:
+        return {
+            "available": False,
+            "unavailable_reason": unavailable_reason,
+            "season": season,
+            "espn_team_id": team_id,
+            "scoring": scoring,
+            "as_of": roster.get("as_of"),
+            "week": player_data.get("week"),
+            "projection_as_of": player_data.get("projection_as_of"),
+            "slots": slots,
+            "current": {"total": None, "entries": []},
+            "optimal": {"total": None, "entries": []},
+            "gain": None,
+            "starts": [],
+            "sits": [],
+            "unprojected_starters": 0,
+            "unfilled_slots": len(slots),
+        }
 
     entries = []
     for entry in roster["entries"]:
@@ -907,14 +952,22 @@ def get_team_lineup(
     ]
     optimal = _optimal_lineup(slots, candidates)
 
-    current_total = sum(entry["_points"] or 0.0 for entry in current)
+    unprojected_starters = sum(
+        1 for entry in current if entry["_points"] is None
+    )
+    current_total = (
+        None
+        if unprojected_starters
+        else sum(entry["_points"] for entry in current)
+    )
     optimal_total = sum(entry["_points"] for entry in optimal)
     optimal_ids = {entry["player_id"] for entry in optimal}
     current_ids = {entry["player_id"] for entry in current}
 
-    # Pair the players to start with the players to sit, best against worst.
-    # A slot-by-slot diff reads as a shuffle when one player merely changes
-    # seats; this reads as the decision actually being made.
+    # These are sets, not one-for-one swaps. Retained players may move between
+    # narrow and flex seats, so arbitrarily pairing an incoming WR with an
+    # outgoing RB can describe an illegal individual transaction even though
+    # applying the complete set produces the optimum.
     bench_in = sorted(
         (entry for entry in optimal if entry["player_id"] not in current_ids),
         key=lambda entry: entry["_points"],
@@ -924,44 +977,34 @@ def get_team_lineup(
         (entry for entry in current if entry["player_id"] not in optimal_ids),
         key=lambda entry: (entry["_points"] is not None, entry["_points"] or 0.0),
     )
-    swaps = []
-    for start, sit in zip(bench_in, bench_out):
-        swaps.append(
-            {
-                "slot": start["slot"],
-                "start": _lineup_player(start, start["slot"]),
-                "sit": _lineup_player(sit),
-                "gain": (
-                    round(start["_points"] - sit["_points"], 1)
-                    if sit["_points"] is not None
-                    else None
-                ),
-            }
-        )
-
     return {
+        "available": True,
+        "unavailable_reason": None,
         "season": season,
         "espn_team_id": team_id,
         "scoring": scoring,
         "as_of": roster["as_of"],
-        "week": roster["player_data"]["week"],
-        "projection_as_of": roster["player_data"]["projection_as_of"],
+        "week": player_data.get("week"),
+        "projection_as_of": player_data.get("projection_as_of"),
         "slots": slots,
         "current": {
-            "total": round(current_total, 1),
+            "total": round(current_total, 1) if current_total is not None else None,
             "entries": [_lineup_player(entry) for entry in current],
         },
         "optimal": {
             "total": round(optimal_total, 1),
             "entries": [_lineup_player(entry, entry["slot"]) for entry in optimal],
         },
-        "gain": round(optimal_total - current_total, 1),
-        "swaps": swaps,
+        "gain": (
+            round(optimal_total - current_total, 1)
+            if current_total is not None
+            else None
+        ),
+        "starts": [_lineup_player(entry, entry["slot"]) for entry in bench_in],
+        "sits": [_lineup_player(entry) for entry in bench_out],
         # Named so the card can say why it may be wrong rather than looking
         # confidently wrong.
-        "unprojected_starters": sum(
-            1 for entry in current if entry["_points"] is None
-        ),
+        "unprojected_starters": unprojected_starters,
         "unfilled_slots": max(0, len(slots) - len(optimal)),
     }
 

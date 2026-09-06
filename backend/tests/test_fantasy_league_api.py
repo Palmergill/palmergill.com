@@ -711,13 +711,13 @@ def _spot(player_id, name, position, slot, points):
     }
 
 
-def _roster(entries, season=2024):
+def _roster(entries, season=2024, projection_season=None):
     return {
         "season": season,
         "espn_team_id": 1,
         "as_of": "2026-09-05T12:00:00Z",
         "player_data": {
-            "season": 2026,
+            "season": projection_season or season,
             "week": 2,
             "projection_as_of": "2026-09-05T11:00:00Z",
             "ranking_as_of": None,
@@ -759,9 +759,8 @@ def test_lineup_starts_the_bench_player_who_outprojects_a_starter(seeded_db, mon
     assert body["current"]["total"] == 89.5
     assert body["optimal"]["total"] == 98.5
     assert body["gain"] == 9.0
-    assert [swap["start"]["name"] for swap in body["swaps"]] == ["Runner Three"]
-    assert [swap["sit"]["name"] for swap in body["swaps"]] == ["Runner Two"]
-    assert body["swaps"][0]["gain"] == 9.0
+    assert [entry["name"] for entry in body["starts"]] == ["Runner Three"]
+    assert [entry["name"] for entry in body["sits"]] == ["Runner Two"]
     assert body["unprojected_starters"] == 0
 
 
@@ -778,7 +777,8 @@ def test_lineup_leaves_a_correct_lineup_alone(seeded_db, monkeypatch):
     ], slots=STARTING_SLOTS)
 
     body = member_client().get("/api/fantasy/league/teams/1/lineup").json()
-    assert body["swaps"] == []
+    assert body["starts"] == []
+    assert body["sits"] == []
     assert body["gain"] == 0.0
     assert body["current"]["total"] == body["optimal"]["total"]
 
@@ -793,7 +793,8 @@ def test_lineup_never_starts_a_player_on_ir(seeded_db, monkeypatch):
     body = member_client().get("/api/fantasy/league/teams/1/lineup").json()
     assert body["slots"] == ["QB"]
     assert [entry["name"] for entry in body["optimal"]["entries"]] == ["Passer One"]
-    assert body["swaps"] == []
+    assert body["starts"] == []
+    assert body["sits"] == []
 
 
 def test_lineup_names_a_starter_it_cannot_grade(seeded_db, monkeypatch):
@@ -805,11 +806,11 @@ def test_lineup_names_a_starter_it_cannot_grade(seeded_db, monkeypatch):
 
     body = member_client().get("/api/fantasy/league/teams/1/lineup").json()
     assert body["unprojected_starters"] == 1
-    assert body["swaps"][0]["start"]["name"] == "Passer Two"
-    assert body["swaps"][0]["sit"]["name"] == "Passer One"
-    # There is no number to have beaten, so the swap claims no gain.
-    assert body["swaps"][0]["gain"] is None
-    assert body["swaps"][0]["sit"]["projected_points"] is None
+    assert body["current"]["total"] is None
+    assert body["gain"] is None
+    assert body["starts"][0]["name"] == "Passer Two"
+    assert body["sits"][0]["name"] == "Passer One"
+    assert body["sits"][0]["projected_points"] is None
 
 
 def test_lineup_without_stored_slot_settings_returns_an_empty_lineup(seeded_db, monkeypatch):
@@ -822,9 +823,39 @@ def test_lineup_without_stored_slot_settings_returns_an_empty_lineup(seeded_db, 
     )
 
     body = member_client().get("/api/fantasy/league/teams/1/lineup").json()
+    assert body["available"] is False
+    assert body["unavailable_reason"] == "missing_lineup_settings"
     assert body["slots"] == []
     assert body["optimal"]["entries"] == []
-    assert body["swaps"] == []
+    assert body["starts"] == []
+    assert body["sits"] == []
+
+
+def test_lineup_is_unavailable_when_roster_and_projection_seasons_differ(
+    seeded_db, monkeypatch
+):
+    _seed_lineup(
+        seeded_db,
+        monkeypatch,
+        [_spot("qb1", "Passer One", "QB", "QB", 12.0)],
+        slots={"0": 1, "20": 6},
+    )
+    monkeypatch.setattr(
+        "app.services.fantasy_league_data.get_team_roster",
+        lambda *_args, **_kwargs: _roster(
+            [_spot("qb1", "Passer One", "QB", "QB", 12.0)],
+            season=2024,
+            projection_season=2026,
+        ),
+    )
+
+    body = member_client().get("/api/fantasy/league/teams/1/lineup").json()
+    assert body["available"] is False
+    assert body["unavailable_reason"] == "projection_season_mismatch"
+    assert body["season"] == 2024
+    assert body["week"] == 2
+    assert body["starts"] == []
+    assert body["sits"] == []
 
 
 def test_lineup_404s_for_a_team_the_league_does_not_have(seeded_db):

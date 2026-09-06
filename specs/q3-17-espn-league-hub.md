@@ -226,24 +226,23 @@ and weights but fixed five defects, each locked by a regression test:
   the hub was fetching anyway — no new collection and no second source of truth
   about who is on the team. `GET /api/fantasy/league/teams/{team_id}/lineup`
   returns the lineup as set against that best one, and the card states the
-  decision rather than the assignment: start this player over that one, worth
-  this much.
+  actionable sets independently: players to start and players to sit, plus the
+  total value of applying the complete change.
 
   **The assignment is provably optimal, not a heuristic.** Seats are filled
-  most-restrictive first (a QB seat before a superflex), each taking the best
-  projected player still available. That is the true optimum because the
-  eligibility sets form a laminar family — any two are nested (QB ⊂ OP,
-  RB/WR/TE ⊂ FLEX ⊂ OP) or disjoint — so filling the narrowest seat first can
-  never strand a player a wider seat needed. It would stop being true if
-  someone added a partially overlapping slot (a "QB/WR" flex), which is why
-  `test_fantasy_league_lineup.py` pins it against brute force over randomized
-  rosters rather than asserting it in a comment.
+  with an exact dynamic program over the small set of lineup seats. This is a
+  general assignment problem: ESPN's RB/WR and WR/TE slots partially overlap,
+  so a narrowest-first greedy pass can strand the only RB or TE that could have
+  completed the lineup. `test_fantasy_league_lineup.py` pins the implementation
+  against brute force over randomized rosters and includes that overlap as an
+  explicit regression.
 
-  Two silences are deliberate. A player on IR is never started whatever he is
-  projected for. And a starter the projection feed does not cover is *named*
-  (`unprojected_starters`) rather than silently benched: "start someone else"
-  is worth nothing if the reason is a missing number, so the swap reports no
-  gain instead of an invented one. A league whose lineup settings were never
-  collected gets no card at all — a card that says nothing is worse than no
-  card. The card is fetched alongside the roster and fails independently: it is
-  the one part of the page that can be missing without the page being broken.
+  Three silences are deliberate. A player on IR is never started whatever he
+  is projected for. When any current starter has no projection, the current
+  total and aggregate gain are unknown rather than treating that starter as
+  zero. And when the selected league season differs from the projection season,
+  or the lineup settings were never collected, advice is unavailable and the
+  card stays hidden. Historical rosters may still show current player context,
+  but that enrichment cannot become current-week advice for a past team. The
+  card is fetched alongside the roster and fails independently: it is the one
+  part of the page that can be missing without the page being broken.

@@ -53,6 +53,8 @@ function lineup(overrides = {}) {
     return {
         season: 2026,
         espn_team_id: 1,
+        available: true,
+        unavailable_reason: null,
         scoring: "ppr",
         week: 2,
         as_of: OVERVIEW.as_of,
@@ -61,13 +63,11 @@ function lineup(overrides = {}) {
         current: { total: 89.5, entries: [] },
         optimal: { total: 98.5, entries: [] },
         gain: 9.0,
-        swaps: [
-            {
-                slot: "RB",
-                start: { player_id: "rb3", name: "Runner Three", position: "RB", pro_team: "SF", projected_points: 15.5 },
-                sit: { player_id: "rb2", name: "Runner Two", position: "RB", pro_team: "CHI", projected_points: 6.5 },
-                gain: 9.0,
-            },
+        starts: [
+            { player_id: "rb3", name: "Runner Three", position: "RB", pro_team: "SF", slot: "RB", projected_points: 15.5 },
+        ],
+        sits: [
+            { player_id: "rb2", name: "Runner Two", position: "RB", pro_team: "CHI", slot: "RB", projected_points: 6.5 },
         ],
         unprojected_starters: 0,
         unfilled_slots: 0,
@@ -129,7 +129,7 @@ const totals = () =>
         node.querySelector("dt").textContent,
         node.querySelector("dd").textContent,
     ]);
-const swaps = () => [...document.querySelectorAll("#lineupSwaps .lineup__swap")];
+const changes = () => [...document.querySelectorAll("#lineupChanges .lineup__change")];
 
 async function openTeam(table = routes()) {
     boot(table);
@@ -142,7 +142,7 @@ describe("start/sit card", () => {
         jest.restoreAllMocks();
     });
 
-    test("states the swap, what it is worth, and what is left on the bench", async () => {
+    test("states the independent start and sit actions and what is left on the bench", async () => {
         await openTeam();
         await waitFor(() => !card().hidden);
 
@@ -151,13 +151,15 @@ describe("start/sit card", () => {
             ["Best possible", "98.5"],
             ["On the bench", "+9.0"],
         ]);
-        expect(swaps()).toHaveLength(1);
-        expect(swaps()[0].querySelector(".lineup__slot").textContent).toBe("RB");
-        expect([...swaps()[0].querySelectorAll(".lineup__name")].map((n) => n.textContent))
+        expect(changes()).toHaveLength(2);
+        expect(changes().map((row) => row.querySelector(".lineup__label").textContent))
+            .toEqual(["Start", "Sit"]);
+        expect(changes().map((row) => row.querySelector(".lineup__slot").textContent))
+            .toEqual(["RB", "RB"]);
+        expect(changes().map((row) => row.querySelector(".lineup__name").textContent))
             .toEqual(["Runner Three", "Runner Two"]);
-        expect([...swaps()[0].querySelectorAll(".lineup__points")].map((n) => n.textContent))
+        expect(changes().map((row) => row.querySelector(".lineup__points").textContent))
             .toEqual(["RB · SF · 15.5", "RB · CHI · 6.5"]);
-        expect(swaps()[0].querySelector(".lineup__gain").textContent).toBe("+9.0");
         expect(document.getElementById("lineupMeta").textContent)
             .toBe("Best legal lineup for week 2, on PPR projections");
     });
@@ -166,14 +168,15 @@ describe("start/sit card", () => {
         await openTeam(routes({
             "/teams/1/lineup": lineup({
                 gain: 0,
-                swaps: [],
+                starts: [],
+                sits: [],
                 optimal: { total: 89.5, entries: [] },
             }),
         }));
         await waitFor(() => !card().hidden);
 
-        expect(swaps()).toHaveLength(0);
-        expect(document.querySelector("#lineupSwaps .lineup__ok").textContent)
+        expect(changes()).toHaveLength(0);
+        expect(document.querySelector("#lineupChanges .lineup__ok").textContent)
             .toBe("This is the best lineup this roster can field.");
         expect(totals()[2]).toEqual(["On the bench", "—"]);
     });
@@ -181,29 +184,56 @@ describe("start/sit card", () => {
     test("claims no gain over a starter it could not project", async () => {
         await openTeam(routes({
             "/teams/1/lineup": lineup({
+                current: { total: null, entries: [] },
+                gain: null,
                 unprojected_starters: 1,
-                swaps: [
-                    {
-                        slot: "QB",
-                        start: { name: "Passer Two", position: "QB", pro_team: "SF", projected_points: 15.0 },
-                        sit: { name: "Passer One", position: "QB", pro_team: "KC", projected_points: null },
-                        gain: null,
-                    },
+                starts: [
+                    { name: "Passer Two", position: "QB", pro_team: "SF", slot: "QB", projected_points: 15.0 },
+                ],
+                sits: [
+                    { name: "Passer One", position: "QB", pro_team: "KC", slot: "QB", projected_points: null },
                 ],
             }),
         }));
         await waitFor(() => !card().hidden);
 
-        expect(swaps()[0].querySelector(".lineup__gain").textContent).toBe("?");
-        expect([...swaps()[0].querySelectorAll(".lineup__points")].map((n) => n.textContent))
+        expect(totals()).toEqual([
+            ["Started", "—"],
+            ["Best possible", "98.5"],
+            ["On the bench", "—"],
+        ]);
+        expect(changes().map((row) => row.querySelector(".lineup__points").textContent))
             .toEqual(["QB · SF · 15.0", "QB · KC · no projection"]);
         expect(document.getElementById("lineupNote").textContent)
-            .toContain("1 starter has no projection this week, so he is not compared");
+            .toContain("1 starter has no projection this week, so the overall gain cannot be calculated");
     });
 
     test("stays hidden when the league's lineup settings were never collected", async () => {
-        await openTeam(routes({ "/teams/1/lineup": lineup({ slots: [], swaps: [] }) }));
+        await openTeam(routes({
+            "/teams/1/lineup": lineup({
+                available: false,
+                unavailable_reason: "missing_lineup_settings",
+                slots: [],
+                starts: [],
+                sits: [],
+            }),
+        }));
         // The rest of the team page still renders.
+        await waitFor(() => document.getElementById("teamName").textContent === "Test Team");
+
+        expect(card().hidden).toBe(true);
+    });
+
+    test("stays hidden when roster and projection seasons do not match", async () => {
+        await openTeam(routes({
+            "/teams/1/lineup": lineup({
+                available: false,
+                unavailable_reason: "projection_season_mismatch",
+                season: 2024,
+                starts: [],
+                sits: [],
+            }),
+        }));
         await waitFor(() => document.getElementById("teamName").textContent === "Test Team");
 
         expect(card().hidden).toBe(true);

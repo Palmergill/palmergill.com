@@ -618,7 +618,7 @@ button:focus-visible {
 
 .lineup__total--gain dd { color: #3f6d4a; }
 
-.lineup__swaps {
+.lineup__changes {
     margin: 14px 0 0;
     padding: 0;
     list-style: none;
@@ -626,7 +626,7 @@ button:focus-visible {
     gap: 8px;
 }
 
-.lineup__swap {
+.lineup__change {
     display: flex;
     align-items: center;
     gap: 12px;
@@ -646,15 +646,7 @@ button:focus-visible {
     color: var(--muted, #928a7d);
 }
 
-.lineup__move {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 10px;
-    flex: 1 1 auto;
-    min-width: 0;
-}
-
-.lineup__side { min-width: 0; }
+.lineup__side { flex: 1 1 auto; min-width: 0; }
 
 .lineup__label {
     display: block;
@@ -683,14 +675,6 @@ button:focus-visible {
     color: var(--soft, #5d574e);
 }
 
-.lineup__gain {
-    flex: 0 0 auto;
-    font-size: 15px;
-    font-weight: 700;
-    font-variant-numeric: tabular-nums;
-    color: #3f6d4a;
-}
-
 .lineup__ok {
     padding: 10px 12px;
     border-radius: 12px;
@@ -708,7 +692,6 @@ button:focus-visible {
 @media (max-width: 620px) {
     .lineup { padding: 14px; }
     .lineup__totals { gap: 14px; }
-    .lineup__move { grid-template-columns: 1fr; gap: 6px; }
 }
 
 .team-overview {

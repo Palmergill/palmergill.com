@@ -141,7 +141,8 @@ function boot(table, { url = "/fantasy/" } = {}) {
     window.fetch = jest.fn((requested) => {
         const match = Object.keys(table).find((key) => String(requested).includes(key));
         if (!match) return response({}, 500);
-        return response(table[match]);
+        const value = table[match];
+        return value instanceof Promise ? value : response(value);
     });
 
     let init;
@@ -177,7 +178,9 @@ async function openWeekBoard(table = routes()) {
     boot(table);
     await waitFor(() => modeChips().length === 2);
     modeChips()[1].click();
-    await waitFor(() => weekRows().length > 0);
+    await waitFor(
+        () => weekRows().length > 0 && !document.querySelector(".week-board__loading")
+    );
 }
 
 describe("week board", () => {
@@ -231,7 +234,9 @@ describe("week board", () => {
 
     test("a deep link opens the week board once the week resolves", async () => {
         boot(routes(), { url: "/fantasy/?board=week" });
-        await waitFor(() => weekRows().length > 0);
+        await waitFor(
+            () => weekRows().length > 0 && !document.querySelector(".week-board__loading")
+        );
 
         expect(pressedMode()).toBe("Week 2");
         expect(document.getElementById("weekBoardWrap").hidden).toBe(false);
@@ -277,7 +282,9 @@ describe("week board", () => {
         expect(headCells()).toEqual(["#", "Player", "Proj", "Move"]);
 
         document.getElementById("weekStepBack").click();
-        await waitFor(() => headCells().length === 5);
+        await waitFor(
+            () => headCells().length === 5 && !document.querySelector(".week-board__loading")
+        );
 
         expect(headCells()).toEqual(["#", "Player", "Proj", "Actual", "+/-"]);
         expect(document.getElementById("marketBoardTitle").textContent).toBe("Week Results");
@@ -298,7 +305,9 @@ describe("week board", () => {
     test("the results note publishes how far off the board was", async () => {
         await openWeekBoard();
         document.getElementById("weekStepBack").click();
-        await waitFor(() => headCells().length === 5);
+        await waitFor(
+            () => headCells().length === 5 && !document.querySelector(".week-board__loading")
+        );
 
         expect(document.getElementById("seasonFantasyNote").textContent)
             .toContain("Week 1 results · projections missed by 6.4 on average across 3 players");
@@ -313,12 +322,16 @@ describe("week board", () => {
         expect(next.disabled).toBe(true); // week 2 is the live week
 
         back.click();
-        await waitFor(() => headCells().length === 5);
+        await waitFor(
+            () => headCells().length === 5 && !document.querySelector(".week-board__loading")
+        );
         expect(back.disabled).toBe(true);
         expect(next.disabled).toBe(false);
 
         next.click();
-        await waitFor(() => headCells().length === 4);
+        await waitFor(
+            () => headCells().length === 4 && !document.querySelector(".week-board__loading")
+        );
         expect(document.getElementById("marketBoardTitle").textContent).toBe("Week Board");
         expect(document.getElementById("weekStepLabel").textContent).toBe("Week 2");
     });
@@ -336,9 +349,30 @@ describe("week board", () => {
             "/week-results": { season: 2026, week: 1, entries: [], played: 0, mean_absolute_error: null },
         }));
         document.getElementById("weekStepBack").click();
-        await waitFor(() => weekRows().length === 1);
+        await waitFor(
+            () => weekRows().length === 1 && !document.querySelector(".week-board__loading")
+        );
 
         expect(weekRows()[0].textContent).toBe("Week 1 results have not been collected yet.");
+    });
+
+    test("clears the previous week's rows while another week loads", async () => {
+        let releaseResults;
+        const resultsReply = new Promise((resolve) => { releaseResults = resolve; });
+        await openWeekBoard(routes({ "/week-results": resultsReply }));
+        expect(weekRows()[0].textContent).toContain("Passer One");
+
+        document.getElementById("weekStepBack").click();
+
+        expect(document.getElementById("weekStepLabel").textContent).toBe("Week 1");
+        expect(weekRows()).toHaveLength(1);
+        expect(weekRows()[0].classList.contains("week-board__loading")).toBe(true);
+        expect(weekRows()[0].textContent).toBe("Loading week 1…");
+        expect(weekRows()[0].textContent).not.toContain("Passer One");
+
+        response(WEEK_ONE_RESULTS).then(releaseResults);
+        await waitFor(() => !document.querySelector(".week-board__loading"));
+        expect(weekRows()[0].textContent).toContain("Catcher One");
     });
 
     test("a season payload landing under the week board does not repaint its controls", async () => {
@@ -352,7 +386,9 @@ describe("week board", () => {
         });
         await waitFor(() => modeChips().length === 2);
         modeChips()[1].click();
-        await waitFor(() => weekRows().length > 0);
+        await waitFor(
+            () => weekRows().length > 0 && !document.querySelector(".week-board__loading")
+        );
 
         releaseSeason({
             status: 200,
