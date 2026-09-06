@@ -1,17 +1,10 @@
 (function () {
     const form = document.getElementById("signupForm");
     const status = document.getElementById("signupStatus");
-    const inviteCode = document.getElementById("inviteCode");
     const username = document.getElementById("username");
     const password = document.getElementById("password");
     const confirmPassword = document.getElementById("confirmPassword");
     const button = form.querySelector("button[type='submit']");
-
-    // Prefill verbatim. Draft room codes already arrive uppercase, and the
-    // site invite code is compared exactly — upper-casing it here made every
-    // /signup/?invite=<site-code> link impossible to submit.
-    const inviteFromUrl = new URLSearchParams(window.location.search).get("invite");
-    if (inviteFromUrl) inviteCode.value = inviteFromUrl.trim();
 
     function safeNextPath() {
         const params = new URLSearchParams(window.location.search);
@@ -43,11 +36,10 @@
     form.addEventListener("submit", async (event) => {
         event.preventDefault();
 
-        const codeValue = inviteCode.value.trim();
         const userValue = username.value.trim();
         const passwordValue = password.value;
 
-        if (!codeValue || !userValue || !passwordValue) {
+        if (!userValue || !passwordValue) {
             setStatus("Fill in every field.");
             return;
         }
@@ -73,7 +65,6 @@
                 body: JSON.stringify({
                     username: userValue,
                     password: passwordValue,
-                    inviteCode: codeValue,
                     next: safeNextPath(),
                 }),
             });
@@ -94,5 +85,5 @@
         }
     });
 
-    (inviteCode.value ? username : inviteCode).focus();
+    username.focus();
 })();

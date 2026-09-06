@@ -62,11 +62,8 @@ Protected local app routes, FastAPI docs/OpenAPI JSON, and protected API routes 
 APP_AUTH_USERNAME=palmer APP_AUTH_PASSWORD=your-password ./start.sh
 ```
 
-To exercise member sign-ups locally, add an invite code — without it `/signup/` stays closed:
-
-```bash
-APP_AUTH_USERNAME=palmer APP_AUTH_PASSWORD=your-password APP_SIGNUP_INVITE_CODE=local-invite ./start.sh
-```
+Member sign-ups are open whenever app authentication is configured. The API
+allows at most five successfully created accounts per UTC day.
 
 Logs are written to:
 
@@ -103,7 +100,7 @@ Both run automatically on every push/PR via
 - API service: Railway/FastAPI from `backend/`.
 - Vercel rewrites `/api/*`, `/login/session`, `/login/signup`, and `/login/logout` to the Railway backend in production.
 - The root page `/`, `/docs/`, `/login/`, `/signup/`, `/stock-research/`, `/bitcoin-chat/`, `/casino/`, `/poker/`, `/craps/`, `/craps-strategy/`, `/blackjack/`, `/high-card-flush/`, `/api/poker/*`, `/api/craps/*`, `/api/stocks/*`, `/api/bitcoin/*`, and `/api/analytics/*` stay public. Unauthenticated stock and Bitcoin API requests return demo data only; any signed-in account unlocks the live provider-backed paths. Admin and other `/api/*` routes require authentication; sign-in creates a signed HttpOnly session cookie carrying a role, failed sign-ins are rate-limited, and Basic Auth remains supported for the admin. Protected routes return `503` if `APP_AUTH_PASSWORD` is missing. Set the same `APP_AUTH_USERNAME` and `APP_AUTH_PASSWORD` values in Vercel and Railway.
-- Two roles: the **admin** (env vars, full access) and **members** (rows in `app_users`, created at `/signup/` with the `APP_SIGNUP_INVITE_CODE` or an open fantasy draft-room code). Members get the live tools but are refused `/admin/*`, `/api/admin/*`, `/api/fantasy/admin/*`, and the API docs. See `ARCHITECTURE.md` for how the roles are kept apart.
+- Two roles: the **admin** (env vars, full access) and **members** (rows in `app_users`, created through the open `/signup/` flow, capped at five successful registrations per UTC day). Members get the live tools but are refused `/admin/*`, `/api/admin/*`, `/api/fantasy/admin/*`, and the API docs. See `ARCHITECTURE.md` for how the roles are kept apart.
 - Poker games are cached in process and snapshotted to the backend database so a fresh backend process can recover active games until inactive cleanup removes them.
 
 ## Repository Layout

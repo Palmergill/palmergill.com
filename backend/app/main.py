@@ -850,7 +850,10 @@ async def login_session(request: Request):
 async def signup_status():
     """Lets the sign-in page decide whether to advertise account creation."""
     return JSONResponse(
-        {"enabled": accounts.signup_enabled()},
+        {
+            "enabled": accounts.signup_enabled(),
+            "dailyLimit": accounts.DAILY_SIGNUP_LIMIT,
+        },
         headers={"Cache-Control": "no-store"},
     )
 
@@ -861,8 +864,8 @@ async def signup(request: Request):
     if not config:
         return JSONResponse({"error": "App authentication is not configured"}, status_code=503)
 
-    # Signup is rate limited on the same counter as failed logins: it is the
-    # other way to guess an invite code, and it is the expensive one to serve.
+    # Keep the existing short-window abuse protection in addition to the
+    # database-backed daily account cap. Password hashing is expensive.
     if auth_rate_limited(request):
         return auth_rate_limit_response()
 
@@ -875,8 +878,12 @@ async def signup(request: Request):
     redirect = safe_next_path(body.get("next"))
     db = SessionLocal()
     try:
-        accounts.check_invite_code(body.get("inviteCode"), db)
-        user = accounts.create_user(db, body.get("username"), body.get("password"))
+        user = accounts.create_user(
+            db,
+            body.get("username"),
+            body.get("password"),
+            enforce_daily_limit=True,
+        )
     except AccountError as error:
         record_auth_failure(request)
         return JSONResponse({"error": error.message}, status_code=error.status_code)

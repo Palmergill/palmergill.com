@@ -1,11 +1,20 @@
 """Member accounts: signup, login, and the admin/member privilege boundary."""
 
+from concurrent.futures import ThreadPoolExecutor
+
 import pytest
 from fastapi.testclient import TestClient
 
 from app import accounts
-from app.accounts import AccountError, ROLE_ADMIN, ROLE_MEMBER
-from app.database import AnalyticsEvent, AppUser, Base, SessionLocal, engine
+from app.accounts import ROLE_ADMIN, ROLE_MEMBER
+from app.database import (
+    AnalyticsEvent,
+    AppUser,
+    Base,
+    DailySignupCounter,
+    SessionLocal,
+    engine,
+)
 from app.main import (
     SESSION_COOKIE_NAME,
     _auth_failure_store,
@@ -15,7 +24,6 @@ from app.main import (
 
 ADMIN_USERNAME = "palmer"
 ADMIN_PASSWORD = "secret"
-INVITE_CODE = "come-on-in"
 
 
 def setup_function():
@@ -23,6 +31,7 @@ def setup_function():
     Base.metadata.create_all(bind=engine)
     db = SessionLocal()
     try:
+        db.query(DailySignupCounter).delete()
         db.query(AppUser).delete()
         # Analytics rows carry usernames; a leftover row from another test
         # would show up as activity on a freshly created account.
@@ -36,14 +45,13 @@ def setup_function():
 def configured(monkeypatch):
     monkeypatch.setenv("APP_AUTH_USERNAME", ADMIN_USERNAME)
     monkeypatch.setenv("APP_AUTH_PASSWORD", ADMIN_PASSWORD)
-    monkeypatch.setenv("APP_SIGNUP_INVITE_CODE", INVITE_CODE)
     return TestClient(app)
 
 
-def signup(client, username="taylor", password="a-good-password", code=INVITE_CODE):
+def signup(client, username="taylor", password="a-good-password"):
     return client.post(
         "/login/signup",
-        json={"username": username, "password": password, "inviteCode": code},
+        json={"username": username, "password": password},
     )
 
 
@@ -111,26 +119,80 @@ def test_signup_creates_member_and_signs_them_in(configured):
     assert session["role"] == ROLE_MEMBER
 
 
-def test_signup_rejects_wrong_invite_code(configured):
-    response = signup(configured, code="guess")
-
-    assert response.status_code == 403
-    assert "invite code" in response.json()["error"].lower()
-
-
-def test_signup_closed_when_no_invite_code_configured(monkeypatch):
+def test_signup_is_open_without_an_invite_code(monkeypatch):
     monkeypatch.setenv("APP_AUTH_USERNAME", ADMIN_USERNAME)
     monkeypatch.setenv("APP_AUTH_PASSWORD", ADMIN_PASSWORD)
     monkeypatch.delenv("APP_SIGNUP_INVITE_CODE", raising=False)
     client = TestClient(app)
 
-    assert client.get("/login/signup").json() == {"enabled": False}
-    assert signup(client, code="").status_code == 403
-    assert signup(client, code="anything").status_code == 403
+    assert client.get("/login/signup").json() == {"enabled": True, "dailyLimit": 5}
+    assert signup(client).status_code == 200
 
 
 def test_signup_status_reports_enabled(configured):
-    assert configured.get("/login/signup").json() == {"enabled": True}
+    assert configured.get("/login/signup").json() == {
+        "enabled": True,
+        "dailyLimit": accounts.DAILY_SIGNUP_LIMIT,
+    }
+
+
+def test_signup_allows_only_five_accounts_per_utc_day(configured):
+    for index in range(accounts.DAILY_SIGNUP_LIMIT):
+        response = signup(
+            TestClient(app),
+            username=f"player{index}",
+            password="shared-safe-password",
+        )
+        assert response.status_code == 200, response.text
+
+    limited = signup(
+        TestClient(app),
+        username="player5",
+        password="shared-safe-password",
+    )
+
+    assert limited.status_code == 429
+    assert "try again tomorrow" in limited.json()["error"].lower()
+
+    db = SessionLocal()
+    try:
+        assert db.query(AppUser).count() == accounts.DAILY_SIGNUP_LIMIT
+        assert db.query(DailySignupCounter).one().account_count == accounts.DAILY_SIGNUP_LIMIT
+    finally:
+        db.close()
+
+
+def test_concurrent_signups_cannot_exceed_the_daily_limit(configured):
+    def create(index):
+        return signup(
+            TestClient(app),
+            username=f"racer{index}",
+            password="shared-safe-password",
+        ).status_code
+
+    with ThreadPoolExecutor(max_workers=6) as executor:
+        statuses = list(executor.map(create, range(6)))
+
+    assert sorted(statuses) == [200, 200, 200, 200, 200, 429]
+
+    db = SessionLocal()
+    try:
+        assert db.query(AppUser).count() == accounts.DAILY_SIGNUP_LIMIT
+        assert db.query(DailySignupCounter).one().account_count == accounts.DAILY_SIGNUP_LIMIT
+    finally:
+        db.close()
+
+
+def test_failed_signup_does_not_consume_a_daily_slot(configured):
+    assert signup(configured, username="bad", password="short").status_code == 400
+
+    for index in range(accounts.DAILY_SIGNUP_LIMIT):
+        response = signup(
+            TestClient(app),
+            username=f"valid{index}",
+            password="shared-safe-password",
+        )
+        assert response.status_code == 200, response.text
 
 
 def test_signup_rejects_admin_username(configured):
@@ -412,30 +474,6 @@ def test_expired_member_token_is_rejected(configured):
     assert client.get("/login/session").json()["authenticated"] is False
 
 
-# --- invite code handling ---------------------------------------------------
-
-
-def test_check_invite_code_requires_exact_match(monkeypatch):
-    monkeypatch.setenv("APP_SIGNUP_INVITE_CODE", INVITE_CODE)
-
-    accounts.check_invite_code(INVITE_CODE)
-    accounts.check_invite_code(f"  {INVITE_CODE}  ")
-
-    for wrong in [None, "", "come-on-i", f"{INVITE_CODE}x", INVITE_CODE.upper(), 42]:
-        with pytest.raises(AccountError):
-            accounts.check_invite_code(wrong)
-
-
-def test_check_invite_code_rejects_non_ascii_without_crashing(monkeypatch):
-    """secrets.compare_digest raises TypeError on non-ASCII str, which turned
-    a mistyped code into a 500 instead of a refusal."""
-    monkeypatch.setenv("APP_SIGNUP_INVITE_CODE", INVITE_CODE)
-
-    for wrong in ["café☕", "пароль", "🎲🎲🎲"]:
-        with pytest.raises(AccountError):
-            accounts.check_invite_code(wrong)
-
-
 # --- the admin accounts list ------------------------------------------------
 
 
@@ -523,17 +561,6 @@ def test_admin_users_list_joins_analytics_activity_case_insensitively(configured
 
 def test_member_session_cannot_list_users(configured, monkeypatch):
     assert member_client(monkeypatch).get("/api/admin/users").status_code == 403
-
-
-def test_signup_rejects_non_ascii_invite_code(configured):
-    response = configured.post("/login/signup", json={
-        "username": "curious",
-        "password": "a-great-password",
-        "inviteCode": "café☕",
-    })
-
-    assert response.status_code == 403
-    assert response.json()["error"] == "That invite code isn't valid."
 
 
 def test_admin_users_metrics_ignore_the_active_filter(configured):

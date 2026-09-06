@@ -1566,7 +1566,7 @@
         const params = new URLSearchParams(window.location.search);
         const desiredRoom = params.get("room");
         const verificationRoom = params.get("verify");
-        const inviteCode = (params.get("join") || "").trim().toUpperCase();
+        const joinCode = (params.get("join") || "").trim().toUpperCase();
         try {
             if (verificationRoom) {
                 await openPublicVerification(verificationRoom);
@@ -1577,16 +1577,14 @@
             if (!identity.authenticated) {
                 const destination = encodeURIComponent(nextPath());
                 els.signInLink.href = `/login/?next=${destination}`;
-                els.createAccountLink.href = `/signup/?next=${destination}${inviteCode ? `&invite=${encodeURIComponent(inviteCode)}` : ""}`;
-                // A manager can use an open room code as their account invite,
-                // even when general site sign-ups are closed.
+                els.createAccountLink.href = `/signup/?next=${destination}`;
                 els.createAccountLink.hidden = false;
                 setView("signedOut");
                 return;
             }
             state.identity = identity;
             if (desiredRoom) await openRoom(desiredRoom);
-            else if (inviteCode) await joinFromInvite(inviteCode);
+            else if (joinCode) await joinFromInvite(joinCode);
             else await loadHome();
         } catch {
             showStatus("The draft room service is unavailable right now.", true);

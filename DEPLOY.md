@@ -50,15 +50,13 @@ APP_AUTH_PASSWORD=<secret password>
 
 If `APP_AUTH_PASSWORD` is missing in Vercel, protected routes return `503` so the apps do not accidentally publish without auth.
 
-### Turning member sign-ups on
+### Member sign-ups
 
-Set the invite code on **Railway** (the API service creates accounts, so Vercel does not need it):
-
-```text
-APP_SIGNUP_INVITE_CODE=<code you hand out>
-```
-
-When this is unset, general sign-ups are closed. An open Fourth & Fortune room code remains a narrowly scoped account invite so the host only has to share one code with league managers; it stops creating accounts as soon as the roster is locked. Rotating the site invite immediately invalidates any copy already handed out; existing accounts are unaffected. Passwords are hashed with scrypt, and there is no self-serve password reset: to reset one, delete the row from `app_users` and have the person sign up again.
+Member sign-ups are open whenever `APP_AUTH_PASSWORD` is configured. The API
+accepts at most five successful registrations per UTC day, using a database
+counter so the cap is shared across backend workers. Passwords are hashed with
+scrypt, and there is no self-serve password reset: to reset one, delete the row
+from `app_users` and have the person sign up again.
 
 ## API Backend
 

@@ -18,10 +18,14 @@ import os
 import re
 import secrets
 import unicodedata
+from datetime import datetime, time, timedelta
 
+from sqlalchemy import func
+from sqlalchemy.dialects.postgresql import insert as postgresql_insert
+from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.orm import Session
 
-from app.database import AppUser, FantasyDraftSession, utc_now
+from app.database import AppUser, DailySignupCounter, utc_now
 
 ROLE_ADMIN = "admin"
 ROLE_MEMBER = "member"
@@ -39,6 +43,7 @@ USERNAME_MIN_LENGTH = 3
 USERNAME_MAX_LENGTH = 24
 PASSWORD_MIN_LENGTH = 10
 PASSWORD_MAX_LENGTH = 200
+DAILY_SIGNUP_LIMIT = 5
 
 _USERNAME_PATTERN = re.compile(r"^[a-z0-9](?:[a-z0-9_-]*[a-z0-9])?$")
 
@@ -89,48 +94,59 @@ def admin_username() -> str:
     return os.getenv("APP_AUTH_USERNAME", "palmer")
 
 
-def signup_invite_code() -> str | None:
-    code = os.getenv("APP_SIGNUP_INVITE_CODE", "").strip()
-    return code or None
-
-
 def signup_enabled() -> bool:
-    """Signup requires an invite code to be configured. With no code set the
-    endpoint stays closed rather than falling open to the whole internet."""
-    return signup_invite_code() is not None
+    """Account creation is public; the daily database cap limits abuse."""
+    return True
 
 
-def check_invite_code(submitted: object, db: Session | None = None) -> None:
-    """Accept the site invite or an open fantasy draft-room code.
+def _reserve_daily_signup_slot(db: Session) -> None:
+    """Atomically reserve one of today's public-signup slots.
 
-    A room code is intentionally also an account invitation: the host only
-    needs to share one code with the league, and a newly created account lands
-    back on the room link to claim its own seat.
+    The first request after this feature ships seeds the counter from accounts
+    already created that UTC day, so a deploy cannot accidentally reset the
+    day's allowance. PostgreSQL and SQLite both support this conditional
+    upsert; its RETURNING row is absent when the counter is already at five.
     """
-    expected = signup_invite_code()
-    submitted_code = submitted.strip() if isinstance(submitted, str) else ""
-    if len(submitted_code) > 128:
-        raise AccountError("That invite code isn't valid.", 403)
-    # Compare bytes, not str: secrets.compare_digest raises TypeError on a
-    # non-ASCII string, which would turn a mistyped code into a 500.
-    if expected is not None and secrets.compare_digest(
-        submitted_code.encode("utf-8"), expected.encode("utf-8")
-    ):
-        return
+    signup_date = utc_now().date()
+    day_start = datetime.combine(signup_date, time.min)
+    day_end = day_start + timedelta(days=1)
+    existing_count = db.query(func.count(AppUser.id)).filter(
+        AppUser.created_at >= day_start,
+        AppUser.created_at < day_end,
+    ).scalar() or 0
 
-    room_code = "".join(submitted_code.upper().split())
-    if db is not None and room_code:
-        open_room = db.query(FantasyDraftSession.id).filter(
-            FantasyDraftSession.join_code == room_code,
-            FantasyDraftSession.state == "lobby",
-            FantasyDraftSession.mode == "league",
-        ).first()
-        if open_room:
-            return
+    if existing_count >= DAILY_SIGNUP_LIMIT:
+        raise AccountError(
+            "Today's account limit has been reached. Please try again tomorrow.",
+            429,
+        )
 
-    if expected is None:
-        raise AccountError("Sign-ups are closed right now.", 403)
-    raise AccountError("That invite code isn't valid.", 403)
+    dialect_name = db.get_bind().dialect.name
+    if dialect_name == "postgresql":
+        insert = postgresql_insert(DailySignupCounter)
+    elif dialect_name == "sqlite":
+        insert = sqlite_insert(DailySignupCounter)
+    else:  # The app only configures PostgreSQL and SQLite.
+        raise RuntimeError(f"Unsupported signup-counter database: {dialect_name}")
+
+    statement = insert.values(
+        signup_date=signup_date,
+        account_count=existing_count + 1,
+        updated_at=utc_now(),
+    ).on_conflict_do_update(
+        index_elements=[DailySignupCounter.signup_date],
+        set_={
+            "account_count": DailySignupCounter.account_count + 1,
+            "updated_at": utc_now(),
+        },
+        where=DailySignupCounter.account_count < DAILY_SIGNUP_LIMIT,
+    ).returning(DailySignupCounter.account_count)
+
+    if db.execute(statement).scalar_one_or_none() is None:
+        raise AccountError(
+            "Today's account limit has been reached. Please try again tomorrow.",
+            429,
+        )
 
 
 def validate_username(value: object) -> str:
@@ -208,12 +224,21 @@ def get_user(db: Session, username: object) -> AppUser | None:
     return db.query(AppUser).filter(AppUser.username == normalized).first()
 
 
-def create_user(db: Session, username: object, password: object) -> AppUser:
+def create_user(
+    db: Session,
+    username: object,
+    password: object,
+    *,
+    enforce_daily_limit: bool = False,
+) -> AppUser:
     normalized = validate_username(username)
     validate_password(password, normalized)
 
     if get_user(db, normalized) is not None:
         raise AccountError("That username is taken.", 409)
+
+    if enforce_daily_limit:
+        _reserve_daily_signup_slot(db)
 
     display_name = unicodedata.normalize("NFKC", str(username)).strip()
     user = AppUser(

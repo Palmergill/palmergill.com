@@ -106,7 +106,7 @@ logs/backend.log
 Two roles, stored in different places on purpose:
 
 - **admin** — the `APP_AUTH_USERNAME` / `APP_AUTH_PASSWORD` env pair. No database row, so nothing that can write to `app_users` can grant itself the logs.
-- **member** — a row in `app_users`, created at `/signup/` with the invite code in `APP_SIGNUP_INVITE_CODE` or the join code for an open fantasy draft room. Passwords are hashed with stdlib scrypt (`backend/app/accounts.py`). Members get the live tools; `/admin/*`, `/api/admin/*`, `/api/fantasy/admin/*`, and the FastAPI docs return `403`.
+- **member** — a row in `app_users`, created through the open `/signup/` flow. Successful registrations are capped at five per UTC day by the `daily_signup_counters` table. Passwords are hashed with stdlib scrypt (`backend/app/accounts.py`). Members get the live tools; `/admin/*`, `/api/admin/*`, `/api/fantasy/admin/*`, and the FastAPI docs return `403`.
 
 Fourth & Fortune persists rooms, players, rounds, and every dealt card in the
 `ff_draft_*` tables. The API owns turn authorization and derives a separate

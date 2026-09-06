@@ -184,6 +184,21 @@ class AppUser(Base):
     last_login_at = Column(DateTime, nullable=True)
 
 
+class DailySignupCounter(Base):
+    """Committed account creations for one UTC calendar day.
+
+    Keeping the limit in the database makes the cap consistent across API
+    workers. The counter update and the new user are committed together, so a
+    failed signup does not consume one of the day's slots.
+    """
+
+    __tablename__ = "daily_signup_counters"
+
+    signup_date = Column(Date, primary_key=True)
+    account_count = Column(Integer, nullable=False)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now, nullable=False)
+
+
 class PokerGameState(Base):
     __tablename__ = "poker_game_states"
 

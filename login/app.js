@@ -76,8 +76,8 @@
         }
     });
 
-    // Only advertise account creation when an invite code is configured;
-    // otherwise the signup page would just hand out a 403.
+    // Discover signup availability from the API so this remains compatible
+    // with deployments that have not picked up the open-signup backend yet.
     async function revealSignupPrompt() {
         const prompt = document.getElementById("signupPrompt");
         if (!prompt) return;

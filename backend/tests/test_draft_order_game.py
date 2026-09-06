@@ -12,7 +12,9 @@ from sqlalchemy import event
 from app import accounts
 from app.accounts import ROLE_ADMIN, ROLE_MEMBER
 from app.database import (
+    AppUser,
     Base,
+    DailySignupCounter,
     FantasyDraftFlip,
     FantasyDraftPlayer,
     FantasyDraftRound,
@@ -42,10 +44,12 @@ def setup_function():
     draft_order_game.FORFEIT_GRACE_SECONDS = 0
     db = SessionLocal()
     try:
+        db.query(DailySignupCounter).delete()
         db.query(FantasyDraftFlip).delete()
         db.query(FantasyDraftRound).delete()
         db.query(FantasyDraftPlayer).delete()
         db.query(FantasyDraftSession).delete()
+        db.query(AppUser).delete()
         db.commit()
     finally:
         db.close()
@@ -403,9 +407,8 @@ def test_only_admin_can_create_bot_test_room_and_bots_finish_full_flow(monkeypat
     assert verify_proof(proof) == []
 
 
-def test_open_room_code_can_invite_a_new_account(monkeypatch):
+def test_open_signup_can_return_a_new_account_to_an_invited_room(monkeypatch):
     host = member_client(monkeypatch, "host-player")
-    monkeypatch.delenv("APP_SIGNUP_INVITE_CODE", raising=False)
     room = create_room(host)
     newcomer = TestClient(app)
 
@@ -414,7 +417,6 @@ def test_open_room_code_can_invite_a_new_account(monkeypatch):
         json={
             "username": "new-manager",
             "password": "a-great-password",
-            "inviteCode": room["joinCode"].lower(),
             "next": f"/fantasy/draft-order/?join={room['joinCode']}",
         },
     )
