@@ -5,6 +5,10 @@
 
     const F = window.LeagueFormat;
     const API_BASE = `${window.API_ORIGIN || ""}/api/fantasy/league`;
+    const LEAGUE_SCORING = "half";
+    const LEAGUE_SCORING_LABEL = "Half PPR";
+    const LEAGUE_PROJECTION_FIELD = "pts_half_ppr";
+    const LEAGUE_ACTUAL_FIELD = "fantasy_points_half";
 
     const state = {
         season: null,
@@ -143,7 +147,7 @@
     function handleFailure(error) {
         if (error instanceof ForbiddenError) {
             // Preserve where they were headed so login can bounce them back.
-            const next = `${window.location.pathname}${window.location.search}`;
+            const next = `${window.location.pathname}${window.location.search}${window.location.hash}`;
             els.signInLink.href = `/login/?next=${encodeURIComponent(next)}`;
             setView("signedOut");
             return true;
@@ -166,7 +170,7 @@
         if (algo) state.algorithm = algo;
     }
 
-    function writeUrlState(replace) {
+    function writeUrlState(replace, hash = "") {
         const params = new URLSearchParams();
         if (state.season) params.set("season", state.season);
         if (state.teamId) {
@@ -178,7 +182,8 @@
             }
         }
         const query = params.toString();
-        const url = query ? `?${query}` : window.location.pathname;
+        const suffix = hash.startsWith("#") ? hash : "";
+        const url = `${query ? `?${query}` : window.location.pathname}${suffix}`;
         if (replace) {
             window.history.replaceState({}, "", url);
         } else {
@@ -526,16 +531,16 @@
             main.appendChild(el("span", "roster__meta", meta));
             if (entry.matched) {
                 const detail = [];
-                if (entry.projection && entry.projection.pts_ppr != null) {
-                    detail.push(`Proj ${F.formatPoints(entry.projection.pts_ppr)}`);
+                if (entry.projection && entry.projection[LEAGUE_PROJECTION_FIELD] != null) {
+                    detail.push(`Proj ${F.formatPoints(entry.projection[LEAGUE_PROJECTION_FIELD])}`);
                 }
                 if (entry.ranking && entry.ranking.rank != null) {
                     const position = entry.ranking.position === "DEF" ? "DST" : entry.ranking.position;
-                    detail.push(`${position || "PPR"} #${entry.ranking.rank}`);
+                    detail.push(`${position || LEAGUE_SCORING_LABEL} #${entry.ranking.rank}`);
                 }
                 const actual = (entry.recent_actuals || [])[0];
-                if (actual && actual.fantasy_points_ppr != null) {
-                    detail.push(`Last ${F.formatPoints(actual.fantasy_points_ppr)}`);
+                if (actual && actual[LEAGUE_ACTUAL_FIELD] != null) {
+                    detail.push(`Last ${F.formatPoints(actual[LEAGUE_ACTUAL_FIELD])}`);
                 }
                 if (detail.length) main.appendChild(el("span", "roster__data", detail.join(" · ")));
                 const prop = (entry.props || [])[0];
@@ -595,7 +600,7 @@
         els.lineupCard.hidden = false;
 
         const week = payload.week === 0 ? "season-long" : `week ${payload.week}`;
-        els.lineupMeta.textContent = `Best legal lineup for ${week}, on PPR projections`;
+        els.lineupMeta.textContent = `Best legal lineup for ${week}, on ${LEAGUE_SCORING_LABEL} projections`;
 
         els.lineupTotals.replaceChildren();
         els.lineupTotals.appendChild(lineupTotal("Started", F.formatPoints(payload.current.total)));
@@ -740,7 +745,7 @@
 
     async function loadMyTeam() {
         const generation = state.generation;
-        const params = new URLSearchParams();
+        const params = new URLSearchParams({ scoring: LEAGUE_SCORING });
         if (state.season) params.set("season", state.season);
         try {
             const me = await fetchJson(`${API_BASE}/me?${params}`);
@@ -753,7 +758,7 @@
             // Advice is a second request and a nice-to-have: the strip is
             // already useful as a shortcut without it.
             const lineupParams = new URLSearchParams(params);
-            lineupParams.set("scoring", "ppr");
+            lineupParams.set("scoring", LEAGUE_SCORING);
             const lineup = await fetchJson(
                 `${API_BASE}/teams/${me.selected_team_id}/lineup?${lineupParams}`
             ).catch(() => null);
@@ -804,10 +809,15 @@
         els.myTeamAdvice.classList.toggle("my-team__advice--gain", lineup.gain > 0);
     }
 
-    function scrollToRequestedBoard() {
-        const hash = window.location.hash;
+    function scrollToRequestedBoard(hash = window.location.hash) {
         if (!hash || hash.length < 2) return;
-        const target = document.querySelector(hash);
+        let id;
+        try {
+            id = decodeURIComponent(hash.slice(1));
+        } catch (_error) {
+            return;
+        }
+        const target = document.getElementById(id);
         if (target) target.scrollIntoView({ block: "start" });
     }
 
@@ -820,7 +830,7 @@
 
     async function loadFreeAgents() {
         const generation = state.generation;
-        const params = new URLSearchParams({ scoring: "ppr", limit: "25" });
+        const params = new URLSearchParams({ scoring: LEAGUE_SCORING, limit: "25" });
         if (state.season) params.set("season", state.season);
         try {
             const payload = await fetchJson(`${API_BASE}/free-agents?${params}`);
@@ -884,7 +894,7 @@
         const week = payload.week === 0 ? "season-long" : `week ${payload.week}`;
         els.freeAgentsNote.textContent = [
             `${payload.rostered} players rostered`,
-            `${week} PPR projections`,
+            `${week} ${LEAGUE_SCORING_LABEL} projections`,
             // The exclusion is only as fresh as the last league sync, and a
             // stale claim here is the difference between a waiver and a laugh.
             `rosters ${F.formatAsOf(payload.roster_as_of) || "unknown"}`,
@@ -899,9 +909,9 @@
         els.teamOverviewMeta.textContent = "";
         try {
             const lineupParams = new URLSearchParams(params);
-            // The roster list below prints PPR projections, so the lineup that
+            // The roster list below prints Half PPR projections, so the lineup that
             // grades them has to be scored the same way.
-            lineupParams.set("scoring", "ppr");
+            lineupParams.set("scoring", LEAGUE_SCORING);
             const [detail, roster, lineup] = await Promise.all([
                 fetchJson(`${API_BASE}/teams/${state.teamId}?${params}`),
                 fetchJson(`${API_BASE}/teams/${state.teamId}/roster?${params}`),
@@ -956,6 +966,7 @@
 
     async function loadSeason() {
         const generation = ++state.generation;
+        const requestedHash = window.location.hash;
         clearError();
         try {
             const params = state.season ? `?season=${state.season}` : "";
@@ -973,7 +984,7 @@
             setView("league");
             renderHeader(overview);
             renderSeasonChips(overview.seasons);
-            writeUrlState(true);
+            writeUrlState(true, requestedHash);
 
             const standings = await fetchJson(`${API_BASE}/standings?season=${state.season}`);
             if (stale(generation)) return;
@@ -994,7 +1005,7 @@
             applyRoute();
             // A cross-link from the dashboard's Waiver Pulse lands on the
             // free-agent board, which anchors immediately but fills in late.
-            scrollToRequestedBoard();
+            scrollToRequestedBoard(requestedHash);
         } catch (error) {
             if (!stale(generation)) handleFailure(error);
         }

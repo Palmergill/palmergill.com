@@ -53,7 +53,10 @@ def _member_username(identity: Dict[str, Any]) -> str:
 def member_snapshot(
     season: Optional[int] = None,
     week: Optional[int] = None,
-    scoring: str = Query("std", pattern="^(ppr|half|half_ppr|half-ppr|std|standard)$"),
+    scoring: str = Query(
+        fantasy_league_data.LEAGUE_SCORING,
+        pattern="^(ppr|half|half_ppr|half-ppr|std|standard)$",
+    ),
     identity: Dict[str, Any] = Depends(require_member),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
@@ -187,7 +190,10 @@ def team_roster(
 @router.get("/free-agents")
 def free_agents(
     season: Optional[int] = None,
-    scoring: str = Query("std", pattern="^(ppr|half|half_ppr|half-ppr|std|standard)$"),
+    scoring: str = Query(
+        fantasy_league_data.LEAGUE_SCORING,
+        pattern="^(ppr|half|half_ppr|half-ppr|std|standard)$",
+    ),
     limit: int = Query(40, ge=1, le=150),
     _: Dict[str, Any] = Depends(require_member),
     db: Session = Depends(get_db),
@@ -205,7 +211,10 @@ def free_agents(
 def team_lineup(
     team_id: int,
     season: Optional[int] = None,
-    scoring: str = Query("std", pattern="^(ppr|half|half_ppr|half-ppr|std|standard)$"),
+    scoring: str = Query(
+        fantasy_league_data.LEAGUE_SCORING,
+        pattern="^(ppr|half|half_ppr|half-ppr|std|standard)$",
+    ),
     _: Dict[str, Any] = Depends(require_member),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:

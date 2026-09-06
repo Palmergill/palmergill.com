@@ -58,7 +58,7 @@ function lineup(overrides = {}) {
         espn_team_id: 1,
         available: true,
         unavailable_reason: null,
-        scoring: "ppr",
+        scoring: "half",
         week: 2,
         as_of: OVERVIEW.as_of,
         projection_as_of: "2026-09-16T11:00:00Z",
@@ -95,9 +95,9 @@ function routes(overrides = {}) {
     };
 }
 
-function boot(table) {
+function boot(table, url = "/fantasy/league/?season=2026&team=1") {
     document.body.innerHTML = bodySource;
-    window.history.replaceState({}, "", "/fantasy/league/?season=2026&team=1");
+    window.history.replaceState({}, "", url);
     window.LeagueFormat = F;
     window.API_ORIGIN = "";
     window.fetch = jest.fn((requested) => {
@@ -166,7 +166,36 @@ describe("start/sit card", () => {
         expect(changes().map((row) => row.querySelector(".lineup__points").textContent))
             .toEqual(["RB · SF · 15.5", "RB · CHI · 6.5"]);
         expect(document.getElementById("lineupMeta").textContent)
-            .toBe("Best legal lineup for week 2, on PPR projections");
+            .toBe("Best legal lineup for week 2, on Half PPR projections");
+        const lineupRequests = window.fetch.mock.calls
+            .map(([url]) => String(url))
+            .filter((url) => url.includes("/lineup?"));
+        expect(lineupRequests.length).toBeGreaterThan(0);
+        expect(lineupRequests.every((url) => new URL(url, window.location.origin)
+            .searchParams.get("scoring") === "half")).toBe(true);
+    });
+
+    test("renders roster projections and actuals in the league's Half PPR format", async () => {
+        const roster = {
+            ...ROSTER,
+            entries: [{
+                matched: true,
+                name: "Catcher One",
+                position: "WR",
+                pro_team: "SF",
+                lineup_slot: "WR",
+                projection: { pts_ppr: 20, pts_half_ppr: 18 },
+                ranking: { position: "WR", rank: 4 },
+                recent_actuals: [{ fantasy_points_ppr: 22.5, fantasy_points_half: 20 }],
+                props: [],
+                injury_status: null,
+            }],
+        };
+        await openTeam(routes({ "/teams/1/roster": roster }));
+        await waitFor(() => document.querySelector(".roster__data") !== null);
+
+        expect(document.querySelector(".roster__data").textContent)
+            .toBe("Proj 18.0 · WR #4 · Last 20.0");
     });
 
     test("says so when the lineup is already the best one", async () => {
@@ -267,7 +296,7 @@ describe("free agents", () => {
         unavailable_reason: null,
         season: 2026,
         week: 2,
-        scoring: "ppr",
+        scoring: "half",
         rostered: 154,
         roster_as_of: "2026-09-16T12:00:00Z",
         as_of: "2026-09-16T11:00:00Z",
@@ -305,8 +334,28 @@ describe("free agents", () => {
         await waitFor(() => agents().length === 2);
 
         expect(note()).toContain("154 players rostered");
-        expect(note()).toContain("week 2 PPR projections");
+        expect(note()).toContain("week 2 Half PPR projections");
         expect(note()).toContain("rosters ");
+    });
+
+    test("keeps the free-agent deep link through initial URL normalization", async () => {
+        Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
+            configurable: true,
+            value: jest.fn(),
+        });
+        boot(
+            routes({ "/free-agents": POOL }),
+            "/fantasy/league/#free-agents"
+        );
+        await waitFor(() => agents().length === 2);
+
+        expect(window.location.hash).toBe("#free-agents");
+        expect(HTMLElement.prototype.scrollIntoView).toHaveBeenCalled();
+        const request = window.fetch.mock.calls
+            .map(([url]) => String(url))
+            .find((url) => url.includes("/free-agents?"));
+        expect(new URL(request, window.location.origin).searchParams.get("scoring"))
+            .toBe("half");
     });
 
     test.each([

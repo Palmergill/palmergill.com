@@ -132,9 +132,18 @@ def test_member_can_select_a_team_and_reuse_it_for_the_season(seeded_db, monkeyp
         lambda *_args, **_kwargs: {
             "player_data": {"projection_as_of": None},
             "entries": [
-                {"is_starter": True, "projection": {"pts_std": 10.0}},
-                {"is_starter": True, "projection": {"pts_std": 12.5}},
-                {"is_starter": False, "projection": {"pts_std": 50.0}},
+                {
+                    "is_starter": True,
+                    "projection": {"pts_std": 10.0, "pts_half_ppr": 10.0},
+                },
+                {
+                    "is_starter": True,
+                    "projection": {"pts_std": 12.5, "pts_half_ppr": 12.5},
+                },
+                {
+                    "is_starter": False,
+                    "projection": {"pts_std": 50.0, "pts_half_ppr": 50.0},
+                },
             ],
         },
     )
@@ -348,7 +357,7 @@ def test_team_roster_joins_dashboard_player_data(seeded_db):
         seeded_db.add(
             FantasyProjection(
                 run_id=run.id, season=2026, week=0, source=source,
-                player_id="200", pts_ppr=points,
+                player_id="200", pts_ppr=points, pts_half_ppr=points - 1,
             )
         )
     ranking_run = FantasyCollectionRun(
@@ -360,13 +369,13 @@ def test_team_roster_joins_dashboard_player_data(seeded_db):
     seeded_db.add(
         FantasyRanking(
             run_id=ranking_run.id, season=2026, week=0, source="fantasypros",
-            scoring="ppr", position="WR", player_id="200", rank=4, ecr=4.2,
+            scoring="half", position="WR", player_id="200", rank=4, ecr=4.2,
         )
     )
     seeded_db.add(
         FantasyPlayerStat(
             season=2025, week=17, player_id="200", opponent="MIN",
-            fantasy_points_ppr=22.5,
+            fantasy_points_ppr=22.5, fantasy_points_half=20.0,
         )
     )
     props_run = FantasyCollectionRun(
@@ -388,9 +397,11 @@ def test_team_roster_joins_dashboard_player_data(seeded_db):
     entry = next(row for row in body["entries"] if row["player_id"] == "200")
     assert entry["matched"] is True
     assert entry["projection"]["pts_ppr"] == pytest.approx(19.0)
+    assert entry["projection"]["pts_half_ppr"] == pytest.approx(18.0)
     assert entry["ranking"]["rank"] == 4
     assert entry["props"][0]["point"] == pytest.approx(6.5)
     assert entry["recent_actuals"][0]["fantasy_points_ppr"] == pytest.approx(22.5)
+    assert entry["recent_actuals"][0]["fantasy_points_half"] == pytest.approx(20.0)
     assert entry["injury_status"] == "QUESTIONABLE"
     assert body["player_data"]["season"] == 2026
 
@@ -755,6 +766,7 @@ def test_lineup_starts_the_bench_player_who_outprojects_a_starter(seeded_db, mon
     body = member_client().get("/api/fantasy/league/teams/1/lineup").json()
     assert body["season"] == 2024
     assert body["week"] == 2
+    assert body["scoring"] == "half"
     assert body["slots"] == ["QB", "RB", "RB", "WR", "WR", "TE", "FLEX"]
 
     # 22 + 17 + 6.5 + 14 + 11 + 9 + 10 started; the bench back replaces the
@@ -899,7 +911,7 @@ def _seed_free_agent_pool(
                 season=ranking_season if ranking_season is not None else season,
                 week=week,
                 source="derived",
-                scoring="std",
+                scoring="half",
                 position="ALL",
                 player_id=player_id,
                 rank=rank,
@@ -908,6 +920,10 @@ def _seed_free_agent_pool(
         )
 
     roster_run = latest_run(session, "league_rosters", season)
+    # The collector fixture deliberately contains unresolved ESPN names. Each
+    # free-agent test supplies its own complete snapshot so those rows do not
+    # accidentally define the scenario under test.
+    session.query(FantasyLeagueRosterEntry).filter_by(run_id=roster_run.id).delete()
     for player_id in rostered_ids:
         session.add(
             FantasyLeagueRosterEntry(
@@ -953,7 +969,9 @@ def test_free_agents_exclude_everyone_rostered_in_this_league(seeded_db):
     assert [entry["rank"] for entry in body["entries"]] == [2, 4]
     assert [entry["projected_points"] for entry in body["entries"]] == [14.5, 8.5]
     assert body["available"] is True
+    assert body["scoring"] == "half"
     assert body["rostered"] == 2
+    assert body["unmatched"] == 0
     assert body["roster_as_of"] is not None
 
 
@@ -993,6 +1011,31 @@ def test_free_agents_make_no_claim_without_a_roster_snapshot(seeded_db):
     assert body["unavailable_reason"] == "missing_roster_snapshot"
     assert body["entries"] == []
     assert body["rostered"] == 0
+
+
+def test_free_agents_make_no_claim_with_an_unmatched_roster_entry(seeded_db):
+    _seed_free_agent_pool(seeded_db, RANKED_POOL, ["100"])
+    roster_run = latest_run(seeded_db, "league_rosters", 2024)
+    seeded_db.add(
+        FantasyLeagueRosterEntry(
+            run_id=roster_run.id,
+            season=2024,
+            scoring_period=2,
+            espn_team_id=1,
+            player_id=None,
+            player_name_raw="Free Agent One",
+            lineup_slot="BENCH",
+            position="WR",
+        )
+    )
+    seeded_db.commit()
+
+    body = member_client().get("/api/fantasy/league/free-agents").json()
+    assert body["available"] is False
+    assert body["unavailable_reason"] == "incomplete_roster_snapshot"
+    assert body["entries"] == []
+    assert body["rostered"] == 1
+    assert body["unmatched"] == 1
 
 
 def test_free_agents_refuse_to_mix_a_past_season_with_current_rankings(seeded_db):

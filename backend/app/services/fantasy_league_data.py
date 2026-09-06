@@ -37,6 +37,7 @@ from app.services.fantasy_common import SCORING_POINTS_FIELD, normalize_scoring
 logger = logging.getLogger(__name__)
 
 DEFAULT_ALGORITHM = "composite"
+LEAGUE_SCORING = "half"
 
 # Starters render above the fold in this order; bench and IR sink below it.
 SLOT_ORDER = {
@@ -650,7 +651,7 @@ def get_team_roster(
             .filter(
                 FantasyRanking.run_id == ranking_run.id,
                 FantasyRanking.player_id.in_(player_ids),
-                FantasyRanking.scoring == "ppr",
+                FantasyRanking.scoring == LEAGUE_SCORING,
             )
             .order_by(FantasyRanking.rank.asc())
             .all()
@@ -886,7 +887,7 @@ def get_team_lineup(
     db: Session,
     season: Optional[int],
     team_id: int,
-    scoring: str = "std",
+    scoring: str = LEAGUE_SCORING,
 ) -> Dict[str, Any]:
     """This week's lineup against the best one the roster could field.
 
@@ -1019,7 +1020,7 @@ FREE_AGENT_SCAN = 600
 def get_free_agents(
     db: Session,
     season: Optional[int] = None,
-    scoring: str = "std",
+    scoring: str = LEAGUE_SCORING,
     limit: int = 40,
 ) -> Dict[str, Any]:
     """Ranked players nobody in this league has rostered.
@@ -1040,17 +1041,15 @@ def get_free_agents(
 
     roster_run = latest_successful_run(db, "league_rosters", season)
     rostered: set = set()
+    unmatched_roster_entries = 0
     if roster_run is not None:
-        rostered = {
-            row.player_id
-            for row in db.query(FantasyLeagueRosterEntry.player_id)
-            .filter(
-                FantasyLeagueRosterEntry.run_id == roster_run.id,
-                FantasyLeagueRosterEntry.player_id.isnot(None),
-            )
+        roster_rows = (
+            db.query(FantasyLeagueRosterEntry.player_id)
+            .filter(FantasyLeagueRosterEntry.run_id == roster_run.id)
             .all()
-            if row.player_id
-        }
+        )
+        rostered = {row.player_id for row in roster_rows if row.player_id}
+        unmatched_roster_entries = sum(1 for row in roster_rows if not row.player_id)
 
     context = fantasy_data.default_context(db)
     ranking_run = latest_successful_run(
@@ -1068,6 +1067,10 @@ def get_free_agents(
         unavailable_reason = "missing_rankings"
     elif context.get("season") != season:
         unavailable_reason = "projection_season_mismatch"
+    elif unmatched_roster_entries:
+        # One unresolved roster name is enough to make the subtraction unsafe:
+        # that player could otherwise be advertised as claimable.
+        unavailable_reason = "incomplete_roster_snapshot"
     elif not rostered:
         # Without a roster snapshot every ranked player would read as
         # available, which is the opposite of what the board is for.
@@ -1081,6 +1084,7 @@ def get_free_agents(
             "scoring": scoring,
             "entries": [],
             "rostered": len(rostered),
+            "unmatched": unmatched_roster_entries,
             "roster_as_of": _iso(roster_run.finished_at) if roster_run else None,
             "as_of": _iso(ranking_run.finished_at) if ranking_run else None,
         }
@@ -1141,6 +1145,7 @@ def get_free_agents(
         "scoring": scoring,
         "entries": entries,
         "rostered": len(rostered),
+        "unmatched": 0,
         "roster_as_of": _iso(roster_run.finished_at) if roster_run else None,
         "as_of": _iso(ranking_run.finished_at),
     }
@@ -1151,7 +1156,7 @@ def get_member_snapshot(
     username: str,
     season: Optional[int] = None,
     week: Optional[int] = None,
-    scoring: str = "std",
+    scoring: str = LEAGUE_SCORING,
 ) -> Dict[str, Any]:
     """Team picker and the signed-in member's compact weekly snapshot."""
     season = _require_season(db, season)
@@ -1233,7 +1238,7 @@ def select_member_team(
     username: str,
     season: int,
     espn_team_id: int,
-    scoring: str = "std",
+    scoring: str = LEAGUE_SCORING,
 ) -> Dict[str, Any]:
     """Persist one ESPN team per account and season, then return its snapshot."""
     season = _require_season(db, season)

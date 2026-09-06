@@ -40,7 +40,7 @@ const PROP_LEADERS = [
 const FANTASY_LEADERS = [
     { player: player("Passer One", "QB"), fantasy_points: 380, yard_points: 300, touchdown_points: 80, rushing_points: 90, markets_used: 4, books: ["kalshi"], pairs_used: ["passing", "rushing"], partial_pairs: [], projected_points: 350, projection_delta: 30 },
     { player: player("Runner One", "RB"), fantasy_points: 250, yard_points: 140, touchdown_points: 110, rushing_points: 250, markets_used: 2, books: [], pairs_used: ["rushing"], partial_pairs: ["receiving"], projected_points: 270, projection_delta: -20 },
-    { player: player("Catcher One", "WR"), fantasy_points: 240, yard_points: 130, touchdown_points: 110, rushing_points: 0, markets_used: 2, books: [], projected_points: 240, projection_delta: 0 },
+    { player: player("Catcher One", "WR"), fantasy_points: 240, yard_points: 130, touchdown_points: 110, rushing_points: null, markets_used: 2, books: [], projected_points: 240, projection_delta: 0 },
     // Quoted by the market, absent from the projection feed.
     { player: player("Runner Two", "RB"), fantasy_points: 200, yard_points: 120, touchdown_points: 80, rushing_points: 200, markets_used: 2, books: [], projected_points: null, projection_delta: null },
 ];
@@ -258,6 +258,18 @@ describe("season board position filter", () => {
 
         expect(head.textContent).toBe("Rush pts");
         expect(passer.children[rushingIndex].textContent).toBe("90.0");
+    });
+
+    test("does not report zero rushing points when no complete rushing market exists", async () => {
+        boot(routes());
+        await waitFor(() => document.querySelectorAll("#seasonFantasyLeaders tr").length);
+
+        const head = document.querySelector('.col-sort[data-sort="rushing_points"]');
+        const receiver = [...document.querySelectorAll("#seasonFantasyLeaders tr")]
+            .find((row) => row.textContent.includes("Catcher One"));
+        const rushingIndex = [...head.closest("tr").children].indexOf(head.closest("th"));
+
+        expect(receiver.children[rushingIndex].textContent).toBe("—");
     });
 
     test("a quoted player with no projection keeps his rank and blanks the comparison", async () => {
