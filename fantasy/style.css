@@ -784,7 +784,49 @@ h1, h2, .drawer__head h2 { font-family: "Libre Caslon Display", Georgia, serif; 
 .primary-grid { display: grid; grid-template-columns: minmax(0, 2fr) minmax(280px, .82fr); align-items: start; gap: 18px; }
 .insight-rail { display: grid; gap: 18px; }
 .editorial-card { border: 1px solid var(--fantasy-line); border-radius: 3px; background: rgba(255,253,248,.94); box-shadow: 0 12px 30px rgba(47,40,29,.055); }
-.value-board { overflow: hidden; }
+/* The board shares its row with the insight rail, so the card is a good deal
+   narrower than the window — about 730px at a 1140px viewport. The per-category
+   breakdown used to be dropped on a *viewport* media query, which is how nine
+   columns could still be crammed into a 728px card and clip the last one. The
+   card is the constraint, so the card is what gets asked. */
+.value-board { overflow: hidden; container-type: inline-size; }
+
+/* Headers wrap rather than forcing their column wide: "ESPN + Sleeper avg" was
+   holding 150px to display a five-character number, and the player column paid
+   for it by wrapping every name onto three lines. */
+.season-fantasy__table thead th { vertical-align: bottom; }
+.season-fantasy__table thead th .col-sort { white-space: normal; }
+
+@container (max-width: 820px) {
+    /* Provenance goes before the decision does — the drawer carries the
+       per-category breakdown in full, one click away. */
+    .season-fantasy__table .col-detail { display: none; }
+
+    /* Fixed layout is what makes the fit exact instead of approximate: the
+       player cell's meta line ("QB BUF · passing + rushing · 3 sources · 0 rec
+       proj") has a ~377px min-content that auto layout is obliged to honour,
+       and honouring it is what pushed the last column out of the card. */
+    .season-fantasy__table { width: 100%; min-width: 0; table-layout: fixed; }
+    .season-fantasy__table .col-rank { width: 34px; }
+    /* Counted from the right: the three decision columns are always the last
+       three, so another breakdown column on the left cannot retarget these. */
+    .season-fantasy__table th:nth-last-child(3) { width: 74px; }
+    .season-fantasy__table th:nth-last-child(2) { width: 82px; }
+    .season-fantasy__table th:nth-last-child(1) { width: 62px; }
+
+    .season-fantasy__table .season-leader__name,
+    .season-fantasy__table .season-leader__meta {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .season-fantasy__table .col-sort[data-mobile-label] { gap: 2px; font-size: 0; }
+    .season-fantasy__table .col-sort[data-mobile-label]::before {
+        content: attr(data-mobile-label);
+        font-size: .61rem;
+    }
+}
 .card-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 18px; padding: 22px 24px 16px; border-bottom: 1px solid var(--fantasy-line); }
 .card-head h2 { margin: 3px 0 0; color: var(--fantasy-forest); font-size: 2rem; line-height: 1; }
 .card-head--compact { padding: 19px 20px 14px; }
@@ -910,7 +952,6 @@ button:focus-visible,a:focus-visible,summary:focus-visible,[tabindex]:focus-visi
     .card-head { padding-right: 16px; padding-left: 16px; }
     .value-board__toolbar { align-items: stretch; }
     .value-board__toolbar .button { width: 100%; margin-left: 0; }
-    .season-fantasy__table .col-detail { display: none; }
     .rank-table thead th,.rank-table tbody td { padding-right: 7px; padding-left: 7px; }
     .rank-table { font-size: .69rem; }
     .trending { gap: 12px; }
@@ -1081,10 +1122,7 @@ button:focus-visible,a:focus-visible,summary:focus-visible,[tabindex]:focus-visi
 
 #futuresSection .section-head h3 { font-size: 1.08rem; }
 
-/* The per-category breakdown is provenance, not the decision, and the drawer
-   carries it in full — so it goes before the hero table has to scroll. */
 @media (max-width: 860px) {
-    .col-detail { display: none; }
     .market-board__head { align-items: flex-start; flex-direction: column; gap: 16px; }
     .market-board__search { flex-basis: auto; }
 }
@@ -1188,12 +1226,8 @@ button:focus-visible,a:focus-visible,summary:focus-visible,[tabindex]:focus-visi
     .drawer__panel,.drawer__panel--wide,.drawer--modal .drawer__panel { inset: 0; width: 100%; max-width: none; height: 100%; max-height: none; border: 0; transform: none; }
     .compare-grid { grid-template-columns: 1fr !important; }
 }
-@media (min-width: 521px) and (max-width: 820px) {
-    .season-fantasy__table .col-detail { display: table-cell; }
-}
 @media (max-width: 520px) {
     .week-table .col-week-proj { display: none; }
-    .season-fantasy__table .col-detail { display: none; }
     .week-badge__season { display: none; }
     .hero-snapshot__member { overflow: hidden; }
 }

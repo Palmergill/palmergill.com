@@ -430,3 +430,26 @@ static mounts in `main.py`, `fantasy/tests` added to jest roots in
   the URL's omit-the-default rule cannot drift from the state default, and a
   board sorted by Rec falls back to the default order when standard hides it.
   Closes finding 10 of `reviews/2026-08-30-fantasy.md`.
+
+- **Sep 2026 — the board asks the card, not the window.** With a ninth column
+  (rushing points) the market table began clipping its last column on ordinary
+  laptops: the board shares its row with the insight rail, so a 1140px window
+  gives the card about 730px while the table wanted 760px. The rule that was
+  supposed to prevent exactly this — drop the per-category breakdown "before
+  the hero table has to scroll" — was keyed to the *viewport*, which is not the
+  constraint, and a second rule at 521–820px put the columns back.
+
+  `.value-board` is now a container (`container-type: inline-size`) and the
+  breakdown drops at `@container (max-width: 820px)`, so the trigger is the
+  space the card actually has at any window size. Inside that query the table
+  switches to `table-layout: fixed`, which is what makes the fit exact rather
+  than close: the player cell's meta line has a ~377px min-content that auto
+  layout is obliged to honour, and honouring it is what pushed the last column
+  out. Measured across card widths from 900px down to 540px, clipping is zero
+  at every step, and the three decision columns are addressed with
+  `nth-last-child` so a tenth breakdown column cannot silently retarget them.
+
+  The wide case improved too: header text now wraps instead of forcing its
+  column wide ("ESPN + Sleeper avg" was holding 150px to show a five-character
+  number), which returned ~100px to the player column and dropped the row from
+  114px to 97px.
