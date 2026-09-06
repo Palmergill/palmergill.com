@@ -44,6 +44,8 @@
         scoreboardWeek: byId("scoreboardWeek"),
         scoreboard: byId("scoreboard"),
         teamsGrid: byId("teamsGrid"),
+        freeAgents: byId("freeAgents"),
+        freeAgentsNote: byId("freeAgentsNote"),
         teamView: byId("teamView"),
         teamBack: byId("teamBack"),
         teamLogo: byId("teamLogo"),
@@ -725,6 +727,86 @@
         }
     }
 
+    // ── free agents ─────────────────────────────────────────────────────
+    //
+    // Every other waiver list on the internet ranks the player pool. This one
+    // subtracts twelve rosters from it, which is the only version of the
+    // question anybody actually asks. The hub stores all twelve, so the
+    // subtraction is a set difference rather than a guess.
+
+    async function loadFreeAgents() {
+        const generation = state.generation;
+        const params = new URLSearchParams({ scoring: "ppr", limit: "25" });
+        if (state.season) params.set("season", state.season);
+        try {
+            const payload = await fetchJson(`${API_BASE}/free-agents?${params}`);
+            if (stale(generation)) return;
+            renderFreeAgents(payload);
+        } catch (error) {
+            if (stale(generation)) return;
+            // A read that failed is a different thing from a league where
+            // everyone is rostered, and an empty list would read as the
+            // second. The board stays, and says which one this is.
+            els.freeAgents.replaceChildren();
+            els.freeAgentsNote.textContent = "Unavailable right now.";
+        }
+    }
+
+    function renderFreeAgents(payload) {
+        els.freeAgents.replaceChildren();
+        // Same rule the start/sit card follows: with no roster snapshot to
+        // subtract, or rankings from a different season than the one being
+        // browsed, there is no claim to make and the board says nothing by
+        // not being there.
+        const board = els.freeAgents.closest(".board");
+        if (!payload || payload.available === false) {
+            if (board) board.hidden = true;
+            els.freeAgentsNote.textContent = "";
+            return;
+        }
+        if (board) board.hidden = false;
+
+        if (!payload.entries.length) {
+            els.freeAgents.appendChild(
+                el("li", "empty-note", "Every ranked player is on a roster.")
+            );
+            els.freeAgentsNote.textContent = "";
+            return;
+        }
+
+        payload.entries.forEach((entry) => {
+            const item = el("li", "free-agent");
+            item.appendChild(el("span", "free-agent__rank", `#${entry.rank}`));
+            const main = el("div", "free-agent__main");
+            main.appendChild(el("span", "free-agent__name", entry.name || "—"));
+            const meta = [entry.position, entry.team].filter(Boolean).join(" · ");
+            main.appendChild(el("span", "free-agent__meta", meta));
+            item.appendChild(main);
+            if (entry.trending_adds) {
+                // Sleeper's whole user base, not this league — a measure of how
+                // contested the pickup is, not of whether he is good.
+                const hot = el("span", "free-agent__trend", `+${F.compactCount(entry.trending_adds)} adds`);
+                hot.title = `${entry.trending_adds.toLocaleString()} Sleeper adds in the last day`;
+                item.appendChild(hot);
+            }
+            item.appendChild(
+                el("span", "free-agent__points", F.formatPoints(entry.projected_points))
+            );
+            const badge = F.injuryBadge(entry.injury_status);
+            if (badge) item.appendChild(el("span", "roster__injury", badge));
+            els.freeAgents.appendChild(item);
+        });
+
+        const week = payload.week === 0 ? "season-long" : `week ${payload.week}`;
+        els.freeAgentsNote.textContent = [
+            `${payload.rostered} players rostered`,
+            `${week} PPR projections`,
+            // The exclusion is only as fresh as the last league sync, and a
+            // stale claim here is the difference between a waiver and a laugh.
+            `rosters ${F.formatAsOf(payload.roster_as_of) || "unknown"}`,
+        ].join(" · ");
+    }
+
     async function loadTeam() {
         const generation = state.generation;
         const params = new URLSearchParams();
@@ -819,7 +901,7 @@
             // instead of boards that have nothing in them yet.
             els.leagueSections.classList.toggle("is-preseason", overview.mode === "preseason");
 
-            await Promise.all([loadPowerRankings(), loadScoreboard()]);
+            await Promise.all([loadPowerRankings(), loadScoreboard(), loadFreeAgents()]);
             applyRoute();
         } catch (error) {
             if (!stale(generation)) handleFailure(error);

@@ -25,6 +25,7 @@ from app.database import (
     FantasyPlayer,
     FantasyPlayerStat,
     FantasyRanking,
+    FantasyTrendingSnapshot,
     iso_utc,
 )
 from app.services import fantasy_data
@@ -1006,6 +1007,142 @@ def get_team_lineup(
         # confidently wrong.
         "unprojected_starters": unprojected_starters,
         "unfilled_slots": max(0, len(slots) - len(optimal)),
+    }
+
+
+# A waiver list is only worth reading if it is deep enough to reach past the
+# rostered players; the pool is filtered after the rankings are read, so the
+# read has to be wider than the page it serves.
+FREE_AGENT_SCAN = 600
+
+
+def get_free_agents(
+    db: Session,
+    season: Optional[int] = None,
+    scoring: str = "std",
+    limit: int = 40,
+) -> Dict[str, Any]:
+    """Ranked players nobody in this league has rostered.
+
+    This is the one board here that a public fantasy site structurally cannot
+    show: "available" is a fact about twelve specific rosters, and the hub
+    stores all twelve. Trending adds come from Sleeper's whole user base and
+    say what the market is doing; the exclusion says what is actually claimable
+    where it matters.
+
+    Freshness is the honest caveat and it is reported, not hidden: the roster
+    snapshot is as recent as the last league sync, so a player claimed since
+    then still reads as free. A season whose rosters and rankings come from
+    different years answers nothing and says so instead.
+    """
+    season = _require_season(db, season)
+    scoring = normalize_scoring(scoring)
+
+    roster_run = latest_successful_run(db, "league_rosters", season)
+    rostered: set = set()
+    if roster_run is not None:
+        rostered = {
+            row.player_id
+            for row in db.query(FantasyLeagueRosterEntry.player_id)
+            .filter(
+                FantasyLeagueRosterEntry.run_id == roster_run.id,
+                FantasyLeagueRosterEntry.player_id.isnot(None),
+            )
+            .all()
+            if row.player_id
+        }
+
+    context = fantasy_data.default_context(db)
+    ranking_run = latest_successful_run(
+        db, "rankings", context.get("season"), context.get("week")
+    ) or latest_successful_run(db, "rankings")
+
+    # Same boundary the lineup advice draws: the roster view may enrich a 2024
+    # team with today's player data, but "available in your league" is a claim
+    # about one season and cannot be assembled from two.
+    # Ordered by how fundamental the gap is: with no rankings at all there is
+    # no pool to subtract from, and reporting a season mismatch instead would
+    # send someone looking for the wrong problem.
+    unavailable_reason = None
+    if ranking_run is None:
+        unavailable_reason = "missing_rankings"
+    elif context.get("season") != season:
+        unavailable_reason = "projection_season_mismatch"
+    elif not rostered:
+        # Without a roster snapshot every ranked player would read as
+        # available, which is the opposite of what the board is for.
+        unavailable_reason = "missing_roster_snapshot"
+    if unavailable_reason:
+        return {
+            "available": False,
+            "unavailable_reason": unavailable_reason,
+            "season": season,
+            "week": context.get("week"),
+            "scoring": scoring,
+            "entries": [],
+            "rostered": len(rostered),
+            "roster_as_of": _iso(roster_run.finished_at) if roster_run else None,
+            "as_of": _iso(ranking_run.finished_at) if ranking_run else None,
+        }
+
+    rows = (
+        db.query(FantasyRanking)
+        .filter(
+            FantasyRanking.run_id == ranking_run.id,
+            FantasyRanking.scoring == scoring,
+            FantasyRanking.position == "ALL",
+        )
+        .order_by(FantasyRanking.rank.asc())
+        .limit(FREE_AGENT_SCAN)
+        .all()
+    )
+    available = [row for row in rows if row.player_id not in rostered][:limit]
+
+    players = {
+        player.player_id: player
+        for player in db.query(FantasyPlayer)
+        .filter(FantasyPlayer.player_id.in_([row.player_id for row in available]))
+        .all()
+    } if available else {}
+
+    trending = {}
+    trending_run = latest_successful_run(db, "trending")
+    if trending_run is not None and available:
+        trending = {
+            row.player_id: row.count
+            for row in db.query(FantasyTrendingSnapshot)
+            .filter(
+                FantasyTrendingSnapshot.run_id == trending_run.id,
+                FantasyTrendingSnapshot.kind == "add",
+            )
+            .all()
+        }
+
+    entries = []
+    for row in available:
+        player = players.get(row.player_id)
+        entry = fantasy_data._player_public(player)
+        entry.update(
+            {
+                "rank": row.rank,
+                "projected_points": row.ecr,
+                # Sleeper adds across every league it hosts. Not a
+                # recommendation — a note on how contested the pickup is.
+                "trending_adds": trending.get(row.player_id),
+            }
+        )
+        entries.append(entry)
+
+    return {
+        "available": True,
+        "unavailable_reason": None,
+        "season": season,
+        "week": context.get("week"),
+        "scoring": scoring,
+        "entries": entries,
+        "rostered": len(rostered),
+        "roster_as_of": _iso(roster_run.finished_at) if roster_run else None,
+        "as_of": _iso(ranking_run.finished_at),
     }
 
 

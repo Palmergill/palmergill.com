@@ -217,6 +217,8 @@ and weights but fixed five defects, each locked by a regression test:
   isolation, digest-cached team overviews, no-key template, specs and live QA.
 - **P5 — Start/sit (Sep 2026, ~0.5 wk):** `GET /teams/{id}/lineup` and the card
   above the roster.
+- **P6 — Free agents (Sep 2026, ~0.3 wk):** `GET /free-agents` and the league
+  board that subtracts the league's own rosters from the ranked pool.
 
 ## Amendments
 
@@ -246,3 +248,25 @@ and weights but fixed five defects, each locked by a regression test:
   but that enrichment cannot become current-week advice for a past team. The
   card is fetched alongside the roster and fails independently: it is the one
   part of the page that can be missing without the page being broken.
+
+- **Sep 2026 — free agents.** Every waiver list on the internet ranks the
+  player pool; the only version of the question anybody asks is "who can I
+  actually get". That is a fact about these twelve rosters, and the hub stores
+  all twelve, so `GET /api/fantasy/league/free-agents` is a set difference:
+  the derived rankings for the week, minus every player on a roster in the
+  latest `league_rosters` snapshot. Sleeper's add counts ride along as a
+  measure of how contested a pickup is — the market's opinion, not a
+  recommendation, and blank rather than zero when nobody is adding him.
+
+  The board inherits the start/sit boundary and its reasons vocabulary
+  (`available` / `unavailable_reason`): no rankings, a league season that does
+  not match the projection season, or no roster snapshot to subtract all mean
+  there is no claim to make, and the board hides rather than printing a list
+  that would read as "nobody is rostered". The reasons are ordered by how
+  fundamental the gap is, so an empty database reports missing rankings rather
+  than sending someone after a season mismatch.
+
+  Staleness is the load-bearing caveat and is printed, not hidden: the
+  exclusion is only as fresh as the last league sync, so the note carries the
+  roster timestamp beside the count. A player claimed an hour ago still reads
+  as free, and the board says when it last looked.

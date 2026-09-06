@@ -248,6 +248,20 @@
         return short[normalized] || normalized.charAt(0);
     }
 
+    // "4.2k" — an add count is a magnitude, and five digits of it crowds out
+    // the player's name on a phone.
+    function compactCount(value) {
+        if (value === null || value === undefined) return "";
+        const count = Number(value);
+        if (!Number.isFinite(count)) return "";
+        if (Math.abs(count) < 1000) return String(Math.round(count));
+        const thousands = count / 1000;
+        const rounded = Math.abs(thousands) >= 10
+            ? Math.round(thousands)
+            : Math.round(thousands * 10) / 10;
+        return `${rounded}k`;
+    }
+
     return {
         ALGORITHM_LABELS,
         SLOT_ORDER,
@@ -273,5 +287,6 @@
         powerBar,
         sparkline,
         injuryBadge,
+        compactCount,
     };
 });

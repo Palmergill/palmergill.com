@@ -27,6 +27,7 @@ from app.database import (
     FantasyProjection,
     FantasyPropSnapshot,
     FantasyRanking,
+    FantasyTrendingSnapshot,
     SessionLocal,
     utc_now,
 )
@@ -53,6 +54,7 @@ LEAGUE_MODELS = (
     FantasyPlayerStat,
     FantasyProjection,
     FantasyRanking,
+    FantasyTrendingSnapshot,
     FantasyCollectionRun,
     FantasyPlayer,
     FantasyMeta,
@@ -68,6 +70,7 @@ LEAGUE_ROUTES = (
     "/api/fantasy/league/scoreboard",
     "/api/fantasy/league/teams/1",
     "/api/fantasy/league/teams/1/roster",
+    "/api/fantasy/league/free-agents",
     "/api/fantasy/league/teams/1/lineup",
     "/api/fantasy/league/teams/1/overview",
 )
@@ -861,3 +864,166 @@ def test_lineup_is_unavailable_when_roster_and_projection_seasons_differ(
 def test_lineup_404s_for_a_team_the_league_does_not_have(seeded_db):
     response = member_client().get("/api/fantasy/league/teams/99/lineup")
     assert response.status_code == 404
+
+
+# ── free agents ─────────────────────────────────────────────────────────────
+#
+# "Available" is a fact about these twelve rosters, which is the one thing a
+# public fantasy site cannot compute. The tests are about the subtraction and
+# about what happens when either half of it is missing.
+
+
+def _seed_free_agent_pool(
+    session, ranked, rostered_ids, season=2024, week=2, ranking_season=None
+):
+    """A ranked pool, and a roster snapshot claiming part of it."""
+    run = FantasyCollectionRun(
+        job="rankings",
+        source="derived",
+        season=ranking_season if ranking_season is not None else season,
+        week=week,
+        status="success",
+        finished_at=utc_now(),
+    )
+    session.add(run)
+    session.flush()
+    for rank, (player_id, name, position, points) in enumerate(ranked, start=1):
+        session.add(
+            FantasyPlayer(
+                player_id=player_id, full_name=name, position=position, team="SF"
+            )
+        )
+        session.add(
+            FantasyRanking(
+                run_id=run.id,
+                season=ranking_season if ranking_season is not None else season,
+                week=week,
+                source="derived",
+                scoring="std",
+                position="ALL",
+                player_id=player_id,
+                rank=rank,
+                ecr=points,
+            )
+        )
+
+    roster_run = latest_run(session, "league_rosters", season)
+    for player_id in rostered_ids:
+        session.add(
+            FantasyLeagueRosterEntry(
+                run_id=roster_run.id,
+                season=season,
+                scoring_period=week,
+                espn_team_id=1,
+                player_id=player_id,
+                lineup_slot="BENCH",
+                position="RB",
+            )
+        )
+    session.commit()
+
+
+def latest_run(session, job, season):
+    return (
+        session.query(FantasyCollectionRun)
+        .filter_by(job=job, season=season, status="success")
+        .order_by(FantasyCollectionRun.id.desc())
+        .first()
+    )
+
+
+RANKED_POOL = [
+    ("100", "Rostered Star", "RB", 19.0),
+    ("200", "Free Agent One", "WR", 14.5),
+    ("300", "Rostered Two", "QB", 13.0),
+    ("400", "Free Agent Two", "TE", 8.5),
+]
+
+
+def test_free_agents_exclude_everyone_rostered_in_this_league(seeded_db):
+    _seed_free_agent_pool(seeded_db, RANKED_POOL, ["100", "300"])
+
+    body = member_client().get("/api/fantasy/league/free-agents").json()
+    assert [entry["name"] for entry in body["entries"]] == [
+        "Free Agent One",
+        "Free Agent Two",
+    ]
+    # Ranks are the board's, not the free-agent list's: FA One is the site's
+    # number two overall, and saying "1" would misdescribe him.
+    assert [entry["rank"] for entry in body["entries"]] == [2, 4]
+    assert [entry["projected_points"] for entry in body["entries"]] == [14.5, 8.5]
+    assert body["available"] is True
+    assert body["rostered"] == 2
+    assert body["roster_as_of"] is not None
+
+
+def test_free_agents_carry_sleeper_add_counts_where_there_are_any(seeded_db):
+    _seed_free_agent_pool(seeded_db, RANKED_POOL, ["100"])
+    run = FantasyCollectionRun(
+        job="trending", source="sleeper", status="success", finished_at=utc_now()
+    )
+    seeded_db.add(run)
+    seeded_db.flush()
+    seeded_db.add(
+        FantasyTrendingSnapshot(run_id=run.id, kind="add", player_id="200", count=4200)
+    )
+    seeded_db.commit()
+
+    entries = member_client().get("/api/fantasy/league/free-agents").json()["entries"]
+    by_name = {entry["name"]: entry for entry in entries}
+    assert by_name["Free Agent One"]["trending_adds"] == 4200
+    # Nobody is adding him; that is a blank, not a zero.
+    assert by_name["Free Agent Two"]["trending_adds"] is None
+
+
+def test_free_agents_respect_the_requested_limit(seeded_db):
+    _seed_free_agent_pool(seeded_db, RANKED_POOL, ["100"])
+
+    body = member_client().get("/api/fantasy/league/free-agents?limit=1").json()
+    assert [entry["name"] for entry in body["entries"]] == ["Free Agent One"]
+
+
+def test_free_agents_make_no_claim_without_a_roster_snapshot(seeded_db):
+    # Rankings but nothing rostered: every player would read as available,
+    # which is a claim the data does not support.
+    _seed_free_agent_pool(seeded_db, RANKED_POOL, [])
+
+    body = member_client().get("/api/fantasy/league/free-agents").json()
+    assert body["available"] is False
+    assert body["unavailable_reason"] == "missing_roster_snapshot"
+    assert body["entries"] == []
+    assert body["rostered"] == 0
+
+
+def test_free_agents_refuse_to_mix_a_past_season_with_current_rankings(seeded_db):
+    # Browsing 2024 while the site's newest rankings are 2026: the roster view
+    # may still enrich players with today's data, but "available in your
+    # league" cannot be assembled from two different years.
+    _seed_free_agent_pool(seeded_db, RANKED_POOL, ["100"], ranking_season=2026)
+
+    body = member_client().get("/api/fantasy/league/free-agents").json()
+    assert body["available"] is False
+    assert body["unavailable_reason"] == "projection_season_mismatch"
+    assert body["entries"] == []
+
+
+def test_free_agents_are_empty_without_a_rankings_run(seeded_db):
+    roster_run = latest_run(seeded_db, "league_rosters", 2024)
+    seeded_db.add(
+        FantasyLeagueRosterEntry(
+            run_id=roster_run.id,
+            season=2024,
+            scoring_period=2,
+            espn_team_id=1,
+            player_id="100",
+            lineup_slot="BENCH",
+            position="RB",
+        )
+    )
+    seeded_db.commit()
+
+    body = member_client().get("/api/fantasy/league/free-agents").json()
+    assert body["available"] is False
+    assert body["unavailable_reason"] == "missing_rankings"
+    assert body["entries"] == []
+    assert body["rostered"] == 1

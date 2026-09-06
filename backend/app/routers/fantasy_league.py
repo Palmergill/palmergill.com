@@ -184,6 +184,23 @@ def team_roster(
         raise HTTPException(status_code=404, detail=str(exc))
 
 
+@router.get("/free-agents")
+def free_agents(
+    season: Optional[int] = None,
+    scoring: str = Query("std", pattern="^(ppr|half|half_ppr|half-ppr|std|standard)$"),
+    limit: int = Query(40, ge=1, le=150),
+    _: Dict[str, Any] = Depends(require_member),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """Ranked players no team in this league has rostered."""
+    try:
+        return fantasy_league_data.get_free_agents(
+            db, season=season, scoring=scoring, limit=limit
+        )
+    except UnknownSeasonError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+
+
 @router.get("/teams/{team_id}/lineup")
 def team_lineup(
     team_id: int,

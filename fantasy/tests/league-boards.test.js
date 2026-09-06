@@ -1,9 +1,12 @@
 /**
- * The start/sit card on a league team page.
+ * The two boards that turn the league hub from a mirror of ESPN into
+ * something worth opening on a Sunday: start/sit on a team page, and the
+ * free-agent list on the league page.
  *
- * The assignment itself is the backend's (and is proven against brute force
- * there); what matters here is that the card states a decision a person can
- * act on, and stays quiet when it has nothing trustworthy to say.
+ * The arithmetic behind both is the backend's (and the lineup assignment is
+ * proven against brute force there); what matters here is that each states a
+ * decision a person can act on, and stays quiet when it has nothing
+ * trustworthy to say.
  */
 const fs = require("fs");
 const path = require("path");
@@ -86,6 +89,7 @@ function routes(overrides = {}) {
         "/standings": { season: 2026, divisions: [], teams: [] },
         "/power-rankings": { season: 2026, week: 2, available_weeks: [1, 2], rankings: [] },
         "/scoreboard": { season: 2026, week: 2, available_weeks: [1, 2], matchups: [] },
+        "/free-agents": { available: false, unavailable_reason: "missing_roster_snapshot", season: 2026, week: 2, entries: [], rostered: 0, roster_as_of: null },
         ...overrides,
     };
 }
@@ -245,5 +249,110 @@ describe("start/sit card", () => {
 
         expect(card().hidden).toBe(true);
         expect(document.getElementById("errorBanner").hidden).toBe(true);
+    });
+});
+
+describe("free agents", () => {
+    afterEach(() => {
+        document.body.innerHTML = "";
+        jest.restoreAllMocks();
+    });
+
+    const agents = () => [...document.querySelectorAll("#freeAgents .free-agent")];
+    const note = () => document.getElementById("freeAgentsNote").textContent;
+
+    const POOL = {
+        available: true,
+        unavailable_reason: null,
+        season: 2026,
+        week: 2,
+        scoring: "ppr",
+        rostered: 154,
+        roster_as_of: "2026-09-16T12:00:00Z",
+        as_of: "2026-09-16T11:00:00Z",
+        entries: [
+            { player_id: "200", name: "Free Agent One", position: "WR", team: "SF", rank: 42, projected_points: 11.4, trending_adds: 4200, injury_status: null },
+            { player_id: "400", name: "Free Agent Two", position: "TE", team: "NYG", rank: 61, projected_points: 8.5, trending_adds: null, injury_status: null },
+        ],
+    };
+
+    test("lists who is unrostered, keeping the board's own rank", async () => {
+        boot(routes({ "/free-agents": POOL }));
+        await waitFor(() => agents().length === 2);
+
+        expect(agents().map((row) => row.querySelector(".free-agent__rank").textContent))
+            .toEqual(["#42", "#61"]);
+        expect(agents().map((row) => row.querySelector(".free-agent__name").textContent))
+            .toEqual(["Free Agent One", "Free Agent Two"]);
+        expect(agents().map((row) => row.querySelector(".free-agent__points").textContent))
+            .toEqual(["11.4", "8.5"]);
+    });
+
+    test("flags a contested pickup with Sleeper's add count, compacted", async () => {
+        boot(routes({ "/free-agents": POOL }));
+        await waitFor(() => agents().length === 2);
+
+        const trend = agents()[0].querySelector(".free-agent__trend");
+        expect(trend.textContent).toBe("+4.2k adds");
+        expect(trend.title).toBe("4,200 Sleeper adds in the last day");
+        // Nobody is adding the second one, which is a blank rather than a zero.
+        expect(agents()[1].querySelector(".free-agent__trend")).toBeNull();
+    });
+
+    test("says how stale the exclusion is, because that is the whole claim", async () => {
+        boot(routes({ "/free-agents": POOL }));
+        await waitFor(() => agents().length === 2);
+
+        expect(note()).toContain("154 players rostered");
+        expect(note()).toContain("week 2 PPR projections");
+        expect(note()).toContain("rosters ");
+    });
+
+    test.each([
+        ["no roster snapshot to subtract", "missing_roster_snapshot"],
+        ["rankings from another season", "projection_season_mismatch"],
+    ])("hides the board with %s rather than implying nobody is rostered", async (_label, reason) => {
+        boot(routes({
+            "/free-agents": {
+                available: false,
+                unavailable_reason: reason,
+                season: 2026,
+                week: 2,
+                entries: [],
+                rostered: 0,
+                roster_as_of: null,
+            },
+        }));
+        await waitFor(() => !document.getElementById("leagueView").hidden);
+        await waitFor(() => document.querySelector('[data-board="free-agents"]').hidden);
+
+        expect(document.querySelector('[data-board="free-agents"]').hidden).toBe(true);
+        expect(agents()).toHaveLength(0);
+    });
+
+    test("a league where everyone is rostered says that, not nothing", async () => {
+        boot(routes({
+            "/free-agents": {
+                available: true,
+                unavailable_reason: null,
+                season: 2026,
+                week: 2,
+                entries: [],
+                rostered: 300,
+                roster_as_of: POOL.roster_as_of,
+            },
+        }));
+        await waitFor(() => document.querySelector("#freeAgents .empty-note") !== null);
+
+        expect(document.querySelector('[data-board="free-agents"]').hidden).toBe(false);
+        expect(document.querySelector("#freeAgents .empty-note").textContent)
+            .toBe("Every ranked player is on a roster.");
+    });
+
+    test("a failed read says so rather than showing an empty waiver wire", async () => {
+        boot(routes({ "/free-agents": response({}, 500) }));
+        await waitFor(() => note() === "Unavailable right now.");
+
+        expect(agents()).toHaveLength(0);
     });
 });
