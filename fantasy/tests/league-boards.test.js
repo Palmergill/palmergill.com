@@ -90,6 +90,7 @@ function routes(overrides = {}) {
         "/power-rankings": { season: 2026, week: 2, available_weeks: [1, 2], rankings: [] },
         "/scoreboard": { season: 2026, week: 2, available_weeks: [1, 2], matchups: [] },
         "/free-agents": { available: false, unavailable_reason: "missing_roster_snapshot", season: 2026, week: 2, entries: [], rostered: 0, roster_as_of: null },
+        "/me": { season: 2026, status: "unconfigured", selected_team_id: null, teams: [], snapshot: null },
         ...overrides,
     };
 }
@@ -354,5 +355,75 @@ describe("free agents", () => {
         await waitFor(() => note() === "Unavailable right now.");
 
         expect(agents()).toHaveLength(0);
+    });
+});
+
+describe("your team strip", () => {
+    afterEach(() => {
+        document.body.innerHTML = "";
+        jest.restoreAllMocks();
+    });
+
+    const strip = () => document.getElementById("myTeamStrip");
+    const advice = () => document.getElementById("myTeamAdvice");
+
+    const CONFIGURED_ME = {
+        season: 2026,
+        status: "configured",
+        selected_team_id: 1,
+        teams: [{ espn_team_id: 1, name: "Test Team" }],
+        snapshot: {
+            team: { espn_team_id: 1, name: "Test Team" },
+            record: { wins: 1, losses: 0, ties: 0 },
+            opponent: { name: "Rivals" },
+            power_rank: 3,
+        },
+    };
+
+    test("names your team, and links into it", async () => {
+        boot(routes({ "/me": CONFIGURED_ME }));
+        await waitFor(() => !strip().hidden);
+
+        const name = document.getElementById("myTeamName");
+        expect(name.textContent).toBe("Test Team");
+        expect(name.getAttribute("href")).toBe("/fantasy/league/?season=2026&team=1");
+        expect(document.getElementById("myTeamMeta").textContent).toBe("1-0 · vs Rivals · Power #3");
+    });
+
+    test("leads with what the lineup is leaving on the bench", async () => {
+        boot(routes({ "/me": CONFIGURED_ME }));
+        await waitFor(() => !advice().hidden);
+
+        expect(advice().textContent).toBe("Your lineup leaves 9.0 on the bench →");
+        expect(advice().getAttribute("href")).toBe("/fantasy/league/?season=2026&team=1");
+    });
+
+    test("says so when the lineup is already the best one", async () => {
+        boot(routes({
+            "/me": CONFIGURED_ME,
+            "/teams/1/lineup": lineup({ gain: 0, swaps: [], starts: [], sits: [] }),
+        }));
+        await waitFor(() => !advice().hidden);
+
+        expect(advice().textContent).toBe("Your lineup is the best one available →");
+    });
+
+    test("keeps the shortcut but drops the advice when there is none to give", async () => {
+        boot(routes({
+            "/me": CONFIGURED_ME,
+            "/teams/1/lineup": lineup({ available: false, unavailable_reason: "projection_season_mismatch", gain: null }),
+        }));
+        await waitFor(() => !strip().hidden);
+        await waitFor(() => advice().hidden);
+
+        expect(document.getElementById("myTeamName").textContent).toBe("Test Team");
+    });
+
+    test("stays hidden for a member who has not picked a team", async () => {
+        boot(routes());
+        await waitFor(() => !document.getElementById("leagueView").hidden);
+        await new Promise((resolve) => setTimeout(resolve, 0));
+
+        expect(strip().hidden).toBe(true);
     });
 });

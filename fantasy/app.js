@@ -80,6 +80,7 @@
         memberMetrics: document.getElementById("memberMetrics"),
         chooseTeam: document.getElementById("chooseTeam"),
         teamSelect: document.getElementById("teamSelect"),
+        leagueFreeAgentsLink: document.getElementById("leagueFreeAgentsLink"),
         trendingAdd: document.getElementById("trendingAdd"),
         trendingDrop: document.getElementById("trendingDrop"),
         gamesSection: document.getElementById("gamesSection"),
@@ -627,7 +628,7 @@
             els.seasonFantasyLeaders.innerHTML = "";
             els.seasonFantasyNote.textContent = "";
             // This board is the page now, so its failure is the page's.
-            showError("Could not load the market board.");
+            showError("Could not load the implied-value board.");
         }
     }
 
@@ -840,7 +841,7 @@
             // The week board names itself as it renders, once it knows whether
             // the week it is showing has been played.
             if (els.marketBoardEyebrow) els.marketBoardEyebrow.textContent = "Season board";
-            if (els.marketBoardTitle) els.marketBoardTitle.textContent = "Market Value";
+            if (els.marketBoardTitle) els.marketBoardTitle.textContent = "Implied Value";
         }
         if (els.marketTableWrap) els.marketTableWrap.hidden = week;
         if (els.weekBoardWrap) els.weekBoardWrap.hidden = !week;
@@ -1237,7 +1238,7 @@
         cell.colSpan = 8;
         cell.textContent = total
             ? `No ${position} has a complete yardage and touchdown market pair yet.`
-            : "No season markets have been collected yet. The research panels below and your league tools still work.";
+            : "No betting lines have been collected yet. The research panels below and your league tools still work.";
         row.appendChild(cell);
         els.seasonFantasyLeaders.appendChild(row);
     }
@@ -1407,10 +1408,14 @@
             els.memberMetrics.innerHTML = "";
             els.chooseTeam.hidden = true;
             els.teamSelect.hidden = true;
+            if (els.leagueFreeAgentsLink) els.leagueFreeAgentsLink.hidden = true;
         }
     }
 
     function renderMemberSnapshot(data) {
+        // The free-agent board is members-only, and "free in your league" is
+        // not a claim that means anything to a visitor without one.
+        if (els.leagueFreeAgentsLink) els.leagueFreeAgentsLink.hidden = false;
         els.teamSelect.innerHTML = "";
         els.teamSelect.appendChild(new Option("Choose your team", ""));
         (data.teams || []).forEach((team) => {
@@ -1427,7 +1432,15 @@
         const snapshot = data.snapshot;
         const team = snapshot.team || {};
         els.memberStatus.textContent = team.owner_name || "Your team";
-        els.memberTeam.textContent = team.name || team.abbrev || "Team";
+        // The most personal thing on the page used to be static text, while
+        // the start/sit advice about this exact team sat three clicks away.
+        // The hub routes on ?team= already, so this is the whole shortcut.
+        els.memberTeam.replaceChildren();
+        const teamLink = el("a", "hero-snapshot__team", team.name || team.abbrev || "Team");
+        teamLink.href = `/fantasy/league/?season=${encodeURIComponent(state.season)}` +
+            `&team=${encodeURIComponent(data.selected_team_id)}`;
+        teamLink.title = "Open your team in the league hub";
+        els.memberTeam.appendChild(teamLink);
         els.memberMetrics.innerHTML = "";
         const record = snapshot.record || {};
         const values = [
@@ -2109,6 +2122,19 @@
         }
     }
 
+    // Fourth & Fortune is a draft-night tool. Once the season starts it is a
+    // curiosity, and it should stop sitting level with the two tools somebody
+    // opens every week; before the draft it is the reason to be here at all.
+    function renderToolGrid() {
+        const draft = document.querySelector(".tool-card--draft");
+        if (!draft) return;
+        const inSeason = !!state.inSeason;
+        draft.classList.toggle("tool-card--quiet", inSeason);
+        draft.classList.toggle("tool-card--lead", !inSeason);
+        const hint = draft.querySelector("small");
+        if (hint) hint.textContent = inSeason ? "Next draft" : "Draft night";
+    }
+
     function renderHeader(data) {
         state.inSeason = !!data.in_season;
         state.defaultWeek = data.default_week != null ? data.default_week : data.week;
@@ -2118,6 +2144,7 @@
             state.week = state.defaultWeek;
         }
         renderWeekBadge();
+        renderToolGrid();
         // Re-applies ?board=week now that there is a week to apply it to, and
         // falls back to the season board when there is not.
         setBoardMode(state.boardMode);

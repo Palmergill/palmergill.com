@@ -270,3 +270,15 @@ and weights but fixed five defects, each locked by a regression test:
   exclusion is only as fresh as the last league sync, so the note carries the
   roster timestamp beside the count. A player claimed an hour ago still reads
   as free, and the board says when it last looked.
+
+- **Sep 2026 — your team, first.** The hub knew all twelve teams and not which
+  one was yours: start/sit is advice about one specific roster, and it was
+  reachable only by recognising your own name in the Teams grid. The landing
+  page now opens with a strip naming your team, its record, this week's
+  opponent and power rank, and what the lineup is leaving on the bench —
+  linking into the team page for the detail. It reuses `GET /league/me`, which
+  already stored the account → team mapping for the dashboard hero, plus the
+  P5 lineup read; no new endpoint. The advice line follows the same rule as the
+  card it summarises: when the lineup payload is `available: false`, the strip
+  keeps the shortcut and drops the claim. The free-agent board also carries an
+  `id`, so the dashboard's Waiver Pulse can link straight to it.

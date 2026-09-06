@@ -1,6 +1,12 @@
 /* Personal ranking boards (spec 18) — warm light theme, reusing the shared
    tokens defined in /shared/site-nav.css (--bg, --card, --ink, --sage, etc.). */
 
+/* The hidden attribute has to beat any display rule below it. Without this a
+   class like .button (display: inline-flex) silently overrides `hidden`, and
+   the element stays on screen while every test that checks `el.hidden` passes.
+   fantasy/draft-order/style.css has carried this line for the same reason. */
+[hidden] { display: none !important; }
+
 body {
     margin: 0;
     background: var(--bg, #faf6f0);

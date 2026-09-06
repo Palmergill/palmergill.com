@@ -13,10 +13,12 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/shared/site-nav.css?v=13">
-    <link rel="stylesheet" href="style.css?v=4">
+    <link rel="stylesheet" href="/shared/fantasy-header.css?v=1">
+    <link rel="stylesheet" href="style.css?v=6">
 </head>
 <body>
     <main class="app-shell">
+        <div id="fantasy-header-mount"></div>
         <header class="page-head">
             <div class="page-head__titles">
                 <span class="eyebrow">Private league</span>
@@ -113,6 +115,17 @@
             </section>
 
             <div id="leagueSections">
+                <!-- Your own team, first: the hub knew every team except which
+                     one was yours, so the advice about it was three clicks in. -->
+                <section class="my-team" id="myTeamStrip" hidden aria-labelledby="myTeamLabel">
+                    <div class="my-team__identity">
+                        <span class="my-team__label" id="myTeamLabel">Your team</span>
+                        <a class="my-team__name" id="myTeamName" href="/fantasy/league/"></a>
+                        <span class="my-team__meta" id="myTeamMeta"></span>
+                    </div>
+                    <a class="my-team__advice" id="myTeamAdvice" href="/fantasy/league/" hidden></a>
+                </section>
+
                 <section class="board" data-board="standings" aria-labelledby="standingsTitle">
                     <div class="board__head">
                         <h2 id="standingsTitle">Standings</h2>
@@ -149,7 +162,7 @@
 
                 <!-- Who is actually claimable here, which is a fact about
                      these rosters rather than about the player pool. -->
-                <section class="board" data-board="free-agents" aria-labelledby="freeAgentsTitle">
+                <section class="board" id="free-agents" data-board="free-agents" aria-labelledby="freeAgentsTitle">
                     <div class="board__head">
                         <h2 id="freeAgentsTitle">Free agents</h2>
                         <span class="board__note" id="freeAgentsNote"></span>
@@ -188,10 +201,12 @@
     </main>
 
     <script src="/shared/site-nav.js?v=14"></script>
+    <script src="/shared/fantasy-header.js?v=1"></script>
+    <script>window.FantasyHeader.mount({ page: "league" });</script>
     <script src="/shared/analytics.js?v=1"></script>
     <script src="/shared/api-base.js?v=1"></script>
     <script src="format.js?v=2"></script>
     <script src="/fantasy/chat.js?v=1"></script>
-    <script src="app.js?v=5"></script>
+    <script src="app.js?v=6"></script>
 </body>
 </html>

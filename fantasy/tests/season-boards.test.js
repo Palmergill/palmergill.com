@@ -276,7 +276,7 @@ describe("season board position filter", () => {
         await waitFor(() => document.querySelectorAll("#seasonFantasyLeaders tr").length);
         const cell = document.querySelector("#seasonFantasyLeaders .table-empty");
         expect(cell).not.toBeNull();
-        expect(cell.textContent).toContain("No season markets have been collected");
+        expect(cell.textContent).toContain("No betting lines have been collected");
     });
 
     test("hides the live-markets disclosure when nothing is trading", async () => {
@@ -487,6 +487,61 @@ describe("season board position filter", () => {
         document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
         expect(document.getElementById("marketsDrawer").hidden).toBe(true);
         expect(window.location.search).not.toContain("category=");
+    });
+
+    // The hero is the only place on the public page that knows which team is
+    // yours, and start/sit — advice about that exact roster — lives two pages
+    // away. These pin the shortcuts that connect them.
+
+    const CONFIGURED_ME = {
+        season: 2026,
+        week: 1,
+        scoring: "std",
+        status: "configured",
+        selected_team_id: 7,
+        teams: [{ espn_team_id: 7, name: "Fourth & Twenty" }],
+        snapshot: {
+            team: { espn_team_id: 7, name: "Fourth & Twenty", owner_name: "Palmer" },
+            record: { wins: 1, losses: 0, ties: 0 },
+            opponent: { abbrev: "RIV" },
+            power_rank: 3,
+            starter_projection: 118.4,
+        },
+    };
+
+    test("the hero team name opens your own team in the league hub", async () => {
+        boot(routes({
+            "/state": { default_season: 2026, default_week: 1, season: 2026, week: 1, in_season: true },
+            "/league/me": CONFIGURED_ME,
+        }));
+        await waitFor(() => document.querySelector("#memberTeam a") !== null);
+
+        const link = document.querySelector("#memberTeam a");
+        expect(link.textContent).toBe("Fourth & Twenty");
+        expect(link.getAttribute("href")).toBe("/fantasy/league/?season=2026&team=7");
+    });
+
+    test("members get a way to the free agents they can actually claim", async () => {
+        boot(routes({
+            "/state": { default_season: 2026, default_week: 1, season: 2026, week: 1, in_season: true },
+            "/league/me": CONFIGURED_ME,
+        }));
+        await waitFor(() => !document.getElementById("leagueFreeAgentsLink").hidden);
+
+        const link = document.getElementById("leagueFreeAgentsLink");
+        expect(link.getAttribute("href")).toBe("/fantasy/league/#free-agents");
+    });
+
+    test("a visitor with no league sees no link to a members-only board", async () => {
+        // /league/me 403s for anyone outside the league, which is the same
+        // path a signed-out visitor takes.
+        boot(routes({
+            "/state": { default_season: 2026, default_week: 1, season: 2026, week: 1, in_season: true },
+        }));
+        await waitFor(() => document.getElementById("memberStatus").textContent === "Latest market");
+
+        expect(document.getElementById("leagueFreeAgentsLink").hidden).toBe(true);
+        expect(document.querySelector("#memberTeam a")).toBeNull();
     });
 
     test("renders an unconfigured member hero without explanatory copy", async () => {

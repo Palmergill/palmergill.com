@@ -591,7 +591,7 @@ def test_members_may_ask_about_a_team_by_name(seeded_db, monkeypatch):
     """
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
 
-    refused = fantasy_ai.answer_demo_chat("How is 4th and 20 doing?")
+    refused = fantasy_ai.answer_chat("How is 4th and 20 doing?", league_access=False)
     assert refused["answer"] == fantasy_ai.OUT_OF_SCOPE_ANSWER
 
     allowed = fantasy_ai.answer_chat("How is 4th and 20 doing?", league_access=True)

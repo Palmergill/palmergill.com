@@ -1,6 +1,12 @@
 /* League hub. Consumes the shared tokens from /shared/site-nav.css with
    fallbacks so the page still renders standalone. Warm theme only. */
 
+/* The hidden attribute has to beat any display rule below it. Without this a
+   class like .button (display: inline-flex) silently overrides `hidden`, and
+   the element stays on screen while every test that checks `el.hidden` passes.
+   fantasy/draft-order/style.css has carried this line for the same reason. */
+[hidden] { display: none !important; }
+
 * { box-sizing: border-box; }
 
 body {
@@ -568,6 +574,77 @@ button:focus-visible {
     stroke-width: 2;
     stroke-linecap: round;
     stroke-linejoin: round;
+}
+
+/* Your team. The first thing on the league page, because it is the only board
+   here about one specific roster — and the way into the advice about it. */
+.my-team {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px 18px;
+    margin-bottom: 18px;
+    padding: 14px 18px;
+    border: 1px solid var(--line, #ece4d8);
+    border-left: 3px solid var(--sage, #5b7152);
+    border-radius: 14px;
+    background: var(--card, #fff);
+}
+
+.my-team__identity {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 4px 10px;
+    min-width: 0;
+}
+
+.my-team__label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--muted, #928a7d);
+}
+
+.my-team__name {
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--ink, #23201c);
+    text-decoration: none;
+}
+
+.my-team__name:hover,
+.my-team__name:focus-visible {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+}
+
+.my-team__meta {
+    font-size: 12px;
+    color: var(--muted, #928a7d);
+}
+
+.my-team__advice {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--soft, #5d574e);
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+.my-team__advice--gain { color: #3f6d4a; }
+
+.my-team__advice:hover,
+.my-team__advice:focus-visible {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+}
+
+@media (max-width: 620px) {
+    .my-team { padding: 12px 14px; }
+    .my-team__advice { white-space: normal; }
 }
 
 /* Free agents. A ranked list, but the point is the subtraction: these are the

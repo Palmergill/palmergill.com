@@ -46,6 +46,10 @@
         teamsGrid: byId("teamsGrid"),
         freeAgents: byId("freeAgents"),
         freeAgentsNote: byId("freeAgentsNote"),
+        myTeamStrip: byId("myTeamStrip"),
+        myTeamName: byId("myTeamName"),
+        myTeamMeta: byId("myTeamMeta"),
+        myTeamAdvice: byId("myTeamAdvice"),
         teamView: byId("teamView"),
         teamBack: byId("teamBack"),
         teamLogo: byId("teamLogo"),
@@ -727,6 +731,86 @@
         }
     }
 
+    // ── your team ───────────────────────────────────────────────────────
+    //
+    // The hub knew all twelve teams and not which one was yours, so start/sit
+    // — advice about one specific roster — was reachable only by recognising
+    // your own name in the Teams grid. /league/me already stores the mapping
+    // for the dashboard hero; this is the same read, used where the advice is.
+
+    async function loadMyTeam() {
+        const generation = state.generation;
+        const params = new URLSearchParams();
+        if (state.season) params.set("season", state.season);
+        try {
+            const me = await fetchJson(`${API_BASE}/me?${params}`);
+            if (stale(generation)) return;
+            if (me.status !== "configured" || !me.snapshot || !me.selected_team_id) {
+                els.myTeamStrip.hidden = true;
+                return;
+            }
+            renderMyTeam(me);
+            // Advice is a second request and a nice-to-have: the strip is
+            // already useful as a shortcut without it.
+            const lineupParams = new URLSearchParams(params);
+            lineupParams.set("scoring", "ppr");
+            const lineup = await fetchJson(
+                `${API_BASE}/teams/${me.selected_team_id}/lineup?${lineupParams}`
+            ).catch(() => null);
+            if (stale(generation)) return;
+            renderMyTeamAdvice(lineup, me.selected_team_id);
+        } catch (error) {
+            if (!stale(generation)) els.myTeamStrip.hidden = true;
+        }
+    }
+
+    function teamHref(teamId) {
+        const params = new URLSearchParams();
+        if (state.season) params.set("season", state.season);
+        params.set("team", String(teamId));
+        return `/fantasy/league/?${params}`;
+    }
+
+    function renderMyTeam(me) {
+        const snapshot = me.snapshot;
+        const team = snapshot.team || {};
+        els.myTeamStrip.hidden = false;
+        els.myTeamName.textContent = team.name || team.abbrev || "Your team";
+        els.myTeamName.href = teamHref(me.selected_team_id);
+        const record = snapshot.record || {};
+        els.myTeamMeta.textContent = [
+            F.recordLabel(record.wins, record.losses, record.ties),
+            snapshot.is_bye
+                ? "Bye"
+                : snapshot.opponent
+                    ? `vs ${snapshot.opponent.name || snapshot.opponent.abbrev}`
+                    : "",
+            snapshot.power_rank ? `Power #${snapshot.power_rank}` : "",
+        ].filter(Boolean).join(" · ");
+    }
+
+    function renderMyTeamAdvice(lineup, teamId) {
+        // Same rule the start/sit card follows: no advice is better than
+        // advice assembled from a season the projections do not cover.
+        if (!lineup || lineup.available === false || lineup.gain == null) {
+            els.myTeamAdvice.hidden = true;
+            return;
+        }
+        els.myTeamAdvice.hidden = false;
+        els.myTeamAdvice.href = teamHref(teamId);
+        els.myTeamAdvice.textContent = lineup.gain > 0
+            ? `Your lineup leaves ${F.formatPoints(lineup.gain)} on the bench →`
+            : "Your lineup is the best one available →";
+        els.myTeamAdvice.classList.toggle("my-team__advice--gain", lineup.gain > 0);
+    }
+
+    function scrollToRequestedBoard() {
+        const hash = window.location.hash;
+        if (!hash || hash.length < 2) return;
+        const target = document.querySelector(hash);
+        if (target) target.scrollIntoView({ block: "start" });
+    }
+
     // ── free agents ─────────────────────────────────────────────────────
     //
     // Every other waiver list on the internet ranks the player pool. This one
@@ -901,8 +985,16 @@
             // instead of boards that have nothing in them yet.
             els.leagueSections.classList.toggle("is-preseason", overview.mode === "preseason");
 
-            await Promise.all([loadPowerRankings(), loadScoreboard(), loadFreeAgents()]);
+            await Promise.all([
+                loadPowerRankings(),
+                loadScoreboard(),
+                loadFreeAgents(),
+                loadMyTeam(),
+            ]);
             applyRoute();
+            // A cross-link from the dashboard's Waiver Pulse lands on the
+            // free-agent board, which anchors immediately but fills in late.
+            scrollToRequestedBoard();
         } catch (error) {
             if (!stale(generation)) handleFailure(error);
         }

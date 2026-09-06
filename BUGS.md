@@ -13,13 +13,17 @@ Closed items are trimmed quarterly.
 
 ## Low
 
-- [ ] (fantasy API) Three fantasy endpoints have no caller on the site, and two of them were found 500ing only because someone looked: `GET /api/fantasy/trending` (fixed 2026-08-22), `GET /api/fantasy/games/{id}/lines/history` (fixed 2026-08-30), and `POST /api/fantasy/chat`, whose panel moved to the members-only league hub in the dashboard redesign so the demo-mode local router built for spec 16 R16 is now unreachable through the UI. Decide as one question whether these are public API surface worth keeping and testing, or dead code to delete. — found 2026-08-22, widened 2026-08-30
+- [ ] (fantasy API) Two fantasy endpoints have no caller on the site, and both were found 500ing only because someone looked: `GET /api/fantasy/trending` (fixed 2026-08-22) and `GET /api/fantasy/games/{id}/lines/history` (fixed 2026-08-30). Decide whether these are public API surface worth keeping and testing, or dead code to delete. The lines history is the more promising of the two: it holds the movement behind every game line and would give the games strip a sparkline. — found 2026-08-22, widened 2026-08-30, narrowed 2026-09-05
 - [ ] (repo) `fourth-and-fortune-kickoff.html` is a tracked deck at the repository root rather than under a directory; move it under `fantasy/` or `docs/`. — found 2026-08-22
 - [ ] (fantasy) `formatAsOf` is duplicated between `fantasy/format.js` and `fantasy/league/format.js`. Per-page format modules are the deliberate convention (`formatPoints`, `sparkline`, `injuryBadge` are duplicated the same way), so this is only worth revisiting if a genuinely shared module ever appears. — found 2026-08-22
 - [ ] (frontend offline) Chart.js now has SRI, but the CDN script is still unavailable when craps strategy or stock research starts fully offline; vendor the pinned script if first-load offline support becomes a requirement. — found 2026-07-01
 - [ ] (admin analytics) Admin analytics summary endpoints load the full window into Python and aggregate in memory; move counts to SQL `GROUP BY` when traffic makes this slow. — found 2026-07-01
 
 ## Closed
+
+- (fantasy CSS) `hidden` did not hide two elements, because a class setting `display` outranks the UA `[hidden]` rule: `#shareLink` on the rankings board (`.button` is `inline-flex`, so "View shared board" showed on unpublished boards) and the week board's stepper (`.week-step`). Every DOM test asserting `el.hidden === true` passed the whole time; only opening a browser showed it. `fantasy/draft-order/style.css` had carried `[hidden] { display: none !important; }` for the same reason since it was written — the other three fantasy stylesheets now do too, with `fantasy/tests/hidden-guard.test.js` keeping the next one honest. — closed 2026-09-06
+
+- (fantasy API) `POST /api/fantasy/chat` carried a demo-mode branch that no UI could reach: the panel moved to the members-only league hub in the dashboard redesign, and demo mode means anonymous. Deleting the branch alone would have been worse than leaving it — `answer_demo_chat` was the only thing keeping an anonymous caller out of the model — so the route is now member-gated (JSON 403, mirroring `fantasy_league.require_member`) and the demo path is gone. `_answer_with_local_router` stays: it is also the no-key fallback. — closed 2026-09-05
 
 - The 2026-08-30 fantasy review closed three findings (`reviews/2026-08-30-fantasy.md`).
   (1) `GET /api/fantasy/players/search` ordered a substring match over the whole

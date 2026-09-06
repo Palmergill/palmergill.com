@@ -46,6 +46,14 @@ Shared site chrome defaults to the warm light palette defined in
 `shared/site-nav.css`. Casino pages opt into `body.theme-casino` so their
 felt-table surfaces and navigation chrome keep the dark casino treatment.
 
+Two section strips sit below the global nav, mounted by the pages that need
+them: `shared/casino-header.js` under the casino games, and
+`shared/fantasy-header.js` under `/fantasy/rankings/`, `/fantasy/league/` and
+`/fantasy/draft-order/`. Both exist for the same reason — the global nav marks
+one entry current for a whole section, so without a strip the sub-pages have no
+way back to their own landing page and none across to their siblings. Neither
+lobby (`/casino/`, `/fantasy/`) mounts its own strip.
+
 ## Backend
 
 The backend is a FastAPI service in `backend/app`.
@@ -56,7 +64,7 @@ Important routes:
 - `/api/poker/*` (includes the `GET /api/poker/games/{game_id}/ws` WebSocket push channel)
 - `/api/craps/*`
 - `/api/bitcoin/*`
-- `/api/fantasy/*` (public fantasy reads plus account-gated persistent draft rooms)
+- `/api/fantasy/*` (public fantasy reads, account-gated persistent draft rooms, and `POST /api/fantasy/chat`, which is member-gated because it spends model budget per request)
 - `/api/fantasy/league/*` (members-only ESPN league reads and digest-cached team overviews; 403 for anonymous callers)
 - `/api/fantasy/rankings/*` (personal ranking boards; every `/boards` route is account-owned and returns JSON 403 to anonymous callers, 404 for someone else's board — including to the admin)
 - `/api/analytics/*` (public client analytics ingest)

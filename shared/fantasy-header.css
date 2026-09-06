@@ -1,0 +1,87 @@
+/* Shared fantasy section strip, mounted by shared/fantasy-header.js under
+   /fantasy/rankings/, /fantasy/league/ and /fantasy/draft-order/.
+
+   Self-contained on purpose: the three pages define different palette tokens
+   (--fantasy-* on the dashboard, --line/--card/--ink on the others), so every
+   colour here carries its own fallback and the strip looks the same wherever
+   it mounts. */
+.fantasy-header {
+    margin-bottom: 18px;
+}
+
+.fantasy-header__inner {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 16px;
+    padding: 8px 0 12px;
+    border-bottom: 1px solid var(--line, #ece4d8);
+}
+
+.fantasy-header__home {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    color: var(--fantasy-clay, #b86f52);
+    font-size: 0.82rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+.fantasy-header__home:hover,
+.fantasy-header__home:focus-visible {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+}
+
+.fantasy-header__links {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 6px;
+    margin-left: auto;
+}
+
+.fantasy-header__link {
+    padding: 5px 10px;
+    border: 1px solid transparent;
+    border-radius: 999px;
+    color: var(--muted, #928a7d);
+    font-size: 0.78rem;
+    font-weight: 600;
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+.fantasy-header__link:hover,
+.fantasy-header__link:focus-visible {
+    border-color: var(--line, #ece4d8);
+    background: var(--surface, #f3eee5);
+    color: var(--fantasy-forest, #2f4a37);
+}
+
+/* Where you already are: readable, but plainly not somewhere to click. */
+.fantasy-header__link.is-current {
+    background: var(--surface, #f3eee5);
+    color: var(--fantasy-forest, #2f4a37);
+    cursor: default;
+}
+
+@media (max-width: 620px) {
+    .fantasy-header__inner {
+        gap: 8px;
+        padding-bottom: 10px;
+    }
+
+    .fantasy-header__links {
+        width: 100%;
+        margin-left: 0;
+    }
+
+    .fantasy-header__link {
+        padding: 5px 9px;
+        font-size: 0.74rem;
+    }
+}

@@ -1,6 +1,12 @@
 /* Fantasy dashboard — warm light theme, reusing the shared tokens defined in
    /shared/site-nav.css (--bg, --card, --ink, --sage, etc.). */
 
+/* The hidden attribute has to beat any display rule below it. Without this a
+   class like .button (display: inline-flex) silently overrides `hidden`, and
+   the element stays on screen while every test that checks `el.hidden` passes.
+   fantasy/draft-order/style.css has carried this line for the same reason. */
+[hidden] { display: none !important; }
+
 * { box-sizing: border-box; }
 
 .sr-only {
@@ -760,6 +766,10 @@ h1, h2, .drawer__head h2 { font-family: "Libre Caslon Display", Georgia, serif; 
 .hero-snapshot__member { display: flex; flex: 1; flex-direction: column; justify-content: center; align-items: flex-start; min-width: 0; padding: 16px 20px; }
 .hero-snapshot__status { color: var(--fantasy-muted); font-size: .68rem; text-transform: uppercase; letter-spacing: .1em; }
 .hero-snapshot__member > strong { overflow: hidden; max-width: 100%; color: var(--fantasy-forest); font-family: "Libre Caslon Display", Georgia, serif; font-size: 1.35rem; text-overflow: ellipsis; white-space: nowrap; }
+/* The team name is the way into your own team page, so it has to read as a
+   link without breaking the display-serif line it sits on. */
+.hero-snapshot__team { color: inherit; text-decoration: underline; text-decoration-color: rgba(47,74,55,.28); text-underline-offset: 4px; }
+.hero-snapshot__team:hover,.hero-snapshot__team:focus-visible { text-decoration-color: currentColor; }
 .hero-snapshot__metrics { display: flex; flex-wrap: wrap; gap: 7px 14px; margin-top: 5px; color: var(--fantasy-muted); font-size: .75rem; font-variant-numeric: tabular-nums; }
 
 .tool-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 18px 0 26px; }
@@ -808,6 +818,9 @@ h1, h2, .drawer__head h2 { font-family: "Libre Caslon Display", Georgia, serif; 
 .season-fantasy__table .player-link { color: var(--fantasy-forest); font-weight: 700; }
 .value-board__foot { display: flex; justify-content: space-between; align-items: center; gap: 16px; min-height: 48px; padding: 9px 18px; border-top: 1px solid var(--fantasy-line); }
 .season-props__note,.card-note { margin: 0; color: var(--fantasy-muted); font-size: .68rem; }
+/* A rail card's way out to the fuller version of what it is showing. */
+.card-link { display: block; padding: 0 18px 14px; color: var(--fantasy-clay); font-size: .72rem; font-weight: 700; text-decoration: none; }
+.card-link:hover,.card-link:focus-visible { text-decoration: underline; text-underline-offset: 3px; }
 
 .rail-card { overflow: hidden; }
 .movers-toggle { display: flex; gap: 14px; padding: 11px 18px 0; }
@@ -1096,6 +1109,11 @@ button:focus-visible,a:focus-visible,summary:focus-visible,[tabindex]:focus-visi
 .tool-card--rankings .tool-card__mark,
 .tool-card__mark--cards { border-radius: 50%; background: var(--fantasy-forest); color: white; }
 .tool-card--draft .tool-card__mark { color: white; }
+/* Seasonal weighting: the draft game leads before the draft and recedes once
+   games are being played. Reachable either way — just not shouting in October. */
+.tool-card--lead { order: -1; }
+.tool-card--quiet { opacity: .78; }
+.tool-card--quiet:hover,.tool-card--quiet:focus-visible { opacity: 1; }
 .season-offense__detail { color: var(--fantasy-muted); }
 .season-offense__total { color: var(--fantasy-clay); }
 #market-board .col-sort { color: inherit; }

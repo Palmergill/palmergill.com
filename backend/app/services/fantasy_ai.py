@@ -2,8 +2,8 @@
 
 Structurally a clone of bitcoin_ai: OpenAI Responses API via urllib, a
 strict-schema tool loop capped at MAX_TOOL_CALLS, an in-process LRU session
-store, keyword topic-scoping, and a deterministic local router used for the
-demo path and whenever OPENAI_API_KEY is unset.
+store, keyword topic-scoping, and a deterministic local router used whenever
+OPENAI_API_KEY is unset or the model call fails.
 
 The key difference: every tool is a pure read over the local collected data
 (a fresh Session is opened per turn), so the model can never trigger an
@@ -35,10 +35,6 @@ MODEL_TIMEOUT_SECONDS = float(os.getenv("FANTASY_CHAT_MODEL_TIMEOUT_SECONDS", "3
 MAX_TOOL_CALLS = int(os.getenv("FANTASY_CHAT_MAX_TOOL_CALLS", "6"))
 MAX_SESSION_MESSAGES = int(os.getenv("FANTASY_CHAT_MAX_SESSION_MESSAGES", "12"))
 MAX_SESSIONS = int(os.getenv("FANTASY_CHAT_MAX_SESSIONS", "5000"))
-
-DEMO_WARNING = (
-    "Public demo mode answers from the collected data with a local router and does not call the language model."
-)
 
 # LRU session history (per-process only), same shape/eviction as bitcoin_ai.
 _SESSION_MESSAGES: "OrderedDict[str, List[Dict[str, str]]]" = OrderedDict()
@@ -255,7 +251,7 @@ LEAGUE_TOOL_HANDLERS = {
 
 
 def tool_schemas(league_access: bool) -> List[Dict[str, Any]]:
-    """Return the tools visible to this turn; demo turns get no league schema."""
+    """Return the tools visible to this turn; without league access, no league schema."""
     return BASE_TOOL_SCHEMAS + (LEAGUE_TOOL_SCHEMAS if league_access else [])
 
 
@@ -286,20 +282,6 @@ def answer_chat(message: str, session_id: str | None = None, timezone_name: str 
                 fallback["warnings"] = [f"Model response unavailable: {exc}"] + fallback.get("warnings", [])
                 return fallback
         return _answer_with_local_router(db, message, session_id, league_access=league_access)
-    finally:
-        db.close()
-
-
-def answer_demo_chat(message: str, session_id: str | None = None, timezone_name: str | None = None,
-                     level: str | None = None) -> Dict[str, Any]:
-    session_id = session_id or str(uuid.uuid4())
-    db = SessionLocal()
-    try:
-        if not _is_fantasy_related(db, message, league_access=False):
-            return _response(OUT_OF_SCOPE_ANSWER, session_id, [], {}, [DEMO_WARNING])
-        response = _answer_with_local_router(db, message, session_id, league_access=False)
-        response["warnings"] = _unique([DEMO_WARNING] + response.get("warnings", []))
-        return response
     finally:
         db.close()
 
@@ -396,7 +378,7 @@ def _execute_tool(
         return {"error": str(exc)}
 
 
-# ── local router (demo + no-key fallback) ───────────────────────────────
+# ── local router (no-key / model-failure fallback) ──────────────────────
 
 
 def _answer_with_local_router(

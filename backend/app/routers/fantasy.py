@@ -31,6 +31,26 @@ def is_authenticated(request: Request) -> bool:
     return bool(getattr(request.state, "app_auth_authenticated", False))
 
 
+def require_member(request: Request) -> Dict[str, Any]:
+    """Chat is the one route here that spends money, so it is not public.
+
+    Mirrors fantasy_league.require_member, including the JSON 403 rather than
+    a 401: a transport-level rejection carries ``WWW-Authenticate: Basic``,
+    which some browsers turn into a native credential modal on a ``fetch()``.
+
+    Its panel has lived behind the members-only league hub since the dashboard
+    redesign, so this is the gate the UI already implied. Without it, removing
+    the (unreachable) demo branch below would drop anonymous callers straight
+    into the model.
+    """
+    if is_demo_request(request):
+        raise HTTPException(status_code=403, detail="Sign in to use the fantasy assistant.")
+    identity = getattr(request.state, "app_user", None)
+    if not identity:
+        raise HTTPException(status_code=403, detail="Sign in to use the fantasy assistant.")
+    return identity
+
+
 def is_admin(request: Request) -> bool:
     # Member accounts are authenticated but must not trigger collector runs.
     identity = getattr(request.state, "app_user", None)
@@ -298,21 +318,21 @@ def futures(
 
 
 @router.post("/chat", response_model=FantasyChatResponse)
-async def fantasy_chat(http_request: Request, request: FantasyChatRequest):
+async def fantasy_chat(
+    http_request: Request,
+    request: FantasyChatRequest,
+    _: Dict[str, Any] = Depends(require_member),
+):
     # Prefer the cookie over the body so a stolen body token can't be replayed.
     session_id = http_request.cookies.get(FANTASY_SESSION_COOKIE) or request.session_id
 
-    if is_demo_request(http_request):
-        result = await run_blocking(fantasy_ai.answer_demo_chat, request.message, session_id, request.timezone)
-    else:
-        league_access = is_authenticated(http_request) and not is_demo_request(http_request)
-        result = await run_blocking(
-            fantasy_ai.answer_chat,
-            request.message,
-            session_id,
-            request.timezone,
-            league_access=league_access,
-        )
+    result = await run_blocking(
+        fantasy_ai.answer_chat,
+        request.message,
+        session_id,
+        request.timezone,
+        league_access=True,
+    )
 
     cookie_session_id = result["session_id"]
     body = {key: value for key, value in result.items() if key != "session_id"}

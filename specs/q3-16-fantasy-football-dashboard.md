@@ -384,3 +384,38 @@ static mounts in `main.py`, `fantasy/tests` added to jest roots in
   the row says `—` rather than inventing a miss. Positions are limited to
   QB/RB/WR/TE, since nflverse publishes stat lines for punters and returners
   too and they belong to nobody's board.
+
+- **Sep 2026 — flow and vocabulary.** A link-graph check found the section only
+  ran one way: `/fantasy/` linked to all three sub-pages and two of them linked
+  nowhere, while the global nav marks its Fantasy entry `aria-current` on those
+  pages — so the one route back announced itself as somewhere you already were.
+  `shared/fantasy-header.js` now mounts a section strip on the three spokes,
+  mirroring `shared/casino-header.js` in shape and reason. The lobby does not
+  mount it, exactly as `/casino/` does not.
+
+  The hero's member snapshot is now a link into that team's page in the league
+  hub, which is where the start/sit advice about it lives, and Waiver Pulse
+  carries a members-only link to the league's free-agent board — Sleeper's adds
+  are the whole user base's opinion, and the league board is the claimable
+  version of the same question. The tool grid is seasonal: Fourth & Fortune
+  leads before the draft and recedes once games are being played.
+
+  **Vocabulary.** "Market" had come to mean four things on one screen. Now
+  *lines* and *markets* mean real sportsbook markets and nothing else, *implied
+  value* means the points derived from them, and *rankings* is always qualified:
+  Market Value → **Implied Value**, Market Movers → **Value Movers**, Market
+  Freshness → **Source Freshness**, Live Markets → **Betting Lines**, Player
+  markets → **Player Lines**, and the tool card Rankings → **My Rankings**.
+  Element ids, classes and CSS hooks were deliberately left alone (`#market-board`,
+  `marketBoardTitle`): renaming them churns tests and stylesheets for nothing a
+  reader can see.
+
+  **R16 amendment — chat is member-gated.** The spec's demo-mode chat is
+  removed rather than restored. Its panel has lived behind the members-only
+  league hub since the redesign, so the demo branch was unreachable through the
+  UI, and `answer_demo_chat` was the only thing standing between an anonymous
+  `POST /api/fantasy/chat` and a paid model call. Deleting it alone would have
+  opened that door, so the route took a member gate first — a JSON 403
+  mirroring `fantasy_league.require_member`, never a `WWW-Authenticate` 401.
+  `_answer_with_local_router` survives: it is not demo-only, it is also the
+  fallback whenever `OPENAI_API_KEY` is unset or the model call fails.

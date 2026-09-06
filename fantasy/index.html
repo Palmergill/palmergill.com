@@ -34,7 +34,7 @@
             <p id="offseasonBanner" class="banner" hidden></p>
             <p id="errorBanner" class="banner banner--error" role="alert" hidden></p>
             <nav class="tool-grid" aria-label="Fantasy tools">
-                <a class="tool-card tool-card--rankings" href="/fantasy/rankings/"><span class="tool-card__mark" aria-hidden="true">R</span><span><small>Draft board</small><strong>Rankings</strong></span><span aria-hidden="true">↗</span></a>
+                <a class="tool-card tool-card--rankings" href="/fantasy/rankings/"><span class="tool-card__mark" aria-hidden="true">R</span><span><small>Draft board</small><strong>My Rankings</strong></span><span aria-hidden="true">↗</span></a>
             <a class="tool-card tool-card--league" href="/fantasy/league/"><span class="tool-card__mark" aria-hidden="true">L</span><span><small>Members</small><strong>League Hub</strong></span><span aria-hidden="true">↗</span></a>
             <a class="tool-card tool-card--draft" href="/fantasy/draft-order/"><span class="tool-card__mark tool-card__mark--cards" aria-hidden="true">A♠</span><span><small>Draft night</small><strong>Fourth &amp; Fortune</strong></span><span aria-hidden="true">↗</span></a></nav>
             <section class="primary-grid" aria-label="Fantasy market dashboard">
@@ -43,7 +43,7 @@
                         <div>
                             <span class="eyebrow" id="marketBoardEyebrow">Season board</span>
                             <h2 id="marketBoardTitle">
-                                Market Value</h2></div>
+                                Implied Value</h2></div>
                         <div class="player-search market-board__search">
                             <label class="sr-only" for="playerSearch">Search players</label><input id="playerSearch" type="search" class="player-search__input" placeholder="Search player" autocomplete="off" role="combobox" aria-expanded="false" aria-controls="searchResults" aria-autocomplete="list">
                             <ul id="searchResults" class="search-results" role="listbox" hidden></ul>
@@ -58,7 +58,7 @@
                         </div>
                         <div id="seasonFantasyScoring" class="segmented" role="group" aria-label="Scoring"></div>
                         <div id="seasonFantasyPositions" class="chip-row" role="group" aria-label="Position"></div>
-                        <button type="button" class="button button--secondary" id="playerMarkets">Player markets</button></div>
+                        <button type="button" class="button button--secondary" id="playerMarkets">Player lines</button></div>
                     <div class="table-wrap" id="marketTableWrap">
                         <table class="rank-table season-fantasy__table">
                             <thead>
@@ -97,7 +97,7 @@
                             <div>
                                 <span class="eyebrow">7 days</span>
                                 <h2 id="moversTitle">
-                                    Market Movers</h2></div></header>
+                                    Value Movers</h2></div></header>
                         <div class="movers-toggle" role="group" aria-label="Market movers">
                             <button class="is-active" type="button" data-movers="gainers" aria-pressed="true">Risers</button><button type="button" data-movers="fallers" aria-pressed="false">Fallers</button></div>
                         <ol id="marketMovers" class="compact-list">
@@ -123,7 +123,10 @@
                                     Drops</h3>
                                 <ol class="trending__list" id="trendingDrop">
                                     <li class="trending__empty">
-                                        —</li></ol></div></div></article></aside></section>
+                                        —</li></ol></div></div>
+                        <!-- Sleeper's adds are the whole user base's opinion.
+                             League members can see who is actually claimable. -->
+                        <a class="card-link" id="leagueFreeAgentsLink" href="/fantasy/league/#free-agents" hidden>Who's free in your league →</a></article></aside></section>
             <section class="support-grid">
                 <article class="editorial-card season-offenses" aria-labelledby="offensesTitle">
                     <header class="card-head card-head--compact">
@@ -150,14 +153,14 @@
                         <div>
                             <span class="eyebrow">Sources</span>
                             <h2 id="freshnessTitle">
-                                Market Freshness</h2></div></header>
+                                Source Freshness</h2></div></header>
                     <ul id="marketFreshness" class="freshness-list">
                         <li class="empty-row">
                             —</li></ul></article></section>
             <details class="editorial-card disclosure" id="live-markets" hidden>
                 <summary>
                     <h2 class="disclosure__title">
-                        <small>Available now</small>Live Markets</h2>
+                        <small>Available now</small>Betting Lines</h2>
                     <span aria-hidden="true">＋</span></summary>
                 <div class="disclosure__body">
                     <section class="market-group" id="marketGroup" hidden>
@@ -241,11 +244,11 @@
     <div class="drawer drawer--markets" id="marketsDrawer" hidden>
         <div class="drawer__backdrop" id="marketsBackdrop"></div>
         <aside class="drawer__panel drawer__panel--wide" role="dialog" aria-modal="true" aria-labelledby="marketsTitle" tabindex="-1">
-            <button type="button" class="drawer__close" id="marketsClose" aria-label="Close player markets">×</button>
+            <button type="button" class="drawer__close" id="marketsClose" aria-label="Close player lines">×</button>
             <header class="drawer__head">
                 <span class="eyebrow">Raw categories</span>
                 <h2 id="marketsTitle">
-                    Player Markets</h2>
+                    Player Lines</h2>
                 <p class="drawer__sub" id="marketsSub"></p>
             </header>
             <div class="drawer__body">

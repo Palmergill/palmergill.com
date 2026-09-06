@@ -1,5 +1,5 @@
 """Fantasy chat tests: topic guard, local router, tool handlers, the
-model tool-loop (with a stubbed OpenAI call), and demo-mode behavior. No
+model tool-loop (with a stubbed OpenAI call), and the member gate. No
 network and no OpenAI calls.
 """
 import json
@@ -21,13 +21,50 @@ from app.database import (
     FantasyTrendingSnapshot,
     SessionLocal,
 )
-from app.main import app
+from app import accounts
+from app.accounts import ROLE_MEMBER
+from app.main import SESSION_COOKIE_NAME, app, create_app_session_token
 from app.services import fantasy_ai
 from app.services import fantasy_collector as fc
 from app.services import fantasy_tools
 from app.services.fantasy_sleeper import parse_projection_rows
 
 client = TestClient(app)
+
+
+MEMBER_USERNAME = "taylor"
+ADMIN_USERNAME = "palmer"
+ADMIN_PASSWORD = "secret"
+
+
+@pytest.fixture(autouse=True)
+def auth_env(monkeypatch):
+    monkeypatch.setenv("APP_AUTH_USERNAME", ADMIN_USERNAME)
+    monkeypatch.setenv("APP_AUTH_PASSWORD", ADMIN_PASSWORD)
+
+
+def member_client():
+    """Chat costs money, so every turn belongs to a signed-in account.
+
+    A member session is signed with the app password and checked against a
+    live account row, so the account has to exist for the cookie to resolve.
+    """
+    session = SessionLocal()
+    try:
+        user = accounts.get_user(session, MEMBER_USERNAME)
+        if user is None:
+            accounts.create_user(session, MEMBER_USERNAME, "fixture-password-123")
+        elif not user.is_active:
+            user.is_active = True
+            session.commit()
+    finally:
+        session.close()
+    signed_in = TestClient(app)
+    signed_in.cookies.set(
+        SESSION_COOKIE_NAME,
+        create_app_session_token(MEMBER_USERNAME, ADMIN_PASSWORD, role=ROLE_MEMBER),
+    )
+    return signed_in
 
 FF_MODELS = (
     FantasyRanking, FantasyProjection, FantasyTrendingSnapshot, FantasyPlayerStat,
@@ -120,7 +157,7 @@ def test_search_players_tool_clamps_limit(db):
     assert isinstance(result["players"], list)
 
 
-# ── local router (demo / no-key) ────────────────────────────────────────
+# ── local router (no key, or the model failed) ──────────────────────────
 
 
 def test_local_router_answers_rankings(db):
@@ -129,19 +166,21 @@ def test_local_router_answers_rankings(db):
     assert "Bijan Robinson" in result["answer"]
 
 
-def test_demo_chat_never_calls_openai(db, monkeypatch):
-    # If the model path were taken this would blow up; demo must not touch it.
+def test_a_keyless_turn_never_calls_openai(db, monkeypatch):
+    # Without a key the router answers alone; reaching the model here would
+    # be an attempt to spend money the deployment has not configured.
     def _boom(*args, **kwargs):
-        raise AssertionError("demo path must not call the model")
+        raise AssertionError("the keyless path must not call the model")
 
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     monkeypatch.setattr(fantasy_ai, "_openai_response", _boom)
-    result = fantasy_ai.answer_demo_chat("Who are the top WRs?")
-    assert any("demo mode" in w.lower() for w in result["warnings"])
+    result = fantasy_ai.answer_chat("Who are the top WRs?")
     assert result["answer"]
 
 
-def test_out_of_scope_returns_refusal(db):
-    result = fantasy_ai.answer_demo_chat("What's the weather tomorrow?")
+def test_out_of_scope_returns_refusal(db, monkeypatch):
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    result = fantasy_ai.answer_chat("What's the weather tomorrow?")
     assert "fantasy football" in result["answer"].lower()
     assert result["tools_used"] == []
 
@@ -170,8 +209,9 @@ def test_model_loop_executes_tool_then_answers(db, monkeypatch):
     assert "Josh Allen" in result["answer"]
 
 
-def test_demo_chat_has_no_private_league_tool_even_when_asked_directly(db):
-    result = fantasy_ai.answer_demo_chat("Show me the league standings")
+def test_a_turn_without_league_access_has_no_private_league_tool(db, monkeypatch):
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    result = fantasy_ai.answer_chat("Show me the league standings", league_access=False)
     assert all(not name.startswith("get_league_") for name in result["tools_used"])
     assert all(
         not schema["name"].startswith("get_league_")
@@ -186,13 +226,35 @@ def test_demo_chat_has_no_private_league_tool_even_when_asked_directly(db):
 # ── endpoint contract ───────────────────────────────────────────────────
 
 
-def test_chat_endpoint_demo_sets_cookie_and_answers(db):
-    response = client.post("/api/fantasy/chat", json={"message": "top RBs this week"})
+def test_chat_endpoint_answers_a_member_and_sets_the_session_cookie(db):
+    response = member_client().post(
+        "/api/fantasy/chat", json={"message": "top RBs this week"}
+    )
     assert response.status_code == 200
     body = response.json()
     assert "answer" in body and "tools_used" in body
     assert "pg_fantasy_session" in response.cookies
 
 
+def test_chat_endpoint_refuses_anonymous_callers_without_touching_the_model(db, monkeypatch):
+    """The panel has been members-only since the redesign; the route now is too.
+
+    Before this gate the anonymous branch answered from the local router, so
+    deleting that branch without gating the route would have dropped anonymous
+    callers into the model — a public endpoint that spends money per request.
+    """
+    def _boom(*args, **kwargs):
+        raise AssertionError("an anonymous caller must never reach the model")
+
+    monkeypatch.setattr(fantasy_ai, "_openai_response", _boom)
+    response = client.post("/api/fantasy/chat", json={"message": "top RBs this week"})
+
+    assert response.status_code == 403
+    # JSON, never a WWW-Authenticate 401: a challenge makes the browser throw
+    # a native credential modal over a fetch().
+    assert "sign in" in response.json()["detail"].lower()
+    assert "www-authenticate" not in {k.lower() for k in response.headers}
+
+
 def test_chat_endpoint_rejects_empty_message():
-    assert client.post("/api/fantasy/chat", json={"message": ""}).status_code == 422
+    assert member_client().post("/api/fantasy/chat", json={"message": ""}).status_code == 422
