@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Page not found — Palmer Gill</title>
+    <meta name="description" content="That page does not exist on palmergill.com. Jump back to the projects, or pick a tool below.">
+    <meta name="robots" content="noindex">
+    <meta name="theme-color" content="#faf6f0">
+    <link rel="icon" type="image/png" href="/assets/palmer-gill-logo-small.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/shared/site-nav.css?v=14">
+    <style>
+        :root {
+            --radius: 18px;
+            --max: 640px;
+            --sans: "Plus Jakarta Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        html {
+            background: var(--bg);
+            color-scheme: light;
+        }
+
+        body {
+            background: var(--bg);
+            color: var(--ink);
+            font-family: var(--sans);
+            line-height: 1.6;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        main {
+            max-width: var(--max);
+            margin: 0 auto;
+            padding: clamp(3.5rem, 12vh, 7rem) 1.5rem 4rem;
+        }
+
+        .code {
+            font-size: 0.75rem;
+            font-weight: 600;
+            letter-spacing: 0.16em;
+            text-transform: uppercase;
+            color: var(--sage);
+        }
+
+        h1 {
+            margin: 0.6rem 0 0.75rem;
+            font-size: clamp(1.9rem, 5vw, 2.6rem);
+            line-height: 1.15;
+            letter-spacing: -0.02em;
+        }
+
+        .lede {
+            color: var(--soft);
+            font-size: 1.05rem;
+        }
+
+        .paths {
+            margin-top: 2.25rem;
+            border-top: 1px solid var(--line);
+        }
+
+        .paths a {
+            display: flex;
+            align-items: baseline;
+            gap: 0.9rem;
+            padding: 0.95rem 0.25rem;
+            border-bottom: 1px solid var(--line);
+            color: var(--ink);
+            text-decoration: none;
+            transition: background 0.15s ease, padding-left 0.15s ease;
+        }
+
+        .paths a:hover,
+        .paths a:focus-visible {
+            background: var(--sage-soft);
+            padding-left: 0.75rem;
+            outline: none;
+        }
+
+        .paths a:focus-visible { box-shadow: var(--focus-ring); }
+
+        .paths strong { font-weight: 600; }
+
+        .paths span {
+            margin-left: auto;
+            color: var(--muted);
+            font-size: 0.9rem;
+        }
+
+        .back {
+            display: inline-block;
+            margin-top: 2rem;
+            color: var(--sage);
+            font-weight: 600;
+            text-decoration: none;
+        }
+
+        .back:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+    <main>
+        <p class="code">Error 404</p>
+        <h1>That page isn't here.</h1>
+        <p class="lede">The link may be out of date, or the page may have moved. Everything that does exist is one hop away:</p>
+
+        <nav class="paths" aria-label="Popular pages">
+            <a href="/"><strong>Projects</strong> <span>Site home</span></a>
+            <a href="/stock-research/"><strong>Stock Research</strong> <span>Market data</span></a>
+            <a href="/bitcoin-chat/"><strong>Bitcoin Dashboard</strong> <span>Live chain metrics</span></a>
+            <a href="/fantasy/"><strong>Fantasy Football</strong> <span>Implied player value</span></a>
+            <a href="/casino/"><strong>Casino</strong> <span>Table games &amp; strategy</span></a>
+            <a href="/about/"><strong>About</strong> <span>Palmer Gill</span></a>
+        </nav>
+
+        <a class="back" href="/">← Back to projects</a>
+    </main>
+
+    <script src="/shared/site-nav.js?v=15"></script>
+    <script src="/shared/analytics.js?v=1"></script>
+</body>
+</html>

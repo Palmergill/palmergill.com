@@ -47,6 +47,57 @@ body.has-site-nav {
     padding-top: var(--site-nav-height);
 }
 
+/* Shown only when scripts are blocked, so it carries its own colors rather
+   than the theme tokens the casino pages override. */
+.site-noscript {
+    margin: 0;
+    padding: 0.9rem 1.25rem;
+    background: #fdf3d8;
+    border-bottom: 1px solid #e3cf9a;
+    color: #4a3c1c;
+    font-family: "Plus Jakarta Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+    font-size: 0.9rem;
+    line-height: 1.5;
+    text-align: center;
+}
+
+.site-noscript a {
+    color: #6b5218;
+    font-weight: 600;
+}
+
+/* Injected by site-nav.js as the first focusable element on the page. */
+.site-nav__skip {
+    position: fixed;
+    top: 0;
+    left: 50%;
+    z-index: calc(var(--site-nav-z) + 1);
+    transform: translate(-50%, -130%);
+    padding: 0.7rem 1.3rem;
+    border: 1px solid var(--site-nav-line-strong);
+    border-top: none;
+    border-radius: 0 0 10px 10px;
+    background: var(--site-nav-panel-bg);
+    color: var(--site-nav-brand-color);
+    font-family: var(--site-nav-mono);
+    font-size: 0.85rem;
+    font-weight: 600;
+    line-height: 1;
+    text-decoration: none;
+    transition: transform 0.15s ease;
+}
+
+.site-nav__skip:focus {
+    transform: translate(-50%, 0);
+    outline: none;
+    box-shadow: var(--focus-ring);
+}
+
+/* The skip target only takes focus programmatically; no ring needed. */
+[tabindex="-1"]:focus {
+    outline: none;
+}
+
 .site-nav {
     position: fixed;
     inset: 0 0 auto 0;

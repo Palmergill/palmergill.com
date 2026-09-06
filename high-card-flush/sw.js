@@ -13,8 +13,8 @@ const STATIC_ASSETS = [
     '/shared/casino-profile.js?v=3',
     '/shared/casino-header.js?v=2',
     '/shared/analytics.js?v=1',
-    '/shared/site-nav.css?v=13',
-    '/shared/site-nav.js?v=14',
+    '/shared/site-nav.css?v=14',
+    '/shared/site-nav.js?v=15',
     '/casino/high%20card%20flush%20rules%20and%20strategy.txt'
 ];
 

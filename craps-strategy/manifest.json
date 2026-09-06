@@ -1,7 +1,7 @@
 {
   "name": "Craps Strategy Simulator",
   "short_name": "Craps Sim",
-  "description": "Describe a craps strategy in plain English and Monte-Carlo simulate it over 100 trials.",
+  "description": "Describe a craps strategy in plain English and Monte-Carlo simulate it over 1,000 trials.",
   "start_url": "/craps-strategy/",
   "display": "standalone",
   "background_color": "#0a1f12",

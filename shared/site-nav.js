@@ -88,6 +88,24 @@
         document.head.appendChild(icon);
     }
 
+    function ensureSkipLink() {
+        if (document.querySelector(".site-nav__skip")) return;
+
+        // Every page wraps its content in <main> except poker, which uses #app.
+        const target = document.querySelector("main") || document.getElementById("app");
+        if (!target) return;
+
+        if (!target.id) target.id = "main-content";
+        // Without tabindex the browser moves the caret but not keyboard focus.
+        if (!target.hasAttribute("tabindex")) target.setAttribute("tabindex", "-1");
+
+        const skip = document.createElement("a");
+        skip.className = "site-nav__skip";
+        skip.href = `#${target.id}`;
+        skip.textContent = "Skip to content";
+        document.body.prepend(skip);
+    }
+
     function isCurrent(href, matches) {
         if (typeof href === "function") return false;
         const path = window.location.pathname;
@@ -231,6 +249,7 @@
         ].join("");
 
         document.body.prepend(nav);
+        ensureSkipLink();
         ensureFavicon();
         hydrateAuthState(nav);
 
