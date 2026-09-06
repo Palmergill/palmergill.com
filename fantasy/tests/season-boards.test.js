@@ -38,11 +38,11 @@ const PROP_LEADERS = [
 
 /** Leaders for the "implied fantasy points" panel, best first. */
 const FANTASY_LEADERS = [
-    { player: player("Passer One", "QB"), fantasy_points: 380, yard_points: 300, touchdown_points: 80, markets_used: 4, books: ["kalshi"], pairs_used: ["passing", "rushing"], partial_pairs: [], projected_points: 350, projection_delta: 30 },
-    { player: player("Runner One", "RB"), fantasy_points: 250, yard_points: 140, touchdown_points: 110, markets_used: 2, books: [], pairs_used: ["rushing"], partial_pairs: ["receiving"], projected_points: 270, projection_delta: -20 },
-    { player: player("Catcher One", "WR"), fantasy_points: 240, yard_points: 130, touchdown_points: 110, markets_used: 2, books: [], projected_points: 240, projection_delta: 0 },
+    { player: player("Passer One", "QB"), fantasy_points: 380, yard_points: 300, touchdown_points: 80, rushing_points: 90, markets_used: 4, books: ["kalshi"], pairs_used: ["passing", "rushing"], partial_pairs: [], projected_points: 350, projection_delta: 30 },
+    { player: player("Runner One", "RB"), fantasy_points: 250, yard_points: 140, touchdown_points: 110, rushing_points: 250, markets_used: 2, books: [], pairs_used: ["rushing"], partial_pairs: ["receiving"], projected_points: 270, projection_delta: -20 },
+    { player: player("Catcher One", "WR"), fantasy_points: 240, yard_points: 130, touchdown_points: 110, rushing_points: 0, markets_used: 2, books: [], projected_points: 240, projection_delta: 0 },
     // Quoted by the market, absent from the projection feed.
-    { player: player("Runner Two", "RB"), fantasy_points: 200, yard_points: 120, touchdown_points: 80, markets_used: 2, books: [], projected_points: null, projection_delta: null },
+    { player: player("Runner Two", "RB"), fantasy_points: 200, yard_points: 120, touchdown_points: 80, rushing_points: 200, markets_used: 2, books: [], projected_points: null, projection_delta: null },
 ];
 
 function routes(overrides = {}) {
@@ -247,6 +247,19 @@ describe("season board position filter", () => {
         expect(row.slice(-3)).toEqual(["380.0", "350.0", "+30"]);
     });
 
+    test("shows the market-implied rushing contribution for quarterbacks", async () => {
+        boot(routes());
+        await waitFor(() => document.querySelectorAll("#seasonFantasyLeaders tr").length);
+
+        const head = document.querySelector('.col-sort[data-sort="rushing_points"]');
+        const passer = [...document.querySelectorAll("#seasonFantasyLeaders tr")]
+            .find((row) => row.textContent.includes("Passer One"));
+        const rushingIndex = [...head.closest("tr").children].indexOf(head.closest("th"));
+
+        expect(head.textContent).toBe("Rush pts");
+        expect(passer.children[rushingIndex].textContent).toBe("90.0");
+    });
+
     test("a quoted player with no projection keeps his rank and blanks the comparison", async () => {
         boot(routes());
         await waitFor(() => document.querySelectorAll("#seasonFantasyLeaders tr").length);
@@ -261,11 +274,14 @@ describe("season board position filter", () => {
         expect(cells[0]).toBe("4");
     });
 
-    test("marks whether the market sits over or under consensus", async () => {
+    test("labels and marks the difference from the projection", async () => {
         boot(routes());
         await waitFor(() => document.querySelectorAll("#seasonFantasyLeaders tr").length);
         const deltas = [...document.querySelectorAll("#seasonFantasyLeaders .season-fantasy__delta")];
+        const head = document.querySelector('.col-sort[data-sort="projection_delta"]');
 
+        expect(head.textContent).toBe("Diff");
+        expect(head.dataset.mobileLabel).toBe("Diff");
         expect(deltas[0].className).toContain("is-over");
         expect(deltas[1].className).toContain("is-under");
         expect(deltas[0].title).toContain("%");
@@ -318,7 +334,7 @@ describe("season board position filter", () => {
         expect(cols[1].querySelector(".compare-col__proj-value").textContent).toBe("\u2014");
     });
 
-    test("names the projection source in the column header", async () => {
+    test("names every averaged projection source in the column header", async () => {
         boot(routes({
             "/season-fantasy-points": {
                 scoring: "std", sources: [], leaders: FANTASY_LEADERS,
@@ -327,8 +343,9 @@ describe("season board position filter", () => {
         }));
         await waitFor(() => document.querySelectorAll("#seasonFantasyLeaders tr").length);
         const head = document.getElementById("seasonFantasyProjHead");
-        expect(head.textContent).toBe("Consensus");
-        expect(head.title).toContain("espn, sleeper");
+        expect(head.textContent).toBe("ESPN + Sleeper avg");
+        expect(head.dataset.mobileLabel).toBe("ESPN+SLP");
+        expect(head.title).toContain("per-player average across available data from ESPN and Sleeper");
     });
 
     test("a single provider is named, not called a consensus", async () => {
@@ -339,7 +356,10 @@ describe("season board position filter", () => {
             },
         }));
         await waitFor(() => document.querySelectorAll("#seasonFantasyLeaders tr").length);
-        expect(document.getElementById("seasonFantasyProjHead").textContent).toBe("Sleeper");
+        const head = document.getElementById("seasonFantasyProjHead");
+        expect(head.textContent).toBe("Sleeper proj");
+        expect(head.dataset.mobileLabel).toBe("SLP proj");
+        expect(head.title).toContain("from Sleeper");
     });
 
     test("says how many players a PPR board had to hide", async () => {
@@ -487,6 +507,85 @@ describe("season board position filter", () => {
         document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
         expect(document.getElementById("marketsDrawer").hidden).toBe(true);
         expect(window.location.search).not.toContain("category=");
+    });
+
+    // Half PPR is the default because it is the format the league plays, and
+    // because standard scoring makes the Rec column a row of zeros — a
+    // scoring rule that reads exactly like missing data.
+
+    test("the board opens on half PPR", async () => {
+        boot(routes());
+        await waitFor(() => rows("seasonFantasyLeaders").length > 0);
+
+        const pressed = chips("seasonFantasyScoring")
+            .find((chip) => chip.getAttribute("aria-pressed") === "true");
+        expect(pressed.textContent).toBe("Half PPR");
+
+        const asked = window.fetch.mock.calls
+            .map(([url]) => String(url))
+            .filter((url) => url.includes("/season-fantasy-points"));
+        expect(asked.every((url) => url.includes("scoring=half"))).toBe(true);
+        // The default is not worth carrying in the URL; anything else is.
+        expect(window.location.search).not.toContain("scoring=");
+    });
+
+    test("picking another format refetches and says so in the URL", async () => {
+        boot(routes());
+        await waitFor(() => rows("seasonFantasyLeaders").length > 0);
+
+        click("seasonFantasyScoring", "Standard");
+        await waitFor(() =>
+            window.fetch.mock.calls.some(([url]) =>
+                String(url).includes("/season-fantasy-points") && String(url).includes("scoring=std")
+            )
+        );
+
+        expect(window.location.search).toContain("scoring=std");
+    });
+
+    test("standard scoring drops the Rec column instead of showing zeros", async () => {
+        boot(routes());
+        await waitFor(() => rows("seasonFantasyLeaders").length > 0);
+
+        const table = document.querySelector(".season-fantasy__table");
+        const header = () => table.querySelector("th.col-rec");
+        // Half PPR: receptions are worth something, so the column is there.
+        expect(table.classList.contains("hide-rec")).toBe(false);
+        expect(header()).not.toBeNull();
+
+        click("seasonFantasyScoring", "Standard");
+        await waitFor(() => table.classList.contains("hide-rec"));
+
+        // The cells stay in the DOM (the CSS hides them), so the column count
+        // and every nth-child rule the phone layout leans on are unchanged.
+        expect(header().className).toContain("col-rec");
+        expect(rows("seasonFantasyLeaders")[0].querySelectorAll("td")).toHaveLength(9);
+
+        click("seasonFantasyScoring", "PPR");
+        await waitFor(() => !table.classList.contains("hide-rec"));
+    });
+
+    test("a board sorted by Rec does not stay sorted by a column it hides", async () => {
+        document.body.innerHTML = bodySource;
+        window.history.replaceState({}, "", "/fantasy/?sort=reception_points:desc");
+        boot(routes(), { keepUrl: true });
+        await waitFor(() => rows("seasonFantasyLeaders").length > 0);
+
+        click("seasonFantasyScoring", "Standard");
+        await waitFor(() => document.querySelector(".season-fantasy__table").classList.contains("hide-rec"));
+
+        expect(window.location.search).not.toContain("reception_points");
+    });
+
+    test("a ?scoring deep link wins over the default", async () => {
+        document.body.innerHTML = bodySource;
+        window.history.replaceState({}, "", "/fantasy/?scoring=ppr");
+        boot(routes(), { keepUrl: true });
+        await waitFor(() => rows("seasonFantasyLeaders").length > 0);
+
+        const pressed = chips("seasonFantasyScoring")
+            .find((chip) => chip.getAttribute("aria-pressed") === "true");
+        expect(pressed.textContent).toBe("PPR");
     });
 
     // The hero is the only place on the public page that knows which team is

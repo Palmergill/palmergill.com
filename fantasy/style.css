@@ -246,7 +246,7 @@ body.has-site-nav .app-shell {
     line-height: 1.5;
 }
 .season-fantasy__controls .chip-row { margin: 0; }
-.season-fantasy__table { min-width: 640px; }
+.season-fantasy__table { min-width: 700px; }
 .season-leader .season-fantasy__total { color: #e7b95f; font-weight: 700; }
 
 /* A category the market only half quoted, dropped from the total. Set apart
@@ -669,7 +669,7 @@ body.drawer-open { overflow: hidden; }
 
 .compare-col__delta.is-over { color: #3f8f5b; }
 .compare-col__delta.is-under { color: var(--clay, #b96a4b); }
-/* Same marker as the board's Edge column, for the same reason. */
+/* Same marker as the board's Diff column, for the same reason. */
 .compare-col__delta.is-qualified {
     text-decoration: underline dotted currentColor 1.5px;
     text-underline-offset: 3px;
@@ -1025,7 +1025,7 @@ button:focus-visible,a:focus-visible,summary:focus-visible,[tabindex]:focus-visi
     box-shadow: 0 0 0 2px rgba(143, 176, 143, 0.7);
 }
 
-/* The market number and what consensus says about it. */
+/* The market number and how it differs from the adjacent projection. */
 .market-board .season-fantasy__total { color: #e7b95f; font-weight: 700; }
 .season-fantasy__proj { color: #cfd9d0; font-variant-numeric: tabular-nums; }
 
@@ -1118,6 +1118,7 @@ button:focus-visible,a:focus-visible,summary:focus-visible,[tabindex]:focus-visi
 .season-offense__total { color: var(--fantasy-clay); }
 #market-board .col-sort { color: inherit; }
 #market-board .col-sort:hover,#market-board .col-sort.is-sorted { color: var(--fantasy-forest); }
+.season-fantasy__table.hide-rec .col-rec { display: none; }
 #market-board .season-fantasy__total { color: var(--fantasy-gold); }
 #market-board .season-fantasy__proj { color: var(--fantasy-muted); }
 .season-fantasy__delta.is-over { color: #4d775a; }
@@ -1244,21 +1245,21 @@ button:focus-visible,a:focus-visible,summary:focus-visible,[tabindex]:focus-visi
     }
 
     #market-board .season-fantasy__table th:first-child { width: 30px; }
-    #market-board .season-fantasy__table th:nth-child(6) { width: 58px; }
-    #market-board .season-fantasy__table th:nth-child(7) { width: 70px; }
-    #market-board .season-fantasy__table th:nth-child(8) { width: 54px; }
+    #market-board .season-fantasy__table th:nth-child(7) { width: 58px; }
+    #market-board .season-fantasy__table th:nth-child(8) { width: 70px; }
+    #market-board .season-fantasy__table th:nth-child(9) { width: 54px; }
 
-    #market-board .season-fantasy__table th:nth-child(n+6) .col-sort {
+    #market-board .season-fantasy__table th:nth-child(n+7) .col-sort {
         gap: 2px;
         font-size: 0;
     }
 
-    #market-board .season-fantasy__table th:nth-child(n+6) .col-sort::before {
+    #market-board .season-fantasy__table th:nth-child(n+7) .col-sort::before {
         content: attr(data-mobile-label);
         font-size: .58rem;
     }
 
-    #market-board .season-fantasy__table th:nth-child(n+6) .col-sort::after {
+    #market-board .season-fantasy__table th:nth-child(n+7) .col-sort::after {
         font-size: .46rem;
     }
 

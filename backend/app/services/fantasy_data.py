@@ -1516,12 +1516,22 @@ def _score_season_player(
     implied = {market: implied[market] for market in used_markets}
     yard_markets = SEASON_YARD_MARKETS.intersection(used_markets)
     touchdown_markets = SEASON_TD_MARKETS.intersection(used_markets)
+    rushing_markets = set(SEASON_FANTASY_MARKET_PAIRS["rushing"]).intersection(
+        used_markets
+    )
 
     yard_points = round(
         sum(implied[market] * SEASON_FANTASY_WEIGHTS[market] for market in yard_markets), 1
     )
     touchdown_points = round(
         sum(implied[market] * SEASON_FANTASY_WEIGHTS[market] for market in touchdown_markets), 1
+    )
+    # Yard and touchdown points are useful scoring-rule breakdowns, but they
+    # hide how much of a quarterback's value comes from his legs. Keep this as
+    # an additional (overlapping) category total so the board can surface that
+    # contribution without changing the implied fantasy-points calculation.
+    rushing_points = round(
+        sum(implied[market] * SEASON_FANTASY_WEIGHTS[market] for market in rushing_markets), 1
     )
     reception_points = round((projected_receptions or 0) * reception_multiplier, 1)
     fantasy_points_total = round(yard_points + touchdown_points + reception_points, 1)
@@ -1538,6 +1548,7 @@ def _score_season_player(
         "player": _player_public(player),
         "yard_points": yard_points,
         "touchdown_points": touchdown_points,
+        "rushing_points": rushing_points,
         "projected_receptions": (
             round(projected_receptions, 1) if projected_receptions is not None else None
         ),

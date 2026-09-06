@@ -419,3 +419,14 @@ static mounts in `main.py`, `fantasy/tests` added to jest roots in
   mirroring `fantasy_league.require_member`, never a `WWW-Authenticate` 401.
   `_answer_with_local_router` survives: it is not demo-only, it is also the
   fallback whenever `OPENAI_API_KEY` is unset or the model call fails.
+
+- **Sep 2026 — half PPR by default, and no zero column.** The board opened on
+  standard scoring, where a reception is worth zero: the Rec column read `0.0`
+  for all 133 rows, which looks exactly like missing data and is in fact a rule
+  of the format. The default is now half PPR — the format the league plays, and
+  the only one of the three where every column carries a number — and in
+  standard the Rec column is hidden rather than blanked, since the market total
+  there genuinely excludes receptions. `DEFAULT_SCORING` is a single constant so
+  the URL's omit-the-default rule cannot drift from the state default, and a
+  board sorted by Rec falls back to the default order when standard hides it.
+  Closes finding 10 of `reviews/2026-08-30-fantasy.md`.

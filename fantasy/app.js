@@ -8,6 +8,11 @@
     "use strict";
 
     const API_BASE = `${window.API_ORIGIN || ""}/api/fantasy`;
+    // Half PPR is the format the league actually plays, and it is the only one
+    // of the three where the Rec column carries a number for everybody: in
+    // standard a reception is worth zero, so that column reads as missing data
+    // rather than as the scoring rule it is.
+    const DEFAULT_SCORING = "half";
     const F = window.FantasyFormat;
     const MAX_COMPARE = 4;
 
@@ -22,7 +27,7 @@
         weekBoardWeek: null,
         weekBoardSeq: 0,
         inSeason: false,
-        seasonFantasyScoring: "std",
+        seasonFantasyScoring: DEFAULT_SCORING,
         seasonFantasyPosition: "ALL",
         // The board's last payload, so a chip, a sort, or clearing the compare
         // tray repaints from memory instead of refetching the same rows.
@@ -156,6 +161,12 @@
         consensus: { id: "consensus", label: "Consensus", url: null },
     };
 
+    const PROVIDER_SHORT_LABELS = {
+        sleeper: "SLP",
+        espn: "ESPN",
+        fantasypros: "FPros",
+    };
+
     function providerFor(sourceId) {
         return PROVIDERS[sourceId] || {
             id: sourceId,
@@ -231,7 +242,7 @@
         if (state.seasonFantasyPosition && state.seasonFantasyPosition !== "ALL") {
             params.set("pos", state.seasonFantasyPosition);
         }
-        if (state.seasonFantasyScoring && state.seasonFantasyScoring !== "std") {
+        if (state.seasonFantasyScoring && state.seasonFantasyScoring !== DEFAULT_SCORING) {
             params.set("scoring", state.seasonFantasyScoring);
         }
         if (state.boardMode === "week") params.set("board", "week");
@@ -638,6 +649,7 @@
         player: { value: (e) => (e.player || {}).name || "", text: true },
         yard_points: { value: (e) => e.yard_points },
         touchdown_points: { value: (e) => e.touchdown_points },
+        rushing_points: { value: (e) => e.rushing_points },
         reception_points: { value: (e) => e.reception_points },
         fantasy_points: { value: (e) => e.fantasy_points },
         projected_points: { value: (e) => e.projected_points },
@@ -693,8 +705,28 @@
         });
     }
 
+    // In standard scoring a reception is worth zero, so the Rec column is a
+    // rule of the format rendering as a column of zeros — which reads as
+    // missing data. Hidden rather than blanked: the market total genuinely
+    // excludes receptions there, so there is no number being withheld.
+    function syncRecColumn() {
+        const standard = state.seasonFantasyScoring === "std";
+        const table = document.querySelector(".season-fantasy__table");
+        if (table) table.classList.toggle("hide-rec", standard);
+        // A board sorted by a column nobody can see is a state with no way
+        // out, so a standard board falls back to its default order. The URL is
+        // rewritten here rather than at the two call sites that can reach this
+        // state (the scoring chip, and a deep link that arrives sorted that
+        // way); the guard means it fires once, on the switch itself.
+        if (standard && state.seasonFantasySort.key === "reception_points") {
+            state.seasonFantasySort = { key: "fantasy_points", dir: "desc" };
+            writeUrlState();
+        }
+    }
+
     function renderSeasonFantasyLeaders(data) {
         const all = data.leaders || [];
+        syncRecColumn();
         const position = resolveSeasonPosition(all, state.seasonFantasyPosition);
         state.seasonFantasyPosition = position;
         renderSeasonPositionChips(els.seasonFantasyPositions, all, position, (pick) => {
@@ -748,7 +780,8 @@
             tr.appendChild(who);
             tr.appendChild(el("td", "col-proj col-detail", F.formatPoints(entry.yard_points)));
             tr.appendChild(el("td", "col-proj col-detail", F.formatPoints(entry.touchdown_points)));
-            tr.appendChild(el("td", "col-proj col-detail", F.formatPoints(entry.reception_points)));
+            tr.appendChild(el("td", "col-proj col-detail", F.formatPoints(entry.rushing_points)));
+            tr.appendChild(el("td", "col-proj col-detail col-rec", F.formatPoints(entry.reception_points)));
             tr.appendChild(el("td", "col-proj season-fantasy__total", F.formatPoints(entry.fantasy_points)));
             tr.appendChild(el("td", "col-proj season-fantasy__proj", F.formatPoints(entry.projected_points)));
             tr.appendChild(deltaCell(entry));
@@ -765,15 +798,44 @@
             els.seasonFantasyLeaders.appendChild(tr);
         });
 
-        // "Consensus" is only true when more than one provider has a
-        // season-long run; with one it is that provider's number, and saying
-        // otherwise would overstate the column.
+        // Name the feeds behind an average instead of asking the reader to
+        // decode "Consensus". The compact label is visual-only at the phone
+        // breakpoint; the button's accessible name remains the full source
+        // list, and the tooltip spells out the calculation.
         if (els.seasonFantasyProjHead) {
             const src = data.projection_source;
-            els.seasonFantasyProjHead.textContent = src ? providerFor(src).label : "Proj";
-            els.seasonFantasyProjHead.title = Array.isArray(data.projection_providers)
-                ? `Projected points, averaged across ${data.projection_providers.join(", ")}`
-                : "Season-long projected points";
+            const providerIds = Array.isArray(data.projection_providers)
+                ? data.projection_providers.filter(Boolean)
+                : [];
+            const providerLabels = providerIds.map((id) => providerFor(id).label);
+            const providerList = providerLabels.length > 2
+                ? `${providerLabels.slice(0, -1).join(", ")}, and ${providerLabels[providerLabels.length - 1]}`
+                : providerLabels.join(" and ");
+            if (src === "consensus" && providerLabels.length) {
+                els.seasonFantasyProjHead.textContent = `${providerLabels.join(" + ")} avg`;
+                els.seasonFantasyProjHead.dataset.mobileLabel = providerIds.length > 2
+                    ? `${providerIds.length}-src avg`
+                    : providerIds
+                        .map((id) => PROVIDER_SHORT_LABELS[id] || providerFor(id).label)
+                        .join("+");
+                els.seasonFantasyProjHead.title =
+                    `Season-long projected points: per-player average across available data from ${providerList}.`;
+            } else if (src === "consensus") {
+                els.seasonFantasyProjHead.textContent = "Avg projection";
+                els.seasonFantasyProjHead.dataset.mobileLabel = "Avg proj";
+                els.seasonFantasyProjHead.title =
+                    "Season-long projected points averaged across multiple sources; source names unavailable.";
+            } else if (src) {
+                const provider = providerFor(src);
+                els.seasonFantasyProjHead.textContent = `${provider.label} proj`;
+                els.seasonFantasyProjHead.dataset.mobileLabel =
+                    `${PROVIDER_SHORT_LABELS[src] || provider.label} proj`;
+                els.seasonFantasyProjHead.title = `Season-long projected points from ${provider.label}.`;
+            } else {
+                els.seasonFantasyProjHead.textContent = "Projection";
+                els.seasonFantasyProjHead.dataset.mobileLabel = "Proj";
+                els.seasonFantasyProjHead.title = "Season-long projected points; source unavailable.";
+            }
         }
 
         const positionMetric = position === "ALL" ? "" : ` · ${rows.length} of ${all.length} ${position}`;
@@ -1201,7 +1263,7 @@
         }
     }
 
-    // How far the market sits from consensus. The signed number is the point
+    // How far the implied value sits from the adjacent projection. The signed number is the point
     // of the column; the percentage rides along in the tooltip because +30 on
     // a 320-point quarterback and +30 on a 95-point tight end are not the
     // same claim.
@@ -1235,7 +1297,7 @@
     function renderMarketBoardEmpty(total, position) {
         const row = el("tr");
         const cell = el("td", "table-empty");
-        cell.colSpan = 8;
+        cell.colSpan = 9;
         cell.textContent = total
             ? `No ${position} has a complete yardage and touchdown market pair yet.`
             : "No betting lines have been collected yet. The research panels below and your league tools still work.";
@@ -1910,7 +1972,7 @@
             const grid = el("div", "proj-grid");
             grid.appendChild(statBlock("Market", F.formatPoints(marketEntry.fantasy_points)));
             grid.appendChild(statBlock("Projection", F.formatPoints(marketEntry.projected_points)));
-            grid.appendChild(statBlock("Edge", F.formatSigned(marketEntry.projection_delta, 1)));
+            grid.appendChild(statBlock("Diff", F.formatSigned(marketEntry.projection_delta, 1)));
             card.appendChild(grid);
             els.drawerBody.appendChild(card);
         }

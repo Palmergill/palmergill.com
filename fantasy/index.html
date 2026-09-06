@@ -11,7 +11,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Libre+Caslon+Display&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/shared/site-nav.css?v=13">
-    <link rel="stylesheet" href="style.css?v=28">
+    <link rel="stylesheet" href="style.css?v=29">
 </head>
 <body>
     <main class="app-shell">
@@ -72,13 +72,15 @@
                                     <th class="col-proj col-detail" aria-sort="none">
                                         <button type="button" class="col-sort" data-sort="touchdown_points">TD pts</button></th>
                                     <th class="col-proj col-detail" aria-sort="none">
+                                        <button type="button" class="col-sort" data-sort="rushing_points">Rush pts</button></th>
+                                    <th class="col-proj col-detail col-rec" aria-sort="none">
                                         <button type="button" class="col-sort" data-sort="reception_points">Rec</button></th>
                                     <th class="col-proj" aria-sort="descending">
                                         <button type="button" class="col-sort" data-sort="fantasy_points" data-mobile-label="Impl pts">Implied points</button></th>
                                     <th class="col-proj" aria-sort="none">
                                         <button type="button" class="col-sort" data-sort="projected_points" data-mobile-label="Proj" id="seasonFantasyProjHead">Proj</button></th>
                                     <th class="col-proj" aria-sort="none">
-                                        <button type="button" class="col-sort" data-sort="projection_delta" data-mobile-label="Edge">Edge</button></th></tr></thead>
+                                        <button type="button" class="col-sort" data-sort="projection_delta" data-mobile-label="Diff">Diff</button></th></tr></thead>
                             <tbody id="seasonFantasyLeaders"></tbody>
                         </table>
                     </div>
@@ -209,7 +211,7 @@
                     <p>
                         Market values use 1 point per 25 passing yards, 4 per passing touchdown, 1 per 10 rushing or receiving yards, and 6 per rushing or receiving touchdown. Half PPR and PPR add projected reception points. Categories require both yardage and touchdown quotes.</p>
                     <p>
-                        Each row names the categories its market value was built from, and flags any the market did not quote. Edge is that value minus the consensus projection — but the projection counts everything a player does, including categories with no market and the interceptions and fumbles nothing here quotes. Where a category is missing, the Edge is underlined: that gap is partly missing data rather than market disagreement, and a running back with no receiving market will look far cheaper than he is.</p>
+                        Each row names the categories its market value was built from, and flags any the market did not quote. Diff is implied points minus the adjacent season projection. When multiple projection providers are available, that projection is the per-player average of the sources named in the column header; otherwise the single source is named. The projection counts everything a player does, including categories with no market and the interceptions and fumbles nothing here quotes. Where a category is missing, Diff is underlined: that gap is partly missing data rather than market disagreement, and a running back with no receiving market will look far cheaper than he is.</p>
                     <p class="betting-disclaimer">
                         Market-implied values, contract lines, and prices are informational only, not betting advice. Availability and freshness vary by source.</p></div></details></main>
 
@@ -276,6 +278,6 @@
         </aside>
     </div>
 
-    <script src="/shared/site-nav.js?v=14"></script><script src="/shared/analytics.js?v=1"></script><script src="/shared/api-base.js?v=1"></script><script src="format.js?v=11"></script><script src="app.js?v=25"></script>
+    <script src="/shared/site-nav.js?v=14"></script><script src="/shared/analytics.js?v=1"></script><script src="/shared/api-base.js?v=1"></script><script src="format.js?v=11"></script><script src="app.js?v=26"></script>
 </body>
 </html>

@@ -337,6 +337,7 @@ def test_implied_fantasy_points_combine_yards_and_touchdowns(db):
         "player": fd._player_public(db.get(FantasyPlayer, "wr_alpha")),
         "yard_points": 100.0,
         "touchdown_points": 57.0,
+        "rushing_points": 0,
         "projected_receptions": 90.0,
         "reception_points": 0.0,
         "fantasy_points": 157.0,
@@ -465,6 +466,7 @@ def test_implied_fantasy_points_name_the_categories_behind_each_total(db):
     # 3999.5/25 + 499.5/10 = 159.98 + 49.95; 29.5*4 + 5.5*6 = 118 + 33.
     assert allen["yard_points"] == 209.9
     assert allen["touchdown_points"] == 151.0
+    assert allen["rushing_points"] == 83.0
     assert allen["fantasy_points"] == 360.9
 
     pocket = rows["Pocket Passer"]
@@ -475,6 +477,7 @@ def test_implied_fantasy_points_name_the_categories_behind_each_total(db):
     assert pocket["edge_is_qualified"] is True
     # The 199.5 rushing yards are not in the total, and the row says so.
     assert pocket["yard_points"] == 160.0
+    assert pocket["rushing_points"] == 0
     assert pocket["fantasy_points"] == 278.0
 
 
