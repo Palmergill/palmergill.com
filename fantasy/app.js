@@ -72,8 +72,7 @@
         seasonFantasyScoring: document.getElementById("seasonFantasyScoring"),
         seasonFantasyPositions: document.getElementById("seasonFantasyPositions"),
         seasonFantasyProjHead: document.getElementById("seasonFantasyProjHead"),
-        seasonOffenseYards: document.getElementById("seasonOffenseYards"),
-        seasonOffenseTouchdowns: document.getElementById("seasonOffenseTouchdowns"),
+        seasonOffenses: document.getElementById("seasonOffenses"),
         seasonOffensesNote: document.getElementById("seasonOffensesNote"),
         showAllMarket: document.getElementById("showAllMarket"),
         playerMarkets: document.getElementById("playerMarkets"),
@@ -1334,38 +1333,62 @@
     }
 
     async function loadSeasonOffenses() {
-        if (!els.seasonOffenseYards || !els.seasonOffenseTouchdowns) return;
+        if (!els.seasonOffenses) return;
         try {
             const data = await fetchJson(`${API_BASE}/season-offenses?limit=10`);
-            renderSeasonOffenseList(els.seasonOffenseYards, data.yards, "yards");
-            renderSeasonOffenseList(els.seasonOffenseTouchdowns, data.touchdowns, "TDs");
+            const teams = data.teams || [];
+            renderSeasonOffenses(teams);
             els.seasonOffensesNote.textContent = [
-                `${(data.yards || []).length} yards · ${(data.touchdowns || []).length} TD`,
+                `${teams.length} team${teams.length === 1 ? "" : "s"} · points at standard scoring`,
                 F.marketSources(data.sources),
             ].filter(Boolean).join(" · ");
         } catch (err) {
-            renderSeasonOffenseList(els.seasonOffenseYards, [], "yards");
-            renderSeasonOffenseList(els.seasonOffenseTouchdowns, [], "TDs");
+            renderSeasonOffenses([]);
             els.seasonOffensesNote.textContent = "Team offense rankings are unavailable right now.";
         }
     }
 
-    function renderSeasonOffenseList(target, rows, unit) {
-        target.innerHTML = "";
-        (rows || []).forEach((entry, index) => {
-            const item = el("li", "season-offense");
-            item.appendChild(el("span", "season-offense__rank", index + 1));
-            item.appendChild(el("b", "season-offense__team", entry.team));
-            const detail = el("span", "season-offense__detail");
-            const source = entry.air_source === "receiving" ? "receiving fallback" : "passing";
-            detail.textContent = `${F.seasonLine(entry.air)} air + ${F.seasonLine(entry.ground)} rush · ${source}`;
-            item.appendChild(detail);
-            item.appendChild(el("strong", "season-offense__total", `${F.seasonLine(entry.total)} ${unit}`));
-            target.appendChild(item);
-        });
+    // Season yardage runs to four figures, where a tenth of a yard is noise
+    // that only makes the column ragged next to a team quoted at a round
+    // number. Touchdowns keep their decimal, which is most of their range.
+    function offenseYards(value) {
+        if (value === null || value === undefined || Number.isNaN(Number(value))) return "—";
+        return Math.round(Number(value)).toLocaleString();
+    }
+
+    function renderSeasonOffenses(rows) {
+        els.seasonOffenses.innerHTML = "";
         if (!rows || rows.length === 0) {
-            target.appendChild(el("li", "season-offense-list__empty", "Not enough quoted markets yet."));
+            const empty = el("tr", "season-offense");
+            const cell = el("td", "season-offense__empty", "Not enough quoted markets yet.");
+            cell.colSpan = 5;
+            empty.appendChild(cell);
+            els.seasonOffenses.appendChild(empty);
+            return;
         }
+        rows.forEach((entry, index) => {
+            const yards = entry.yards || {};
+            const touchdowns = entry.touchdowns || {};
+            const tr = el("tr", "season-offense");
+            tr.appendChild(el("td", "col-rank", index + 1));
+            const who = el("td", "col-team");
+            who.appendChild(el("b", "season-offense__team", entry.team));
+            // The split is what the two totals are made of, and a receiving
+            // fallback changes how the points column scores them, so both
+            // stay visible rather than being folded into a bare total.
+            const fallback = yards.air_source === "receiving" || touchdowns.air_source === "receiving";
+            who.appendChild(el(
+                "span",
+                "season-offense__detail",
+                `${offenseYards(yards.air)} air + ${offenseYards(yards.ground)} rush yards`
+                    + (fallback ? " · receiving fallback" : "")
+            ));
+            tr.appendChild(who);
+            tr.appendChild(el("td", "col-proj", offenseYards(yards.total)));
+            tr.appendChild(el("td", "col-proj", F.formatPoints(touchdowns.total)));
+            tr.appendChild(el("td", "col-proj season-offense__total", F.formatPoints(entry.points)));
+            els.seasonOffenses.appendChild(tr);
+        });
     }
 
     // ── trending ────────────────────────────────────────────────────────

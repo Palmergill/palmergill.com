@@ -110,10 +110,13 @@ ladder and the two exchanges space their strikes differently.
 `GET /api/fantasy/season-props` ranks everyone quoted in one category — the
 entry point, since a bare name lookup only helps once you already know who has
 a market — and reports how many providers back each row.
-`GET /api/fantasy/season-offenses` builds top-10 team yardage and touchdown
-indicators from non-overlapping air and rushing markets, summing each player's
-implied value (not a ladder rung, which would rank teams on which provider
-quoted them). `GET /api/fantasy/season-fantasy-points` converts every
+`GET /api/fantasy/season-offenses` builds one top-10 team board — yardage,
+touchdowns and the fantasy points they imply on a single row — from
+non-overlapping air and rushing markets, summing each player's implied value
+(not a ladder rung, which would rank teams on which provider quoted them). A
+team needs both halves quoted to be ranked, and its points are scored against
+the markets they came from, so a receiving fallback is worth a receiver's
+0.1/yard rather than a passer's 0.04. `GET /api/fantasy/season-fantasy-points` converts every
 available implied yardage and touchdown value into a fantasy points board
 using complete stat pairs; stats without a matching yardage and touchdown
 market are not estimated. Its `scoring` option supports standard, half-PPR and

@@ -341,8 +341,7 @@ def test_betting_endpoints_return_well_formed_empty_structures():
     ).status_code == 422
 
     offense_leaders = client.get("/api/fantasy/season-offenses").json()
-    assert offense_leaders["yards"] == []
-    assert offense_leaders["touchdowns"] == []
+    assert offense_leaders["teams"] == []
 
     assert client.get("/api/fantasy/players/unknown/season-props").status_code == 404
 

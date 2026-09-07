@@ -260,23 +260,12 @@ body.has-site-nav .app-shell {
     padding-top: 22px;
 }
 
-.season-offense-board { min-width: 0; }
-
-.season-offense-list { margin: 0; padding: 0; list-style: none; }
-.season-offense {
-    display: grid;
-    grid-template-columns: 24px 42px minmax(0, 1fr) auto;
-    align-items: baseline;
-    gap: 8px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-    padding: 8px 0;
-}
-.season-offense:last-child { border-bottom: 0; }
-.season-offense__rank { color: #7f9284; font-size: 0.76rem; text-align: right; }
-.season-offense__team { font-size: 0.86rem; }
-.season-offense__detail { overflow: hidden; color: #8ea08f; font-size: 0.68rem; text-overflow: ellipsis; white-space: nowrap; }
-.season-offense__total { color: #d8e1d9; font-size: 0.78rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.season-offense-list__empty { padding: 14px 0 6px; color: #8ea08f; font-size: 0.78rem; }
+.season-offense .col-rank,
+.season-offense .col-proj { font-variant-numeric: tabular-nums; }
+.season-offense__team { display: block; font-size: 0.86rem; }
+.season-offense__detail { display: block; color: #8ea08f; font-size: 0.68rem; }
+.season-offense__total { color: #d8e1d9; font-weight: 700; }
+.season-offense__empty { color: #8ea08f; font-size: 0.78rem; }
 
 /* ── rankings table ──────────────────────────────────────────────────── */
 
@@ -726,7 +715,6 @@ body.drawer-open { overflow: hidden; }
     .season-offenses__head,
     .season-fantasy__head { align-items: flex-start; flex-direction: column; gap: 8px; }
     .season-fantasy__controls { align-items: flex-start; }
-    .season-offenses__grid { grid-template-columns: 1fr; }
     .compare-tray { left: 8px; right: 8px; transform: none; max-width: none; }
     .compare-tray__actions { margin-left: 0; }
 }
@@ -884,15 +872,10 @@ h1, h2, .drawer__head h2 { font-family: "Libre Caslon Display", Georgia, serif; 
 
 .support-grid { display: grid; grid-template-columns: 1.35fr .65fr; gap: 18px; margin-top: 18px; }
 .season-offenses,.freshness-card { overflow: hidden; }
-.season-offenses__grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0; padding: 0; }
-.season-offense-board { border: 0; border-radius: 0; background: transparent; padding: 12px 18px 16px; }
-.season-offense-board + .season-offense-board { border-left: 1px solid var(--fantasy-line); }
-.season-offense-board h3 { margin: 0 0 7px; color: var(--fantasy-muted); font-size: .66rem; text-transform: uppercase; letter-spacing: .1em; }
-.season-offense { display: grid; grid-template-columns: 22px 44px 1fr auto; padding: 7px 0; border-color: #ebe5db; }
 .season-offense__team { color: var(--fantasy-forest); }
 .season-offense__detail { color: var(--fantasy-muted); }
 .season-offense__total { color: var(--fantasy-clay); }
-.season-offenses > .card-note { padding: 0 18px 13px; }
+.season-offenses > .card-note { padding: 11px 18px 13px; }
 .freshness-source { color: var(--fantasy-forest); font-size: .76rem; font-weight: 700; }
 .freshness-time { color: var(--fantasy-muted); font-size: .68rem; }
 .freshness-dot { display: inline-block; width: 7px; height: 7px; margin-right: 7px; border-radius: 50%; background: var(--fantasy-sage); }
@@ -936,8 +919,6 @@ button:focus-visible,a:focus-visible,summary:focus-visible,[tabindex]:focus-visi
     .tool-card { min-height: 72px; }
     .value-board__head { align-items: stretch; flex-direction: column; }
     .market-board__search { width: 100%; }
-    .season-offense-board + .season-offense-board { border-top: 1px solid var(--fantasy-line); border-left: 0; }
-    .season-offenses__grid { grid-template-columns: 1fr; }
     .drawer__panel,.drawer__panel--wide,.drawer--modal .drawer__panel { inset: 0; width: 100%; max-width: none; height: 100%; max-height: none; border: 0; transform: none; }
     .compare-grid { grid-template-columns: 1fr; }
 }
@@ -1222,7 +1203,6 @@ button:focus-visible,a:focus-visible,summary:focus-visible,[tabindex]:focus-visi
 @media (max-width: 720px) {
     .tool-grid,.insight-rail,.support-grid { grid-template-columns: 1fr; }
     .tool-card { min-height: 72px; }
-    .season-offenses__grid { grid-template-columns: 1fr; }
     .drawer__panel,.drawer__panel--wide,.drawer--modal .drawer__panel { inset: 0; width: 100%; max-width: none; height: 100%; max-height: none; border: 0; transform: none; }
     .compare-grid { grid-template-columns: 1fr !important; }
 }
@@ -1393,10 +1373,4 @@ button:focus-visible,a:focus-visible,summary:focus-visible,[tabindex]:focus-visi
     .trending { padding-right: 14px; padding-left: 14px; }
     .compact-list,
     .freshness-list { padding-right: 14px; padding-left: 14px; }
-
-    .season-offense-board { padding-right: 14px; padding-left: 14px; }
-    .season-offense {
-        grid-template-columns: 20px 38px minmax(0, 1fr) auto;
-        gap: 6px;
-    }
 }

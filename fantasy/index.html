@@ -23,7 +23,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Libre+Caslon+Display&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/shared/site-nav.css?v=14">
-    <link rel="stylesheet" href="style.css?v=30">
+    <link rel="stylesheet" href="style.css?v=31">
 </head>
 <body>
 <noscript>
@@ -151,18 +151,21 @@
                             <span class="eyebrow">Team outlook</span>
                             <h2 id="offensesTitle">
                                 Top Offenses</h2></div></header>
-                    <div class="season-offenses__grid">
-                        <section class="season-offense-board">
-                            <h3>
-                                Yards</h3>
-                            <ol id="seasonOffenseYards" class="season-offense-list"></ol>
-                        </section>
-                        <section class="season-offense-board">
-                            <h3>
-                                Touchdowns</h3>
-                            <ol id="seasonOffenseTouchdowns" class="season-offense-list"></ol>
-                        </section>
-                    </div>
+                    <div class="table-wrap">
+                        <table class="rank-table season-offense__table">
+                            <thead>
+                                <tr>
+                                    <th class="col-rank">
+                                        #</th>
+                                    <th>
+                                        Team</th>
+                                    <th class="col-proj">
+                                        Yards</th>
+                                    <th class="col-proj">
+                                        TDs</th>
+                                    <th class="col-proj">
+                                        Implied pts</th></tr></thead>
+                            <tbody id="seasonOffenses"></tbody></table></div>
                     <p id="seasonOffensesNote" class="card-note" role="status"></p>
                 </article>
                 <article class="editorial-card freshness-card" aria-labelledby="freshnessTitle">
@@ -293,6 +296,6 @@
         </aside>
     </div>
 
-    <script src="/shared/site-nav.js?v=16"></script><script src="/shared/analytics.js?v=1"></script><script src="/shared/api-base.js?v=1"></script><script src="format.js?v=11"></script><script src="app.js?v=26"></script>
+    <script src="/shared/site-nav.js?v=16"></script><script src="/shared/analytics.js?v=1"></script><script src="/shared/api-base.js?v=1"></script><script src="format.js?v=11"></script><script src="app.js?v=27"></script>
 </body>
 </html>

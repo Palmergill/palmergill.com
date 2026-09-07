@@ -614,9 +614,11 @@ def test_offense_rankings_combine_air_and_rushing_without_double_counting(db):
                 "KXNFLSEASONRSHTD": [
                     market("KXNFLSEASONRSHTD-27C12-BUFRB", "Buffalo Runner", 11.5, 0.48, 0.52),
                     market("KXNFLSEASONRSHTD-27C10-KCRB", "Kansas City Runner", 9.5, 0.48, 0.52),
+                    market("KXNFLSEASONRSHTD-27C6-CHIRB", "Chicago Runner", 5.5, 0.48, 0.52),
                 ],
                 "KXNFLSEASONRECTD": [
                     market("KXNFLSEASONRECTD-27C14-KCWR", "Kansas City Receiver", 13.5, 0.48, 0.52),
+                    market("KXNFLSEASONRECTD-27C8-CHIWR", "Chicago Receiver", 7.5, 0.48, 0.52),
                 ],
             }
 
@@ -634,27 +636,32 @@ def test_offense_rankings_combine_air_and_rushing_without_double_counting(db):
 
     board = fd.get_season_offense_leaders(db, season=2026)
 
-    assert [row["team"] for row in board["yards"]] == ["KC", "BUF", "CHI"]
-    assert board["yards"][0] == {
-        "team": "KC",
+    assert [row["team"] for row in board["teams"]] == ["KC", "BUF", "CHI"]
+    assert board["teams"][0]["yards"] == {
         "total": 5299.0,
         "air": 4499.5,
         "ground": 799.5,
         "air_source": "passing",
         "players": 2,
     }
-    assert board["yards"][2]["air_source"] == "receiving"
-    assert board["yards"][2]["total"] == 2099.0
-    assert [row["team"] for row in board["touchdowns"]] == ["KC", "BUF"]
-    assert [row["total"] for row in board["touchdowns"]] == [44.0, 41.0]
+    assert board["teams"][0]["touchdowns"]["total"] == 44.0
+    assert board["teams"][1]["touchdowns"]["total"] == 41.0
+    # KC: 4499.5 passing yards at 1/25 and 799.5 rushing at 1/10, then 34.5
+    # passing touchdowns at 4 and 9.5 rushing at 6.
+    assert board["teams"][0]["points"] == 454.9
+    # Chicago's air half is a receiving fallback, so it is scored at receiving
+    # rates — 1/10 a yard and 6 a touchdown — not a passer's 1/25 and 4.
+    chicago = board["teams"][2]
+    assert chicago["yards"]["air_source"] == "receiving"
+    assert chicago["yards"]["total"] == 2099.0
+    assert chicago["points"] == 287.9
 
 
 def test_offense_rankings_are_empty_before_any_collection_run(db):
     board = fd.get_season_offense_leaders(db, season=2026)
 
     assert board["source"] is None
-    assert board["yards"] == []
-    assert board["touchdowns"] == []
+    assert board["teams"] == []
 
 
 def _market_run(db, finished_at, values, include_new=False):

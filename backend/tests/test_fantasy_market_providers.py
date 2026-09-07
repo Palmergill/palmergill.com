@@ -492,20 +492,26 @@ def test_offense_rankings_add_implied_values_not_ladder_rungs(db):
         ("Kalshi", [
             *pair("Alpha Passer", "season_pass_yds", 4000.5, 100, "Kalshi", "k1"),
             *pair("Alpha Receiver", "season_rush_yds", 1000.5, 100, "Kalshi", "k2"),
+            # Touchdowns share the row with yardage, so the board needs both
+            # halves quoted before it will rank a team at all.
+            *pair("Alpha Passer", "season_pass_tds", 30.5, 100, "Kalshi", "k3"),
+            *pair("Alpha Receiver", "season_rush_tds", 8.5, 100, "Kalshi", "k4"),
         ]),
         ("Underdog", [
             *pair("Alpha Passer", "season_pass_yds", 4200.5, 100, "Underdog", "u1"),
             *pair("Alpha Receiver", "season_rush_yds", 1200.5, 100, "Underdog", "u2"),
+            *pair("Alpha Passer", "season_pass_tds", 30.5, 100, "Underdog", "u3"),
+            *pair("Alpha Receiver", "season_rush_tds", 8.5, 100, "Underdog", "u4"),
         ]),
     )
 
     board = fd.get_season_offense_leaders(db, season=2026)
 
-    assert [row["team"] for row in board["yards"]] == ["SEA"]
+    assert [row["team"] for row in board["teams"]] == ["SEA"]
     # Medians of each pair: 4100.5 through the air, 1100.5 on the ground.
-    assert board["yards"][0]["air"] == 4100.5
-    assert board["yards"][0]["ground"] == 1100.5
-    assert board["yards"][0]["total"] == 5201.0
+    assert board["teams"][0]["yards"]["air"] == 4100.5
+    assert board["teams"][0]["yards"]["ground"] == 1100.5
+    assert board["teams"][0]["yards"]["total"] == 5201.0
 
 
 def test_clients_are_public_and_need_no_key():

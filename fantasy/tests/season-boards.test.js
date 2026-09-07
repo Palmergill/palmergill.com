@@ -666,3 +666,60 @@ describe("season board position filter", () => {
         expect(document.getElementById("memberMetrics").textContent).toBe("");
     });
 });
+
+/**
+ * The team offense board. Yardage, touchdowns and the points they imply sit
+ * on one row, so the interesting behaviour is that the row keeps the two
+ * totals and the points column in agreement with the payload — and that a
+ * team whose air number is a receiving fallback says so.
+ */
+describe("team offense board", () => {
+    const OFFENSES = {
+        season: 2026,
+        sources: [],
+        teams: [
+            {
+                team: "KC",
+                yards: { total: 5299, air: 4499.5, ground: 799.5, air_source: "passing", players: 2 },
+                touchdowns: { total: 44, air: 34.5, ground: 9.5, air_source: "passing", players: 2 },
+                points: 454.9,
+            },
+            {
+                team: "CHI",
+                yards: { total: 2099, air: 1199.5, ground: 899.5, air_source: "receiving", players: 2 },
+                touchdowns: { total: 13, air: 7.5, ground: 5.5, air_source: "receiving", players: 2 },
+                points: 287.9,
+            },
+        ],
+    };
+
+    test("puts yards, touchdowns and implied points on one row per team", async () => {
+        boot(routes({ "/season-offenses": OFFENSES }));
+        await waitFor(() => rows("seasonOffenses").length === 2);
+
+        const [best] = cells("seasonOffenses");
+        expect(best[0]).toBe("1");
+        expect(best[1]).toContain("KC");
+        expect(best.slice(2)).toEqual(["5,299", "44.0", "454.9"]);
+    });
+
+    test("marks the team whose air total is a receiving fallback", async () => {
+        boot(routes({ "/season-offenses": OFFENSES }));
+        await waitFor(() => rows("seasonOffenses").length === 2);
+
+        const [passing, fallback] = rows("seasonOffenses").map(
+            (row) => row.querySelector(".season-offense__detail").textContent
+        );
+        expect(passing).toBe("4,500 air + 800 rush yards");
+        expect(fallback).toContain("receiving fallback");
+    });
+
+    test("says so rather than showing an empty table when nothing is quoted", async () => {
+        boot(routes({ "/season-offenses": { season: 2026, sources: [], teams: [] } }));
+        await waitFor(() => rows("seasonOffenses").length === 1);
+
+        expect(rows("seasonOffenses")[0].textContent).toBe("Not enough quoted markets yet.");
+        expect(document.getElementById("seasonOffensesNote").textContent)
+            .toBe("0 teams · points at standard scoring");
+    });
+});

@@ -2315,6 +2315,12 @@ def get_season_offense_leaders(
     kind of number and summing them would rank teams on which source quoted
     them.
 
+    Each team is scored once, with yardage and touchdown totals sitting on the
+    same row beside the fantasy points they imply. Points use conventional
+    scoring against the component that produced each total, so a team whose
+    air number is a receiving fallback is scored at receiving rates rather
+    than passing ones.
+
     These are market-derived offense indicators, not official team totals:
     the providers list only selected players. The response exposes the
     components so the UI can say exactly what each number contains instead of
@@ -2329,8 +2335,7 @@ def get_season_offense_leaders(
             "as_of": None,
             "source": None,
             "sources": [],
-            "yards": [],
-            "touchdowns": [],
+            "teams": [],
         }
 
     snapshots = (
@@ -2363,7 +2368,7 @@ def get_season_offense_leaders(
             "value": value,
         })
 
-    def build(metric: str) -> List[Dict[str, Any]]:
+    def components(metric: str) -> Dict[str, Dict[str, Any]]:
         if metric == "yards":
             pass_market, receive_market, rush_market = (
                 "season_pass_yds", "season_rec_yds", "season_rush_yds"
@@ -2373,7 +2378,7 @@ def get_season_offense_leaders(
                 "season_pass_tds", "season_rec_tds", "season_rush_tds"
             )
 
-        rankings = []
+        built: Dict[str, Dict[str, Any]] = {}
         for team, markets in by_team.items():
             passers = markets.get(pass_market, [])
             receivers = markets.get(receive_market, [])
@@ -2399,17 +2404,49 @@ def get_season_offense_leaders(
             # ten until enough players are quoted.
             if air_total is None or ground_total is None:
                 continue
-            rankings.append({
-                "team": team,
+            built[team] = {
                 "total": round(air_total + ground_total, 1),
                 "air": round(air_total, 1),
                 "ground": round(ground_total, 1),
                 "air_source": air_source,
                 "players": air_players + len(rushers),
-            })
+            }
+        return built
 
-        rankings.sort(key=lambda row: (-row["total"], row["team"]))
-        return rankings[:limit]
+    yards = components("yards")
+    touchdowns = components("touchdowns")
+
+    def implied_points(yard_row: Dict[str, Any], td_row: Dict[str, Any]) -> float:
+        # Score each half at the rate of the market it actually came from. A
+        # receiving fallback is worth 0.1/yard and 6/TD, not a passer's
+        # 0.04 and 4, so scoring it as passing would understate the team by
+        # more than the ranking's spread.
+        air_yard_market = (
+            "season_pass_yds" if yard_row["air_source"] == "passing" else "season_rec_yds"
+        )
+        air_td_market = (
+            "season_pass_tds" if td_row["air_source"] == "passing" else "season_rec_tds"
+        )
+        return (
+            yard_row["air"] * SEASON_FANTASY_WEIGHTS[air_yard_market]
+            + yard_row["ground"] * SEASON_FANTASY_WEIGHTS["season_rush_yds"]
+            + td_row["air"] * SEASON_FANTASY_WEIGHTS[air_td_market]
+            + td_row["ground"] * SEASON_FANTASY_WEIGHTS["season_rush_tds"]
+        )
+
+    # One row per team, so a team quoted for yardage but not touchdowns is
+    # left out rather than shown with a blank half and a points column that
+    # would silently be missing its touchdowns.
+    rankings = [
+        {
+            "team": team,
+            "yards": yards[team],
+            "touchdowns": touchdowns[team],
+            "points": round(implied_points(yards[team], touchdowns[team]), 1),
+        }
+        for team in yards.keys() & touchdowns.keys()
+    ]
+    rankings.sort(key=lambda row: (-row["points"], row["team"]))
 
     sources = _season_sources(snapshots)
     return {
@@ -2417,8 +2454,7 @@ def get_season_offense_leaders(
         "as_of": iso_utc(run.finished_at),
         "source": _season_source_label(sources),
         "sources": sources,
-        "yards": build("yards"),
-        "touchdowns": build("touchdowns"),
+        "teams": rankings[:limit],
     }
 
 
