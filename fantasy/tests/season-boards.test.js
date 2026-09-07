@@ -240,11 +240,11 @@ describe("season board position filter", () => {
     test("shows the market total against the consensus projection", async () => {
         boot(routes());
         await waitFor(() => document.querySelectorAll("#seasonFantasyLeaders tr").length);
-        const row = [...document.querySelectorAll("#seasonFantasyLeaders tr")[0].children]
-            .map((cell) => cell.textContent);
+        const row = document.querySelectorAll("#seasonFantasyLeaders tr")[0];
+        const decision = (cls) => row.querySelector(`.${cls}`).textContent;
 
-        // ... Yard, TD, Rec, Market, Proj, Delta
-        expect(row.slice(-3)).toEqual(["380.0", "350.0", "+30"]);
+        expect([decision("col-implied"), decision("col-consensus"), decision("col-diff")])
+            .toEqual(["380.0", "350.0", "+30"]);
     });
 
     test("shows the market-implied rushing contribution for quarterbacks", async () => {
@@ -278,12 +278,11 @@ describe("season board position filter", () => {
         const rows = [...document.querySelectorAll("#seasonFantasyLeaders tr")];
         const runnerTwo = rows.find((r) => r.textContent.includes("Runner Two"));
 
-        const cells = [...runnerTwo.children].map((c) => c.textContent);
-        expect(cells[cells.length - 2]).toBe("\u2014");   // Proj renders an em dash
-        expect(cells[cells.length - 1]).toBe("");          // no delta to show
+        expect(runnerTwo.querySelector(".col-consensus").textContent).toBe("\u2014");
+        expect(runnerTwo.querySelector(".col-diff").textContent).toBe("");
         // He is 4th on market value and stays there.
         expect(rows.indexOf(runnerTwo)).toBe(3);
-        expect(cells[0]).toBe("4");
+        expect(runnerTwo.querySelector(".col-rank").textContent).toBe("4");
     });
 
     test("labels and marks the difference from the projection", async () => {
@@ -388,9 +387,9 @@ describe("season board position filter", () => {
 
     describe("sorting", () => {
         const marketCol = () => [...document.querySelectorAll("#seasonFantasyLeaders tr")]
-            .map((r) => r.children[r.children.length - 3].textContent);
+            .map((r) => r.querySelector(".col-implied").textContent);
         const deltaCol = () => [...document.querySelectorAll("#seasonFantasyLeaders tr")]
-            .map((r) => r.children[r.children.length - 1].textContent);
+            .map((r) => r.querySelector(".col-diff").textContent);
         const names = () => [...document.querySelectorAll("#seasonFantasyLeaders .season-leader__name")]
             .map((n) => n.textContent);
         const head = (key) => document.querySelector(`.col-sort[data-sort="${key}"]`);
@@ -571,7 +570,7 @@ describe("season board position filter", () => {
         // The cells stay in the DOM (the CSS hides them), so the column count
         // and every nth-child rule the phone layout leans on are unchanged.
         expect(header().className).toContain("col-rec");
-        expect(rows("seasonFantasyLeaders")[0].querySelectorAll("td")).toHaveLength(9);
+        expect(rows("seasonFantasyLeaders")[0].querySelectorAll("td")).toHaveLength(17);
 
         click("seasonFantasyScoring", "PPR");
         await waitFor(() => !table.classList.contains("hide-rec"));
@@ -721,5 +720,107 @@ describe("team offense board", () => {
         expect(rows("seasonOffenses")[0].textContent).toBe("Not enough quoted markets yet.");
         expect(document.getElementById("seasonOffensesNote").textContent)
             .toBe("0 teams · points at standard scoring");
+    });
+});
+
+/**
+ * The player-context columns: each provider's own rank and projection, plus
+ * the roster facts (age, bye, waiver traffic) that were only ever visible
+ * one player at a time in the drawer.
+ */
+describe("player context columns", () => {
+    const CONTEXT_LEADERS = [
+        {
+            ...FANTASY_LEADERS[0],
+            provider_boards: {
+                espn: { points: 355.2, rank: 2, position_rank: 2 },
+                sleeper: { points: 344.0, rank: 1, position_rank: 1 },
+            },
+            age: 30, years_exp: 8, bye_week: 7, trending_add: 12450, trending_drop: 0,
+        },
+        {
+            ...FANTASY_LEADERS[1],
+            // Nobody's projection feed covers him; only the market does.
+            provider_boards: {},
+            age: 24, years_exp: 2, bye_week: null, trending_add: 0, trending_drop: 310,
+        },
+    ];
+
+    const contextRoutes = (extra = {}) => routes({
+        "/season-fantasy-points": {
+            scoring: "std",
+            sources: [],
+            provider_boards: ["espn", "sleeper"],
+            leaders: CONTEXT_LEADERS,
+            ...extra,
+        },
+    });
+
+    const cell = (rowIndex, selector) =>
+        rows("seasonFantasyLeaders")[rowIndex].querySelector(selector);
+
+    test("shows each provider's own rank and projection", async () => {
+        boot(contextRoutes());
+        await waitFor(() => rows("seasonFantasyLeaders").length === 2);
+
+        const [espnRank, espnPoints] = [...rows("seasonFantasyLeaders")[0].querySelectorAll(".col-espn")];
+        expect(espnRank.textContent).toBe("2 · QB2");
+        expect(espnRank.title).toContain("2nd");
+        expect(espnPoints.textContent).toBe("355.2");
+        const [sleeperRank] = [...rows("seasonFantasyLeaders")[0].querySelectorAll(".col-sleeper")];
+        expect(sleeperRank.textContent).toBe("1 · QB1");
+    });
+
+    test("a player no provider projects gets dashes, not zeros", async () => {
+        boot(contextRoutes());
+        await waitFor(() => rows("seasonFantasyLeaders").length === 2);
+
+        [...rows("seasonFantasyLeaders")[1].querySelectorAll(".col-espn, .col-sleeper")]
+            .forEach((td) => expect(td.textContent).toBe("—"));
+    });
+
+    test("carries the roster facts: age, bye and waiver traffic", async () => {
+        boot(contextRoutes());
+        await waitFor(() => rows("seasonFantasyLeaders").length === 2);
+
+        const first = cells("seasonFantasyLeaders")[0];
+        expect(first.slice(-4)).toEqual(["30", "7", "12k", "0"]);
+        // No bye is a blank, not a zero — week 0 is not a week.
+        expect(cells("seasonFantasyLeaders")[1].slice(-4)).toEqual(["24", "—", "0", "310"]);
+    });
+
+    test("ranks sort best-first on the first click, unlike a points column", async () => {
+        boot(contextRoutes());
+        await waitFor(() => rows("seasonFantasyLeaders").length === 2);
+
+        document.querySelector('.col-sort[data-sort="sleeper_rank"]').click();
+        expect(document.querySelector('.col-sort[data-sort="sleeper_rank"]')
+            .closest("th").getAttribute("aria-sort")).toBe("ascending");
+        // Rank 1 first, and the player with no rank at all sinks rather than
+        // sorting ahead of everyone as a blank would.
+        expect([...document.querySelectorAll("#seasonFantasyLeaders .season-leader__name")]
+            .map((n) => n.textContent)).toEqual(["Passer One", "Runner One"]);
+    });
+
+    test("hides a provider's columns when its feed was never collected", async () => {
+        boot(contextRoutes({ provider_boards: ["sleeper"] }));
+        await waitFor(() => rows("seasonFantasyLeaders").length === 2);
+
+        const table = document.querySelector(".season-fantasy__table");
+        expect(table.classList.contains("hide-espn")).toBe(true);
+        expect(table.classList.contains("hide-sleeper")).toBe(false);
+    });
+
+    test("a board sorted by a provider that vanishes falls back to market order", async () => {
+        document.body.innerHTML = bodySource;
+        window.history.replaceState({}, "", "/fantasy/?sort=espn_rank:asc");
+        boot(contextRoutes({ provider_boards: ["sleeper"] }), { keepUrl: true });
+        await waitFor(() => rows("seasonFantasyLeaders").length === 2);
+
+        // The default order is the absence of a sort param, so the deep link
+        // is dropped rather than rewritten.
+        expect(window.location.search).not.toContain("espn_rank");
+        expect(document.querySelector('.col-sort[data-sort="fantasy_points"]')
+            .closest("th").getAttribute("aria-sort")).toBe("descending");
     });
 });

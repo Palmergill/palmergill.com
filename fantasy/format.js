@@ -87,6 +87,17 @@
         return Number(value).toFixed(1);
     }
 
+    // Waiver counts run to five figures, and the column they sit in is a few
+    // characters wide. Thousands are rounded to a tenth, which is all the
+    // precision a "how much noise is this player making" number carries.
+    function compactCount(value) {
+        const num = Number(value);
+        if (value === null || value === undefined || Number.isNaN(num)) return "—";
+        if (Math.abs(num) < 1000) return String(Math.round(num));
+        const thousands = num / 1000;
+        return `${thousands.toFixed(Math.abs(thousands) < 10 ? 1 : 0)}k`;
+    }
+
     function ordinal(n) {
         const num = Number(n);
         if (!Number.isFinite(num)) return String(n);
@@ -263,6 +274,7 @@
         seasonPairDetail,
         scoringLabel,
         formatPoints,
+        compactCount,
         ordinal,
         sparkline,
         americanOdds,

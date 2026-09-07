@@ -23,7 +23,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Libre+Caslon+Display&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/shared/site-nav.css?v=14">
-    <link rel="stylesheet" href="style.css?v=31">
+    <link rel="stylesheet" href="style.css?v=32">
 </head>
 <body>
 <noscript>
@@ -90,12 +90,28 @@
                                         <button type="button" class="col-sort" data-sort="rushing_points">Rush pts</button></th>
                                     <th class="col-proj col-detail col-rec" aria-sort="none">
                                         <button type="button" class="col-sort" data-sort="reception_points">Rec</button></th>
-                                    <th class="col-proj" aria-sort="descending">
+                                    <th class="col-proj col-implied" aria-sort="descending">
                                         <button type="button" class="col-sort" data-sort="fantasy_points" data-mobile-label="Impl pts">Implied points</button></th>
-                                    <th class="col-proj" aria-sort="none">
+                                    <th class="col-proj col-detail col-espn" aria-sort="none">
+                                        <button type="button" class="col-sort" data-sort="espn_rank">ESPN rank</button></th>
+                                    <th class="col-proj col-detail col-espn" aria-sort="none">
+                                        <button type="button" class="col-sort" data-sort="espn_points">ESPN proj</button></th>
+                                    <th class="col-proj col-detail col-sleeper" aria-sort="none">
+                                        <button type="button" class="col-sort" data-sort="sleeper_rank">Sleeper rank</button></th>
+                                    <th class="col-proj col-detail col-sleeper" aria-sort="none">
+                                        <button type="button" class="col-sort" data-sort="sleeper_points">Sleeper proj</button></th>
+                                    <th class="col-proj col-consensus" aria-sort="none">
                                         <button type="button" class="col-sort" data-sort="projected_points" data-mobile-label="Proj" id="seasonFantasyProjHead">Proj</button></th>
-                                    <th class="col-proj" aria-sort="none">
-                                        <button type="button" class="col-sort" data-sort="projection_delta" data-mobile-label="Diff">Diff</button></th></tr></thead>
+                                    <th class="col-proj col-diff" aria-sort="none">
+                                        <button type="button" class="col-sort" data-sort="projection_delta" data-mobile-label="Diff">Diff</button></th>
+                                    <th class="col-proj col-detail" aria-sort="none">
+                                        <button type="button" class="col-sort" data-sort="age">Age</button></th>
+                                    <th class="col-proj col-detail" aria-sort="none">
+                                        <button type="button" class="col-sort" data-sort="bye_week">Bye</button></th>
+                                    <th class="col-proj col-detail" aria-sort="none">
+                                        <button type="button" class="col-sort" data-sort="trending_add">Adds</button></th>
+                                    <th class="col-proj col-detail" aria-sort="none">
+                                        <button type="button" class="col-sort" data-sort="trending_drop">Drops</button></th></tr></thead>
                             <tbody id="seasonFantasyLeaders"></tbody>
                         </table>
                     </div>
@@ -296,6 +312,6 @@
         </aside>
     </div>
 
-    <script src="/shared/site-nav.js?v=16"></script><script src="/shared/analytics.js?v=1"></script><script src="/shared/api-base.js?v=1"></script><script src="format.js?v=11"></script><script src="app.js?v=27"></script>
+    <script src="/shared/site-nav.js?v=16"></script><script src="/shared/analytics.js?v=1"></script><script src="/shared/api-base.js?v=1"></script><script src="format.js?v=12"></script><script src="app.js?v=29"></script>
 </body>
 </html>

@@ -642,8 +642,13 @@
         }
     }
 
+    const providerBoard = (entry, source) => (entry.provider_boards || {})[source] || {};
+
     // Text sorts A–Z on first click, numbers biggest-first — nobody opens a
-    // points column hoping to see the smallest number.
+    // points column hoping to see the smallest number. `low` marks the
+    // columns where small is good: a rank of 1 and an early bye are the
+    // answers those columns are read for, and burying them under the
+    // hundreds would make the first click useless.
     const MARKET_SORTS = {
         player: { value: (e) => (e.player || {}).name || "", text: true },
         yard_points: { value: (e) => e.yard_points },
@@ -651,8 +656,21 @@
         rushing_points: { value: (e) => e.rushing_points },
         reception_points: { value: (e) => e.reception_points },
         fantasy_points: { value: (e) => e.fantasy_points },
+        espn_rank: { value: (e) => providerBoard(e, "espn").rank, low: true },
+        espn_points: { value: (e) => providerBoard(e, "espn").points },
+        sleeper_rank: { value: (e) => providerBoard(e, "sleeper").rank, low: true },
+        sleeper_points: { value: (e) => providerBoard(e, "sleeper").points },
         projected_points: { value: (e) => e.projected_points },
         projection_delta: { value: (e) => e.projection_delta },
+        age: { value: (e) => e.age, low: true },
+        bye_week: { value: (e) => e.bye_week, low: true },
+        trending_add: { value: (e) => e.trending_add },
+        trending_drop: { value: (e) => e.trending_drop },
+    };
+
+    const firstSortDirection = (key) => {
+        const sort = MARKET_SORTS[key];
+        return sort.text || sort.low ? "asc" : "desc";
     };
 
     function sortMarketRows(rows) {
@@ -680,7 +698,7 @@
             button.addEventListener("click", () => {
                 const key = button.dataset.sort;
                 const current = state.seasonFantasySort;
-                const first = MARKET_SORTS[key].text ? "asc" : "desc";
+                const first = firstSortDirection(key);
                 state.seasonFantasySort = {
                     key,
                     dir: current.key === key && current.dir === first
@@ -723,9 +741,30 @@
         }
     }
 
+    // A provider the collector has no season-long run for would render as a
+    // column of dashes, which reads as "nobody ranks these players" rather
+    // than "we did not fetch this feed". The response says which boards it
+    // built, so the columns follow it.
+    function syncProviderColumns(data) {
+        const table = document.querySelector(".season-fantasy__table");
+        if (!table) return;
+        const built = data.provider_boards || [];
+        ["espn", "sleeper"].forEach((source) => {
+            const missing = !built.includes(source);
+            table.classList.toggle(`hide-${source}`, missing);
+            // Same trap as the Rec column: a board sorted by a column that
+            // just disappeared has no way back to a visible order.
+            if (missing && state.seasonFantasySort.key.startsWith(source)) {
+                state.seasonFantasySort = { key: "fantasy_points", dir: "desc" };
+                writeUrlState();
+            }
+        });
+    }
+
     function renderSeasonFantasyLeaders(data) {
         const all = data.leaders || [];
         syncRecColumn();
+        syncProviderColumns(data);
         const position = resolveSeasonPosition(all, state.seasonFantasyPosition);
         state.seasonFantasyPosition = position;
         renderSeasonPositionChips(els.seasonFantasyPositions, all, position, (pick) => {
@@ -781,9 +820,15 @@
             tr.appendChild(el("td", "col-proj col-detail", F.formatPoints(entry.touchdown_points)));
             tr.appendChild(el("td", "col-proj col-detail", F.formatPoints(entry.rushing_points)));
             tr.appendChild(el("td", "col-proj col-detail col-rec", F.formatPoints(entry.reception_points)));
-            tr.appendChild(el("td", "col-proj season-fantasy__total", F.formatPoints(entry.fantasy_points)));
-            tr.appendChild(el("td", "col-proj season-fantasy__proj", F.formatPoints(entry.projected_points)));
+            tr.appendChild(el("td", "col-proj col-implied season-fantasy__total", F.formatPoints(entry.fantasy_points)));
+            providerRankCell(tr, entry, "espn");
+            providerRankCell(tr, entry, "sleeper");
+            tr.appendChild(el("td", "col-proj col-consensus season-fantasy__proj", F.formatPoints(entry.projected_points)));
             tr.appendChild(deltaCell(entry));
+            tr.appendChild(el("td", "col-proj col-detail", entry.age ?? "—"));
+            tr.appendChild(el("td", "col-proj col-detail", entry.bye_week ?? "—"));
+            tr.appendChild(trendingCell(entry.trending_add));
+            tr.appendChild(trendingCell(entry.trending_drop));
             const open = () => {
                 if (player.player_id) openPlayer(player.player_id);
             };
@@ -1266,10 +1311,54 @@
     // of the column; the percentage rides along in the tooltip because +30 on
     // a 320-point quarterback and +30 on a 95-point tight end are not the
     // same claim.
+    // A provider publishes points, and the rank is this site counting them.
+    // Overall rank alone reads oddly across positions — every quarterback
+    // outprojects every back, so the top of the column is all QBs — so the
+    // positional rank rides in the same cell, which is the number a roster
+    // decision actually turns on.
+    function providerRankCell(tr, entry, source) {
+        const board = (entry.provider_boards || {})[source] || {};
+        const rank = el("td", `col-proj col-detail col-${source}`);
+        if (board.rank == null) {
+            rank.textContent = "—";
+        } else {
+            rank.appendChild(el("span", "provider-rank__overall", board.rank));
+            const position = (entry.player || {}).position;
+            const positionRank = board.position_rank != null && position
+                ? `${position}${board.position_rank}`
+                : null;
+            if (positionRank) {
+                // The separator is in the text, not the margin: read aloud,
+                // "2 RB1" and "2RB1" are the same string of digits.
+                rank.appendChild(el("span", "provider-rank__position", ` · ${positionRank}`));
+            }
+            rank.title = [
+                `${providerFor(source).label}'s own season projection ranks him`,
+                `${F.ordinal(board.rank)} overall`,
+                positionRank ? `and ${positionRank}` : "",
+            ].filter(Boolean).join(" ");
+        }
+        tr.appendChild(rank);
+        tr.appendChild(el(
+            "td",
+            `col-proj col-detail col-${source}`,
+            F.formatPoints(board.points)
+        ));
+    }
+
+    // Sleeper publishes a top-N trending list, so a player who is not on it
+    // has a real zero rather than a missing number. Zeroes are muted so the
+    // column reads as the handful of players actually moving.
+    function trendingCell(count) {
+        const cell = el("td", "col-proj col-detail", F.compactCount(count));
+        if (!count) cell.classList.add("is-quiet");
+        return cell;
+    }
+
     function deltaCell(entry) {
         const delta = entry.projection_delta;
-        if (delta == null) return el("td", "col-proj season-fantasy__delta");
-        const cell = el("td", "col-proj season-fantasy__delta", F.formatSigned(delta, 1));
+        if (delta == null) return el("td", "col-proj col-diff season-fantasy__delta");
+        const cell = el("td", "col-proj col-diff season-fantasy__delta", F.formatSigned(delta, 1));
         cell.classList.add(delta >= 0 ? "is-over" : "is-under");
         const detail = entry.projected_points
             ? [`${F.formatSigned(delta, 1)} vs ${F.formatPoints(entry.projected_points)} projected`,

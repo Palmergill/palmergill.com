@@ -353,7 +353,20 @@ def test_implied_fantasy_points_combine_yards_and_touchdowns(db):
         "projection_delta": -3.0,
         "books": ["Kalshi"],
         "implied": {"season_rec_yds": 999.5, "season_rec_tds": 9.5},
+        # Context the board carries alongside the market number. Sleeper is
+        # the only provider with a season-long run here, and it projects
+        # alpha ahead of zeta, so he leads that provider's board too. There
+        # is no schedule in this fixture, hence no bye.
+        "provider_boards": {
+            "sleeper": {"points": 160.0, "rank": 1, "position_rank": 1},
+        },
+        "age": None,
+        "years_exp": None,
+        "bye_week": None,
+        "trending_add": 0,
+        "trending_drop": 0,
     }
+    assert board["leaders"][1]["provider_boards"]["sleeper"]["rank"] == 2
     assert board["leaders"][1]["fantasy_points"] == 120.0
 
     half = fd.get_season_fantasy_point_leaders(db, season=2026, scoring="half")
@@ -818,3 +831,105 @@ def test_a_receiver_is_not_flagged_for_an_absent_rushing_market(db):
     assert split["pairs_used"] == ["receiving"]
     assert split["missing_pairs"] == []
     assert split["edge_is_qualified"] is False
+
+
+def _season_projection_run(db, source, season, values):
+    """One provider's season-long projection run: {player_id: pts_std}."""
+    run = FantasyCollectionRun(
+        job="projections",
+        source=source,
+        season=season,
+        week=fc.SEASON_LONG_WEEK,
+        status="success",
+        started_at=datetime(2026, 8, 1),
+        finished_at=datetime(2026, 8, 1),
+        rows_written=len(values),
+    )
+    db.add(run)
+    db.flush()
+    for player_id, points in values.items():
+        db.add(FantasyProjection(
+            run_id=run.id,
+            season=season,
+            week=fc.SEASON_LONG_WEEK,
+            source=source,
+            player_id=player_id,
+            pts_std=points,
+            pts_half_ppr=points,
+            pts_ppr=points,
+        ))
+    db.commit()
+    return run
+
+
+def test_provider_ranks_are_each_providers_own_order(db):
+    # ESPN and Sleeper disagree about the two receivers. Each column has to
+    # report its own provider's order, not a blend of them and not the order
+    # of the board the player is being shown on.
+    for player_id, name, position, team in (
+        ("wr_alpha", "Alpha Receiver", "WR", "SEA"),
+        ("wr_zeta", "Zeta Receiver", "WR", "NYJ"),
+        ("rb_one", "One Runner", "RB", "SEA"),
+        ("wr_bench", "Bench Receiver", "WR", "NYJ"),
+    ):
+        db.add(named_player(player_id, name, position, team))
+    db.commit()
+    _season_projection_run(db, "sleeper", 2026, {
+        "wr_alpha": 250.0, "wr_zeta": 200.0, "rb_one": 220.0, "wr_bench": 0.0,
+    })
+    _season_projection_run(db, "espn", 2026, {
+        "wr_alpha": 190.0, "wr_zeta": 240.0, "rb_one": 210.0,
+    })
+
+    boards = fd._provider_season_boards(db, 2026, "pts_std")
+
+    assert boards["sleeper"]["wr_alpha"] == {"points": 250.0, "rank": 1, "position_rank": 1}
+    assert boards["sleeper"]["wr_zeta"] == {"points": 200.0, "rank": 3, "position_rank": 2}
+    assert boards["espn"]["wr_zeta"] == {"points": 240.0, "rank": 1, "position_rank": 1}
+    assert boards["espn"]["wr_alpha"] == {"points": 190.0, "rank": 3, "position_rank": 2}
+    # Position rank counts within the position, so the lone back is RB1 on
+    # both boards despite sitting second and third overall.
+    assert boards["sleeper"]["rb_one"]["position_rank"] == 1
+    assert boards["espn"]["rb_one"]["position_rank"] == 1
+    # Sleeper carries a row for every player in the league. A zero is not a
+    # rank, and ranking those would push a real WR3 into the hundreds.
+    assert "wr_bench" not in boards["sleeper"]
+
+
+def test_bye_weeks_need_a_complete_schedule(db):
+    from app.database import FantasyGame
+
+    db.query(FantasyGame).delete()
+    db.commit()
+
+    def schedule(weeks):
+        for week in weeks:
+            # SEA is off in week 2; NYJ plays every week against a rotating
+            # opponent so the fixture has more than one team in it.
+            db.add(FantasyGame(
+                game_id=f"2026_{week}_NYJ",
+                season=2026, week=week, game_type="REG",
+                home_team="NYJ", away_team="BUF",
+            ))
+            if week != 2:
+                db.add(FantasyGame(
+                    game_id=f"2026_{week}_SEA",
+                    season=2026, week=week, game_type="REG",
+                    home_team="SEA", away_team="LAR",
+                ))
+        db.commit()
+
+    # A schedule with a hole in it — week 3 never collected — would read as a
+    # bye for every team in the league, so no team gets one.
+    schedule([1, 2, 4])
+    assert fd._team_bye_weeks(db, 2026) == {}
+
+    db.query(FantasyGame).delete()
+    db.commit()
+    schedule([1, 2, 3])
+    # SEA and its week-2 opponent are both off that week; NYJ and BUF play
+    # all three and so have no bye inside the schedule collected here.
+    assert fd._team_bye_weeks(db, 2026) == {"SEA": 2, "LAR": 2}
+
+    db.query(FantasyGame).delete()
+    db.commit()

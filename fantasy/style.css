@@ -769,8 +769,11 @@ h1, h2, .drawer__head h2 { font-family: "Libre Caslon Display", Georgia, serif; 
 .tool-card small { display: block; color: var(--fantasy-muted); font-size: .64rem; text-transform: uppercase; letter-spacing: .1em; }
 .tool-card strong { display: block; color: var(--fantasy-forest); font-family: "Libre Caslon Display", Georgia, serif; font-size: 1.2rem; font-weight: 400; }
 
-.primary-grid { display: grid; grid-template-columns: minmax(0, 2fr) minmax(280px, .82fr); align-items: start; gap: 18px; }
-.insight-rail { display: grid; gap: 18px; }
+/* The board is the widest thing on the page — seventeen columns of market,
+   projection and roster context — so it takes the whole row and the insight
+   rail sits underneath it two-up rather than beside it in a 280px column. */
+.primary-grid { display: grid; grid-template-columns: minmax(0, 1fr); align-items: start; gap: 18px; }
+.insight-rail { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
 .editorial-card { border: 1px solid var(--fantasy-line); border-radius: 3px; background: rgba(255,253,248,.94); box-shadow: 0 12px 30px rgba(47,40,29,.055); }
 /* The board shares its row with the insight rail, so the card is a good deal
    narrower than the window — about 730px at a 1140px viewport. The per-category
@@ -796,11 +799,12 @@ h1, h2, .drawer__head h2 { font-family: "Libre Caslon Display", Georgia, serif; 
        and honouring it is what pushed the last column out of the card. */
     .season-fantasy__table { width: 100%; min-width: 0; table-layout: fixed; }
     .season-fantasy__table .col-rank { width: 34px; }
-    /* Counted from the right: the three decision columns are always the last
-       three, so another breakdown column on the left cannot retarget these. */
-    .season-fantasy__table th:nth-last-child(3) { width: 74px; }
-    .season-fantasy__table th:nth-last-child(2) { width: 82px; }
-    .season-fantasy__table th:nth-last-child(1) { width: 62px; }
+    /* The three decision columns, named rather than counted from the right —
+       they are no longer the last three, and every column that now follows
+       them is hidden at this width. */
+    .season-fantasy__table .col-implied { width: 74px; }
+    .season-fantasy__table .col-consensus { width: 82px; }
+    .season-fantasy__table .col-diff { width: 62px; }
 
     .season-fantasy__table .season-leader__name,
     .season-fantasy__table .season-leader__meta {
@@ -908,8 +912,6 @@ button:focus-visible,a:focus-visible,summary:focus-visible,[tabindex]:focus-visi
 @media (max-width: 960px) {
     .editorial-hero { align-items: stretch; }
     .hero-snapshot { min-width: 400px; }
-    .primary-grid { grid-template-columns: 1fr; }
-    .insight-rail { grid-template-columns: 1fr 1fr; }
 }
 
 @media (max-width: 720px) {
@@ -1137,7 +1139,27 @@ button:focus-visible,a:focus-visible,summary:focus-visible,[tabindex]:focus-visi
 .season-offense__total { color: var(--fantasy-clay); }
 #market-board .col-sort { color: inherit; }
 #market-board .col-sort:hover,#market-board .col-sort.is-sorted { color: var(--fantasy-forest); }
-.season-fantasy__table.hide-rec .col-rec { display: none; }
+.season-fantasy__table.hide-rec .col-rec,
+.season-fantasy__table.hide-espn .col-espn,
+.season-fantasy__table.hide-sleeper .col-sleeper { display: none; }
+
+/* Seventeen columns scroll sideways on anything short of a wide monitor, and
+   a scrolled-away name makes every number anonymous. Rank and player stay
+   put; they need their own background or the cells slide under them. */
+.season-fantasy__table .col-rank,
+.season-fantasy__table .col-player { position: sticky; z-index: 1; background: #fffdf8; }
+.season-fantasy__table .col-rank { left: 0; }
+.season-fantasy__table .col-player { left: 38px; box-shadow: 1px 0 0 #ebe5db; }
+.season-fantasy__table thead .col-rank,
+.season-fantasy__table thead th:nth-child(2) { position: sticky; z-index: 2; background: #f2ede4; }
+.season-fantasy__table thead .col-rank { left: 0; }
+.season-fantasy__table thead th:nth-child(2) { left: 38px; box-shadow: 1px 0 0 var(--fantasy-line); }
+.season-fantasy__table tbody tr:hover .col-rank,
+.season-fantasy__table tbody tr:hover .col-player { background: #f8f4ec; }
+
+/* The overall rank is the number; the positional one qualifies it. */
+.provider-rank__position { margin-left: 4px; color: var(--fantasy-muted); font-size: .64rem; }
+.season-fantasy__table .is-quiet { color: #c3bbac; }
 #market-board .season-fantasy__total { color: var(--fantasy-gold); }
 #market-board .season-fantasy__proj { color: var(--fantasy-muted); }
 .season-fantasy__delta.is-over { color: #4d775a; }
@@ -1196,10 +1218,6 @@ button:focus-visible,a:focus-visible,summary:focus-visible,[tabindex]:focus-visi
 .sparkline--market { width: 100%; color: var(--fantasy-clay); }
 .drawer { z-index: 10001; }
 
-@media (max-width: 960px) {
-    .primary-grid { grid-template-columns: 1fr; }
-    .insight-rail { grid-template-columns: 1fr 1fr; }
-}
 @media (max-width: 720px) {
     .tool-grid,.insight-rail,.support-grid { grid-template-columns: 1fr; }
     .tool-card { min-height: 72px; }

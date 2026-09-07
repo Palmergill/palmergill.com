@@ -1576,6 +1576,37 @@ def _score_season_player(
     }
 
 
+def _attach_player_context(
+    row: Dict[str, Any],
+    player: Optional[FantasyPlayer],
+    provider_boards: Dict[str, Dict[str, Dict[str, Any]]],
+    byes: Dict[str, int],
+    trending: Dict[str, Dict[str, int]],
+) -> None:
+    """Everything the site knows about a player that is not his market price.
+
+    The board's own columns all come from one source — the betting market —
+    and a row that shows only those makes the market look like the whole
+    story. Provider ranks, the bye, and what the rest of the league is doing
+    with the player are the context that says whether an implied total is a
+    bargain or a warning.
+    """
+    player_id = player.player_id if player else None
+    row["provider_boards"] = {
+        source: board[player_id]
+        for source, board in provider_boards.items()
+        if player_id in board
+    }
+    row["age"] = player.age if player else None
+    row["years_exp"] = player.years_exp if player else None
+    row["bye_week"] = byes.get((player.team or "").upper()) if player else None
+    counts = trending.get(player_id) or {}
+    # Sleeper publishes a top-N list, so absence means "not trending", which
+    # is a zero the column can show, not a gap in the data.
+    row["trending_add"] = counts.get("add", 0)
+    row["trending_drop"] = counts.get("drop", 0)
+
+
 def _season_book_values(
     rows, market: str, drop_rates: Dict[Tuple[str, str], float]
 ) -> Dict[str, float]:
@@ -2034,11 +2065,105 @@ def _season_projection_map(
     return projections, source, providers
 
 
+def _team_bye_weeks(db: Session, season: Optional[int]) -> Dict[str, int]:
+    """Each team's bye: the one regular-season week it has no game.
+
+    Derived rather than stored, and only from a schedule that covers the
+    whole regular season. A partially collected one would read every
+    uncollected week as a bye for half the league, which is worse than
+    showing no bye column at all.
+    """
+    if not season:
+        return {}
+    games = (
+        db.query(FantasyGame)
+        .filter(FantasyGame.season == season, FantasyGame.game_type == "REG")
+        .all()
+    )
+    played: Dict[str, set] = {}
+    weeks = set()
+    for game in games:
+        if not game.week:
+            continue
+        weeks.add(game.week)
+        for team in (game.home_team, game.away_team):
+            if team:
+                played.setdefault(team.upper(), set()).add(game.week)
+    if not weeks or weeks != set(range(1, max(weeks) + 1)):
+        return {}
+    byes = {}
+    for team, team_weeks in played.items():
+        missing = sorted(weeks - team_weeks)
+        if len(missing) == 1:
+            byes[team] = missing[0]
+    return byes
+
+
+def _provider_season_boards(
+    db: Session, season: Optional[int], scoring_field: str
+) -> Dict[str, Dict[str, Dict[str, Any]]]:
+    """Each provider's own season-long board: points, overall and position rank.
+
+    A provider publishes points, not places, so "ESPN rank" is this: order
+    that provider's season-long projection and count. Only positive
+    projections are ranked — Sleeper carries a row for every player in the
+    league, and giving four thousand zeroes a rank apiece would make the
+    column meaningless for the players who have one.
+
+    Ranks are read off the whole provider board, not off the rows the market
+    happens to quote, so a player's rank does not move when the board he is
+    shown on is filtered.
+    """
+    boards: Dict[str, Dict[str, Dict[str, Any]]] = {}
+    field = getattr(FantasyProjection, scoring_field)
+    for source, run in _provider_runs(db, season, SEASON_LONG_WEEK).items():
+        rows = (
+            db.query(FantasyProjection.player_id, field, FantasyPlayer.position)
+            .join(FantasyPlayer, FantasyPlayer.player_id == FantasyProjection.player_id)
+            .filter(
+                FantasyProjection.run_id == run.id,
+                field.isnot(None),
+                field > 0,
+            )
+            .order_by(field.desc())
+            .all()
+        )
+        board: Dict[str, Dict[str, Any]] = {}
+        position_counts: Dict[str, int] = {}
+        for index, (player_id, points, position) in enumerate(rows):
+            label = display_position(position)
+            position_counts[label] = position_counts.get(label, 0) + 1
+            board[player_id] = {
+                "points": round(points, 1),
+                "rank": index + 1,
+                "position_rank": position_counts[label],
+            }
+        if board:
+            boards[source] = board
+    return boards
+
+
+def _trending_counts(db: Session) -> Dict[str, Dict[str, int]]:
+    """player_id -> {"add": n, "drop": n} from the latest trending run."""
+    run = latest_successful_run(db, "trending")
+    if run is None:
+        return {}
+    counts: Dict[str, Dict[str, int]] = {}
+    for row in (
+        db.query(FantasyTrendingSnapshot)
+        .filter(FantasyTrendingSnapshot.run_id == run.id)
+        .all()
+    ):
+        counts.setdefault(row.player_id, {})[row.kind] = row.count
+    return counts
+
+
 def get_season_fantasy_point_leaders(
     db: Session,
     season: Optional[int] = None,
     scoring: str = "std",
     limit: int = 100,
+    include_context: bool = True,
     _run=None,
 ) -> Dict[str, Any]:
     """Rank players by fantasy points implied by quoted markets.
@@ -2078,6 +2203,7 @@ def get_season_fantasy_point_leaders(
             "scoring": scoring,
             "projection_source": None,
             "projection_providers": None,
+            "provider_boards": [],
             "excluded_without_projection": 0,
             "leaders": [],
         }
@@ -2101,6 +2227,9 @@ def get_season_fantasy_point_leaders(
     projections, projection_source, projection_providers = _season_projection_map(db, season)
     reception_multiplier = {"std": 0.0, "half": 0.5, "ppr": 1.0}[scoring]
     scoring_field = _SEASON_SCORING_FIELD[scoring]
+    provider_boards = _provider_season_boards(db, season, scoring_field) if include_context else {}
+    byes = _team_bye_weeks(db, season) if include_context else {}
+    trending = _trending_counts(db) if include_context else {}
     excluded_without_projection = 0
     leaders = []
     for player_id, market_rows in rows_by_player.items():
@@ -2116,6 +2245,10 @@ def get_season_fantasy_point_leaders(
             excluded_without_projection += 1
             continue
         if row is not None:
+            if include_context:
+                _attach_player_context(
+                    row, players.get(player_id), provider_boards, byes, trending
+                )
             leaders.append(row)
 
     leaders.sort(key=lambda entry: (
@@ -2131,6 +2264,7 @@ def get_season_fantasy_point_leaders(
         "scoring": scoring,
         "projection_source": projection_source,
         "projection_providers": projection_providers,
+        "provider_boards": sorted(provider_boards),
         "excluded_without_projection": excluded_without_projection,
         "leaders": leaders[:limit],
     }
@@ -2165,11 +2299,16 @@ def get_season_fantasy_movers(
     if baseline_run is None:
         return empty
 
+    # Two whole boards, read for their totals alone: the per-player context
+    # would be four extra passes over the projection feed for columns this
+    # comparison never looks at.
     current = get_season_fantasy_point_leaders(
-        db, season=season, scoring=scoring, limit=10000, _run=current_run
+        db, season=season, scoring=scoring, limit=10000,
+        include_context=False, _run=current_run,
     )
     baseline = get_season_fantasy_point_leaders(
-        db, season=season, scoring=scoring, limit=10000, _run=baseline_run
+        db, season=season, scoring=scoring, limit=10000,
+        include_context=False, _run=baseline_run,
     )
     baseline_values = {
         entry["player"]["player_id"]: entry["fantasy_points"]
