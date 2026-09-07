@@ -181,6 +181,19 @@ class EspnLeagueClient:
         """Settings, members, teams, and current rosters in one call."""
         return self.get_views(season, ["mSettings", "mTeam", "mRoster"])
 
+    def get_draft(self, season: int) -> Dict[str, Any]:
+        """The draft board, bundled with rosters.
+
+        mDraftDetail identifies each pick by bare ``playerId`` and nothing
+        else — no name, position, or team. ff_players.espn_id cannot close
+        that gap alone (Sleeper leaves it null for a large share of players,
+        stars included, which is why PlayerCrosswalk exists), so mRoster comes
+        along to supply the identity of every drafted player. Immediately
+        after a draft the two sets are the same players, which is exactly when
+        this job runs.
+        """
+        return self.get_views(season, ["mDraftDetail", "mRoster"])
+
     def get_schedule(self, season: int) -> Dict[str, Any]:
         """Full season schedule with scores.
 
@@ -431,6 +444,86 @@ def espn_player_key(player: Dict[str, Any], espn_player_id: Optional[int] = None
     if player_id is None:
         player_id = espn_player_id
     return (str(player_id) if player_id is not None else None), None
+
+
+# ESPN pre-generates every pick slot before the draft starts and fills them
+# in as it runs, using -1 as the "nobody yet" placeholder. A real D/ST id is
+# below DST_PLAYER_ID_OFFSET, so the two negatives never collide.
+UNDRAFTED_PLAYER_ID = -1
+
+
+def draft_pick_player_key(
+    espn_player_id: Optional[int],
+) -> Tuple[Optional[str], Optional[str]]:
+    """Return (espn_id, dst_team_abbrev) for a pick's bare playerId.
+
+    The roster payload carries a whole player object, so parse_roster_entries
+    can use espn_player_key. mDraftDetail carries only the id, so the D/ST
+    crosswalk has to run the DST_PLAYER_ID_OFFSET arithmetic in reverse:
+    -16007 -> proTeamId 7 -> "DEN".
+    """
+    if espn_player_id is None:
+        return None, None
+    if espn_player_id < DST_PLAYER_ID_OFFSET:
+        pro_team_id = -espn_player_id + DST_PLAYER_ID_OFFSET
+        return None, ESPN_PRO_TEAM_ABBR.get(pro_team_id)
+    if espn_player_id <= 0:
+        return None, None
+    return str(espn_player_id), None
+
+
+def parse_draft_picks(payload: Any) -> Tuple[str, List[Dict[str, Any]]]:
+    """Parse the draft board into (status, rows).
+
+    Status is one of ``not_drafted`` | ``in_progress`` | ``complete``. Only
+    picks that have actually been made are returned — the empty slots carry no
+    information the round/pick math cannot reproduce, and returning them would
+    make "how many picks are in" a filtering question at every call site.
+    """
+    payload = _require_dict(payload, "league")
+    detail = payload.get("draftDetail")
+    if not isinstance(detail, dict):
+        raise EspnLeagueError("ESPN league payload had no draftDetail block")
+
+    if detail.get("drafted"):
+        status = "complete"
+    elif detail.get("inProgress"):
+        status = "in_progress"
+    else:
+        status = "not_drafted"
+
+    rows = []
+    for pick in detail.get("picks") or []:
+        if not isinstance(pick, dict):
+            continue
+        espn_player_id = coerce_int(pick.get("playerId"))
+        if espn_player_id is None or espn_player_id == UNDRAFTED_PLAYER_ID:
+            continue
+        overall_pick = coerce_int(pick.get("overallPickNumber"))
+        espn_team_id = coerce_int(pick.get("teamId"))
+        if overall_pick is None or espn_team_id is None:
+            continue
+        espn_id, dst_team = draft_pick_player_key(espn_player_id)
+        rows.append(
+            {
+                "overall_pick": overall_pick,
+                "round_id": coerce_int(pick.get("roundId")),
+                "round_pick": coerce_int(pick.get("roundPickNumber")),
+                "espn_team_id": espn_team_id,
+                "espn_player_id": espn_player_id,
+                "espn_id": espn_id,
+                "dst_team": dst_team,
+                "lineup_slot_id": coerce_int(pick.get("lineupSlotId")),
+                # ESPN sets `keeper` on the pick and `reservedForKeeper` on the
+                # slot it was held in; either one means this was not a live
+                # selection and must not be graded against ADP.
+                "keeper": bool(pick.get("keeper") or pick.get("reservedForKeeper")),
+                "bid_amount": coerce_float(pick.get("bidAmount")),
+                "auto_draft_type_id": coerce_int(pick.get("autoDraftTypeId")),
+            }
+        )
+    rows.sort(key=lambda row: row["overall_pick"])
+    return status, rows
 
 
 def parse_roster_entries(payload: Any) -> List[Dict[str, Any]]:

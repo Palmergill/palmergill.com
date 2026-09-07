@@ -19,8 +19,9 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel
 
 from app.database import SessionLocal, get_db
-from app.services import fantasy_ai, fantasy_league_data
+from app.services import fantasy_ai, fantasy_league_data, fantasy_league_draft
 from app.services.fantasy_league_data import UnknownSeasonError, UnknownTeamError
+from app.services.fantasy_league_draft import DraftUnavailable
 from app.services.fantasy_league_rankings import ALGORITHMS
 from app.routers.fantasy import run_blocking
 
@@ -283,3 +284,76 @@ async def regenerate_team_overview(
             worker.close()
 
     return await run_blocking(_generate)
+
+
+# ── draft recap ─────────────────────────────────────────────────────────
+
+
+@router.get("/draft")
+def draft_recap(
+    season: Optional[int] = None,
+    _: Dict[str, Any] = Depends(require_member),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """Picks, grades, accolades, and the ADP board they were graded against.
+
+    One read rather than three: the grades and the accolades are both derived
+    from the same enriched pick list, and splitting them across endpoints
+    would recompute the whole recap twice for one page load.
+    """
+    try:
+        return fantasy_league_draft.get_draft_recap(db, season)
+    except DraftUnavailable as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+
+
+@router.get("/draft/notes/{team_id}")
+def draft_note(
+    team_id: int,
+    season: Optional[int] = None,
+    _: Dict[str, Any] = Depends(require_member),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """Read a stored draft recap. Never generates — see the POST."""
+    resolved = _resolved_draft_season(db, season)
+    try:
+        return fantasy_ai.read_draft_note(db, resolved, team_id)
+    except fantasy_ai.UnknownDraftTeamError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+
+
+@router.post("/draft/notes/{team_id}", status_code=201)
+async def write_draft_note(
+    team_id: int,
+    season: Optional[int] = None,
+    force: bool = False,
+    _: Dict[str, Any] = Depends(require_member),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """Write one team's draft recap, reusing an unchanged one."""
+    resolved = _resolved_draft_season(db, season)
+
+    def _generate() -> Dict[str, Any]:
+        # Own session, for the same reason regenerate_team_overview needs one:
+        # the request-scoped session belongs to the event loop.
+        worker = SessionLocal()
+        try:
+            return fantasy_ai.generate_draft_note(worker, resolved, team_id, force=force)
+        finally:
+            worker.close()
+
+    try:
+        return await run_blocking(_generate)
+    except fantasy_ai.UnknownDraftTeamError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+
+
+def _resolved_draft_season(db: Session, season: Optional[int]) -> int:
+    if season is not None:
+        return season
+    from app.services import fantasy_league_collector
+
+    resolved = fantasy_league_collector.current_league_season(db)
+    if not resolved:
+        raise HTTPException(status_code=404, detail="No league season is configured.")
+    return resolved

@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Draft Recap — Fantasy Football</title>
+    <meta name="description" content="Grades, accolades, and every pick from a private ESPN fantasy football league draft.">
+    <meta name="theme-color" content="#faf6f0">
+    <!-- Members-only and about real people: keep it out of search results. -->
+    <meta name="robots" content="noindex, nofollow">
+    <link rel="icon" type="image/png" href="/assets/palmer-gill-logo-small.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/shared/site-nav.css?v=14">
+    <link rel="stylesheet" href="/shared/fantasy-header.css?v=1">
+    <link rel="stylesheet" href="style.css?v=1">
+</head>
+<body>
+<noscript>
+    <p class="site-noscript">This page builds its content with JavaScript, so it needs scripts enabled. <a href="/">Browse the other projects</a> in the meantime.</p>
+</noscript>
+    <main class="app-shell">
+        <div id="fantasy-header-mount"></div>
+        <header class="page-head">
+            <div class="page-head__titles">
+                <span class="eyebrow">Private league</span>
+                <h1>Draft Recap</h1>
+                <p class="lede" id="draftLede">
+                    Grades, accolades, and every pick — measured against where the
+                    rest of the world was taking these players.
+                </p>
+            </div>
+            <div class="week-badge" id="statusBadge" aria-live="polite">
+                <span class="week-badge__label" id="statusLabel">Draft</span>
+                <span class="week-badge__value" id="statusValue">—</span>
+                <span class="week-badge__season" id="statusSeason"></span>
+            </div>
+        </header>
+
+        <p id="errorBanner" class="banner banner--error" hidden></p>
+        <p id="noticeBanner" class="banner" hidden></p>
+
+        <!-- Shown when the API returns 403: not signed in. -->
+        <section id="signedOutView" class="signed-out" hidden>
+            <h2>Members only</h2>
+            <p>
+                The draft recap is limited to league managers. Sign in to see
+                grades, accolades, and the full board.
+            </p>
+            <div class="signed-out__actions">
+                <a class="button" id="signInLink" href="/login/">Sign in</a>
+                <a class="button button--quiet" href="/signup/">Create an account</a>
+            </div>
+        </section>
+
+        <section id="emptyView" class="signed-out" hidden>
+            <h2 id="emptyTitle">No draft yet</h2>
+            <p id="emptyBody">
+                This page fills in on its own once the draft board has picks on it.
+            </p>
+        </section>
+
+        <div id="draftView" hidden>
+            <nav class="season-bar" aria-label="Season">
+                <div class="chip-row" id="seasonChips" role="group" aria-label="Choose a season"></div>
+            </nav>
+
+            <!-- The accolades come first: they are what people came for. -->
+            <section class="board" aria-labelledby="accoladesTitle">
+                <div class="board__head">
+                    <h2 id="accoladesTitle">Accolades</h2>
+                    <span class="board__note" id="accoladesNote"></span>
+                </div>
+                <div class="awards" id="awardsGrid"></div>
+            </section>
+
+            <section class="board" aria-labelledby="gradesTitle">
+                <div class="board__head">
+                    <h2 id="gradesTitle">Grades</h2>
+                    <span class="board__note" id="gradesNote"></span>
+                </div>
+                <div class="grades" id="gradesGrid"></div>
+            </section>
+
+            <section class="board" aria-labelledby="boardTitle">
+                <div class="board__head">
+                    <h2 id="boardTitle">Every pick</h2>
+                    <span class="board__note" id="boardNote"></span>
+                </div>
+                <div class="chip-row" id="boardFilters" role="group" aria-label="Filter picks by team"></div>
+                <div class="table-wrap">
+                    <table class="rank-table pick-table">
+                        <thead>
+                            <tr>
+                                <th scope="col"><button type="button" class="col-sort" data-sort="pick" data-mobile-label="#">Pick</button></th>
+                                <th scope="col">Team</th>
+                                <th scope="col"><button type="button" class="col-sort" data-sort="player" data-mobile-label="Player">Player</button></th>
+                                <th scope="col"><button type="button" class="col-sort" data-sort="position" data-mobile-label="Pos">Pos</button></th>
+                                <th scope="col"><button type="button" class="col-sort" data-sort="adp" data-mobile-label="ADP">ADP</button></th>
+                                <th scope="col"><button type="button" class="col-sort" data-sort="sigma" data-mobile-label="±σ">Reach</button></th>
+                                <th scope="col"><button type="button" class="col-sort" data-sort="points" data-mobile-label="Proj">Proj</button></th>
+                            </tr>
+                        </thead>
+                        <tbody id="pickRows"></tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section class="board" aria-labelledby="calloutsTitle">
+                <div class="board__head">
+                    <h2 id="calloutsTitle">How the board went</h2>
+                </div>
+                <div class="callouts" id="callouts"></div>
+            </section>
+
+            <details class="board method" id="methodCard">
+                <summary><h2>How these grades are built</h2></summary>
+                <div class="method__body" id="methodBody"></div>
+            </details>
+        </div>
+    </main>
+
+    <script src="/shared/site-nav.js?v=16"></script>
+    <script src="/shared/fantasy-header.js?v=1"></script>
+    <script>window.FantasyHeader.mount({ page: "league" });</script>
+    <script src="/shared/analytics.js?v=1"></script>
+    <script src="/shared/api-base.js?v=1"></script>
+    <script src="format.js?v=1"></script>
+    <script src="app.js?v=1"></script>
+</body>
+</html>

@@ -19,6 +19,7 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple
 from sqlalchemy.orm import Session
 
 from app.database import (
+    FantasyAdpSnapshot,
     FantasyCollectionRun,
     FantasyFutureSnapshot,
     FantasyGame,
@@ -42,6 +43,7 @@ from app.services.fantasy_common import (
     normalize_name,
     normalize_position,
 )
+from app.services.fantasy_adp import ADP_FORMATS, adp_client
 from app.services.fantasy_fantasypros import fantasypros_client
 from app.services.fantasy_espn import espn_projection_client
 from app.services.fantasy_nflverse import nflverse_client
@@ -92,11 +94,21 @@ JOB_INTERVALS_SECONDS = {
     # keep moving them into September. A daily snapshot keeps the lookup fresh
     # without polling a long-dated market unnecessarily.
     "season_props": {"in_season": 24 * 3600, "off_season": 24 * 3600},
+    # ADP is only meaningful while people are still drafting: it moves daily
+    # through August, freezes once the season starts, and the draft recap
+    # grades against whichever snapshot sat nearest the draft. Daily in both
+    # states keeps that history dense enough to pick from without being
+    # anything like expensive — it is one small JSON per format.
+    "adp": {"in_season": 24 * 3600, "off_season": 24 * 3600},
     # ESPN league hub (spec 17). Season-scoped, so these use per-season timer
     # keys rather than the bare job name — see _league_due_job.
     "league_sync": {"in_season": 6 * 3600, "off_season": 24 * 3600},
     "league_rosters": {"in_season": 6 * 3600, "off_season": 24 * 3600},
     "league_rankings": {"in_season": 6 * 3600, "off_season": 7 * 24 * 3600},
+    # The draft board is written once and then never changes, but it is worth
+    # catching promptly while it fills in — a recap that appears the morning
+    # after is a worse read than one waiting when the last pick lands.
+    "league_draft": {"in_season": 6 * 3600, "off_season": 24 * 3600},
 }
 
 # A finished season never changes, so polling it on the live cadence is pure
@@ -716,6 +728,110 @@ def _season_prop_player_map(db) -> Dict[str, str]:
     return resolved
 
 
+def collect_adp(
+    db: Session, client=None, formats=None, teams: int = 10
+) -> FantasyCollectionRun:
+    """Snapshot average draft position from Fantasy Football Calculator.
+
+    Formats are collected independently and pooled, on the same reasoning as
+    the season-prop providers: losing one board costs that board, not the run.
+    ``teams`` matches the league the draft recap grades, so the ADP is drawn
+    from drafts the same size rather than rescaled from a 12-team board.
+    """
+    client = client or adp_client
+    formats = formats or tuple(ADP_FORMATS)
+
+    season = current_season_week(db)["season"]
+    run = _start_run(db, "adp", None, season=season)
+    if not season:
+        return _finish_run(
+            db, run, "skipped", detail="no NFL season known — run the state job first"
+        )
+
+    boards = []
+    failures = []
+    for fmt in formats:
+        try:
+            boards.append(client.get_adp(season, fmt=fmt, teams=teams))
+        except Exception as exc:
+            logger.warning("ADP fetch failed for %s: %s", fmt, exc)
+            failures.append(f"{fmt}: {exc}")
+
+    if not boards:
+        return _finish_run(db, run, "error", detail="; ".join(failures))
+
+    run.source = ",".join(board["meta"]["format"] for board in boards)
+
+    players = db.query(FantasyPlayer).all()
+    by_name_team = {(p.search_name, p.team): p.player_id for p in players if p.search_name}
+    by_name: Dict[str, List[str]] = {}
+    defenses = {}
+    for player in players:
+        if player.search_name:
+            by_name.setdefault(player.search_name, []).append(player.player_id)
+        if player.position == "DEF" and player.team:
+            defenses[player.team] = player.player_id
+
+    now = utc_now()
+    written = 0
+    unmatched = 0
+    for board in boards:
+        meta = board["meta"]
+        for row in board["players"]:
+            team = FANTASYPROS_TEAM_ALIASES.get(row["team"], row["team"])
+            if row["position"] == "DEF":
+                player_id = defenses.get(team)
+            else:
+                name = normalize_name(row["name"])
+                player_id = by_name_team.get((name, team))
+                # Fall back to a bare name match only when it is unambiguous;
+                # FFC's team can lag a preseason trade by a day or two.
+                if player_id is None and len(by_name.get(name, [])) == 1:
+                    player_id = by_name[name][0]
+            if player_id is None:
+                unmatched += 1
+            db.add(
+                FantasyAdpSnapshot(
+                    run_id=run.id,
+                    season=season,
+                    format=meta["format"],
+                    teams=meta["teams"],
+                    rounds=meta["rounds"],
+                    player_id=player_id,
+                    player_name_raw=row["name"],
+                    provider_player_id=(
+                        str(row["provider_player_id"])
+                        if row["provider_player_id"] is not None
+                        else None
+                    ),
+                    position=row["position"],
+                    team=team,
+                    adp=row["adp"],
+                    adp_stdev=row["adp_stdev"],
+                    adp_high=row["adp_high"],
+                    adp_low=row["adp_low"],
+                    times_drafted=row["times_drafted"],
+                    bye=row["bye"],
+                    total_drafts=meta["total_drafts"],
+                    source_start_date=meta["start_date"],
+                    source_end_date=meta["end_date"],
+                    fetched_at=now,
+                )
+            )
+            written += 1
+    db.commit()
+
+    notes = []
+    if unmatched:
+        notes.append(f"{unmatched} of {written} rows unmatched to a player")
+    if failures:
+        notes.append("lost " + "; ".join(failures))
+    status = "success" if not failures else "partial"
+    return _finish_run(
+        db, run, status, rows_written=written, detail="; ".join(notes) or None
+    )
+
+
 def collect_odds_lines(db: Session, client=None, markets=GAME_MARKETS) -> FantasyCollectionRun:
     client = client or odds_client
     run = _start_run(db, "odds_lines", "the-odds-api")
@@ -1036,6 +1152,25 @@ def _mark_league_next_due(
     db.commit()
 
 
+def _mark_draft_next_due(
+    db: Session, season: int, now: datetime, in_season: bool, completed: bool
+) -> None:
+    """Next-due for league_draft, which has three speeds rather than two.
+
+    A draft in progress is polled on every scheduler tick; anything else falls
+    back to the ordinary league cadence. The status comes from ff_meta rather
+    than a fresh fetch, so a completed draft costs nothing to stay slow.
+    """
+    from app.services import fantasy_league_collector
+
+    if fantasy_league_collector.last_draft_status(db, season) == "in_progress":
+        key = f"{_DUE_META_PREFIX}{_league_due_job('league_draft', season)}"
+        set_meta(db, key, now.isoformat())
+        db.commit()
+        return
+    _mark_league_next_due(db, "league_draft", season, now, in_season, completed)
+
+
 def _mark_provider_next_due(
     db: Session, source: str, season: int, week: int, now: datetime, in_season: bool
 ) -> None:
@@ -1113,6 +1248,9 @@ def run_scheduled(db: Session, now: Optional[datetime] = None) -> List[Dict[str,
     if _job_due(db, "season_props", now):
         summaries.append(_summary(collect_season_props(db)))
         _mark_next_due(db, "season_props", now, in_season)
+    if _job_due(db, "adp", now):
+        summaries.append(_summary(collect_adp(db)))
+        _mark_next_due(db, "adp", now, in_season)
     if _job_due(db, "odds_futures", now):
         summaries.append(_summary(collect_odds_futures(db)))
         _mark_next_due(db, "odds_futures", now, in_season)
@@ -1135,11 +1273,25 @@ def run_scheduled(db: Session, now: Optional[datetime] = None) -> List[Dict[str,
         completed = current_league is not None and league_season < current_league
         runs = fantasy_league_collector.collect_season(db, league_season)
         summaries.extend(_summary(run) for run in runs)
-        for job in ("league_sync", "league_rosters", "league_rankings"):
+        for job in fantasy_league_collector.LEAGUE_JOBS:
             # A private season is polled on the slow cadence too: it is a
             # stable state, not something worth rechecking four times a day.
             slow = completed or runs[0].status == "skipped"
             _mark_league_next_due(db, job, league_season, now, in_season, slow)
+        _mark_draft_next_due(db, league_season, now, in_season, completed)
+
+    # The draft board gets its own trigger rather than riding the league_sync
+    # tick. A draft runs for a couple of hours once a year, and a recap that
+    # lands the next morning is a much worse read than one already waiting
+    # when the last pick is in — so a live draft is polled every tick.
+    for league_season in fantasy_league_collector.league_seasons():
+        due_job = _league_due_job("league_draft", league_season)
+        if not _job_due(db, due_job, now):
+            continue
+        completed = current_league is not None and league_season < current_league
+        run = fantasy_league_collector.collect_league_draft(db, league_season)
+        summaries.append(_summary(run))
+        _mark_draft_next_due(db, league_season, now, in_season, completed)
 
     return summaries
 
@@ -1159,7 +1311,7 @@ def run_job(
     if not is_in_season(ctx["season_type"]):
         week = SEASON_LONG_WEEK  # offseason -> season-long snapshots
 
-    if job in ("league_sync", "league_rosters", "league_rankings"):
+    if job in ("league_sync", "league_rosters", "league_rankings", "league_draft"):
         from app.services import fantasy_league_collector
 
         target = league_season or fantasy_league_collector.current_league_season(db)
@@ -1169,6 +1321,8 @@ def run_job(
             return fantasy_league_collector.collect_league_sync(db, target)
         if job == "league_rosters":
             return fantasy_league_collector.collect_league_rosters(db, target)
+        if job == "league_draft":
+            return fantasy_league_collector.collect_league_draft(db, target)
         return fantasy_league_collector.build_league_power_rankings(db, target)
 
     if job == "state":
@@ -1209,6 +1363,8 @@ def run_job(
         return collect_odds_futures(db)
     if job == "season_props":
         return collect_season_props(db)
+    if job == "adp":
+        return collect_adp(db)
     raise ValueError(f"unknown job: {job}")
 
 
@@ -1226,9 +1382,11 @@ REFRESHABLE_JOBS = (
     "odds_props",
     "odds_futures",
     "season_props",
+    "adp",
     "league_sync",
     "league_rosters",
     "league_rankings",
+    "league_draft",
 )
 
 

@@ -13,7 +13,9 @@ from app.services.fantasy_league_espn import (
     ESPN_PRO_TEAM_ABBR,
     EspnLeagueError,
     configured_seasons,
+    draft_pick_player_key,
     espn_player_key,
+    parse_draft_picks,
     parse_members,
     parse_roster_entries,
     parse_schedule,
@@ -291,3 +293,127 @@ def test_configured_seasons_parses_env(monkeypatch):
 
     monkeypatch.setenv("ESPN_LEAGUE_SEASONS", "")
     assert configured_seasons() == [2023, 2024, 2025, 2026]
+
+
+# ── draft board ─────────────────────────────────────────────────────────
+#
+# Shapes captured from league 225965's 2026 board. ESPN pre-generates all 180
+# slots the moment the draft is scheduled and fills them in as it runs, so
+# "the payload has picks" and "the draft has happened" are different claims.
+
+
+def draft_payload(picks, drafted=False, in_progress=False):
+    return {
+        "draftDetail": {
+            "drafted": drafted,
+            "inProgress": in_progress,
+            "picks": picks,
+        }
+    }
+
+
+def pick(overall, team_id, player_id, **overrides):
+    row = {
+        "autoDraftTypeId": 0,
+        "bidAmount": 0,
+        "id": overall,
+        "keeper": False,
+        "lineupSlotId": 0,
+        "nominatingTeamId": 0,
+        "overallPickNumber": overall,
+        "playerId": player_id,
+        "reservedForKeeper": False,
+        "roundId": (overall - 1) // 10 + 1,
+        "roundPickNumber": (overall - 1) % 10 + 1,
+        "teamId": team_id,
+        "tradeLocked": False,
+    }
+    row.update(overrides)
+    return row
+
+
+def test_an_unstarted_draft_reports_not_drafted_with_no_picks():
+    payload = draft_payload([pick(n, 1, -1) for n in range(1, 181)])
+    status, rows = parse_draft_picks(payload)
+    assert status == "not_drafted"
+    # The 180 placeholders carry nothing the round math cannot reproduce.
+    assert rows == []
+
+
+def test_a_draft_underway_reports_in_progress_and_returns_only_real_picks():
+    payload = draft_payload(
+        [pick(1, 9, 4262921), pick(2, 3, 4429795)]
+        + [pick(n, 1, -1) for n in range(3, 181)],
+        in_progress=True,
+    )
+    status, rows = parse_draft_picks(payload)
+    assert status == "in_progress"
+    assert [row["overall_pick"] for row in rows] == [1, 2]
+
+
+def test_a_finished_draft_reports_complete():
+    payload = draft_payload([pick(1, 9, 4262921)], drafted=True)
+    status, _ = parse_draft_picks(payload)
+    assert status == "complete"
+
+
+def test_picks_come_back_in_board_order_whatever_order_espn_sent_them():
+    payload = draft_payload([pick(3, 5, 111), pick(1, 9, 222), pick(2, 3, 333)])
+    _, rows = parse_draft_picks(payload)
+    assert [row["overall_pick"] for row in rows] == [1, 2, 3]
+
+
+def test_a_drafted_defense_resolves_through_the_negative_id_arithmetic():
+    # -16007 is proTeamId 7, and the site spells that team DEN.
+    _, rows = parse_draft_picks(draft_payload([pick(150, 4, -16007)]))
+    assert rows[0]["dst_team"] == "DEN"
+    assert rows[0]["espn_id"] is None
+
+
+def test_the_undrafted_placeholder_is_never_mistaken_for_a_defense():
+    # -1 and -16007 are both negative; only one of them is a team.
+    assert draft_pick_player_key(-1) == (None, None)
+    assert draft_pick_player_key(-16007) == (None, "DEN")
+
+
+def test_a_skill_player_carries_a_string_espn_id_for_the_crosswalk():
+    _, rows = parse_draft_picks(draft_payload([pick(1, 9, 4262921)]))
+    assert rows[0]["espn_id"] == "4262921"
+    assert rows[0]["dst_team"] is None
+
+
+def test_either_keeper_flag_marks_a_pick_as_not_a_live_selection():
+    # Grading a keeper for "reaching" past ADP is meaningless, so both of
+    # ESPN's spellings have to reach the grader.
+    _, rows = parse_draft_picks(
+        draft_payload(
+            [
+                pick(1, 9, 111, keeper=True),
+                pick(2, 3, 222, reservedForKeeper=True),
+                pick(3, 5, 333),
+            ]
+        )
+    )
+    assert [row["keeper"] for row in rows] == [True, True, False]
+
+
+def test_an_autopicked_selection_keeps_espns_marker():
+    _, rows = parse_draft_picks(draft_payload([pick(1, 9, 111, autoDraftTypeId=1)]))
+    assert rows[0]["auto_draft_type_id"] == 1
+
+
+def test_a_bid_amount_survives_so_an_auction_can_be_detected():
+    _, rows = parse_draft_picks(draft_payload([pick(1, 9, 111, bidAmount=54)]))
+    assert rows[0]["bid_amount"] == 54
+
+
+def test_a_payload_without_a_draft_block_raises():
+    with pytest.raises(EspnLeagueError):
+        parse_draft_picks({"teams": []})
+
+
+def test_a_pick_missing_its_board_position_is_dropped():
+    _, rows = parse_draft_picks(
+        draft_payload([pick(1, 9, 111, overallPickNumber=None), pick(2, 3, 222)])
+    )
+    assert [row["overall_pick"] for row in rows] == [2]

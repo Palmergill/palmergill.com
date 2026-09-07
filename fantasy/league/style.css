@@ -1087,3 +1087,23 @@ button:focus-visible {
     .result { grid-template-columns: 44px 26px minmax(0, 1fr); }
     .result__opponent { display: none; }
 }
+
+/* Way across to the draft recap. Sits with the season chips because it is a
+   sibling view of the same league, not a separate tool. */
+.season-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.league-link {
+    color: var(--sage, #5b7152);
+    font-size: 13px;
+    font-weight: 600;
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+.league-link:hover { text-decoration: underline; }

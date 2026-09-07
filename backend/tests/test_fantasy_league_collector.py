@@ -8,6 +8,7 @@ import pytest
 
 from app.database import (
     FantasyCollectionRun,
+    FantasyLeagueDraftPick,
     FantasyLeagueMatchup,
     FantasyLeagueMember,
     FantasyLeaguePowerRanking,
@@ -23,6 +24,7 @@ from app.services import fantasy_league_collector as lc
 from app.services.fantasy_league_espn import EspnLeagueError, EspnLeagueUnauthorized
 
 LEAGUE_MODELS = (
+    FantasyLeagueDraftPick,
     FantasyLeaguePowerRanking,
     FantasyLeagueRosterEntry,
     FantasyLeagueMatchup,
@@ -167,9 +169,10 @@ SCHEDULE_PAYLOAD = {
 class FakeEspnLeagueClient:
     """Serves canned payloads, or raises for seasons configured to fail."""
 
-    def __init__(self, payloads=None, errors=None):
+    def __init__(self, payloads=None, errors=None, drafts=None):
         self.payloads = payloads or {}
         self.errors = errors or {}
+        self.drafts = drafts or {}
         self.calls = []
 
     def _check(self, season):
@@ -185,6 +188,16 @@ class FakeEspnLeagueClient:
     def get_schedule(self, season):
         self._check(season)
         return SCHEDULE_PAYLOAD
+
+    def get_draft(self, season):
+        self._check(season)
+        # Default: a league whose draft has not happened. Tests that care
+        # pass an explicit payload through `drafts`.
+        payload = dict(self.payloads.get(season, league_payload()))
+        payload["draftDetail"] = self.drafts.get(
+            season, {"drafted": False, "inProgress": False, "picks": []}
+        )
+        return payload
 
 
 def seed_players(db):
@@ -236,7 +249,14 @@ def test_one_private_season_does_not_block_the_others(db):
     public = lc.collect_season(db, 2024, client)
 
     assert [run.status for run in private] == ["skipped"]
-    assert [run.status for run in public] == ["success", "success", "success"]
+    # sync, rosters, rankings, then the draft — which skips, because this
+    # fixture league has not drafted.
+    assert [run.status for run in public] == [
+        "success",
+        "success",
+        "success",
+        "skipped",
+    ]
     assert db.query(FantasyLeagueTeam).filter_by(season=2024).count() == 2
 
 
@@ -644,3 +664,118 @@ def test_run_scheduled_keeps_going_when_one_season_is_private(db, monkeypatch):
     assert db.query(FantasyLeagueSeason).filter_by(season=2023).one().status == "unauthorized"
     assert db.query(FantasyLeagueSeason).filter_by(season=2024).one().status == "ok"
     assert db.query(FantasyLeagueTeam).filter_by(season=2024).count() == 2
+
+
+# ── draft board ─────────────────────────────────────────────────────────
+
+
+def draft_detail(picks, drafted=False, in_progress=False):
+    return {"drafted": drafted, "inProgress": in_progress, "picks": picks}
+
+
+def draft_pick(overall, team_id, player_id, **overrides):
+    row = {
+        "autoDraftTypeId": 0,
+        "bidAmount": 0,
+        "keeper": False,
+        "lineupSlotId": 0,
+        "overallPickNumber": overall,
+        "playerId": player_id,
+        "reservedForKeeper": False,
+        "roundId": (overall - 1) // 2 + 1,
+        "roundPickNumber": (overall - 1) % 2 + 1,
+        "teamId": team_id,
+    }
+    row.update(overrides)
+    return row
+
+
+def test_a_league_that_has_not_drafted_is_skipped_not_errored(db):
+    # Eleven months of the year this is the answer, and an error here would
+    # make the run log read like a crash loop.
+    client = FakeEspnLeagueClient(drafts={2024: draft_detail([])})
+    run = lc.collect_league_draft(db, 2024, client)
+    assert run.status == "skipped"
+    assert "not drafted" in run.detail
+    assert db.query(FantasyLeagueDraftPick).count() == 0
+
+
+def test_a_draft_room_open_with_no_picks_yet_is_also_skipped(db):
+    client = FakeEspnLeagueClient(
+        drafts={2024: draft_detail([draft_pick(n, 1, -1) for n in range(1, 5)], in_progress=True)}
+    )
+    run = lc.collect_league_draft(db, 2024, client)
+    assert run.status == "skipped"
+    assert "in progress" in run.detail
+
+
+def test_the_last_seen_draft_state_is_recorded_for_the_scheduler(db):
+    # The scheduler polls a live draft every tick and a finished one rarely,
+    # and it decides that from stored state rather than a fresh fetch.
+    client = FakeEspnLeagueClient(drafts={2024: draft_detail([], in_progress=True)})
+    lc.collect_league_draft(db, 2024, client)
+    assert lc.last_draft_status(db, 2024) == "in_progress"
+
+
+def test_picks_are_stored_with_identity_borrowed_from_the_roster_payload(db):
+    # mDraftDetail names nobody, so the bundled rosters supply the identity.
+    seed_players(db)
+    client = FakeEspnLeagueClient(
+        drafts={2024: draft_detail([draft_pick(1, 1, 4374302)], drafted=True)}
+    )
+    run = lc.collect_league_draft(db, 2024, client)
+    assert run.status == "success"
+
+    row = db.query(FantasyLeagueDraftPick).one()
+    assert row.overall_pick == 1
+    assert row.player_name_raw == "Amon-Ra St. Brown"
+    assert row.position == "WR"
+    assert row.player_id == "4035687"
+
+
+def test_a_second_run_upserts_rather_than_duplicating_the_board(db):
+    seed_players(db)
+    detail = draft_detail([draft_pick(1, 1, 4374302)], drafted=True)
+    client = FakeEspnLeagueClient(drafts={2024: detail})
+    lc.collect_league_draft(db, 2024, client)
+    lc.collect_league_draft(db, 2024, client)
+    assert db.query(FantasyLeagueDraftPick).count() == 1
+
+
+def test_a_pick_made_after_the_last_run_lands_without_disturbing_the_others(db):
+    seed_players(db)
+    client = FakeEspnLeagueClient(
+        drafts={2024: draft_detail([draft_pick(1, 1, 4374302)], in_progress=True)}
+    )
+    lc.collect_league_draft(db, 2024, client)
+
+    client.drafts[2024] = draft_detail(
+        [draft_pick(1, 1, 4374302), draft_pick(2, 2, 4374302)], drafted=True
+    )
+    run = lc.collect_league_draft(db, 2024, client)
+    assert run.status == "success"
+    assert db.query(FantasyLeagueDraftPick).count() == 2
+
+
+def test_an_unmatched_pick_is_kept_and_counted_rather_than_dropped(db):
+    # A player ESPN has and Sleeper has not published yet must stay on the
+    # board — the coverage gap belongs in the detail, not in silence.
+    client = FakeEspnLeagueClient(
+        drafts={2024: draft_detail([draft_pick(1, 1, 999999)], drafted=True)}
+    )
+    run = lc.collect_league_draft(db, 2024, client)
+    assert run.status == "success"
+    assert "1 of 1 picks unmatched" in run.detail
+    assert db.query(FantasyLeagueDraftPick).one().player_id is None
+
+
+def test_a_private_season_skips_instead_of_erroring(db):
+    client = FakeEspnLeagueClient(errors={2025: EspnLeagueUnauthorized("not public")})
+    run = lc.collect_league_draft(db, 2025, client)
+    assert run.status == "skipped"
+
+
+def test_a_transport_failure_is_an_error(db):
+    client = FakeEspnLeagueClient(errors={2024: EspnLeagueError("HTTP 503")})
+    run = lc.collect_league_draft(db, 2024, client)
+    assert run.status == "error"

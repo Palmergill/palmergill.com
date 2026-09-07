@@ -6,6 +6,7 @@ Three jobs, all season-scoped, following the same run-log contract as
   * ``league_sync``     — settings, members, teams/standings, and the schedule
   * ``league_rosters``  — a roster snapshot, skipped when nothing changed
   * ``league_rankings`` — power rankings recomputed for every completed week
+  * ``league_draft``    — the draft board, once it exists
 
 A season that is still private raises ``EspnLeagueUnauthorized``. That closes
 the run as ``skipped`` rather than ``error``: a private season is a stable,
@@ -23,6 +24,7 @@ from sqlalchemy.orm import Session
 
 from app.database import (
     FantasyCollectionRun,
+    FantasyLeagueDraftPick,
     FantasyLeagueMatchup,
     FantasyLeagueMember,
     FantasyLeaguePowerRanking,
@@ -42,6 +44,7 @@ from app.services.fantasy_league_espn import (
     configured_seasons,
     espn_league_client,
     league_collection_enabled,
+    parse_draft_picks,
     parse_members,
     parse_roster_entries,
     parse_schedule,
@@ -52,12 +55,24 @@ from app.services.fantasy_league_espn import (
 logger = logging.getLogger(__name__)
 
 ROSTER_DIGEST_META_PREFIX = "league:roster_digest:"
+# Last seen draft state, so the scheduler can poll a live draft hard and
+# an eleven-month-old one barely at all without re-fetching to find out.
+DRAFT_STATUS_META_PREFIX = "league:draft_status:"
 
-LEAGUE_JOBS = ("league_sync", "league_rosters", "league_rankings")
+LEAGUE_JOBS = ("league_sync", "league_rosters", "league_rankings", "league_draft")
 
 
 def _digest_key(season: int) -> str:
     return f"{ROSTER_DIGEST_META_PREFIX}{season}"
+
+
+def draft_status_key(season: int) -> str:
+    return f"{DRAFT_STATUS_META_PREFIX}{season}"
+
+
+def last_draft_status(db: Session, season: int) -> Optional[str]:
+    """The draft state the last run saw, or None if it has never run."""
+    return get_meta(db, draft_status_key(season))
 
 
 def _upsert_season_status(
@@ -331,6 +346,126 @@ def collect_league_rosters(db: Session, season: int, client=None) -> FantasyColl
     return finish_run(db, run, "success", rows_written=written, detail=detail)
 
 
+def collect_league_draft(db: Session, season: int, client=None) -> FantasyCollectionRun:
+    """Upsert the league's draft board.
+
+    ESPN pre-generates every pick slot before the draft opens, so an
+    undrafted league returns a full board of placeholders. That is a stable,
+    expected state — the draft simply has not happened — and closes the run as
+    ``skipped`` for the same reason a private season does: logging it as an
+    error would make the run log read like a crash loop for eleven months of
+    the year.
+    """
+    client = client or espn_league_client
+    run = start_run(db, "league_draft", "espn", season=season)
+    try:
+        payload = client.get_draft(season)
+        status, picks = parse_draft_picks(payload)
+        roster_entries = parse_roster_entries(payload)
+    except EspnLeagueUnauthorized as exc:
+        logger.info("ESPN league season %s is not public: %s", season, exc)
+        return finish_run(db, run, "skipped", detail=str(exc))
+    except EspnLeagueError as exc:
+        logger.warning("ESPN draft fetch failed for %s: %s", season, exc)
+        return finish_run(db, run, "error", detail=str(exc))
+
+    set_meta(db, draft_status_key(season), status)
+    db.commit()
+
+    if not picks:
+        return finish_run(
+            db,
+            run,
+            "skipped",
+            detail=f"Draft is {status.replace('_', ' ')} — no picks on the board yet",
+        )
+
+    # mDraftDetail names nobody, so identity comes from the bundled rosters,
+    # falling back to the last stored roster snapshot for a player who was
+    # drafted and then dropped before this job next ran.
+    identity = {
+        entry["espn_player_id"]: entry
+        for entry in roster_entries
+        if entry.get("espn_player_id") is not None
+    }
+    for row in (
+        db.query(FantasyLeagueRosterEntry)
+        .filter(FantasyLeagueRosterEntry.season == season)
+        .order_by(FantasyLeagueRosterEntry.id.desc())
+        .all()
+    ):
+        identity.setdefault(
+            row.espn_player_id,
+            {
+                "player_name_raw": row.player_name_raw,
+                "position": row.position,
+                "pro_team": row.pro_team,
+                "espn_id": str(row.espn_player_id) if row.espn_player_id else None,
+                "dst_team": None,
+            },
+        )
+
+    league_id = configured_league_id()
+    existing = {
+        row.overall_pick: row
+        for row in db.query(FantasyLeagueDraftPick)
+        .filter(
+            FantasyLeagueDraftPick.espn_league_id == league_id,
+            FantasyLeagueDraftPick.season == season,
+        )
+        .all()
+    }
+
+    crosswalk = PlayerCrosswalk(db)
+    now = utc_now()
+    written = 0
+    unmatched = 0
+    for pick in picks:
+        known = identity.get(pick["espn_player_id"]) or {}
+        entry = {
+            "dst_team": pick.get("dst_team") or known.get("dst_team"),
+            "espn_id": pick.get("espn_id"),
+            "player_name_raw": known.get("player_name_raw"),
+            "pro_team": known.get("pro_team"),
+        }
+        player_id = crosswalk.resolve(entry)
+        if player_id is None:
+            unmatched += 1
+
+        row = existing.get(pick["overall_pick"])
+        if row is None:
+            row = FantasyLeagueDraftPick(
+                espn_league_id=league_id,
+                season=season,
+                overall_pick=pick["overall_pick"],
+            )
+            db.add(row)
+        row.round_id = pick["round_id"]
+        row.round_pick = pick["round_pick"]
+        row.espn_team_id = pick["espn_team_id"]
+        row.espn_player_id = pick["espn_player_id"]
+        row.player_id = player_id
+        row.player_name_raw = known.get("player_name_raw")
+        row.position = known.get("position") or (
+            "DEF" if entry["dst_team"] else None
+        )
+        row.pro_team = known.get("pro_team") or entry["dst_team"]
+        row.lineup_slot_id = pick["lineup_slot_id"]
+        row.keeper = pick["keeper"]
+        row.bid_amount = pick["bid_amount"]
+        row.auto_draft_type_id = pick["auto_draft_type_id"]
+        row.fetched_at = now
+        written += 1
+    db.commit()
+
+    notes = [f"draft {status.replace('_', ' ')}"]
+    if unmatched:
+        notes.append(f"{unmatched} of {written} picks unmatched to a player")
+    return finish_run(
+        db, run, "success", rows_written=written, detail="; ".join(notes)
+    )
+
+
 def build_league_power_rankings(db: Session, season: int) -> FantasyCollectionRun:
     """Recompute power rankings for every completed week from stored data."""
     run = start_run(db, "league_rankings", "derived", season=season)
@@ -384,7 +519,7 @@ def build_league_power_rankings(db: Session, season: int) -> FantasyCollectionRu
 
 
 def collect_season(db: Session, season: int, client=None) -> List[FantasyCollectionRun]:
-    """Full refresh for one season: sync, then rosters and rankings.
+    """Full refresh for one season: sync, then rosters, rankings, and draft.
 
     Rosters and rankings only run when the sync succeeded — there is no point
     snapshotting or recomputing against a season we could not read.
@@ -393,6 +528,7 @@ def collect_season(db: Session, season: int, client=None) -> List[FantasyCollect
     if runs[0].status == "success":
         runs.append(collect_league_rosters(db, season, client))
         runs.append(build_league_power_rankings(db, season))
+        runs.append(collect_league_draft(db, season, client))
     return runs
 
 

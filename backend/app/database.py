@@ -413,6 +413,50 @@ class FantasyFutureSnapshot(Base):
     price = Column(Integer, nullable=True)
 
 
+class FantasyAdpSnapshot(Base):
+    """Average draft position from Fantasy Football Calculator (spec 17).
+
+    Snapshot, not upsert, for the reason that matters to the draft recap:
+    ADP moves right up to kickoff and then freezes, so grading a draft means
+    comparing it against the board *as it stood that day*. Keeping the history
+    lets the grader pick the snapshot nearest the draft rather than whichever
+    one happens to be current when someone loads the page in December.
+
+    ``player_id`` is nullable on the same principle as ff_prop_snapshots: an
+    unmatched player is kept with its raw name so the coverage gap is visible
+    rather than silently narrowing the board.
+    """
+
+    __tablename__ = "ff_adp_snapshots"
+    __table_args__ = (
+        Index("ix_ff_adp_season_format_run", "season", "format", "run_id"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    run_id = Column(Integer, index=True)
+    season = Column(Integer, index=True)
+    format = Column(String, index=True)  # 2qb|half_ppr
+    teams = Column(Integer, nullable=True)
+    rounds = Column(Integer, nullable=True)
+    player_id = Column(String, nullable=True, index=True)
+    player_name_raw = Column(String, nullable=True)
+    provider_player_id = Column(String, nullable=True)
+    position = Column(String, nullable=True)
+    team = Column(String, nullable=True)
+    adp = Column(Float, nullable=True)
+    adp_stdev = Column(Float, nullable=True)
+    adp_high = Column(Integer, nullable=True)
+    adp_low = Column(Integer, nullable=True)
+    times_drafted = Column(Integer, nullable=True)
+    bye = Column(Integer, nullable=True)
+    # The sample the board was built from, carried per row so a stored board
+    # can describe itself without a join back to the run log.
+    total_drafts = Column(Integer, nullable=True)
+    source_start_date = Column(String, nullable=True)
+    source_end_date = Column(String, nullable=True)
+    fetched_at = Column(DateTime, default=utc_now, index=True)
+
+
 class FantasyMeta(Base):
     __tablename__ = "ff_meta"
 
@@ -592,6 +636,49 @@ class FantasyLeagueRosterEntry(Base):
     fetched_at = Column(DateTime, default=utc_now, index=True)
 
 
+class FantasyLeagueDraftPick(Base):
+    """One pick from the league's ESPN draft (spec 17 draft recap).
+
+    UPSERT on (season, overall_pick). A completed pick is immutable, and ESPN
+    pre-generates every slot before the draft starts, so the same 180 rows are
+    written repeatedly as the draft fills in — snapshotting would store a copy
+    of the whole board on every poll for no recoverable information.
+
+    ``player_id`` is nullable and re-resolved on later runs: the crosswalk
+    runs through ff_players.espn_id, which the players job refreshes daily, so
+    a player ESPN has and Sleeper has not yet published resolves on the next
+    pass instead of being dropped.
+    """
+
+    __tablename__ = "ff_league_draft_picks"
+    __table_args__ = (
+        UniqueConstraint(
+            "espn_league_id", "season", "overall_pick", name="uq_ff_league_draft_pick"
+        ),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    espn_league_id = Column(String, index=True)
+    season = Column(Integer, index=True)
+    overall_pick = Column(Integer, index=True)
+    round_id = Column(Integer, nullable=True)
+    round_pick = Column(Integer, nullable=True)
+    espn_team_id = Column(Integer, index=True)
+    espn_player_id = Column(Integer, nullable=True)  # negative for D/ST
+    player_id = Column(String, nullable=True, index=True)
+    player_name_raw = Column(String, nullable=True)
+    position = Column(String, nullable=True)
+    pro_team = Column(String, nullable=True)
+    lineup_slot_id = Column(Integer, nullable=True)
+    keeper = Column(Boolean, default=False)
+    # Populated in an auction draft; 0/None in a snake. Stored so the grader
+    # can detect the format instead of assuming snake and mis-grading.
+    bid_amount = Column(Float, nullable=True)
+    # Nonzero when ESPN autopicked for an absent manager.
+    auto_draft_type_id = Column(Integer, nullable=True)
+    fetched_at = Column(DateTime, default=utc_now, index=True)
+
+
 class FantasyLeaguePowerRanking(Base):
     __tablename__ = "ff_league_power_rankings"
     __table_args__ = (
@@ -633,6 +720,31 @@ class FantasyLeagueTeamOverview(Base):
     # Hash of the context the overview was written from. Regenerating when
     # this changes invalidates the cache on real movement instead of on a
     # timer that is always either too eager or too stale.
+    prompt_digest = Column(String, nullable=True)
+    generated_at = Column(DateTime, default=utc_now, index=True)
+
+
+class FantasyLeagueDraftNote(Base):
+    """A written recap of one team's draft.
+
+    Same shape and same caching contract as ff_league_team_overviews: the
+    digest is a hash of the facts the note was written from, so it regenerates
+    on real movement rather than on a timer. ``source`` records whether a model
+    wrote it or the deterministic fallback did, which is what lets the page
+    read well with no API key configured.
+    """
+
+    __tablename__ = "ff_league_draft_notes"
+    __table_args__ = (
+        UniqueConstraint("season", "espn_team_id", name="uq_ff_league_draft_note"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    season = Column(Integer, index=True)
+    espn_team_id = Column(Integer, index=True)
+    note_md = Column(Text, nullable=True)
+    model = Column(String, nullable=True)
+    source = Column(String, nullable=True)  # model|local
     prompt_digest = Column(String, nullable=True)
     generated_at = Column(DateTime, default=utc_now, index=True)
 

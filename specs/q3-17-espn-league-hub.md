@@ -282,3 +282,64 @@ and weights but fixed five defects, each locked by a regression test:
   card it summarises: when the lineup payload is `available: false`, the strip
   keeps the shortcut and drops the claim. The free-agent board also carries an
   `id`, so the dashboard's Waiver Pulse can link straight to it.
+- **Sep 2026 — draft recap.** The draft is the one event in a fantasy season
+  everybody has an opinion about and nobody has evidence for, so the hub grew a
+  room for it at `/fantasy/league/draft/`.
+
+  Two data additions carry it. ESPN's `mDraftDetail` view is public on this
+  league and returns every pick with `playerId`, `overallPickNumber`, `teamId`,
+  `keeper` and `autoDraftTypeId`; it is requested alongside `mRoster` because
+  the draft payload names nobody — a pick is a bare id, and
+  `ff_players.espn_id` is null for a large share of players, which is the same
+  gap `PlayerCrosswalk` already exists to close. And ADP, which the site had
+  never held, now comes from Fantasy Football Calculator: keyless, and the only
+  free source that publishes a standard deviation alongside the mean.
+
+  **Reach is measured in standard deviations, not picks.** FFC's superflex
+  proxy is its 2QB board, and 2QB is not superflex — a 2QB league forces a
+  second quarterback where superflex merely permits one — so a raw `pick - adp`
+  carries a systematic bias. Dividing by the spread of the drafts that produced
+  the ADP normalises it. The floor on that divisor grows with the pick number
+  (5% of ADP): a thinly drafted late-rounder can come back with a stdev under
+  one pick, and dividing by that turns an ordinary 25-pick reach into a
+  25-sigma one that would win every award forever.
+
+  **Replacement level is derived from the league's own `lineupSlotCounts`,**
+  not from `fantasy_rankings_board.BASELINE_RANK`. Those baselines describe a
+  12-team, one-QB, 3WR league; this one is 10 teams with an OP seat and two
+  FLEX. Filling all ten starting lineups from the projection board and reading
+  off the best player who missed a seat puts QB replacement around 215 points
+  against RB's 139 — the superflex premium, which a generic baseline erases.
+
+  **Grades are a curve and say so on the page.** Ten managers split the same
+  180 players, so the total value in the room is fixed and an absolute grade
+  would be a fiction. Four sub-scores (value vs ADP 35%, starting lineup 30%,
+  bench 15%, roster construction 20%) are z-scored across the league, weighted,
+  and then *re-standardised* before the curve is applied: a weighted sum of
+  z-scores has a spread well under one sigma, so reading the curve off it
+  directly parked every team in the middle letters regardless of how the draft
+  went.
+
+  **The accolades are the headline, not the grades.** Eighteen awards, each
+  naming a winner, the number that won it, and the runner-up, with the full
+  ordering behind a disclosure so a card can be argued with. The three that
+  matter most are Vegas's, ESPN's and Sleeper's favourite rosters — three
+  independent valuations the site already collects, whose disagreement is the
+  most interesting thing the page can say. The Vegas award is the only one with
+  a real coverage gap: the season-prop market prices a few hundred players
+  against Sleeper's few thousand, so it is computed over starters only, and a
+  roster under 60% priced is listed as unrankable rather than quietly finishing
+  last. Awards nobody earned are omitted rather than handed to whoever scored a
+  zero.
+
+  Written recaps clone the `ff_league_team_overviews` machinery exactly —
+  context digest, cached row, model or deterministic local fallback — so the
+  page reads properly with `OPENAI_API_KEY` unset, and generation stays behind
+  an explicit POST so no schedule can bill for it.
+
+  Cadence: `league_draft` gets its own trigger rather than riding the
+  `league_sync` tick, and polls every scheduler pass while ESPN reports the
+  draft in progress. A league that has not drafted closes the run as `skipped`,
+  for the same reason a private season does — it is the answer eleven months of
+  the year, and logging it as an error would make the run log read like a crash
+  loop.

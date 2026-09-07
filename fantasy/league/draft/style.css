@@ -1,0 +1,646 @@
+/* Draft recap. Consumes the shared tokens from /shared/site-nav.css with
+   fallbacks so the page still renders standalone. Warm theme only.
+
+   The shell rules (head, banners, chips, boards, tables) are deliberately
+   the same ones fantasy/league/style.css carries: this page is a room in
+   the league hub, not a separate product, and diverging on the frame is
+   how two pages start to look like two sites. */
+
+/* The hidden attribute has to beat any display rule below it. Without this a
+   class like .button (display: inline-flex) silently overrides `hidden`, and
+   the element stays on screen while every test that checks `el.hidden` passes.
+   fantasy/draft-order/style.css has carried this line for the same reason. */
+[hidden] { display: none !important; }
+
+* { box-sizing: border-box; }
+
+body {
+    margin: 0;
+    background: var(--bg, #faf6f0);
+    color: var(--ink, #23201c);
+    font-family: "Plus Jakarta Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+    line-height: 1.5;
+}
+
+.app-shell {
+    max-width: 1060px;
+    margin: 0 auto;
+    padding: 28px 20px 80px;
+}
+
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+/* ── head ─────────────────────────────────────────────────────────── */
+
+.page-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 18px;
+    margin-bottom: 22px;
+}
+
+.eyebrow {
+    display: inline-block;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--sage, #5b7152);
+    margin-bottom: 6px;
+}
+
+.page-head h1 {
+    margin: 0 0 6px;
+    font-size: clamp(26px, 4vw, 34px);
+    letter-spacing: -0.02em;
+}
+
+.lede {
+    margin: 0;
+    color: var(--soft, #5d574e);
+    max-width: 54ch;
+}
+
+.week-badge {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 2px;
+    padding: 10px 16px;
+    background: var(--card, #fff);
+    border: 1px solid var(--line, #ece4d8);
+    border-radius: 14px;
+}
+
+.week-badge__label {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted, #928a7d);
+}
+
+.week-badge__value {
+    font-size: 22px;
+    font-weight: 700;
+    line-height: 1.1;
+}
+
+.week-badge__season {
+    font-size: 12px;
+    color: var(--muted, #928a7d);
+}
+
+/* ── banners and empty states ─────────────────────────────────────── */
+
+.banner {
+    margin: 0 0 18px;
+    padding: 12px 16px;
+    border-radius: 12px;
+    background: var(--sage-soft, #e7eee2);
+    border: 1px solid var(--line, #ece4d8);
+    color: var(--soft, #5d574e);
+    font-size: 14px;
+}
+
+.banner--error {
+    background: #fbeae4;
+    border-color: #f0cdbf;
+    color: var(--clay, #b96a4b);
+}
+
+.signed-out {
+    max-width: 520px;
+    margin: 48px auto;
+    padding: 32px;
+    text-align: center;
+    background: var(--card, #fff);
+    border: 1px solid var(--line, #ece4d8);
+    border-radius: 18px;
+}
+
+.signed-out h2 { margin: 0 0 10px; }
+.signed-out p { margin: 0 0 20px; color: var(--soft, #5d574e); }
+
+.signed-out__actions {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.button {
+    display: inline-block;
+    padding: 10px 18px;
+    border-radius: 10px;
+    background: var(--sage, #5b7152);
+    color: #fff;
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 14px;
+}
+
+.button:hover { background: var(--sage-dim, #4c6044); }
+
+.button--quiet {
+    background: transparent;
+    color: var(--sage, #5b7152);
+    border: 1px solid var(--line-strong, #d8cdba);
+}
+
+.button--quiet:hover { background: var(--surface, #f3eee4); }
+
+.empty-note {
+    margin: 0;
+    padding: 20px;
+    text-align: center;
+    color: var(--muted, #928a7d);
+    font-size: 14px;
+}
+
+/* ── chips and controls ───────────────────────────────────────────── */
+
+.season-bar { margin-bottom: 20px; }
+
+.chip-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.chip {
+    padding: 7px 14px;
+    border-radius: 999px;
+    border: 1px solid var(--line-strong, #d8cdba);
+    background: var(--card, #fff);
+    color: var(--soft, #5d574e);
+    font: inherit;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+}
+
+.chip:hover:not(:disabled) { border-color: var(--sage, #5b7152); }
+
+.chip--active {
+    background: var(--sage, #5b7152);
+    border-color: var(--sage, #5b7152);
+    color: #fff;
+}
+
+.chip--disabled,
+.chip:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    text-decoration: line-through;
+}
+
+.chip:focus-visible,
+.button:focus-visible,
+select:focus-visible,
+button:focus-visible {
+    outline: none;
+    box-shadow: var(--focus-ring, 0 0 0 3px rgba(91, 113, 82, 0.24));
+}
+
+.controls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 14px;
+}
+
+.select-field select {
+    padding: 7px 12px;
+    border-radius: 10px;
+    border: 1px solid var(--line-strong, #d8cdba);
+    background: var(--card, #fff);
+    color: var(--ink, #23201c);
+    font: inherit;
+    font-size: 13px;
+}
+
+/* ── boards ───────────────────────────────────────────────────────── */
+
+.board {
+    margin-bottom: 28px;
+    padding: 20px;
+    background: var(--card, #fff);
+    border: 1px solid var(--line, #ece4d8);
+    border-radius: 18px;
+}
+
+.board__head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 14px;
+}
+
+.board__head h2 { margin: 0; font-size: 18px; }
+
+.board__note {
+    font-size: 13px;
+    color: var(--muted, #928a7d);
+}
+
+
+
+/* ── tables ───────────────────────────────────────────────────────── */
+
+/* The pick table is the widest thing on the page; it scrolls inside its own
+   box so the page body never scrolls sideways on a phone. */
+.table-wrap { overflow-x: auto; }
+
+.rank-table {
+    width: 100%;
+    min-width: 680px;
+    border-collapse: collapse;
+    font-size: 14px;
+}
+
+.rank-table th {
+    text-align: left;
+    padding: 8px 10px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--muted, #928a7d);
+    border-bottom: 1px solid var(--line, #ece4d8);
+    white-space: nowrap;
+}
+
+.rank-table td {
+    padding: 10px;
+    border-bottom: 1px solid var(--line, #ece4d8);
+    white-space: nowrap;
+    vertical-align: top;
+}
+
+.rank-table tbody tr:last-child td { border-bottom: none; }
+.rank-table tbody tr:hover { background: var(--surface, #f3eee4); }
+
+.col-sort {
+    padding: 0;
+    border: 0;
+    background: none;
+    font: inherit;
+    color: inherit;
+    letter-spacing: inherit;
+    text-transform: inherit;
+    cursor: pointer;
+}
+
+.col-sort:hover { color: var(--sage, #5b7152); }
+
+/* ── accolades ────────────────────────────────────────────────────── */
+
+.awards {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 14px;
+}
+
+.award {
+    padding: 16px;
+    border: 1px solid var(--line, #ece4d8);
+    border-radius: 14px;
+    background: var(--surface, #f3eee4);
+}
+
+/* The three scorers lead the wall — their disagreement is the point. */
+.award--featured {
+    background: var(--sage-soft, #e7eee2);
+    border-color: var(--sage, #5b7152);
+    grid-column: span 1;
+}
+
+.award__label {
+    margin: 0 0 4px;
+    font-size: 15px;
+    letter-spacing: -0.01em;
+}
+
+.award__blurb {
+    margin: 0 0 12px;
+    font-size: 13px;
+    color: var(--soft, #5d574e);
+}
+
+.award__winner {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--line, #ece4d8);
+}
+
+.award__team {
+    font-weight: 700;
+    font-size: 16px;
+}
+
+.award__detail {
+    font-size: 13px;
+    color: var(--soft, #5d574e);
+}
+
+.award__value {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--sage, #5b7152);
+    letter-spacing: -0.02em;
+}
+
+.award__runner,
+.award__note {
+    margin: 10px 0 0;
+    font-size: 12px;
+    color: var(--muted, #928a7d);
+}
+
+.award__standings {
+    margin-top: 10px;
+    font-size: 13px;
+}
+
+.award__standings summary {
+    cursor: pointer;
+    color: var(--sage, #5b7152);
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.compact-list {
+    margin: 10px 0 0;
+    padding: 0 0 0 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 13px;
+}
+
+.compact-list li {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.compact-list__value {
+    color: var(--muted, #928a7d);
+    font-variant-numeric: tabular-nums;
+}
+
+/* ── grades ───────────────────────────────────────────────────────── */
+
+.grades {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 14px;
+}
+
+.grade {
+    padding: 16px;
+    border: 1px solid var(--line, #ece4d8);
+    border-radius: 14px;
+    background: var(--surface, #f3eee4);
+}
+
+.grade__head {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.grade__letter {
+    display: grid;
+    place-items: center;
+    width: 46px;
+    height: 46px;
+    flex: none;
+    border-radius: 12px;
+    font-size: 19px;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    color: #fff;
+    background: var(--muted, #928a7d);
+}
+
+.grade__letter--great { background: var(--sage, #5b7152); }
+.grade__letter--good { background: #7d9670; }
+.grade__letter--fair { background: #c0a675; }
+.grade__letter--poor { background: var(--clay, #b96a4b); }
+
+.grade__titles { flex: 1; min-width: 0; }
+
+.grade__team {
+    margin: 0;
+    font-size: 16px;
+    letter-spacing: -0.01em;
+}
+
+.grade__owner {
+    font-size: 12px;
+    color: var(--muted, #928a7d);
+}
+
+.grade__toggle { flex: none; padding: 6px 12px; }
+
+.grade__trophies {
+    margin: 12px 0 0;
+    padding: 0;
+    list-style: none;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.grade__trophies li {
+    padding: 3px 9px;
+    border-radius: 999px;
+    background: var(--sage-soft, #e7eee2);
+    color: var(--sage-dim, #4c6044);
+    font-size: 11px;
+    font-weight: 600;
+}
+
+.grade__body {
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px solid var(--line, #ece4d8);
+}
+
+.component { margin-bottom: 12px; }
+
+.component__head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 8px;
+}
+
+.component__label {
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.component__z {
+    font-size: 12px;
+    color: var(--muted, #928a7d);
+    font-variant-numeric: tabular-nums;
+}
+
+.component__track {
+    position: relative;
+    height: 6px;
+    margin: 5px 0 4px;
+    border-radius: 999px;
+    background: var(--line, #ece4d8);
+    overflow: hidden;
+}
+
+/* The midpoint is league average, so a bar is read against the tick, not
+   against zero at the left edge. */
+.component__track::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 0;
+    bottom: 0;
+    width: 1px;
+    background: var(--line-strong, #d8cdba);
+}
+
+.component__fill {
+    height: 100%;
+    border-radius: 999px;
+    background: var(--sage, #5b7152);
+}
+
+.component__blurb {
+    font-size: 11px;
+    color: var(--muted, #928a7d);
+}
+
+.grade__pick {
+    margin: 8px 0 0;
+    font-size: 13px;
+    color: var(--soft, #5d574e);
+}
+
+.grade__notes {
+    margin: 10px 0 0;
+    padding-left: 18px;
+    font-size: 12px;
+    color: var(--clay, #b96a4b);
+}
+
+.grade__note {
+    margin-top: 14px;
+    padding-top: 12px;
+    border-top: 1px solid var(--line, #ece4d8);
+}
+
+.grade__note-body { font-size: 14px; }
+.grade__note-body p { margin: 0 0 8px; }
+.grade__error { color: var(--clay, #b96a4b); font-size: 13px; }
+
+/* ── the board ────────────────────────────────────────────────────── */
+
+#boardFilters { margin-bottom: 14px; }
+
+.pick__name { display: block; font-weight: 600; }
+
+.pick__meta,
+.pick__flag {
+    display: block;
+    font-size: 12px;
+    color: var(--muted, #928a7d);
+}
+
+.pick__flag { color: var(--clay, #b96a4b); }
+
+.col-rank,
+.col-adp,
+.col-sigma,
+.col-proj {
+    font-variant-numeric: tabular-nums;
+}
+
+.col-sigma--unlisted { color: var(--muted, #928a7d); font-size: 12px; }
+
+/* A reach and a steal are the two things anyone scans this table for. */
+.pick--reach .col-sigma { color: var(--clay, #b96a4b); font-weight: 600; }
+.pick--value .col-sigma { color: var(--sage, #5b7152); font-weight: 600; }
+
+/* ── callouts and method ──────────────────────────────────────────── */
+
+.callouts {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 14px;
+}
+
+.callout {
+    padding: 16px;
+    border: 1px solid var(--line, #ece4d8);
+    border-radius: 14px;
+    background: var(--surface, #f3eee4);
+}
+
+.callout h3 { margin: 0 0 8px; font-size: 15px; }
+.callout p { margin: 0; font-size: 14px; color: var(--soft, #5d574e); }
+.callout__note { margin-top: 8px !important; font-size: 12px !important; }
+
+.method summary {
+    cursor: pointer;
+    list-style: none;
+}
+
+.method summary h2 {
+    display: inline;
+    font-size: 18px;
+}
+
+.method summary::-webkit-details-marker { display: none; }
+
+.method__body {
+    margin-top: 14px;
+    font-size: 14px;
+    color: var(--soft, #5d574e);
+}
+
+.method__body p { margin: 0 0 10px; }
+
+.method__list {
+    margin: 0 0 12px;
+    padding-left: 20px;
+    font-size: 13px;
+}
+
+@media (max-width: 640px) {
+    .awards,
+    .grades,
+    .callouts { grid-template-columns: 1fr; }
+
+    /* Short headers on a phone; the full words return above 640px. */
+    .col-sort[data-mobile-label]::before { content: attr(data-mobile-label); }
+    .col-sort[data-mobile-label] { font-size: 0; }
+    .col-sort[data-mobile-label]::before { font-size: 11px; }
+}

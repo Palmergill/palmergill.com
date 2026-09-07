@@ -93,6 +93,14 @@ everything fetched is persisted as timestamped snapshots so history
   `FANTASYPROS_API_KEY` is set; otherwise a derived ranking computed from
   projection snapshots (sort by projected points within position), so the
   rankings UI never depends on the optional key.
+- **R4b. ADP:** average draft position snapshotted daily from Fantasy Football
+  Calculator's keyless `/api/v1/adp/{format}` for the formats the league uses
+  (`2qb` as the superflex proxy, `half-ppr` as a cross-check), at the league's
+  own team count. Append-only, because ADP moves right up to kickoff and then
+  freezes: grading a draft means comparing it against the board as it stood
+  that day, not whichever snapshot happens to be current in December. Added
+  Sep 2026 for the league-hub draft recap (spec 17); the dashboard does not
+  read it yet.
 - **R5. nflverse:** schedules weekly; weekly player stats (actuals) Tuesdays
   in-season; injuries + depth charts daily in-season. One-time backfill of
   the 2025 season populates the app with real data during the offseason.
