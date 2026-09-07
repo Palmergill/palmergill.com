@@ -14,6 +14,7 @@ describe('site navigation authentication', () => {
     beforeEach(() => {
         document.head.innerHTML = '';
         document.body.innerHTML = '';
+        document.body.removeAttribute('data-site-nav-return-to');
         window.history.replaceState({}, '', '/about/');
         global.fetch = jest.fn();
     });
@@ -46,6 +47,17 @@ describe('site navigation authentication', () => {
 
         expect(document.querySelector('[data-auth-control]').textContent).toContain('Login');
         expect(document.querySelector('.site-nav__logout')).toBeNull();
+    });
+
+    test('uses a page-provided return path instead of the current URL', async () => {
+        window.history.replaceState({}, '', '/page-that-does-not-exist');
+        document.body.dataset.siteNavReturnTo = '/';
+        global.fetch.mockResolvedValue({ ok: true, json: async () => ({ authenticated: false }) });
+
+        await loadNav();
+
+        expect(document.querySelector('[data-auth-control]').getAttribute('href')).toBe('/login/?next=%2F');
+        expect(document.querySelector('[data-auth-top]').getAttribute('href')).toBe('/login/?next=%2F');
     });
 
     test('posts to the logout endpoint from the Logout button', async () => {

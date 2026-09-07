@@ -126,7 +126,14 @@
             return `/login/?next=${encodeURIComponent(next)}`;
         }
 
-        const next = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+        // Error pages can retain a nonexistent URL in the address bar. Let
+        // those pages provide a safe destination instead of sending a user
+        // back to the same error immediately after login or logout.
+        const override = document.body.dataset.siteNavReturnTo;
+        const safeOverride = override?.startsWith("/") && !override.startsWith("//")
+            ? override
+            : null;
+        const next = safeOverride || `${window.location.pathname}${window.location.search}${window.location.hash}`;
         return `/login/?next=${encodeURIComponent(next || "/")}`;
     }
 

@@ -2,16 +2,7 @@
 User-agent: *
 Allow: /
 
-# Private tooling and account flows — nothing useful to index.
-Disallow: /admin/
-Disallow: /login/
-Disallow: /signup/
-
-# Member- and person-specific fantasy views (these pages set noindex too).
-Disallow: /fantasy/league/
-Disallow: /fantasy/rankings/
-
-# League briefing deck: public link, but not for search results.
-Disallow: /fourth-and-fortune-kickoff.html
+# Pages omitted from search declare noindex in their HTML. They remain
+# crawlable here so search engines can read and honor that directive.
 
 Sitemap: https://palmergill.com/sitemap.xml
