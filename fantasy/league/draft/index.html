@@ -54,6 +54,10 @@
             </div>
         </section>
 
+        <nav class="season-bar" id="seasonBar" aria-label="Season" hidden>
+            <div class="chip-row" id="seasonChips" role="group" aria-label="Choose a season"></div>
+        </nav>
+
         <section id="emptyView" class="signed-out" hidden>
             <h2 id="emptyTitle">No draft yet</h2>
             <p id="emptyBody">
@@ -62,10 +66,6 @@
         </section>
 
         <div id="draftView" hidden>
-            <nav class="season-bar" aria-label="Season">
-                <div class="chip-row" id="seasonChips" role="group" aria-label="Choose a season"></div>
-            </nav>
-
             <!-- The accolades come first: they are what people came for. -->
             <section class="board" aria-labelledby="accoladesTitle">
                 <div class="board__head">

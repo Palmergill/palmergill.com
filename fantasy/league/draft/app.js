@@ -33,6 +33,7 @@
         emptyTitle: byId("emptyTitle"),
         emptyBody: byId("emptyBody"),
         draftView: byId("draftView"),
+        seasonBar: byId("seasonBar"),
         seasonChips: byId("seasonChips"),
         awardsGrid: byId("awardsGrid"),
         accoladesNote: byId("accoladesNote"),
@@ -94,6 +95,46 @@
         els.signedOutView.hidden = name !== "signedOut";
         els.emptyView.hidden = name !== "empty";
         els.draftView.hidden = name !== "draft";
+        els.seasonBar.hidden = name === "signedOut";
+    }
+
+    function writeUrlState(replace) {
+        const params = new URLSearchParams();
+        if (state.season) params.set("season", state.season);
+        const query = params.toString();
+        const url = query ? `?${query}` : window.location.pathname;
+        window.history[replace ? "replaceState" : "pushState"]({}, "", url);
+    }
+
+    function selectSeason(season) {
+        if (season === state.season) return;
+        state.season = season;
+        state.teamFilter = null;
+        state.expanded.clear();
+        state.notes = {};
+        writeUrlState(false);
+        load();
+    }
+
+    function renderSeasonChips(seasons) {
+        els.seasonChips.replaceChildren();
+        (seasons || []).forEach((season) => {
+            const label = `${season.season}${season.available ? "" : " · private"}`;
+            const chip = el("button", "chip", label);
+            chip.type = "button";
+            if (!season.available) {
+                chip.disabled = true;
+                chip.classList.add("chip--disabled");
+                chip.title = "This season is private in ESPN's league settings.";
+            } else {
+                chip.addEventListener("click", () => selectSeason(season.season));
+            }
+            if (season.season === state.season) {
+                chip.classList.add("chip--active");
+                chip.setAttribute("aria-current", "true");
+            }
+            els.seasonChips.appendChild(chip);
+        });
     }
 
     function showError(message) {
@@ -279,17 +320,48 @@
         if (stored && stored.note_md) {
             renderMarkdown(noteBody, stored.note_md);
             write.textContent = "Rewrite";
+            write.dataset.hasNote = "true";
         }
 
         toggle.addEventListener("click", () => {
             body.hidden = !body.hidden;
             toggle.setAttribute("aria-expanded", String(!body.hidden));
             if (body.hidden) state.expanded.delete(row.espn_team_id);
-            else state.expanded.add(row.espn_team_id);
+            else {
+                state.expanded.add(row.espn_team_id);
+                if (!Object.prototype.hasOwnProperty.call(state.notes, row.espn_team_id)) {
+                    loadStoredNote(row.espn_team_id, noteBody, write);
+                }
+            }
         });
 
         card.appendChild(body);
         return card;
+    }
+
+    async function loadStoredNote(teamId, container, button) {
+        const generation = state.generation;
+        const season = state.season;
+        button.disabled = true;
+        try {
+            const payload = await fetchJson(
+                `${API_BASE}/draft/notes/${teamId}?season=${season}`
+            );
+            if (generation !== state.generation || season !== state.season) return;
+            state.notes[teamId] = payload;
+            if (payload.note_md) {
+                renderMarkdown(container, payload.note_md);
+                button.textContent = "Rewrite";
+                button.dataset.hasNote = "true";
+            }
+        } catch (_error) {
+            // A note is optional. Keep generation available even if its read
+            // endpoint is temporarily unavailable.
+        } finally {
+            if (generation === state.generation && season === state.season) {
+                button.disabled = false;
+            }
+        }
     }
 
     function renderGrades(recap) {
@@ -309,15 +381,19 @@
     async function writeNote(teamId, container, button) {
         button.disabled = true;
         const original = button.textContent;
+        const force = button.dataset.hasNote === "true";
         button.textContent = "Writing…";
         try {
+            const params = new URLSearchParams({ season: String(state.season) });
+            if (force) params.set("force", "true");
             const payload = await fetchJson(
-                `${API_BASE}/draft/notes/${teamId}?season=${state.season}`,
+                `${API_BASE}/draft/notes/${teamId}?${params}`,
                 { method: "POST" }
             );
             state.notes[teamId] = payload;
             renderMarkdown(container, payload.note_md || "No recap available.");
             button.textContent = "Rewrite";
+            button.dataset.hasNote = "true";
         } catch (error) {
             container.replaceChildren(
                 el("p", "grade__error", error.message || "Could not write a recap.")
@@ -521,12 +597,17 @@
         const generation = ++state.generation;
         try {
             const params = state.season ? `?season=${state.season}` : "";
-            const recap = await fetchJson(`${API_BASE}/draft${params}`);
+            const [seasonPayload, recap] = await Promise.all([
+                fetchJson(`${API_BASE}/seasons`),
+                fetchJson(`${API_BASE}/draft${params}`),
+            ]);
             if (generation !== state.generation) return;
 
             state.recap = recap;
             state.season = recap.season;
             renderStatus(recap);
+            renderSeasonChips(seasonPayload.seasons);
+            writeUrlState(true);
 
             if (!recap.picks || !recap.picks.length) {
                 els.emptyTitle.textContent =
@@ -559,5 +640,13 @@
 
     readUrlState();
     bindSorting();
+    window.addEventListener("popstate", () => {
+        state.season = null;
+        state.teamFilter = null;
+        state.expanded.clear();
+        state.notes = {};
+        readUrlState();
+        load();
+    });
     load();
 })();

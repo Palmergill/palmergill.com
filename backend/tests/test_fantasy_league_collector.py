@@ -4,6 +4,8 @@ Covers the three things that are easy to get wrong and expensive to notice
 late — a private season must not poison the rest of the tick, the roster
 digest must keep reads pointing at real rows, and upserts must not duplicate.
 """
+from datetime import datetime
+
 import pytest
 
 from app.database import (
@@ -174,6 +176,7 @@ class FakeEspnLeagueClient:
         self.errors = errors or {}
         self.drafts = drafts or {}
         self.calls = []
+        self.draft_calls = []
 
     def _check(self, season):
         self.calls.append(season)
@@ -190,6 +193,7 @@ class FakeEspnLeagueClient:
         return SCHEDULE_PAYLOAD
 
     def get_draft(self, season):
+        self.draft_calls.append(season)
         self._check(season)
         # Default: a league whose draft has not happened. Tests that care
         # pass an explicit payload through `drafts`.
@@ -742,6 +746,21 @@ def test_a_second_run_upserts_rather_than_duplicating_the_board(db):
     assert db.query(FantasyLeagueDraftPick).count() == 1
 
 
+def test_a_second_run_preserves_when_the_pick_was_first_seen(db, monkeypatch):
+    seed_players(db)
+    detail = draft_detail([draft_pick(1, 1, 4374302)], drafted=True)
+    client = FakeEspnLeagueClient(drafts={2024: detail})
+    first_seen = datetime(2024, 8, 25, 1, 0, 0)
+    later_poll = datetime(2024, 9, 5, 12, 0, 0)
+
+    monkeypatch.setattr(lc, "utc_now", lambda: first_seen)
+    lc.collect_league_draft(db, 2024, client)
+    monkeypatch.setattr(lc, "utc_now", lambda: later_poll)
+    lc.collect_league_draft(db, 2024, client)
+
+    assert db.query(FantasyLeagueDraftPick).one().fetched_at == first_seen
+
+
 def test_a_pick_made_after_the_last_run_lands_without_disturbing_the_others(db):
     seed_players(db)
     client = FakeEspnLeagueClient(
@@ -779,3 +798,23 @@ def test_a_transport_failure_is_an_error(db):
     client = FakeEspnLeagueClient(errors={2024: EspnLeagueError("HTTP 503")})
     run = lc.collect_league_draft(db, 2024, client)
     assert run.status == "error"
+
+
+def test_a_live_draft_is_collected_once_per_scheduler_pass(db, monkeypatch):
+    seed_players(db)
+    client = FakeEspnLeagueClient(
+        drafts={
+            2024: draft_detail(
+                [draft_pick(1, 1, 4374302)],
+                in_progress=True,
+            )
+        }
+    )
+    monkeypatch.setenv("ESPN_LEAGUE_ID", "225965")
+    monkeypatch.setenv("ESPN_LEAGUE_SEASONS", "2024")
+    monkeypatch.setattr(lc, "espn_league_client", client)
+    defer_non_league_jobs(db)
+
+    fc.run_scheduled(db)
+
+    assert client.draft_calls == [2024]

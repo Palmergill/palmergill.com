@@ -135,6 +135,58 @@ def test_the_three_scorers_are_ranked_independently_of_each_other():
     assert awards["sleeper_favourite"]["winner"]["team"] == "Charlie"
 
 
+def test_each_provider_chooses_its_own_best_legal_lineup():
+    # Team Alpha's blended board starts its first kicker, but ESPN strongly
+    # prefers the second. Reusing the blended lineup would incorrectly hand
+    # ESPN's award to Bravo.
+    alpha_blended = pick(
+        1, 1, "K", points={"best": 100.0, "espn": 1.0}
+    )
+    alpha_espn = pick(
+        1, 3, "K", points={"best": 90.0, "espn": 1000.0}
+    )
+    bravo = pick(2, 2, "K", points={"best": 80.0, "espn": 500.0})
+    rosters = {1: [alpha_blended, alpha_espn], 2: [bravo]}
+    blended_starters = {
+        team_id: fld._starters(roster, ["K"], "best")
+        for team_id, roster in rosters.items()
+    }
+    awards = {
+        award["key"]: award
+        for award in fld._accolades(
+            rosters,
+            blended_starters,
+            TEAMS,
+            [alpha_blended, bravo, alpha_espn],
+            ["K"],
+        )
+    }
+
+    assert awards["espn_favourite"]["winner"]["team"] == "Alpha"
+    assert awards["espn_favourite"]["winner"]["value"] == 1000.0
+
+
+def test_a_provider_with_no_projection_data_hands_out_no_award():
+    rosters = {
+        1: [pick(1, 1, points={"best": 100.0})],
+        2: [pick(2, 2, points={"best": 90.0})],
+    }
+    starters = {
+        team_id: fld._starters(roster, ["RB"], "best")
+        for team_id, roster in rosters.items()
+    }
+    awards = {
+        award["key"]: award
+        for award in fld._accolades(
+            rosters, starters, TEAMS, [*rosters[1], *rosters[2]], ["RB"]
+        )
+    }
+
+    assert "espn_favourite" not in awards
+    assert "sleeper_favourite" not in awards
+    assert "vegas_favourite" not in awards
+
+
 def test_the_biggest_reach_and_the_steal_are_opposite_ends_of_one_scale():
     rosters = {
         1: [pick(1, 1, name="Reached For", sigma=-3.0)],

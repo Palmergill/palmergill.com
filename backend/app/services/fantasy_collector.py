@@ -1266,6 +1266,7 @@ def run_scheduled(db: Session, now: Optional[datetime] = None) -> List[Dict[str,
     from app.services import fantasy_league_collector
 
     current_league = fantasy_league_collector.current_league_season(db)
+    drafts_collected_this_pass = set()
     for league_season in fantasy_league_collector.league_seasons():
         due_job = _league_due_job("league_sync", league_season)
         if not _job_due(db, due_job, now):
@@ -1273,6 +1274,8 @@ def run_scheduled(db: Session, now: Optional[datetime] = None) -> List[Dict[str,
         completed = current_league is not None and league_season < current_league
         runs = fantasy_league_collector.collect_season(db, league_season)
         summaries.extend(_summary(run) for run in runs)
+        if any(run.job == "league_draft" for run in runs):
+            drafts_collected_this_pass.add(league_season)
         for job in fantasy_league_collector.LEAGUE_JOBS:
             # A private season is polled on the slow cadence too: it is a
             # stable state, not something worth rechecking four times a day.
@@ -1285,6 +1288,11 @@ def run_scheduled(db: Session, now: Optional[datetime] = None) -> List[Dict[str,
     # lands the next morning is a much worse read than one already waiting
     # when the last pick is in — so a live draft is polled every tick.
     for league_season in fantasy_league_collector.league_seasons():
+        # A full league refresh above already includes this job. A live draft
+        # is deliberately left due for the *next* scheduler pass, but should
+        # not be fetched a second time during this one.
+        if league_season in drafts_collected_this_pass:
+            continue
         due_job = _league_due_job("league_draft", league_season)
         if not _job_due(db, due_job, now):
             continue

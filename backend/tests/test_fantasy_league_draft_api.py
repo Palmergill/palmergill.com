@@ -228,6 +228,8 @@ def test_a_draft_with_no_adp_collected_still_grades_on_everything_else(db):
     assert recap["adp_source"] is None
     assert len(recap["grades"]) == TEAM_COUNT
     assert all(row["unranked_picks"] == ROUNDS for row in recap["grades"])
+    assert all(row["components"]["adp_value"]["raw"] == 0 for row in recap["grades"])
+    assert all(pick["adp_sigma"] is None for pick in recap["picks"])
 
 
 def test_replacement_levels_are_published_so_vor_can_be_checked(db):

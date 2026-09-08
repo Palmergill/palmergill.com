@@ -454,7 +454,11 @@ def collect_league_draft(db: Session, season: int, client=None) -> FantasyCollec
         row.keeper = pick["keeper"]
         row.bid_amount = pick["bid_amount"]
         row.auto_draft_type_id = pick["auto_draft_type_id"]
-        row.fetched_at = now
+        # ``fetched_at`` is the first time this pick was observed, not the
+        # latest time ESPN repeated it.  The recap uses that immutable moment
+        # to choose the last ADP snapshot available when the draft began.
+        if row.fetched_at is None:
+            row.fetched_at = now
         written += 1
     db.commit()
 

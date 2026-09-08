@@ -104,8 +104,16 @@ class FakePick:
         self.auto_draft_type_id = auto
 
 
-def enrich(picks, adp, total=180):
-    return fld._enrich_picks(picks, {}, adp, {"best": {}}, {"DET": 6}, total)
+def enrich(picks, adp, total=180, adp_available=True):
+    return fld._enrich_picks(
+        picks,
+        {},
+        adp,
+        {"best": {}},
+        {"DET": 6},
+        total,
+        adp_available=adp_available,
+    )
 
 
 def test_a_player_who_lasted_past_his_adp_scores_as_value():
@@ -143,6 +151,17 @@ def test_a_player_no_adp_board_listed_is_padded_rather_than_dropped():
     # Treated as going one past the end of the draft: taking him at 150 is a
     # small reach against that padding, not free value.
     assert rows[0]["adp_delta"] == -31.0
+
+
+def test_no_adp_board_does_not_manufacture_value_from_draft_position():
+    rows = enrich(
+        [FakePick(1, 1, "a"), FakePick(150, 2, "b")],
+        {},
+        total=180,
+        adp_available=False,
+    )
+    assert [row["adp_sigma"] for row in rows] == [None, None]
+    assert [row["adp_delta"] for row in rows] == [None, None]
 
 
 def test_an_autopicked_selection_is_flagged():

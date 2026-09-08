@@ -91,10 +91,11 @@ ADP_STDEV_FLOOR_RATE = 0.05
 # totals can absorb him; a single-pick award named after him cannot.
 MIN_ADP_SAMPLE = 30
 
-# A team needs this share of its starters priced by the season-prop market
-# before the Vegas award will rank it. Under that, the sum is measuring
-# coverage rather than the roster, so the team is listed as unrankable.
-MIN_VEGAS_COVERAGE = 0.6
+# A team needs this share of its source-specific starters valued before a
+# provider's favourite-roster award will rank it. Under that, the sum is
+# measuring coverage rather than the roster, so the team is listed as
+# unrankable instead of quietly finishing last (or winning a board of zeroes).
+MIN_FAVOURITE_COVERAGE = 0.6
 
 # Bench value counts, but a bench cannot win a league: past this many points
 # of surplus the marginal hoarded player stops adding to the score.
@@ -353,6 +354,7 @@ def _enrich_picks(
     values: Dict[str, Dict[str, float]],
     byes: Dict[str, int],
     total_picks: int,
+    adp_available: bool,
 ) -> List[Dict[str, Any]]:
     """Attach identity, ADP, and every valuation to each pick."""
     unranked_adp = total_picks + UNRANKED_ADP_PADDING
@@ -363,16 +365,25 @@ def _enrich_picks(
         pro_team = pick.pro_team or (player.team if player else None)
         board = adp.get(pick.player_id) if pick.player_id else None
 
-        adp_value = board["adp"] if board else float(unranked_adp)
-        stdev = max(
-            (board or {}).get("stdev") or 0.0,
-            MIN_ADP_STDEV,
-            adp_value * ADP_STDEV_FLOOR_RATE,
-        )
-        # Positive means the player lasted longer than the room expected —
-        # he was still there at a pick number past his ADP, which is value.
-        # Negative means he came off the board early: a reach.
-        delta = pick.overall_pick - adp_value
+        # Padding an individual omission is useful evidence when a real board
+        # exists. If there is no board at all, however, manufacturing a sigma
+        # from draft position would make the ADP component reward slot order
+        # rather than any decision the manager made.
+        if board is None and not adp_available:
+            delta = None
+            sigma = None
+        else:
+            adp_value = board["adp"] if board else float(unranked_adp)
+            stdev = max(
+                (board or {}).get("stdev") or 0.0,
+                MIN_ADP_STDEV,
+                adp_value * ADP_STDEV_FLOOR_RATE,
+            )
+            # Positive means the player lasted longer than the room expected —
+            # he was still there at a pick number past his ADP, which is value.
+            # Negative means he came off the board early: a reach.
+            delta = pick.overall_pick - adp_value
+            sigma = delta / stdev
         rows.append(
             {
                 "overall_pick": pick.overall_pick,
@@ -396,7 +407,7 @@ def _enrich_picks(
                 "adp_ranked": board is not None,
                 "adp_sample": (board or {}).get("times_drafted"),
                 "adp_delta": _round(delta, 1),
-                "adp_sigma": _round(delta / stdev, 2),
+                "adp_sigma": _round(sigma, 2),
                 "points": {
                     source: _round(table.get(pick.player_id))
                     for source, table in values.items()
@@ -623,17 +634,22 @@ def _accolades(
     ):
         ranking = []
         unrankable = []
-        for team_id, starters in starters_by_team.items():
+        for team_id, roster_rows in rosters.items():
+            # Each provider gets to choose its own best legal lineup. Reusing
+            # the blended-value lineup can leave that provider's highest-rated
+            # player on the bench and change the award winner.
+            starters = _starters(roster_rows, slots, source)
             roster = [entry["_pick"] for entry in starters]
             total, priced, whole = _team_points(roster, source)
             if not whole:
                 continue
             coverage = priced / whole
-            # The market prices a few hundred players, not a few thousand. A
-            # thinly covered roster would score low for a reason that has
+            # A thinly covered roster would score low for a reason that has
             # nothing to do with how it was drafted, so it is named as
-            # unrankable instead of quietly finishing last.
-            if source == "vegas" and coverage < MIN_VEGAS_COVERAGE:
+            # unrankable instead of quietly finishing last. This matters most
+            # for Vegas, but also prevents a missing historical projection
+            # board from awarding an arbitrary zero-point winner.
+            if coverage < MIN_FAVOURITE_COVERAGE:
                 unrankable.append(
                     {
                         "espn_team_id": team_id,
@@ -651,7 +667,7 @@ def _accolades(
             award["unrankable"] = unrankable
             award["note"] = (
                 f"{len(unrankable)} team(s) had too few starters priced by the "
-                "market to rank"
+                "source to rank"
             )
         awards.append(award)
 
@@ -1059,7 +1075,15 @@ def get_draft_recap(
     values["best"] = best
 
     total_picks = len(picks)
-    enriched = _enrich_picks(picks, player_rows, adp, values, byes, total_picks)
+    enriched = _enrich_picks(
+        picks,
+        player_rows,
+        adp,
+        values,
+        byes,
+        total_picks,
+        adp_available=adp_meta is not None,
+    )
 
     positions = {
         row.player_id: row.position
