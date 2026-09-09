@@ -22,6 +22,7 @@
         teamId: null,
         overview: null,
         ledger: null,
+        ledgerRequest: 0,
         myTeamId: null,
         // Bumped on every context change. A response that resolves with a
         // stale generation is discarded — switching season fires several
@@ -400,6 +401,7 @@
             ["expected", "xW"],
             ["luck", "Luck"],
             ["lineup", "Lineup"],
+            ["scoring", "Range"],
             ["power", "Power"],
             ["odds", "Odds"],
             ["form", "Form"],
@@ -475,6 +477,7 @@
             row.appendChild(luckCell);
 
             row.appendChild(valueCell("lineup", F.ledgerText(team, "lineup")));
+            row.appendChild(valueCell("scoring", F.ledgerText(team, "scoring")));
 
             const powerCell = valueCell("power", F.ledgerText(team, "power"));
             const movement = F.rankMovement(team.power && team.power.rank_delta);
@@ -490,7 +493,7 @@
             } else {
                 const wrap = el("div", "ledger__odds");
                 wrap.appendChild(meterEl(odds * 100));
-                wrap.appendChild(el("span", "ledger__odds-value", `${Math.round(odds * 100)}`));
+                wrap.appendChild(el("span", "ledger__odds-value", `${Math.round(odds * 100)}%`));
                 oddsCell.appendChild(wrap);
             }
             row.appendChild(oddsCell);
@@ -515,10 +518,14 @@
             : `${teams.length} teams`;
 
         const rating = payload.manager_rating || {};
+        const excluded = rating.excluded_slots || [];
+        const exclusionNote = excluded.length
+            ? ` ${excluded.join("/")} is excluded because its aggregate actuals are not in the weekly player feed.`
+            : "";
         els.ledgerFootnote.textContent = rating.available
             ? `Lineup is the share of each week's best legal lineup a manager actually started, ` +
               `over ${rating.weeks.length} scored week${rating.weeks.length === 1 ? "" : "s"}. ` +
-              `League average ${(rating.league_average * 100).toFixed(1)}%.`
+              `League average ${(rating.league_average * 100).toFixed(1)}%.` + exclusionNote
             : LINEUP_UNAVAILABLE[rating.reason] || "";
     }
 
@@ -971,18 +978,19 @@
 
     async function loadLedger() {
         const generation = state.generation;
+        const request = ++state.ledgerRequest;
         const params = new URLSearchParams({ algorithm: state.algorithm });
         if (state.season) params.set("season", state.season);
         try {
             const payload = await fetchJson(`${API_BASE}/ledger?${params}`);
-            if (stale(generation)) return;
+            if (stale(generation) || request !== state.ledgerRequest) return;
             state.ledger = payload;
             renderAlgorithmSelect(payload.algorithms);
             renderColumnChips();
             renderLedger(payload);
             renderCharts(payload);
         } catch (error) {
-            if (stale(generation)) return;
+            if (stale(generation) || request !== state.ledgerRequest) return;
             // Being signed out is a whole-page condition; anything else is
             // this board's problem alone. The ledger is also fetched while a
             // team page is open, and a failure there should not put an error
@@ -1044,6 +1052,7 @@
             const me = await fetchJson(`${API_BASE}/me?${params}`);
             if (stale(generation)) return;
             if (me.status !== "configured" || !me.snapshot || !me.selected_team_id) {
+                state.myTeamId = null;
                 els.myTeamStrip.hidden = true;
                 return;
             }
@@ -1061,7 +1070,10 @@
             if (stale(generation)) return;
             renderMyTeamAdvice(lineup, me.selected_team_id);
         } catch (error) {
-            if (!stale(generation)) els.myTeamStrip.hidden = true;
+            if (!stale(generation)) {
+                state.myTeamId = null;
+                els.myTeamStrip.hidden = true;
+            }
         }
     }
 
@@ -1286,6 +1298,8 @@
     async function loadSeason() {
         const generation = ++state.generation;
         const requestedHash = window.location.hash;
+        state.myTeamId = null;
+        els.myTeamStrip.hidden = true;
         clearError();
         try {
             const params = state.season ? `?season=${state.season}` : "";

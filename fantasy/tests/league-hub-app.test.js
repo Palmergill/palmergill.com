@@ -4,6 +4,7 @@ const path = require("path");
 const leagueDir = path.join(__dirname, "..", "league");
 const appSource = fs.readFileSync(path.join(leagueDir, "app.js"), "utf8");
 const pageSource = fs.readFileSync(path.join(leagueDir, "index.html"), "utf8");
+const styleSource = fs.readFileSync(path.join(leagueDir, "style.css"), "utf8");
 const bodySource = pageSource.match(/<body>([\s\S]*)<\/body>/)[1];
 const F = require("../league/format.js");
 
@@ -117,6 +118,10 @@ function boot(overrides = {}, url = "/fantasy/league/") {
     window.FantasyHeader = { mount: () => null };
     window.fetch = jest.fn((requested) => {
         const target = String(requested);
+        if (overrides.fetch) {
+            const custom = overrides.fetch(target);
+            if (custom) return custom;
+        }
         if (target.includes("/overview")) return response(overrides.overview || OVERVIEW);
         if (target.includes("/standings")) return response({ season: 2026, teams: TEAMS, divisions: [] });
         if (target.includes("/ledger")) return response(overrides.ledger || ledger());
@@ -158,6 +163,7 @@ describe("league hub ledger", () => {
             "expected",
             "luck",
             "lineup",
+            "scoring",
             "power",
             "odds",
             "form",
@@ -202,6 +208,19 @@ describe("league hub ledger", () => {
         expect(active[0].textContent).toBe("+1.0");
     });
 
+    test("the Range choice exposes and activates its scoring column", async () => {
+        boot();
+        await waitFor(() => document.querySelectorAll("#ledger tbody tr").length === 2);
+
+        [...document.querySelectorAll("#ledgerColumns .chip")]
+            .find((chip) => chip.textContent === "Range")
+            .click();
+
+        const active = document.querySelector("#ledger tbody tr:first-child td.is-active");
+        expect(active.dataset.key).toBe("scoring");
+        expect(active.textContent).toBe("131.0");
+    });
+
     test("the row carries the chosen column's context and chart for a phone", async () => {
         boot();
         await waitFor(() => document.querySelectorAll("#ledger tbody tr").length === 2);
@@ -243,6 +262,41 @@ describe("league hub ledger", () => {
         ).toBe(true);
     });
 
+    test("an older power-method response cannot overwrite the latest choice", async () => {
+        let resolveRecord;
+        let resolveRecent;
+        const recordResponse = new Promise((resolve) => { resolveRecord = resolve; });
+        const recentResponse = new Promise((resolve) => { resolveRecent = resolve; });
+        boot({
+            fetch: (target) => {
+                if (target.includes("/ledger?algorithm=record")) return recordResponse;
+                if (target.includes("/ledger?algorithm=recent_form")) return recentResponse;
+                return null;
+            },
+        });
+        await waitFor(() => document.querySelectorAll("#ledger tbody tr").length === 2);
+
+        const select = document.getElementById("powerAlgorithm");
+        select.value = "record";
+        select.dispatchEvent(new window.Event("change"));
+        select.value = "recent_form";
+        select.dispatchEvent(new window.Event("change"));
+
+        const withRank = (rank, algorithm) => ledger({
+            algorithm,
+            teams: TEAMS.map((entry) => Object.assign({}, entry, {
+                power: Object.assign({}, entry.power, { rank }),
+            })),
+        });
+        resolveRecent(response(withRank(8, "recent_form")));
+        await waitFor(() => document.querySelector('td[data-key="power"]').textContent.startsWith("8"));
+        resolveRecord(response(withRank(3, "record")));
+        await new Promise((resolve) => setTimeout(resolve, 0));
+
+        expect(document.querySelector('td[data-key="power"]').textContent.startsWith("8")).toBe(true);
+        expect(document.getElementById("powerAlgorithm").value).toBe("recent_form");
+    });
+
     test("the three charts read across the same teams", async () => {
         boot();
         await waitFor(() => document.querySelectorAll("#charts .chart").length === 3);
@@ -276,6 +330,25 @@ describe("league hub ledger", () => {
 
         expect(document.getElementById("ledgerFootnote").textContent).toContain(
             "actual points"
+        );
+    });
+
+    test("the manager-rating note discloses excluded aggregate slots", async () => {
+        boot({
+            ledger: ledger({
+                manager_rating: {
+                    available: true,
+                    reason: null,
+                    league_average: 0.9395,
+                    weeks: [1, 2],
+                    excluded_slots: ["DST"],
+                },
+            }),
+        });
+        await waitFor(() => document.getElementById("ledgerFootnote").textContent !== "");
+
+        expect(document.getElementById("ledgerFootnote").textContent).toContain(
+            "DST is excluded"
         );
     });
 
@@ -314,6 +387,51 @@ describe("league hub ledger", () => {
         );
         expect(moves[0]).toContain("Rome Odunze");
         expect(moves[1]).toContain("Zach Charbonnet");
+    });
+
+    test("an unconfigured season clears the previous season's team highlight", async () => {
+        const seasons = [
+            { season: 2026, status: "ok", available: true },
+            { season: 2025, status: "ok", available: true },
+        ];
+        boot({
+            fetch: (target) => {
+                if (target.includes("/overview")) {
+                    const season = target.includes("season=2025") ? 2025 : 2026;
+                    return response(Object.assign({}, OVERVIEW, { season, seasons }));
+                }
+                if (target.includes("/me?")) {
+                    if (target.includes("season=2025")) return response({ status: "unconfigured" });
+                    return response({
+                        status: "configured",
+                        selected_team_id: 2,
+                        snapshot: {
+                            team: { espn_team_id: 2, name: "Bravo" },
+                            record: { wins: 5, losses: 0, ties: 0 },
+                        },
+                    });
+                }
+                return null;
+            },
+        });
+        await waitFor(() => document.querySelector(".ledger-row--mine") !== null);
+
+        [...document.querySelectorAll("#seasonChips .chip")]
+            .find((chip) => chip.textContent === "2025")
+            .click();
+
+        await waitFor(() => window.location.search.includes("season=2025"));
+        await waitFor(() => document.querySelector(".ledger-row--mine") === null);
+        expect(document.getElementById("myTeamStrip").hidden).toBe(true);
+    });
+
+    test("preseason ordering targets every current board", () => {
+        expect(styleSource).toContain('.is-preseason [data-board="teams"] { order: 1; }');
+        expect(styleSource).toContain('.is-preseason [data-board="scoreboard"] { order: 2; }');
+        expect(styleSource).toContain('.is-preseason [data-board="ledger"] { order: 3; }');
+        expect(styleSource).toContain('.is-preseason [data-board="charts"] { order: 4; }');
+        expect(styleSource).not.toContain('[data-board="standings"]');
+        expect(styleSource).not.toContain('[data-board="power"]');
     });
 
     test("a team without a computable measure sinks and prints a dash", async () => {

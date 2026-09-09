@@ -174,6 +174,69 @@ def test_an_unscored_bench_player_is_not_a_missed_opportunity(db):
     assert team["efficiency"] == pytest.approx(1.0)
 
 
+def test_dst_without_an_individual_stat_row_does_not_invalidate_the_week(db):
+    db.query(FantasyLeagueSeason).filter_by(season=SEASON).update(
+        {"lineup_slot_counts_json": json.dumps({**SLOT_COUNTS, "16": 1})}
+    )
+    db.commit()
+    roster(
+        db,
+        1,
+        1,
+        [
+            ("qb1", "QB", "QB"),
+            ("rb1", "RB", "RB"),
+            ("wr1", "WR", "WR"),
+            ("DEN", "DST", "DEF"),
+        ],
+    )
+    # The individual-player feed deliberately has no aggregate DEN row.
+    scores(db, 1, {"qb1": 20.0, "rb1": 15.0, "wr1": 10.0})
+
+    result = ld._manager_ratings(db, SEASON)
+
+    assert result["available"] is True
+    assert result["excluded_slots"] == ["DST"]
+    assert result["teams"][1]["efficiency"] == pytest.approx(1.0)
+
+
+def test_unchanged_snapshot_is_carried_forward_to_the_next_scored_week(db):
+    roster(
+        db,
+        1,
+        1,
+        [
+            ("qb1", "QB", "QB"),
+            ("rb1", "RB", "RB"),
+            ("wr1", "WR", "WR"),
+            ("rb2", "BENCH", "RB"),
+        ],
+    )
+    scores(db, 1, {"qb1": 20.0, "rb1": 10.0, "wr1": 10.0, "rb2": 5.0})
+    scores(db, 2, {"qb1": 20.0, "rb1": 5.0, "wr1": 10.0, "rb2": 15.0})
+
+    team = ld._manager_ratings(db, SEASON)["teams"][1]
+
+    assert team["weeks"] == 2
+    assert team["efficiency"] == pytest.approx(75.0 / 85.0)
+    assert team["points_left"] == pytest.approx(10.0)
+
+
+def test_preseason_snapshot_can_supply_an_unchanged_week_one_lineup(db):
+    roster(
+        db,
+        0,
+        1,
+        [("qb1", "QB", "QB"), ("rb1", "RB", "RB"), ("wr1", "WR", "WR")],
+    )
+    scores(db, 1, {"qb1": 20.0, "rb1": 15.0, "wr1": 10.0})
+
+    team = ld._manager_ratings(db, SEASON)["teams"][1]
+
+    assert team["weeks"] == 1
+    assert team["efficiency"] == pytest.approx(1.0)
+
+
 def test_a_player_on_ir_is_never_counted_as_startable(db):
     roster(
         db,

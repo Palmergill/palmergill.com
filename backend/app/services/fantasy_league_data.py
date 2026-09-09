@@ -785,6 +785,11 @@ SLOT_ELIGIBILITY = {
 }
 # A player on IR cannot be started at all, whatever he is projected for.
 INELIGIBLE_SLOTS = frozenset({"IR"})
+# nflverse's weekly feed is keyed by individual GSIS players. Team defenses
+# have no GSIS player row, so their aggregate ESPN score is not present in
+# FantasyPlayerStat. Grade the positions the feed can score instead of letting
+# the required D/ST starter invalidate every week in a normal league.
+UNSCORED_ACTUAL_POSITIONS = frozenset({"DEF", "DST", "D/ST"})
 
 
 def _starting_slots(season_row: Optional[FantasyLeagueSeason]) -> List[str]:
@@ -1206,11 +1211,67 @@ def _latest_roster_run_by_week(db: Session, season: int) -> Dict[int, int]:
     )
     latest: Dict[int, int] = {}
     for period, run_id in rows:
-        if period is None or run_id is None or period <= 0:
+        # Period 0 is the preseason snapshot. If nobody changes a roster or
+        # lineup before week 1, the collector intentionally skips another
+        # identical write, so this is the correct snapshot to carry forward.
+        if period is None or run_id is None or period < 0:
             continue
         if period not in latest or run_id > latest[period]:
             latest[period] = run_id
     return latest
+
+
+def _rating_weeks(db: Session, season: int) -> List[int]:
+    """Completed regular-season fantasy weeks that can be manager-rated.
+
+    Production has the full ESPN schedule, which keeps NFL weeks after the
+    fantasy season out. The stat-week fallback keeps the pure DB unit tests
+    and partially collected databases useful until a league sync arrives.
+    """
+    weeks = [
+        week
+        for (week,) in (
+            db.query(FantasyLeagueMatchup.matchup_period)
+            .filter(
+                FantasyLeagueMatchup.season == season,
+                FantasyLeagueMatchup.is_complete.is_(True),
+                FantasyLeagueMatchup.is_bye.is_(False),
+                FantasyLeagueMatchup.away_team_id.isnot(None),
+                (FantasyLeagueMatchup.playoff_tier.is_(None))
+                | (FantasyLeagueMatchup.playoff_tier == "NONE"),
+            )
+            .distinct()
+            .all()
+        )
+        if week is not None and week > 0
+    ]
+    if weeks:
+        return sorted(set(weeks))
+    return sorted(
+        {
+            week
+            for (week,) in (
+                db.query(FantasyPlayerStat.week)
+                .filter(FantasyPlayerStat.season == season)
+                .distinct()
+                .all()
+            )
+            if week is not None and week > 0
+        }
+    )
+
+
+def _roster_runs_for_weeks(
+    snapshots: Dict[int, int], weeks: List[int]
+) -> Dict[int, int]:
+    """Carry each stored roster forward until the next changed snapshot."""
+    periods = sorted(snapshots)
+    runs: Dict[int, int] = {}
+    for week in weeks:
+        applicable = [period for period in periods if period <= week]
+        if applicable:
+            runs[week] = snapshots[applicable[-1]]
+    return runs
 
 
 def _actual_points(db: Session, season: int, weeks: List[int]) -> Dict[tuple, float]:
@@ -1254,6 +1315,11 @@ def _manager_ratings(db: Session, season: int) -> Dict[str, Any]:
         lineup. It cannot be claimed he would have scored more than the
         starter when there is no record of him scoring at all. This nudges
         the reported efficiency up rather than inventing a benched hero.
+
+    D/ST is different from a missing player: nflverse publishes individual
+    GSIS player actuals, not aggregate team-defense fantasy scores. The D/ST
+    seat and defense entries are therefore excluded from both sides of the
+    ratio and disclosed in the response instead of invalidating every week.
     """
     season_row = (
         db.query(FantasyLeagueSeason)
@@ -1263,18 +1329,29 @@ def _manager_ratings(db: Session, season: int) -> Dict[str, Any]:
         )
         .first()
     )
-    slots = _starting_slots(season_row)
-    if not slots:
+    configured_slots = _starting_slots(season_row)
+    if not configured_slots:
         return {"available": False, "reason": "no_lineup_settings", "teams": {}}
 
-    runs_by_week = _latest_roster_run_by_week(db, season)
-    if not runs_by_week:
+    excluded_slots = sorted(
+        {slot for slot in configured_slots if slot in UNSCORED_ACTUAL_POSITIONS}
+    )
+    slots = [slot for slot in configured_slots if slot not in UNSCORED_ACTUAL_POSITIONS]
+    if not slots:
+        return {"available": False, "reason": "no_scorable_weeks", "teams": {}}
+
+    snapshots = _latest_roster_run_by_week(db, season)
+    if not snapshots:
         return {"available": False, "reason": "no_roster_snapshots", "teams": {}}
 
-    weeks = sorted(runs_by_week)
+    weeks = _rating_weeks(db, season)
     points = _actual_points(db, season, weeks)
     if not points:
         return {"available": False, "reason": "no_actuals", "teams": {}}
+
+    runs_by_week = _roster_runs_for_weeks(snapshots, weeks)
+    if not runs_by_week:
+        return {"available": False, "reason": "no_scorable_weeks", "teams": {}}
 
     entries = (
         db.query(FantasyLeagueRosterEntry)
@@ -1285,50 +1362,61 @@ def _manager_ratings(db: Session, season: int) -> Dict[str, Any]:
         .all()
     )
 
-    # (week, team) -> roster rows from that week's final snapshot
+    # (run, team) -> roster rows. A run may serve more than one week when the
+    # collector skipped unchanged snapshots between scoring periods.
     rosters: Dict[tuple, List[FantasyLeagueRosterEntry]] = {}
     for entry in entries:
-        period = entry.scoring_period
-        if period is None or runs_by_week.get(period) != entry.run_id:
-            continue
-        rosters.setdefault((period, entry.espn_team_id), []).append(entry)
+        rosters.setdefault((entry.run_id, entry.espn_team_id), []).append(entry)
 
     per_team: Dict[int, List[Dict[str, Any]]] = {}
-    for (week, team_id), roster in rosters.items():
-        started = 0.0
-        starters_known = True
-        candidates: List[Dict[str, Any]] = []
+    for week, run_id in runs_by_week.items():
+        team_ids = {
+            team_id for roster_run_id, team_id in rosters if roster_run_id == run_id
+        }
+        for team_id in team_ids:
+            roster = rosters[(run_id, team_id)]
+            started = 0.0
+            starters_known = True
+            candidates: List[Dict[str, Any]] = []
 
-        for entry in roster:
-            slot = entry.lineup_slot
-            position = entry.position
-            scored = points.get((week, entry.player_id)) if entry.player_id else None
-            is_starter = bool(slot) and slot not in BENCH_SLOTS
+            for entry in roster:
+                slot = entry.lineup_slot
+                position = entry.position
+                # D/ST is an aggregate team result and has no row in the
+                # individual-player actuals feed. It and its lineup seat are
+                # excluded transparently from this otherwise complete grade.
+                if (
+                    slot in UNSCORED_ACTUAL_POSITIONS
+                    or position in UNSCORED_ACTUAL_POSITIONS
+                ):
+                    continue
+                scored = points.get((week, entry.player_id)) if entry.player_id else None
+                is_starter = bool(slot) and slot not in BENCH_SLOTS
 
-            if is_starter:
-                if scored is None:
-                    starters_known = False
-                else:
-                    started += scored
+                if is_starter:
+                    if scored is None:
+                        starters_known = False
+                    else:
+                        started += scored
 
-            # IR is storage a manager cannot start from, whatever it scored.
-            if slot in INELIGIBLE_SLOTS or scored is None or not position:
+                # IR is storage a manager cannot start from, whatever it scored.
+                if slot in INELIGIBLE_SLOTS or scored is None or not position:
+                    continue
+                candidates.append(
+                    {
+                        "player_id": entry.player_id,
+                        "name": entry.player_name_raw,
+                        "_points": scored,
+                        "_position": position,
+                    }
+                )
+
+            if not starters_known or not candidates:
                 continue
-            candidates.append(
-                {
-                    "player_id": entry.player_id,
-                    "name": entry.player_name_raw,
-                    "_points": scored,
-                    "_position": position,
-                }
+            optimal = sum(row["_points"] for row in _optimal_lineup(slots, candidates))
+            per_team.setdefault(team_id, []).append(
+                {"week": week, "started": started, "optimal": optimal}
             )
-
-        if not starters_known or not candidates:
-            continue
-        optimal = sum(row["_points"] for row in _optimal_lineup(slots, candidates))
-        per_team.setdefault(team_id, []).append(
-            {"week": week, "started": started, "optimal": optimal}
-        )
 
     teams = {
         team_id: fantasy_league_advanced.lineup_efficiency(weeks_for_team)
@@ -1343,6 +1431,7 @@ def _manager_ratings(db: Session, season: int) -> Dict[str, Any]:
         "reason": None,
         "league_average": sum(rated) / len(rated),
         "weeks": sorted({week["week"] for rows in per_team.values() for week in rows}),
+        "excluded_slots": excluded_slots,
         "teams": teams,
     }
 
@@ -1435,6 +1524,7 @@ def get_league_ledger(
             "reason": ratings["reason"],
             "league_average": ratings.get("league_average"),
             "weeks": ratings.get("weeks", []),
+            "excluded_slots": ratings.get("excluded_slots", []),
         },
         "teams": rows,
     }

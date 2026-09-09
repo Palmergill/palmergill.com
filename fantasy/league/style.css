@@ -254,14 +254,15 @@ button:focus-visible {
     color: var(--muted, #928a7d);
 }
 
-/* In the preseason the standings and power boards have nothing in them, so
-   the teams grid leads instead. Order only — no content is hidden, and the
-   keys are explicit rather than positional so reordering the HTML is safe. */
+/* In the preseason the derived boards have nothing in them, so the teams
+   grid leads instead. Order only — no content is hidden, and the keys are
+   explicit rather than positional so reordering the HTML is safe. */
 .is-preseason { display: flex; flex-direction: column; }
 .is-preseason [data-board="teams"] { order: 1; }
 .is-preseason [data-board="scoreboard"] { order: 2; }
-.is-preseason [data-board="standings"] { order: 3; }
-.is-preseason [data-board="power"] { order: 4; }
+.is-preseason [data-board="ledger"] { order: 3; }
+.is-preseason [data-board="charts"] { order: 4; }
+.is-preseason [data-board="free-agents"] { order: 5; }
 
 /* ── the ledger table ──────────────────────────────────────────────── */
 
@@ -1070,7 +1071,7 @@ button:focus-visible {
 .chip-row--scroll::-webkit-scrollbar { display: none; }
 .chip-row--scroll .chip { flex: 0 0 auto; }
 
-.ledger-table { min-width: 860px; }
+.ledger-table { min-width: 940px; }
 
 .ledger-table th[data-key],
 .ledger__cell {
