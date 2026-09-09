@@ -94,11 +94,20 @@ def expected_wins(
     This is the number of wins the schedule "should" have handed a team given
     how it actually scored, so wins minus this is a clean measure of how
     kindly the schedule treated it.
+
+    A team that has not played reports ``None`` rather than 0.0. Both are
+    arithmetically true, but 0.0 reads as a measured result — "this team was
+    expected to win nothing" — where the honest answer before kickoff is that
+    there is nothing to expect yet.
     """
     if all_play is None:
         all_play = all_play_records(metrics)
     return {
-        team_id: metric.games_played * all_play[team_id]["win_pct"]
+        team_id: (
+            metric.games_played * all_play[team_id]["win_pct"]
+            if metric.games_played
+            else None
+        )
         for team_id, metric in metrics.items()
     }
 
@@ -107,11 +116,19 @@ def luck_index(
     metrics: Dict[int, TeamMetrics],
     expected: Optional[Dict[int, float]] = None,
 ) -> Dict[int, float]:
-    """Actual wins minus expected wins. Sums to zero across the league."""
+    """Actual wins minus expected wins. Sums to zero across the league.
+
+    Unknown wherever the expectation is: before a team has played, it has
+    been neither lucky nor unlucky, and saying 0.0 claims otherwise.
+    """
     if expected is None:
         expected = expected_wins(metrics)
     return {
-        team_id: (metric.wins + 0.5 * metric.ties) - expected[team_id]
+        team_id: (
+            (metric.wins + 0.5 * metric.ties) - expected[team_id]
+            if expected[team_id] is not None
+            else None
+        )
         for team_id, metric in metrics.items()
     }
 

@@ -240,7 +240,7 @@
 
         if (overview.mode === "preseason") {
             els.modeBanner.textContent =
-                "The season hasn't kicked off yet — rosters are drafted, but no games have been played. Standings and power rankings appear after week 1.";
+                "The season hasn't kicked off yet — rosters are drafted, but no games have been played. Every column in the table fills in from week 1.";
             els.modeBanner.hidden = false;
         } else {
             els.modeBanner.hidden = true;
@@ -1325,11 +1325,6 @@
             const standings = await fetchJson(`${API_BASE}/standings?season=${state.season}`);
             if (stale(generation)) return;
             renderTeamsGrid(standings);
-
-            // In the preseason every derived column is empty and the schedule
-            // is unplayed, so lead with the teams and their drafted rosters
-            // instead of a table that has nothing in it yet.
-            els.leagueSections.classList.toggle("is-preseason", overview.mode === "preseason");
 
             // The ledger is the page; it loads before the boards under it so
             // the table is readable while the rest fills in.

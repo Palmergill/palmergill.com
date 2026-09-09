@@ -425,13 +425,45 @@ describe("league hub ledger", () => {
         expect(document.getElementById("myTeamStrip").hidden).toBe(true);
     });
 
-    test("preseason ordering targets every current board", () => {
-        expect(styleSource).toContain('.is-preseason [data-board="teams"] { order: 1; }');
-        expect(styleSource).toContain('.is-preseason [data-board="scoreboard"] { order: 2; }');
-        expect(styleSource).toContain('.is-preseason [data-board="ledger"] { order: 3; }');
-        expect(styleSource).toContain('.is-preseason [data-board="charts"] { order: 4; }');
+    test("the table leads whatever the season's state, preseason included", () => {
+        // The hub used to reorder itself before week 1, putting the teams
+        // grid above a table with nothing in it. The table leads now in
+        // every state, so nothing may reorder the boards at all.
+        expect(styleSource).not.toContain("is-preseason");
         expect(styleSource).not.toContain('[data-board="standings"]');
         expect(styleSource).not.toContain('[data-board="power"]');
+        expect(appSource).not.toContain("is-preseason");
+    });
+
+    test("a preseason season still renders the table, first", async () => {
+        const blank = TEAMS.map((row) =>
+            Object.assign({}, row, {
+                wins: 0,
+                losses: 0,
+                win_pct: 0,
+                points_for: 0,
+                luck: null,
+                expected_wins: null,
+                all_play: { wins: 0, losses: 0, ties: 0, games: 0, win_pct: 0 },
+                playoff: { odds: null, projected_wins: null, projected_losses: null },
+            })
+        );
+        boot({
+            overview: Object.assign({}, OVERVIEW, {
+                mode: "preseason",
+                latest_week: null,
+                completed_weeks: [],
+            }),
+            ledger: ledger({ teams: blank, power_week: null }),
+        });
+        await waitFor(() => document.querySelectorAll("#ledger tbody tr").length === 2);
+
+        const boards = [...document.querySelectorAll("#leagueSections .board")];
+        expect(boards[0].dataset.board).toBe("ledger");
+        expect(document.getElementById("leagueSections").className).toBe("");
+        // Empty, but present and explained rather than reordered away.
+        expect(document.getElementById("modeBanner").hidden).toBe(false);
+        expect(document.querySelector('#ledger td[data-key="luck"]').textContent).toBe("—");
     });
 
     test("a team without a computable measure sinks and prints a dash", async () => {

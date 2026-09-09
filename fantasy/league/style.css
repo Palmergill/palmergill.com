@@ -196,16 +196,6 @@ button:focus-visible {
     color: var(--muted, #928a7d);
 }
 
-/* In the preseason the derived boards have nothing in them, so the teams
-   grid leads instead. Order only — no content is hidden, and the keys are
-   explicit rather than positional so reordering the HTML is safe. */
-.is-preseason { display: flex; flex-direction: column; }
-.is-preseason [data-board="teams"] { order: 1; }
-.is-preseason [data-board="scoreboard"] { order: 2; }
-.is-preseason [data-board="ledger"] { order: 3; }
-.is-preseason [data-board="charts"] { order: 4; }
-.is-preseason [data-board="free-agents"] { order: 5; }
-
 /* ── the ledger table ──────────────────────────────────────────────── */
 
 .ledger { overflow-x: auto; }

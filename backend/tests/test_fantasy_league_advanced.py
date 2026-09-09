@@ -121,6 +121,15 @@ def test_expected_wins_is_games_times_all_play_percentage():
     assert expected[4] == pytest.approx(0.0)
 
 
+def test_a_team_that_has_not_played_has_no_expectation_and_no_luck():
+    """Before kickoff every one of these is 0.0 arithmetically, and every one
+    of them would read on the page as a measured result."""
+    metrics = metrics_for(TEAMS, [])
+
+    assert A.expected_wins(metrics) == {1: None, 2: None, 3: None, 4: None}
+    assert A.luck_index(metrics) == {1: None, 2: None, 3: None, 4: None}
+
+
 def test_luck_sums_to_zero_across_the_league():
     matchups = [
         matchup(1, 1, 2, 120.0, 90.0),
