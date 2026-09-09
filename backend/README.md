@@ -44,35 +44,63 @@ Poker, craps, craps strategy, blackjack, High Card Flush, login, `/api/poker/*`,
 database, so previewing it needs three things: a member account, some league
 data, and a server pointed at the database that holds both.
 
-**None of the credentials below are real.** They exist only in the local
-SQLite file and are safe to recreate or change at will. Do not reuse them
-anywhere that matters.
+Everything below reads its values from the environment. Keep them in
+`backend/.env`, which is gitignored — no credential for this belongs in the
+repository, not even a throwaway one, because a password committed once
+stays in the history after it is deleted.
+
+```bash
+cd backend
+cp .env.example .env          # if you do not have one yet
+```
+
+Then set the two keys this flow needs. `LEAGUE_TEST_PASSWORD` is yours to
+choose; `python3 -c 'import secrets; print(secrets.token_urlsafe(18))'`
+generates a reasonable one.
+
+```
+LEAGUE_TEST_USER=leaguetester
+LEAGUE_TEST_PASSWORD=...
+APP_AUTH_USERNAME=palmer
+APP_AUTH_PASSWORD=...
+ESPN_LEAGUE_ID=225965
+DATABASE_URL=sqlite:////absolute/path/to/backend/stock_data.db
+```
+
+Nothing loads `.env` automatically, so each step below sources it.
 
 ### 1. A local member account
 
+Creates the account on first run and rotates its password on later runs, so
+changing `LEAGUE_TEST_PASSWORD` is enough to change the account:
+
 ```bash
-cd backend && ./venv/bin/python - <<'EOF'
+cd backend && set -a && . ./.env && set +a && ./venv/bin/python - <<'EOF'
+import os
 from app.database import SessionLocal
 from app import accounts
 
+username = os.environ["LEAGUE_TEST_USER"]
+password = os.environ["LEAGUE_TEST_PASSWORD"]
+
 db = SessionLocal()
 try:
-    if accounts.get_user(db, "leaguetester") is None:
-        accounts.create_user(db, "leaguetester", "hub-preview-2026-local")
-        print("created")
+    user = accounts.get_user(db, username)
+    if user is None:
+        accounts.create_user(db, username, password)
+        print("created", username)
     else:
-        print("already exists")
+        accounts.validate_password(password, username)
+        user.password_hash = accounts.hash_password(password)
+        db.commit()
+        print("rotated", username)
 finally:
     db.close()
 EOF
 ```
 
-| | |
-|---|---|
-| Username | `leaguetester` |
-| Password | `hub-preview-2026-local` |
-| Role | member (not admin — the hub only needs a member) |
-| Scope | `backend/stock_data.db` on this machine only |
+The account is a member, not an admin — the hub needs nothing more — and it
+exists only in the local SQLite file.
 
 ### 2. League data
 
@@ -81,7 +109,7 @@ local database without any credential. Private seasons close their run as
 `skipped`, which is the expected answer rather than a failure:
 
 ```bash
-cd backend && ESPN_LEAGUE_ID=225965 ./venv/bin/python - <<'EOF'
+cd backend && set -a && . ./.env && set +a && ./venv/bin/python - <<'EOF'
 from app.database import SessionLocal
 from app.services import fantasy_league_collector as lc
 
@@ -106,29 +134,26 @@ error that explains itself:
 - `DATABASE_URL` defaults to `sqlite:///./stock_data.db`, **relative to the
   working directory**. Starting uvicorn from the repo root uses
   `./stock_data.db`, not `backend/stock_data.db`, so the account and league
-  data collected above are simply not there and login returns 401.
+  data collected above are simply not there and login returns 401. Set it to
+  an absolute path in `.env`.
 - `/login/session` returns 503 unless `APP_AUTH_USERNAME` and
   `APP_AUTH_PASSWORD` are set. They sign the session token; a member still
   signs in with their own account password, not these.
 
 ```bash
-LOCAL_SITE_ROOT=true \
-ESPN_LEAGUE_ID=225965 \
-APP_AUTH_USERNAME=palmer \
-APP_AUTH_PASSWORD=local-dev-only-password \
-DATABASE_URL="sqlite:///$(pwd)/backend/stock_data.db" \
-backend/venv/bin/uvicorn app.main:app --app-dir backend --port 8000
+set -a && . backend/.env && set +a && LOCAL_SITE_ROOT=true \
+  backend/venv/bin/uvicorn app.main:app --app-dir backend --port 8000
 ```
 
-Then sign in at `http://127.0.0.1:8000/login/` and open
+Then sign in at `http://127.0.0.1:8000/login/` as `LEAGUE_TEST_USER` and open
 `http://127.0.0.1:8000/fantasy/league/`.
 
 ### What you should expect to see
 
-The hub lands on the newest readable season. **Before week 1 that season is
-in preseason mode, which deliberately orders the teams grid above the
-ledger** — every derived column is empty until games are played, and a
-banner says so. To see the ledger with real numbers, pick a played season:
+The hub lands on the newest readable season and the table leads in every
+state. Before week 1 that table is mostly dashes — all-play, expected wins,
+luck and lineup efficiency have nothing to derive from until games are
+played — and a banner says so. To see it full, pick a played season:
 `http://127.0.0.1:8000/fantasy/league/?season=2024`.
 
 Columns stay blank when the data behind them is genuinely missing rather
