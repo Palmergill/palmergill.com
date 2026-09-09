@@ -33,9 +33,9 @@
     const byId = (id) => document.getElementById(id);
     const els = {
         leagueName: byId("leagueName"),
-        leagueLede: byId("leagueLede"),
         modeLabel: byId("modeLabel"),
         seasonValue: byId("seasonValue"),
+        weekValue: byId("weekValue"),
         freshnessValue: byId("freshnessValue"),
         errorBanner: byId("errorBanner"),
         modeBanner: byId("modeBanner"),
@@ -233,6 +233,9 @@
         els.leagueName.textContent = overview.name || "League Hub";
         els.seasonValue.textContent = overview.season || "—";
         els.modeLabel.textContent = F.modeLabel(overview.mode) || "Season";
+        els.weekValue.textContent = overview.latest_week
+            ? `Week ${overview.latest_week}`
+            : "Preseason";
         els.freshnessValue.textContent = F.formatAsOf(overview.freshness.league_sync);
 
         if (overview.mode === "preseason") {

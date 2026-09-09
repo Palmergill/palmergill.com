@@ -17,6 +17,8 @@ body {
     line-height: 1.5;
 }
 
+:root { --shell-pad: 20px; }
+
 .app-shell {
     max-width: 1060px;
     margin: 0 auto;
@@ -35,68 +37,8 @@ body {
     border: 0;
 }
 
-/* ── head ─────────────────────────────────────────────────────────── */
-
-.page-head {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 18px;
-    margin-bottom: 22px;
-}
-
-.eyebrow {
-    display: inline-block;
-    font-size: 12px;
-    font-weight: 600;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--sage, #5b7152);
-    margin-bottom: 6px;
-}
-
-.page-head h1 {
-    margin: 0 0 6px;
-    font-size: clamp(26px, 4vw, 34px);
-    letter-spacing: -0.02em;
-}
-
-.lede {
-    margin: 0;
-    color: var(--soft, #5d574e);
-    max-width: 54ch;
-}
-
-.week-badge {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-end;
-    gap: 2px;
-    padding: 10px 16px;
-    background: var(--card, #fff);
-    border: 1px solid var(--line, #ece4d8);
-    border-radius: 14px;
-}
-
-.week-badge__label {
-    font-size: 11px;
-    font-weight: 600;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--muted, #928a7d);
-}
-
-.week-badge__value {
-    font-size: 22px;
-    font-weight: 700;
-    line-height: 1.1;
-}
-
-.week-badge__season {
-    font-size: 12px;
-    color: var(--muted, #928a7d);
-}
+/* The masthead replaced the old page head; its rules live with the
+   ledger's visual language at the foot of this file. */
 
 /* ── banners and empty states ─────────────────────────────────────── */
 
@@ -1015,9 +957,8 @@ button:focus-visible {
 }
 
 @media (max-width: 620px) {
-    .app-shell { padding: 20px 14px 60px; }
-    .page-head { flex-direction: column; align-items: stretch; }
-    .week-badge { align-items: flex-start; }
+    :root { --shell-pad: 14px; }
+    .app-shell { padding: 20px var(--shell-pad) 60px; }
     .team-power { align-items: flex-start; }
     .team-overview__head { align-items: flex-start; flex-direction: column; }
 
@@ -1403,7 +1344,10 @@ button:focus-visible {
     }
 
     .controls--ledger { align-items: stretch; }
-    .chip-row--scroll { margin: 0 -20px; padding: 0 20px 2px; }
+    .chip-row--scroll {
+        margin: 0 calc(var(--shell-pad) * -1);
+        padding: 0 var(--shell-pad) 2px;
+    }
 
     /* Every control clears a thumb. */
     .chip-row--scroll .chip,
@@ -1415,4 +1359,228 @@ button:focus-visible {
 
     .my-team__advice-block { align-items: flex-start; }
     .my-team__moves { justify-content: flex-start; }
+}
+
+/* ── the ledger's visual language ──────────────────────────────────────
+   The hub used to be a stack of white cards on ivory. The ledger reads as
+   one document instead: a serif masthead, hairline rules where a card
+   border used to be, and section headings that sit on a rule rather than
+   inside a box. Nothing below changes structure — only the surface. */
+
+.display,
+.masthead h1,
+.board__head h2,
+.chart__title,
+.team-columns h3,
+.team-overview__head h3,
+.lineup__head h3 {
+    font-family: "Newsreader", Georgia, "Times New Roman", serif;
+    font-weight: 500;
+    letter-spacing: -0.015em;
+}
+
+/* ── masthead ─────────────────────────────────────────────────────── */
+
+.masthead {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 16px 24px;
+    padding-bottom: 14px;
+    border-bottom: 2px solid var(--ink, #23201c);
+}
+
+.masthead__title { min-width: 0; }
+
+/* The kicker above the name. Muted and tracked, so the serif line below it
+   is unambiguously the loudest thing on the page. */
+.eyebrow {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted, #928a7d);
+}
+
+.masthead h1 {
+    margin: 4px 0 0;
+    font-size: clamp(34px, 5.5vw, 50px);
+    line-height: 1;
+}
+
+.masthead__meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 12px 22px;
+    margin: 0;
+    padding-bottom: 4px;
+}
+
+.masthead__fact {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+}
+
+.masthead__fact dt {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted, #928a7d);
+}
+
+.masthead__fact dd {
+    margin: 2px 0 0;
+    font-size: 20px;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+    font-variant-numeric: tabular-nums;
+}
+
+.masthead__freshness {
+    margin: 8px 0 0;
+    font-size: 12px;
+    color: var(--muted, #928a7d);
+}
+
+/* ── seasons read as a rule of links, not a row of pills ──────────── */
+
+.season-bar { margin: 14px 0 26px; }
+
+.season-bar .chip {
+    padding: 2px 0;
+    border: 0;
+    border-bottom: 1px solid transparent;
+    border-radius: 0;
+    background: none;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--muted, #928a7d);
+}
+
+.season-bar .chip-row { gap: 16px; }
+.season-bar .chip:hover:not(:disabled) { color: var(--ink, #23201c); }
+
+.season-bar .chip--active {
+    background: none;
+    color: var(--ink, #23201c);
+    border-bottom-color: var(--clay, #b96a4b);
+}
+
+.season-bar .chip--disabled,
+.season-bar .chip:disabled { color: var(--line-strong, #d8cdba); }
+
+/* ── sections: rules instead of boxes ─────────────────────────────── */
+
+.board {
+    margin-bottom: 34px;
+    padding: 0;
+    background: none;
+    border: 0;
+    border-radius: 0;
+}
+
+.board__head {
+    align-items: flex-end;
+    padding-bottom: 10px;
+    margin-bottom: 14px;
+    border-bottom: 1px solid var(--ink, #23201c);
+}
+
+.board__head h2 { font-size: 26px; }
+
+/* The ledger's own header row already carries a rule, so it would double
+   up with the section rule directly above it. */
+.ledger .rank-table th { border-bottom-color: var(--line-strong, #d8cdba); }
+
+.chart__title { font-size: 20px; }
+
+/* The team page keeps its cards: it is a detail view about one roster,
+   not the league-wide document the ledger is. */
+.team-head,
+.team-overview,
+.lineup,
+.my-team {
+    border-radius: 14px;
+}
+
+@media (max-width: 720px) {
+    .masthead {
+        align-items: flex-start;
+        gap: 12px;
+    }
+
+    .masthead__meta {
+        gap: 10px 18px;
+        padding-bottom: 0;
+    }
+
+    .masthead__fact { align-items: flex-start; }
+    .masthead__fact dd { font-size: 17px; }
+    .board__head h2 { font-size: 22px; }
+    .season-bar .chip { min-height: 44px; display: inline-flex; align-items: center; }
+}
+
+/* The band is part of the document, not a card floating on it: it was the
+   only box left on the league view once the boards lost their chrome. */
+.my-team {
+    padding: 14px 0 16px;
+    background: none;
+    border: 0;
+    border-top: 2px solid var(--ink, #23201c);
+    border-bottom: 1px solid var(--line-strong, #d8cdba);
+    border-radius: 0;
+    margin-bottom: 30px;
+}
+
+/* The column chooser is a switcher, not a set of buttons competing with the
+   masthead. Same treatment as the season rule — until a phone, where it is
+   the only control on the page and needs a thumb-sized target. */
+.controls--ledger .chip-row--scroll { gap: 16px; }
+
+.controls--ledger .chip {
+    padding: 2px 0;
+    border: 0;
+    border-bottom: 1px solid transparent;
+    border-radius: 0;
+    background: none;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--muted, #928a7d);
+}
+
+.controls--ledger .chip:hover:not(:disabled) { color: var(--ink, #23201c); }
+
+.controls--ledger .chip--active {
+    background: none;
+    color: var(--ink, #23201c);
+    border-bottom-color: var(--clay, #b96a4b);
+}
+
+@media (max-width: 720px) {
+    .my-team { padding: 14px 0 16px; }
+
+    /* Re-assert the stacked head: the card-less `.board__head` rule above
+       sets flex-end, and same-specificity source order would otherwise push
+       the note to the right edge on a phone. */
+    .board__head { align-items: flex-start; }
+
+    .controls--ledger .chip-row--scroll { gap: 7px; }
+
+    .controls--ledger .chip {
+        padding: 0 14px;
+        border: 1px solid var(--line-strong, #d8cdba);
+        border-radius: 999px;
+        background: var(--card, #fff);
+    }
+
+    .controls--ledger .chip--active {
+        background: var(--ink, #23201c);
+        border-color: var(--ink, #23201c);
+        color: #fff;
+    }
 }

@@ -11,10 +11,10 @@
     <link rel="icon" type="image/png" href="/assets/palmer-gill-logo-small.png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/shared/site-nav.css?v=14">
     <link rel="stylesheet" href="/shared/fantasy-header.css?v=1">
-    <link rel="stylesheet" href="style.css?v=8">
+    <link rel="stylesheet" href="style.css?v=10">
 </head>
 <body>
 <noscript>
@@ -22,20 +22,30 @@
 </noscript>
     <main class="app-shell">
         <div id="fantasy-header-mount"></div>
-        <header class="page-head">
-            <div class="page-head__titles">
-                <span class="eyebrow">Private league</span>
+        <!-- A masthead, not a page header: the league's name is the loudest
+             thing on the page and the season facts read as a standing line
+             under it, the way a ledger's own heading would. -->
+        <header class="masthead">
+            <div class="masthead__title">
+                <span class="eyebrow">Private league · ESPN</span>
                 <h1 id="leagueName">League Hub</h1>
-                <p class="lede" id="leagueLede">
-                    Standings, power rankings, and rosters for the league.
-                </p>
             </div>
-            <div class="week-badge" id="modeBadge" aria-live="polite">
-                <span class="week-badge__label" id="modeLabel">Season</span>
-                <span class="week-badge__value" id="seasonValue">—</span>
-                <span class="week-badge__season" id="freshnessValue"></span>
-            </div>
+            <dl class="masthead__meta" id="modeBadge" aria-live="polite">
+                <div class="masthead__fact">
+                    <dt id="modeLabel">Season</dt>
+                    <dd id="seasonValue">—</dd>
+                </div>
+                <div class="masthead__fact">
+                    <dt>Through</dt>
+                    <dd id="weekValue">—</dd>
+                </div>
+                <div class="masthead__fact">
+                    <dt>Scoring</dt>
+                    <dd>Half PPR</dd>
+                </div>
+            </dl>
         </header>
+        <p class="masthead__freshness" id="freshnessValue"></p>
 
         <p id="errorBanner" class="banner banner--error" hidden></p>
         <p id="modeBanner" class="banner" hidden></p>
@@ -227,6 +237,6 @@
     <script src="/shared/api-base.js?v=1"></script>
     <script src="format.js?v=3"></script>
     <script src="/fantasy/chat.js?v=1"></script>
-    <script src="app.js?v=7"></script>
+    <script src="app.js?v=8"></script>
 </body>
 </html>
