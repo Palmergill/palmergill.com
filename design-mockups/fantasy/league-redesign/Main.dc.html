@@ -1,0 +1,469 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&display=swap">
+  <style>
+    body {
+      margin: 0;
+      background: #faf6f0;
+      color: #23201c;
+      font-family: "Plus Jakarta Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+    }
+    a { color: #5b7152; text-decoration: none; }
+    a:hover { color: #4c6044; }
+    .display { font-family: "Newsreader", Georgia, "Times New Roman", serif; font-weight: 500; letter-spacing: -0.015em; }
+    .kicker { font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #928a7d; }
+    .num { font-variant-numeric: tabular-nums; }
+
+    table.ledger { width: 100%; border-collapse: collapse; }
+    table.ledger th {
+      padding: 0 8px 8px; text-align: left; font-size: 10px; font-weight: 700;
+      letter-spacing: 0.07em; text-transform: uppercase; color: #928a7d;
+      border-bottom: 1px solid #23201c; white-space: nowrap;
+    }
+    table.ledger td {
+      padding: 10px 8px; border-bottom: 1px solid #ece4d8;
+      font-size: 13px; white-space: nowrap; vertical-align: middle;
+    }
+    table.ledger tbody tr:last-child td { border-bottom: 1px solid #d8cdba; }
+    .method { font-size: 12px; font-weight: 600; color: #928a7d; padding-bottom: 2px; border-bottom: 1px solid transparent; }
+    .method--on { color: #23201c; border-bottom-color: #b96a4b; }
+
+    .meter { height: 7px; background: #f3eee4; border-radius: 2px; overflow: hidden; }
+    .meter__fill { height: 100%; background: #5b7152; border-radius: 0 4px 4px 0; }
+
+    /* diverging row: polarity by side of the zero rule, magnitude by length */
+    .dv { display: grid; grid-template-columns: 108px minmax(0, 1fr) 52px; align-items: center; gap: 10px; padding: 5px 0; }
+    .dv__name { font-size: 12px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .dv__track { position: relative; height: 16px; }
+    .dv__zero { position: absolute; left: 50%; top: -1px; bottom: -1px; width: 1px; background: #d8cdba; }
+    .dv__bar { position: absolute; top: 1px; height: 14px; }
+    .dv__val { font-size: 12px; font-weight: 700; text-align: right; font-variant-numeric: tabular-nums; }
+
+    /* dot plot: position encodes, so an 80–100 window is honest */
+    .dot { display: grid; grid-template-columns: 108px minmax(0, 1fr) 46px; align-items: center; gap: 10px; padding: 5px 0; }
+    .dot__track { position: relative; height: 16px; }
+    .dot__line { position: absolute; left: 0; right: 0; top: 7.5px; height: 1px; background: #ece4d8; }
+    .dot__avg { position: absolute; top: -1px; bottom: -1px; width: 1px; background: #23201c; }
+    .dot__pt { position: absolute; top: 3px; width: 10px; height: 10px; border-radius: 999px; background: #5b7152; border: 2px solid #ffffff; margin-left: -5px; }
+
+    .rng { display: grid; grid-template-columns: 108px minmax(0, 1fr) 46px; align-items: center; gap: 10px; padding: 5px 0; }
+    .rng__track { position: relative; height: 16px; }
+    .rng__span { position: absolute; top: 4px; height: 8px; background: #5b7152; opacity: 0.28; border-radius: 4px; }
+    .rng__med { position: absolute; top: 3px; width: 10px; height: 10px; border-radius: 999px; background: #5b7152; border: 2px solid #ffffff; margin-left: -5px; }
+  </style>
+</helmet>
+
+<div style="width: 1280px; background: #faf6f0;">
+
+  <div style="display: flex; align-items: center; justify-content: space-between; gap: 24px; height: 52px; padding: 0 32px; background: rgba(250, 246, 240, 0.88); border-bottom: 1px solid #ece4d8;">
+    <div style="display: flex; align-items: center; gap: 10px;">
+      <div style="width: 22px; height: 22px; border-radius: 6px; background: #5b7152;"></div>
+      <span style="font-size: 14px; font-weight: 700; color: #23201c;">Palmer Gill</span>
+    </div>
+    <div style="display: flex; align-items: center; gap: 20px; font-size: 13px; color: #5d574e;">
+      <span>Projects</span><span>Fantasy</span><span>Casino</span><span>Stocks</span><span>About</span>
+      <span style="padding: 5px 12px; border-radius: 999px; background: #e7eee2; color: #4c6044; font-weight: 600;">Palmer</span>
+    </div>
+  </div>
+
+  <div style="max-width: 1180px; margin: 0 auto; padding: 24px 32px 64px;">
+
+    <div style="display: flex; align-items: center; gap: 16px; padding: 8px 0 12px; border-bottom: 1px solid #ece4d8; margin-bottom: 24px;">
+      <span style="font-size: 13px; font-weight: 700; color: #b86f52;">← Fantasy</span>
+      <div style="display: flex; align-items: center; gap: 6px; margin-left: auto;">
+        <span style="padding: 5px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; color: #928a7d;">My Rankings</span>
+        <span style="padding: 5px 10px; border-radius: 999px; background: #f3eee5; font-size: 12px; font-weight: 600; color: #2f4a37;">League Hub</span>
+        <span style="padding: 5px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; color: #928a7d;">Fourth &amp; Fortune</span>
+      </div>
+    </div>
+
+    <div style="display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; padding-bottom: 14px; border-bottom: 2px solid #23201c; margin-bottom: 8px;">
+      <div style="display: flex; flex-direction: column; gap: 6px;">
+        <span class="kicker">Private league · ESPN</span>
+        <h1 class="display" style="margin: 0; font-size: 50px; line-height: 1;">Sunday Money</h1>
+      </div>
+      <div style="display: flex; align-items: baseline; gap: 22px; padding-bottom: 4px;">
+        <div style="display: flex; flex-direction: column; align-items: flex-end;">
+          <span class="kicker">Season</span>
+          <span class="num" style="font-size: 20px; font-weight: 800;">2026</span>
+        </div>
+        <div style="display: flex; flex-direction: column; align-items: flex-end;">
+          <span class="kicker">Through</span>
+          <span class="num" style="font-size: 20px; font-weight: 800;">Week 5</span>
+        </div>
+        <div style="display: flex; flex-direction: column; align-items: flex-end;">
+          <span class="kicker">Scoring</span>
+          <span style="font-size: 20px; font-weight: 800;">Half PPR</span>
+        </div>
+      </div>
+    </div>
+
+    <div style="display: flex; align-items: center; gap: 18px; padding: 10px 0 24px;">
+      <div style="display: flex; align-items: baseline; gap: 14px; font-size: 13px;">
+        <span style="font-weight: 700; border-bottom: 1px solid #b96a4b; padding-bottom: 2px;">2026</span>
+        <span style="color: #928a7d;">2025</span>
+        <span style="color: #928a7d;">2024</span>
+        <span style="color: #d8cdba; text-decoration: line-through;">2023</span>
+      </div>
+      <span style="margin-left: auto; font-size: 13px; font-weight: 600; color: #5b7152;">Draft recap →</span>
+    </div>
+
+    <!-- Your team, first: the one board here about a single roster, and the only
+         thing on the page that asks for a decision rather than reporting a fact. -->
+    <div style="display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.3fr); gap: 30px; align-items: start; padding: 16px 0 20px; border-top: 2px solid #23201c; border-bottom: 1px solid #d8cdba; margin-bottom: 34px;">
+
+      <div style="display: flex; flex-direction: column; gap: 3px;">
+        <span class="kicker">Your team</span>
+        <span class="display" style="font-size: 26px; font-weight: 600; line-height: 1.15;">Hurts So Good</span>
+        <span style="font-size: 13px; color: #928a7d;">4-1 · 2nd · 32-13 all-play · 91% playoff odds</span>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 5px; padding-left: 30px; border-left: 1px solid #ece4d8;">
+        <span class="kicker">Week 6, live</span>
+        <span style="font-size: 14px; font-weight: 700;">vs Gibbs Me More</span>
+        <div style="display: flex; align-items: baseline; gap: 8px;">
+          <span class="num" style="font-size: 26px; font-weight: 800; letter-spacing: -0.02em; color: #2f4a37;">118.9</span>
+          <span class="num" style="font-size: 16px; font-weight: 600; color: #928a7d;">– 104.6</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 9px; margin-top: 2px;">
+          <div class="meter" style="flex: 1 1 auto;"><div class="meter__fill" style="width: 71%; background: #5a7794;"></div></div>
+          <span class="num" style="font-size: 12px; font-weight: 700; color: #5a7794;">71%</span>
+        </div>
+        <span style="font-size: 12px; color: #928a7d;">6 of your 9 still to play</span>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 8px; padding-left: 30px; border-left: 1px solid #ece4d8;">
+        <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 12px;">
+          <span class="kicker">Start / sit</span>
+          <span style="font-size: 12px; color: #928a7d;">Locks 1:00 PM ET</span>
+        </div>
+        <div style="display: flex; align-items: baseline; gap: 10px;">
+          <span class="num" style="font-size: 30px; font-weight: 800; letter-spacing: -0.025em; line-height: 1; color: #3f6d4a;">+9.1</span>
+          <span style="font-size: 13px; font-weight: 700;">points on your bench</span>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 5px; margin-top: 2px;">
+          <div style="display: flex; align-items: baseline; gap: 10px; font-size: 13px;">
+            <span style="min-width: 38px; font-size: 11px; font-weight: 700; letter-spacing: 0.05em; color: #928a7d;">FLEX</span>
+            <span style="flex: 1 1 auto;"><span style="color: #3f6d4a; font-weight: 700;">Odunze</span> <span style="color: #928a7d;">for</span> <span style="color: #8c3a1f;">Charbonnet</span></span>
+            <span class="num" style="font-weight: 700; color: #3f6d4a;">+5.6</span>
+          </div>
+          <div style="display: flex; align-items: baseline; gap: 10px; font-size: 13px;">
+            <span style="min-width: 38px; font-size: 11px; font-weight: 700; letter-spacing: 0.05em; color: #928a7d;">TE</span>
+            <span style="flex: 1 1 auto;"><span style="color: #3f6d4a; font-weight: 700;">Loveland</span> <span style="color: #928a7d;">for</span> <span style="color: #8c3a1f;">Otton</span></span>
+            <span class="num" style="font-weight: 700; color: #3f6d4a;">+3.5</span>
+          </div>
+        </div>
+        <span style="margin-top: 4px; font-size: 13px; font-weight: 700; color: #5b7152;">Open your roster →</span>
+      </div>
+    </div>
+
+    <!-- the table -->
+    <div style="display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; margin-bottom: 12px;">
+      <div>
+        <h2 class="display" style="margin: 0; font-size: 26px;">The table</h2>
+        <p style="margin: 2px 0 0; font-size: 12px; color: #928a7d;">All-play is your record against every team, every week. Luck is wins minus expected wins.</p>
+      </div>
+      <div style="display: flex; align-items: baseline; gap: 6px; padding-bottom: 4px;">
+        <span class="kicker" style="margin-right: 6px;">Power column</span>
+        <span class="method method--on">Composite</span>
+        <span style="color: #d8cdba;">·</span><span class="method">Record</span>
+        <span style="color: #d8cdba;">·</span><span class="method">Point diff</span>
+        <span style="color: #d8cdba;">·</span><span class="method">Schedule</span>
+        <span style="color: #d8cdba;">·</span><span class="method">Consistency</span>
+        <span style="color: #d8cdba;">·</span><span class="method">Recent form</span>
+        <span style="color: #d8cdba;">·</span><span class="method">H2H</span>
+      </div>
+    </div>
+
+    <table class="ledger">
+      <thead>
+        <tr>
+          <th style="width: 26px;">#</th>
+          <th>Team</th>
+          <th style="text-align: right;">W-L</th>
+          <th style="text-align: right;">PF</th>
+          <th style="text-align: right;">All-play</th>
+          <th style="text-align: right;">xW</th>
+          <th style="text-align: right;">Luck</th>
+          <th style="text-align: right;">Lineup</th>
+          <th style="text-align: right;">Power</th>
+          <th style="width: 96px;">Playoff odds</th>
+          <th style="width: 66px;">Form</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="num" style="color: #b96a4b; font-weight: 700;">1</td>
+          <td><span style="font-weight: 700;">Bijan Mustard</span> <span style="color: #928a7d; font-size: 11px;">Ali</span></td>
+          <td class="num" style="text-align: right; font-weight: 700;">5-0</td>
+          <td class="num" style="text-align: right;">677.0</td>
+          <td class="num" style="text-align: right; color: #5d574e;">36-9</td>
+          <td class="num" style="text-align: right; color: #928a7d;">4.0</td>
+          <td class="num" style="text-align: right; font-weight: 700; color: #5a7794;">+1.0</td>
+          <td class="num" style="text-align: right;">94.1%</td>
+          <td style="text-align: right;"><span class="num" style="font-weight: 700;">1</span> <span style="font-size: 10px; color: #928a7d;">—</span></td>
+          <td><div style="display: flex; align-items: center; gap: 6px;"><div class="meter" style="flex: 1 1 auto;"><div class="meter__fill" style="width: 98%;"></div></div><span class="num" style="font-size: 11px; font-weight: 700;">98</span></div></td>
+          <td><svg width="60" height="20" viewBox="0 0 60 20"><path d="M2 13 L13 10 L24 11 L35 6 L46 7 L58 3" fill="none" stroke="#5a7794" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></td>
+        </tr>
+        <tr style="background: #f7f4ec;">
+          <td class="num" style="color: #b96a4b; font-weight: 700;">2</td>
+          <td><span style="font-weight: 700;">Hurts So Good</span> <span style="color: #928a7d; font-size: 11px;">You</span></td>
+          <td class="num" style="text-align: right; font-weight: 700;">4-1</td>
+          <td class="num" style="text-align: right;">655.2</td>
+          <td class="num" style="text-align: right; color: #5d574e;">32-13</td>
+          <td class="num" style="text-align: right; color: #928a7d;">3.6</td>
+          <td class="num" style="text-align: right; font-weight: 700; color: #5a7794;">+0.4</td>
+          <td class="num" style="text-align: right;">91.6%</td>
+          <td style="text-align: right;"><span class="num" style="font-weight: 700;">2</span> <span style="font-size: 10px; color: #928a7d;">—</span></td>
+          <td><div style="display: flex; align-items: center; gap: 6px;"><div class="meter" style="flex: 1 1 auto;"><div class="meter__fill" style="width: 91%;"></div></div><span class="num" style="font-size: 11px; font-weight: 700;">91</span></div></td>
+          <td><svg width="60" height="20" viewBox="0 0 60 20"><path d="M2 11 L13 15 L24 7 L35 10 L46 5 L58 4" fill="none" stroke="#5a7794" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></td>
+        </tr>
+        <tr>
+          <td class="num" style="color: #b96a4b; font-weight: 700;">3</td>
+          <td><span style="font-weight: 700;">Ctrl+Alt+Defeat</span> <span style="color: #928a7d; font-size: 11px;">Dana</span></td>
+          <td class="num" style="text-align: right; font-weight: 700;">3-2</td>
+          <td class="num" style="text-align: right;">637.4</td>
+          <td class="num" style="text-align: right; color: #5d574e;">29-16</td>
+          <td class="num" style="text-align: right; color: #928a7d;">3.2</td>
+          <td class="num" style="text-align: right; font-weight: 700; color: #b96a4b;">−0.2</td>
+          <td class="num" style="text-align: right; font-weight: 700;">96.3%</td>
+          <td style="text-align: right;"><span class="num" style="font-weight: 700;">3</span> <span style="font-size: 10px; color: #5a7794;">▲1</span></td>
+          <td><div style="display: flex; align-items: center; gap: 6px;"><div class="meter" style="flex: 1 1 auto;"><div class="meter__fill" style="width: 79%;"></div></div><span class="num" style="font-size: 11px; font-weight: 700;">79</span></div></td>
+          <td><svg width="60" height="20" viewBox="0 0 60 20"><path d="M2 15 L13 14 L24 11 L35 9 L46 5 L58 3" fill="none" stroke="#5a7794" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></td>
+        </tr>
+        <tr>
+          <td class="num" style="color: #b96a4b; font-weight: 700;">4</td>
+          <td><span style="font-weight: 700;">Nacho Average Team</span> <span style="color: #928a7d; font-size: 11px;">Jen</span></td>
+          <td class="num" style="text-align: right; font-weight: 700;">3-2</td>
+          <td class="num" style="text-align: right;">623.5</td>
+          <td class="num" style="text-align: right; color: #5d574e;">27-18</td>
+          <td class="num" style="text-align: right; color: #928a7d;">3.0</td>
+          <td class="num" style="text-align: right; font-weight: 700; color: #928a7d;">0.0</td>
+          <td class="num" style="text-align: right;">88.2%</td>
+          <td style="text-align: right;"><span class="num" style="font-weight: 700;">4</span> <span style="font-size: 10px; color: #b96a4b;">▼1</span></td>
+          <td><div style="display: flex; align-items: center; gap: 6px;"><div class="meter" style="flex: 1 1 auto;"><div class="meter__fill" style="width: 72%;"></div></div><span class="num" style="font-size: 11px; font-weight: 700;">72</span></div></td>
+          <td><svg width="60" height="20" viewBox="0 0 60 20"><path d="M2 5 L13 6 L24 8 L35 7 L46 12 L58 14" fill="none" stroke="#5a7794" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></td>
+        </tr>
+        <tr>
+          <td class="num" style="color: #b96a4b; font-weight: 700;">5</td>
+          <td><span style="font-weight: 700;">Chubb Rock</span> <span style="color: #928a7d; font-size: 11px;">Wes</span></td>
+          <td class="num" style="text-align: right; font-weight: 700;">3-2</td>
+          <td class="num" style="text-align: right;">609.6</td>
+          <td class="num" style="text-align: right; color: #5d574e;">24-21</td>
+          <td class="num" style="text-align: right; color: #928a7d;">2.7</td>
+          <td class="num" style="text-align: right; font-weight: 700; color: #5a7794;">+0.3</td>
+          <td class="num" style="text-align: right;">92.7%</td>
+          <td style="text-align: right;"><span class="num" style="font-weight: 700;">5</span> <span style="font-size: 10px; color: #5a7794;">▲2</span></td>
+          <td><div style="display: flex; align-items: center; gap: 6px;"><div class="meter" style="flex: 1 1 auto;"><div class="meter__fill" style="width: 68%;"></div></div><span class="num" style="font-size: 11px; font-weight: 700;">68</span></div></td>
+          <td><svg width="60" height="20" viewBox="0 0 60 20"><path d="M2 14 L13 12 L24 13 L35 8 L46 7 L58 6" fill="none" stroke="#5a7794" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></td>
+        </tr>
+        <tr>
+          <td class="num" style="color: #928a7d; font-weight: 700;">6</td>
+          <td><span style="font-weight: 700;">Blitz Almighty</span> <span style="color: #928a7d; font-size: 11px;">Marcus</span></td>
+          <td class="num" style="text-align: right; font-weight: 700;">2-3</td>
+          <td class="num" style="text-align: right;">602.6</td>
+          <td class="num" style="text-align: right; color: #5d574e;">22-23</td>
+          <td class="num" style="text-align: right; color: #928a7d;">2.4</td>
+          <td class="num" style="text-align: right; font-weight: 700; color: #b96a4b;">−0.4</td>
+          <td class="num" style="text-align: right;">90.4%</td>
+          <td style="text-align: right;"><span class="num" style="font-weight: 700;">6</span> <span style="font-size: 10px; color: #928a7d;">—</span></td>
+          <td><div style="display: flex; align-items: center; gap: 6px;"><div class="meter" style="flex: 1 1 auto;"><div class="meter__fill" style="width: 55%;"></div></div><span class="num" style="font-size: 11px; font-weight: 700;">55</span></div></td>
+          <td><svg width="60" height="20" viewBox="0 0 60 20"><path d="M2 8 L13 10 L24 9 L35 13 L46 12 L58 15" fill="none" stroke="#5a7794" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></td>
+        </tr>
+        <tr>
+          <td class="num" style="color: #928a7d; font-weight: 700;">7</td>
+          <td><span style="font-weight: 700;">Pardon My Punt</span> <span style="color: #928a7d; font-size: 11px;">Tobin</span></td>
+          <td class="num" style="text-align: right; font-weight: 700;">2-3</td>
+          <td class="num" style="text-align: right;">588.0</td>
+          <td class="num" style="text-align: right; color: #5d574e;">19-26</td>
+          <td class="num" style="text-align: right; color: #928a7d;">2.1</td>
+          <td class="num" style="text-align: right; font-weight: 700; color: #b96a4b;">−0.1</td>
+          <td class="num" style="text-align: right;">87.5%</td>
+          <td style="text-align: right;"><span class="num" style="font-weight: 700;">7</span> <span style="font-size: 10px; color: #5a7794;">▲1</span></td>
+          <td><div style="display: flex; align-items: center; gap: 6px;"><div class="meter" style="flex: 1 1 auto;"><div class="meter__fill" style="width: 47%;"></div></div><span class="num" style="font-size: 11px; font-weight: 700;">47</span></div></td>
+          <td><svg width="60" height="20" viewBox="0 0 60 20"><path d="M2 7 L13 11 L24 10 L35 15 L46 14 L58 16" fill="none" stroke="#5a7794" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></td>
+        </tr>
+        <tr>
+          <td class="num" style="color: #928a7d; font-weight: 700;">8</td>
+          <td><span style="font-weight: 700;">Gibbs Me More</span> <span style="color: #928a7d; font-size: 11px;">Ray</span></td>
+          <td class="num" style="text-align: right; font-weight: 700;">2-3</td>
+          <td class="num" style="text-align: right;">583.0</td>
+          <td class="num" style="text-align: right; color: #5d574e;">17-28</td>
+          <td class="num" style="text-align: right; color: #928a7d;">1.9</td>
+          <td class="num" style="text-align: right; font-weight: 700; color: #5a7794;">+0.1</td>
+          <td class="num" style="text-align: right;">93.8%</td>
+          <td style="text-align: right;"><span class="num" style="font-weight: 700;">8</span> <span style="font-size: 10px; color: #b96a4b;">▼3</span></td>
+          <td><div style="display: flex; align-items: center; gap: 6px;"><div class="meter" style="flex: 1 1 auto;"><div class="meter__fill" style="width: 41%;"></div></div><span class="num" style="font-size: 11px; font-weight: 700;">41</span></div></td>
+          <td><svg width="60" height="20" viewBox="0 0 60 20"><path d="M2 16 L13 14 L24 17 L35 13 L46 14 L58 10" fill="none" stroke="#5a7794" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></td>
+        </tr>
+        <tr>
+          <td class="num" style="color: #928a7d; font-weight: 700;">9</td>
+          <td><span style="font-weight: 700;">Kelce Grammer</span> <span style="color: #928a7d; font-size: 11px;">Vic</span></td>
+          <td class="num" style="text-align: right; font-weight: 700;">1-4</td>
+          <td class="num" style="text-align: right;">559.6</td>
+          <td class="num" style="text-align: right; color: #5d574e;">12-33</td>
+          <td class="num" style="text-align: right; color: #928a7d;">1.3</td>
+          <td class="num" style="text-align: right; font-weight: 700; color: #b96a4b;">−0.3</td>
+          <td class="num" style="text-align: right;">85.9%</td>
+          <td style="text-align: right;"><span class="num" style="font-weight: 700;">9</span> <span style="font-size: 10px; color: #928a7d;">—</span></td>
+          <td><div style="display: flex; align-items: center; gap: 6px;"><div class="meter" style="flex: 1 1 auto;"><div class="meter__fill" style="width: 32%;"></div></div><span class="num" style="font-size: 11px; font-weight: 700;">32</span></div></td>
+          <td><svg width="60" height="20" viewBox="0 0 60 20"><path d="M2 6 L13 9 L24 12 L35 11 L46 16 L58 17" fill="none" stroke="#5a7794" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></td>
+        </tr>
+        <tr>
+          <td class="num" style="color: #928a7d; font-weight: 700;">10</td>
+          <td><span style="font-weight: 700;">Sunday Scaries</span> <span style="color: #928a7d; font-size: 11px;">Nina</span></td>
+          <td class="num" style="text-align: right; font-weight: 700;">0-5</td>
+          <td class="num" style="text-align: right;">504.0</td>
+          <td class="num" style="text-align: right; color: #5d574e;">7-38</td>
+          <td class="num" style="text-align: right; color: #928a7d;">0.8</td>
+          <td class="num" style="text-align: right; font-weight: 700; color: #b96a4b;">−0.8</td>
+          <td class="num" style="text-align: right;">82.3%</td>
+          <td style="text-align: right;"><span class="num" style="font-weight: 700;">10</span> <span style="font-size: 10px; color: #928a7d;">—</span></td>
+          <td><div style="display: flex; align-items: center; gap: 6px;"><div class="meter" style="flex: 1 1 auto;"><div class="meter__fill" style="width: 17%;"></div></div><span class="num" style="font-size: 11px; font-weight: 700;">17</span></div></td>
+          <td><svg width="60" height="20" viewBox="0 0 60 20"><path d="M2 12 L13 15 L24 14 L35 17 L46 16 L58 18" fill="none" stroke="#5a7794" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <!-- three panels -->
+    <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 26px; margin-top: 40px;">
+
+      <div>
+        <h3 class="display" style="margin: 0 0 2px; font-size: 20px;">Luck index</h3>
+        <p style="margin: 0 0 12px; font-size: 12px; color: #928a7d;">Wins minus expected wins. Left of the line is <span style="color: #b96a4b; font-weight: 700;">below</span>, right is <span style="color: #5a7794; font-weight: 700;">above</span>.</p>
+        <div class="dv"><span class="dv__name">Bijan Mustard</span><div class="dv__track"><div class="dv__zero"></div><div class="dv__bar" style="left: 50%; width: 46%; background: #5a7794; border-radius: 0 4px 4px 0;"></div></div><span class="dv__val" style="color: #5a7794;">+1.0</span></div>
+        <div class="dv"><span class="dv__name" style="font-weight: 700;">Hurts So Good</span><div class="dv__track"><div class="dv__zero"></div><div class="dv__bar" style="left: 50%; width: 18.4%; background: #5a7794; border-radius: 0 4px 4px 0;"></div></div><span class="dv__val" style="color: #5a7794;">+0.4</span></div>
+        <div class="dv"><span class="dv__name">Chubb Rock</span><div class="dv__track"><div class="dv__zero"></div><div class="dv__bar" style="left: 50%; width: 13.8%; background: #5a7794; border-radius: 0 4px 4px 0;"></div></div><span class="dv__val" style="color: #5a7794;">+0.3</span></div>
+        <div class="dv"><span class="dv__name">Gibbs Me More</span><div class="dv__track"><div class="dv__zero"></div><div class="dv__bar" style="left: 50%; width: 4.6%; background: #5a7794; border-radius: 0 4px 4px 0;"></div></div><span class="dv__val" style="color: #5a7794;">+0.1</span></div>
+        <div class="dv"><span class="dv__name">Nacho Average</span><div class="dv__track"><div class="dv__zero"></div></div><span class="dv__val" style="color: #928a7d;">0.0</span></div>
+        <div class="dv"><span class="dv__name">Pardon My Punt</span><div class="dv__track"><div class="dv__zero"></div><div class="dv__bar" style="right: 50%; width: 4.6%; background: #b96a4b; border-radius: 4px 0 0 4px;"></div></div><span class="dv__val" style="color: #b96a4b;">−0.1</span></div>
+        <div class="dv"><span class="dv__name">Ctrl+Alt+Defeat</span><div class="dv__track"><div class="dv__zero"></div><div class="dv__bar" style="right: 50%; width: 9.2%; background: #b96a4b; border-radius: 4px 0 0 4px;"></div></div><span class="dv__val" style="color: #b96a4b;">−0.2</span></div>
+        <div class="dv"><span class="dv__name">Kelce Grammer</span><div class="dv__track"><div class="dv__zero"></div><div class="dv__bar" style="right: 50%; width: 13.8%; background: #b96a4b; border-radius: 4px 0 0 4px;"></div></div><span class="dv__val" style="color: #b96a4b;">−0.3</span></div>
+        <div class="dv"><span class="dv__name">Blitz Almighty</span><div class="dv__track"><div class="dv__zero"></div><div class="dv__bar" style="right: 50%; width: 18.4%; background: #b96a4b; border-radius: 4px 0 0 4px;"></div></div><span class="dv__val" style="color: #b96a4b;">−0.4</span></div>
+        <div class="dv"><span class="dv__name">Sunday Scaries</span><div class="dv__track"><div class="dv__zero"></div><div class="dv__bar" style="right: 50%; width: 36.8%; background: #b96a4b; border-radius: 4px 0 0 4px;"></div></div><span class="dv__val" style="color: #b96a4b;">−0.8</span></div>
+        <p style="margin: 12px 0 0; font-size: 12px; color: #5d574e;">Bijan Mustard is 5-0 and has been the league's luckiest team. Four of those five were coin flips.</p>
+      </div>
+
+      <div>
+        <h3 class="display" style="margin: 0 0 2px; font-size: 20px;">Manager rating</h3>
+        <p style="margin: 0 0 12px; font-size: 12px; color: #928a7d;">Points started as a share of the best legal lineup. Rule marks the league average, 90.3%.</p>
+        <div class="dot"><span class="dv__name">Ctrl+Alt+Defeat</span><div class="dot__track"><div class="dot__line"></div><div class="dot__avg" style="left: 51.5%;"></div><div class="dot__pt" style="left: 81.5%;"></div></div><span class="dv__val">96.3</span></div>
+        <div class="dot"><span class="dv__name">Bijan Mustard</span><div class="dot__track"><div class="dot__line"></div><div class="dot__avg" style="left: 51.5%;"></div><div class="dot__pt" style="left: 70.5%;"></div></div><span class="dv__val">94.1</span></div>
+        <div class="dot"><span class="dv__name">Gibbs Me More</span><div class="dot__track"><div class="dot__line"></div><div class="dot__avg" style="left: 51.5%;"></div><div class="dot__pt" style="left: 69%;"></div></div><span class="dv__val">93.8</span></div>
+        <div class="dot"><span class="dv__name">Chubb Rock</span><div class="dot__track"><div class="dot__line"></div><div class="dot__avg" style="left: 51.5%;"></div><div class="dot__pt" style="left: 63.5%;"></div></div><span class="dv__val">92.7</span></div>
+        <div class="dot"><span class="dv__name" style="font-weight: 700;">Hurts So Good</span><div class="dot__track"><div class="dot__line"></div><div class="dot__avg" style="left: 51.5%;"></div><div class="dot__pt" style="left: 58%;"></div></div><span class="dv__val">91.6</span></div>
+        <div class="dot"><span class="dv__name">Blitz Almighty</span><div class="dot__track"><div class="dot__line"></div><div class="dot__avg" style="left: 51.5%;"></div><div class="dot__pt" style="left: 52%;"></div></div><span class="dv__val">90.4</span></div>
+        <div class="dot"><span class="dv__name">Nacho Average</span><div class="dot__track"><div class="dot__line"></div><div class="dot__avg" style="left: 51.5%;"></div><div class="dot__pt" style="left: 41%;"></div></div><span class="dv__val">88.2</span></div>
+        <div class="dot"><span class="dv__name">Pardon My Punt</span><div class="dot__track"><div class="dot__line"></div><div class="dot__avg" style="left: 51.5%;"></div><div class="dot__pt" style="left: 37.5%;"></div></div><span class="dv__val">87.5</span></div>
+        <div class="dot"><span class="dv__name">Kelce Grammer</span><div class="dot__track"><div class="dot__line"></div><div class="dot__avg" style="left: 51.5%;"></div><div class="dot__pt" style="left: 29.5%;"></div></div><span class="dv__val">85.9</span></div>
+        <div class="dot"><span class="dv__name">Sunday Scaries</span><div class="dot__track"><div class="dot__line"></div><div class="dot__avg" style="left: 51.5%;"></div><div class="dot__pt" style="left: 11.5%;"></div></div><span class="dv__val">82.3</span></div>
+        <div style="display: flex; justify-content: space-between; margin-top: 4px; padding-left: 118px;">
+          <span style="font-size: 10px; color: #928a7d;">80%</span>
+          <span style="font-size: 10px; color: #928a7d;">100%</span>
+        </div>
+        <p style="margin: 8px 0 0; font-size: 12px; color: #5d574e;">Sunday Scaries has left 108.9 points on the bench — more than a full week of scoring.</p>
+      </div>
+
+      <div>
+        <h3 class="display" style="margin: 0 0 2px; font-size: 20px;">Weekly range</h3>
+        <p style="margin: 0 0 12px; font-size: 12px; color: #928a7d;">Lowest to highest week, with the median. Long bars are boom-or-bust.</p>
+        <div class="rng"><span class="dv__name">Bijan Mustard</span><div class="rng__track"><div class="rng__span" style="left: 48%; width: 38%;"></div><div class="rng__med" style="left: 67.3%;"></div></div><span class="dv__val">135.4</span></div>
+        <div class="rng"><span class="dv__name" style="font-weight: 700;">Hurts So Good</span><div class="rng__track"><div class="rng__span" style="left: 23.8%; width: 69.2%;"></div><div class="rng__med" style="left: 62.2%;"></div></div><span class="dv__val">131.0</span></div>
+        <div class="rng"><span class="dv__name">Ctrl+Alt+Defeat</span><div class="rng__track"><div class="rng__span" style="left: 41.9%; width: 34.7%;"></div><div class="rng__med" style="left: 58.3%;"></div></div><span class="dv__val">127.5</span></div>
+        <div class="rng"><span class="dv__name">Nacho Average</span><div class="rng__track"><div class="rng__span" style="left: 29.2%; width: 52.1%;"></div><div class="rng__med" style="left: 55.2%;"></div></div><span class="dv__val">124.7</span></div>
+        <div class="rng"><span class="dv__name">Chubb Rock</span><div class="rng__track"><div class="rng__span" style="left: 34.3%; width: 37.3%;"></div><div class="rng__med" style="left: 52.1%;"></div></div><span class="dv__val">121.9</span></div>
+        <div class="rng"><span class="dv__name">Blitz Almighty</span><div class="rng__track"><div class="rng__span" style="left: 26.2%; width: 48%;"></div><div class="rng__med" style="left: 50.6%;"></div></div><span class="dv__val">120.5</span></div>
+        <div class="rng"><span class="dv__name">Pardon My Punt</span><div class="rng__track"><div class="rng__span" style="left: 14.6%; width: 64.6%;"></div><div class="rng__med" style="left: 47.3%;"></div></div><span class="dv__val">117.6</span></div>
+        <div class="rng"><span class="dv__name">Gibbs Me More</span><div class="rng__track"><div class="rng__span" style="left: 32.9%; width: 26.9%;"></div><div class="rng__med" style="left: 46.2%;"></div></div><span class="dv__val">116.6</span></div>
+        <div class="rng"><span class="dv__name">Kelce Grammer</span><div class="rng__track"><div class="rng__span" style="left: 19.4%; width: 43.9%;"></div><div class="rng__med" style="left: 41%;"></div></div><span class="dv__val">111.9</span></div>
+        <div class="rng"><span class="dv__name">Sunday Scaries</span><div class="rng__track"><div class="rng__span" style="left: 4.9%; width: 46.9%;"></div><div class="rng__med" style="left: 28.7%;"></div></div><span class="dv__val">100.8</span></div>
+        <div style="display: flex; justify-content: space-between; margin-top: 4px; padding-left: 118px;">
+          <span style="font-size: 10px; color: #928a7d;">75</span>
+          <span style="font-size: 10px; color: #928a7d;">165</span>
+        </div>
+        <p style="margin: 8px 0 0; font-size: 12px; color: #5d574e;">You have both the highest week (158.7) and the third lowest (96.4) in the league.</p>
+      </div>
+    </div>
+
+    <!-- draft, aging -->
+    <div style="margin-top: 40px; padding-top: 26px; border-top: 1px solid #d8cdba;">
+      <div style="display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; margin-bottom: 14px;">
+        <div>
+          <h3 class="display" style="margin: 0; font-size: 22px;">How the draft is aging</h3>
+          <p style="margin: 2px 0 0; font-size: 12px; color: #928a7d;">Points scored against the pace the draft grade implied. The graders liked Pardon My Punt and Sunday Scaries.</p>
+        </div>
+        <span style="font-size: 13px; font-weight: 600; color: #5b7152; white-space: nowrap;">Full draft recap →</span>
+      </div>
+
+      <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 48px;">
+        <div class="dv" style="grid-template-columns: 150px minmax(0, 1fr) 62px;"><span class="dv__name">Ctrl+Alt+Defeat <span style="color: #928a7d; font-weight: 400;">C+</span></span><div class="dv__track"><div class="dv__zero"></div><div class="dv__bar" style="left: 50%; width: 46%; background: #5a7794; border-radius: 0 4px 4px 0;"></div></div><span class="dv__val" style="color: #5a7794;">+82.4</span></div>
+        <div class="dv" style="grid-template-columns: 150px minmax(0, 1fr) 62px;"><span class="dv__name">Hurts So Good <span style="color: #928a7d; font-weight: 400;">B+</span></span><div class="dv__track"><div class="dv__zero"></div><div class="dv__bar" style="right: 50%; width: 2.6%; background: #b96a4b; border-radius: 4px 0 0 4px;"></div></div><span class="dv__val" style="color: #b96a4b;">−4.7</span></div>
+
+        <div class="dv" style="grid-template-columns: 150px minmax(0, 1fr) 62px;"><span class="dv__name">Gibbs Me More <span style="color: #928a7d; font-weight: 400;">B−</span></span><div class="dv__track"><div class="dv__zero"></div><div class="dv__bar" style="left: 50%; width: 19%; background: #5a7794; border-radius: 0 4px 4px 0;"></div></div><span class="dv__val" style="color: #5a7794;">+34.1</span></div>
+        <div class="dv" style="grid-template-columns: 150px minmax(0, 1fr) 62px;"><span class="dv__name">Blitz Almighty <span style="color: #928a7d; font-weight: 400;">B</span></span><div class="dv__track"><div class="dv__zero"></div><div class="dv__bar" style="right: 50%; width: 6.3%; background: #b96a4b; border-radius: 4px 0 0 4px;"></div></div><span class="dv__val" style="color: #b96a4b;">−11.3</span></div>
+
+        <div class="dv" style="grid-template-columns: 150px minmax(0, 1fr) 62px;"><span class="dv__name">Bijan Mustard <span style="color: #928a7d; font-weight: 400;">A−</span></span><div class="dv__track"><div class="dv__zero"></div><div class="dv__bar" style="left: 50%; width: 10.6%; background: #5a7794; border-radius: 0 4px 4px 0;"></div></div><span class="dv__val" style="color: #5a7794;">+18.9</span></div>
+        <div class="dv" style="grid-template-columns: 150px minmax(0, 1fr) 62px;"><span class="dv__name">Pardon My Punt <span style="color: #928a7d; font-weight: 400;">A</span></span><div class="dv__track"><div class="dv__zero"></div><div class="dv__bar" style="right: 50%; width: 21.5%; background: #b96a4b; border-radius: 4px 0 0 4px;"></div></div><span class="dv__val" style="color: #b96a4b;">−38.5</span></div>
+
+        <div class="dv" style="grid-template-columns: 150px minmax(0, 1fr) 62px;"><span class="dv__name">Chubb Rock <span style="color: #928a7d; font-weight: 400;">C</span></span><div class="dv__track"><div class="dv__zero"></div><div class="dv__bar" style="left: 50%; width: 7%; background: #5a7794; border-radius: 0 4px 4px 0;"></div></div><span class="dv__val" style="color: #5a7794;">+12.6</span></div>
+        <div class="dv" style="grid-template-columns: 150px minmax(0, 1fr) 62px;"><span class="dv__name">Kelce Grammer <span style="color: #928a7d; font-weight: 400;">B−</span></span><div class="dv__track"><div class="dv__zero"></div><div class="dv__bar" style="right: 50%; width: 23%; background: #b96a4b; border-radius: 4px 0 0 4px;"></div></div><span class="dv__val" style="color: #b96a4b;">−41.2</span></div>
+
+        <div class="dv" style="grid-template-columns: 150px minmax(0, 1fr) 62px;"><span class="dv__name">Nacho Average <span style="color: #928a7d; font-weight: 400;">C+</span></span><div class="dv__track"><div class="dv__zero"></div><div class="dv__bar" style="left: 50%; width: 5.5%; background: #5a7794; border-radius: 0 4px 4px 0;"></div></div><span class="dv__val" style="color: #5a7794;">+9.8</span></div>
+        <div class="dv" style="grid-template-columns: 150px minmax(0, 1fr) 62px;"><span class="dv__name">Sunday Scaries <span style="color: #928a7d; font-weight: 400;">A−</span></span><div class="dv__track"><div class="dv__zero"></div><div class="dv__bar" style="right: 50%; width: 34.7%; background: #b96a4b; border-radius: 4px 0 0 4px;"></div></div><span class="dv__val" style="color: #b96a4b;">−62.1</span></div>
+      </div>
+    </div>
+
+    <!-- week 6 + ask -->
+    <div style="display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 40px; margin-top: 40px;">
+      <div>
+        <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 16px; padding-bottom: 10px; border-bottom: 1px solid #23201c; margin-bottom: 4px;">
+          <h2 class="display" style="margin: 0; font-size: 24px;">Week 6, live</h2>
+          <span style="font-size: 13px; color: #928a7d;">2 of 5 final</span>
+        </div>
+        <div style="display: grid; grid-template-columns: minmax(0, 1fr) 54px 60px 54px minmax(0, 1fr); align-items: baseline; gap: 12px; padding: 9px 0; border-bottom: 1px solid #ece4d8; font-size: 14px;">
+          <span style="font-weight: 700; color: #5b7152;">Ctrl+Alt+Defeat</span><span class="num" style="text-align: right; font-weight: 700; color: #5b7152;">131.7</span><span style="text-align: center; font-size: 11px; color: #928a7d;">FINAL</span><span class="num" style="color: #5d574e;">88.1</span><span style="color: #5d574e;">Sunday Scaries</span>
+        </div>
+        <div style="display: grid; grid-template-columns: minmax(0, 1fr) 54px 60px 54px minmax(0, 1fr); align-items: baseline; gap: 12px; padding: 9px 0; border-bottom: 1px solid #ece4d8; font-size: 14px;">
+          <span style="font-weight: 700; color: #5b7152;">Bijan Mustard</span><span class="num" style="text-align: right; font-weight: 700; color: #5b7152;">128.4</span><span style="text-align: center; font-size: 11px; color: #928a7d;">FINAL</span><span class="num" style="color: #5d574e;">96.2</span><span style="color: #5d574e;">Kelce Grammer</span>
+        </div>
+        <div style="display: grid; grid-template-columns: minmax(0, 1fr) 54px 60px 54px minmax(0, 1fr); align-items: baseline; gap: 12px; padding: 9px 0; border-bottom: 1px solid #ece4d8; font-size: 14px;">
+          <span style="font-weight: 700;">Hurts So Good</span><span class="num" style="text-align: right; font-weight: 700;">118.9</span><span class="num" style="text-align: center; font-size: 11px; color: #5a7794; font-weight: 700;">71%</span><span class="num" style="color: #5d574e;">104.6</span><span style="color: #5d574e;">Gibbs Me More</span>
+        </div>
+        <div style="display: grid; grid-template-columns: minmax(0, 1fr) 54px 60px 54px minmax(0, 1fr); align-items: baseline; gap: 12px; padding: 9px 0; border-bottom: 1px solid #ece4d8; font-size: 14px;">
+          <span style="font-weight: 700;">Nacho Average Team</span><span class="num" style="text-align: right; font-weight: 700;">104.9</span><span class="num" style="text-align: center; font-size: 11px; color: #5a7794; font-weight: 700;">58%</span><span class="num" style="color: #5d574e;">99.3</span><span style="color: #5d574e;">Blitz Almighty</span>
+        </div>
+        <div style="display: grid; grid-template-columns: minmax(0, 1fr) 54px 60px 54px minmax(0, 1fr); align-items: baseline; gap: 12px; padding: 9px 0; font-size: 14px;">
+          <span style="font-weight: 700;">Chubb Rock</span><span class="num" style="text-align: right; font-weight: 700;">88.5</span><span class="num" style="text-align: center; font-size: 11px; color: #5a7794; font-weight: 700;">52%</span><span class="num" style="color: #5d574e;">86.1</span><span style="color: #5d574e;">Pardon My Punt</span>
+        </div>
+      </div>
+
+      <div>
+        <div style="padding-bottom: 10px; border-bottom: 1px solid #23201c; margin-bottom: 14px;">
+          <h2 class="display" style="margin: 0; font-size: 24px;">Ask the league</h2>
+        </div>
+        <div style="display: flex; align-items: center; gap: 10px; padding: 11px 0; border-bottom: 1px solid #d8cdba;">
+          <span style="flex: 1 1 auto; font-size: 14px; color: #928a7d;">Who is the most overrated 5-0 team?</span>
+          <span style="font-size: 15px; font-weight: 700; color: #5b7152;">↑</span>
+        </div>
+        <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px;">
+          <span style="padding: 6px 11px; border-radius: 999px; border: 1px solid #d8cdba; background: #ffffff; font-size: 12px; font-weight: 600; color: #5d574e;">Explain my luck index</span>
+          <span style="padding: 6px 11px; border-radius: 999px; border: 1px solid #d8cdba; background: #ffffff; font-size: 12px; font-weight: 600; color: #5d574e;">Hardest schedule left</span>
+          <span style="padding: 6px 11px; border-radius: 999px; border: 1px solid #d8cdba; background: #ffffff; font-size: 12px; font-weight: 600; color: #5d574e;">Who should I trade with?</span>
+        </div>
+        <p style="margin: 12px 0 0; font-size: 12px; color: #928a7d;">Answers use only data this site has collected.</p>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

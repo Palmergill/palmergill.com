@@ -234,6 +234,222 @@
             .join(" ");
     }
 
+    // ── the ledger's switchable column ──────────────────────────────
+    //
+    // Standings, power rankings and rosters used to be three lists of the
+    // same ten teams. They are one table now, and this is the column that
+    // changes: each entry knows how to read its measure out of a row, how to
+    // print it, and which chart form carries it. On a phone that chart rides
+    // inside the row, which is what lets a ten-column table survive 390px.
+    const LEDGER_COLUMNS = [
+        { key: "record", label: "Record", header: "W-L", chart: "none" },
+        { key: "points_for", label: "Points", header: "PF", chart: "none" },
+        { key: "all_play", label: "All-play", header: "Record vs all", chart: "meter" },
+        { key: "luck", label: "Luck", header: "W − xW", chart: "diverging" },
+        { key: "lineup", label: "Lineup", header: "% of best", chart: "dot" },
+        { key: "scoring", label: "Range", header: "Low–high", chart: "range" },
+        { key: "power", label: "Power", header: "Rank", chart: "spark" },
+        { key: "odds", label: "Playoff odds", header: "Odds", chart: "meter" },
+    ];
+
+    function ledgerColumn(key) {
+        return LEDGER_COLUMNS.find((column) => column.key === key) || LEDGER_COLUMNS[0];
+    }
+
+    // The number the column sorts on. Always "higher is better", so a rank
+    // (where 1 is best) comes back negated rather than needing a per-column
+    // sort direction.
+    function ledgerValue(row, key) {
+        if (!row) return null;
+        switch (key) {
+            case "record":
+                return winPct(row.wins, row.losses, row.ties);
+            case "points_for":
+                return row.points_for === null || row.points_for === undefined
+                    ? null
+                    : Number(row.points_for);
+            case "all_play":
+                return row.all_play && row.all_play.games ? row.all_play.win_pct : null;
+            case "luck":
+                return row.luck === null || row.luck === undefined ? null : Number(row.luck);
+            case "lineup":
+                return row.lineup ? row.lineup.efficiency : null;
+            case "scoring":
+                return row.scoring ? row.scoring.median : null;
+            case "power":
+                return row.power && row.power.rank ? -row.power.rank : null;
+            case "odds":
+                return row.playoff ? row.playoff.odds : null;
+            default:
+                return null;
+        }
+    }
+
+    // What the column prints. Separate from ledgerValue because a rank sorts
+    // as a negative and prints as "3".
+    function ledgerText(row, key) {
+        if (!row) return "—";
+        switch (key) {
+            case "record":
+                return recordLabel(row.wins, row.losses, row.ties);
+            case "points_for":
+                return formatPoints(row.points_for);
+            case "all_play":
+                return row.all_play && row.all_play.games
+                    ? recordLabel(row.all_play.wins, row.all_play.losses, row.all_play.ties)
+                    : "—";
+            case "luck":
+                return row.luck === null || row.luck === undefined
+                    ? "—"
+                    : formatSigned(row.luck);
+            case "lineup":
+                return row.lineup && row.lineup.efficiency !== null &&
+                    row.lineup.efficiency !== undefined
+                    ? `${(row.lineup.efficiency * 100).toFixed(1)}%`
+                    : "—";
+            case "scoring":
+                return row.scoring && row.scoring.median !== null &&
+                    row.scoring.median !== undefined
+                    ? formatPoints(row.scoring.median)
+                    : "—";
+            case "power":
+                return row.power && row.power.rank ? String(row.power.rank) : "—";
+            case "odds":
+                return row.playoff && row.playoff.odds !== null &&
+                    row.playoff.odds !== undefined
+                    ? `${Math.round(row.playoff.odds * 100)}%`
+                    : "—";
+            default:
+                return "—";
+        }
+    }
+
+    // The muted line under the name: whatever context makes the number mean
+    // something without opening a second view.
+    function ledgerMeta(row, key) {
+        if (!row) return "";
+        const record = recordLabel(row.wins, row.losses, row.ties);
+        switch (key) {
+            case "all_play":
+                return row.expected_wins === null || row.expected_wins === undefined
+                    ? record
+                    : `${record} · ${row.expected_wins.toFixed(1)} expected wins`;
+            case "luck":
+                return row.all_play && row.all_play.games
+                    ? `${record} · ${recordLabel(
+                          row.all_play.wins,
+                          row.all_play.losses,
+                          row.all_play.ties
+                      )} all-play`
+                    : record;
+            case "lineup":
+                return row.lineup && row.lineup.points_left !== null &&
+                    row.lineup.points_left !== undefined
+                    ? `${formatPoints(row.lineup.points_left)} pts left on the bench`
+                    : record;
+            case "scoring":
+                return row.scoring && row.scoring.low !== null && row.scoring.low !== undefined
+                    ? `${formatPoints(row.scoring.low)} to ${formatPoints(row.scoring.high)}`
+                    : record;
+            case "odds":
+                return row.playoff && row.playoff.projected_wins !== null &&
+                    row.playoff.projected_wins !== undefined
+                    ? `projected ${Math.round(row.playoff.projected_wins)}-${Math.round(
+                          row.playoff.projected_losses
+                      )}`
+                    : record;
+            case "power":
+                return `${record} · ${rankMovement(row.power && row.power.rank_delta).label}`;
+            default:
+                return `${record} · ${formatPoints(row.points_for)} PF`;
+        }
+    }
+
+    // Nulls sink, whichever column is showing: a team the measure cannot be
+    // computed for is not "worst", it is unknown, and floating it to the top
+    // of a descending sort would read as a result.
+    function sortLedger(rows, key) {
+        return (rows || []).slice().sort((a, b) => {
+            const left = ledgerValue(a, key);
+            const right = ledgerValue(b, key);
+            const leftMissing = left === null || left === undefined;
+            const rightMissing = right === null || right === undefined;
+            if (leftMissing && rightMissing) return 0;
+            if (leftMissing) return 1;
+            if (rightMissing) return -1;
+            if (right !== left) return right - left;
+            return (b.points_for || 0) - (a.points_for || 0);
+        });
+    }
+
+    // ── chart geometry ──────────────────────────────────────────────
+
+    // `Number(null)` is 0, so every geometry helper has to reject a missing
+    // value explicitly. Without this a team whose measure could not be
+    // computed draws a dot hard against the bottom of the axis, which reads
+    // as "worst in the league" rather than "unknown".
+    function finite(value) {
+        if (value === null || value === undefined || value === "") return null;
+        const number = Number(value);
+        return Number.isFinite(number) ? number : null;
+    }
+
+    // A diverging bar reads its polarity from which side of the zero rule it
+    // sits on, so colour is never the only channel.
+    function divergingBar(value, maxAbs, reach) {
+        const number = finite(value);
+        const span = Math.abs(finite(maxAbs) || 0) || 1;
+        const limit = reach === undefined ? 46 : reach;
+        if (number === null || number === 0) {
+            return { side: "zero", width: 0 };
+        }
+        const width = Math.min(limit, (Math.abs(number) / span) * limit);
+        return { side: number > 0 ? "positive" : "negative", width };
+    }
+
+    // Position, not length, so a window that does not start at zero stays
+    // honest — which is why lineup efficiency is a dot plot and not a bar.
+    function dotPosition(value, min, max) {
+        const number = finite(value);
+        const lo = finite(min);
+        const hi = finite(max);
+        if (number === null || lo === null || hi === null) return null;
+        if (hi === lo) return 50;
+        return Math.max(0, Math.min(100, ((number - lo) / (hi - lo)) * 100));
+    }
+
+    function rangeBand(low, high, min, max) {
+        const left = dotPosition(low, min, max);
+        const right = dotPosition(high, min, max);
+        if (left === null || right === null) return null;
+        return { left: Math.min(left, right), width: Math.abs(right - left) };
+    }
+
+    // Round outward to a step so the axis labels are readable numbers and
+    // the marks are not jammed against the ends of the track.
+    function niceAxis(values, step) {
+        const numbers = (values || [])
+            .map(finite)
+            .filter((value) => value !== null);
+        if (!numbers.length) return null;
+        const size = finite(step) || 1;
+        let low = Math.min.apply(null, numbers);
+        let high = Math.max.apply(null, numbers);
+        const pad = (high - low) * 0.12 || size;
+        low = Math.floor((low - pad) / size) * size;
+        high = Math.ceil((high + pad) / size) * size;
+        if (high === low) high = low + size;
+        return { min: low, max: high };
+    }
+
+    function maxAbs(values) {
+        const numbers = (values || [])
+            .map(finite)
+            .filter((value) => value !== null);
+        if (!numbers.length) return 0;
+        return numbers.reduce((best, value) => Math.max(best, Math.abs(value)), 0);
+    }
+
     function injuryBadge(status) {
         if (!status) return "";
         const normalized = String(status).toUpperCase();
@@ -266,6 +482,17 @@
         ALGORITHM_LABELS,
         SLOT_ORDER,
         BENCH_SLOTS,
+        LEDGER_COLUMNS,
+        ledgerColumn,
+        ledgerValue,
+        ledgerText,
+        ledgerMeta,
+        sortLedger,
+        divergingBar,
+        dotPosition,
+        rangeBand,
+        niceAxis,
+        maxAbs,
         algorithmLabel,
         recordLabel,
         winPct,

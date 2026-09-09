@@ -1,0 +1,392 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&display=swap">
+  <style>
+    body {
+      margin: 0;
+      background: #faf6f0;
+      color: #23201c;
+      font-family: "Plus Jakarta Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+    }
+    a { color: #5b7152; text-decoration: none; }
+    a:hover { color: #4c6044; }
+    .display { font-family: "Newsreader", Georgia, "Times New Roman", serif; font-weight: 500; letter-spacing: -0.02em; }
+    .kicker { font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #928a7d; }
+    .num { font-variant-numeric: tabular-nums; }
+    .meter { height: 7px; background: #f3eee4; border-radius: 2px; overflow: hidden; }
+    .meter__fill { height: 100%; background: #5b7152; border-radius: 0 4px 4px 0; }
+    .tile {
+      display: flex; flex-direction: column; gap: 5px;
+      padding: 15px 17px; background: #ffffff; border: 1px solid #ece4d8; border-radius: 16px;
+    }
+    .tile__v { font-size: 28px; font-weight: 800; letter-spacing: -0.025em; line-height: 1; }
+    .tile__l { font-size: 12px; color: #5d574e; }
+    .seed {
+      display: grid; grid-template-columns: 20px minmax(0, 1fr) 52px 74px 34px;
+      align-items: center; gap: 10px; padding: 9px 12px;
+      border-radius: 10px; font-size: 13px; border-left: 3px solid transparent;
+    }
+    .rec {
+      display: grid; grid-template-columns: minmax(0, 1fr) auto;
+      align-items: baseline; gap: 12px; padding: 10px 0; border-bottom: 1px solid #ece4d8;
+    }
+    .rec:last-child { border-bottom: none; }
+    .h2h {
+      display: grid; grid-template-columns: minmax(0, 1fr) 46px;
+      align-items: baseline; gap: 10px; padding: 6px 0;
+      border-bottom: 1px solid #f2ebdf; font-size: 13px;
+    }
+    .h2h:last-child { border-bottom: none; }
+    .mini {
+      display: grid; align-items: center; gap: 10px; padding: 7px 0;
+      border-bottom: 1px solid #f2ebdf; font-size: 13px;
+    }
+    .mini:last-child { border-bottom: none; }
+  </style>
+</helmet>
+
+<div style="width: 1280px; background: #faf6f0;">
+
+  <div style="display: flex; align-items: center; justify-content: space-between; gap: 24px; height: 52px; padding: 0 32px; background: rgba(250, 246, 240, 0.88); border-bottom: 1px solid #ece4d8;">
+    <div style="display: flex; align-items: center; gap: 10px;">
+      <div style="width: 22px; height: 22px; border-radius: 6px; background: #5b7152;"></div>
+      <span style="font-size: 14px; font-weight: 700; color: #23201c;">Palmer Gill</span>
+    </div>
+    <div style="display: flex; align-items: center; gap: 20px; font-size: 13px; color: #5d574e;">
+      <span>Projects</span><span>Fantasy</span><span>Casino</span><span>Stocks</span><span>About</span>
+      <span style="padding: 5px 12px; border-radius: 999px; background: #e7eee2; color: #4c6044; font-weight: 600;">Palmer</span>
+    </div>
+  </div>
+
+  <div style="max-width: 1180px; margin: 0 auto; padding: 24px 32px 64px;">
+
+    <div style="display: flex; align-items: center; gap: 16px; padding: 8px 0 12px; border-bottom: 1px solid #ece4d8; margin-bottom: 20px;">
+      <span style="font-size: 13px; font-weight: 700; color: #b86f52;">← Fantasy</span>
+      <div style="display: flex; align-items: center; gap: 6px; margin-left: auto;">
+        <span style="padding: 5px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; color: #928a7d;">My Rankings</span>
+        <span style="padding: 5px 10px; border-radius: 999px; background: #f3eee5; font-size: 12px; font-weight: 600; color: #2f4a37;">League Hub</span>
+        <span style="padding: 5px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; color: #928a7d;">Fourth &amp; Fortune</span>
+      </div>
+    </div>
+
+    <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 20px; padding-bottom: 10px; border-bottom: 1px solid #d8cdba; margin-bottom: 22px;">
+      <span class="kicker">Sunday Money · Week 6 · 11 October 2026</span>
+      <div style="display: flex; align-items: baseline; gap: 14px; font-size: 12px;">
+        <span style="font-weight: 700; border-bottom: 1px solid #b96a4b; padding-bottom: 2px;">2026</span>
+        <span style="color: #928a7d;">2025</span>
+        <span style="color: #928a7d;">2024</span>
+        <span style="color: #d8cdba; text-decoration: line-through;">2023</span>
+        <span style="color: #5b7152; font-weight: 600; margin-left: 8px;">Draft recap →</span>
+      </div>
+    </div>
+
+    <!-- lead -->
+    <div style="display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr); gap: 36px; padding-bottom: 28px; border-bottom: 1px solid #d8cdba; margin-bottom: 28px;">
+
+      <div>
+        <span class="kicker" style="display: block; margin-bottom: 10px; color: #b96a4b;">The week in the league</span>
+        <h1 class="display" style="margin: 0 0 14px; font-size: 46px; line-height: 1.06; text-wrap: pretty;">
+          Bijan Mustard is 5-0. Four of those wins were coin flips.
+        </h1>
+        <p style="margin: 0 0 12px; font-size: 16px; line-height: 1.6; color: #3b362f; max-width: 62ch;">
+          Ali's team leads the league at 5-0 and leads it in luck too: an all-play record of 36-9
+          works out to four expected wins, not five, the widest gap in the league. Three of those
+          wins came by under six points.
+        </p>
+        <p style="margin: 0 0 16px; font-size: 16px; line-height: 1.6; color: #3b362f; max-width: 62ch;">
+          The team actually playing best is Ctrl+Alt+Defeat, 3-2 despite starting 96.3% of its
+          available points — the best managed roster in the league. Sunday Scaries, meanwhile, is
+          0-5 and has been unlucky doing it, with 108.9 points left on the bench.
+        </p>
+        <span style="font-size: 12px; color: #928a7d;">Written from this week's collected data · updated 2 hours ago · <span style="color: #5b7152; font-weight: 600;">Regenerate</span></span>
+      </div>
+
+      <div style="background: #ffffff; border: 1px solid #ece4d8; border-left: 3px solid #5b7152; border-radius: 18px; padding: 20px 22px; display: flex; flex-direction: column;">
+        <span class="kicker" style="margin-bottom: 8px;">Your team</span>
+        <span class="display" style="font-size: 26px; font-weight: 600; line-height: 1.15;">Hurts So Good</span>
+        <span style="font-size: 13px; color: #928a7d; margin-top: 2px;">4-1 · 2nd · 91% playoff odds</span>
+
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 16px; padding-top: 14px; border-top: 1px solid #f2ebdf;">
+          <div style="display: flex; flex-direction: column;">
+            <span style="font-size: 13px; font-weight: 700;">vs Gibbs Me More</span>
+            <span style="font-size: 12px; color: #928a7d;">All-time 8-3 · won last three</span>
+          </div>
+          <div style="display: flex; flex-direction: column; align-items: flex-end;">
+            <span class="num" style="font-size: 20px; font-weight: 800; color: #2f4a37;">118.9<span style="font-size: 14px; color: #928a7d; font-weight: 600;"> – 104.6</span></span>
+            <span style="font-size: 11px; font-weight: 700; color: #5a7794;">71% to win</span>
+          </div>
+        </div>
+
+        <div style="margin-top: 14px; padding: 14px 16px; background: #f0f5ec; border: 1px solid #cfddc6; border-radius: 14px;">
+          <div style="display: flex; align-items: baseline; gap: 10px;">
+            <span class="num" style="font-size: 30px; font-weight: 800; color: #3f6d4a; line-height: 1;">+9.1</span>
+            <span style="font-size: 13px; font-weight: 700; color: #2f4a37;">sitting on your bench</span>
+          </div>
+          <p style="margin: 8px 0 0; font-size: 13px; color: #3b362f;">
+            Odunze over Charbonnet at flex, Loveland over Otton at tight end.
+          </p>
+        </div>
+
+        <span style="display: inline-block; margin-top: auto; padding-top: 14px; font-size: 13px; font-weight: 700; color: #5b7152;">Open your roster →</span>
+      </div>
+    </div>
+
+    <!-- playoff picture -->
+    <div style="margin-bottom: 30px;">
+      <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 16px; margin-bottom: 12px;">
+        <div>
+          <h2 class="display" style="margin: 0; font-size: 24px;">Playoff picture</h2>
+          <p style="margin: 2px 0 0; font-size: 12px; color: #928a7d;">Projected final record and odds of making the six-team bracket, from 10,000 simulations of the rest of the schedule.</p>
+        </div>
+        <span style="font-size: 13px; font-weight: 600; color: #5b7152; white-space: nowrap;">Clinch scenarios →</span>
+      </div>
+
+      <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 24px;">
+        <div class="seed" style="background: #ffffff; border-left-color: #5b7152;">
+          <span class="num" style="font-weight: 700; color: #b96a4b;">1</span>
+          <span style="font-weight: 700;">Bijan Mustard</span>
+          <span class="num" style="color: #5d574e;">11-3</span>
+          <div class="meter"><div class="meter__fill" style="width: 98%;"></div></div>
+          <span class="num" style="font-weight: 700; text-align: right;">98%</span>
+        </div>
+        <div class="seed" style="background: #ffffff; border-left-color: #5b7152;">
+          <span class="num" style="font-weight: 700; color: #b96a4b;">6</span>
+          <span style="font-weight: 700;">Blitz Almighty</span>
+          <span class="num" style="color: #5d574e;">7-7</span>
+          <div class="meter"><div class="meter__fill" style="width: 55%;"></div></div>
+          <span class="num" style="font-weight: 700; text-align: right;">55%</span>
+        </div>
+
+        <div class="seed" style="background: #f7f4ec; border-left-color: #5b7152;">
+          <span class="num" style="font-weight: 700; color: #b96a4b;">2</span>
+          <span style="font-weight: 700;">Hurts So Good</span>
+          <span class="num" style="color: #5d574e;">10-4</span>
+          <div class="meter"><div class="meter__fill" style="width: 91%;"></div></div>
+          <span class="num" style="font-weight: 700; text-align: right;">91%</span>
+        </div>
+        <div class="seed" style="background: #ffffff;">
+          <span class="num" style="font-weight: 700; color: #928a7d;">7</span>
+          <span style="font-weight: 600; color: #5d574e;">Pardon My Punt</span>
+          <span class="num" style="color: #928a7d;">6-8</span>
+          <div class="meter"><div class="meter__fill" style="width: 47%; background: #928a7d;"></div></div>
+          <span class="num" style="font-weight: 700; text-align: right; color: #5d574e;">47%</span>
+        </div>
+
+        <div class="seed" style="background: #ffffff; border-left-color: #5b7152;">
+          <span class="num" style="font-weight: 700; color: #b96a4b;">3</span>
+          <span style="font-weight: 700;">Ctrl+Alt+Defeat</span>
+          <span class="num" style="color: #5d574e;">9-5</span>
+          <div class="meter"><div class="meter__fill" style="width: 79%;"></div></div>
+          <span class="num" style="font-weight: 700; text-align: right;">79%</span>
+        </div>
+        <div class="seed" style="background: #ffffff;">
+          <span class="num" style="font-weight: 700; color: #928a7d;">8</span>
+          <span style="font-weight: 600; color: #5d574e;">Gibbs Me More</span>
+          <span class="num" style="color: #928a7d;">6-8</span>
+          <div class="meter"><div class="meter__fill" style="width: 41%; background: #928a7d;"></div></div>
+          <span class="num" style="font-weight: 700; text-align: right; color: #5d574e;">41%</span>
+        </div>
+
+        <div class="seed" style="background: #ffffff; border-left-color: #5b7152;">
+          <span class="num" style="font-weight: 700; color: #b96a4b;">4</span>
+          <span style="font-weight: 700;">Nacho Average Team</span>
+          <span class="num" style="color: #5d574e;">8-6</span>
+          <div class="meter"><div class="meter__fill" style="width: 72%;"></div></div>
+          <span class="num" style="font-weight: 700; text-align: right;">72%</span>
+        </div>
+        <div class="seed" style="background: #ffffff;">
+          <span class="num" style="font-weight: 700; color: #928a7d;">9</span>
+          <span style="font-weight: 600; color: #5d574e;">Kelce Grammer</span>
+          <span class="num" style="color: #928a7d;">4-10</span>
+          <div class="meter"><div class="meter__fill" style="width: 32%; background: #928a7d;"></div></div>
+          <span class="num" style="font-weight: 700; text-align: right; color: #5d574e;">32%</span>
+        </div>
+
+        <div class="seed" style="background: #ffffff; border-left-color: #5b7152;">
+          <span class="num" style="font-weight: 700; color: #b96a4b;">5</span>
+          <span style="font-weight: 700;">Chubb Rock</span>
+          <span class="num" style="color: #5d574e;">7-7</span>
+          <div class="meter"><div class="meter__fill" style="width: 68%;"></div></div>
+          <span class="num" style="font-weight: 700; text-align: right;">68%</span>
+        </div>
+        <div class="seed" style="background: #ffffff;">
+          <span class="num" style="font-weight: 700; color: #928a7d;">10</span>
+          <span style="font-weight: 600; color: #5d574e;">Sunday Scaries</span>
+          <span class="num" style="color: #928a7d;">2-12</span>
+          <div class="meter"><div class="meter__fill" style="width: 17%; background: #928a7d;"></div></div>
+          <span class="num" style="font-weight: 700; text-align: right; color: #5d574e;">17%</span>
+        </div>
+      </div>
+      <p style="margin: 10px 0 0; font-size: 12px; color: #928a7d;">Seeds 1–6 make the bracket. Nobody is mathematically in or out yet.</p>
+    </div>
+
+    <!-- week in numbers -->
+    <div style="margin-bottom: 28px;">
+      <h2 class="display" style="margin: 0 0 12px; font-size: 24px;">The week in numbers</h2>
+      <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px;">
+        <div class="tile">
+          <span class="kicker">Highest score</span>
+          <span class="tile__v" style="color: #2f4a37;">131.7</span>
+          <span class="tile__l"><strong style="font-weight: 700;">Ctrl+Alt+Defeat</strong> — best of 2026</span>
+        </div>
+        <div class="tile">
+          <span class="kicker">Biggest upset</span>
+          <span class="tile__v" style="color: #5a7794;">31%</span>
+          <span class="tile__l"><strong style="font-weight: 700;">Chubb Rock</strong> won at 31% pregame odds</span>
+        </div>
+        <div class="tile">
+          <span class="kicker">Player of the week</span>
+          <span class="tile__v">31.4</span>
+          <span class="tile__l">Jahmyr Gibbs — <strong style="font-weight: 700;">Gibbs Me More</strong></span>
+        </div>
+        <div class="tile">
+          <span class="kicker">Left on benches</span>
+          <span class="tile__v" style="color: #8c3a1f;">64.8</span>
+          <span class="tile__l">League-wide, across ten lineups</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ask bar -->
+    <div style="display: flex; align-items: center; gap: 14px; padding: 16px 20px; background: #e7eee2; border: 1px solid #cfddc6; border-radius: 16px; margin-bottom: 30px;">
+      <span style="font-size: 13px; font-weight: 700; color: #2f4a37; white-space: nowrap;">Ask the league</span>
+      <div style="flex: 1 1 auto; display: flex; align-items: center; gap: 10px; padding: 11px 14px; background: #ffffff; border: 1px solid #cfddc6; border-radius: 12px;">
+        <span style="flex: 1 1 auto; font-size: 14px; color: #928a7d;">Am I actually good, or just lucky?</span>
+        <span style="display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 999px; background: #5b7152; color: #ffffff; font-size: 14px; font-weight: 700;">↑</span>
+      </div>
+      <div style="display: flex; gap: 6px;">
+        <span style="padding: 7px 12px; border-radius: 999px; background: #ffffff; border: 1px solid #cfddc6; font-size: 12px; font-weight: 600; color: #4c6044; white-space: nowrap;">What clinches a bye?</span>
+        <span style="padding: 7px 12px; border-radius: 999px; background: #ffffff; border: 1px solid #cfddc6; font-size: 12px; font-weight: 600; color: #4c6044; white-space: nowrap;">Waiver targets</span>
+      </div>
+    </div>
+
+    <!-- record book + rivalries -->
+    <div style="display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); gap: 36px; padding-top: 26px; border-top: 1px solid #d8cdba; margin-bottom: 30px;">
+
+      <div>
+        <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 6px;">
+          <h2 class="display" style="margin: 0; font-size: 24px;">The record book</h2>
+          <span style="font-size: 12px; color: #928a7d;">Seven readable seasons, 2019–2026</span>
+        </div>
+        <div class="rec">
+          <div>
+            <span style="display: block; font-size: 13px; font-weight: 700;">Highest score, one week</span>
+            <span style="display: block; font-size: 12px; color: #928a7d;">Bijan Mustard · Week 11, 2024</span>
+          </div>
+          <span class="num" style="font-size: 20px; font-weight: 800;">187.6</span>
+        </div>
+        <div class="rec">
+          <div>
+            <span style="display: block; font-size: 13px; font-weight: 700;">Biggest blowout</span>
+            <span style="display: block; font-size: 12px; color: #928a7d;">Blitz Almighty over Sunday Scaries · Week 3, 2025</span>
+          </div>
+          <span class="num" style="font-size: 20px; font-weight: 800;">94.2</span>
+        </div>
+        <div class="rec">
+          <div>
+            <span style="display: block; font-size: 13px; font-weight: 700;">Closest game</span>
+            <span style="display: block; font-size: 12px; color: #928a7d;">Chubb Rock over Kelce Grammer · Week 9, 2024</span>
+          </div>
+          <span class="num" style="font-size: 20px; font-weight: 800;">0.2</span>
+        </div>
+        <div class="rec">
+          <div>
+            <span style="display: block; font-size: 13px; font-weight: 700;">Longest win streak</span>
+            <span style="display: block; font-size: 12px; color: #928a7d;">Pardon My Punt · 2022</span>
+          </div>
+          <span class="num" style="font-size: 20px; font-weight: 800;">11</span>
+        </div>
+        <div class="rec">
+          <div>
+            <span style="display: block; font-size: 13px; font-weight: 700;">Most points, one season</span>
+            <span style="display: block; font-size: 12px; color: #928a7d;">Ctrl+Alt+Defeat · 2025</span>
+          </div>
+          <span class="num" style="font-size: 20px; font-weight: 800;">1,842.3</span>
+        </div>
+        <div class="rec">
+          <div>
+            <span style="display: block; font-size: 13px; font-weight: 700;">Most points left on a bench</span>
+            <span style="display: block; font-size: 12px; color: #928a7d;">Sunday Scaries · Week 2, 2026</span>
+          </div>
+          <span class="num" style="font-size: 20px; font-weight: 800; color: #8c3a1f;">71.4</span>
+        </div>
+      </div>
+
+      <div>
+        <div style="margin-bottom: 8px;">
+          <h2 class="display" style="margin: 0; font-size: 24px;">Your rivalries</h2>
+          <p style="margin: 2px 0 0; font-size: 12px; color: #928a7d;">All-time, every readable season</p>
+        </div>
+        <div class="h2h"><span>Kelce Grammer</span><span class="num" style="text-align: right; font-weight: 700; color: #3f6d4a;">11-2</span></div>
+        <div class="h2h"><span>Sunday Scaries</span><span class="num" style="text-align: right; font-weight: 700; color: #3f6d4a;">10-3</span></div>
+        <div class="h2h"><span>Gibbs Me More</span><span class="num" style="text-align: right; font-weight: 700; color: #3f6d4a;">8-3</span></div>
+        <div class="h2h"><span>Pardon My Punt</span><span class="num" style="text-align: right; font-weight: 700; color: #3f6d4a;">7-6</span></div>
+        <div class="h2h"><span>Blitz Almighty</span><span class="num" style="text-align: right; font-weight: 700; color: #928a7d;">6-6</span></div>
+        <div class="h2h"><span>Chubb Rock</span><span class="num" style="text-align: right; font-weight: 700; color: #8c3a1f;">6-7</span></div>
+        <div class="h2h"><span>Nacho Average Team</span><span class="num" style="text-align: right; font-weight: 700; color: #8c3a1f;">5-7</span></div>
+        <div class="h2h"><span>Ctrl+Alt+Defeat</span><span class="num" style="text-align: right; font-weight: 700; color: #8c3a1f;">4-8</span></div>
+        <div class="h2h"><span>Bijan Mustard</span><span class="num" style="text-align: right; font-weight: 700; color: #8c3a1f;">3-9</span></div>
+        <p style="margin: 10px 0 0; font-size: 12px; color: #5d574e;">You have never had a winning record against Bijan Mustard.</p>
+      </div>
+    </div>
+
+    <!-- footer -->
+    <div style="display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 36px; padding-top: 24px; border-top: 1px solid #d8cdba;">
+      <div>
+        <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 8px;">
+          <h3 class="display" style="margin: 0; font-size: 20px;">Scoreboard</h3>
+          <span style="font-size: 12px; color: #928a7d;">Week 6 · 2 final</span>
+        </div>
+        <div class="mini" style="grid-template-columns: minmax(0, 1fr) 46px 44px 46px minmax(0, 1fr);">
+          <span style="font-weight: 600; color: #5b7152;">Ctrl+Alt+Defeat</span><span class="num" style="text-align: right; font-weight: 700; color: #5b7152;">131.7</span><span style="text-align: center; font-size: 10px; color: #928a7d;">FINAL</span><span class="num" style="color: #928a7d;">88.1</span><span style="color: #5d574e;">Sunday Scaries</span>
+        </div>
+        <div class="mini" style="grid-template-columns: minmax(0, 1fr) 46px 44px 46px minmax(0, 1fr);">
+          <span style="font-weight: 600; color: #5b7152;">Bijan Mustard</span><span class="num" style="text-align: right; font-weight: 700; color: #5b7152;">128.4</span><span style="text-align: center; font-size: 10px; color: #928a7d;">FINAL</span><span class="num" style="color: #928a7d;">96.2</span><span style="color: #5d574e;">Kelce Grammer</span>
+        </div>
+        <div class="mini" style="grid-template-columns: minmax(0, 1fr) 46px 44px 46px minmax(0, 1fr);">
+          <span style="font-weight: 600;">Hurts So Good</span><span class="num" style="text-align: right; font-weight: 700;">118.9</span><span class="num" style="text-align: center; font-size: 10px; color: #5a7794; font-weight: 700;">71%</span><span class="num" style="color: #928a7d;">104.6</span><span style="color: #5d574e;">Gibbs Me More</span>
+        </div>
+        <div class="mini" style="grid-template-columns: minmax(0, 1fr) 46px 44px 46px minmax(0, 1fr);">
+          <span style="font-weight: 600;">Nacho Average Team</span><span class="num" style="text-align: right; font-weight: 700;">104.9</span><span class="num" style="text-align: center; font-size: 10px; color: #5a7794; font-weight: 700;">58%</span><span class="num" style="color: #928a7d;">99.3</span><span style="color: #5d574e;">Blitz Almighty</span>
+        </div>
+        <div class="mini" style="grid-template-columns: minmax(0, 1fr) 46px 44px 46px minmax(0, 1fr);">
+          <span style="font-weight: 600;">Chubb Rock</span><span class="num" style="text-align: right; font-weight: 700;">88.5</span><span class="num" style="text-align: center; font-size: 10px; color: #5a7794; font-weight: 700;">52%</span><span class="num" style="color: #928a7d;">86.1</span><span style="color: #5d574e;">Pardon My Punt</span>
+        </div>
+      </div>
+
+      <div>
+        <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 8px;">
+          <h3 class="display" style="margin: 0; font-size: 20px;">On waivers</h3>
+          <span style="font-size: 12px; color: #928a7d;">Synced 41m ago</span>
+        </div>
+        <div class="mini" style="grid-template-columns: 40px minmax(0, 1fr) 58px 46px;">
+          <span class="num" style="font-size: 12px; color: #928a7d;">RB18</span><span style="font-weight: 600;">Tank Bigsby</span><span style="font-size: 11px; font-weight: 700; color: #8c3a1f;">+2,140</span><span class="num" style="text-align: right; font-weight: 700;">11.2</span>
+        </div>
+        <div class="mini" style="grid-template-columns: 40px minmax(0, 1fr) 58px 46px;">
+          <span class="num" style="font-size: 12px; color: #928a7d;">WR34</span><span style="font-weight: 600;">Jalen McMillan</span><span style="font-size: 11px; font-weight: 700; color: #8c3a1f;">+1,780</span><span class="num" style="text-align: right; font-weight: 700;">10.4</span>
+        </div>
+        <div class="mini" style="grid-template-columns: 40px minmax(0, 1fr) 58px 46px;">
+          <span class="num" style="font-size: 12px; color: #928a7d;">TE11</span><span style="font-weight: 600;">Isaiah Likely</span><span style="font-size: 11px; font-weight: 700; color: #8c3a1f;">+1,320</span><span class="num" style="text-align: right; font-weight: 700;">9.8</span>
+        </div>
+        <div class="mini" style="grid-template-columns: 40px minmax(0, 1fr) 58px 46px;">
+          <span class="num" style="font-size: 12px; color: #928a7d;">RB31</span><span style="font-weight: 600;">Braelon Allen</span><span style="font-size: 11px; font-weight: 700; color: #8c3a1f;">+980</span><span class="num" style="text-align: right; font-weight: 700;">9.1</span>
+        </div>
+        <div class="mini" style="grid-template-columns: 40px minmax(0, 1fr) 58px 46px;">
+          <span class="num" style="font-size: 12px; color: #928a7d;">WR41</span><span style="font-weight: 600;">Michael Wilson</span><span style="color: #d8cdba; font-size: 11px;">—</span><span class="num" style="text-align: right; font-weight: 700;">8.6</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

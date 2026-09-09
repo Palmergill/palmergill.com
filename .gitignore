@@ -12,3 +12,7 @@ logs/
 .DS_Store
 .vercel
 .claude/
+
+# Seeded design-canvas payload: 2.6MB build artifact, regenerated from the
+# .dc.html sources and canvas.json beside it.
+design-mockups/**/league-hub-redesign.html

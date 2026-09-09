@@ -16,8 +16,13 @@
         week: null,
         scoreWeek: null,
         algorithm: "composite",
+        // Which measure the ledger's switchable column is showing. On a
+        // phone this is the only column, so it is worth keeping in the URL.
+        column: "record",
         teamId: null,
         overview: null,
+        ledger: null,
+        myTeamId: null,
         // Bumped on every context change. A response that resolves with a
         // stale generation is discarded — switching season fires several
         // requests at once, so out-of-order replies are the normal case.
@@ -39,12 +44,14 @@
         signInLink: byId("signInLink"),
         seasonChips: byId("seasonChips"),
         leagueSections: byId("leagueSections"),
-        standings: byId("standings"),
-        standingsNote: byId("standingsNote"),
-        algorithmChips: byId("algorithmChips"),
-        powerWeek: byId("powerWeek"),
-        powerRankings: byId("powerRankings"),
-        powerNote: byId("powerNote"),
+        ledger: byId("ledger"),
+        ledgerColumns: byId("ledgerColumns"),
+        ledgerNote: byId("ledgerNote"),
+        ledgerFootnote: byId("ledgerFootnote"),
+        powerAlgorithm: byId("powerAlgorithm"),
+        chartsBoard: document.querySelector('[data-board="charts"]'),
+        charts: byId("charts"),
+        chartsNote: byId("chartsNote"),
         scoreboardWeek: byId("scoreboardWeek"),
         scoreboard: byId("scoreboard"),
         teamsGrid: byId("teamsGrid"),
@@ -54,6 +61,7 @@
         myTeamName: byId("myTeamName"),
         myTeamMeta: byId("myTeamMeta"),
         myTeamAdvice: byId("myTeamAdvice"),
+        myTeamMoves: byId("myTeamMoves"),
         teamView: byId("teamView"),
         teamBack: byId("teamBack"),
         teamLogo: byId("teamLogo"),
@@ -168,6 +176,10 @@
         if (Number.isFinite(team)) state.teamId = team;
         const algo = params.get("algo");
         if (algo) state.algorithm = algo;
+        const column = params.get("col");
+        if (column && F.LEDGER_COLUMNS.some((entry) => entry.key === column)) {
+            state.column = column;
+        }
     }
 
     function writeUrlState(replace, hash = "") {
@@ -179,6 +191,9 @@
             if (state.week) params.set("week", state.week);
             if (state.algorithm && state.algorithm !== "composite") {
                 params.set("algo", state.algorithm);
+            }
+            if (state.column && state.column !== "record") {
+                params.set("col", state.column);
             }
         }
         const query = params.toString();
@@ -247,69 +262,377 @@
         return wrap;
     }
 
-    function renderStandings(payload, overview) {
-        els.standings.replaceChildren();
-        const groups = F.groupByDivision(payload.teams, overview.divisions);
-        const showDivisions = groups.length > 1;
+    // ── the ledger ──────────────────────────────────────────────────────
 
-        groups.forEach((group) => {
-            if (showDivisions) {
-                els.standings.appendChild(el("h3", "standings__division", group.division_name));
-            }
-            const table = el("table", "rank-table");
-            const head = el("thead");
-            const headRow = el("tr");
-            ["", "Team", "W-L", "PCT", "PF", "PA", "DIFF", "PPG", "Streak"].forEach((label) => {
-                headRow.appendChild(el("th", null, label));
-            });
-            head.appendChild(headRow);
-            table.appendChild(head);
-
-            const body = el("tbody");
-            group.teams.forEach((team) => {
-                const row = el("tr");
-                row.appendChild(
-                    el("td", "cell-seed", F.seedLabel(team.playoff_seed, overview.playoff_team_count))
-                );
-                const nameCell = el("td");
-                nameCell.appendChild(teamCell(team));
-                row.appendChild(nameCell);
-                row.appendChild(el("td", null, F.recordLabel(team.wins, team.losses, team.ties)));
-                row.appendChild(el("td", null, F.formatPct(F.winPct(team.wins, team.losses, team.ties))));
-                row.appendChild(el("td", null, F.formatPoints(team.points_for)));
-                row.appendChild(el("td", null, F.formatPoints(team.points_against)));
-                row.appendChild(el("td", null, F.formatSigned(team.point_differential)));
-                row.appendChild(
-                    el("td", null, F.formatPoints(F.pointsPerGame(team.points_for, team.games_played)))
-                );
-                row.appendChild(el("td", null, F.streakLabel(team.streak_length, team.streak_type)));
-                body.appendChild(row);
-            });
-            table.appendChild(body);
-            els.standings.appendChild(table);
-        });
-
-        els.standingsNote.textContent = payload.teams.length
-            ? `${payload.teams.length} teams`
-            : "";
+    // Scales are computed once per payload rather than per row: every chart
+    // in a column has to share an axis or the bars are not comparable, which
+    // is the whole point of putting them in one table.
+    function ledgerScales(teams) {
+        return {
+            luckMax: F.maxAbs(teams.map((team) => team.luck)),
+            efficiency: F.niceAxis(
+                teams.map((team) => team.lineup && team.lineup.efficiency),
+                0.02
+            ),
+            scoring: F.niceAxis(
+                teams.reduce((values, team) => {
+                    const scoring = team.scoring || {};
+                    return values.concat([scoring.low, scoring.high]);
+                }, []),
+                10
+            ),
+        };
     }
 
-    function renderAlgorithmChips(algorithms) {
-        els.algorithmChips.replaceChildren();
-        algorithms.forEach((algorithm) => {
-            const chip = el("button", "chip", F.algorithmLabel(algorithm));
+    function sparkSvg(ranks, width, height, pad) {
+        const path = F.sparkline(ranks, width, height, pad);
+        if (!path) return null;
+        const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+        svg.setAttribute("class", "spark");
+        svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
+        svg.setAttribute("aria-hidden", "true");
+        const line = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        line.setAttribute("d", path);
+        svg.appendChild(line);
+        return svg;
+    }
+
+    function meterEl(percent) {
+        const track = el("div", "meter");
+        const fill = el("div", "meter__fill");
+        fill.style.width = `${Math.max(0, Math.min(100, percent || 0))}%`;
+        track.appendChild(fill);
+        return track;
+    }
+
+    // The chart that rides in the row. Polarity always reads from which side
+    // of the zero rule a bar sits on, and a value the measure could not be
+    // computed for draws nothing rather than a bar of length zero — those
+    // look identical and mean opposite things.
+    function ledgerChart(team, columnKey, scales) {
+        const column = F.ledgerColumn(columnKey);
+        if (column.chart === "diverging") {
+            const bar = F.divergingBar(team.luck, scales.luckMax);
+            const track = el("div", "dv");
+            track.appendChild(el("div", "dv__zero"));
+            if (bar.side !== "zero") {
+                const fill = el("div", `dv__bar dv__bar--${bar.side}`);
+                fill.style.width = `${bar.width}%`;
+                track.appendChild(fill);
+            }
+            return track;
+        }
+        if (column.chart === "dot") {
+            const axis = scales.efficiency;
+            const value = team.lineup && team.lineup.efficiency;
+            const position = axis ? F.dotPosition(value, axis.min, axis.max) : null;
+            if (position === null) return null;
+            const track = el("div", "dot");
+            track.appendChild(el("div", "dot__line"));
+            const point = el("div", "dot__pt");
+            point.style.left = `${position}%`;
+            track.appendChild(point);
+            return track;
+        }
+        if (column.chart === "range") {
+            const axis = scales.scoring;
+            const scoring = team.scoring || {};
+            const band = axis ? F.rangeBand(scoring.low, scoring.high, axis.min, axis.max) : null;
+            if (!band) return null;
+            const track = el("div", "rng");
+            const span = el("div", "rng__span");
+            span.style.left = `${band.left}%`;
+            span.style.width = `${band.width}%`;
+            track.appendChild(span);
+            const median = F.dotPosition(scoring.median, axis.min, axis.max);
+            if (median !== null) {
+                const point = el("div", "rng__med");
+                point.style.left = `${median}%`;
+                track.appendChild(point);
+            }
+            return track;
+        }
+        if (column.chart === "meter") {
+            const value = F.ledgerValue(team, columnKey);
+            if (value === null || value === undefined) return null;
+            return meterEl(value * 100);
+        }
+        if (column.chart === "spark") {
+            const ranks = ((team.power && team.power.history) || []).map((point) => point.rank);
+            return sparkSvg(ranks, 72, 22, 3);
+        }
+        return null;
+    }
+
+    function renderColumnChips() {
+        els.ledgerColumns.replaceChildren();
+        F.LEDGER_COLUMNS.forEach((column) => {
+            const chip = el("button", "chip", column.label);
             chip.type = "button";
-            if (algorithm === state.algorithm) {
+            if (column.key === state.column) {
                 chip.classList.add("chip--active");
                 chip.setAttribute("aria-current", "true");
             }
-            chip.addEventListener("click", () => {
-                state.algorithm = algorithm;
-                writeUrlState(true);
-                loadPowerRankings();
-            });
-            els.algorithmChips.appendChild(chip);
+            chip.addEventListener("click", () => selectColumn(column.key));
+            els.ledgerColumns.appendChild(chip);
         });
+    }
+
+    function renderAlgorithmSelect(algorithms) {
+        els.powerAlgorithm.replaceChildren();
+        (algorithms || []).forEach((algorithm) => {
+            const option = el("option", null, F.algorithmLabel(algorithm));
+            option.value = algorithm;
+            if (algorithm === state.algorithm) option.selected = true;
+            els.powerAlgorithm.appendChild(option);
+        });
+        els.powerAlgorithm.disabled = !(algorithms || []).length;
+    }
+
+    function ledgerHeadRow() {
+        const row = el("tr");
+        row.appendChild(el("th", null, ""));
+        row.appendChild(el("th", null, "Team"));
+        [
+            ["record", "W-L"],
+            ["points_for", "PF"],
+            ["all_play", "All-play"],
+            ["expected", "xW"],
+            ["luck", "Luck"],
+            ["lineup", "Lineup"],
+            ["power", "Power"],
+            ["odds", "Odds"],
+            ["form", "Form"],
+        ].forEach(([key, label]) => {
+            const cell = el("th", null, label);
+            cell.dataset.key = key;
+            if (key === state.column) cell.classList.add("is-active");
+            row.appendChild(cell);
+        });
+        return row;
+    }
+
+    function valueCell(key, text) {
+        const cell = el("td", "ledger__cell", text);
+        cell.dataset.key = key;
+        if (key === state.column) cell.classList.add("is-active");
+        return cell;
+    }
+
+    function renderLedger(payload) {
+        const teams = payload.teams || [];
+        els.ledger.replaceChildren();
+        if (!teams.length) {
+            els.ledger.appendChild(el("p", "empty-note", "No teams collected for this season."));
+            els.ledgerNote.textContent = "";
+            return;
+        }
+
+        const scales = ledgerScales(teams);
+        const ordered = F.sortLedger(teams, state.column);
+        const table = el("table", "rank-table ledger-table");
+        const head = el("thead");
+        head.appendChild(ledgerHeadRow());
+        table.appendChild(head);
+
+        const body = el("tbody");
+        ordered.forEach((team, index) => {
+            const row = el("tr");
+            if (state.myTeamId && team.espn_team_id === state.myTeamId) {
+                row.classList.add("ledger-row--mine");
+            }
+            row.appendChild(el("td", "cell-seed", String(index + 1)));
+
+            const nameCell = el("td", "ledger__team");
+            nameCell.dataset.key = "team";
+            nameCell.appendChild(teamCell(team));
+            // Mobile only: the chosen column's context and chart move into
+            // the identity cell, because a phone shows one column at a time.
+            nameCell.appendChild(el("span", "ledger__meta", F.ledgerMeta(team, state.column)));
+            const chart = ledgerChart(team, state.column, scales);
+            if (chart) {
+                const holder = el("div", "ledger__chart");
+                holder.appendChild(chart);
+                nameCell.appendChild(holder);
+            }
+            row.appendChild(nameCell);
+
+            row.appendChild(valueCell("record", F.ledgerText(team, "record")));
+            row.appendChild(valueCell("points_for", F.ledgerText(team, "points_for")));
+            row.appendChild(valueCell("all_play", F.ledgerText(team, "all_play")));
+            row.appendChild(
+                valueCell(
+                    "expected",
+                    team.expected_wins === null || team.expected_wins === undefined
+                        ? "—"
+                        : Number(team.expected_wins).toFixed(1)
+                )
+            );
+
+            const luckCell = valueCell("luck", F.ledgerText(team, "luck"));
+            if (team.luck > 0) luckCell.classList.add("cell-above");
+            if (team.luck < 0) luckCell.classList.add("cell-below");
+            row.appendChild(luckCell);
+
+            row.appendChild(valueCell("lineup", F.ledgerText(team, "lineup")));
+
+            const powerCell = valueCell("power", F.ledgerText(team, "power"));
+            const movement = F.rankMovement(team.power && team.power.rank_delta);
+            powerCell.appendChild(
+                el("span", `ledger__move ledger__move--${movement.direction}`, movement.label)
+            );
+            row.appendChild(powerCell);
+
+            const oddsCell = valueCell("odds", "");
+            const odds = team.playoff && team.playoff.odds;
+            if (odds === null || odds === undefined) {
+                oddsCell.textContent = "—";
+            } else {
+                const wrap = el("div", "ledger__odds");
+                wrap.appendChild(meterEl(odds * 100));
+                wrap.appendChild(el("span", "ledger__odds-value", `${Math.round(odds * 100)}`));
+                oddsCell.appendChild(wrap);
+            }
+            row.appendChild(oddsCell);
+
+            const formCell = valueCell("form", "");
+            const spark = sparkSvg(
+                ((team.power && team.power.history) || []).map((point) => point.rank),
+                60,
+                20,
+                3
+            );
+            if (spark) formCell.appendChild(spark);
+            row.appendChild(formCell);
+
+            body.appendChild(row);
+        });
+        table.appendChild(body);
+        els.ledger.appendChild(table);
+
+        els.ledgerNote.textContent = payload.power_week
+            ? `${teams.length} teams · power through week ${payload.power_week}`
+            : `${teams.length} teams`;
+
+        const rating = payload.manager_rating || {};
+        els.ledgerFootnote.textContent = rating.available
+            ? `Lineup is the share of each week's best legal lineup a manager actually started, ` +
+              `over ${rating.weeks.length} scored week${rating.weeks.length === 1 ? "" : "s"}. ` +
+              `League average ${(rating.league_average * 100).toFixed(1)}%.`
+            : LINEUP_UNAVAILABLE[rating.reason] || "";
+    }
+
+    // Why a column is blank, in the reader's terms. A metric that silently
+    // shows nothing is indistinguishable from one that is broken.
+    const LINEUP_UNAVAILABLE = {
+        no_lineup_settings:
+            "Lineup efficiency needs this league's roster settings, which have not been collected yet.",
+        no_roster_snapshots:
+            "Lineup efficiency needs stored weekly rosters. None have been collected for this season.",
+        no_actuals:
+            "Lineup efficiency needs each player's actual points, which have not been collected for this season.",
+        no_scorable_weeks:
+            "No week has a full set of starter results yet, so lineup efficiency cannot be scored.",
+    };
+
+    // ── the season charts ───────────────────────────────────────────────
+
+    function chartRow(team, valueText, chart, highlight) {
+        const row = el("div", "chart-row");
+        if (highlight) row.classList.add("chart-row--mine");
+        const name = el("button", "chart-row__name", team.name || "—");
+        name.type = "button";
+        name.addEventListener("click", () => selectTeam(team.espn_team_id));
+        row.appendChild(name);
+        const holder = el("div", "chart-row__track");
+        if (chart) holder.appendChild(chart);
+        row.appendChild(holder);
+        row.appendChild(el("span", "chart-row__value", valueText));
+        return row;
+    }
+
+    function chartPanel(title, lede, rows, axis) {
+        const panel = el("section", "chart");
+        panel.appendChild(el("h3", "chart__title", title));
+        panel.appendChild(el("p", "chart__lede", lede));
+        rows.forEach((row) => panel.appendChild(row));
+        if (axis) {
+            const scale = el("div", "chart__axis");
+            scale.appendChild(el("span", null, axis[0]));
+            scale.appendChild(el("span", null, axis[1]));
+            panel.appendChild(scale);
+        }
+        return panel;
+    }
+
+    function renderCharts(payload) {
+        const teams = payload.teams || [];
+        els.charts.replaceChildren();
+        const scored = teams.filter((team) => (team.all_play || {}).games);
+        if (!scored.length) {
+            els.chartsBoard.hidden = true;
+            return;
+        }
+        els.chartsBoard.hidden = false;
+        const scales = ledgerScales(teams);
+
+        els.charts.appendChild(
+            chartPanel(
+                "Luck index",
+                "Wins minus expected wins. Left of the line is below, right is above.",
+                F.sortLedger(scored, "luck").map((team) =>
+                    chartRow(
+                        team,
+                        F.ledgerText(team, "luck"),
+                        ledgerChart(team, "luck", scales),
+                        team.espn_team_id === state.myTeamId
+                    )
+                )
+            )
+        );
+
+        const rated = scored.filter(
+            (team) => team.lineup && team.lineup.efficiency !== null && team.lineup.efficiency !== undefined
+        );
+        if (rated.length) {
+            const axis = scales.efficiency;
+            els.charts.appendChild(
+                chartPanel(
+                    "Manager rating",
+                    "Points started as a share of the best legal lineup that week.",
+                    F.sortLedger(rated, "lineup").map((team) =>
+                        chartRow(
+                            team,
+                            F.ledgerText(team, "lineup"),
+                            ledgerChart(team, "lineup", scales),
+                            team.espn_team_id === state.myTeamId
+                        )
+                    ),
+                    axis
+                        ? [`${(axis.min * 100).toFixed(0)}%`, `${(axis.max * 100).toFixed(0)}%`]
+                        : null
+                )
+            );
+        }
+
+        const axis = scales.scoring;
+        els.charts.appendChild(
+            chartPanel(
+                "Weekly range",
+                "Lowest to highest week, with the median. Long bars are boom-or-bust.",
+                F.sortLedger(scored, "scoring").map((team) =>
+                    chartRow(
+                        team,
+                        F.formatPoints(team.scoring && team.scoring.median),
+                        ledgerChart(team, "scoring", scales),
+                        team.espn_team_id === state.myTeamId
+                    )
+                ),
+                axis ? [String(axis.min), String(axis.max)] : null
+            )
+        );
+
+        els.chartsNote.textContent = `${scored.length} teams with completed games`;
     }
 
     function fillWeekSelect(select, weeks, selected) {
@@ -321,63 +644,6 @@
             select.appendChild(option);
         });
         select.disabled = weeks.length === 0;
-    }
-
-    function renderPowerRankings(payload) {
-        els.powerRankings.replaceChildren();
-        if (!payload.rankings.length) {
-            els.powerRankings.appendChild(
-                el("p", "empty-note", "No completed games yet this season.")
-            );
-            els.powerNote.textContent = "";
-            return;
-        }
-
-        payload.rankings.forEach((team) => {
-            const row = el("article", "power-row");
-            row.appendChild(el("span", "power-row__rank", String(team.rank)));
-
-            const movement = F.rankMovement(team.rank_delta);
-            const move = el("span", `power-row__move power-row__move--${movement.direction}`, movement.label);
-            row.appendChild(move);
-
-            const main = el("div", "power-row__main");
-            const nameButton = el("button", "power-row__name", team.name || "—");
-            nameButton.type = "button";
-            nameButton.addEventListener("click", () => selectTeam(team.espn_team_id));
-            main.appendChild(nameButton);
-            main.appendChild(
-                el(
-                    "span",
-                    "power-row__meta",
-                    `${F.recordLabel(team.wins, team.losses, team.ties)} · ${F.formatPoints(team.points_for)} PF`
-                )
-            );
-            row.appendChild(main);
-
-            const track = el("div", "power-bar");
-            const fill = el("div", "power-bar__fill");
-            fill.style.width = `${F.powerBar(team.score)}%`;
-            track.appendChild(fill);
-            row.appendChild(track);
-
-            const ranks = (team.history || []).map((point) => point.rank);
-            const path = F.sparkline(ranks, 72, 22, 3);
-            if (path) {
-                const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-                svg.setAttribute("class", "spark");
-                svg.setAttribute("viewBox", "0 0 72 22");
-                svg.setAttribute("aria-hidden", "true");
-                const line = document.createElementNS("http://www.w3.org/2000/svg", "path");
-                line.setAttribute("d", path);
-                svg.appendChild(line);
-                row.appendChild(svg);
-            }
-
-            els.powerRankings.appendChild(row);
-        });
-
-        els.powerNote.textContent = `Through week ${payload.week}`;
     }
 
     function renderScoreboard(payload) {
@@ -703,20 +969,47 @@
         return generation !== state.generation;
     }
 
-    async function loadPowerRankings() {
+    async function loadLedger() {
         const generation = state.generation;
         const params = new URLSearchParams({ algorithm: state.algorithm });
         if (state.season) params.set("season", state.season);
-        if (state.week) params.set("week", state.week);
         try {
-            const payload = await fetchJson(`${API_BASE}/power-rankings?${params}`);
+            const payload = await fetchJson(`${API_BASE}/ledger?${params}`);
             if (stale(generation)) return;
-            state.week = payload.week;
-            fillWeekSelect(els.powerWeek, payload.available_weeks, payload.week);
-            renderAlgorithmChips(state.overview.algorithms);
-            renderPowerRankings(payload);
+            state.ledger = payload;
+            renderAlgorithmSelect(payload.algorithms);
+            renderColumnChips();
+            renderLedger(payload);
+            renderCharts(payload);
         } catch (error) {
-            if (!stale(generation)) handleFailure(error);
+            if (stale(generation)) return;
+            // Being signed out is a whole-page condition; anything else is
+            // this board's problem alone. The ledger is also fetched while a
+            // team page is open, and a failure there should not put an error
+            // banner over a view the table is not even on.
+            if (error instanceof ForbiddenError) {
+                handleFailure(error);
+                return;
+            }
+            state.ledger = null;
+            els.ledger.replaceChildren(el("p", "empty-note", "The table is unavailable right now."));
+            els.ledgerNote.textContent = "";
+            els.ledgerFootnote.textContent = "";
+            els.chartsBoard.hidden = true;
+        }
+    }
+
+    // Switching column re-sorts and redraws from the payload already in
+    // hand; only the power *method* costs a request, because the ranks
+    // themselves are computed server-side.
+    function selectColumn(key) {
+        if (key === state.column) return;
+        state.column = key;
+        writeUrlState(true);
+        renderColumnChips();
+        if (state.ledger) {
+            renderLedger(state.ledger);
+            renderCharts(state.ledger);
         }
     }
 
@@ -754,6 +1047,9 @@
                 els.myTeamStrip.hidden = true;
                 return;
             }
+            // The ledger highlights your row, so it needs to know which one
+            // is yours before it draws.
+            state.myTeamId = me.selected_team_id;
             renderMyTeam(me);
             // Advice is a second request and a nice-to-have: the strip is
             // already useful as a shortcut without it.
@@ -797,6 +1093,7 @@
     function renderMyTeamAdvice(lineup, teamId) {
         // Same rule the start/sit card follows: no advice is better than
         // advice assembled from a season the projections do not cover.
+        els.myTeamMoves.replaceChildren();
         if (!lineup || lineup.available === false || lineup.gain == null) {
             els.myTeamAdvice.hidden = true;
             return;
@@ -807,6 +1104,28 @@
             ? `Your lineup leaves ${F.formatPoints(lineup.gain)} on the bench →`
             : "Your lineup is the best one available →";
         els.myTeamAdvice.classList.toggle("my-team__advice--gain", lineup.gain > 0);
+
+        // Starts and sits are listed as two sets rather than paired swaps,
+        // because the lineup read deliberately does not pair them: with
+        // overlapping FLEX seats a change is not always one player for one.
+        const moves = []
+            .concat((lineup.starts || []).map((player) => ["Start", player]))
+            .concat((lineup.sits || []).map((player) => ["Sit", player]));
+        moves.slice(0, 4).forEach(([label, player]) => {
+            const item = el("li", `my-team__move my-team__move--${label.toLowerCase()}`);
+            item.appendChild(el("span", "my-team__move-label", label));
+            item.appendChild(el("span", "my-team__move-name", player.name || "—"));
+            item.appendChild(
+                el(
+                    "span",
+                    "my-team__move-points",
+                    player.projected_points == null
+                        ? "—"
+                        : F.formatPoints(player.projected_points)
+                )
+            );
+            els.myTeamMoves.appendChild(item);
+        });
     }
 
     function scrollToRequestedBoard(hash = window.location.hash) {
@@ -988,20 +1307,17 @@
 
             const standings = await fetchJson(`${API_BASE}/standings?season=${state.season}`);
             if (stale(generation)) return;
-            renderStandings(standings, overview);
             renderTeamsGrid(standings);
 
-            // In the preseason the standings are all zeroes and the schedule
+            // In the preseason every derived column is empty and the schedule
             // is unplayed, so lead with the teams and their drafted rosters
-            // instead of boards that have nothing in them yet.
+            // instead of a table that has nothing in it yet.
             els.leagueSections.classList.toggle("is-preseason", overview.mode === "preseason");
 
-            await Promise.all([
-                loadPowerRankings(),
-                loadScoreboard(),
-                loadFreeAgents(),
-                loadMyTeam(),
-            ]);
+            // The ledger is the page; it loads before the boards under it so
+            // the table is readable while the rest fills in.
+            await loadMyTeam();
+            await Promise.all([loadLedger(), loadScoreboard(), loadFreeAgents()]);
             applyRoute();
             // A cross-link from the dashboard's Waiver Pulse lands on the
             // free-agent board, which anchors immediately but fills in late.
@@ -1042,10 +1358,10 @@
         els.teamBack.addEventListener("click", clearTeam);
         els.teamOverviewRefresh.addEventListener("click", () => loadTeamOverview(true));
 
-        els.powerWeek.addEventListener("change", (event) => {
-            state.week = parseInt(event.target.value, 10);
+        els.powerAlgorithm.addEventListener("change", (event) => {
+            state.algorithm = event.target.value;
             writeUrlState(true);
-            loadPowerRankings();
+            loadLedger();
         });
 
         els.scoreboardWeek.addEventListener("change", (event) => {
@@ -1058,6 +1374,7 @@
             state.week = null;
             state.teamId = null;
             state.algorithm = "composite";
+            state.column = "record";
             readUrlState();
             loadSeason();
         });

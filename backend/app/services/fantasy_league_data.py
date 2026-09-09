@@ -29,9 +29,10 @@ from app.database import (
     iso_utc,
 )
 from app.services import fantasy_data
+from app.services import fantasy_league_advanced
 from app.services.fantasy_collector import latest_successful_run
 from app.services.fantasy_league_espn import ESPN_LINEUP_SLOTS, configured_league_id
-from app.services.fantasy_league_rankings import ALGORITHMS
+from app.services.fantasy_league_rankings import ALGORITHMS, build_team_metrics
 from app.services.fantasy_common import SCORING_POINTS_FIELD, normalize_scoring
 
 logger = logging.getLogger(__name__)
@@ -1148,6 +1149,294 @@ def get_free_agents(
         "unmatched": 0,
         "roster_as_of": _iso(roster_run.finished_at) if roster_run else None,
         "as_of": _iso(ranking_run.finished_at),
+    }
+
+
+def _matchup_dicts(db: Session, season: int) -> List[Dict[str, Any]]:
+    """Stored matchups in the plain shape the pure ranking/ledger math takes."""
+    rows = (
+        db.query(FantasyLeagueMatchup)
+        .filter(FantasyLeagueMatchup.season == season)
+        .order_by(FantasyLeagueMatchup.matchup_period, FantasyLeagueMatchup.espn_matchup_id)
+        .all()
+    )
+    return [
+        {
+            "matchup_period": row.matchup_period,
+            "playoff_tier": row.playoff_tier,
+            "winner": row.winner,
+            "home_team_id": row.home_team_id,
+            "home_points": row.home_points,
+            "away_team_id": row.away_team_id,
+            "away_points": row.away_points,
+            "is_bye": bool(row.is_bye),
+            "is_complete": bool(row.is_complete),
+        }
+        for row in rows
+    ]
+
+
+def _remaining_schedule(matchups: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Regular-season games still to be played, for the playoff simulation."""
+    return [
+        row
+        for row in matchups
+        if not row["is_complete"]
+        and not row["is_bye"]
+        and row["away_team_id"] is not None
+        and (row["playoff_tier"] or "NONE") == "NONE"
+    ]
+
+
+def _latest_roster_run_by_week(db: Session, season: int) -> Dict[int, int]:
+    """The final stored snapshot for each week.
+
+    A roster can be snapshotted more than once in a week — the digest only
+    skips *unchanged* ones — and the lineup a manager is judged on is the one
+    that was standing last, so take the newest run per scoring period.
+    """
+    rows = (
+        db.query(
+            FantasyLeagueRosterEntry.scoring_period,
+            FantasyLeagueRosterEntry.run_id,
+        )
+        .filter(FantasyLeagueRosterEntry.season == season)
+        .distinct()
+        .all()
+    )
+    latest: Dict[int, int] = {}
+    for period, run_id in rows:
+        if period is None or run_id is None or period <= 0:
+            continue
+        if period not in latest or run_id > latest[period]:
+            latest[period] = run_id
+    return latest
+
+
+def _actual_points(db: Session, season: int, weeks: List[int]) -> Dict[tuple, float]:
+    """(week, player_id) -> the points that player actually scored."""
+    if not weeks:
+        return {}
+    rows = (
+        db.query(
+            FantasyPlayerStat.week,
+            FantasyPlayerStat.player_id,
+            FantasyPlayerStat.fantasy_points_half,
+        )
+        .filter(
+            FantasyPlayerStat.season == season,
+            FantasyPlayerStat.week.in_(weeks),
+        )
+        .all()
+    )
+    return {
+        (week, player_id): points
+        for week, player_id, points in rows
+        if player_id and points is not None
+    }
+
+
+def _manager_ratings(db: Session, season: int) -> Dict[str, Any]:
+    """Season-long lineup efficiency, measured against what actually happened.
+
+    The optimiser from the start/sit card already knows how to fill this
+    league's seats; pointing it at *actual* points rather than projections
+    turns "who should you start" into "who should you have started", which is
+    the only version of the question that can be scored.
+
+    Two silences, both deliberate and both in the direction of claiming less:
+
+      * A week in which any starter has no stat row is dropped entirely. No
+        row could mean the player did not play or that the crosswalk never
+        matched him, and those are indistinguishable here — so the week's
+        actual total is unknown rather than quietly short.
+      * A *bench* player with no stat row is not a candidate for the optimal
+        lineup. It cannot be claimed he would have scored more than the
+        starter when there is no record of him scoring at all. This nudges
+        the reported efficiency up rather than inventing a benched hero.
+    """
+    season_row = (
+        db.query(FantasyLeagueSeason)
+        .filter(
+            FantasyLeagueSeason.espn_league_id == configured_league_id(),
+            FantasyLeagueSeason.season == season,
+        )
+        .first()
+    )
+    slots = _starting_slots(season_row)
+    if not slots:
+        return {"available": False, "reason": "no_lineup_settings", "teams": {}}
+
+    runs_by_week = _latest_roster_run_by_week(db, season)
+    if not runs_by_week:
+        return {"available": False, "reason": "no_roster_snapshots", "teams": {}}
+
+    weeks = sorted(runs_by_week)
+    points = _actual_points(db, season, weeks)
+    if not points:
+        return {"available": False, "reason": "no_actuals", "teams": {}}
+
+    entries = (
+        db.query(FantasyLeagueRosterEntry)
+        .filter(
+            FantasyLeagueRosterEntry.season == season,
+            FantasyLeagueRosterEntry.run_id.in_(list(runs_by_week.values())),
+        )
+        .all()
+    )
+
+    # (week, team) -> roster rows from that week's final snapshot
+    rosters: Dict[tuple, List[FantasyLeagueRosterEntry]] = {}
+    for entry in entries:
+        period = entry.scoring_period
+        if period is None or runs_by_week.get(period) != entry.run_id:
+            continue
+        rosters.setdefault((period, entry.espn_team_id), []).append(entry)
+
+    per_team: Dict[int, List[Dict[str, Any]]] = {}
+    for (week, team_id), roster in rosters.items():
+        started = 0.0
+        starters_known = True
+        candidates: List[Dict[str, Any]] = []
+
+        for entry in roster:
+            slot = entry.lineup_slot
+            position = entry.position
+            scored = points.get((week, entry.player_id)) if entry.player_id else None
+            is_starter = bool(slot) and slot not in BENCH_SLOTS
+
+            if is_starter:
+                if scored is None:
+                    starters_known = False
+                else:
+                    started += scored
+
+            # IR is storage a manager cannot start from, whatever it scored.
+            if slot in INELIGIBLE_SLOTS or scored is None or not position:
+                continue
+            candidates.append(
+                {
+                    "player_id": entry.player_id,
+                    "name": entry.player_name_raw,
+                    "_points": scored,
+                    "_position": position,
+                }
+            )
+
+        if not starters_known or not candidates:
+            continue
+        optimal = sum(row["_points"] for row in _optimal_lineup(slots, candidates))
+        per_team.setdefault(team_id, []).append(
+            {"week": week, "started": started, "optimal": optimal}
+        )
+
+    teams = {
+        team_id: fantasy_league_advanced.lineup_efficiency(weeks_for_team)
+        for team_id, weeks_for_team in per_team.items()
+    }
+    if not any(row["efficiency"] is not None for row in teams.values()):
+        return {"available": False, "reason": "no_scorable_weeks", "teams": {}}
+
+    rated = [row["efficiency"] for row in teams.values() if row["efficiency"] is not None]
+    return {
+        "available": True,
+        "reason": None,
+        "league_average": sum(rated) / len(rated),
+        "weeks": sorted({week["week"] for rows in per_team.values() for week in rows}),
+        "teams": teams,
+    }
+
+
+def get_league_ledger(
+    db: Session,
+    season: Optional[int] = None,
+    algorithm: str = DEFAULT_ALGORITHM,
+) -> Dict[str, Any]:
+    """One row per team carrying every measure the ledger table shows.
+
+    The hub used to answer standings, power rankings and rosters as three
+    separate lists of the same ten teams. This is those ten teams once, with
+    the derived columns joined on, so the front end sorts and switches
+    columns without a second round trip per measure.
+    """
+    season = _require_season(db, season)
+    if algorithm not in ALGORITHMS:
+        algorithm = DEFAULT_ALGORITHM
+
+    team_rows = _team_rows(db, season)
+    teams = [_team_payload(row) for row in team_rows]
+    matchups = _matchup_dicts(db, season)
+
+    metrics = build_team_metrics(teams, matchups)
+    season_row = (
+        db.query(FantasyLeagueSeason)
+        .filter(
+            FantasyLeagueSeason.espn_league_id == configured_league_id(),
+            FantasyLeagueSeason.season == season,
+        )
+        .first()
+    )
+    playoff_team_count = (season_row.playoff_team_count if season_row else 0) or 0
+
+    derived = fantasy_league_advanced.ledger_rows(
+        metrics, _remaining_schedule(matchups), playoff_team_count
+    )
+    ratings = _manager_ratings(db, season)
+    power = get_power_rankings(db, season, algorithm=algorithm)
+    power_by_team = {row["espn_team_id"]: row for row in power["rankings"]}
+
+    rows = []
+    for team in teams:
+        team_id = team["espn_team_id"]
+        extra = derived.get(team_id, {})
+        rank_row = power_by_team.get(team_id, {})
+        rating = ratings["teams"].get(team_id, {})
+        rows.append(
+            {
+                **team,
+                "all_play": extra.get("all_play"),
+                "expected_wins": extra.get("expected_wins"),
+                "luck": extra.get("luck"),
+                "scoring": extra.get("scoring"),
+                "playoff": extra.get("playoff"),
+                "weekly_scores": extra.get("weekly_scores", []),
+                "power": {
+                    "rank": rank_row.get("rank"),
+                    "previous_rank": rank_row.get("previous_rank"),
+                    "rank_delta": rank_row.get("rank_delta"),
+                    "history": rank_row.get("history", []),
+                },
+                "lineup": {
+                    "efficiency": rating.get("efficiency"),
+                    "points_left": rating.get("points_left"),
+                    "weeks": rating.get("weeks", 0),
+                },
+            }
+        )
+
+    # Standings order is the default the table opens on; every other column
+    # sorts client-side from the same payload.
+    rows.sort(
+        key=lambda row: (
+            -(row["win_pct"] or 0.0),
+            -(row["points_for"] or 0.0),
+            row["espn_team_id"],
+        )
+    )
+
+    return {
+        "season": season,
+        "algorithm": algorithm,
+        "algorithms": list(ALGORITHMS),
+        "power_week": power.get("week"),
+        "playoff_team_count": playoff_team_count,
+        "manager_rating": {
+            "available": ratings["available"],
+            "reason": ratings["reason"],
+            "league_average": ratings.get("league_average"),
+            "weeks": ratings.get("weeks", []),
+        },
+        "teams": rows,
     }
 
 

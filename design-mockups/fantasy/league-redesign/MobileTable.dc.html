@@ -1,0 +1,144 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&display=swap">
+  <style>
+    body {
+      margin: 0;
+      background: #faf6f0;
+      color: #23201c;
+      font-family: "Plus Jakarta Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+    }
+    .display { font-family: "Newsreader", Georgia, "Times New Roman", serif; font-weight: 500; letter-spacing: -0.015em; }
+    .kicker { font-size: 10px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #928a7d; }
+    .num { font-variant-numeric: tabular-nums; }
+    .tap {
+      display: inline-flex; align-items: center; min-height: 40px;
+      padding: 0 14px; border-radius: 999px; border: 1px solid #d8cdba;
+      background: #ffffff; color: #5d574e; font-size: 13px; font-weight: 600; white-space: nowrap;
+    }
+    .tap--on { background: #23201c; border-color: #23201c; color: #ffffff; }
+    .row { padding: 10px 0; border-bottom: 1px solid #ece4d8; }
+    .row:last-child { border-bottom: none; }
+    .row__top { display: flex; align-items: baseline; gap: 8px; }
+    .row__rank { width: 16px; font-size: 12px; font-weight: 700; color: #928a7d; font-variant-numeric: tabular-nums; }
+    .row__name { flex: 1 1 auto; font-size: 14px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .row__val { font-size: 15px; font-weight: 800; font-variant-numeric: tabular-nums; }
+    .row__body { padding-left: 24px; margin-top: 3px; }
+    .row__meta { font-size: 11px; color: #928a7d; }
+    /* position encodes, so the 80–100 window is honest here where a bar would not be */
+    .dot__track { position: relative; height: 14px; margin-top: 5px; }
+    .dot__line { position: absolute; left: 0; right: 0; top: 6.5px; height: 1px; background: #ece4d8; }
+    .dot__avg { position: absolute; top: 0; bottom: 0; width: 1px; background: #23201c; }
+    .dot__pt { position: absolute; top: 2px; width: 10px; height: 10px; border-radius: 999px; background: #5b7152; border: 2px solid #faf6f0; margin-left: -5px; }
+  </style>
+</helmet>
+
+<div style="width: 390px; background: #faf6f0; padding: 20px; box-sizing: border-box;">
+
+  <h2 class="display" style="margin: 0; font-size: 24px;">The table</h2>
+  <p style="margin: 3px 0 0; font-size: 12px; color: #928a7d;">Ten teams, one measure at a time. Swipe the row to change what the column shows.</p>
+
+  <div style="display: flex; gap: 7px; margin: 12px -20px 0; padding: 0 20px; overflow: hidden;">
+    <span class="tap">All-play</span>
+    <span class="tap">Luck</span>
+    <span class="tap tap--on">Lineup</span>
+    <span class="tap">Power</span>
+    <span class="tap">Odd</span>
+  </div>
+
+  <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-top: 16px; padding-bottom: 7px; border-bottom: 1px solid #23201c;">
+    <span class="kicker">Manager rating</span>
+    <span class="kicker">% of best lineup</span>
+  </div>
+
+  <div class="row">
+    <div class="row__top"><span class="row__rank">1</span><span class="row__name">Ctrl+Alt+Defeat</span><span class="row__val">96.3</span></div>
+    <div class="row__body">
+      <span class="row__meta">24.5 pts left on the bench this season</span>
+      <div class="dot__track"><div class="dot__line"></div><div class="dot__avg" style="left: 51.5%;"></div><div class="dot__pt" style="left: 81.5%;"></div></div>
+    </div>
+  </div>
+  <div class="row">
+    <div class="row__top"><span class="row__rank">2</span><span class="row__name">Bijan Mustard</span><span class="row__val">94.1</span></div>
+    <div class="row__body">
+      <span class="row__meta">42.4 pts left on the bench this season</span>
+      <div class="dot__track"><div class="dot__line"></div><div class="dot__avg" style="left: 51.5%;"></div><div class="dot__pt" style="left: 70.5%;"></div></div>
+    </div>
+  </div>
+  <div class="row">
+    <div class="row__top"><span class="row__rank">3</span><span class="row__name">Gibbs Me More</span><span class="row__val">93.8</span></div>
+    <div class="row__body">
+      <span class="row__meta">38.5 pts left on the bench this season</span>
+      <div class="dot__track"><div class="dot__line"></div><div class="dot__avg" style="left: 51.5%;"></div><div class="dot__pt" style="left: 69%;"></div></div>
+    </div>
+  </div>
+  <div class="row">
+    <div class="row__top"><span class="row__rank">4</span><span class="row__name">Chubb Rock</span><span class="row__val">92.7</span></div>
+    <div class="row__body">
+      <span class="row__meta">48.0 pts left on the bench this season</span>
+      <div class="dot__track"><div class="dot__line"></div><div class="dot__avg" style="left: 51.5%;"></div><div class="dot__pt" style="left: 63.5%;"></div></div>
+    </div>
+  </div>
+  <div class="row" style="background: #f7f4ec; margin: 0 -12px; padding: 10px 12px; border-radius: 10px;">
+    <div class="row__top"><span class="row__rank">5</span><span class="row__name">Hurts So Good <span style="font-weight: 400; color: #928a7d; font-size: 11px;">you</span></span><span class="row__val">91.6</span></div>
+    <div class="row__body">
+      <span class="row__meta">60.1 pts left on the bench this season</span>
+      <div class="dot__track"><div class="dot__line"></div><div class="dot__avg" style="left: 51.5%;"></div><div class="dot__pt" style="left: 58%; border-color: #f7f4ec;"></div></div>
+    </div>
+  </div>
+  <div class="row">
+    <div class="row__top"><span class="row__rank">6</span><span class="row__name">Blitz Almighty</span><span class="row__val">90.4</span></div>
+    <div class="row__body">
+      <span class="row__meta">64.0 pts left on the bench this season</span>
+      <div class="dot__track"><div class="dot__line"></div><div class="dot__avg" style="left: 51.5%;"></div><div class="dot__pt" style="left: 52%;"></div></div>
+    </div>
+  </div>
+  <div class="row">
+    <div class="row__top"><span class="row__rank">7</span><span class="row__name">Nacho Average Team</span><span class="row__val">88.2</span></div>
+    <div class="row__body">
+      <span class="row__meta">83.4 pts left on the bench this season</span>
+      <div class="dot__track"><div class="dot__line"></div><div class="dot__avg" style="left: 51.5%;"></div><div class="dot__pt" style="left: 41%;"></div></div>
+    </div>
+  </div>
+  <div class="row">
+    <div class="row__top"><span class="row__rank">8</span><span class="row__name">Pardon My Punt</span><span class="row__val">87.5</span></div>
+    <div class="row__body">
+      <span class="row__meta">84.0 pts left on the bench this season</span>
+      <div class="dot__track"><div class="dot__line"></div><div class="dot__avg" style="left: 51.5%;"></div><div class="dot__pt" style="left: 37.5%;"></div></div>
+    </div>
+  </div>
+  <div class="row">
+    <div class="row__top"><span class="row__rank">9</span><span class="row__name">Kelce Grammer</span><span class="row__val">85.9</span></div>
+    <div class="row__body">
+      <span class="row__meta">91.9 pts left on the bench this season</span>
+      <div class="dot__track"><div class="dot__line"></div><div class="dot__avg" style="left: 51.5%;"></div><div class="dot__pt" style="left: 29.5%;"></div></div>
+    </div>
+  </div>
+  <div class="row">
+    <div class="row__top"><span class="row__rank">10</span><span class="row__name">Sunday Scaries</span><span class="row__val">82.3</span></div>
+    <div class="row__body">
+      <span class="row__meta">108.9 pts left on the bench this season</span>
+      <div class="dot__track"><div class="dot__line"></div><div class="dot__avg" style="left: 51.5%;"></div><div class="dot__pt" style="left: 11.5%;"></div></div>
+    </div>
+  </div>
+
+  <div style="display: flex; justify-content: space-between; margin-top: 6px; padding-left: 24px;">
+    <span style="font-size: 10px; color: #928a7d;">80%</span>
+    <span style="font-size: 10px; color: #928a7d;">rule marks the league average, 90.3%</span>
+    <span style="font-size: 10px; color: #928a7d;">100%</span>
+  </div>
+
+  <p style="margin: 12px 0 0; font-size: 12px; color: #5d574e;">Sunday Scaries has left 108.9 points on the bench — more than a full week of scoring.</p>
+</div>
+</x-dc>
+</body>
+</html>

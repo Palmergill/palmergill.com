@@ -67,6 +67,7 @@ LEAGUE_ROUTES = (
     "/api/fantasy/league/overview",
     "/api/fantasy/league/standings",
     "/api/fantasy/league/power-rankings",
+    "/api/fantasy/league/ledger",
     "/api/fantasy/league/scoreboard",
     "/api/fantasy/league/teams/1",
     "/api/fantasy/league/teams/1/roster",
@@ -284,6 +285,66 @@ def test_power_rankings_default_to_composite_latest_week(seeded_db):
     assert body["available_weeks"] == [1, 2]
     assert [row["rank"] for row in body["rankings"]] == [1, 2]
     assert body["rankings"][0]["history"]
+
+
+def test_ledger_joins_every_derived_column_onto_each_team(seeded_db):
+    body = member_client().get("/api/fantasy/league/ledger?season=2024").json()
+
+    assert len(body["teams"]) == 2
+    row = body["teams"][0]
+    assert {
+        "all_play",
+        "expected_wins",
+        "luck",
+        "scoring",
+        "playoff",
+        "power",
+        "lineup",
+        "weekly_scores",
+    } <= set(row)
+    # Two teams, two weeks: one all-play game apiece per week.
+    assert row["all_play"]["games"] == 2
+    assert row["power"]["rank"] in (1, 2)
+    assert len(row["weekly_scores"]) == 2
+
+
+def test_ledger_luck_balances_across_the_league(seeded_db):
+    body = member_client().get("/api/fantasy/league/ledger?season=2024").json()
+    assert sum(row["luck"] for row in body["teams"]) == pytest.approx(0.0, abs=1e-9)
+
+
+def test_ledger_opens_in_standings_order(seeded_db):
+    body = member_client().get("/api/fantasy/league/ledger?season=2024").json()
+    percentages = [row["win_pct"] for row in body["teams"]]
+    assert percentages == sorted(percentages, reverse=True)
+
+
+def test_ledger_says_why_manager_rating_is_unavailable(seeded_db):
+    """No stored actuals means no rating — and the reason travels with it.
+
+    A blank column that never explains itself is the failure mode here: the
+    metric is only as good as the weeks it could score, so an empty one has
+    to say whether that is missing snapshots, missing settings or missing
+    stats.
+    """
+    body = member_client().get("/api/fantasy/league/ledger?season=2024").json()
+    rating = body["manager_rating"]
+
+    assert rating["available"] is False
+    assert rating["reason"] in {
+        "no_lineup_settings",
+        "no_roster_snapshots",
+        "no_actuals",
+        "no_scorable_weeks",
+    }
+    assert all(row["lineup"]["efficiency"] is None for row in body["teams"])
+
+
+def test_ledger_rejects_an_unknown_algorithm(seeded_db):
+    response = member_client().get(
+        "/api/fantasy/league/ledger?season=2024&algorithm=vibes"
+    )
+    assert response.status_code == 422
 
 
 def test_power_rankings_reject_an_unknown_algorithm(seeded_db):

@@ -1,0 +1,334 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&display=swap">
+  <style>
+    body {
+      margin: 0;
+      background: #faf6f0;
+      color: #23201c;
+      font-family: "Plus Jakarta Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+    }
+    a { color: #5b7152; text-decoration: none; }
+    a:hover { color: #4c6044; }
+    .display { font-family: "Newsreader", Georgia, "Times New Roman", serif; font-weight: 500; letter-spacing: -0.015em; }
+    .kicker { font-size: 10px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #928a7d; }
+    .num { font-variant-numeric: tabular-nums; }
+    .meter { height: 7px; background: #f3eee4; border-radius: 2px; overflow: hidden; }
+    .meter__fill { height: 100%; background: #5b7152; border-radius: 0 4px 4px 0; }
+
+    /* 44px minimum touch target on every control */
+    .tap {
+      display: inline-flex; align-items: center; min-height: 44px;
+      padding: 0 14px; border-radius: 999px; border: 1px solid #d8cdba;
+      background: #ffffff; color: #5d574e; font-size: 13px; font-weight: 600;
+      white-space: nowrap;
+    }
+    .tap--on { background: #23201c; border-color: #23201c; color: #ffffff; }
+    .tap--off { opacity: 0.45; text-decoration: line-through; }
+
+    .row { padding: 10px 0; border-bottom: 1px solid #ece4d8; }
+    .row:last-child { border-bottom: none; }
+    .row__top { display: flex; align-items: baseline; gap: 8px; }
+    .row__rank { width: 16px; font-size: 12px; font-weight: 700; color: #928a7d; font-variant-numeric: tabular-nums; }
+    .row__name { flex: 1 1 auto; font-size: 14px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .row__val { font-size: 15px; font-weight: 800; font-variant-numeric: tabular-nums; }
+    .row__body { padding-left: 24px; margin-top: 3px; }
+    .row__meta { font-size: 11px; color: #928a7d; }
+
+    .dv__track { position: relative; height: 14px; margin-top: 5px; }
+    .dv__zero { position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: #d8cdba; }
+    .dv__bar { position: absolute; top: 1px; height: 12px; }
+
+    .fix { padding: 11px 0; border-bottom: 1px solid #ece4d8; }
+    .fix:last-child { border-bottom: none; }
+    .fix__side { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; padding: 2px 0; font-size: 14px; }
+  </style>
+</helmet>
+
+<div style="width: 390px; background: #faf6f0;">
+
+  <!-- site nav -->
+  <div style="display: flex; align-items: center; justify-content: space-between; height: 52px; padding: 0 18px; background: rgba(250, 246, 240, 0.92); border-bottom: 1px solid #ece4d8;">
+    <div style="display: flex; align-items: center; gap: 9px;">
+      <div style="width: 20px; height: 20px; border-radius: 5px; background: #5b7152;"></div>
+      <span style="font-size: 14px; font-weight: 700;">Palmer Gill</span>
+    </div>
+    <div style="display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; margin-right: -10px;">
+      <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="#5d574e" stroke-width="1.8" stroke-linecap="round">
+        <line x1="3" y1="6" x2="17" y2="6"></line>
+        <line x1="3" y1="10" x2="17" y2="10"></line>
+        <line x1="3" y1="14" x2="17" y2="14"></line>
+      </svg>
+    </div>
+  </div>
+
+  <div style="padding: 16px 20px 48px;">
+
+    <!-- fantasy strip -->
+    <div style="padding-bottom: 12px; border-bottom: 1px solid #ece4d8; margin-bottom: 18px;">
+      <span style="display: block; font-size: 13px; font-weight: 700; color: #b86f52; margin-bottom: 8px;">← Fantasy</span>
+      <div style="display: flex; gap: 6px;">
+        <span style="padding: 7px 11px; border-radius: 999px; font-size: 12px; font-weight: 600; color: #928a7d;">My Rankings</span>
+        <span style="padding: 7px 11px; border-radius: 999px; background: #f3eee5; font-size: 12px; font-weight: 600; color: #2f4a37;">League Hub</span>
+        <span style="padding: 7px 11px; border-radius: 999px; font-size: 12px; font-weight: 600; color: #928a7d;">Fourth &amp; Fortune</span>
+      </div>
+    </div>
+
+    <!-- masthead -->
+    <span class="kicker">Private league · ESPN</span>
+    <h1 class="display" style="margin: 4px 0 10px; font-size: 38px; line-height: 1;">Sunday Money</h1>
+    <div style="display: flex; align-items: baseline; gap: 14px; padding-bottom: 12px; border-bottom: 2px solid #23201c; font-size: 12px; color: #5d574e;">
+      <span class="num" style="font-weight: 700; color: #23201c;">2026</span>
+      <span>Through Week 5</span>
+      <span>Half PPR</span>
+    </div>
+
+    <!-- seasons -->
+    <div style="display: flex; align-items: center; gap: 8px; padding: 12px 0 18px; overflow: hidden;">
+      <span class="tap tap--on">2026</span>
+      <span class="tap">2025</span>
+      <span class="tap">2024</span>
+      <span class="tap tap--off">2023</span>
+    </div>
+
+    <!-- your team -->
+    <div style="padding: 16px 0 18px; border-top: 2px solid #23201c; border-bottom: 1px solid #d8cdba;">
+      <span class="kicker">Your team</span>
+      <h2 class="display" style="margin: 3px 0 2px; font-size: 26px; font-weight: 600; line-height: 1.1;">Hurts So Good</h2>
+      <span style="display: block; font-size: 12px; color: #928a7d;">4-1 · 2nd · 32-13 all-play · 91% playoff odds</span>
+
+      <div style="margin-top: 14px; padding-top: 14px; border-top: 1px solid #ece4d8;">
+        <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 10px;">
+          <div style="display: flex; flex-direction: column;">
+            <span class="kicker">Week 6, live</span>
+            <span style="font-size: 13px; font-weight: 700; margin-top: 2px;">vs Gibbs Me More</span>
+          </div>
+          <div style="display: flex; align-items: baseline; gap: 6px;">
+            <span class="num" style="font-size: 26px; font-weight: 800; letter-spacing: -0.02em; color: #2f4a37;">118.9</span>
+            <span class="num" style="font-size: 15px; font-weight: 600; color: #928a7d;">– 104.6</span>
+          </div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 9px; margin-top: 9px;">
+          <div class="meter" style="flex: 1 1 auto;"><div class="meter__fill" style="width: 71%; background: #5a7794;"></div></div>
+          <span class="num" style="font-size: 12px; font-weight: 700; color: #5a7794;">71%</span>
+        </div>
+        <span style="display: block; margin-top: 5px; font-size: 11px; color: #928a7d;">6 of your 9 still to play</span>
+      </div>
+
+      <div style="margin-top: 14px; padding-top: 14px; border-top: 1px solid #ece4d8;">
+        <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 10px;">
+          <span class="kicker">Start / sit</span>
+          <span style="font-size: 11px; color: #928a7d;">Locks 1:00 PM ET</span>
+        </div>
+        <div style="display: flex; align-items: baseline; gap: 9px; margin-top: 6px;">
+          <span class="num" style="font-size: 30px; font-weight: 800; letter-spacing: -0.025em; line-height: 1; color: #3f6d4a;">+9.1</span>
+          <span style="font-size: 13px; font-weight: 700;">points on your bench</span>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 7px; margin-top: 10px;">
+          <div style="display: flex; align-items: baseline; gap: 9px; font-size: 13px;">
+            <span style="min-width: 34px; font-size: 10px; font-weight: 700; letter-spacing: 0.05em; color: #928a7d;">FLEX</span>
+            <span style="flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"><span style="color: #3f6d4a; font-weight: 700;">Odunze</span> <span style="color: #928a7d;">for</span> <span style="color: #8c3a1f;">Charbonnet</span></span>
+            <span class="num" style="font-weight: 700; color: #3f6d4a;">+5.6</span>
+          </div>
+          <div style="display: flex; align-items: baseline; gap: 9px; font-size: 13px;">
+            <span style="min-width: 34px; font-size: 10px; font-weight: 700; letter-spacing: 0.05em; color: #928a7d;">TE</span>
+            <span style="flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"><span style="color: #3f6d4a; font-weight: 700;">Loveland</span> <span style="color: #928a7d;">for</span> <span style="color: #8c3a1f;">Otton</span></span>
+            <span class="num" style="font-weight: 700; color: #3f6d4a;">+3.5</span>
+          </div>
+        </div>
+        <div style="display: flex; align-items: center; justify-content: center; min-height: 48px; margin-top: 14px; border-radius: 12px; background: #5b7152; color: #ffffff; font-size: 15px; font-weight: 700;">Open your roster</div>
+      </div>
+    </div>
+
+    <!-- the table: one column at a time -->
+    <div style="padding-top: 22px;">
+      <h2 class="display" style="margin: 0; font-size: 24px;">The table</h2>
+      <p style="margin: 3px 0 0; font-size: 12px; color: #928a7d;">Ten teams, one measure at a time. Swipe the row to change what the column shows.</p>
+
+      <!-- column chooser: the desktop's power-method switcher, promoted to govern the whole column -->
+      <div style="display: flex; gap: 7px; margin: 12px -20px 0; padding: 0 20px; overflow: hidden;">
+        <span class="tap" style="min-height: 40px;">Record</span>
+        <span class="tap" style="min-height: 40px;">All-play</span>
+        <span class="tap tap--on" style="min-height: 40px;">Luck</span>
+        <span class="tap" style="min-height: 40px;">Lineup</span>
+        <span class="tap" style="min-height: 40px;">Pow</span>
+      </div>
+
+      <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-top: 16px; padding-bottom: 7px; border-bottom: 1px solid #23201c;">
+        <span class="kicker">Luck · wins minus expected</span>
+        <span class="kicker">W − xW</span>
+      </div>
+
+      <div class="row">
+        <div class="row__top"><span class="row__rank">1</span><span class="row__name">Bijan Mustard</span><span class="row__val" style="color: #5a7794;">+1.0</span></div>
+        <div class="row__body">
+          <span class="row__meta">5-0 · 36-9 all-play · 4.0 expected</span>
+          <div class="dv__track"><div class="dv__zero"></div><div class="dv__bar" style="left: 50%; width: 46%; background: #5a7794; border-radius: 0 4px 4px 0;"></div></div>
+        </div>
+      </div>
+      <div class="row" style="background: #f7f4ec; margin: 0 -12px; padding: 10px 12px; border-radius: 10px;">
+        <div class="row__top"><span class="row__rank">2</span><span class="row__name">Hurts So Good <span style="font-weight: 400; color: #928a7d; font-size: 11px;">you</span></span><span class="row__val" style="color: #5a7794;">+0.4</span></div>
+        <div class="row__body">
+          <span class="row__meta">4-1 · 32-13 all-play · 3.6 expected</span>
+          <div class="dv__track"><div class="dv__zero"></div><div class="dv__bar" style="left: 50%; width: 18.4%; background: #5a7794; border-radius: 0 4px 4px 0;"></div></div>
+        </div>
+      </div>
+      <div class="row">
+        <div class="row__top"><span class="row__rank">3</span><span class="row__name">Ctrl+Alt+Defeat</span><span class="row__val" style="color: #b96a4b;">−0.2</span></div>
+        <div class="row__body">
+          <span class="row__meta">3-2 · 29-16 all-play · 3.2 expected</span>
+          <div class="dv__track"><div class="dv__zero"></div><div class="dv__bar" style="right: 50%; width: 9.2%; background: #b96a4b; border-radius: 4px 0 0 4px;"></div></div>
+        </div>
+      </div>
+      <div class="row">
+        <div class="row__top"><span class="row__rank">4</span><span class="row__name">Nacho Average Team</span><span class="row__val" style="color: #928a7d;">0.0</span></div>
+        <div class="row__body">
+          <span class="row__meta">3-2 · 27-18 all-play · 3.0 expected</span>
+          <div class="dv__track"><div class="dv__zero"></div></div>
+        </div>
+      </div>
+      <div class="row">
+        <div class="row__top"><span class="row__rank">5</span><span class="row__name">Chubb Rock</span><span class="row__val" style="color: #5a7794;">+0.3</span></div>
+        <div class="row__body">
+          <span class="row__meta">3-2 · 24-21 all-play · 2.7 expected</span>
+          <div class="dv__track"><div class="dv__zero"></div><div class="dv__bar" style="left: 50%; width: 13.8%; background: #5a7794; border-radius: 0 4px 4px 0;"></div></div>
+        </div>
+      </div>
+      <div class="row">
+        <div class="row__top"><span class="row__rank">6</span><span class="row__name">Blitz Almighty</span><span class="row__val" style="color: #b96a4b;">−0.4</span></div>
+        <div class="row__body">
+          <span class="row__meta">2-3 · 22-23 all-play · 2.4 expected</span>
+          <div class="dv__track"><div class="dv__zero"></div><div class="dv__bar" style="right: 50%; width: 18.4%; background: #b96a4b; border-radius: 4px 0 0 4px;"></div></div>
+        </div>
+      </div>
+      <div class="row">
+        <div class="row__top"><span class="row__rank">7</span><span class="row__name">Pardon My Punt</span><span class="row__val" style="color: #b96a4b;">−0.1</span></div>
+        <div class="row__body">
+          <span class="row__meta">2-3 · 19-26 all-play · 2.1 expected</span>
+          <div class="dv__track"><div class="dv__zero"></div><div class="dv__bar" style="right: 50%; width: 4.6%; background: #b96a4b; border-radius: 4px 0 0 4px;"></div></div>
+        </div>
+      </div>
+      <div class="row">
+        <div class="row__top"><span class="row__rank">8</span><span class="row__name">Gibbs Me More</span><span class="row__val" style="color: #5a7794;">+0.1</span></div>
+        <div class="row__body">
+          <span class="row__meta">2-3 · 17-28 all-play · 1.9 expected</span>
+          <div class="dv__track"><div class="dv__zero"></div><div class="dv__bar" style="left: 50%; width: 4.6%; background: #5a7794; border-radius: 0 4px 4px 0;"></div></div>
+        </div>
+      </div>
+      <div class="row">
+        <div class="row__top"><span class="row__rank">9</span><span class="row__name">Kelce Grammer</span><span class="row__val" style="color: #b96a4b;">−0.3</span></div>
+        <div class="row__body">
+          <span class="row__meta">1-4 · 12-33 all-play · 1.3 expected</span>
+          <div class="dv__track"><div class="dv__zero"></div><div class="dv__bar" style="right: 50%; width: 13.8%; background: #b96a4b; border-radius: 4px 0 0 4px;"></div></div>
+        </div>
+      </div>
+      <div class="row">
+        <div class="row__top"><span class="row__rank">10</span><span class="row__name">Sunday Scaries</span><span class="row__val" style="color: #b96a4b;">−0.8</span></div>
+        <div class="row__body">
+          <span class="row__meta">0-5 · 7-38 all-play · 0.8 expected</span>
+          <div class="dv__track"><div class="dv__zero"></div><div class="dv__bar" style="right: 50%; width: 36.8%; background: #b96a4b; border-radius: 4px 0 0 4px;"></div></div>
+        </div>
+      </div>
+
+      <p style="margin: 12px 0 0; font-size: 12px; color: #5d574e;">Bijan Mustard is 5-0 and has been the league's luckiest team. Four of those five were coin flips.</p>
+    </div>
+
+    <!-- draft, aging -->
+    <div style="margin-top: 30px; padding-top: 22px; border-top: 1px solid #d8cdba;">
+      <h2 class="display" style="margin: 0; font-size: 22px;">How the draft is aging</h2>
+      <p style="margin: 3px 0 14px; font-size: 12px; color: #928a7d;">Points scored against the pace the draft grade implied.</p>
+
+      <div style="display: grid; grid-template-columns: 116px minmax(0, 1fr) 50px; align-items: center; gap: 9px; padding: 6px 0;">
+        <span style="font-size: 12px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Ctrl+Alt+Defeat <span style="color: #928a7d; font-weight: 400;">C+</span></span>
+        <div class="dv__track" style="margin-top: 0;"><div class="dv__zero"></div><div class="dv__bar" style="left: 50%; width: 46%; background: #5a7794; border-radius: 0 4px 4px 0;"></div></div>
+        <span class="num" style="font-size: 12px; font-weight: 700; text-align: right; color: #5a7794;">+82.4</span>
+      </div>
+      <div style="display: grid; grid-template-columns: 116px minmax(0, 1fr) 50px; align-items: center; gap: 9px; padding: 6px 0;">
+        <span style="font-size: 12px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Gibbs Me More <span style="color: #928a7d; font-weight: 400;">B−</span></span>
+        <div class="dv__track" style="margin-top: 0;"><div class="dv__zero"></div><div class="dv__bar" style="left: 50%; width: 19%; background: #5a7794; border-radius: 0 4px 4px 0;"></div></div>
+        <span class="num" style="font-size: 12px; font-weight: 700; text-align: right; color: #5a7794;">+34.1</span>
+      </div>
+      <div style="display: grid; grid-template-columns: 116px minmax(0, 1fr) 50px; align-items: center; gap: 9px; padding: 6px 0;">
+        <span style="font-size: 12px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Bijan Mustard <span style="color: #928a7d; font-weight: 400;">A−</span></span>
+        <div class="dv__track" style="margin-top: 0;"><div class="dv__zero"></div><div class="dv__bar" style="left: 50%; width: 10.6%; background: #5a7794; border-radius: 0 4px 4px 0;"></div></div>
+        <span class="num" style="font-size: 12px; font-weight: 700; text-align: right; color: #5a7794;">+18.9</span>
+      </div>
+      <div style="display: grid; grid-template-columns: 116px minmax(0, 1fr) 50px; align-items: center; gap: 9px; padding: 6px 0;">
+        <span style="font-size: 12px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Hurts So Good <span style="color: #928a7d; font-weight: 400;">B+</span></span>
+        <div class="dv__track" style="margin-top: 0;"><div class="dv__zero"></div><div class="dv__bar" style="right: 50%; width: 2.6%; background: #b96a4b; border-radius: 4px 0 0 4px;"></div></div>
+        <span class="num" style="font-size: 12px; font-weight: 700; text-align: right; color: #b96a4b;">−4.7</span>
+      </div>
+      <div style="display: grid; grid-template-columns: 116px minmax(0, 1fr) 50px; align-items: center; gap: 9px; padding: 6px 0;">
+        <span style="font-size: 12px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Kelce Grammer <span style="color: #928a7d; font-weight: 400;">B−</span></span>
+        <div class="dv__track" style="margin-top: 0;"><div class="dv__zero"></div><div class="dv__bar" style="right: 50%; width: 23%; background: #b96a4b; border-radius: 4px 0 0 4px;"></div></div>
+        <span class="num" style="font-size: 12px; font-weight: 700; text-align: right; color: #b96a4b;">−41.2</span>
+      </div>
+      <div style="display: grid; grid-template-columns: 116px minmax(0, 1fr) 50px; align-items: center; gap: 9px; padding: 6px 0;">
+        <span style="font-size: 12px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Sunday Scaries <span style="color: #928a7d; font-weight: 400;">A−</span></span>
+        <div class="dv__track" style="margin-top: 0;"><div class="dv__zero"></div><div class="dv__bar" style="right: 50%; width: 34.7%; background: #b96a4b; border-radius: 4px 0 0 4px;"></div></div>
+        <span class="num" style="font-size: 12px; font-weight: 700; text-align: right; color: #b96a4b;">−62.1</span>
+      </div>
+      <div style="display: flex; align-items: center; justify-content: center; min-height: 44px; margin-top: 8px; border: 1px solid #d8cdba; border-radius: 12px; font-size: 13px; font-weight: 700; color: #5d574e;">Show all ten</div>
+    </div>
+
+    <!-- week 6 -->
+    <div style="margin-top: 30px; padding-top: 22px; border-top: 1px solid #d8cdba;">
+      <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding-bottom: 9px; border-bottom: 1px solid #23201c;">
+        <h2 class="display" style="margin: 0; font-size: 22px;">Week 6, live</h2>
+        <span style="font-size: 12px; color: #928a7d;">2 of 5 final</span>
+      </div>
+
+      <div class="fix">
+        <div class="fix__side"><span style="font-weight: 700; color: #5b7152;">Ctrl+Alt+Defeat</span><span class="num" style="font-weight: 700; color: #5b7152;">131.7</span></div>
+        <div class="fix__side"><span style="color: #5d574e;">Sunday Scaries</span><span class="num" style="color: #5d574e;">88.1</span></div>
+        <span style="display: block; margin-top: 4px; font-size: 11px; color: #928a7d;">Final</span>
+      </div>
+      <div class="fix">
+        <div class="fix__side"><span style="font-weight: 700; color: #5b7152;">Bijan Mustard</span><span class="num" style="font-weight: 700; color: #5b7152;">128.4</span></div>
+        <div class="fix__side"><span style="color: #5d574e;">Kelce Grammer</span><span class="num" style="color: #5d574e;">96.2</span></div>
+        <span style="display: block; margin-top: 4px; font-size: 11px; color: #928a7d;">Final</span>
+      </div>
+      <div class="fix">
+        <div class="fix__side"><span style="font-weight: 700;">Hurts So Good</span><span class="num" style="font-weight: 700;">118.9</span></div>
+        <div class="fix__side"><span style="color: #5d574e;">Gibbs Me More</span><span class="num" style="color: #5d574e;">104.6</span></div>
+        <span style="display: block; margin-top: 4px; font-size: 11px; color: #5a7794; font-weight: 700;">71% to win · 6 still to play</span>
+      </div>
+      <div class="fix">
+        <div class="fix__side"><span style="font-weight: 700;">Nacho Average Team</span><span class="num" style="font-weight: 700;">104.9</span></div>
+        <div class="fix__side"><span style="color: #5d574e;">Blitz Almighty</span><span class="num" style="color: #5d574e;">99.3</span></div>
+        <span style="display: block; margin-top: 4px; font-size: 11px; color: #5a7794; font-weight: 700;">58% to win · 7 still to play</span>
+      </div>
+      <div class="fix">
+        <div class="fix__side"><span style="font-weight: 700;">Chubb Rock</span><span class="num" style="font-weight: 700;">88.5</span></div>
+        <div class="fix__side"><span style="color: #5d574e;">Pardon My Punt</span><span class="num" style="color: #5d574e;">86.1</span></div>
+        <span style="display: block; margin-top: 4px; font-size: 11px; color: #5a7794; font-weight: 700;">52% to win · 9 still to play</span>
+      </div>
+    </div>
+
+    <!-- ask -->
+    <div style="margin-top: 30px; padding-top: 22px; border-top: 1px solid #d8cdba;">
+      <h2 class="display" style="margin: 0 0 12px; font-size: 22px;">Ask the league</h2>
+      <div style="display: flex; align-items: center; gap: 10px; min-height: 48px; padding: 0 6px 0 14px; border: 1px solid #d8cdba; border-radius: 14px; background: #ffffff;">
+        <span style="flex: 1 1 auto; font-size: 14px; color: #928a7d;">Am I good, or just lucky?</span>
+        <span style="display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; border-radius: 999px; background: #5b7152; color: #ffffff; font-size: 15px; font-weight: 700;">↑</span>
+      </div>
+      <div style="display: flex; gap: 7px; margin: 10px -20px 0; padding: 0 20px; overflow: hidden;">
+        <span class="tap" style="min-height: 40px;">Explain my luck index</span>
+        <span class="tap" style="min-height: 40px;">Hardest schedule</span>
+      </div>
+      <p style="margin: 12px 0 0; font-size: 11px; color: #928a7d;">Answers use only data this site has collected.</p>
+    </div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

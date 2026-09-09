@@ -14,7 +14,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/shared/site-nav.css?v=14">
     <link rel="stylesheet" href="/shared/fantasy-header.css?v=1">
-    <link rel="stylesheet" href="style.css?v=7">
+    <link rel="stylesheet" href="style.css?v=8">
 </head>
 <body>
 <noscript>
@@ -127,30 +127,44 @@
                         <a class="my-team__name" id="myTeamName" href="/fantasy/league/"></a>
                         <span class="my-team__meta" id="myTeamMeta"></span>
                     </div>
-                    <a class="my-team__advice" id="myTeamAdvice" href="/fantasy/league/" hidden></a>
+                    <div class="my-team__advice-block">
+                        <a class="my-team__advice" id="myTeamAdvice" href="/fantasy/league/" hidden></a>
+                        <ul class="my-team__moves" id="myTeamMoves"></ul>
+                    </div>
                 </section>
 
-                <section class="board" data-board="standings" aria-labelledby="standingsTitle">
+                <!-- Standings, power rankings and rosters used to be three
+                     lists of the same ten teams. One table now, with a column
+                     that changes — which is also what lets it survive a phone,
+                     where the chosen column brings its chart into the row. -->
+                <section class="board" data-board="ledger" aria-labelledby="ledgerTitle">
                     <div class="board__head">
-                        <h2 id="standingsTitle">Standings</h2>
-                        <span class="board__note" id="standingsNote"></span>
+                        <div>
+                            <h2 id="ledgerTitle">The table</h2>
+                            <p class="board__lede">
+                                All-play is your record against every team, every week.
+                                Luck is wins minus expected wins.
+                            </p>
+                        </div>
+                        <span class="board__note" id="ledgerNote"></span>
                     </div>
-                    <div id="standings" class="standings"></div>
-                </section>
-
-                <section class="board" data-board="power" aria-labelledby="powerTitle">
-                    <div class="board__head">
-                        <h2 id="powerTitle">Power rankings</h2>
-                        <span class="board__note" id="powerNote"></span>
-                    </div>
-                    <div class="controls">
-                        <div class="chip-row" id="algorithmChips" role="group" aria-label="Ranking method"></div>
+                    <div class="controls controls--ledger">
+                        <div class="chip-row chip-row--scroll" id="ledgerColumns" role="group" aria-label="Sort and column"></div>
                         <label class="select-field">
-                            <span class="sr-only">Week</span>
-                            <select id="powerWeek"></select>
+                            <span class="sr-only">Power ranking method</span>
+                            <select id="powerAlgorithm"></select>
                         </label>
                     </div>
-                    <div id="powerRankings" class="power"></div>
+                    <div id="ledger" class="ledger"></div>
+                    <p class="ledger__note" id="ledgerFootnote"></p>
+                </section>
+
+                <section class="board" data-board="charts" aria-labelledby="chartsTitle" hidden>
+                    <div class="board__head">
+                        <h2 id="chartsTitle">Reading the season</h2>
+                        <span class="board__note" id="chartsNote"></span>
+                    </div>
+                    <div id="charts" class="charts"></div>
                 </section>
 
                 <section class="board" data-board="scoreboard" aria-labelledby="scoreboardTitle">
@@ -174,6 +188,8 @@
                     <ol class="free-agents" id="freeAgents"></ol>
                 </section>
 
+                <!-- Kept for the preseason, when the ledger's derived columns
+                     are all empty and this grid is the only way into a team. -->
                 <section class="board" data-board="teams" aria-labelledby="teamsTitle">
                     <div class="board__head">
                         <h2 id="teamsTitle">Teams</h2>
@@ -209,8 +225,8 @@
     <script>window.FantasyHeader.mount({ page: "league" });</script>
     <script src="/shared/analytics.js?v=1"></script>
     <script src="/shared/api-base.js?v=1"></script>
-    <script src="format.js?v=2"></script>
+    <script src="format.js?v=3"></script>
     <script src="/fantasy/chat.js?v=1"></script>
-    <script src="app.js?v=6"></script>
+    <script src="app.js?v=7"></script>
 </body>
 </html>

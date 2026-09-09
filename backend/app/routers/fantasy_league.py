@@ -145,6 +145,27 @@ def power_rankings(
         raise HTTPException(status_code=404, detail=str(exc))
 
 
+@router.get("/ledger")
+def ledger(
+    season: Optional[int] = None,
+    algorithm: str = Query("composite", pattern="^[a-z_]+$"),
+    _: Dict[str, Any] = Depends(require_member),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """Every team once, with every derived column joined on."""
+    if algorithm not in ALGORITHMS:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Unknown algorithm '{algorithm}'. Valid: {', '.join(ALGORITHMS)}",
+        )
+    try:
+        return fantasy_league_data.get_league_ledger(
+            db, season=season, algorithm=algorithm
+        )
+    except UnknownSeasonError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+
+
 @router.get("/scoreboard")
 def scoreboard(
     season: Optional[int] = None,

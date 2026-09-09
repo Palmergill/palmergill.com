@@ -263,22 +263,9 @@ button:focus-visible {
 .is-preseason [data-board="standings"] { order: 3; }
 .is-preseason [data-board="power"] { order: 4; }
 
-/* ── standings ────────────────────────────────────────────────────── */
+/* ── the ledger table ──────────────────────────────────────────────── */
 
-.standings__division {
-    margin: 18px 0 8px;
-    font-size: 13px;
-    font-weight: 600;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    color: var(--muted, #928a7d);
-}
-
-.standings__division:first-child { margin-top: 0; }
-
-/* The table is the widest thing on the page; let it scroll inside its own
-   box so the page body never scrolls sideways on a phone. */
-.standings { overflow-x: auto; }
+.ledger { overflow-x: auto; }
 
 .rank-table {
     width: 100%;
@@ -331,7 +318,7 @@ button:focus-visible {
 .team-cell__text { display: flex; flex-direction: column; }
 
 .team-cell__name,
-.power-row__name,
+.ledger__team-name,
 .matchup__name {
     padding: 0;
     border: 0;
@@ -344,57 +331,12 @@ button:focus-visible {
 }
 
 .team-cell__name:hover,
-.power-row__name:hover,
+.ledger__team-name:hover,
 .matchup__name:hover { color: var(--sage, #5b7152); }
 
 .team-cell__owner {
     font-size: 12px;
     color: var(--muted, #928a7d);
-}
-
-/* ── power rankings ───────────────────────────────────────────────── */
-
-.power-row {
-    display: grid;
-    grid-template-columns: 28px 44px minmax(0, 1fr) 120px 72px;
-    align-items: center;
-    gap: 12px;
-    padding: 10px 4px;
-    border-bottom: 1px solid var(--line, #ece4d8);
-}
-
-.power-row:last-child { border-bottom: none; }
-
-.power-row__rank {
-    font-size: 17px;
-    font-weight: 700;
-    color: var(--muted, #928a7d);
-}
-
-.power-row__move { font-size: 12px; font-weight: 600; }
-.power-row__move--up { color: var(--sage, #5b7152); }
-.power-row__move--down { color: var(--clay, #b96a4b); }
-.power-row__move--flat,
-.power-row__move--none { color: var(--muted, #928a7d); }
-
-.power-row__main { display: flex; flex-direction: column; min-width: 0; }
-
-.power-row__meta {
-    font-size: 12px;
-    color: var(--muted, #928a7d);
-}
-
-.power-bar {
-    height: 8px;
-    border-radius: 999px;
-    background: var(--surface, #f3eee4);
-    overflow: hidden;
-}
-
-.power-bar__fill {
-    height: 100%;
-    border-radius: 999px;
-    background: var(--sage, #5b7152);
 }
 
 .spark { width: 72px; height: 22px; }
@@ -1078,12 +1020,6 @@ button:focus-visible {
     .team-power { align-items: flex-start; }
     .team-overview__head { align-items: flex-start; flex-direction: column; }
 
-    /* Drop the sparkline and bar first — the rank, movement and name are
-       what matter on a small screen. */
-    .power-row { grid-template-columns: 24px 40px minmax(0, 1fr); }
-    .power-row .power-bar,
-    .power-row .spark { display: none; }
-
     .result { grid-template-columns: 44px 26px minmax(0, 1fr); }
     .result__opponent { display: none; }
 }
@@ -1107,3 +1043,375 @@ button:focus-visible {
 }
 
 .league-link:hover { text-decoration: underline; }
+
+/* ── the ledger: one table, one switchable column ──────────────────── */
+
+.board__lede {
+    margin: 4px 0 0;
+    font-size: 13px;
+    color: var(--muted, #928a7d);
+    max-width: 62ch;
+}
+
+.board__head > div { min-width: 0; }
+
+.controls--ledger { align-items: center; }
+
+/* The chooser is the only control on a phone, so it scrolls rather than
+   wrapping into three rows of chips above the table. */
+.chip-row--scroll {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+    padding-bottom: 2px;
+    -webkit-overflow-scrolling: touch;
+}
+
+.chip-row--scroll::-webkit-scrollbar { display: none; }
+.chip-row--scroll .chip { flex: 0 0 auto; }
+
+.ledger-table { min-width: 860px; }
+
+.ledger-table th[data-key],
+.ledger__cell {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+.ledger-table th[data-key="team"],
+.ledger__team { text-align: left; }
+
+/* The chosen column is emphasised rather than isolated: on a wide screen
+   the others are still worth reading. */
+.ledger-table th.is-active,
+.ledger__cell.is-active {
+    background: var(--surface, #f3eee4);
+    color: var(--ink, #23201c);
+    font-weight: 700;
+}
+
+.ledger-row--mine { background: #f7f4ec; }
+.ledger-row--mine .team-cell__name { font-weight: 700; }
+
+.cell-above { color: var(--sky, #5a7794); }
+.cell-below { color: var(--clay, #b96a4b); }
+
+.ledger__move {
+    margin-left: 5px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--muted, #928a7d);
+}
+
+.ledger__move--up { color: var(--sky, #5a7794); }
+.ledger__move--down { color: var(--clay, #b96a4b); }
+
+.ledger__odds {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    min-width: 92px;
+}
+
+.ledger__odds .meter { flex: 1 1 auto; }
+.ledger__odds-value { font-weight: 700; font-size: 12px; }
+
+/* Mobile only: the chosen column's context and chart ride in the identity
+   cell, because a phone shows one column at a time. */
+.ledger__meta,
+.ledger__chart { display: none; }
+
+.ledger__note {
+    margin: 12px 0 0;
+    font-size: 12px;
+    color: var(--muted, #928a7d);
+}
+
+/* ── chart marks ───────────────────────────────────────────────────── */
+
+/* Magnitude: square at the baseline, rounded at the data end. */
+.meter {
+    height: 7px;
+    background: var(--surface, #f3eee4);
+    border-radius: 2px;
+    overflow: hidden;
+}
+
+.meter__fill {
+    height: 100%;
+    background: var(--sage, #5b7152);
+    border-radius: 0 4px 4px 0;
+}
+
+/* Polarity: which side of the zero rule the bar sits on carries the sign,
+   so the colours are a second channel and never the only one. */
+.dv {
+    position: relative;
+    height: 14px;
+    min-width: 120px;
+}
+
+.dv__zero {
+    position: absolute;
+    left: 50%;
+    top: 0;
+    bottom: 0;
+    width: 1px;
+    background: var(--line-strong, #d8cdba);
+}
+
+.dv__bar { position: absolute; top: 1px; height: 12px; }
+
+.dv__bar--positive {
+    left: 50%;
+    background: var(--sky, #5a7794);
+    border-radius: 0 4px 4px 0;
+}
+
+.dv__bar--negative {
+    right: 50%;
+    background: var(--clay, #b96a4b);
+    border-radius: 4px 0 0 4px;
+}
+
+/* Position, not length, so a window that does not start at zero stays
+   honest — which is why lineup efficiency is a dot plot and not a bar. */
+.dot {
+    position: relative;
+    height: 14px;
+    min-width: 120px;
+}
+
+.dot__line {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 6.5px;
+    height: 1px;
+    background: var(--line, #ece4d8);
+}
+
+.dot__pt {
+    position: absolute;
+    top: 2px;
+    width: 10px;
+    height: 10px;
+    margin-left: -5px;
+    border-radius: 999px;
+    background: var(--sage, #5b7152);
+    /* A ring in the surface colour keeps the dot legible where it crosses
+       the axis line. */
+    border: 2px solid var(--card, #fff);
+}
+
+.rng {
+    position: relative;
+    height: 14px;
+    min-width: 120px;
+}
+
+.rng__span {
+    position: absolute;
+    top: 4px;
+    height: 8px;
+    border-radius: 4px;
+    background: var(--sage, #5b7152);
+    opacity: 0.28;
+}
+
+.rng__med {
+    position: absolute;
+    top: 2px;
+    width: 10px;
+    height: 10px;
+    margin-left: -5px;
+    border-radius: 999px;
+    background: var(--sage, #5b7152);
+    border: 2px solid var(--card, #fff);
+}
+
+/* ── the season charts ─────────────────────────────────────────────── */
+
+.charts {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 26px;
+}
+
+.chart__title { margin: 0 0 2px; font-size: 15px; }
+
+.chart__lede {
+    margin: 0 0 12px;
+    font-size: 12px;
+    color: var(--muted, #928a7d);
+}
+
+.chart-row {
+    display: grid;
+    grid-template-columns: 104px minmax(0, 1fr) 52px;
+    align-items: center;
+    gap: 10px;
+    padding: 5px 0;
+}
+
+.chart-row--mine .chart-row__name { font-weight: 700; }
+
+.chart-row__name {
+    padding: 0;
+    border: 0;
+    background: none;
+    font: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--ink, #23201c);
+    text-align: left;
+    cursor: pointer;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.chart-row__name:hover { color: var(--sage, #5b7152); }
+.chart-row__track { min-width: 0; }
+
+.chart-row__value {
+    font-size: 12px;
+    font-weight: 700;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+.chart__axis {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 4px;
+    padding-left: 114px;
+    font-size: 10px;
+    color: var(--muted, #928a7d);
+}
+
+/* ── your team, expanded ───────────────────────────────────────────── */
+
+.my-team__advice-block {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 6px;
+}
+
+.my-team__moves {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 5px 8px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.my-team__move {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 5px;
+    padding: 3px 8px;
+    border-radius: 999px;
+    background: var(--surface, #f3eee4);
+    font-size: 12px;
+}
+
+.my-team__move-label {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--muted, #928a7d);
+}
+
+.my-team__move--start .my-team__move-label { color: #3f6d4a; }
+.my-team__move--sit .my-team__move-label { color: #8c3a1f; }
+.my-team__move-name { font-weight: 600; }
+.my-team__move-points {
+    color: var(--soft, #5d574e);
+    font-variant-numeric: tabular-nums;
+}
+
+/* ── the phone: one column at a time ───────────────────────────────── */
+
+@media (max-width: 720px) {
+    /* A ten-column table cannot survive 390px. Scrolling it sideways hides
+       exactly the comparison the table exists to make, and one card per team
+       destroys reading down a column — so the chooser governs the whole
+       right-hand column instead, and brings its chart into the row. */
+    .ledger { overflow-x: visible; }
+    .ledger-table { min-width: 0; }
+    .ledger-table thead { display: none; }
+    .ledger-table,
+    .ledger-table tbody,
+    .ledger-table tr,
+    .ledger-table td { display: block; }
+
+    .ledger-table tr {
+        display: grid;
+        grid-template-columns: 20px minmax(0, 1fr) auto;
+        align-items: baseline;
+        gap: 4px 8px;
+        padding: 10px 0;
+        border-bottom: 1px solid var(--line, #ece4d8);
+    }
+
+    .ledger-table tbody tr:last-child { border-bottom: none; }
+    .ledger-table td { border-bottom: none; padding: 0; }
+    .ledger-table td:not(.is-active):not(.ledger__team):not(.cell-seed) {
+        display: none;
+    }
+
+    .ledger__cell.is-active {
+        background: none;
+        font-size: 15px;
+        font-weight: 800;
+    }
+
+    .ledger-row--mine {
+        margin: 0 -8px;
+        padding-left: 8px;
+        padding-right: 8px;
+        border-radius: 10px;
+    }
+
+    .ledger__meta {
+        display: block;
+        margin-top: 2px;
+        font-size: 11px;
+        color: var(--muted, #928a7d);
+    }
+
+    .ledger__chart { display: block; margin-top: 5px; }
+    .ledger__chart .dv,
+    .ledger__chart .dot,
+    .ledger__chart .rng { min-width: 0; }
+
+    /* The chart is in the row now, so the standalone panels would repeat it. */
+    [data-board="charts"] { display: none; }
+
+    /* The note is a second line on a phone, not a second column: beside a
+       heading it collapses to a four-word-wide ribbon. */
+    .board__head {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 6px;
+    }
+
+    .controls--ledger { align-items: stretch; }
+    .chip-row--scroll { margin: 0 -20px; padding: 0 20px 2px; }
+
+    /* Every control clears a thumb. */
+    .chip-row--scroll .chip,
+    .controls--ledger select {
+        min-height: 44px;
+        display: inline-flex;
+        align-items: center;
+    }
+
+    .my-team__advice-block { align-items: flex-start; }
+    .my-team__moves { justify-content: flex-start; }
+}

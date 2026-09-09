@@ -1,0 +1,56 @@
+{
+  "pages": [
+    { "id": "page-1", "name": "League hub" },
+    { "id": "page-2", "name": "Not chosen" }
+  ],
+  "artboards": [
+    { "file": "Main.dc.html", "title": "Desktop", "page": "page-1", "x": 0, "y": 0, "w": 1280, "h": 2040 },
+    { "file": "Mobile.dc.html", "title": "Phone · 390", "page": "page-1", "x": 1960, "y": 0, "w": 390, "h": 2700 },
+    { "file": "MobileTable.dc.html", "title": "Phone · column chooser", "page": "page-1", "x": 2450, "y": 0, "w": 390, "h": 880 },
+    { "file": "WeekDesk.dc.html", "title": "A · Week desk", "page": "page-2", "x": 0, "y": 0, "w": 1280, "h": 1760 },
+    { "file": "FrontPage.dc.html", "title": "C · League front page", "page": "page-2", "x": 1960, "y": 0, "w": 1280, "h": 2060 }
+  ],
+  "annotations": [
+    {
+      "id": "note-b",
+      "page": "page-1",
+      "x": 1400,
+      "y": 0,
+      "w": 460,
+      "text": "THE SEASON LEDGER — chosen direction\n\nOne row per team carrying all-play record, expected wins, luck, lineup efficiency, power rank and playoff odds, with the seven ranking methods as a switchable column instead of their own board. Three charts read across the same ten teams: luck, manager rating, weekly scoring range. A strip at the foot scores the draft against what has happened since.\n\nThe band under the masthead was added when this became the deliverable. All three direction sketches had dropped it, but 'your team, first' is a decision the live hub already shipped — start/sit is the one thing on this page that asks for an action rather than reporting a fact."
+    },
+    {
+      "id": "note-mobile",
+      "page": "page-1",
+      "x": 2450,
+      "y": 1000,
+      "w": 460,
+      "text": "THE PHONE LAYOUT — the table shows one column at a time\n\nA ten-column table cannot survive 390px, and the two usual escapes both break this direction. Sideways scrolling inside the board hides exactly the comparison the table exists to make. One card per team destroys it outright — you can no longer read down a column, which is the whole job.\n\nSo the desktop's power-method switcher is promoted to govern the entire right-hand column. Pick a measure; every team shows that measure, sorted by it, with its own chart form inline: diverging bars for luck, a dot plot against the league average for manager rating, a meter for playoff odds, a sparkline for form. Reading down a column still works, which was the requirement. The second artboard is the same table with Lineup selected, so the chart form visibly changes with the column.\n\nThe three desktop chart panels therefore have no separate mobile equivalent — on a phone the table IS the chart, which also cuts about 800px of scroll.\n\nEverything else stacks conventionally. Every control clears a 44px target; the fixture list goes to two lines per game; the draft strip shows six with a disclosure. No fake status bar — the real one renders over this."
+    },
+    {
+      "id": "note-data",
+      "page": "page-1",
+      "x": 0,
+      "y": 2120,
+      "w": 1240,
+      "text": "WHAT THESE METRICS WOULD COST TO BUILD\n\nAlmost everything on this page is a reduction over tables the hub already stores, not a new data source:\n\n• All-play record, expected wins, luck index — pure reductions of ff_league_matchups. Free.\n• Manager rating / points left on bench — the P5 lineup optimiser already computes the best legal lineup; run it over stored roster snapshots against actual points. This is the metric no other fantasy site does well, and the hub is one loop away from it.\n• Weekly scoring range — stored matchups, all readable seasons.\n• Playoff odds — Monte Carlo over the remaining schedule using each team's scoring mean and spread. New computation, no new data.\n• How the draft is aging — draft grades and ADP are already stored from the Sep 2026 draft-recap work.\n\nThe one number here that needs anything new is the 71% live win probability in the band: spec 17 rules out a live scoring stream, so it updates at collector cadence unless the collector polls faster on Sundays.\n\nData shown is illustrative — team names, managers, players and scores are invented. Nothing was in the local database."
+    },
+    {
+      "id": "note-a",
+      "page": "page-2",
+      "x": 1400,
+      "y": 0,
+      "w": 460,
+      "text": "A · WEEK DESK — not chosen\n\nThe gameday console: a live win-probability curve for your matchup, players yet to play on both sides, per-game win% across the league, and gameday leaders on all ten rosters.\n\nKept for reference. If the ledger ever wants a Sunday mode, this is where that thinking is."
+    },
+    {
+      "id": "note-c",
+      "page": "page-2",
+      "x": 3360,
+      "y": 0,
+      "w": 460,
+      "text": "C · LEAGUE FRONT PAGE — not chosen\n\nThe written overview promoted to a lead story, with a playoff picture, the week's superlatives, a record book across every readable season, and your all-time head-to-head with all nine managers.\n\nKept for reference. The record book and the rivalry list are the two pieces here that would transplant into the ledger cleanly."
+    }
+  ],
+  "launch": { "view": "canvas", "page": "page-1" }
+}
