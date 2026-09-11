@@ -343,3 +343,47 @@ and weights but fixed five defects, each locked by a regression test:
   for the same reason a private season does — it is the answer eleven months of
   the year, and logging it as an error would make the run log read like a crash
   loop.
+
+- **Sep 2026 — weekly recap.** The draft recap gave the season one loud
+  argument and then went quiet for four months. The hub now has a room for the
+  weekly one at `/fantasy/league/week/`, built from data it already stores:
+  no new collection, no new external source.
+
+  **A week grades on three things, and one of them is not the manager's.**
+  Points scored (45%), the share of the roster's best legal lineup that
+  actually started (30%), and the margin against whoever the schedule handed
+  you (25%). The last is the smallest slice on purpose and the method card
+  says why. As with the draft, the composite is z-scored across the league and
+  re-standardised before the curve, because ten managers splitting one week is
+  zero-sum the same way one draft board is.
+
+  **The lineup half reuses the manager rating exactly.** Same roster
+  snapshots, same actual-points join, same optimiser filling this league's own
+  seats — pointed at one week instead of the season. It inherits both of that
+  code's silences: a team whose starters the stat feed cannot all cover gets
+  no efficiency rather than a short one, and a benched player with no stat row
+  is never treated as a missed opportunity. D/ST is excluded from both sides
+  and named in the response instead of invalidating every week.
+
+  **A component that cannot be measured leaves the grade rather than scoring
+  average.** Before roster snapshots exist — the first week of a freshly
+  collected season, or a season collected only at its end — the management
+  component is dropped and the remaining weights renormalise around it. The
+  page prints the reason under the table. Handing an unmeasured team a
+  league-average z would have been the quiet alternative, and it would have
+  read as a manager who set an ordinary lineup.
+
+  **Fifteen awards, and the ones nobody earned are omitted.** Team of the
+  week, the cold shower, best lineup set, left on the bench, over- and
+  under-achiever, best against the field, the blowout, the nail-biter, player
+  of the week, the best player nobody started, the smash and the bust. The two
+  luck awards — the win that beat only the schedule, the loss that beat
+  everyone but its opponent — appear only when the all-play record actually
+  supports the claim, so a week in which every winner deserved it hands out
+  neither. Busts are measured only against a projection of at least eight
+  points, so the award cannot be won every week by a kicker.
+
+  Written recaps clone the draft-note machinery a third time
+  (`ff_league_week_notes`, keyed on season/week/team): context digest, cached
+  row, model or deterministic local fallback, generation behind an explicit
+  POST so no page load and no schedule can bill for it.

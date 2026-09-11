@@ -19,6 +19,7 @@ const SHEETS = [
     "fantasy/style.css",
     "fantasy/league/style.css",
     "fantasy/league/draft/style.css",
+    "fantasy/league/week/style.css",
     "fantasy/rankings/style.css",
     "fantasy/draft-order/style.css",
 ];
@@ -27,6 +28,7 @@ const PAGES = [
     ["fantasy/index.html", "fantasy/style.css"],
     ["fantasy/league/index.html", "fantasy/league/style.css"],
     ["fantasy/league/draft/index.html", "fantasy/league/draft/style.css"],
+    ["fantasy/league/week/index.html", "fantasy/league/week/style.css"],
     ["fantasy/rankings/index.html", "fantasy/rankings/style.css"],
     ["fantasy/draft-order/index.html", "fantasy/draft-order/style.css"],
 ];

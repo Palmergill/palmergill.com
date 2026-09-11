@@ -69,6 +69,7 @@ LEAGUE_ROUTES = (
     "/api/fantasy/league/power-rankings",
     "/api/fantasy/league/ledger",
     "/api/fantasy/league/scoreboard",
+    "/api/fantasy/league/week",
     "/api/fantasy/league/teams/1",
     "/api/fantasy/league/teams/1/roster",
     "/api/fantasy/league/free-agents",

@@ -19,7 +19,12 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel
 
 from app.database import SessionLocal, get_db
-from app.services import fantasy_ai, fantasy_league_data, fantasy_league_draft
+from app.services import (
+    fantasy_ai,
+    fantasy_league_data,
+    fantasy_league_draft,
+    fantasy_league_week,
+)
 from app.services.fantasy_league_data import UnknownSeasonError, UnknownTeamError
 from app.services.fantasy_league_draft import DraftUnavailable
 from app.services.fantasy_league_rankings import ALGORITHMS
@@ -305,6 +310,75 @@ async def regenerate_team_overview(
             worker.close()
 
     return await run_blocking(_generate)
+
+
+# ── weekly recap ────────────────────────────────────────────────────────
+
+
+@router.get("/week")
+def week_recap(
+    season: Optional[int] = None,
+    week: Optional[int] = None,
+    _: Dict[str, Any] = Depends(require_member),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """Results, grades, accolades and callouts for one week.
+
+    One read rather than four, for the same reason the draft recap is one: the
+    grades, the awards and the callouts are all derived from the same enriched
+    result set, and splitting them would recompute the week per section.
+    """
+    try:
+        return fantasy_league_week.get_week_recap(db, season=season, week=week)
+    except UnknownSeasonError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+
+
+@router.get("/week/notes/{team_id}")
+def week_note(
+    team_id: int,
+    season: Optional[int] = None,
+    week: Optional[int] = None,
+    _: Dict[str, Any] = Depends(require_member),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """Read a stored weekly recap. Never generates — see the POST."""
+    try:
+        return fantasy_ai.read_week_note(db, season, week, team_id)
+    except UnknownSeasonError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except fantasy_ai.UnknownWeekTeamError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+
+
+@router.post("/week/notes/{team_id}", status_code=201)
+async def write_week_note(
+    team_id: int,
+    season: Optional[int] = None,
+    week: Optional[int] = None,
+    force: bool = False,
+    _: Dict[str, Any] = Depends(require_member),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """Write one team's weekly recap, reusing an unchanged one."""
+
+    def _generate() -> Dict[str, Any]:
+        # Own session, for the same reason regenerate_team_overview needs one:
+        # the request-scoped session belongs to the event loop.
+        worker = SessionLocal()
+        try:
+            return fantasy_ai.generate_week_note(
+                worker, season, week, team_id, force=force
+            )
+        finally:
+            worker.close()
+
+    try:
+        return await run_blocking(_generate)
+    except UnknownSeasonError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except fantasy_ai.UnknownWeekTeamError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
 
 
 # ── draft recap ─────────────────────────────────────────────────────────

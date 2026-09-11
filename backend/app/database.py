@@ -749,6 +749,34 @@ class FantasyLeagueDraftNote(Base):
     generated_at = Column(DateTime, default=utc_now, index=True)
 
 
+class FantasyLeagueWeekNote(Base):
+    """A written recap of one team's week.
+
+    The third table with this exact shape, after ff_league_team_overviews and
+    ff_league_draft_notes, and deliberately not a fourth variation on it: the
+    digest is a hash of the facts the note was written from, so it regenerates
+    when the week's numbers move rather than on a timer, and ``source`` records
+    whether a model wrote it or the deterministic fallback did.
+    """
+
+    __tablename__ = "ff_league_week_notes"
+    __table_args__ = (
+        UniqueConstraint(
+            "season", "week", "espn_team_id", name="uq_ff_league_week_note"
+        ),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    season = Column(Integer, index=True)
+    week = Column(Integer, index=True)
+    espn_team_id = Column(Integer, index=True)
+    note_md = Column(Text, nullable=True)
+    model = Column(String, nullable=True)
+    source = Column(String, nullable=True)  # model|local
+    prompt_digest = Column(String, nullable=True)
+    generated_at = Column(DateTime, default=utc_now, index=True)
+
+
 # ── Fantasy football draft-order game ──────────────────────────────────
 
 
