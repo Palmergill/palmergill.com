@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Team view redesign — three directions</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&display=swap" rel="stylesheet">
+<style>
+:root {
+    --bg: #faf6f0; --card: #ffffff; --surface: #f3eee4;
+    --ink: #23201c; --soft: #5d574e; --muted: #928a7d;
+    --line: #ece4d8; --line-strong: #d8cdba;
+    --sage: #5b7152; --sage-dim: #4c6044; --sage-soft: #e7eee2;
+    color-scheme: light;
+}
+* { box-sizing: border-box; }
+body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font-family: "Plus Jakarta Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+    line-height: 1.55;
+}
+.shell { max-width: 900px; margin: 0 auto; padding: 44px 20px 90px; }
+.serif { font-family: "Newsreader", Georgia, serif; font-weight: 500; letter-spacing: -0.015em; }
+.eyebrow { display: inline-block; font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+h1 { margin: 6px 0 0; font-size: clamp(32px, 5vw, 46px); line-height: 1; }
+.lede { margin: 16px 0 0; font-size: 15px; color: var(--soft); max-width: 64ch; }
+hr { border: 0; border-top: 2px solid var(--ink); margin: 26px 0 0; }
+.card {
+    display: block; text-decoration: none; color: inherit;
+    background: var(--card); border: 1px solid var(--line); border-radius: 16px;
+    padding: 22px 24px; margin-top: 20px;
+}
+.card:hover { border-color: var(--line-strong); }
+.card__head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px 16px; }
+.card h2 { margin: 0; font-size: 22px; }
+.card__n { font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.card p { margin: 10px 0 0; font-size: 14px; color: var(--soft); }
+.tags { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 14px; }
+.tag {
+    padding: 4px 11px; border-radius: 999px; background: var(--sage-soft);
+    border: 1px solid #cfddc6; color: var(--sage-dim);
+    font-size: 11px; font-weight: 600;
+}
+.tag--warn { background: var(--surface); border-color: var(--line-strong); color: var(--soft); }
+.foot { margin-top: 34px; font-size: 13px; color: var(--muted); }
+</style>
+</head>
+<body>
+<div class="shell">
+    <span class="eyebrow">Design mockups · fantasy league hub</span>
+    <h1 class="serif">Team view, three directions</h1>
+    <p class="lede">
+        The league page became a ledger — serif masthead, one table, hairline rules. The team
+        view is still the older card stack: a head card, an overview card, a start/sit card,
+        then results and roster side by side. These three studies each pick a different thing
+        for the team page to be about.
+    </p>
+    <hr>
+
+    <a class="card" href="01-team-ledger.html">
+        <div class="card__head">
+            <h2 class="serif">The team ledger</h2>
+            <span class="card__n">01</span>
+        </div>
+        <p>
+            Carries the league page’s language down one level. The team gets its own masthead
+            and standing line, and the roster becomes a single table with a switchable column —
+            projection, position rank, last week, season average, market — the way the league
+            ledger switches its own. Results become a margin chart instead of a list.
+        </p>
+        <div class="tags">
+            <span class="tag">Most continuous with the hub</span>
+            <span class="tag">Roster is the centrepiece</span>
+            <span class="tag--warn tag">Least changed in shape</span>
+        </div>
+    </a>
+
+    <a class="card" href="02-sunday-desk.html">
+        <div class="card__head">
+            <h2 class="serif">Sunday desk</h2>
+            <span class="card__n">02</span>
+        </div>
+        <p>
+            Decision-first. A verdict bar states the week’s gain in one line, the lineup renders
+            slot by slot the way a lineup actually looks, and each suggested change rides directly
+            under the slot it would replace. The season, the overview, and the power trend move to
+            a rail. Bench is sorted by what each player would add, not by position.
+        </p>
+        <div class="tags">
+            <span class="tag">Best on a Sunday morning</span>
+            <span class="tag">One clear action per row</span>
+            <span class="tag--warn tag">Season facts demoted</span>
+        </div>
+    </a>
+
+    <a class="card" href="03-season-dossier.html">
+        <div class="card__head">
+            <h2 class="serif">Season dossier</h2>
+            <span class="card__n">03</span>
+        </div>
+        <p>
+            The written overview leads, set as a real lede with the record beside it as a colophon.
+            The season is a week-by-week timeline with margin bars and opponent records, and the
+            roster is grouped by room — each position measured against the league average for that
+            position. Start/sit survives as a small aside.
+        </p>
+        <div class="tags">
+            <span class="tag">Best for reading a rival</span>
+            <span class="tag">Gives the overview a job</span>
+            <span class="tag--warn tag">Weakest for acting</span>
+        </div>
+    </a>
+
+    <p class="foot">
+        Illustrative data throughout, set mid-season (2026, week 14) so every module has something
+        to show. Static HTML — the chips, buttons, and swaps do not do anything.
+    </p>
+</div>
+</body>
+</html>

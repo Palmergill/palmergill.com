@@ -1,0 +1,488 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Team ledger — team view mockup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&display=swap" rel="stylesheet">
+<style>
+:root {
+    --bg: #faf6f0;
+    --card: #ffffff;
+    --surface: #f3eee4;
+    --ink: #23201c;
+    --soft: #5d574e;
+    --muted: #928a7d;
+    --line: #ece4d8;
+    --line-strong: #d8cdba;
+    --sage: #5b7152;
+    --sage-dim: #4c6044;
+    --sage-soft: #e7eee2;
+    --clay: #b96a4b;
+    --sky: #5a7794;
+    color-scheme: light;
+}
+* { box-sizing: border-box; }
+body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "Plus Jakarta Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+    line-height: 1.5;
+}
+.mockup-note {
+    background: var(--ink);
+    color: #f6f1e8;
+    font-size: 12px;
+    letter-spacing: 0.04em;
+    padding: 8px 20px;
+}
+.mockup-note b { color: #d9c98f; font-weight: 600; }
+.shell { max-width: 1060px; margin: 0 auto; padding: 26px 20px 90px; }
+
+.serif { font-family: "Newsreader", Georgia, "Times New Roman", serif; font-weight: 500; letter-spacing: -0.015em; }
+.eyebrow {
+    display: inline-block;
+    font-size: 11px; font-weight: 700; letter-spacing: 0.1em;
+    text-transform: uppercase; color: var(--muted);
+}
+.back {
+    display: inline-block; margin-bottom: 16px;
+    background: none; border: 0; padding: 0;
+    font: inherit; font-size: 13px; font-weight: 600;
+    color: var(--sage); cursor: pointer;
+}
+
+/* ── masthead: the team's own, built from the league masthead ─────── */
+.masthead {
+    display: flex; flex-wrap: wrap; align-items: flex-end;
+    justify-content: space-between; gap: 16px 24px;
+    padding-bottom: 14px;
+    border-bottom: 2px solid var(--ink);
+}
+.masthead__title { min-width: 0; display: flex; align-items: flex-end; gap: 16px; }
+.crest {
+    width: 56px; height: 56px; flex: 0 0 auto;
+    border-radius: 14px; border: 1px solid var(--line-strong);
+    background: var(--sage-soft);
+    display: grid; place-items: center;
+    font-family: "Newsreader", serif; font-size: 22px; color: var(--sage-dim);
+}
+.masthead h1 { margin: 4px 0 0; font-size: clamp(30px, 4.6vw, 42px); line-height: 1; }
+.masthead__sub { margin: 5px 0 0; font-size: 13px; color: var(--muted); }
+.masthead__meta { display: flex; flex-wrap: wrap; align-items: baseline; gap: 12px 22px; margin: 0; padding-bottom: 4px; }
+.fact { display: flex; flex-direction: column; align-items: flex-end; }
+.fact dt { font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+.fact dd { margin: 3px 0 0; font-size: 19px; font-weight: 700; font-variant-numeric: tabular-nums; }
+
+/* The standing line: the four league-table facts about this team, in the
+   same words the ledger uses, so the row you clicked follows you in. */
+.standing {
+    display: flex; flex-wrap: wrap; gap: 4px 18px;
+    margin: 10px 0 30px;
+    font-size: 12px; color: var(--muted);
+}
+.standing b { color: var(--soft); font-weight: 600; font-variant-numeric: tabular-nums; }
+.standing .up { color: var(--sky); }
+
+/* ── section furniture: a rule, not a box ─────────────────────────── */
+.sec { margin-bottom: 38px; }
+.sec__head {
+    display: flex; flex-wrap: wrap; align-items: baseline;
+    justify-content: space-between; gap: 6px 16px;
+    padding-bottom: 8px; border-bottom: 1px solid var(--ink);
+}
+.sec__head h2 { margin: 0; font-size: 20px; }
+.sec__meta { font-size: 12px; color: var(--muted); }
+.sec__lede { margin: 8px 0 0; font-size: 13px; color: var(--muted); max-width: 62ch; }
+
+/* ── this week ────────────────────────────────────────────────────── */
+.week-line {
+    display: flex; flex-wrap: wrap; align-items: flex-end; gap: 26px;
+    padding: 16px 0 14px; border-bottom: 1px solid var(--line);
+}
+.week-line dl { display: flex; gap: 26px; margin: 0; }
+.gain dd { color: var(--sage-dim); }
+.week-line__spacer { flex: 1 1 auto; }
+.pill {
+    align-self: center;
+    padding: 5px 11px; border-radius: 999px;
+    background: var(--sage-soft); border: 1px solid #cfddc6;
+    font-size: 12px; font-weight: 600; color: var(--sage-dim);
+}
+.swaps { list-style: none; margin: 0; padding: 0; }
+.swap {
+    display: grid;
+    grid-template-columns: 46px minmax(0, 1fr) 18px minmax(0, 1fr) 62px;
+    align-items: center; gap: 12px;
+    padding: 11px 0; border-bottom: 1px solid var(--line);
+    font-size: 14px;
+}
+.swap__slot {
+    font-size: 11px; font-weight: 700; letter-spacing: 0.06em;
+    color: var(--muted); text-transform: uppercase;
+}
+.swap__tag { font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; display: block; }
+.swap__in .swap__tag { color: var(--sage-dim); }
+.swap__out .swap__tag { color: var(--clay); }
+.swap__name { font-weight: 600; }
+.swap__out .swap__name { color: var(--soft); text-decoration: line-through; text-decoration-color: var(--line-strong); }
+.swap__meta { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.swap__arrow { color: var(--line-strong); text-align: center; }
+.swap__delta { text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--sage-dim); }
+.note { margin: 10px 0 0; font-size: 12px; color: var(--muted); }
+
+/* ── the roster ledger: one table, one switchable column ──────────── */
+.chip-row { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0 4px; }
+.chip {
+    padding: 6px 13px; border-radius: 999px;
+    border: 1px solid var(--line-strong); background: var(--card);
+    font: inherit; font-size: 12px; font-weight: 600; color: var(--soft);
+    cursor: pointer;
+}
+.chip[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: #f6f1e8; }
+.table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; min-width: 720px; }
+thead th {
+    padding: 10px 8px; border-bottom: 1px solid var(--line-strong);
+    font-size: 11px; font-weight: 700; letter-spacing: 0.06em;
+    text-transform: uppercase; color: var(--muted); text-align: right;
+    white-space: nowrap;
+}
+thead th:nth-child(1), thead th:nth-child(2) { text-align: left; }
+tbody td {
+    padding: 9px 8px; border-bottom: 1px solid var(--line);
+    font-size: 14px; text-align: right; font-variant-numeric: tabular-nums;
+}
+tbody td:nth-child(1), tbody td:nth-child(2) { text-align: left; }
+.is-active { background: var(--surface); font-weight: 700; color: var(--ink); }
+.group td {
+    padding: 20px 8px 6px;
+    border-bottom: 1px solid var(--ink);
+    font-size: 11px; font-weight: 700; letter-spacing: 0.1em;
+    text-transform: uppercase; color: var(--ink);
+}
+.group--first td { padding-top: 8px; }
+.slot {
+    display: inline-block; min-width: 38px;
+    font-size: 11px; font-weight: 700; letter-spacing: 0.06em; color: var(--muted);
+}
+.player { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.player__name { font-weight: 600; }
+.player__meta { font-size: 12px; color: var(--muted); }
+.tag {
+    padding: 1px 6px; border-radius: 4px;
+    font-size: 10px; font-weight: 700; letter-spacing: 0.04em;
+}
+.tag--q { background: #fbf0dd; color: #8a6512; }
+.tag--o { background: #fbeae4; color: #9c4b2c; }
+.prop { display: block; font-size: 11px; color: var(--sky); margin-top: 1px; }
+.dim { color: var(--muted); }
+.meter { height: 7px; width: 110px; margin-left: auto; background: var(--surface); border-radius: 2px; overflow: hidden; }
+.meter__fill { height: 100%; background: var(--sage); border-radius: 0 4px 4px 0; }
+.meter__fill--bench { background: var(--line-strong); }
+
+/* ── season + overview ────────────────────────────────────────────── */
+.cols { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 34px; }
+.result {
+    display: grid;
+    grid-template-columns: 34px 18px 92px minmax(0, 1fr) 120px;
+    align-items: center; gap: 10px;
+    padding: 7px 0; border-bottom: 1px solid var(--line);
+    font-size: 13px;
+}
+.result:last-child { border-bottom: none; }
+.result__week { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.result__out { font-weight: 700; font-size: 13px; }
+.w { color: var(--sage); } .l { color: var(--clay); } .bye { color: var(--muted); }
+.result__score { font-variant-numeric: tabular-nums; }
+.result__opp { color: var(--soft); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dv { position: relative; height: 14px; }
+.dv__zero { position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: var(--line-strong); }
+.dv__bar { position: absolute; top: 2px; height: 10px; }
+.dv__bar--pos { left: 50%; background: var(--sky); border-radius: 0 4px 4px 0; }
+.dv__bar--neg { right: 50%; background: var(--clay); border-radius: 4px 0 0 4px; }
+.prose { font-size: 14px; color: var(--soft); }
+.prose p { margin: 0 0 10px; }
+.prose p:last-child { margin-bottom: 0; }
+.spark { margin-top: 4px; }
+.spark svg { width: 100%; height: 46px; }
+.spark path, .spark polyline { fill: none; stroke: var(--sage); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.quiet-btn {
+    padding: 7px 14px; border-radius: 9px;
+    background: transparent; color: var(--sage);
+    border: 1px solid var(--line-strong);
+    font: inherit; font-size: 12px; font-weight: 600; cursor: pointer;
+}
+@media (max-width: 760px) {
+    .cols { grid-template-columns: minmax(0, 1fr); gap: 30px; }
+    .masthead__meta { gap: 10px 16px; }
+    .fact dd { font-size: 16px; }
+}
+</style>
+</head>
+<body>
+<p class="mockup-note"><b>Mockup 1 of 3 — “The team ledger.”</b> Illustrative data; set mid-season so every module has something to show.</p>
+<div class="shell">
+
+    <button class="back" type="button">← All teams</button>
+
+    <header class="masthead">
+        <div class="masthead__title">
+            <div class="crest">MSR</div>
+            <div>
+                <span class="eyebrow">Team · 2026 season</span>
+                <h1 class="serif">Ministry of Silly Routes</h1>
+                <p class="masthead__sub">D. Okonkwo · 3rd of 10</p>
+            </div>
+        </div>
+        <dl class="masthead__meta">
+            <div class="fact"><dt>Record</dt><dd>8–4</dd></div>
+            <div class="fact"><dt>Points for</dt><dd>1,449.6</dd></div>
+            <div class="fact"><dt>Against</dt><dd>1,352.0</dd></div>
+            <div class="fact"><dt>Per game</dt><dd>120.8</dd></div>
+        </dl>
+    </header>
+
+    <p class="standing">
+        <span>Power <b>#3</b> <span class="up">▲1</span></span>
+        <span>All-play <b>66–42</b></span>
+        <span>Lineup <b>94.8%</b></span>
+        <span>Luck <b>+0.7 wins</b></span>
+        <span>Through week <b>13</b> · Half PPR</span>
+    </p>
+
+    <!-- The decision comes first because it is the only thing on this page
+         that is still actionable. -->
+    <section class="sec">
+        <div class="sec__head">
+            <h2 class="serif">This week</h2>
+            <span class="sec__meta">Week 14 · best legal lineup on Half PPR projections</span>
+        </div>
+        <div class="week-line">
+            <dl>
+                <div class="fact" style="align-items:flex-start"><dt>Started</dt><dd>125.2</dd></div>
+                <div class="fact" style="align-items:flex-start"><dt>Best possible</dt><dd>131.6</dd></div>
+                <div class="fact gain" style="align-items:flex-start"><dt>On the bench</dt><dd>+6.4</dd></div>
+            </dl>
+            <span class="week-line__spacer"></span>
+            <span class="pill">2 changes</span>
+        </div>
+        <ul class="swaps">
+            <li class="swap">
+                <span class="swap__slot">WR</span>
+                <span class="swap__in"><span class="swap__tag">Start</span><span class="swap__name">Jameson Williams</span>
+                    <span class="swap__meta">DET · WR14 · proj 15.1</span></span>
+                <span class="swap__arrow">→</span>
+                <span class="swap__out"><span class="swap__tag">Sit</span><span class="swap__name">Rome Odunze</span>
+                    <span class="swap__meta">CHI · WR34 · proj 11.2</span></span>
+                <span class="swap__delta">+3.9</span>
+            </li>
+            <li class="swap">
+                <span class="swap__slot">RB</span>
+                <span class="swap__in"><span class="swap__tag">Start</span><span class="swap__name">Tyjae Spears</span>
+                    <span class="swap__meta">TEN · RB18 · proj 14.6</span></span>
+                <span class="swap__arrow">→</span>
+                <span class="swap__out"><span class="swap__tag">Sit</span><span class="swap__name">Kenneth Walker III</span>
+                    <span class="swap__meta">SEA · RB21 · proj 12.1 · questionable</span></span>
+                <span class="swap__delta">+2.5</span>
+            </li>
+        </ul>
+        <p class="note">Projections updated 2 hours ago · 1 starter has no opponent set yet</p>
+    </section>
+
+    <!-- One table for the whole roster, with the trailing column switchable
+         the way the league ledger switches its own. -->
+    <section class="sec">
+        <div class="sec__head">
+            <h2 class="serif">Roster</h2>
+            <span class="sec__meta">Snapshot 2 hours ago · 2026 week 14 player data</span>
+        </div>
+        <div class="chip-row" role="group" aria-label="Choose a column">
+            <button class="chip" type="button" aria-pressed="true">Projection</button>
+            <button class="chip" type="button" aria-pressed="false">Position rank</button>
+            <button class="chip" type="button" aria-pressed="false">Last week</button>
+            <button class="chip" type="button" aria-pressed="false">Season average</button>
+            <button class="chip" type="button" aria-pressed="false">Market</button>
+        </div>
+        <p class="sec__lede">Projection is this week’s Half PPR forecast. The bar compares each player to the best projection on the roster.</p>
+        <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Slot</th><th>Player</th><th>Rank</th><th>Last</th><th>Season</th>
+                    <th class="is-active">Proj</th><th></th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr class="group group--first"><td colspan="7">Starters · 125.2 projected</td></tr>
+                <tr>
+                    <td><span class="slot">QB</span></td>
+                    <td><span class="player"><span class="player__name">Jayden Daniels</span><span class="player__meta">WAS</span></span>
+                        <span class="prop">Pass yds o/u 244.5</span></td>
+                    <td>QB6</td><td>24.8</td><td>20.1</td>
+                    <td class="is-active">21.4</td>
+                    <td><div class="meter"><div class="meter__fill" style="width:100%"></div></div></td>
+                </tr>
+                <tr>
+                    <td><span class="slot">RB</span></td>
+                    <td><span class="player"><span class="player__name">Bijan Robinson</span><span class="player__meta">ATL</span></span>
+                        <span class="prop">Anytime TD +135</span></td>
+                    <td>RB3</td><td>21.2</td><td>18.4</td>
+                    <td class="is-active">18.9</td>
+                    <td><div class="meter"><div class="meter__fill" style="width:88%"></div></div></td>
+                </tr>
+                <tr>
+                    <td><span class="slot">RB</span></td>
+                    <td><span class="player"><span class="player__name">Kenneth Walker III</span><span class="player__meta">SEA</span>
+                        <span class="tag tag--q">Q</span></span></td>
+                    <td>RB21</td><td>8.4</td><td>12.9</td>
+                    <td class="is-active">12.1</td>
+                    <td><div class="meter"><div class="meter__fill" style="width:57%"></div></div></td>
+                </tr>
+                <tr>
+                    <td><span class="slot">WR</span></td>
+                    <td><span class="player"><span class="player__name">Malik Nabers</span><span class="player__meta">NYG</span></span>
+                        <span class="prop">Rec yds o/u 71.5</span></td>
+                    <td>WR8</td><td>19.0</td><td>16.2</td>
+                    <td class="is-active">16.7</td>
+                    <td><div class="meter"><div class="meter__fill" style="width:78%"></div></div></td>
+                </tr>
+                <tr>
+                    <td><span class="slot">WR</span></td>
+                    <td><span class="player"><span class="player__name">Rome Odunze</span><span class="player__meta">CHI</span></span></td>
+                    <td>WR34</td><td>6.8</td><td>10.4</td>
+                    <td class="is-active">11.2</td>
+                    <td><div class="meter"><div class="meter__fill" style="width:52%"></div></div></td>
+                </tr>
+                <tr>
+                    <td><span class="slot">TE</span></td>
+                    <td><span class="player"><span class="player__name">Brock Bowers</span><span class="player__meta">LV</span></span>
+                        <span class="prop">Rec yds o/u 62.5</span></td>
+                    <td>TE2</td><td>16.1</td><td>14.8</td>
+                    <td class="is-active">14.3</td>
+                    <td><div class="meter"><div class="meter__fill" style="width:67%"></div></div></td>
+                </tr>
+                <tr>
+                    <td><span class="slot">FLEX</span></td>
+                    <td><span class="player"><span class="player__name">Jaxon Smith-Njigba</span><span class="player__meta">SEA</span></span></td>
+                    <td>WR16</td><td>15.4</td><td>13.6</td>
+                    <td class="is-active">13.8</td>
+                    <td><div class="meter"><div class="meter__fill" style="width:64%"></div></div></td>
+                </tr>
+                <tr>
+                    <td><span class="slot">DST</span></td>
+                    <td><span class="player"><span class="player__name">Broncos D/ST</span><span class="player__meta">DEN</span></span></td>
+                    <td>DST5</td><td>11.0</td><td>8.9</td>
+                    <td class="is-active">8.2</td>
+                    <td><div class="meter"><div class="meter__fill" style="width:38%"></div></div></td>
+                </tr>
+                <tr>
+                    <td><span class="slot">K</span></td>
+                    <td><span class="player"><span class="player__name">Jake Bates</span><span class="player__meta">DET</span></span></td>
+                    <td>K9</td><td>7.0</td><td>8.4</td>
+                    <td class="is-active">8.6</td>
+                    <td><div class="meter"><div class="meter__fill" style="width:40%"></div></div></td>
+                </tr>
+
+                <tr class="group"><td colspan="7">Bench · +6.4 available to the lineup</td></tr>
+                <tr>
+                    <td><span class="slot">BE</span></td>
+                    <td><span class="player"><span class="player__name">Bo Nix</span><span class="player__meta">DEN</span></span></td>
+                    <td>QB14</td><td>15.6</td><td>16.8</td>
+                    <td class="is-active">17.2</td>
+                    <td><div class="meter"><div class="meter__fill meter__fill--bench" style="width:80%"></div></div></td>
+                </tr>
+                <tr>
+                    <td><span class="slot">BE</span></td>
+                    <td><span class="player"><span class="player__name">Jameson Williams</span><span class="player__meta">DET</span></span>
+                        <span class="prop">Rec yds o/u 58.5</span></td>
+                    <td>WR14</td><td>17.8</td><td>14.1</td>
+                    <td class="is-active">15.1</td>
+                    <td><div class="meter"><div class="meter__fill meter__fill--bench" style="width:71%"></div></div></td>
+                </tr>
+                <tr>
+                    <td><span class="slot">BE</span></td>
+                    <td><span class="player"><span class="player__name">Tyjae Spears</span><span class="player__meta">TEN</span></span></td>
+                    <td>RB18</td><td>13.2</td><td>11.7</td>
+                    <td class="is-active">14.6</td>
+                    <td><div class="meter"><div class="meter__fill meter__fill--bench" style="width:68%"></div></div></td>
+                </tr>
+                <tr>
+                    <td><span class="slot">BE</span></td>
+                    <td><span class="player"><span class="player__name">Khalil Shakir</span><span class="player__meta">BUF</span></span></td>
+                    <td>WR38</td><td>9.6</td><td>10.9</td>
+                    <td class="is-active">10.4</td>
+                    <td><div class="meter"><div class="meter__fill meter__fill--bench" style="width:49%"></div></div></td>
+                </tr>
+                <tr>
+                    <td><span class="slot">BE</span></td>
+                    <td><span class="player"><span class="player__name">Dalton Kincaid</span><span class="player__meta">BUF</span></span></td>
+                    <td>TE18</td><td>5.2</td><td>7.4</td>
+                    <td class="is-active">7.8</td>
+                    <td><div class="meter"><div class="meter__fill meter__fill--bench" style="width:36%"></div></div></td>
+                </tr>
+
+                <tr class="group"><td colspan="7">Injured reserve</td></tr>
+                <tr>
+                    <td><span class="slot">IR</span></td>
+                    <td><span class="player"><span class="player__name">Christian McCaffrey</span><span class="player__meta">SF</span>
+                        <span class="tag tag--o">OUT</span></span></td>
+                    <td class="dim">—</td><td class="dim">—</td><td>16.4</td>
+                    <td class="is-active dim">—</td>
+                    <td></td>
+                </tr>
+            </tbody>
+        </table>
+        </div>
+    </section>
+
+    <section class="sec">
+        <div class="cols">
+            <div>
+                <div class="sec__head"><h2 class="serif">Season</h2><span class="sec__meta">Margin, week by week</span></div>
+                <div style="margin-top:12px">
+                    <div class="result"><span class="result__week">1</span><span class="result__out w">W</span><span class="result__score">128.4–102.6</span><span class="result__opp">Pitch &amp; Putt Punters</span><span class="dv"><span class="dv__zero"></span><span class="dv__bar dv__bar--pos" style="width:36.2%"></span></span></div>
+                    <div class="result"><span class="result__week">2</span><span class="result__out l">L</span><span class="result__score">96.2–131.8</span><span class="result__opp">Fourth and Fortune</span><span class="dv"><span class="dv__zero"></span><span class="dv__bar dv__bar--neg" style="width:50%"></span></span></div>
+                    <div class="result"><span class="result__week">3</span><span class="result__out w">W</span><span class="result__score">141.0–118.4</span><span class="result__opp">Gridiron Gospel</span><span class="dv"><span class="dv__zero"></span><span class="dv__bar dv__bar--pos" style="width:31.7%"></span></span></div>
+                    <div class="result"><span class="result__week">4</span><span class="result__out w">W</span><span class="result__score">124.6–109.2</span><span class="result__opp">The Muddy Cleats</span><span class="dv"><span class="dv__zero"></span><span class="dv__bar dv__bar--pos" style="width:21.6%"></span></span></div>
+                    <div class="result"><span class="result__week">5</span><span class="result__out l">L</span><span class="result__score">108.8–122.4</span><span class="result__opp">Sunday Scaries</span><span class="dv"><span class="dv__zero"></span><span class="dv__bar dv__bar--neg" style="width:19.1%"></span></span></div>
+                    <div class="result"><span class="result__week">6</span><span class="result__out w">W</span><span class="result__score">133.2–97.6</span><span class="result__opp">Hail Mary Hotline</span><span class="dv"><span class="dv__zero"></span><span class="dv__bar dv__bar--pos" style="width:50%"></span></span></div>
+                    <div class="result"><span class="result__week">7</span><span class="result__out bye">BYE</span><span class="result__score dim">—</span><span class="result__opp dim">—</span><span class="dv"><span class="dv__zero"></span></span></div>
+                    <div class="result"><span class="result__week">8</span><span class="result__out w">W</span><span class="result__score">119.4–114.8</span><span class="result__opp">Pitch &amp; Putt Punters</span><span class="dv"><span class="dv__zero"></span><span class="dv__bar dv__bar--pos" style="width:6.5%"></span></span></div>
+                    <div class="result"><span class="result__week">9</span><span class="result__out l">L</span><span class="result__score">101.6–126.0</span><span class="result__opp">Fourth and Fortune</span><span class="dv"><span class="dv__zero"></span><span class="dv__bar dv__bar--neg" style="width:34.3%"></span></span></div>
+                    <div class="result"><span class="result__week">10</span><span class="result__out w">W</span><span class="result__score">137.8–111.2</span><span class="result__opp">Gridiron Gospel</span><span class="dv"><span class="dv__zero"></span><span class="dv__bar dv__bar--pos" style="width:37.4%"></span></span></div>
+                    <div class="result"><span class="result__week">11</span><span class="result__out w">W</span><span class="result__score">122.0–104.4</span><span class="result__opp">The Muddy Cleats</span><span class="dv"><span class="dv__zero"></span><span class="dv__bar dv__bar--pos" style="width:24.7%"></span></span></div>
+                    <div class="result"><span class="result__week">12</span><span class="result__out l">L</span><span class="result__score">110.2–118.6</span><span class="result__opp">Sunday Scaries</span><span class="dv"><span class="dv__zero"></span><span class="dv__bar dv__bar--neg" style="width:11.8%"></span></span></div>
+                    <div class="result"><span class="result__week">13</span><span class="result__out w">W</span><span class="result__score">126.4–95.0</span><span class="result__opp">Hail Mary Hotline</span><span class="dv"><span class="dv__zero"></span><span class="dv__bar dv__bar--pos" style="width:44.1%"></span></span></div>
+                </div>
+            </div>
+
+            <div>
+                <div class="sec__head">
+                    <h2 class="serif">Overview</h2>
+                    <button class="quiet-btn" type="button">Check for updates</button>
+                </div>
+                <p class="sec__meta" style="display:block;margin:10px 0 12px">Written after week 13</p>
+                <div class="prose">
+                    <p>Third in power and second in points scored, on a roster that has out-projected its record in four of the last six weeks.</p>
+                    <p>The two losses since the bye both came under 112 points, and both times the bench held a better legal lineup. Lineup efficiency of 94.8% is fifth in the league.</p>
+                    <p>Running back is the thin spot: outside Robinson, the room is a questionable starter and a committee back the market prices as a WR3.</p>
+                </div>
+
+                <p class="eyebrow" style="margin:26px 0 0">Power rank · weeks 1–13</p>
+                <div class="spark">
+                    <svg viewBox="0 0 160 40" preserveAspectRatio="none" aria-label="Power rank moved from 7th to 3rd">
+                        <polyline points="0,36 14.5,28 29.1,28 43.6,20 58.2,20 72.7,12 87.3,12 101.8,4 116.4,12 130.9,4 145.5,4 160,4"></polyline>
+                    </svg>
+                </div>
+                <p class="note" style="display:flex;justify-content:space-between"><span>7th</span><span>3rd</span></p>
+            </div>
+        </div>
+    </section>
+
+</div>
+</body>
+</html>

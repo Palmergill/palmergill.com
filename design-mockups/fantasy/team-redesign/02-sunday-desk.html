@@ -1,0 +1,391 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sunday desk — team view mockup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&display=swap" rel="stylesheet">
+<style>
+:root {
+    --bg: #faf6f0; --card: #ffffff; --surface: #f3eee4;
+    --ink: #23201c; --soft: #5d574e; --muted: #928a7d;
+    --line: #ece4d8; --line-strong: #d8cdba;
+    --sage: #5b7152; --sage-dim: #4c6044; --sage-soft: #e7eee2;
+    --clay: #b96a4b; --sky: #5a7794;
+    color-scheme: light;
+}
+* { box-sizing: border-box; }
+body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font-family: "Plus Jakarta Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+    line-height: 1.5;
+}
+.mockup-note { background: var(--ink); color: #f6f1e8; font-size: 12px; letter-spacing: 0.04em; padding: 8px 20px; }
+.mockup-note b { color: #d9c98f; font-weight: 600; }
+.shell { max-width: 1100px; margin: 0 auto; padding: 22px 20px 90px; }
+.serif { font-family: "Newsreader", Georgia, "Times New Roman", serif; font-weight: 500; letter-spacing: -0.015em; }
+.eyebrow { display: inline-block; font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+.back { display: inline-block; margin-bottom: 14px; background: none; border: 0; padding: 0; font: inherit; font-size: 13px; font-weight: 600; color: var(--sage); cursor: pointer; }
+
+/* ── identity: one compact line, because the decision is the page ──── */
+.ident {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 14px;
+    padding-bottom: 12px; border-bottom: 2px solid var(--ink);
+}
+.crest {
+    width: 42px; height: 42px; border-radius: 11px;
+    border: 1px solid var(--line-strong); background: var(--sage-soft);
+    display: grid; place-items: center;
+    font-family: "Newsreader", serif; font-size: 17px; color: var(--sage-dim);
+}
+.ident h1 { margin: 0; font-size: 26px; line-height: 1.1; }
+.ident__sub { margin: 1px 0 0; font-size: 12px; color: var(--muted); }
+.ident__spacer { flex: 1 1 auto; }
+.ident__facts { display: flex; gap: 18px; margin: 0; }
+.fact { display: flex; flex-direction: column; align-items: flex-end; }
+.fact dt { font-size: 10px; font-weight: 700; letter-spacing: 0.09em; text-transform: uppercase; color: var(--muted); }
+.fact dd { margin: 2px 0 0; font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; }
+
+/* ── the verdict bar: the one number this page exists to deliver ──── */
+.verdict {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 18px 30px;
+    margin: 22px 0 26px; padding: 20px 22px;
+    background: var(--card); border: 1px solid var(--line);
+    border-left: 4px solid var(--sage); border-radius: 14px;
+}
+.verdict__lead { min-width: 0; }
+.verdict__lead h2 { margin: 2px 0 0; font-size: 30px; line-height: 1; }
+.verdict__lead h2 span { color: var(--sage-dim); }
+.verdict__lead p { margin: 6px 0 0; font-size: 13px; color: var(--muted); }
+.verdict__spacer { flex: 1 1 auto; }
+.verdict__totals { display: flex; gap: 26px; margin: 0; }
+.verdict__totals dd { font-size: 20px; }
+.btn {
+    padding: 10px 18px; border-radius: 10px; border: 0;
+    background: var(--sage); color: #fff;
+    font: inherit; font-size: 13px; font-weight: 600; cursor: pointer;
+}
+.btn:hover { background: var(--sage-dim); }
+
+/* ── the workspace ────────────────────────────────────────────────── */
+.desk { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr); gap: 30px; align-items: start; }
+.sec__head {
+    display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between;
+    gap: 6px 14px; padding-bottom: 8px; border-bottom: 1px solid var(--ink);
+}
+.sec__head h3 { margin: 0; font-size: 17px; }
+.sec__meta { font-size: 12px; color: var(--muted); }
+.sec + .sec { margin-top: 32px; }
+
+/* A lineup that looks like a lineup: one row per slot, top to bottom. */
+.lineup { list-style: none; margin: 14px 0 0; padding: 0; }
+.slot-row {
+    display: grid;
+    grid-template-columns: 52px minmax(0, 1fr) 96px 58px;
+    align-items: center; gap: 12px;
+    padding: 11px 10px 11px 0; border-bottom: 1px solid var(--line);
+}
+.slot-row--swap { background: #fdf8ef; border-left: 3px solid #e0b757; padding-left: 9px; margin-left: -12px; }
+.slot-tag {
+    display: grid; place-items: center;
+    width: 46px; height: 28px; border-radius: 7px;
+    background: var(--surface); color: var(--soft);
+    font-size: 11px; font-weight: 700; letter-spacing: 0.05em;
+}
+.slot-row--swap .slot-tag { background: #f6e9cd; color: #8a6512; }
+.name { font-size: 14px; font-weight: 600; }
+.meta { font-size: 12px; color: var(--muted); }
+.matchup { font-size: 12px; color: var(--soft); font-variant-numeric: tabular-nums; text-align: right; }
+.proj { text-align: right; font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.tag { display: inline-block; padding: 1px 6px; border-radius: 4px; font-size: 10px; font-weight: 700; letter-spacing: 0.04em; margin-left: 6px; }
+.tag--q { background: #fbf0dd; color: #8a6512; }
+.tag--o { background: #fbeae4; color: #9c4b2c; }
+
+/* The suggestion rides directly under the slot it would change. */
+.suggest {
+    grid-column: 1 / -1;
+    display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px;
+    margin-top: 9px; padding: 9px 12px;
+    background: var(--sage-soft); border: 1px solid #cfddc6; border-radius: 10px;
+}
+.suggest__label { font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--sage-dim); }
+.suggest__name { font-size: 13px; font-weight: 600; }
+.suggest__meta { font-size: 12px; color: var(--soft); font-variant-numeric: tabular-nums; }
+.suggest__action { display: flex; align-items: center; gap: 12px; margin-left: auto; }
+.suggest__delta { font-size: 13px; font-weight: 700; color: var(--sage-dim); font-variant-numeric: tabular-nums; }
+.mini-btn {
+    padding: 5px 11px; border-radius: 8px; border: 1px solid var(--sage);
+    background: var(--card); color: var(--sage-dim);
+    font: inherit; font-size: 12px; font-weight: 600; cursor: pointer;
+}
+.note { margin: 10px 0 0; font-size: 12px; color: var(--muted); }
+
+/* Bench, compact, sorted by what it would add. */
+.bench { list-style: none; margin: 14px 0 0; padding: 0; }
+.bench li {
+    display: grid; grid-template-columns: minmax(0, 1fr) 64px 52px;
+    align-items: center; gap: 10px;
+    padding: 8px 0; border-bottom: 1px solid var(--line);
+    font-size: 13px;
+}
+.bench li:last-child { border-bottom: none; }
+.bench .proj { font-size: 14px; }
+.delta { text-align: right; font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.delta--up { color: var(--sage-dim); }
+.delta--down { color: var(--muted); }
+
+/* ── right rail ───────────────────────────────────────────────────── */
+.rail-card {
+    background: var(--card); border: 1px solid var(--line);
+    border-radius: 14px; padding: 16px 18px; margin-bottom: 18px;
+}
+.rail-card h3 { margin: 0 0 10px; font-size: 15px; }
+.rail-card p { margin: 0; font-size: 13px; color: var(--soft); }
+.rail-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.quiet-btn {
+    padding: 5px 10px; border-radius: 8px; background: transparent; color: var(--sage);
+    border: 1px solid var(--line-strong); font: inherit; font-size: 11px; font-weight: 600; cursor: pointer;
+}
+.bullets { margin: 8px 0 0; padding-left: 18px; font-size: 13px; color: var(--soft); }
+.bullets li + li { margin-top: 6px; }
+.bullets + .note { margin-top: 14px; }
+.rail-facts { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 0; }
+.rail-facts .fact { align-items: flex-start; }
+.spark svg { width: 100%; height: 42px; }
+.spark polyline { fill: none; stroke: var(--sage); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.scale { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+/* Form strip: the season as thirteen marks. */
+.form { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+.form span {
+    width: 24px; height: 24px; border-radius: 6px;
+    display: grid; place-items: center;
+    font-size: 11px; font-weight: 700;
+}
+.form .w { background: var(--sage-soft); color: var(--sage-dim); }
+.form .l { background: #fbeae4; color: #9c4b2c; }
+.form .b { background: var(--surface); color: var(--muted); }
+.link { display: inline-block; margin-top: 12px; font-size: 12px; font-weight: 600; color: var(--sage); text-decoration: none; }
+.link:hover { text-decoration: underline; }
+
+@media (max-width: 860px) {
+    .desk { grid-template-columns: minmax(0, 1fr); }
+    .verdict__lead h2 { font-size: 24px; }
+}
+</style>
+</head>
+<body>
+<p class="mockup-note"><b>Mockup 2 of 3 — “Sunday desk.”</b> The week’s decision is the page; the season is the rail. Illustrative data.</p>
+<div class="shell">
+
+    <button class="back" type="button">← All teams</button>
+
+    <header class="ident">
+        <div class="crest">MSR</div>
+        <div>
+            <h1 class="serif">Ministry of Silly Routes</h1>
+            <p class="ident__sub">D. Okonkwo · 3rd of 10 · Half PPR</p>
+        </div>
+        <span class="ident__spacer"></span>
+        <dl class="ident__facts">
+            <div class="fact"><dt>Record</dt><dd>8–4</dd></div>
+            <div class="fact"><dt>Points for</dt><dd>1,449.6</dd></div>
+            <div class="fact"><dt>Per game</dt><dd>120.8</dd></div>
+            <div class="fact"><dt>Power</dt><dd>#3</dd></div>
+        </dl>
+    </header>
+
+    <section class="verdict">
+        <div class="verdict__lead">
+            <span class="eyebrow">Week 14 · vs Fourth and Fortune</span>
+            <h2 class="serif">Two changes worth <span>+6.4</span></h2>
+            <p>Projections updated 2 hours ago · lineup locks Sunday 1:00 PM</p>
+        </div>
+        <span class="verdict__spacer"></span>
+        <dl class="verdict__totals">
+            <div class="fact"><dt>Started</dt><dd>125.2</dd></div>
+            <div class="fact"><dt>Best possible</dt><dd>131.6</dd></div>
+        </dl>
+        <button class="btn" type="button">Open in ESPN</button>
+    </section>
+
+    <div class="desk">
+        <div>
+            <section class="sec">
+                <div class="sec__head">
+                    <h3 class="serif">Starting lineup</h3>
+                    <span class="sec__meta">Best legal lineup on Half PPR projections</span>
+                </div>
+                <ul class="lineup">
+                    <li class="slot-row">
+                        <span class="slot-tag">QB</span>
+                        <span><span class="name">Jayden Daniels</span><br><span class="meta">WAS · QB6 · last 24.8</span></span>
+                        <span class="matchup">vs CHI</span>
+                        <span class="proj">21.4</span>
+                    </li>
+                    <li class="slot-row">
+                        <span class="slot-tag">RB</span>
+                        <span><span class="name">Bijan Robinson</span><br><span class="meta">ATL · RB3 · last 21.2</span></span>
+                        <span class="matchup">@ TB</span>
+                        <span class="proj">18.9</span>
+                    </li>
+                    <li class="slot-row slot-row--swap">
+                        <span class="slot-tag">RB</span>
+                        <span><span class="name">Kenneth Walker III<span class="tag tag--q">Q</span></span><br><span class="meta">SEA · RB21 · last 8.4</span></span>
+                        <span class="matchup">vs ARI</span>
+                        <span class="proj">12.1</span>
+                        <span class="suggest">
+                            <span class="suggest__label">Start instead</span>
+                            <span class="suggest__name">Tyjae Spears</span>
+                            <span class="suggest__meta">TEN · RB18 · proj 14.6 · @ JAX</span>
+                            <span class="suggest__action">
+                                <span class="suggest__delta">+2.5</span>
+                                <button class="mini-btn" type="button">Swap</button>
+                            </span>
+                        </span>
+                    </li>
+                    <li class="slot-row">
+                        <span class="slot-tag">WR</span>
+                        <span><span class="name">Malik Nabers</span><br><span class="meta">NYG · WR8 · last 19.0</span></span>
+                        <span class="matchup">vs DAL</span>
+                        <span class="proj">16.7</span>
+                    </li>
+                    <li class="slot-row slot-row--swap">
+                        <span class="slot-tag">WR</span>
+                        <span><span class="name">Rome Odunze</span><br><span class="meta">CHI · WR34 · last 6.8</span></span>
+                        <span class="matchup">@ WAS</span>
+                        <span class="proj">11.2</span>
+                        <span class="suggest">
+                            <span class="suggest__label">Start instead</span>
+                            <span class="suggest__name">Jameson Williams</span>
+                            <span class="suggest__meta">DET · WR14 · proj 15.1 · vs GB</span>
+                            <span class="suggest__action">
+                                <span class="suggest__delta">+3.9</span>
+                                <button class="mini-btn" type="button">Swap</button>
+                            </span>
+                        </span>
+                    </li>
+                    <li class="slot-row">
+                        <span class="slot-tag">TE</span>
+                        <span><span class="name">Brock Bowers</span><br><span class="meta">LV · TE2 · last 16.1</span></span>
+                        <span class="matchup">vs KC</span>
+                        <span class="proj">14.3</span>
+                    </li>
+                    <li class="slot-row">
+                        <span class="slot-tag">FLEX</span>
+                        <span><span class="name">Jaxon Smith-Njigba</span><br><span class="meta">SEA · WR16 · last 15.4</span></span>
+                        <span class="matchup">vs ARI</span>
+                        <span class="proj">13.8</span>
+                    </li>
+                    <li class="slot-row">
+                        <span class="slot-tag">DST</span>
+                        <span><span class="name">Broncos D/ST</span><br><span class="meta">DEN · DST5 · last 11.0</span></span>
+                        <span class="matchup">@ LAC</span>
+                        <span class="proj">8.2</span>
+                    </li>
+                    <li class="slot-row">
+                        <span class="slot-tag">K</span>
+                        <span><span class="name">Jake Bates</span><br><span class="meta">DET · K9 · last 7.0</span></span>
+                        <span class="matchup">vs GB</span>
+                        <span class="proj">8.6</span>
+                    </li>
+                </ul>
+                <p class="note">Every other slot already holds the best legal option.</p>
+            </section>
+
+            <section class="sec">
+                <div class="sec__head">
+                    <h3 class="serif">Bench</h3>
+                    <span class="sec__meta">Sorted by what each would add to the lineup</span>
+                </div>
+                <ul class="bench">
+                    <li>
+                        <span><span class="name">Jameson Williams</span> <span class="meta">WR · DET · WR14</span></span>
+                        <span class="proj">15.1</span>
+                        <span class="delta delta--up">+3.9</span>
+                    </li>
+                    <li>
+                        <span><span class="name">Tyjae Spears</span> <span class="meta">RB · TEN · RB18</span></span>
+                        <span class="proj">14.6</span>
+                        <span class="delta delta--up">+2.5</span>
+                    </li>
+                    <li>
+                        <span><span class="name">Bo Nix</span> <span class="meta">QB · DEN · QB14</span></span>
+                        <span class="proj">17.2</span>
+                        <span class="delta delta--down">−4.2</span>
+                    </li>
+                    <li>
+                        <span><span class="name">Khalil Shakir</span> <span class="meta">WR · BUF · WR38</span></span>
+                        <span class="proj">10.4</span>
+                        <span class="delta delta--down">−0.8</span>
+                    </li>
+                    <li>
+                        <span><span class="name">Dalton Kincaid</span> <span class="meta">TE · BUF · TE18</span></span>
+                        <span class="proj">7.8</span>
+                        <span class="delta delta--down">−6.5</span>
+                    </li>
+                    <li>
+                        <span><span class="name">Christian McCaffrey<span class="tag tag--o">IR</span></span> <span class="meta">RB · SF</span></span>
+                        <span class="proj" style="color:var(--muted)">—</span>
+                        <span class="delta delta--down">—</span>
+                    </li>
+                </ul>
+                <p class="note">Snapshot 2 hours ago · 2026 week 14 player data</p>
+            </section>
+        </div>
+
+        <aside>
+            <div class="rail-card">
+                <div class="rail-head">
+                    <h3 class="serif">Overview</h3>
+                    <button class="quiet-btn" type="button">Update</button>
+                </div>
+                <ul class="bullets">
+                    <li>Second in points scored, third in power — the record understates the roster.</li>
+                    <li>Both losses since the bye came under 112 points with a better lineup on the bench.</li>
+                    <li>Running back is thin behind Robinson: a questionable starter and a committee back.</li>
+                </ul>
+                <p class="note">Written after week 13</p>
+            </div>
+
+            <div class="rail-card">
+                <h3 class="serif">Season</h3>
+                <dl class="rail-facts">
+                    <div class="fact"><dt>Against</dt><dd>1,352.0</dd></div>
+                    <div class="fact"><dt>All-play</dt><dd>66–42</dd></div>
+                    <div class="fact"><dt>Lineup</dt><dd>94.8%</dd></div>
+                    <div class="fact"><dt>Luck</dt><dd>+0.7 W</dd></div>
+                </dl>
+                <p class="eyebrow" style="margin:18px 0 4px">Form · weeks 1–13</p>
+                <div class="form">
+                    <span class="w">W</span><span class="l">L</span><span class="w">W</span><span class="w">W</span>
+                    <span class="l">L</span><span class="w">W</span><span class="b">–</span><span class="w">W</span>
+                    <span class="l">L</span><span class="w">W</span><span class="w">W</span><span class="l">L</span>
+                    <span class="w">W</span>
+                </div>
+                <p class="eyebrow" style="margin:18px 0 2px">Power rank</p>
+                <div class="spark">
+                    <svg viewBox="0 0 160 40" preserveAspectRatio="none" aria-label="Power rank moved from 7th to 3rd">
+                        <polyline points="0,36 14.5,28 29.1,28 43.6,20 58.2,20 72.7,12 87.3,12 101.8,4 116.4,12 130.9,4 145.5,4 160,4"></polyline>
+                    </svg>
+                </div>
+                <div class="scale"><span>7th</span><span>3rd</span></div>
+                <a class="link" href="#">Full results, week by week →</a>
+            </div>
+
+            <div class="rail-card">
+                <h3 class="serif">Next three</h3>
+                <ul class="bullets">
+                    <li>Wk 14 · Fourth and Fortune <span class="meta">(9–3, power #1)</span></li>
+                    <li>Wk 15 · The Muddy Cleats <span class="meta">(5–7, power #8)</span></li>
+                    <li>Wk 16 · Sunday Scaries <span class="meta">(7–5, power #5)</span></li>
+                </ul>
+            </div>
+        </aside>
+    </div>
+
+</div>
+</body>
+</html>
