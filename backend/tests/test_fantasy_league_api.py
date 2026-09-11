@@ -75,6 +75,7 @@ LEAGUE_ROUTES = (
     "/api/fantasy/league/free-agents",
     "/api/fantasy/league/teams/1/lineup",
     "/api/fantasy/league/teams/1/overview",
+    "/api/fantasy/league/teams/1/rooms",
 )
 
 
@@ -371,6 +372,53 @@ def test_team_detail_lists_results(seeded_db):
     assert body["owner_name"] == "Palmer Gill"
     outcomes = [row["outcome"] for row in body["results"]]
     assert outcomes == ["W", "L"]
+
+
+def test_team_detail_carries_the_opponents_record(seeded_db):
+    """A week reads differently once you can see who it was against."""
+    body = member_client().get("/api/fantasy/league/teams/1?season=2024").json()
+    opponent = body["results"][0]["opponent"]
+    assert opponent["name"]
+    assert opponent["wins"] is not None
+    assert set(("wins", "losses", "ties")) <= set(opponent)
+
+
+def test_team_rooms_scores_a_position_from_season_actuals(seeded_db):
+    entry = (
+        seeded_db.query(FantasyLeagueRosterEntry)
+        .filter_by(espn_team_id=1, player_name_raw="Amon-Ra St. Brown")
+        .first()
+    )
+    entry.player_id = "200"
+    seeded_db.add(entry)
+    for week, points in ((1, 20.0), (2, 10.0)):
+        seeded_db.add(
+            FantasyPlayerStat(
+                season=2024, week=week, player_id="200",
+                fantasy_points_ppr=points + 2, fantasy_points_half=points,
+            )
+        )
+    seeded_db.commit()
+
+    body = member_client().get("/api/fantasy/league/teams/1/rooms?season=2024").json()
+    rooms = {room["position"]: room for room in body["rooms"]}
+
+    assert body["available"] is True
+    assert rooms["WR"]["points_per_game"] == 15.0
+    assert rooms["WR"]["players"]["200"]["games"] == 2
+    assert rooms["WR"]["rank"] == 1
+
+    # The weekly feed has no row for a team defense, so that room carries
+    # players and no measurement rather than a zero.
+    assert rooms["DST"]["points_per_game"] is None
+    assert rooms["DST"]["rank"] is None
+
+
+def test_team_rooms_for_an_unknown_team_is_404(seeded_db):
+    assert (
+        member_client().get("/api/fantasy/league/teams/99/rooms?season=2024").status_code
+        == 404
+    )
 
 
 def test_team_roster_marks_unmatched_players(seeded_db):

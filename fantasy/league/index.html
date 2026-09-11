@@ -14,7 +14,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/shared/site-nav.css?v=14">
     <link rel="stylesheet" href="/shared/fantasy-header.css?v=1">
-    <link rel="stylesheet" href="style.css?v=11">
+    <link rel="stylesheet" href="style.css?v=12">
 </head>
 <body>
 <noscript>
@@ -27,8 +27,10 @@
              under it, the way a ledger's own heading would. -->
         <header class="masthead">
             <div class="masthead__title">
-                <span class="eyebrow">Private league · ESPN</span>
+                <span class="eyebrow" id="mastheadEyebrow">Private league · ESPN</span>
                 <h1 id="leagueName">League Hub</h1>
+                <!-- The manager's name, on a team route only. -->
+                <p class="masthead__sub" id="leagueSub" hidden></p>
             </div>
             <dl class="masthead__meta" id="modeBadge" aria-live="polite">
                 <div class="masthead__fact">
@@ -44,6 +46,9 @@
                     <dd>Half PPR</dd>
                 </div>
             </dl>
+            <!-- The team route swaps this in for the league's facts rather
+                 than stacking a second masthead under the first. -->
+            <dl class="masthead__meta" id="teamBadge" aria-live="polite" hidden></dl>
         </header>
         <p class="masthead__freshness" id="freshnessValue"></p>
 
@@ -76,34 +81,32 @@
             </nav>
 
             <!-- Team detail replaces the league sections; it is a routed view
-                 on this page (?team=N) rather than a second HTML file. -->
-            <section id="teamView" class="team-view" hidden aria-labelledby="teamName">
+                 on this page (?team=N) rather than a second HTML file. The
+                 team's own name rides in the masthead above, so this view
+                 opens on the paragraph the hub already writes about it. -->
+            <section id="teamView" class="team-view" hidden aria-labelledby="leagueName">
                 <button type="button" class="back-link" id="teamBack">← All teams</button>
-                <header class="team-head">
-                    <img class="team-head__logo" id="teamLogo" alt="" hidden>
-                    <div>
-                        <h2 id="teamName">—</h2>
-                        <p class="team-head__sub" id="teamOwner"></p>
-                    </div>
-                    <dl class="team-stats" id="teamStats"></dl>
-                    <div class="team-power" id="teamPower"></div>
-                </header>
 
-                <section class="team-overview" aria-labelledby="teamOverviewTitle">
-                    <div class="team-overview__head">
-                        <div>
-                            <h3 id="teamOverviewTitle">Team overview</h3>
-                            <span class="team-overview__meta" id="teamOverviewMeta"></span>
+                <!-- The lede and the record, side by side. The overview used
+                     to sit in a grey box below the numbers, which is where
+                     writing goes to be skipped. -->
+                <div class="dossier">
+                    <div class="dossier__main">
+                        <div class="dossier__lede" id="teamLede" aria-live="polite"></div>
+                        <div class="dossier__foot">
+                            <span class="dossier__meta" id="teamOverviewMeta"></span>
+                            <button type="button" class="button button--quiet" id="teamOverviewRefresh">
+                                Check for updates
+                            </button>
                         </div>
-                        <button type="button" class="button button--quiet" id="teamOverviewRefresh">
-                            Check for updates
-                        </button>
                     </div>
-                    <div class="team-overview__body" id="teamOverviewBody" aria-live="polite"></div>
-                </section>
+                    <dl class="colophon" id="teamColophon"></dl>
+                </div>
 
                 <!-- Start/sit: the lineup as set, against the best one this
-                     roster could field for the week. -->
+                     roster could field for the week. An aside here, because on
+                     six days out of seven it is the least live thing on the
+                     page — but the first thing worth doing on the seventh. -->
                 <section class="lineup" id="lineupCard" aria-labelledby="lineupTitle" hidden>
                     <div class="lineup__head">
                         <div>
@@ -116,17 +119,24 @@
                     <p class="lineup__note" id="lineupNote"></p>
                 </section>
 
-                <div class="team-columns">
-                    <section aria-labelledby="teamResultsTitle">
-                        <h3 id="teamResultsTitle">Results</h3>
-                        <ol class="results" id="teamResults"></ol>
-                    </section>
-                    <section aria-labelledby="teamRosterTitle">
-                        <h3 id="teamRosterTitle">Roster</h3>
-                        <p class="roster__note" id="rosterNote"></p>
-                        <div id="teamRoster"></div>
-                    </section>
-                </div>
+                <section class="board" data-board="season" aria-labelledby="teamResultsTitle">
+                    <div class="board__head">
+                        <h2 id="teamResultsTitle">The season, week by week</h2>
+                        <span class="board__note">Bar is the margin</span>
+                    </div>
+                    <div class="season" id="teamResults"></div>
+                </section>
+
+                <section class="board" data-board="rooms" aria-labelledby="teamRosterTitle">
+                    <div class="board__head">
+                        <div>
+                            <h2 id="teamRosterTitle">The roster, by room</h2>
+                            <p class="board__lede" id="roomsLede"></p>
+                        </div>
+                        <span class="board__note" id="rosterNote"></span>
+                    </div>
+                    <div id="teamRoster" class="rooms"></div>
+                </section>
             </section>
 
             <div id="leagueSections">
@@ -236,8 +246,8 @@
     <script>window.FantasyHeader.mount({ page: "league" });</script>
     <script src="/shared/analytics.js?v=1"></script>
     <script src="/shared/api-base.js?v=1"></script>
-    <script src="format.js?v=3"></script>
+    <script src="format.js?v=4"></script>
     <script src="/fantasy/chat.js?v=1"></script>
-    <script src="app.js?v=9"></script>
+    <script src="app.js?v=10"></script>
 </body>
 </html>

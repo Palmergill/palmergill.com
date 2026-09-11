@@ -130,6 +130,63 @@
         };
     }
 
+    // The rooms a roster is read in, in display order. These mirror
+    // fantasy_league_advanced.ROOMS on the server, which is what lets a room's
+    // players and its league-wide measurement be joined by position key.
+    // Kicker and defense stay apart: only one of them has an actuals feed.
+    const ROOMS = [
+        { position: "QB", label: "Quarterback", positions: ["QB"] },
+        { position: "RB", label: "Running back", positions: ["RB"] },
+        { position: "WR", label: "Wide receiver", positions: ["WR"] },
+        { position: "TE", label: "Tight end", positions: ["TE"] },
+        { position: "K", label: "Kicker", positions: ["K", "PK"] },
+        { position: "DST", label: "Defense", positions: ["DEF", "DST", "D/ST"] },
+    ];
+
+    function roomKey(position) {
+        const upper = String(position || "").toUpperCase();
+        const room = ROOMS.find((entry) => entry.positions.indexOf(upper) !== -1);
+        return room ? room.position : null;
+    }
+
+    // Rooms key on what a player *is*, not on the slot he happens to fill, so
+    // a receiver in the flex is read with the other receivers. Empty rooms are
+    // dropped rather than printed as a heading with nothing under it.
+    function groupByPosition(entries) {
+        const sorted = sortRoster(entries);
+        const buckets = {};
+        const unplaced = [];
+        sorted.forEach((entry) => {
+            const key = roomKey(entry.position);
+            if (key === null) {
+                unplaced.push(entry);
+                return;
+            }
+            (buckets[key] = buckets[key] || []).push(entry);
+        });
+        const rooms = ROOMS.filter((room) => buckets[room.position]).map((room) => ({
+            position: room.position,
+            label: room.label,
+            entries: buckets[room.position],
+        }));
+        if (unplaced.length) {
+            rooms.push({ position: null, label: "Other", entries: unplaced });
+        }
+        return rooms;
+    }
+
+    function ordinal(value) {
+        const number = finite(value);
+        if (number === null) return "—";
+        const rounded = Math.round(number);
+        const tens = Math.abs(rounded) % 100;
+        const suffix =
+            tens >= 11 && tens <= 13
+                ? "th"
+                : { 1: "st", 2: "nd", 3: "rd" }[Math.abs(rounded) % 10] || "th";
+        return `${rounded}${suffix}`;
+    }
+
     function groupByDivision(teams, divisions) {
         const names = {};
         (divisions || []).forEach((division) => {
@@ -506,6 +563,9 @@
         isStarter,
         sortRoster,
         splitRoster,
+        ROOMS,
+        groupByPosition,
+        ordinal,
         groupByDivision,
         matchupResult,
         seasonLabel,

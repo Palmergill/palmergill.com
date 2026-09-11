@@ -303,3 +303,123 @@ def test_a_week_without_a_computable_optimal_is_skipped():
     )
 
     assert result == {"efficiency": None, "points_left": None, "weeks": 0}
+
+
+# ── position rooms ─────────────────────────────────────────────────────
+#
+# Numbers are chosen so every average below divides exactly by hand.
+
+
+def spot(player_id, position):
+    return {"player_id": player_id, "position": position}
+
+
+def test_a_room_scores_points_per_player_game_not_per_total():
+    # Team 1 carries three backs, team 2 carries two. Team 1 has more points
+    # and the worse room; a total would say the opposite.
+    rosters = {
+        1: [spot("a", "RB"), spot("b", "RB"), spot("c", "RB")],
+        2: [spot("d", "RB"), spot("e", "RB")],
+    }
+    production = {
+        "a": {"games": 10, "points": 100.0},
+        "b": {"games": 10, "points": 100.0},
+        "c": {"games": 10, "points": 100.0},
+        "d": {"games": 10, "points": 150.0},
+        "e": {"games": 10, "points": 150.0},
+    }
+
+    rooms = A.position_rooms(rosters, production)
+    first = next(r for r in rooms[1] if r["position"] == "RB")
+    second = next(r for r in rooms[2] if r["position"] == "RB")
+
+    assert first["points_per_game"] == 10.0
+    assert second["points_per_game"] == 15.0
+    assert first["rank"] == 2
+    assert second["rank"] == 1
+    assert first["league_average"] == 12.5
+
+
+def test_a_room_nobody_has_played_takes_no_rank():
+    rosters = {1: [spot("a", "DST")], 2: [spot("b", "DST")]}
+
+    rooms = A.position_rooms(rosters, {})
+    room = next(r for r in rooms[1] if r["position"] == "DST")
+
+    assert room["points_per_game"] is None
+    assert room["league_average"] is None
+    assert room["rank"] is None
+    assert room["teams"] == 0
+
+
+def test_ranking_counts_only_the_teams_that_have_a_number():
+    rosters = {
+        1: [spot("a", "TE")],
+        2: [spot("b", "TE")],
+        3: [spot("c", "TE")],
+    }
+    production = {"a": {"games": 4, "points": 40.0}, "b": {"games": 4, "points": 20.0}}
+
+    rooms = A.position_rooms(rosters, production)
+    ranked = {t: next(r for r in rooms[t] if r["position"] == "TE") for t in (1, 2, 3)}
+
+    assert ranked[1]["rank"] == 1
+    assert ranked[2]["rank"] == 2
+    assert ranked[3]["rank"] is None
+    assert ranked[1]["teams"] == 2
+
+
+def test_an_unplayed_player_is_listed_without_inventing_a_zero():
+    rosters = {1: [spot("a", "WR"), spot("b", "WR")]}
+    production = {"a": {"games": 5, "points": 60.0}}
+
+    room = next(r for r in A.position_rooms(rosters, production)[1] if r["position"] == "WR")
+
+    assert room["players"]["b"] == {
+        "player_id": "b",
+        "games": 0,
+        "points": None,
+        "points_per_game": None,
+    }
+    # The empty player does not drag the room's average toward zero.
+    assert room["points_per_game"] == 12.0
+
+
+def test_an_unmatched_player_has_no_line_at_all():
+    rosters = {1: [{"player_id": None, "position": "WR"}, spot("a", "WR")]}
+    production = {"a": {"games": 2, "points": 30.0}}
+
+    room = next(r for r in A.position_rooms(rosters, production)[1] if r["position"] == "WR")
+
+    assert list(room["players"]) == ["a"]
+    assert room["points_per_game"] == 15.0
+
+
+def test_kicker_and_defense_stay_separate_rooms():
+    rosters = {1: [spot("a", "K"), spot("b", "DEF")]}
+    production = {"a": {"games": 4, "points": 32.0}}
+
+    rooms = {room["position"]: room for room in A.position_rooms(rosters, production)[1]}
+
+    assert rooms["K"]["points_per_game"] == 8.0
+    assert rooms["DST"]["points_per_game"] is None
+    assert [room["label"] for room in A.position_rooms(rosters, production)[1]] == [
+        "Quarterback",
+        "Running back",
+        "Wide receiver",
+        "Tight end",
+        "Kicker",
+        "Defense",
+    ]
+
+
+def test_a_flex_receiver_lands_in_the_receiver_room():
+    # Rooms key on the player's position, not the slot he happens to fill.
+    rosters = {1: [{"player_id": "a", "position": "WR", "lineup_slot": "FLEX"}]}
+
+    room = next(
+        r for r in A.position_rooms(rosters, {"a": {"games": 3, "points": 36.0}})[1]
+        if r["position"] == "WR"
+    )
+
+    assert room["points_per_game"] == 12.0

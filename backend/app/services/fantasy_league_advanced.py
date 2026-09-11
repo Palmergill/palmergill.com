@@ -327,3 +327,125 @@ def lineup_efficiency(weeks: Iterable[Dict[str, Any]]) -> Dict[str, Any]:
         "points_left": optimal - started,
         "weeks": counted,
     }
+
+
+# ── position rooms ────────────────────────────────────────────────────
+#
+# The ledger measures teams against each other on points and schedule. It
+# cannot say *where* a team is strong, which is the question a roster page
+# actually raises: is the record a quarterback, or is it four good receivers?
+#
+# A room is every player a team holds at one position. Rooms are compared on
+# points per player-game rather than on totals, because a team carrying three
+# running backs would otherwise out-score one carrying two by arithmetic
+# alone.
+
+# Display order, and the label each room prints under. Kicker and defense
+# stay separate even though they share a slot's worth of attention: only one
+# of them has an actuals feed, and a combined room would print a bar that
+# silently means "kicker".
+ROOMS = (
+    ("QB", "Quarterback", frozenset({"QB"})),
+    ("RB", "Running back", frozenset({"RB"})),
+    ("WR", "Wide receiver", frozenset({"WR"})),
+    ("TE", "Tight end", frozenset({"TE"})),
+    ("K", "Kicker", frozenset({"K", "PK"})),
+    ("DST", "Defense", frozenset({"DEF", "DST", "D/ST"})),
+)
+
+
+def _room_key(position: Optional[str]) -> Optional[str]:
+    """Which room a roster position belongs to, or None when it fits none."""
+    upper = (position or "").upper()
+    for key, _label, members in ROOMS:
+        if upper in members:
+            return key
+    return None
+
+
+def position_rooms(
+    rosters: Dict[int, List[Dict[str, Any]]],
+    production: Dict[str, Dict[str, float]],
+) -> Dict[int, List[Dict[str, Any]]]:
+    """Each team's rooms, measured against the league at the same position.
+
+    ``rosters`` is ``{team_id: [{"player_id", "position", ...}]}`` and
+    ``production`` is ``{player_id: {"games", "points"}}`` for the season so
+    far. Both come from the read layer; nothing here touches a database.
+
+    A room with no scored games — a defense, whose weekly feed has no row for
+    a team unit, or a roster of players who have not played — reports
+    ``points_per_game: None`` and takes no rank. That is the same discipline
+    the ledger's charts follow: a number that cannot be computed renders as
+    nothing rather than as a zero.
+    """
+    # team -> room -> accumulated games and points, plus the per-player lines
+    # the roster page prints next to each name.
+    tallies: Dict[int, Dict[str, Dict[str, Any]]] = {}
+    for team_id, entries in rosters.items():
+        by_room: Dict[str, Dict[str, Any]] = {
+            key: {"games": 0, "points": 0.0, "players": {}} for key, _l, _m in ROOMS
+        }
+        for entry in entries:
+            key = _room_key(entry.get("position"))
+            if key is None:
+                continue
+            player_id = entry.get("player_id")
+            line = production.get(player_id) if player_id else None
+            games = int((line or {}).get("games") or 0)
+            points = float((line or {}).get("points") or 0.0)
+            if player_id:
+                by_room[key]["players"][player_id] = {
+                    "player_id": player_id,
+                    "games": games,
+                    "points": round(points, 1) if games else None,
+                    "points_per_game": round(points / games, 1) if games else None,
+                }
+            if games:
+                by_room[key]["games"] += games
+                by_room[key]["points"] += points
+        tallies[team_id] = by_room
+
+    # One ranking per room, over the teams that have a number at all, so a
+    # league where two defenses are unscored still ranks the other eight
+    # honestly rather than sinking them to the bottom.
+    ranks: Dict[str, Dict[int, int]] = {}
+    counts: Dict[str, int] = {}
+    for key, _label, _members in ROOMS:
+        scored = [
+            (team_id, room["points"] / room["games"])
+            for team_id, rooms in tallies.items()
+            for room in [rooms[key]]
+            if room["games"]
+        ]
+        scored.sort(key=lambda pair: pair[1], reverse=True)
+        ranks[key] = {team_id: index + 1 for index, (team_id, _ppg) in enumerate(scored)}
+        counts[key] = len(scored)
+
+    result: Dict[int, List[Dict[str, Any]]] = {}
+    for team_id, rooms in tallies.items():
+        lines = []
+        for key, label, _members in ROOMS:
+            room = rooms[key]
+            ppg = room["points"] / room["games"] if room["games"] else None
+            league = [
+                other[key]["points"] / other[key]["games"]
+                for other in tallies.values()
+                if other[key]["games"]
+            ]
+            lines.append(
+                {
+                    "position": key,
+                    "label": label,
+                    "players": room["players"],
+                    "games": room["games"],
+                    "points_per_game": round(ppg, 1) if ppg is not None else None,
+                    "league_average": (
+                        round(sum(league) / len(league), 1) if league else None
+                    ),
+                    "rank": ranks[key].get(team_id),
+                    "teams": counts[key],
+                }
+            )
+        result[team_id] = lines
+    return result

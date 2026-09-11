@@ -33,6 +33,10 @@
     const byId = (id) => document.getElementById(id);
     const els = {
         leagueName: byId("leagueName"),
+        leagueSub: byId("leagueSub"),
+        mastheadEyebrow: byId("mastheadEyebrow"),
+        modeBadge: byId("modeBadge"),
+        teamBadge: byId("teamBadge"),
         modeLabel: byId("modeLabel"),
         seasonValue: byId("seasonValue"),
         weekValue: byId("weekValue"),
@@ -65,12 +69,9 @@
         myTeamMoves: byId("myTeamMoves"),
         teamView: byId("teamView"),
         teamBack: byId("teamBack"),
-        teamLogo: byId("teamLogo"),
-        teamName: byId("teamName"),
-        teamOwner: byId("teamOwner"),
-        teamStats: byId("teamStats"),
-        teamPower: byId("teamPower"),
-        teamOverviewBody: byId("teamOverviewBody"),
+        teamLede: byId("teamLede"),
+        teamColophon: byId("teamColophon"),
+        roomsLede: byId("roomsLede"),
         teamOverviewMeta: byId("teamOverviewMeta"),
         teamOverviewRefresh: byId("teamOverviewRefresh"),
         teamResults: byId("teamResults"),
@@ -722,131 +723,352 @@
         });
     }
 
-    function statItem(label, value) {
-        const wrap = document.createDocumentFragment();
+    // ── the team as a document ──────────────────────────────────────────
+    //
+    // A team page is a detail view about one roster, but it is also the only
+    // page on this site that gets a paragraph written about it every week.
+    // So it opens on the writing, with the record set beside it the way a
+    // colophon sits beside a lede, and the numbers that used to be a header
+    // card become the facts under that lede.
+
+    function fact(label, value, sub) {
+        const wrap = el("div", "masthead__fact");
         wrap.appendChild(el("dt", null, label));
-        wrap.appendChild(el("dd", null, value));
+        const dd = el("dd", null, value);
+        if (sub) dd.appendChild(el("small", null, sub));
+        wrap.appendChild(dd);
         return wrap;
     }
 
+    // The masthead carries whichever thing the page is currently about.
+    // Two mastheads stacked would mean neither is the loudest.
+    function renderTeamMasthead(detail) {
+        const season = (detail && detail.season) || state.season || "";
+        const played = (detail && detail.games_played) || 0;
+        els.mastheadEyebrow.textContent = played
+            ? `Team dossier · ${season} · through ${played} game${played === 1 ? "" : "s"}`
+            : `Team dossier · ${season}`;
+        els.leagueName.textContent = (detail && detail.name) || "—";
+        els.leagueSub.textContent = (detail && detail.owner_name) || "";
+        els.leagueSub.hidden = !els.leagueSub.textContent;
+
+        els.teamBadge.replaceChildren();
+        if (!detail) return;
+        els.teamBadge.appendChild(
+            fact("Record", F.recordLabel(detail.wins, detail.losses, detail.ties))
+        );
+        els.teamBadge.appendChild(fact("Points for", F.formatPoints(detail.points_for)));
+        els.teamBadge.appendChild(fact("Against", F.formatPoints(detail.points_against)));
+        els.teamBadge.appendChild(
+            fact(
+                "Per game",
+                F.formatPoints(F.pointsPerGame(detail.points_for, detail.games_played))
+            )
+        );
+    }
+
+    // Which of the two fact lists the masthead is showing. Called before the
+    // team payload lands so the league's numbers are never left standing
+    // under a team's name.
+    function setMastheadMode(showingTeam) {
+        els.modeBadge.hidden = showingTeam;
+        els.teamBadge.hidden = !showingTeam;
+        els.freshnessValue.hidden = showingTeam;
+        if (!showingTeam) {
+            els.leagueSub.hidden = true;
+            els.teamBadge.replaceChildren();
+            if (state.overview) renderHeader(state.overview);
+        }
+    }
+
+    // Where this team sits among the ten on one ledger column. The ledger is
+    // already loaded — it is fetched before the route is applied and stays in
+    // state — so none of these six facts costs a request.
+    function ledgerRank(rows, key, teamId) {
+        const ranked = F.sortLedger(rows, key).filter(
+            (row) => F.ledgerValue(row, key) !== null
+        );
+        const index = ranked.findIndex((row) => row.espn_team_id === teamId);
+        return index === -1 ? null : { rank: index + 1, of: ranked.length };
+    }
+
+    function rankSub(rows, key, teamId) {
+        const placing = ledgerRank(rows, key, teamId);
+        return placing ? `${F.ordinal(placing.rank)} of ${placing.of}` : "";
+    }
+
+    function renderColophon(detail) {
+        els.teamColophon.replaceChildren();
+        const rows = (state.ledger && state.ledger.teams) || [];
+        const row = rows.find((entry) => entry.espn_team_id === detail.espn_team_id);
+        const history = detail.power_history || [];
+        const latest = history.length ? history[history.length - 1] : null;
+
+        els.teamColophon.appendChild(
+            fact(
+                "Record",
+                F.recordLabel(detail.wins, detail.losses, detail.ties),
+                rankSub(rows, "record", detail.espn_team_id)
+            )
+        );
+        els.teamColophon.appendChild(
+            fact(
+                "Power",
+                latest ? `#${latest.rank}` : "—",
+                history.length > 1 ? `from #${history[0].rank} in week ${history[0].week}` : ""
+            )
+        );
+        els.teamColophon.appendChild(
+            fact(
+                "Points for",
+                F.formatPoints(detail.points_for),
+                `${F.formatPoints(F.pointsPerGame(detail.points_for, detail.games_played))} per game`
+            )
+        );
+        els.teamColophon.appendChild(
+            fact(
+                "Against",
+                F.formatPoints(detail.points_against),
+                `${F.formatPoints(F.pointsPerGame(detail.points_against, detail.games_played))} per game`
+            )
+        );
+        // The last two come off the ledger. When the ledger failed — it is
+        // fetched alongside the team and its errors are deliberately quiet —
+        // they print a dash rather than a plausible zero.
+        els.teamColophon.appendChild(
+            fact(
+                "All-play",
+                row ? F.ledgerText(row, "all_play") : "—",
+                row ? rankSub(rows, "all_play", detail.espn_team_id) : ""
+            )
+        );
+        els.teamColophon.appendChild(
+            fact(
+                "Lineup",
+                row ? F.ledgerText(row, "lineup") : "—",
+                row && row.luck !== null && row.luck !== undefined
+                    ? `${F.formatSigned(row.luck)} wins on luck`
+                    : ""
+            )
+        );
+    }
+
+    // ── the season, week by week ────────────────────────────────────────
+
+    function seasonRow(result, scale) {
+        const row = el("div", `season__wk${result.is_bye ? " season__wk--bye" : ""}`);
+        row.appendChild(el("span", "season__n", `Wk ${result.week}`));
+
+        if (result.is_bye) {
+            row.appendChild(el("span", "season__outcome season__outcome--bye", "BYE"));
+            row.appendChild(el("span", "season__opp dim", "—"));
+            row.appendChild(el("span", "season__score dim", "—"));
+            row.appendChild(el("span", "dv"));
+            return row;
+        }
+
+        // Modifier comes from a fixed set, never from the display text — the
+        // pending state renders an em-dash, which is not a class name.
+        const modifier = { W: "w", L: "l", T: "t" }[result.outcome] || "pending";
+        row.appendChild(
+            el("span", `season__outcome season__outcome--${modifier}`, result.outcome || "—")
+        );
+
+        const opponent = result.opponent || {};
+        const opp = el("span", "season__opp");
+        opp.appendChild(document.createTextNode(opponent.name || "—"));
+        if (opponent.wins !== null && opponent.wins !== undefined) {
+            opp.appendChild(
+                el(
+                    "small",
+                    null,
+                    ` · ${F.recordLabel(opponent.wins, opponent.losses, opponent.ties)}`
+                )
+            );
+        }
+        row.appendChild(opp);
+
+        row.appendChild(
+            el(
+                "span",
+                "season__score",
+                result.points === null || result.points === undefined
+                    ? "—"
+                    : `${F.formatPoints(result.points)}–${F.formatPoints(result.opponent_points)}`
+            )
+        );
+
+        // One scale across the season: a margin bar is only readable against
+        // the other weeks on the same axis. A week not yet played draws no
+        // axis at all — divergingBar reports a missing margin and a genuine
+        // tie identically, and a lone zero rule under an unplayed week reads
+        // as a result that has not happened.
+        const holder = el("div", "dv");
+        if (result.margin !== null && result.margin !== undefined) {
+            holder.appendChild(el("div", "dv__zero"));
+            const bar = F.divergingBar(result.margin, scale);
+            if (bar.side !== "zero") {
+                const fill = el("div", `dv__bar dv__bar--${bar.side}`);
+                fill.style.width = `${bar.width}%`;
+                holder.appendChild(fill);
+            }
+        }
+        row.appendChild(holder);
+        return row;
+    }
+
     function renderTeamDetail(detail) {
-        els.teamName.textContent = detail.name || "—";
-        els.teamOwner.textContent = detail.owner_name || "";
-        if (detail.logo_url) {
-            els.teamLogo.src = detail.logo_url;
-            els.teamLogo.hidden = false;
-        } else {
-            els.teamLogo.hidden = true;
-        }
-
-        els.teamStats.replaceChildren();
-        els.teamStats.appendChild(
-            statItem("Record", F.recordLabel(detail.wins, detail.losses, detail.ties))
-        );
-        els.teamStats.appendChild(statItem("Points for", F.formatPoints(detail.points_for)));
-        els.teamStats.appendChild(statItem("Points against", F.formatPoints(detail.points_against)));
-        els.teamStats.appendChild(
-            statItem("Per game", F.formatPoints(F.pointsPerGame(detail.points_for, detail.games_played)))
-        );
-
-        els.teamPower.replaceChildren();
-        const ranks = (detail.power_history || []).map((point) => point.rank);
-        const path = F.sparkline(ranks, 112, 34, 3);
-        if (path) {
-            const latest = detail.power_history[detail.power_history.length - 1];
-            els.teamPower.appendChild(el("span", "team-power__label", `Power #${latest.rank}`));
-            const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-            svg.setAttribute("viewBox", "0 0 112 34");
-            svg.setAttribute("aria-label", "Power-rank history");
-            const line = document.createElementNS("http://www.w3.org/2000/svg", "path");
-            line.setAttribute("d", path);
-            svg.appendChild(line);
-            els.teamPower.appendChild(svg);
-        }
+        renderTeamMasthead(detail);
+        renderColophon(detail);
 
         els.teamResults.replaceChildren();
-        detail.results.forEach((result) => {
-            const item = el("li", "result");
-            item.appendChild(el("span", "result__week", `Wk ${result.week}`));
-            if (result.is_bye) {
-                item.appendChild(el("span", "result__outcome result__outcome--bye", "BYE"));
-                els.teamResults.appendChild(item);
-                return;
+        const results = detail.results || [];
+        if (!results.length) {
+            els.teamResults.appendChild(el("p", "empty-note", "No games recorded yet."));
+            return;
+        }
+        const scale = F.maxAbs(results.map((result) => result.margin));
+        results.forEach((result) => els.teamResults.appendChild(seasonRow(result, scale)));
+    }
+
+    // ── the roster, by room ─────────────────────────────────────────────
+
+    function playerRow(entry, line, measured) {
+        const item = el("li", `roster__row${entry.matched ? "" : " roster__row--unmatched"}`);
+        item.appendChild(el("span", "roster__slot", entry.lineup_slot || "—"));
+
+        const main = el("div", "roster__main");
+        main.appendChild(el("span", "roster__name", entry.name || "—"));
+        const meta = [entry.position, entry.pro_team].filter(Boolean).join(" · ");
+        main.appendChild(el("span", "roster__meta", meta));
+        if (entry.matched) {
+            const detail = [];
+            if (entry.projection && entry.projection[LEAGUE_PROJECTION_FIELD] != null) {
+                detail.push(`Proj ${F.formatPoints(entry.projection[LEAGUE_PROJECTION_FIELD])}`);
             }
-            // Modifier comes from a fixed set, never from the display text —
-            // the pending state renders an em-dash, which is not a class name.
-            const outcome = result.outcome;
-            const modifier = { W: "w", L: "l", T: "t" }[outcome] || "pending";
-            item.appendChild(
-                el("span", `result__outcome result__outcome--${modifier}`, outcome || "—")
-            );
+            if (entry.ranking && entry.ranking.rank != null) {
+                const position = entry.ranking.position === "DEF" ? "DST" : entry.ranking.position;
+                detail.push(`${position || LEAGUE_SCORING_LABEL} #${entry.ranking.rank}`);
+            }
+            const actual = (entry.recent_actuals || [])[0];
+            if (actual && actual[LEAGUE_ACTUAL_FIELD] != null) {
+                detail.push(`Last ${F.formatPoints(actual[LEAGUE_ACTUAL_FIELD])}`);
+            }
+            if (detail.length) main.appendChild(el("span", "roster__data", detail.join(" · ")));
+            const prop = (entry.props || [])[0];
+            if (prop) {
+                const point = prop.point == null ? "" : ` ${prop.point}`;
+                main.appendChild(el("span", "roster__prop", `${prop.label}${point}`));
+            }
+        }
+        item.appendChild(main);
+
+        const badge = F.injuryBadge(entry.injury_status);
+        if (badge) item.appendChild(el("span", "roster__injury", badge));
+        // Season points per game, in a room that has any. A dash means "this
+        // player has not played", which is only worth saying where the rest
+        // of the room has numbers — an unmeasurable room gets no column at
+        // all rather than one dash per name.
+        if (measured) {
+            const played = line && line.points_per_game != null;
             item.appendChild(
                 el(
                     "span",
-                    "result__score",
-                    `${F.formatPoints(result.points)}–${F.formatPoints(result.opponent_points)}`
+                    `roster__ppg${played ? "" : " dim"}`,
+                    played ? F.formatPoints(line.points_per_game) : "—"
                 )
             );
-            item.appendChild(
-                el("span", "result__opponent", result.opponent ? result.opponent.name || "—" : "—")
-            );
-            els.teamResults.appendChild(item);
-        });
+        }
+        return item;
     }
 
-    function rosterGroup(title, entries) {
-        const section = el("div", "roster-group");
-        section.appendChild(el("h4", "roster-group__title", title));
+    // The bar is the room against the league at the same position, with a
+    // tick where the league average falls. Position, not length alone, is
+    // what makes "above average" readable.
+    // Each room's axis runs to 1.6x the league average at that position,
+    // which puts the average tick at the same place in every room unless a
+    // room is strong enough to run past it. That fixed anchor is the point:
+    // it is what lets you compare a quarterback room to a tight end room by
+    // eye, when the two positions score nothing like the same number.
+    function roomStrength(room) {
+        const best = Math.max(
+            room.points_per_game || 0,
+            (room.league_average || 0) * 1.6,
+            1
+        );
+        const wrap = el("div", "room__strength");
+        const track = el("div", "meter");
+        const fill = el("div", "meter__fill");
+        fill.style.width = `${Math.min(100, (room.points_per_game / best) * 100)}%`;
+        track.appendChild(fill);
+        if (room.league_average != null) {
+            const tick = el("div", "meter__avg");
+            tick.style.left = `${Math.min(100, (room.league_average / best) * 100)}%`;
+            track.appendChild(tick);
+        }
+        wrap.appendChild(track);
+        wrap.appendChild(
+            el(
+                "span",
+                "room__scale",
+                `${F.formatPoints(room.points_per_game)} / ${F.formatPoints(room.league_average)} avg`
+            )
+        );
+        return wrap;
+    }
+
+    function roomSection(group, measure, production) {
+        const section = el("div", "room");
+        const head = el("div", "room__head");
+        head.appendChild(el("h3", null, group.label));
+        if (measure && measure.rank) {
+            const rank = el("span", "room__rank");
+            rank.appendChild(el("b", null, F.ordinal(measure.rank)));
+            rank.appendChild(document.createTextNode(` of ${measure.teams}`));
+            head.appendChild(rank);
+        }
+        section.appendChild(head);
+
+        const measured = Boolean(measure && measure.points_per_game != null);
+        if (measured) section.appendChild(roomStrength(measure));
+
         const list = el("ul", "roster");
-        entries.forEach((entry) => {
-            const item = el("li", `roster__row${entry.matched ? "" : " roster__row--unmatched"}`);
-            item.appendChild(el("span", "roster__slot", entry.lineup_slot || "—"));
-            const main = el("div", "roster__main");
-            main.appendChild(el("span", "roster__name", entry.name || "—"));
-            const meta = [entry.position, entry.pro_team].filter(Boolean).join(" · ");
-            main.appendChild(el("span", "roster__meta", meta));
-            if (entry.matched) {
-                const detail = [];
-                if (entry.projection && entry.projection[LEAGUE_PROJECTION_FIELD] != null) {
-                    detail.push(`Proj ${F.formatPoints(entry.projection[LEAGUE_PROJECTION_FIELD])}`);
-                }
-                if (entry.ranking && entry.ranking.rank != null) {
-                    const position = entry.ranking.position === "DEF" ? "DST" : entry.ranking.position;
-                    detail.push(`${position || LEAGUE_SCORING_LABEL} #${entry.ranking.rank}`);
-                }
-                const actual = (entry.recent_actuals || [])[0];
-                if (actual && actual[LEAGUE_ACTUAL_FIELD] != null) {
-                    detail.push(`Last ${F.formatPoints(actual[LEAGUE_ACTUAL_FIELD])}`);
-                }
-                if (detail.length) main.appendChild(el("span", "roster__data", detail.join(" · ")));
-                const prop = (entry.props || [])[0];
-                if (prop) {
-                    const point = prop.point == null ? "" : ` ${prop.point}`;
-                    main.appendChild(el("span", "roster__prop", `${prop.label}${point}`));
-                }
-            }
-            item.appendChild(main);
-            const badge = F.injuryBadge(entry.injury_status);
-            if (badge) item.appendChild(el("span", "roster__injury", badge));
-            list.appendChild(item);
-        });
+        group.entries.forEach((entry) =>
+            list.appendChild(playerRow(entry, production[entry.player_id], measured))
+        );
         section.appendChild(list);
         return section;
     }
 
-    function renderRoster(payload) {
+    function renderRoster(payload, rooms) {
         els.teamRoster.replaceChildren();
         if (!payload.entries.length) {
             els.teamRoster.appendChild(el("p", "empty-note", "No roster snapshot yet."));
             els.rosterNote.textContent = "";
+            els.roomsLede.textContent = "";
             return;
         }
-        const groups = F.splitRoster(payload.entries);
-        if (groups.starters.length) {
-            els.teamRoster.appendChild(rosterGroup("Starters", groups.starters));
-        }
-        if (groups.bench.length) els.teamRoster.appendChild(rosterGroup("Bench", groups.bench));
-        if (groups.ir.length) els.teamRoster.appendChild(rosterGroup("Injured reserve", groups.ir));
+
+        // The measurement is optional. Without it the rooms still group and
+        // still list, they just carry no bar and no rank.
+        const measures = {};
+        const production = {};
+        ((rooms && rooms.rooms) || []).forEach((room) => {
+            measures[room.position] = room;
+            Object.keys(room.players || {}).forEach((playerId) => {
+                production[playerId] = room.players[playerId];
+            });
+        });
+        els.roomsLede.textContent = rooms && rooms.available
+            ? "Season points per game, for the players on this roster now, against the league average at each position."
+            : "";
+
+        F.groupByPosition(payload.entries).forEach((group) => {
+            els.teamRoster.appendChild(
+                roomSection(group, measures[group.position], production)
+            );
+        });
+
         const notes = [F.formatAsOf(payload.as_of)];
         if (payload.player_data && payload.player_data.season) {
             const week = payload.player_data.week === 0
@@ -942,7 +1164,7 @@
 
     function lineupChange(label, player) {
         const item = el("li", "lineup__change");
-        item.appendChild(el("span", "lineup__slot", player.slot || player.current_slot || "—"));
+        item.appendChild(el("span", "lineup__slot", player.slot || "—"));
         item.appendChild(lineupSide(label, player));
         return item;
     }
@@ -952,7 +1174,7 @@
         // Generating costs a model call, so it stays an explicit choice
         // rather than something a page view triggers.
         if (payload.status === "missing") {
-            els.teamOverviewBody.replaceChildren(
+            els.teamLede.replaceChildren(
                 el("p", "empty-note", "No overview written for this team yet.")
             );
             els.teamOverviewMeta.textContent = "";
@@ -960,7 +1182,7 @@
             return;
         }
 
-        renderMarkdown(els.teamOverviewBody, payload.overview_md || "No overview available.");
+        renderMarkdown(els.teamLede, payload.overview_md || "No overview available.");
         const source = payload.source === "model" ? "Model summary" : "Local summary";
         const parts = [source, `Week ${payload.week}`];
         if (payload.status === "stale") {
@@ -1239,14 +1461,23 @@
         const generation = state.generation;
         const params = new URLSearchParams();
         if (state.season) params.set("season", state.season);
-        els.teamOverviewBody.replaceChildren();
+        // Clear the whole view, not only the overview: without this the
+        // previous team's roster and results sit under the new team's name
+        // for as long as the fetch takes.
+        els.teamLede.replaceChildren();
         els.teamOverviewMeta.textContent = "";
+        els.teamColophon.replaceChildren();
+        els.teamResults.replaceChildren();
+        els.teamRoster.replaceChildren();
+        els.rosterNote.textContent = "";
+        els.roomsLede.textContent = "";
+        els.lineupCard.hidden = true;
         try {
             const lineupParams = new URLSearchParams(params);
             // The roster list below prints Half PPR projections, so the lineup that
             // grades them has to be scored the same way.
             lineupParams.set("scoring", LEAGUE_SCORING);
-            const [detail, roster, lineup] = await Promise.all([
+            const [detail, roster, lineup, rooms] = await Promise.all([
                 fetchJson(`${API_BASE}/teams/${state.teamId}?${params}`),
                 fetchJson(`${API_BASE}/teams/${state.teamId}/roster?${params}`),
                 fetchJson(`${API_BASE}/teams/${state.teamId}/lineup?${lineupParams}`).catch(
@@ -1254,10 +1485,15 @@
                     // without the page being broken.
                     () => null
                 ),
+                // Nor is the league-wide measurement: without it the rooms
+                // still group and list, they just carry no bar and no rank.
+                fetchJson(`${API_BASE}/teams/${state.teamId}/rooms?${params}`).catch(
+                    () => null
+                ),
             ]);
             if (stale(generation)) return;
             renderTeamDetail(detail);
-            renderRoster(roster);
+            renderRoster(roster, rooms);
             renderLineup(lineup);
             loadTeamOverview(false);
         } catch (error) {
@@ -1282,7 +1518,7 @@
         } catch (error) {
             if (!stale(generation)) {
                 els.teamOverviewMeta.textContent = "";
-                els.teamOverviewBody.replaceChildren(
+                els.teamLede.replaceChildren(
                     el("p", "empty-note", error.message || "Overview unavailable.")
                 );
             }
@@ -1295,7 +1531,13 @@
         const showingTeam = Boolean(state.teamId);
         els.teamView.hidden = !showingTeam;
         els.leagueSections.hidden = showingTeam;
-        if (showingTeam) loadTeam();
+        // Swap the masthead before the fetch, not after it: the league's
+        // record must never stand for a frame under a team's name.
+        setMastheadMode(showingTeam);
+        if (showingTeam) {
+            renderTeamMasthead(null);
+            loadTeam();
+        }
     }
 
     async function loadSeason() {

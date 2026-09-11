@@ -14,6 +14,7 @@ const path = require("path");
 const leagueDir = path.join(__dirname, "..", "league");
 const appSource = fs.readFileSync(path.join(leagueDir, "app.js"), "utf8");
 const pageSource = fs.readFileSync(path.join(leagueDir, "index.html"), "utf8");
+const styleSource = fs.readFileSync(path.join(leagueDir, "style.css"), "utf8");
 const bodySource = pageSource.match(/<body>([\s\S]*)<\/body>/)[1];
 const F = require("../league/format.js");
 
@@ -78,11 +79,48 @@ function lineup(overrides = {}) {
     };
 }
 
+function room(position, label, overrides = {}) {
+    return {
+        position,
+        label,
+        players: {},
+        games: 0,
+        points_per_game: null,
+        league_average: null,
+        rank: null,
+        teams: 0,
+        ...overrides,
+    };
+}
+
+function rooms(overrides = {}) {
+    return {
+        available: true,
+        season: 2026,
+        espn_team_id: 1,
+        as_of: OVERVIEW.as_of,
+        scoring: "half",
+        rooms: [
+            room("WR", "Wide receiver", {
+                players: { wr1: { player_id: "wr1", games: 2, points: 30, points_per_game: 15.0 } },
+                games: 2,
+                points_per_game: 15.0,
+                league_average: 12.0,
+                rank: 2,
+                teams: 10,
+            }),
+            room("DST", "Defense"),
+        ],
+        ...overrides,
+    };
+}
+
 function routes(overrides = {}) {
     return {
         // Longest paths first: the matcher takes the first key the URL contains.
         "/teams/1/roster": ROSTER,
         "/teams/1/lineup": lineup(),
+        "/teams/1/rooms": rooms(),
         "/teams/1/overview": { status: "missing" },
         "/teams/1": TEAM,
         "/overview": OVERVIEW,
@@ -143,6 +181,56 @@ const totals = () =>
         node.querySelector("dd").textContent,
     ]);
 const changes = () => [...document.querySelectorAll("#lineupChanges .lineup__change")];
+
+// Masthead and colophon are both lists of .masthead__fact, so one reader
+// serves them all.
+const facts = (id) =>
+    [...document.querySelectorAll(`#${id} .masthead__fact`)].map((node) => [
+        node.querySelector("dt").textContent,
+        node.querySelector("dd").firstChild.textContent,
+    ]);
+
+const subFor = (label) => {
+    const node = [...document.querySelectorAll("#teamColophon .masthead__fact")].find(
+        (fact) => fact.querySelector("dt").textContent === label
+    );
+    const small = node && node.querySelector("small");
+    return small ? small.textContent : "";
+};
+
+// Which of the team's own endpoints were actually called, in order.
+const teamRequests = () =>
+    window.fetch.mock.calls
+        .map(([url]) => String(url).split("?")[0])
+        .filter((url) => url.includes("/teams/1"))
+        .map((url) => url.slice(url.indexOf("/teams/1")));
+
+const allPlay = (wins, losses) => ({
+    wins,
+    losses,
+    ties: 0,
+    games: wins + losses,
+    win_pct: wins / (wins + losses),
+});
+
+function ledgerTeam(id, overrides = {}) {
+    return {
+        espn_team_id: id,
+        name: `Team ${id}`,
+        owner_name: "Owner",
+        wins: 1,
+        losses: 0,
+        ties: 0,
+        points_for: 120,
+        all_play: allPlay(1, 0),
+        luck: 0,
+        lineup: { efficiency: null },
+        scoring: null,
+        power: { rank: id },
+        playoff: { odds: null },
+        ...overrides,
+    };
+}
 
 async function openTeam(table = routes()) {
     boot(table);
@@ -261,7 +349,7 @@ describe("start/sit card", () => {
             }),
         }));
         // The rest of the team page still renders.
-        await waitFor(() => document.getElementById("teamName").textContent === "Test Team");
+        await waitFor(() => document.getElementById("leagueName").textContent === "Test Team");
 
         expect(card().hidden).toBe(true);
     });
@@ -276,17 +364,263 @@ describe("start/sit card", () => {
                 sits: [],
             }),
         }));
-        await waitFor(() => document.getElementById("teamName").textContent === "Test Team");
+        await waitFor(() => document.getElementById("leagueName").textContent === "Test Team");
 
         expect(card().hidden).toBe(true);
     });
 
     test("a failed lineup read does not take the team page down with it", async () => {
         await openTeam(routes({ "/teams/1/lineup": response({}, 500) }));
-        await waitFor(() => document.getElementById("teamName").textContent === "Test Team");
+        await waitFor(() => document.getElementById("leagueName").textContent === "Test Team");
 
         expect(card().hidden).toBe(true);
         expect(document.getElementById("errorBanner").hidden).toBe(true);
+    });
+});
+
+describe("the team masthead", () => {
+    test("carries the team, not the league, while a team is open", async () => {
+        await openTeam();
+        await waitFor(
+            () => document.getElementById("leagueName").textContent === "Test Team"
+        );
+
+        expect(document.getElementById("leagueSub").textContent).toBe("Taylor");
+        expect(document.getElementById("leagueSub").hidden).toBe(false);
+        expect(document.getElementById("teamBadge").hidden).toBe(false);
+        expect(document.getElementById("modeBadge").hidden).toBe(true);
+        expect(facts("teamBadge")).toEqual([
+            ["Record", "1-0"],
+            ["Points for", "120.0"],
+            ["Against", "99.0"],
+            ["Per game", "120.0"],
+        ]);
+    });
+
+    test("gives the league back when you leave the team", async () => {
+        await openTeam();
+        await waitFor(
+            () => document.getElementById("leagueName").textContent === "Test Team"
+        );
+
+        document.getElementById("teamBack").click();
+
+        expect(document.getElementById("leagueName").textContent).toBe("Test League");
+        expect(document.getElementById("teamBadge").hidden).toBe(true);
+        expect(document.getElementById("modeBadge").hidden).toBe(false);
+        expect(document.getElementById("leagueSub").hidden).toBe(true);
+    });
+});
+
+describe("the colophon", () => {
+    test("reads the last two facts off the ledger, without a request for them", async () => {
+        const table = routes({
+            "/ledger": Object.assign({}, routes()["/ledger"], {
+                teams: [
+                    ledgerTeam(1, { all_play: allPlay(6, 3), luck: 0.7, lineup: { efficiency: 0.948 } }),
+                    ledgerTeam(2, { all_play: allPlay(9, 0), luck: -0.2, lineup: { efficiency: 0.9 } }),
+                ],
+            }),
+        });
+        await openTeam(table);
+        await waitFor(() => facts("teamColophon").length === 6);
+
+        const colophon = Object.fromEntries(facts("teamColophon"));
+        expect(colophon["All-play"]).toBe("6-3");
+        expect(colophon["Lineup"]).toBe("94.8%");
+        // Second of the two rated teams on all-play.
+        expect(subFor("All-play")).toBe("2nd of 2");
+        expect(subFor("Lineup")).toBe("+0.7 wins on luck");
+        // Four team routes and no fifth: the ledger was already in hand.
+        expect(teamRequests()).toEqual([
+            "/teams/1",
+            "/teams/1/roster",
+            "/teams/1/lineup",
+            "/teams/1/rooms",
+            "/teams/1/overview",
+        ]);
+    });
+
+    test("prints a dash rather than a zero when the ledger failed", async () => {
+        await openTeam(routes({ "/ledger": response({}, 500) }));
+        await waitFor(() => facts("teamColophon").length === 6);
+
+        const colophon = Object.fromEntries(facts("teamColophon"));
+        expect(colophon["All-play"]).toBe("—");
+        expect(colophon["Lineup"]).toBe("—");
+        // The facts that do not depend on the ledger still report.
+        expect(colophon["Record"]).toBe("1-0");
+    });
+});
+
+describe("the lede", () => {
+    test("an empty state is a note, not a lede with a drop cap", async () => {
+        // The drop cap keys off the first paragraph, and "No overview written
+        // for this team yet." is a paragraph too — it must not get one.
+        await openTeam();
+        await waitFor(() => document.querySelector("#teamLede .empty-note") !== null);
+
+        const note = document.querySelector("#teamLede .empty-note");
+        expect(note.textContent).toContain("No overview written");
+        expect(styleSource).toContain(
+            '.dossier__lede > p:first-child:not(.empty-note)::first-letter'
+        );
+    });
+
+    test("a written overview renders as prose", async () => {
+        await openTeam(
+            routes({
+                "/teams/1/overview": {
+                    status: "current",
+                    overview_md: "First line.\n\nSecond line.",
+                    source: "model",
+                    week: 14,
+                    cache_hit: true,
+                },
+            })
+        );
+        await waitFor(() => document.querySelectorAll("#teamLede p").length === 2);
+
+        expect(document.querySelector("#teamLede p").textContent).toBe("First line.");
+        expect(document.querySelector("#teamLede .empty-note")).toBeNull();
+    });
+});
+
+describe("the season, week by week", () => {
+    const week = (overrides = {}) => ({
+        week: 1,
+        is_bye: false,
+        is_complete: true,
+        outcome: "W",
+        points: 120.0,
+        opponent_points: 99.0,
+        margin: 21.0,
+        opponent: { espn_team_id: 2, name: "Rivals", abbrev: "RIV", wins: 4, losses: 8, ties: 0 },
+        ...overrides,
+    });
+
+    const weeks = async (results) => {
+        await openTeam(routes({ "/teams/1": Object.assign({}, TEAM, { results }) }));
+        await waitFor(() => document.querySelectorAll("#teamResults .season__wk").length > 0);
+        return [...document.querySelectorAll("#teamResults .season__wk")];
+    };
+
+    test("names the opponent and the record it carried", async () => {
+        const rows = await weeks([week()]);
+        expect(rows[0].querySelector(".season__opp").textContent).toBe("Rivals · 4-8");
+        expect(rows[0].querySelector(".season__score").textContent).toBe("120.0–99.0");
+    });
+
+    test("puts every margin on one scale, so the weeks are comparable", async () => {
+        const rows = await weeks([
+            week({ week: 1, margin: 20.0 }),
+            week({ week: 2, outcome: "L", points: 90.0, opponent_points: 130.0, margin: -40.0 }),
+        ]);
+
+        const bars = rows.map((row) => row.querySelector(".dv__bar"));
+        expect(bars[0].className).toContain("dv__bar--positive");
+        expect(bars[1].className).toContain("dv__bar--negative");
+        // Half the reach of the biggest margin in the season.
+        expect(parseFloat(bars[0].style.width)).toBeCloseTo(
+            parseFloat(bars[1].style.width) / 2
+        );
+    });
+
+    test("a bye has no opponent, no score and no bar", async () => {
+        const rows = await weeks([
+            week({ week: 1, is_bye: true, outcome: null, points: null, opponent_points: null, margin: null, opponent: null }),
+        ]);
+
+        expect(rows[0].querySelector(".season__outcome").textContent).toBe("BYE");
+        expect(rows[0].querySelector(".dv__bar")).toBeNull();
+    });
+
+    test("a week not yet played prints a dash, not a result", async () => {
+        const rows = await weeks([
+            week({ week: 3, is_complete: false, outcome: null, points: null, opponent_points: null, margin: null }),
+        ]);
+
+        expect(rows[0].querySelector(".season__outcome").textContent).toBe("—");
+        expect(rows[0].querySelector(".season__score").textContent).toBe("—");
+        // Not even the axis: a zero rule under an unplayed week reads as a
+        // result, and divergingBar cannot tell a missing margin from a tie.
+        expect(rows[0].querySelector(".dv__zero")).toBeNull();
+    });
+
+    test("a tie keeps the axis it sits on", async () => {
+        const rows = await weeks([
+            week({ outcome: "T", points: 110.0, opponent_points: 110.0, margin: 0 }),
+        ]);
+
+        expect(rows[0].querySelector(".dv__zero")).not.toBeNull();
+        expect(rows[0].querySelector(".dv__bar")).toBeNull();
+    });
+});
+
+describe("the roster, by room", () => {
+    const ENTRIES = [
+        { player_id: "wr1", name: "Split End", position: "WR", lineup_slot: "WR", matched: true, props: [], recent_actuals: [] },
+        { player_id: "wr2", name: "Flex Guy", position: "WR", lineup_slot: "FLEX", matched: true, props: [], recent_actuals: [] },
+        { player_id: "dst", name: "Broncos D/ST", position: "DEF", lineup_slot: "DST", matched: true, props: [], recent_actuals: [] },
+    ];
+    const withRoster = (overrides) =>
+        routes(Object.assign({ "/teams/1/roster": Object.assign({}, ROSTER, { entries: ENTRIES }) }, overrides));
+
+    const roomEls = () => [...document.querySelectorAll("#teamRoster .room")];
+
+    test("reads a flex receiver with the other receivers", async () => {
+        await openTeam(withRoster());
+        await waitFor(() => roomEls().length > 0);
+
+        const [first] = roomEls();
+        expect(first.querySelector("h3").textContent).toBe("Wide receiver");
+        expect([...first.querySelectorAll(".roster__name")].map((n) => n.textContent)).toEqual([
+            "Split End",
+            "Flex Guy",
+        ]);
+    });
+
+    test("measures a room against the league and ranks it", async () => {
+        await openTeam(withRoster());
+        await waitFor(() => roomEls().length > 0);
+
+        const [first] = roomEls();
+        expect(first.querySelector(".room__rank").textContent).toBe("2nd of 10");
+        expect(first.querySelector(".room__scale").textContent).toBe("15.0 / 12.0 avg");
+        expect(first.querySelector(".meter__avg")).not.toBeNull();
+    });
+
+    test("a room the weekly feed cannot score carries no bar and no rank", async () => {
+        await openTeam(withRoster());
+        await waitFor(() => roomEls().length > 1);
+
+        const defense = roomEls().find((el) => el.querySelector("h3").textContent === "Defense");
+        expect(defense.querySelector(".room__strength")).toBeNull();
+        expect(defense.querySelector(".room__rank")).toBeNull();
+        expect(defense.querySelectorAll(".roster__ppg")).toHaveLength(0);
+        // Still listed, though — the players are on the roster either way.
+        expect(defense.querySelectorAll(".roster__row")).toHaveLength(1);
+    });
+
+    test("without the measurement the rooms still group and still list", async () => {
+        await openTeam(withRoster({ "/teams/1/rooms": response({}, 500) }));
+        await waitFor(() => roomEls().length > 0);
+
+        const [first] = roomEls();
+        expect(first.querySelector("h3").textContent).toBe("Wide receiver");
+        expect(first.querySelectorAll(".roster__row")).toHaveLength(2);
+        expect(first.querySelector(".room__strength")).toBeNull();
+        expect(document.getElementById("roomsLede").textContent).toBe("");
+        // No column of dashes where there is nothing to measure against.
+        expect(first.querySelectorAll(".roster__ppg")).toHaveLength(0);
+    });
+
+    test("a player with no games played gets a dash, not a zero", async () => {
+        await openTeam(withRoster());
+        await waitFor(() => roomEls().length > 0);
+
+        const points = [...roomEls()[0].querySelectorAll(".roster__ppg")].map((n) => n.textContent);
+        expect(points).toEqual(["15.0", "—"]);
     });
 });
 

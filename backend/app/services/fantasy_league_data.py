@@ -13,6 +13,7 @@ import json
 import logging
 from typing import Any, Dict, List, Optional
 
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.database import (
@@ -575,11 +576,17 @@ def get_team_detail(
                     if points is not None and opponent_points is not None
                     else None
                 ),
+                # The opponent's record rides along because `teams` above
+                # already holds every team's payload: a week reads very
+                # differently once you can see who it was against.
                 "opponent": (
                     {
                         "espn_team_id": opponent_id,
                         "name": teams.get(opponent_id, {}).get("name"),
                         "abbrev": teams.get(opponent_id, {}).get("abbrev"),
+                        "wins": teams.get(opponent_id, {}).get("wins"),
+                        "losses": teams.get(opponent_id, {}).get("losses"),
+                        "ties": teams.get(opponent_id, {}).get("ties"),
                     }
                     if opponent_id
                     else None
@@ -1014,6 +1021,87 @@ def get_team_lineup(
         # confidently wrong.
         "unprojected_starters": unprojected_starters,
         "unfilled_slots": max(0, len(slots) - len(optimal)),
+    }
+
+
+def _season_production(
+    db: Session, season: int, player_ids: List[str]
+) -> Dict[str, Dict[str, float]]:
+    """player_id -> games played and points scored, season to date.
+
+    One grouped read. ``season``, ``week`` and ``player_id`` are each indexed
+    on the stats table, so a whole league's rosters cost a single round trip
+    rather than the bounded per-player slices the roster view takes.
+    """
+    if not player_ids:
+        return {}
+    rows = (
+        db.query(
+            FantasyPlayerStat.player_id,
+            func.count(FantasyPlayerStat.week),
+            func.sum(FantasyPlayerStat.fantasy_points_half),
+        )
+        .filter(
+            FantasyPlayerStat.season == season,
+            FantasyPlayerStat.player_id.in_(player_ids),
+        )
+        .group_by(FantasyPlayerStat.player_id)
+        .all()
+    )
+    return {
+        player_id: {"games": int(games or 0), "points": float(points or 0.0)}
+        for player_id, games, points in rows
+    }
+
+
+def get_team_rooms(
+    db: Session, season: Optional[int], team_id: int
+) -> Dict[str, Any]:
+    """One team's position rooms, measured against the rest of the league.
+
+    Deliberately season-to-date for the roster as it stands *now*: a player
+    picked up in week 12 brings his whole season into the room that holds
+    him. Walking the weekly snapshots instead would attribute every point to
+    whoever owned it at the time, which is a truer number and a much more
+    expensive one. The page says which of the two it is showing.
+    """
+    season = _require_season(db, season)
+    _require_team(db, season, team_id)
+
+    run = latest_successful_run(db, "league_rosters", season)
+    if run is None:
+        return {
+            "available": False,
+            "unavailable_reason": "no_roster_snapshots",
+            "season": season,
+            "espn_team_id": team_id,
+            "as_of": None,
+            "rooms": [],
+        }
+
+    entries = (
+        db.query(FantasyLeagueRosterEntry)
+        .filter(FantasyLeagueRosterEntry.run_id == run.id)
+        .all()
+    )
+    rosters: Dict[int, List[Dict[str, Any]]] = {}
+    for entry in entries:
+        rosters.setdefault(entry.espn_team_id, []).append(
+            {"player_id": entry.player_id, "position": entry.position}
+        )
+
+    production = _season_production(
+        db, season, sorted({entry.player_id for entry in entries if entry.player_id})
+    )
+    rooms = fantasy_league_advanced.position_rooms(rosters, production)
+
+    return {
+        "available": True,
+        "season": season,
+        "espn_team_id": team_id,
+        "as_of": _iso(run.finished_at),
+        "scoring": LEAGUE_SCORING,
+        "rooms": rooms.get(team_id, []),
     }
 
 

@@ -254,6 +254,22 @@ def team_lineup(
         raise HTTPException(status_code=404, detail=str(exc))
 
 
+@router.get("/teams/{team_id}/rooms")
+def team_rooms(
+    team_id: int,
+    season: Optional[int] = None,
+    _: Dict[str, Any] = Depends(require_member),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """This roster by position, each room against the league at that spot."""
+    try:
+        return fantasy_league_data.get_team_rooms(db, season, team_id)
+    except UnknownSeasonError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except UnknownTeamError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+
+
 def _resolved_season(db: Session, season: Optional[int], team_id: int) -> int:
     try:
         return fantasy_league_data.get_team_detail(db, season, team_id)["season"]

@@ -242,3 +242,79 @@ describe("sparkline", () => {
         expect(path).not.toContain("NaN");
     });
 });
+
+describe("position rooms", () => {
+    const spot = (name, position, slot) => ({
+        name,
+        position,
+        lineup_slot: slot || "BENCH",
+    });
+
+    test("a receiver in the flex is read with the other receivers", () => {
+        const rooms = LeagueFormat.groupByPosition([
+            spot("Flex Guy", "WR", "FLEX"),
+            spot("Split End", "WR", "WR"),
+        ]);
+
+        expect(rooms).toHaveLength(1);
+        expect(rooms[0].position).toBe("WR");
+        expect(rooms[0].entries.map((e) => e.name)).toEqual(["Split End", "Flex Guy"]);
+    });
+
+    test("rooms come back in reading order, and empty ones are dropped", () => {
+        const rooms = LeagueFormat.groupByPosition([
+            spot("Kicker", "K", "K"),
+            spot("Passer", "QB", "QB"),
+            spot("Catcher", "TE", "TE"),
+        ]);
+
+        expect(rooms.map((room) => room.label)).toEqual([
+            "Quarterback",
+            "Tight end",
+            "Kicker",
+        ]);
+    });
+
+    test("kicker and defense are separate rooms", () => {
+        const rooms = LeagueFormat.groupByPosition([
+            spot("Leg", "K", "K"),
+            spot("Broncos D/ST", "DEF", "DST"),
+        ]);
+
+        expect(rooms.map((room) => room.position)).toEqual(["K", "DST"]);
+    });
+
+    test("a position nothing recognises still renders, under Other", () => {
+        const rooms = LeagueFormat.groupByPosition([spot("Mystery", "LB", "BENCH")]);
+
+        expect(rooms).toHaveLength(1);
+        expect(rooms[0].label).toBe("Other");
+        expect(rooms[0].position).toBeNull();
+    });
+
+    test("an empty roster has no rooms at all", () => {
+        expect(LeagueFormat.groupByPosition([])).toEqual([]);
+    });
+});
+
+describe("ordinal", () => {
+    test("counts in words the standings use", () => {
+        expect(LeagueFormat.ordinal(1)).toBe("1st");
+        expect(LeagueFormat.ordinal(2)).toBe("2nd");
+        expect(LeagueFormat.ordinal(3)).toBe("3rd");
+        expect(LeagueFormat.ordinal(4)).toBe("4th");
+        expect(LeagueFormat.ordinal(10)).toBe("10th");
+    });
+
+    test("the teens are all th", () => {
+        expect(LeagueFormat.ordinal(11)).toBe("11th");
+        expect(LeagueFormat.ordinal(12)).toBe("12th");
+        expect(LeagueFormat.ordinal(13)).toBe("13th");
+        expect(LeagueFormat.ordinal(21)).toBe("21st");
+    });
+
+    test("a rank that could not be computed prints an em dash", () => {
+        expect(LeagueFormat.ordinal(null)).toBe("—");
+        expect(LeagueFormat.ordinal(undefined)).toBe("—");
+    });
+});
