@@ -728,7 +728,7 @@ body.drawer-open { overflow: hidden; }
     --fantasy-clay: #b86f52;
     --fantasy-gold: #c29a4b;
     --fantasy-ink: #24231f;
-    --fantasy-muted: #766f64;
+    --fantasy-muted: #625d55;
     --fantasy-line: #ded6c8;
 }
 
@@ -788,10 +788,17 @@ h1, h2, .drawer__head h2 { font-family: "Libre Caslon Display", Georgia, serif; 
 .season-fantasy__table thead th { vertical-align: bottom; }
 .season-fantasy__table thead th .col-sort { white-space: normal; }
 
+/* The board opens on the five columns that answer the decision. The raw
+   components and provider detail remain available on demand and in the
+   player drawer instead of compressing every row by default. */
+.season-fantasy__table .col-detail { display: none; }
+.value-board.show-details .season-fantasy__table .col-detail { display: table-cell; }
+
 @container (max-width: 820px) {
     /* Provenance goes before the decision does — the drawer carries the
        per-category breakdown in full, one click away. */
-    .season-fantasy__table .col-detail { display: none; }
+    .value-board.show-details .season-fantasy__table .col-detail { display: none; }
+    .button--columns { display: none; }
 
     /* Fixed layout is what makes the fit exact instead of approximate: the
        player cell's meta line ("QB BUF · passing + rushing · 3 sources · 0 rec
@@ -847,7 +854,7 @@ h1, h2, .drawer__head h2 { font-family: "Libre Caslon Display", Georgia, serif; 
 .rank-table tbody td { padding: 10px 11px; border-bottom: 1px solid #ebe5db; }
 .rank-table tbody tr:last-child td { border-bottom: 0; }
 .rank-table tbody tr:hover { background: #f8f4ec; }
-.rank-table .col-rank { width: 38px; color: #aaa193; text-align: right; }
+.rank-table .col-rank { width: 38px; color: #766f64; text-align: right; }
 .col-sort { padding: 0; border: 0; background: none; color: inherit; font: inherit; letter-spacing: inherit; text-transform: inherit; cursor: pointer; }
 .season-fantasy__table .player-link { color: var(--fantasy-forest); font-weight: 700; }
 .value-board__foot { display: flex; justify-content: space-between; align-items: center; gap: 16px; min-height: 48px; padding: 9px 18px; border-top: 1px solid var(--fantasy-line); }

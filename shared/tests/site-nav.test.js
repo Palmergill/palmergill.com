@@ -34,6 +34,7 @@ describe('site navigation authentication', () => {
         expect(document.querySelector('.site-nav__username').textContent).toBe('palmer');
         expect(document.querySelector('.site-nav__logout').textContent).toContain('Logout');
         expect(document.querySelector('.site-nav__top-username').textContent).toBe('palmer');
+        expect(document.querySelector('.site-nav__top-separator').textContent).toBe('·');
         expect(document.querySelector('[data-auth-control]')).toBeNull();
     });
 

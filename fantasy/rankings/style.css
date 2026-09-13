@@ -196,6 +196,8 @@ body {
     margin-bottom: 32px;
 }
 
+.board-list[hidden] { margin: 0; }
+
 .board-card {
     position: relative;
     padding: 20px;

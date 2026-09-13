@@ -558,6 +558,16 @@ button.site-nav__link:disabled,
     }
 }
 
+@media (max-width: 420px) {
+    .site-nav.is-authenticated .site-nav__mobile-brand {
+        right: calc(max(12px, env(safe-area-inset-right)) + 112px);
+    }
+
+    .site-nav__top-logout { max-width: 104px; }
+    .site-nav__top-username,
+    .site-nav__top-separator { display: none; }
+}
+
 /* Casino pages intentionally keep dark felt-table chrome and play surfaces. */
 body.theme-casino {
     --site-nav-bg: rgba(8, 16, 12, 0.96);

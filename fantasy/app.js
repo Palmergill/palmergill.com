@@ -75,6 +75,7 @@
         seasonOffenses: document.getElementById("seasonOffenses"),
         seasonOffensesNote: document.getElementById("seasonOffensesNote"),
         showAllMarket: document.getElementById("showAllMarket"),
+        marketColumns: document.getElementById("marketColumns"),
         playerMarkets: document.getElementById("playerMarkets"),
         marketMovers: document.getElementById("marketMovers"),
         marketMoversNote: document.getElementById("marketMoversNote"),
@@ -2357,6 +2358,11 @@
         els.showAllMarket.addEventListener("click", () => {
             state.marketExpanded = !state.marketExpanded;
             renderActiveBoard();
+        });
+        els.marketColumns.addEventListener("click", () => {
+            const expanded = document.getElementById("market-board").classList.toggle("show-details");
+            els.marketColumns.textContent = expanded ? "Fewer columns" : "More columns";
+            els.marketColumns.setAttribute("aria-expanded", String(expanded));
         });
         els.weekStepBack.addEventListener("click", () => stepWeekBoard(-1));
         els.weekStepNext.addEventListener("click", () => stepWeekBoard(1));

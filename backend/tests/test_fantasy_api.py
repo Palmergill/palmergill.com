@@ -143,6 +143,25 @@ def test_offseason_defaults_to_upcoming_season_long_rankings():
     assert detail["projection"]["source"] == "sleeper"
 
 
+def test_player_projection_history_never_mixes_weekly_and_season_scales():
+    session = SessionLocal()
+    # The normal fixture is week 3. Add a season-long point that would create
+    # a misleading 360 -> 24 cliff if the detail history mixed scopes.
+    session.add(FantasyProjection(
+        run_id=9999, season=2025, week=fd.SEASON_LONG_WEEK,
+        source="sleeper", player_id="100", pts_ppr=360.0,
+        pts_half_ppr=360.0, pts_std=360.0,
+    ))
+    session.commit()
+    session.close()
+
+    detail = client.get("/api/fantasy/players/100").json()
+
+    assert detail["projection"]["week"] == 3
+    assert {point["week"] for point in detail["projection_history"]} == {3}
+    assert all(point["pts_ppr"] < 100 for point in detail["projection_history"])
+
+
 def test_offseason_without_season_long_snapshot_falls_back_to_last_season():
     # Seeded 2025 wk3 data exists; flip the state to the 2026 offseason
     # without collecting a season-long snapshot.

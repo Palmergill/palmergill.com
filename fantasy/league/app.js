@@ -23,6 +23,8 @@
         overview: null,
         ledger: null,
         ledgerRequest: 0,
+        freeAgentsExpanded: false,
+        freeAgentsPayload: null,
         myTeamId: null,
         // Bumped on every context change. A response that resolves with a
         // stale generation is discarded — switching season fires several
@@ -62,6 +64,7 @@
         teamsGrid: byId("teamsGrid"),
         freeAgents: byId("freeAgents"),
         freeAgentsNote: byId("freeAgentsNote"),
+        freeAgentsToggle: byId("freeAgentsToggle"),
         myTeamStrip: byId("myTeamStrip"),
         myTeamName: byId("myTeamName"),
         myTeamMeta: byId("myTeamMeta"),
@@ -1399,11 +1402,14 @@
             // second. The board stays, and says which one this is.
             els.freeAgents.replaceChildren();
             els.freeAgentsNote.textContent = "Unavailable right now.";
+            els.freeAgentsToggle.hidden = true;
+            state.freeAgentsPayload = null;
         }
     }
 
     function renderFreeAgents(payload) {
         els.freeAgents.replaceChildren();
+        state.freeAgentsPayload = payload;
         // Same rule the start/sit card follows: with no roster snapshot to
         // subtract, or rankings from a different season than the one being
         // browsed, there is no claim to make and the board says nothing by
@@ -1412,6 +1418,7 @@
         if (!payload || payload.available === false) {
             if (board) board.hidden = true;
             els.freeAgentsNote.textContent = "";
+            els.freeAgentsToggle.hidden = true;
             return;
         }
         if (board) board.hidden = false;
@@ -1421,10 +1428,14 @@
                 el("li", "empty-note", "Every ranked player is on a roster.")
             );
             els.freeAgentsNote.textContent = "";
+            els.freeAgentsToggle.hidden = true;
             return;
         }
 
-        payload.entries.forEach((entry) => {
+        const visibleEntries = state.freeAgentsExpanded
+            ? payload.entries
+            : payload.entries.slice(0, 10);
+        visibleEntries.forEach((entry) => {
             const item = el("li", "free-agent");
             item.appendChild(el("span", "free-agent__rank", `#${entry.rank}`));
             const main = el("div", "free-agent__main");
@@ -1446,6 +1457,12 @@
             if (badge) item.appendChild(el("span", "roster__injury", badge));
             els.freeAgents.appendChild(item);
         });
+
+        els.freeAgentsToggle.hidden = payload.entries.length <= 10;
+        els.freeAgentsToggle.textContent = state.freeAgentsExpanded
+            ? "Show top 10"
+            : `Show all ${payload.entries.length}`;
+        els.freeAgentsToggle.setAttribute("aria-expanded", String(state.freeAgentsExpanded));
 
         const week = payload.week === 0 ? "season-long" : `week ${payload.week}`;
         els.freeAgentsNote.textContent = [
@@ -1543,6 +1560,8 @@
     async function loadSeason() {
         const generation = ++state.generation;
         const requestedHash = window.location.hash;
+        state.freeAgentsExpanded = false;
+        state.freeAgentsPayload = null;
         state.myTeamId = null;
         els.myTeamStrip.hidden = true;
         clearError();
@@ -1621,6 +1640,12 @@
         els.scoreboardWeek.addEventListener("change", (event) => {
             state.scoreWeek = parseInt(event.target.value, 10);
             loadScoreboard();
+        });
+
+        els.freeAgentsToggle.addEventListener("click", () => {
+            if (!state.freeAgentsPayload) return;
+            state.freeAgentsExpanded = !state.freeAgentsExpanded;
+            renderFreeAgents(state.freeAgentsPayload);
         });
 
         window.addEventListener("popstate", () => {

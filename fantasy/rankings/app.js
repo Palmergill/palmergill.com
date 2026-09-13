@@ -33,6 +33,7 @@
         signInLink: byId("signInLink"),
         createAccountLink: byId("createAccountLink"),
         boardList: byId("boardList"),
+        newBoardHeading: byId("newBoardHeading"),
         scoringChips: byId("scoringChips"),
         rosterChips: byId("rosterChips"),
         createBoardButton: byId("createBoardButton"),
@@ -230,11 +231,12 @@
     function renderBoardList() {
         els.boardList.innerHTML = "";
         if (!state.boards.length) {
-            els.boardList.appendChild(
-                el("p", "empty-state", "No boards yet. Pick a format below and start one.")
-            );
+            els.boardList.hidden = true;
+            els.newBoardHeading.textContent = "Create your first board";
             return;
         }
+        els.boardList.hidden = false;
+        els.newBoardHeading.textContent = "Start another board";
         state.boards.forEach((board) => {
             const card = el("article", "board-card");
             const link = el("button", "board-card__open", F.boardLabel(board));

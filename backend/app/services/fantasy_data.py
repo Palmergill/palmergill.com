@@ -849,10 +849,13 @@ def get_player_detail(
     if matchups:
         _attach_matchup(detail, matchups)
 
-    # Intra/inter-week projection movement: every snapshot this season.
+    # Projection movement for the same scope as the headline projection.
+    # Season-long (week 0) and weekly values use radically different scales;
+    # mixing them made the drawer chart a false cliff from ~360 to ~20 points.
     history_query = db.query(FantasyProjection).filter(
         FantasyProjection.player_id == player_id,
         FantasyProjection.season == season,
+        FantasyProjection.week == week,
     )
     if history_source:
         history_query = history_query.filter(FantasyProjection.source == history_source)

@@ -189,7 +189,7 @@
             mobileLogout.type = "button";
             mobileLogout.title = `Log out ${username}`;
             mobileLogout.setAttribute("aria-label", `Log out ${username}`);
-            mobileLogout.innerHTML = `${iconSvg("log-out")}<span class="site-nav__top-username"></span><span aria-hidden="true">· Logout</span>`;
+            mobileLogout.innerHTML = `${iconSvg("log-out")}<span class="site-nav__top-username"></span><span class="site-nav__top-separator" aria-hidden="true">·</span><span>Logout</span>`;
             mobileLogout.querySelector(".site-nav__top-username").textContent = username;
             mobileLogout.addEventListener("click", (event) => logOut(event.currentTarget));
             mobileLogin.replaceWith(mobileLogout);

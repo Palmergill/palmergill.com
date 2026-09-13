@@ -671,6 +671,30 @@ describe("free agents", () => {
         expect(agents()[1].querySelector(".free-agent__trend")).toBeNull();
     });
 
+    test("shows the top ten free agents first and expands on request", async () => {
+        const entries = Array.from({ length: 12 }, (_, index) => ({
+            player_id: String(index),
+            name: `Free Agent ${index + 1}`,
+            position: "WR",
+            team: "SF",
+            rank: index + 1,
+            projected_points: 12 - index / 10,
+            trending_adds: null,
+            injury_status: null,
+        }));
+        boot(routes({ "/free-agents": { ...POOL, entries } }));
+        await waitFor(() => agents().length === 10);
+
+        const toggle = document.getElementById("freeAgentsToggle");
+        expect(toggle.hidden).toBe(false);
+        expect(toggle.textContent).toBe("Show all 12");
+
+        toggle.click();
+        expect(agents()).toHaveLength(12);
+        expect(toggle.textContent).toBe("Show top 10");
+        expect(toggle.getAttribute("aria-expanded")).toBe("true");
+    });
+
     test("says how stale the exclusion is, because that is the whole claim", async () => {
         boot(routes({ "/free-agents": POOL }));
         await waitFor(() => agents().length === 2);

@@ -507,6 +507,21 @@ describe("season board position filter", () => {
         expect(toggle.getAttribute("aria-expanded")).toBe("true");
     });
 
+    test("keeps secondary market columns behind an explicit disclosure", async () => {
+        boot(routes());
+        await waitFor(() => rows("seasonFantasyLeaders").length > 0);
+
+        const board = document.getElementById("market-board");
+        const toggle = document.getElementById("marketColumns");
+        expect(board.classList.contains("show-details")).toBe(false);
+        expect(toggle.getAttribute("aria-expanded")).toBe("false");
+
+        toggle.click();
+        expect(board.classList.contains("show-details")).toBe(true);
+        expect(toggle.textContent).toBe("Fewer columns");
+        expect(toggle.getAttribute("aria-expanded")).toBe("true");
+    });
+
     test("restores a raw-market drawer from category state and Escape clears it", async () => {
         document.body.innerHTML = bodySource;
         window.history.replaceState({}, "", "/fantasy/?category=passing_yards");

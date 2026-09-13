@@ -94,6 +94,20 @@ describe("rankings controller", () => {
         jest.restoreAllMocks();
     });
 
+    test("an empty account leads directly into the first-board form", async () => {
+        boot((url) => {
+            if (url.endsWith("/boards/1")) return response({ detail: "Not found" }, 404);
+            if (url.endsWith("/boards/mine")) return response({ boards: [] });
+            throw new Error(`Unexpected request: ${url}`);
+        });
+        await waitFor(() => !document.getElementById("boardsView").hidden);
+
+        expect(document.getElementById("boardList").hidden).toBe(true);
+        expect(document.getElementById("newBoardHeading").textContent)
+            .toBe("Create your first board");
+        expect(document.querySelector(".empty-state:not([hidden])")).toBeNull();
+    });
+
     test("Enter in the rank input does not activate row grab mode", async () => {
         boot((url) => {
             if (url.includes("/consensus?")) {

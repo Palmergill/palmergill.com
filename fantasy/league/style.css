@@ -1492,6 +1492,45 @@ button:focus-visible {
 .season-bar .chip--disabled,
 .season-bar .chip:disabled { color: var(--line-strong, #d8cdba); }
 
+/* This is a long document, so keep its local table of contents close to the
+   global header. On phones it scrolls sideways instead of becoming another
+   tall navigation block. */
+.league-jump-nav {
+    position: sticky;
+    top: calc(var(--site-nav-height, 52px) + 8px);
+    z-index: 8;
+    display: flex;
+    gap: 6px;
+    margin: 0 0 28px;
+    padding: 8px;
+    overflow-x: auto;
+    border: 1px solid var(--line, #ece4d8);
+    border-radius: 999px;
+    background: rgba(250, 246, 240, 0.94);
+    box-shadow: 0 8px 22px rgba(35, 32, 28, 0.06);
+    backdrop-filter: blur(10px);
+    scrollbar-width: none;
+}
+
+.league-jump-nav::-webkit-scrollbar { display: none; }
+.league-jump-nav a {
+    flex: 0 0 auto;
+    padding: 6px 12px;
+    border-radius: 999px;
+    color: var(--soft, #5d574e);
+    font-size: 12px;
+    font-weight: 700;
+    text-decoration: none;
+}
+.league-jump-nav a:hover,
+.league-jump-nav a:focus-visible { background: var(--card, #fff); color: var(--ink, #23201c); }
+
+#standings,
+#scoreboard,
+#free-agents,
+#teams,
+#assistant { scroll-margin-top: calc(var(--site-nav-height, 52px) + 76px); }
+
 /* ── sections: rules instead of boxes ─────────────────────────────── */
 
 .board {
@@ -1501,6 +1540,23 @@ button:focus-visible {
     border: 0;
     border-radius: 0;
 }
+
+.league-more {
+    display: block;
+    min-height: 40px;
+    margin: 14px auto 0;
+    padding: 7px 16px;
+    border: 1px solid var(--line-strong, #d8cdba);
+    border-radius: 999px;
+    background: var(--card, #fff);
+    color: var(--ink, #23201c);
+    font: inherit;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+}
+.league-more:hover,
+.league-more:focus-visible { border-color: var(--sage, #5b7152); color: var(--sage, #5b7152); }
 
 .board__head {
     align-items: flex-end;
@@ -1540,6 +1596,7 @@ button:focus-visible {
     .masthead__fact dd { font-size: 17px; }
     .board__head h2 { font-size: 22px; }
     .season-bar .chip { min-height: 44px; display: inline-flex; align-items: center; }
+    .league-jump-nav { margin-right: -14px; margin-left: -14px; border-right: 0; border-left: 0; border-radius: 0; }
 }
 
 /* The band is part of the document, not a card floating on it: it was the

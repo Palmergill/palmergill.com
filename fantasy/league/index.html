@@ -140,6 +140,13 @@
             </section>
 
             <div id="leagueSections">
+                <nav class="league-jump-nav" aria-label="League sections">
+                    <a href="#standings">Standings</a>
+                    <a href="#scoreboard">Scoreboard</a>
+                    <a href="#free-agents">Waivers</a>
+                    <a href="#teams">Teams</a>
+                    <a href="#assistant">Ask</a>
+                </nav>
                 <!-- Your own team, first: the hub knew every team except which
                      one was yours, so the advice about it was three clicks in. -->
                 <section class="my-team" id="myTeamStrip" hidden aria-labelledby="myTeamLabel">
@@ -158,7 +165,7 @@
                      lists of the same ten teams. One table now, with a column
                      that changes — which is also what lets it survive a phone,
                      where the chosen column brings its chart into the row. -->
-                <section class="board" data-board="ledger" aria-labelledby="ledgerTitle">
+                <section class="board" id="standings" data-board="ledger" aria-labelledby="ledgerTitle">
                     <div class="board__head">
                         <div>
                             <h2 id="ledgerTitle">The table</h2>
@@ -188,7 +195,7 @@
                     <div id="charts" class="charts"></div>
                 </section>
 
-                <section class="board" data-board="scoreboard" aria-labelledby="scoreboardTitle">
+                <section class="board" id="scoreboard" data-board="scoreboard" aria-labelledby="scoreboardTitle">
                     <div class="board__head">
                         <h2 id="scoreboardTitle">Scoreboard</h2>
                         <label class="select-field">
@@ -207,11 +214,12 @@
                         <span class="board__note" id="freeAgentsNote"></span>
                     </div>
                     <ol class="free-agents" id="freeAgents"></ol>
+                    <button type="button" class="league-more" id="freeAgentsToggle" aria-expanded="false" hidden>Show all</button>
                 </section>
 
                 <!-- Kept for the preseason, when the ledger's derived columns
                      are all empty and this grid is the only way into a team. -->
-                <section class="board" data-board="teams" aria-labelledby="teamsTitle">
+                <section class="board" id="teams" data-board="teams" aria-labelledby="teamsTitle">
                     <div class="board__head">
                         <h2 id="teamsTitle">Teams</h2>
                     </div>
@@ -219,7 +227,7 @@
                 </section>
             </div>
 
-            <section class="chat" aria-label="Fantasy assistant">
+            <section class="chat" id="assistant" aria-label="Fantasy assistant">
                 <div class="chat__head">
                     <h2>Ask the fantasy assistant</h2>
                     <span class="chat__note">Answers use only the data this site has collected.</span>
