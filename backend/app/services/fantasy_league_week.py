@@ -128,12 +128,21 @@ def _matchup_rows(db: Session, season: int, week: int) -> List[FantasyLeagueMatc
     )
 
 
-def _status(rows: List[FantasyLeagueMatchup]) -> str:
+def _status(rows: List[FantasyLeagueMatchup], *, is_current_week: bool = False) -> str:
     if not rows:
         return "not_played"
-    if all(row.is_complete for row in rows):
+    # ESPN leaves playoff-bye rows undecided forever. They are schedule rows,
+    # but not games whose missing winner should keep a finished week open.
+    contested = [row for row in rows if not row.is_bye]
+    if contested and all(row.is_complete for row in contested):
         return "complete"
-    if any(row.is_complete for row in rows):
+    if any(row.is_complete for row in contested):
+        return "in_progress"
+    # Before the first final score, a live week can look exactly like a future
+    # week: ESPN has published the matchup rows and every score is still zero.
+    # The season's current scoring/matchup periods are the authoritative signal
+    # that distinguishes those two cases.
+    if is_current_week:
         return "in_progress"
     # ESPN publishes the whole schedule up front, so an untouched future week
     # looks exactly like this: rows exist, nothing has been played.
@@ -1139,7 +1148,11 @@ def get_week_recap(
         }
 
     rows = _matchup_rows(db, season, week)
-    status = _status(rows)
+    season_row = next((row for row in _season_rows(db) if row.season == season), None)
+    current_matchup_period = None
+    if season_row and season_row.current_scoring_period:
+        current_matchup_period = season_row.current_matchup_period
+    status = _status(rows, is_current_week=week == current_matchup_period)
     matchups = [_matchup_payload(row, teams) for row in rows]
     results = _results(rows, teams)
 

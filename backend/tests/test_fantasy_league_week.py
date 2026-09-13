@@ -250,6 +250,39 @@ def test_an_unplayed_week_reports_itself_rather_than_grading_nothing(db):
     assert recap["lineups"]["available"] is False
 
 
+def test_the_current_week_is_in_progress_before_any_game_is_final(db):
+    seed(db)
+    season = db.query(FantasyLeagueSeason).filter_by(season=SEASON).one()
+    season.current_matchup_period = WEEK + 1
+    season.current_scoring_period = WEEK + 1
+    db.commit()
+
+    recap = flw.get_week_recap(db, SEASON, week=WEEK + 1)
+
+    assert recap["status"] == "in_progress"
+    assert recap["grades"] == []
+    assert recap["accolades"] == []
+
+
+def test_a_playoff_bye_does_not_keep_a_finished_week_in_progress(db):
+    seed(db)
+    db.add(
+        FantasyLeagueMatchup(
+            season=SEASON,
+            espn_matchup_id=4,
+            matchup_period=WEEK,
+            home_team_id=1,
+            away_team_id=None,
+            winner="UNDECIDED",
+            is_bye=True,
+            is_complete=False,
+        )
+    )
+    db.commit()
+
+    assert flw.get_week_recap(db, SEASON, week=WEEK)["status"] == "complete"
+
+
 def test_a_season_with_no_schedule_at_all_still_answers(db):
     db.add(
         FantasyLeagueSeason(
