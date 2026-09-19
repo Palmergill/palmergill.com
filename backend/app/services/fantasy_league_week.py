@@ -50,6 +50,7 @@ from app.services.fantasy_league_data import (
     BENCH_SLOTS,
     INELIGIBLE_SLOTS,
     LEAGUE_SCORING,
+    SLOT_ELIGIBILITY,
     UNSCORED_ACTUAL_POSITIONS,
     _actual_points,
     _latest_roster_run_by_week,
@@ -458,6 +459,22 @@ def _lineups(
         ]
         scorable = starters_known and optimal > 0
 
+        # The single swap that cost the most: a bench player who could
+        # legally have taken one starter's seat, against that starter. One
+        # swap is always legal on its own, which is what makes it a fair
+        # thing to pin on a manager — unlike the optimum, which may reshuffle
+        # three seats to get there.
+        worst_call = None
+        if starters_known:
+            for sat in bench:
+                for started_entry in starters:
+                    allowed = SLOT_ELIGIBILITY.get(started_entry["slot"]) or frozenset()
+                    if sat["position"] not in allowed:
+                        continue
+                    gap = sat["points"] - started_entry["points"]
+                    if gap > 0 and (worst_call is None or gap > worst_call[0]):
+                        worst_call = (gap, sat, started_entry)
+
         starters.sort(key=lambda entry: -entry["points"])
         bench.sort(key=lambda entry: -entry["points"])
         teams[team_id] = {
@@ -472,6 +489,15 @@ def _lineups(
             "starters": [_entry_payload(entry) for entry in starters],
             "bench": [_entry_payload(entry) for entry in bench],
             "should_have_started": [_entry_payload(entry) for entry in should_have],
+            "worst_call": (
+                {
+                    "gap": _round(worst_call[0], 1),
+                    "benched": _entry_payload(worst_call[1]),
+                    "started": _entry_payload(worst_call[2]),
+                }
+                if worst_call
+                else None
+            ),
         }
 
     if not any(row["efficiency"] is not None for row in teams.values()):
@@ -482,6 +508,35 @@ def _lineups(
             "teams": teams,
         }
 
+    # The best players nobody in the league had. Only positions the stat
+    # feed scores, and only against a roster snapshot of this week, so a
+    # player claimed on Wednesday is not called unowned on Sunday.
+    rostered = {row.player_id for row in rows if row.player_id}
+    loose = sorted(
+        (
+            (player_id, points)
+            for (stat_week, player_id), points in actuals.items()
+            if stat_week == week and player_id not in rostered and points > 0
+        ),
+        key=lambda item: -item[1],
+    )[:12]
+    loose_players = _player_names(db, [player_id for player_id, _ in loose])
+    unrostered = []
+    for player_id, points in loose:
+        player = loose_players.get(player_id)
+        if player is None or player.position in UNSCORED_ACTUAL_POSITIONS:
+            continue
+        unrostered.append(
+            {
+                "player_id": player_id,
+                "name": player.full_name,
+                "position": player.position,
+                "pro_team": player.team,
+                "points": _round(points, 1),
+                "projected": _round(projections.get(player_id), 1),
+            }
+        )
+
     run = latest_successful_run(db, "league_rosters", season)
     return {
         "available": True,
@@ -489,6 +544,7 @@ def _lineups(
         "excluded_slots": excluded_slots,
         "as_of": iso_utc(run.finished_at) if run is not None else None,
         "teams": teams,
+        "unrostered": unrostered[:5],
     }
 
 
@@ -595,127 +651,137 @@ def _accolades(
     records: Dict[int, Dict[str, Any]],
     projected: Dict[int, Optional[float]],
 ) -> List[Dict[str, Any]]:
+    """One award per distinct fact about the week.
+
+    The slate already shows every score and margin, and the grades already
+    rank the teams, so an award that restates either is noise: the highest
+    score is always 9–0 against the field, and the widest margin is usually
+    the lowest score. What is left are the things only a lineup, a schedule
+    or a stat line can show — the decisions, the luck, and the players.
+    """
     points = lambda value: f"{value:,.1f} pts"
     signed = lambda value: f"{value:+.1f} pts"
     percent = lambda value: f"{value * 100:.0f}%"
     record = lambda value: f"{value * 100:.0f}% of the field"
     team_of = _team_describer(teams, results)
     player_of = _player_describer(teams)
-    matchup_of = _matchup_describer()
 
     played = {
         team_id: row for team_id, row in results.items() if row["points"] is not None
     }
+    lineup_teams = lineups.get("teams") or {}
     awards: List[Optional[Dict[str, Any]]] = []
 
-    # ── the score itself ────────────────────────────────────────────────
-    scores = [(team_id, row["points"]) for team_id, row in played.items()]
+    # ── the week's best team — once ─────────────────────────────────────
+    def top_detail(team_id: int) -> Dict[str, Any]:
+        described = team_of(team_id)
+        field = records.get(team_id) or {}
+        if field.get("wins") is not None and field.get("losses") is not None:
+            described["detail"] = (
+                f"{described['detail']} · {field['wins']}–{field['losses']} against the field"
+                if described.get("detail")
+                else f"{field['wins']}–{field['losses']} against the field"
+            )
+        return described
+
     awards.append(
         _award(
             "top_score",
             "Team of the week",
             "The most points anybody put on the board.",
-            scores,
-            team_of,
+            [(team_id, row["points"]) for team_id, row in played.items()],
+            top_detail,
             points,
-        )
-    )
-    awards.append(
-        _award(
-            "low_score",
-            "The cold shower",
-            "The fewest points anybody put on the board.",
-            scores,
-            team_of,
-            points,
-            highest_wins=False,
-        )
-    )
-    awards.append(
-        _award(
-            "field_beater",
-            "Best against the field",
-            "Record against every other team that played this week, not just "
-            "the one on the schedule.",
-            [
-                (team_id, row["pct"])
-                for team_id, row in records.items()
-                if row["pct"] is not None
-            ],
-            team_of,
-            record,
         )
     )
 
-    # ── the manager, as distinct from the roster ────────────────────────
-    lineup_teams = lineups.get("teams") or {}
-    efficiencies = [
-        (team_id, row["efficiency"])
+    # ── the decisions ───────────────────────────────────────────────────
+    # A loss the manager's own bench would have won. Both sides exclude the
+    # same unscored seats (D/ST), so adding the points left on the bench to
+    # the real score is a like-for-like comparison with the opponent's.
+    def benched_detail(team_id: int) -> Dict[str, Any]:
+        described = team_of(team_id)
+        call = (lineup_teams.get(team_id) or {}).get("worst_call")
+        if call:
+            described["detail"] = (
+                f"{described['detail']} · sat {call['benched']['name']} "
+                f"({call['benched']['points']:g}) for {call['started']['name']} "
+                f"({call['started']['points']:g})"
+            )
+        return described
+
+    benched_wins = []
+    for team_id, row in played.items():
+        left = (lineup_teams.get(team_id) or {}).get("points_left")
+        if row["result"] != "loss" or left is None or row["margin"] is None:
+            continue
+        if left + row["margin"] > 0:
+            benched_wins.append((team_id, left + row["margin"]))
+    awards.append(
+        _award(
+            "benched_win",
+            "Benched the win",
+            "Lost a game the best lineup on the same roster would have won.",
+            benched_wins,
+            benched_detail,
+            lambda value: f"would have won by {value:,.1f}",
+        )
+    )
+
+    def call_of(subject: Tuple[int, Dict[str, Any]]) -> Dict[str, Any]:
+        team_id, call = subject
+        return {
+            "espn_team_id": team_id,
+            "team": teams.get(team_id, {}).get("name"),
+            "owner": teams.get(team_id, {}).get("owner"),
+            "player": f"{call['benched']['name']} over {call['started']['name']}",
+            "detail": (
+                f"{call['benched']['points']:g} on the bench, "
+                f"{call['started']['points']:g} started at {call['started']['slot']}"
+            ),
+        }
+
+    # A team whose bench cost it the game already has its call named on that
+    # card; giving the same swap a second trophy is the redundancy this list
+    # exists to avoid, so the next-worst call gets the space instead.
+    already_named = {team_id for team_id, _ in benched_wins}
+    calls = [
+        ((team_id, row["worst_call"]), row["worst_call"]["gap"])
         for team_id, row in lineup_teams.items()
-        if row["efficiency"] is not None
+        if row.get("worst_call") and team_id not in already_named
     ]
-    unscored = sum(
-        1 for row in lineup_teams.values() if row["efficiency"] is None
+    awards.append(
+        _award(
+            "worst_call",
+            "Worst start/sit call",
+            "The one swap that would have scored the most: a benched player "
+            "against the starter whose seat he could have taken.",
+            calls,
+            call_of,
+            lambda value: f"{value:,.1f} pts left",
+        )
     )
-    coverage_note = (
-        f"{unscored} team(s) had a starter the stat feed does not cover, so "
-        "they are not ranked here"
-        if unscored
-        else None
-    )
+
+    unscored = sum(1 for row in lineup_teams.values() if row["efficiency"] is None)
     awards.append(
         _award(
             "best_manager",
             "Best lineup set",
             "The largest share of the best legal lineup this roster could "
             "have started.",
-            efficiencies,
-            team_of,
-            percent,
-            note=coverage_note,
-        )
-    )
-    awards.append(
-        _award(
-            "bench_regret",
-            "Left on the bench",
-            "The most points a manager could have started and did not.",
             [
-                (team_id, row["points_left"])
+                (team_id, row["efficiency"])
                 for team_id, row in lineup_teams.items()
-                if row["points_left"] is not None
+                if row["efficiency"] is not None
             ],
             team_of,
-            points,
-            note=coverage_note,
-        )
-    )
-
-    # ── against expectation ─────────────────────────────────────────────
-    deltas = [
-        (team_id, played[team_id]["points"] - value)
-        for team_id, value in projected.items()
-        if value is not None and team_id in played
-    ]
-    awards.append(
-        _award(
-            "over_projection",
-            "Overachiever",
-            "The biggest beat on the week's projection board.",
-            deltas,
-            team_of,
-            signed,
-        )
-    )
-    awards.append(
-        _award(
-            "under_projection",
-            "Underachiever",
-            "The biggest miss on the week's projection board.",
-            deltas,
-            team_of,
-            signed,
-            highest_wins=False,
+            percent,
+            note=(
+                f"{unscored} team(s) had a starter the stat feed does not cover, so "
+                "they are not ranked here"
+                if unscored
+                else None
+            ),
         )
     )
 
@@ -759,47 +825,11 @@ def _accolades(
         )
     )
 
-    # ── the games ───────────────────────────────────────────────────────
-    contested = [
-        row
-        for row in matchups
-        if row["is_complete"]
-        and not row["is_bye"]
-        and row["margin"] is not None
-        and row["away"] is not None
-    ]
-    awards.append(
-        _award(
-            "blowout",
-            "Biggest blowout",
-            "The widest margin on the slate.",
-            [(row, row["margin"]) for row in contested],
-            matchup_of,
-            lambda value: f"by {value:,.1f}",
-        )
-    )
-    awards.append(
-        _award(
-            "nail_biter",
-            "Closest call",
-            "The narrowest margin on the slate.",
-            [(row, row["margin"]) for row in contested],
-            matchup_of,
-            lambda value: f"by {value:,.1f}",
-            highest_wins=False,
-        )
-    )
-
-    # ── individual players ──────────────────────────────────────────────
+    # ── the players ─────────────────────────────────────────────────────
     starters = [
         (team_id, entry)
         for team_id, row in lineup_teams.items()
         for entry in row["starters"]
-    ]
-    benched = [
-        (team_id, entry)
-        for team_id, row in lineup_teams.items()
-        for entry in row["bench"]
     ]
     awards.append(
         _award(
@@ -807,16 +837,6 @@ def _accolades(
             "Player of the week",
             "The highest-scoring player anybody actually started.",
             [(subject, subject[1]["points"]) for subject in starters],
-            player_of,
-            points,
-        )
-    )
-    awards.append(
-        _award(
-            "bench_hero",
-            "Best player nobody started",
-            "The highest-scoring player who spent the week on a bench.",
-            [(subject, subject[1]["points"]) for subject in benched],
             player_of,
             points,
         )
@@ -846,6 +866,28 @@ def _accolades(
             player_of,
             signed,
             highest_wins=False,
+        )
+    )
+
+    def loose_of(entry: Dict[str, Any]) -> Dict[str, Any]:
+        bits = [entry.get("position"), entry.get("pro_team")]
+        if entry.get("projected") is not None:
+            bits.append(f"projected {entry['projected']:g}")
+        return {
+            "espn_team_id": None,
+            "team": None,
+            "player": entry["name"],
+            "detail": " · ".join(bit for bit in bits if bit) + " · on waivers",
+        }
+
+    awards.append(
+        _award(
+            "unrostered",
+            "Nobody's player",
+            "The best week from a player no team in the league had rostered.",
+            [(entry, entry["points"]) for entry in lineups.get("unrostered") or []],
+            loose_of,
+            points,
         )
     )
 

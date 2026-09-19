@@ -364,7 +364,8 @@ def test_without_a_roster_snapshot_the_page_says_so_instead_of_guessing(db):
     assert recap["lineups"]["reason"] == "no_roster_snapshot"
     assert all(row["efficiency"] is None for row in recap["grades"])
     assert award(recap, "best_manager") is None
-    assert award(recap, "bench_regret") is None
+    assert award(recap, "benched_win") is None
+    assert award(recap, "worst_call") is None
 
 
 def test_without_actuals_no_claim_is_made_about_any_bench(db):
@@ -430,20 +431,77 @@ def test_the_headline_awards_go_to_the_teams_that_earned_them(db):
     seed(db)
     recap = flw.get_week_recap(db, SEASON)
     assert award(recap, "top_score")["winner"]["espn_team_id"] == 1
-    assert award(recap, "low_score")["winner"]["espn_team_id"] == 2
+    assert "3–0 against the field" in award(recap, "top_score")["winner"]["detail"]
     assert award(recap, "best_manager")["winner"]["espn_team_id"] == 1
-    assert award(recap, "bench_regret")["winner"]["espn_team_id"] == 2
     assert award(recap, "player_of_the_week")["winner"]["player"] == "T1RB"
-    assert award(recap, "bench_hero")["winner"]["player"] == "T2B1"
 
 
-def test_the_margins_name_both_teams_in_the_game(db):
+def test_awards_do_not_restate_the_scoreboard(db):
+    """The slate shows every score and margin, and the top score is always
+    unbeaten against the field; awards that restate those are gone."""
+    seed(db)
+    keys = {row["key"] for row in flw.get_week_recap(db, SEASON)["accolades"]}
+    retired = {
+        "low_score",
+        "field_beater",
+        "blowout",
+        "nail_biter",
+        "bench_regret",
+        "bench_hero",
+        "over_projection",
+        "under_projection",
+    }
+    assert not keys & retired
+
+
+def test_a_loss_the_bench_would_have_won_is_called_out_with_the_swap(db):
     seed(db)
     recap = flw.get_week_recap(db, SEASON)
-    blowout = award(recap, "blowout")
-    assert blowout["winner"]["team"] == "Team 1"
-    assert "Team 2" in blowout["winner"]["detail"]
-    assert award(recap, "nail_biter")["winner"]["team"] == "Team 3"
+    # Team 2 lost 90–130 with 49 on the bench: 139 beats 130 by 9.
+    benched = award(recap, "benched_win")
+    assert benched["winner"]["espn_team_id"] == 2
+    assert benched["winner"]["value"] == 9.0
+    assert "sat T2B1 (40) for T2RB (6)" in benched["winner"]["detail"]
+
+
+def test_a_loss_the_bench_could_not_have_saved_is_not_blamed_on_it(db):
+    seed(db)
+    # Team 4 lost by 1 with a 2-point bench player; no lineup wins that.
+    benched = award(flw.get_week_recap(db, SEASON), "benched_win")
+    assert [row["espn_team_id"] for row in benched["standings"]] == [2]
+
+
+def test_the_worst_call_is_one_legal_swap_and_not_a_repeat(db):
+    seed(db)
+    lineups = flw.get_week_recap(db, SEASON)
+    grade_row = grade(lineups, 2)
+    assert grade_row["efficiency"] is not None
+    call = flw._lineups(
+        db, SEASON, WEEK, [1, 2, 3, 4], {}
+    )["teams"][2]["worst_call"]
+    # The 40-point bench RB could take the RB seat (6), not the QB seat (5).
+    assert call["benched"]["name"] == "T2B1"
+    assert call["started"]["name"] == "T2RB"
+    assert call["gap"] == 34.0
+    # Team 2's call is already named on its Benched-the-win card, and no
+    # other team sat anybody who outscored a starter he could replace.
+    assert award(lineups, "worst_call") is None
+
+
+def test_the_best_unrostered_week_is_named(db):
+    seed(db)
+    db.add(FantasyPlayer(player_id="loose1", full_name="Loose One", position="WR", team="NYJ"))
+    db.add(FantasyPlayerStat(season=SEASON, week=WEEK, player_id="loose1", fantasy_points_half=28.0))
+    db.commit()
+    try:
+        winner = award(flw.get_week_recap(db, SEASON), "unrostered")["winner"]
+        assert winner["player"] == "Loose One"
+        assert winner["espn_team_id"] is None
+        assert "on waivers" in winner["detail"]
+    finally:
+        db.query(FantasyPlayerStat).filter_by(player_id="loose1").delete()
+        db.query(FantasyPlayer).filter_by(player_id="loose1").delete()
+        db.commit()
 
 
 def test_every_award_carries_the_ordering_behind_it(db):
@@ -496,7 +554,7 @@ def test_with_no_projection_board_nothing_is_measured_against_expectation(db):
     seed(db, with_projections=False)
     recap = flw.get_week_recap(db, SEASON)
     assert award(recap, "bust") is None
-    assert award(recap, "over_projection") is None
+    assert award(recap, "smash") is None
     assert grade(recap, 1)["projected"] is None
     assert "No projection board" in recap["method"]["projection_caveat"]
 
