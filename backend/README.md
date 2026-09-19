@@ -148,6 +148,11 @@ set -a && . backend/.env && set +a && LOCAL_SITE_ROOT=true \
 Then sign in at `http://127.0.0.1:8000/login/` as `LEAGUE_TEST_USER` and open
 `http://127.0.0.1:8000/fantasy/league/`.
 
+To skip the login form, add `LOCAL_AUTH_USER=leaguetester` to `.env`: every
+request from loopback is then signed in as that member. It is ignored unless
+`LOCAL_SITE_ROOT=true` is also set and the account exists and is active, and
+it checks the connection's address, not the `Host` header.
+
 ### What you should expect to see
 
 The hub lands on the newest readable season and the table leads in every

@@ -305,7 +305,7 @@
         { key: "luck", label: "Luck", header: "W − xW", chart: "diverging" },
         { key: "lineup", label: "Lineup", header: "% of best", chart: "dot" },
         { key: "scoring", label: "Range", header: "Low–high", chart: "range" },
-        { key: "power", label: "Power", header: "Rank", chart: "spark" },
+        { key: "power", label: "Résumé", header: "Rank", chart: "spark" },
         { key: "odds", label: "Playoff odds", header: "Odds", chart: "meter" },
     ];
 

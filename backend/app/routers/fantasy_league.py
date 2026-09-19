@@ -214,6 +214,23 @@ def team_roster(
         raise HTTPException(status_code=404, detail=str(exc))
 
 
+@router.get("/roster-power")
+def roster_power(
+    season: Optional[int] = None,
+    scoring: str = Query(
+        fantasy_league_data.LEAGUE_SCORING,
+        pattern="^(ppr|half|half_ppr|half-ppr|std|standard)$",
+    ),
+    _: Dict[str, Any] = Depends(require_member),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """Teams ranked by the expected points of the rosters they hold."""
+    try:
+        return fantasy_league_data.get_roster_power(db, season=season, scoring=scoring)
+    except UnknownSeasonError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+
+
 @router.get("/free-agents")
 def free_agents(
     season: Optional[int] = None,

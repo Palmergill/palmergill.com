@@ -129,6 +129,9 @@ function boot(overrides = {}, url = "/fantasy/league/") {
             return response({ season: 2026, week: 2, available_weeks: [1, 2], matchups: [] });
         }
         if (target.includes("/free-agents")) return response({ available: false });
+        if (target.includes("/roster-power")) {
+            return response(overrides.rosterPower || { available: false, unavailable_reason: "missing_projections" });
+        }
         if (target.includes("/lineup")) return response(overrides.lineup || { available: false });
         if (target.includes("/me")) return response(overrides.me || { status: "unconfigured" });
         throw new Error(`Unexpected request: ${target}`);
@@ -458,8 +461,11 @@ describe("league hub ledger", () => {
         });
         await waitFor(() => document.querySelectorAll("#ledger tbody tr").length === 2);
 
+        // Power rankings read rosters, so they lead in every state; the
+        // table is next, present even while it is all dashes.
         const boards = [...document.querySelectorAll("#leagueSections .board")];
-        expect(boards[0].dataset.board).toBe("ledger");
+        expect(boards[0].dataset.board).toBe("power");
+        expect(boards[1].dataset.board).toBe("ledger");
         expect(document.getElementById("leagueSections").className).toBe("");
         // Empty, but present and explained rather than reordered away.
         expect(document.getElementById("modeBanner").hidden).toBe(false);
@@ -483,5 +489,97 @@ describe("league hub ledger", () => {
         expect(rowNames()).toEqual(["Alpha", "Bravo"]);
         const last = document.querySelectorAll("#ledger tbody tr")[1];
         expect(last.querySelector('td[data-key="lineup"]').textContent).toBe("—");
+    });
+});
+
+describe("league hub power rankings", () => {
+    afterEach(() => {
+        document.body.innerHTML = "";
+        jest.restoreAllMocks();
+    });
+
+    const player = (overrides) =>
+        Object.assign(
+            {
+                player_id: "p",
+                name: "Player",
+                position: "QB",
+                pro_team: "KC",
+                slot: null,
+                ppg: 10,
+                out: false,
+                marginal: 0,
+            },
+            overrides
+        );
+
+    const ROSTER_POWER = {
+        available: true,
+        season: 2026,
+        week: 2,
+        scoring: "half",
+        absence_rate: 0.15,
+        replacements: { QB: { name: "Waiver QB", ppg: 11.6 } },
+        teams: [
+            Object.assign({}, TEAMS[1], {
+                rank: 1,
+                standings_rank: 2,
+                expected: 134.4,
+                players: [player({ player_id: "a", name: "Starter QB", slot: "QB", ppg: 20, marginal: 4.2 })],
+                waiver_starters: [],
+                surplus: [],
+                need: null,
+            }),
+            Object.assign({}, TEAMS[0], {
+                rank: 2,
+                standings_rank: 1,
+                expected: 120.1,
+                players: [
+                    player({ player_id: "b", name: "Only QB", slot: "QB", ppg: 19, marginal: 3.1 }),
+                    player({ player_id: "c", name: "Spare RB", position: "RB", ppg: 9.8, marginal: 0 }),
+                ],
+                waiver_starters: [player({ player_id: "w", name: "Waiver QB", slot: "OP", ppg: 11.6 })],
+                surplus: [player({ player_id: "c", name: "Spare RB", position: "RB", ppg: 9.8 })],
+                need: {
+                    slot: "OP",
+                    name: "Waiver QB",
+                    ppg: 11.6,
+                    league_average: 16.8,
+                    gap: -5.2,
+                    from_waivers: true,
+                },
+            }),
+        ],
+    };
+
+    test("ranks rosters with the reasons under each team", async () => {
+        boot({ rosterPower: ROSTER_POWER });
+        await waitFor(() => document.querySelectorAll("#powerList .power-row").length === 2);
+
+        const rows = [...document.querySelectorAll("#powerList .power-row")];
+        expect(rows.map((row) => row.querySelector(".team-cell__name").textContent)).toEqual([
+            TEAMS[1].name,
+            TEAMS[0].name,
+        ]);
+        expect(rows[0].querySelector(".power-row__value strong").textContent).toBe("134.4");
+        expect(rows[1].querySelector(".power-note--need").textContent).toContain(
+            "nobody rostered — best on waivers is Waiver QB"
+        );
+        expect(rows[1].querySelector(".power-note--surplus").textContent).toContain("Spare RB (RB)");
+        // The lineup behind the number folds away, waiver seat included.
+        const detail = rows[1].querySelector("details.power-detail");
+        expect(detail.open).toBe(false);
+        expect(detail.querySelector(".power-detail__row--waiver").textContent).toContain("waivers");
+        expect(document.getElementById("powerFootnote").textContent).toContain("15% of weeks");
+    });
+
+    test("says why it is empty for a season without projections", async () => {
+        boot({
+            rosterPower: { available: false, unavailable_reason: "projection_season_mismatch", teams: [] },
+        });
+        await waitFor(() => document.querySelector("#powerList .empty-note"));
+        expect(document.querySelector("#powerList .empty-note").textContent).toContain(
+            "only cover the current season"
+        );
     });
 });

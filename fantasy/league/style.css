@@ -1525,6 +1525,7 @@ button:focus-visible {
 .league-jump-nav a:hover,
 .league-jump-nav a:focus-visible { background: var(--card, #fff); color: var(--ink, #23201c); }
 
+#power,
 #standings,
 #scoreboard,
 #free-agents,
@@ -1652,9 +1653,304 @@ button:focus-visible {
         background: var(--card, #fff);
     }
 
-    .controls--ledger .chip--active {
+    /* Includes :hover — a tap leaves hover stuck on touch screens, and the
+       plain hover rule above would turn the label ink-on-ink. */
+    .controls--ledger .chip--active,
+    .controls--ledger .chip--active:hover:not(:disabled) {
         background: var(--ink, #23201c);
         border-color: var(--ink, #23201c);
         color: #fff;
     }
+}
+
+/* ── the phone, section by section ─────────────────────────────────────
+   The rest of the page lost its boxes to hairline rules; on a phone the
+   scoreboard and the teams grid kept theirs, and a two-up grid of cards
+   turned ten teams into a screen and a half of scrolling. */
+
+.season-bar__links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 16px;
+}
+
+@media (max-width: 720px) {
+    /* Seasons on one scrolling line, the two recaps on the next — instead of
+       one recap wrapping onto a line of its own. */
+    .season-bar {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 2px;
+    }
+
+    .season-bar .chip-row {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        scrollbar-width: none;
+    }
+
+    .season-bar .chip-row::-webkit-scrollbar { display: none; }
+    .season-bar .chip { flex: 0 0 auto; }
+
+    /* The ranking method only changes the Power column, so on a phone —
+       where one column shows at a time — it appears with that column. */
+    .controls--ledger:not([data-column="power"]) .select-field { display: none; }
+
+    .scoreboard {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 0;
+    }
+
+    .matchup {
+        padding: 10px 0;
+        border: 0;
+        border-bottom: 1px solid var(--line, #ece4d8);
+        border-radius: 0;
+        background: none;
+    }
+
+    .matchup:last-child { border-bottom: none; }
+    .matchup__side { padding: 2px 0; }
+    .matchup__name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    .teams-grid {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 0;
+    }
+
+    .team-card {
+        display: grid;
+        grid-template-columns: 34px minmax(0, 1fr) auto;
+        column-gap: 12px;
+        align-items: center;
+        width: 100%;
+        padding: 10px 0;
+        border: 0;
+        border-bottom: 1px solid var(--line, #ece4d8);
+        border-radius: 0;
+        background: none;
+        color: inherit;
+    }
+
+    .team-card:last-child { border-bottom: none; }
+
+    .team-card__logo {
+        grid-column: 1;
+        grid-row: 1 / span 2;
+        width: 30px;
+        height: 30px;
+        margin: 0;
+    }
+
+    .team-card__name { grid-column: 2; grid-row: 1; }
+    .team-card__owner { grid-column: 2; grid-row: 2; }
+
+    .team-card__record {
+        grid-column: 3;
+        grid-row: 1 / span 2;
+        font-weight: 700;
+        font-variant-numeric: tabular-nums;
+        color: var(--ink, #23201c);
+    }
+}
+
+/* ── power rankings: the rosters ───────────────────────────────────────
+   One row per team, in the same hairline language as the table. The
+   number is the claim; the need and the surplus under it are the reasons,
+   and the lineup behind them folds away until someone asks. */
+
+.power-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.power-row {
+    display: grid;
+    grid-template-columns: 28px minmax(0, 1fr) minmax(120px, 200px) 76px;
+    grid-template-areas:
+        "rank team  chart value"
+        ".    notes notes notes"
+        ".    detail detail detail";
+    align-items: center;
+    column-gap: 16px;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--line, #ece4d8);
+}
+
+.power-row:last-child { border-bottom: none; }
+
+.power-row--mine {
+    margin: 0 -10px;
+    padding-left: 10px;
+    padding-right: 10px;
+    border-radius: 10px;
+    background: #f7f4ec;
+}
+
+.power-row__rank {
+    grid-area: rank;
+    font-family: "Newsreader", Georgia, "Times New Roman", serif;
+    font-size: 22px;
+    color: var(--sage-dim, #4c6044);
+    font-variant-numeric: tabular-nums;
+}
+
+.power-row__team { grid-area: team; min-width: 0; }
+.power-row__chart { grid-area: chart; }
+
+.power-row__meta {
+    display: block;
+    margin: 3px 0 0 36px;
+    font-size: 12px;
+    color: var(--muted, #928a7d);
+}
+
+/* No logo, no indent: the meta line hangs under the name either way. */
+.power-row__team .team-cell:not(:has(.team-cell__logo)) + .power-row__meta { margin-left: 0; }
+
+.power-row__gap {
+    display: inline-block;
+    margin-left: 8px;
+    padding: 1px 7px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 700;
+}
+
+.power-row__gap--up { background: #e7eee2; color: #3f6d4a; }
+.power-row__gap--down { background: #fbeee6; color: #8c3a1f; }
+
+.power-row__value {
+    grid-area: value;
+    text-align: right;
+    line-height: 1.1;
+}
+
+.power-row__value strong {
+    display: block;
+    font-size: 19px;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+}
+
+.power-row__value small {
+    font-size: 11px;
+    color: var(--muted, #928a7d);
+}
+
+.power-row__notes {
+    grid-area: notes;
+    display: grid;
+    gap: 3px;
+    margin: 8px 0 0;
+    padding: 0;
+    list-style: none;
+}
+
+.power-note {
+    font-size: 13px;
+    color: var(--soft, #5d574e);
+}
+
+.power-note__label {
+    display: inline-block;
+    min-width: 58px;
+    margin-right: 6px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+.power-note--need .power-note__label { color: #8c3a1f; }
+.power-note--surplus .power-note__label { color: var(--sky, #5a7794); }
+
+.power-detail { grid-area: detail; margin-top: 6px; }
+
+.power-detail summary {
+    width: fit-content;
+    padding: 4px 0;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--sage, #5b7152);
+    cursor: pointer;
+}
+
+.power-detail__table {
+    width: 100%;
+    max-width: 560px;
+    margin-top: 6px;
+    border-collapse: collapse;
+    font-size: 13px;
+}
+
+.power-detail__table th {
+    padding: 4px 8px 4px 0;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-align: left;
+    text-transform: uppercase;
+    color: var(--muted, #928a7d);
+    border-bottom: 1px solid var(--line-strong, #d8cdba);
+}
+
+.power-detail__table th:nth-child(n + 3) { text-align: right; }
+
+.power-detail__table td {
+    padding: 5px 8px 5px 0;
+    border-bottom: 1px solid var(--line, #ece4d8);
+    vertical-align: top;
+}
+
+.power-detail__slot {
+    width: 52px;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--sage, #5b7152);
+}
+
+.power-detail__name small {
+    display: block;
+    font-size: 11px;
+    color: var(--muted, #928a7d);
+}
+
+.power-detail__num {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.power-detail__row--bench .power-detail__slot { color: var(--muted, #928a7d); }
+.power-detail__row--waiver td { color: var(--muted, #928a7d); font-style: italic; }
+
+.power-detail__note {
+    max-width: 560px;
+    margin: 8px 0 4px;
+    font-size: 12px;
+    color: var(--muted, #928a7d);
+}
+
+@media (max-width: 720px) {
+    /* The dot plot needs width to mean anything; on a phone the number and
+       the reasons carry the row. */
+    .power-row {
+        grid-template-columns: 22px minmax(0, 1fr) auto;
+        grid-template-areas:
+            "rank team  value"
+            "rank notes notes"
+            ".    detail detail";
+        align-items: start;
+        column-gap: 10px;
+    }
+
+    .power-row--mine { margin: 0 -8px; padding-left: 8px; padding-right: 8px; }
+    .power-row__rank { font-size: 19px; line-height: 1.3; }
+    .power-row__chart { display: none; }
+    .power-row__meta { margin-left: 0; }
+    .power-row__gap { margin: 4px 0 0; }
+    .power-note__label { display: block; min-width: 0; margin: 0; }
+    .power-detail summary { min-height: 36px; display: flex; align-items: center; }
 }
