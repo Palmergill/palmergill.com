@@ -518,6 +518,33 @@ def session_identity(request: Request) -> dict | None:
     return None
 
 
+LOOPBACK_HOSTS = {"127.0.0.1", "::1", "localhost"}
+
+
+def local_dev_identity(request: Request) -> dict | None:
+    """Sign loopback requests in as LOCAL_AUTH_USER, for local previews only.
+
+    Needs both LOCAL_SITE_ROOT (production never serves the static site from
+    this process) and LOCAL_AUTH_USER naming an existing active member, and
+    the connection itself must come from loopback. The Host header is not
+    consulted: a client controls it, so it proves nothing."""
+    if os.getenv("LOCAL_SITE_ROOT", "").lower() not in {"1", "true", "yes"}:
+        return None
+    username = os.getenv("LOCAL_AUTH_USER", "").strip()
+    if not username or not request.client or request.client.host not in LOOPBACK_HOSTS:
+        return None
+
+    db = SessionLocal()
+    try:
+        user = accounts.get_user(db, username)
+        if user is None or not user.is_active:
+            logger.warning("LOCAL_AUTH_USER=%s is not an active member; ignoring it", username)
+            return None
+        return {"username": user.display_name, "role": ROLE_MEMBER}
+    finally:
+        db.close()
+
+
 def valid_app_session_cookie(request: Request) -> bool:
     return session_identity(request) is not None
 
@@ -736,7 +763,7 @@ async def require_app_auth(request: Request, call_next):
     if valid_app_credentials(authorization):
         identity = {"username": app_auth_config()["username"], "role": ROLE_ADMIN}
     else:
-        identity = session_identity(request)
+        identity = session_identity(request) or local_dev_identity(request)
 
     if identity:
         request.state.app_auth_authenticated = True

@@ -348,6 +348,34 @@ def test_weekly_stats_maps_gsis_and_derives_half_ppr(db):
     assert stat.fantasy_points_ppr == 30.0
 
 
+def test_weekly_stats_fall_back_to_name_when_sleeper_has_no_gsis_id(db):
+    """Sleeper leaves most players' GSIS id blank; matching on it alone
+    dropped most of every week, stars included."""
+    fc.collect_players(
+        db,
+        client=FakeSleeper(
+            players={
+                "400": {"full_name": "Kenneth Walker", "position": "RB", "team": "KC"},
+                # Same name and position, different team: settled by team.
+                "401": {"full_name": "Kenneth Walker", "position": "RB", "team": "SEA"},
+                "402": {"full_name": "Deebo Samuel", "position": "WR", "team": "SF"},
+            }
+        ),
+    )
+    base = {"season": 2026, "week": 1, "fantasy_points_ppr": 20.0, "fantasy_points_half": None,
+            "fantasy_points_std": 18.0, "opponent": None, "stats": {}}
+    weekly = [
+        {**base, "gsis_id": "00-1", "name": "Kenneth Walker III", "position": "RB", "team": "KC"},
+        {**base, "gsis_id": "00-2", "name": "Deebo Samuel Sr.", "position": "WR", "team": "WAS"},
+        # A name nobody has is still dropped rather than guessed at.
+        {**base, "gsis_id": "00-3", "name": "Nobody Known", "position": "WR", "team": "NYJ"},
+    ]
+    run = fc.collect_weekly_stats(db, 2026, client=FakeNflverse(weekly=weekly))
+    assert run.rows_written == 2
+    matched = {row.player_id for row in db.query(FantasyPlayerStat).filter_by(season=2026)}
+    assert matched == {"400", "402"}
+
+
 def test_schedule_upsert_is_idempotent(db):
     games = [
         {

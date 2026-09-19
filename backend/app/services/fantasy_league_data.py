@@ -31,6 +31,7 @@ from app.database import (
 )
 from app.services import fantasy_data
 from app.services import fantasy_league_advanced
+from app.services import fantasy_league_roster_power as roster_power
 from app.services.fantasy_collector import latest_successful_run
 from app.services.fantasy_league_espn import ESPN_LINEUP_SLOTS, configured_league_id
 from app.services.fantasy_league_rankings import ALGORITHMS, build_team_metrics
@@ -1242,6 +1243,236 @@ def get_free_agents(
         "unmatched": 0,
         "roster_as_of": _iso(roster_run.finished_at) if roster_run else None,
         "as_of": _iso(ranking_run.finished_at),
+    }
+
+
+# Games in an NFL regular season, for turning a season-long projection into
+# points per game.
+SEASON_GAMES = 17
+
+
+def _player_value(
+    season_points: Optional[float],
+    week_points: Optional[float],
+    on_bye: bool,
+    on_ir: bool,
+) -> Dict[str, Any]:
+    """Projected points per game for the rest of the season.
+
+    The season-long projection is the steady signal and this week's is the
+    fresh one, so they are averaged. A bye says nothing about the player, so
+    that week is ignored. A zero this week means the projection has him out;
+    the feed cannot say for how long, so he counts at a discount instead of
+    at nothing or at full value.
+    """
+    season_ppg = season_points / SEASON_GAMES if season_points is not None else None
+    out = on_ir or (week_points is not None and week_points <= 0 and not on_bye)
+    if season_ppg is None and (week_points is None or on_bye):
+        return {"ppg": 0.0, "season_ppg": None, "week": None, "out": out, "projected": False}
+    if out:
+        base = season_ppg if season_ppg is not None else 0.0
+        ppg = roster_power.OUT_DISCOUNT * base
+    elif week_points is None or on_bye:
+        ppg = season_ppg
+    elif season_ppg is None:
+        ppg = week_points
+    else:
+        ppg = (season_ppg + week_points) / 2
+    return {
+        "ppg": ppg,
+        "season_ppg": season_ppg,
+        "week": None if on_bye else week_points,
+        "out": out,
+        "projected": True,
+    }
+
+
+def get_roster_power(
+    db: Session, season: Optional[int] = None, scoring: str = LEAGUE_SCORING
+) -> Dict[str, Any]:
+    """Every team ranked by the players on it, not by its results.
+
+    See ``fantasy_league_roster_power`` for the model. This function is the
+    join: the newest roster snapshot, the league's own starting slots, and the
+    dashboard's consensus projections — season-long and this week's.
+    """
+    season = _require_season(db, season)
+    scoring = normalize_scoring(scoring)
+    scoring_field = SCORING_POINTS_FIELD[scoring]
+    context = fantasy_data.default_context(db)
+    season_row = next((row for row in _season_rows(db) if row.season == season), None)
+    slots = _starting_slots(season_row)
+    roster_run = latest_successful_run(db, "league_rosters", season)
+
+    base = {
+        "season": season,
+        "scoring": scoring,
+        "week": context.get("week"),
+        "slots": slots,
+        "absence_rate": roster_power.ABSENCE_RATE,
+        "out_discount": roster_power.OUT_DISCOUNT,
+        "roster_as_of": _iso(roster_run.finished_at) if roster_run else None,
+    }
+    # Same boundary the lineup and free-agent boards draw: projections are for
+    # one season, and a 2024 roster valued with 2026 numbers answers nothing.
+    unavailable_reason = None
+    if context.get("season") != season:
+        unavailable_reason = "projection_season_mismatch"
+    elif not slots:
+        unavailable_reason = "missing_lineup_settings"
+    elif roster_run is None:
+        unavailable_reason = "missing_roster_snapshot"
+    season_map, season_as_of = fantasy_data._consensus_projection_map(db, season, 0)
+    week_map, week_as_of = fantasy_data._consensus_projection_map(
+        db, season, context.get("week")
+    )
+    if unavailable_reason is None and not season_map and not week_map:
+        unavailable_reason = "missing_projections"
+    if unavailable_reason:
+        return {**base, "available": False, "unavailable_reason": unavailable_reason, "teams": []}
+
+    matchups = fantasy_data._week_matchups(db, season, context.get("week"))
+
+    def value_for(player_id, pro_team, on_ir):
+        season_points = (season_map.get(player_id) or {}).get(scoring_field)
+        week_points = (week_map.get(player_id) or {}).get(scoring_field)
+        on_bye = bool(matchups) and bool(pro_team) and pro_team not in matchups
+        return _player_value(season_points, week_points, on_bye, on_ir)
+
+    roster_rows = (
+        db.query(FantasyLeagueRosterEntry)
+        .filter(FantasyLeagueRosterEntry.run_id == roster_run.id)
+        .all()
+    )
+    rostered_ids = {row.player_id for row in roster_rows if row.player_id}
+    pool_ids = set(season_map) | set(week_map) | rostered_ids
+    players = {
+        player.player_id: player
+        for player in db.query(FantasyPlayer)
+        .filter(FantasyPlayer.player_id.in_(list(pool_ids)))
+        .all()
+    } if pool_ids else {}
+
+    rosters: Dict[int, List[Dict[str, Any]]] = {}
+    unmatched = 0
+    for row in roster_rows:
+        player = players.get(row.player_id) if row.player_id else None
+        if row.player_id is None:
+            unmatched += 1
+        pro_team = row.pro_team or (player.team if player else None)
+        value = (
+            value_for(row.player_id, pro_team, row.lineup_slot == "IR")
+            if row.player_id
+            else _player_value(None, None, False, row.lineup_slot == "IR")
+        )
+        rosters.setdefault(row.espn_team_id, []).append(
+            {
+                "key": row.player_id or f"raw:{row.espn_team_id}:{row.player_name_raw}",
+                "player_id": row.player_id,
+                "name": (player.full_name if player else None) or row.player_name_raw,
+                "position": roster_power.normalize_position(
+                    row.position or (player.position if player else None)
+                ),
+                "pro_team": pro_team,
+                "injury_status": row.injury_status or (player.injury_status if player else None),
+                **value,
+            }
+        )
+
+    waiver_pool = []
+    for player_id in (set(season_map) | set(week_map)) - rostered_ids:
+        player = players.get(player_id)
+        if player is None:
+            continue
+        waiver_pool.append(
+            {
+                "key": player_id,
+                "player_id": player_id,
+                "name": player.full_name,
+                "position": roster_power.normalize_position(player.position),
+                "pro_team": player.team,
+                **value_for(player_id, player.team, False),
+            }
+        )
+    replacements = roster_power.replacement_level(waiver_pool, rostered_ids)
+
+    ranked = roster_power.rank_rosters(slots, rosters, replacements, SLOT_ELIGIBILITY)
+    team_rows = {row.espn_team_id: row for row in _team_rows(db, season)}
+    # ESPN's seed is the standings, tiebreakers included; the record is only a
+    # fallback for a snapshot that has no seeds yet.
+    standings_order = sorted(
+        team_rows.values(),
+        key=lambda row: (
+            row.playoff_seed is None,
+            row.playoff_seed or 0,
+            -(row.win_pct or 0.0),
+            -(row.points_for or 0.0),
+        ),
+    )
+    standing_rank = {row.espn_team_id: index for index, row in enumerate(standings_order, 1)}
+
+    def player_out(player: Dict[str, Any]) -> Dict[str, Any]:
+        return {
+            "player_id": player.get("player_id"),
+            "name": player.get("name"),
+            "position": player["position"],
+            "pro_team": player.get("pro_team"),
+            "slot": player.get("slot"),
+            "ppg": round(player["ppg"], 1),
+            "season_ppg": round(player["season_ppg"], 1) if player.get("season_ppg") is not None else None,
+            "week_points": round(player["week"], 1) if player.get("week") is not None else None,
+            "out": player.get("out", False),
+            "projected": player.get("projected", True),
+            "marginal": round(player["marginal"], 1) if "marginal" in player else None,
+            "over_replacement": round(player["over_replacement"], 1)
+            if "over_replacement" in player
+            else None,
+        }
+
+    teams = []
+    for team in ranked:
+        row = team_rows.get(team["team_id"])
+        payload = _team_payload(row) if row else {"espn_team_id": team["team_id"]}
+        need = team["need"]
+        payload.update(
+            {
+                "rank": team["rank"],
+                "standings_rank": standing_rank.get(team["team_id"]),
+                "expected": round(team["expected"], 1),
+                "lineup_points": round(team["lineup_points"], 1),
+                "absence_cost": round(team["absence_cost"], 1),
+                "players": [player_out(player) for player in team["players"]],
+                "waiver_starters": [
+                    {**player_out(player), "slot": player["slot"]}
+                    for player in team["waiver_starters"]
+                ],
+                "surplus": [player_out(player) for player in team["surplus"]],
+                "need": (
+                    {
+                        **need,
+                        "ppg": round(need["ppg"], 1),
+                        "league_average": round(need["league_average"], 1),
+                        "gap": round(need["gap"], 1),
+                    }
+                    if need
+                    else None
+                ),
+            }
+        )
+        teams.append(payload)
+
+    as_of = max((value for value in (season_as_of, week_as_of) if value), default=None)
+    return {
+        **base,
+        "available": True,
+        "unavailable_reason": None,
+        "projection_as_of": _iso(as_of),
+        "unmatched": unmatched,
+        "replacements": {
+            position: {"name": player.get("name"), "ppg": round(player["ppg"], 1)}
+            for position, player in sorted(replacements.items())
+        },
+        "teams": teams,
     }
 
 

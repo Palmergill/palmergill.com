@@ -14,7 +14,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/shared/site-nav.css?v=14">
     <link rel="stylesheet" href="/shared/fantasy-header.css?v=1">
-    <link rel="stylesheet" href="style.css?v=12">
+    <link rel="stylesheet" href="style.css?v=15">
 </head>
 <body>
 <noscript>
@@ -76,8 +76,10 @@
         <div id="leagueView" hidden>
             <nav class="season-bar" aria-label="Season">
                 <div class="chip-row" id="seasonChips" role="group" aria-label="Choose a season"></div>
-                <a class="league-link" href="/fantasy/league/week/">Weekly recap →</a>
-                <a class="league-link" href="/fantasy/league/draft/">Draft recap →</a>
+                <div class="season-bar__links">
+                    <a class="league-link" href="/fantasy/league/week/">Weekly recap →</a>
+                    <a class="league-link" href="/fantasy/league/draft/">Draft recap →</a>
+                </div>
             </nav>
 
             <!-- Team detail replaces the league sections; it is a routed view
@@ -141,6 +143,7 @@
 
             <div id="leagueSections">
                 <nav class="league-jump-nav" aria-label="League sections">
+                    <a href="#power">Power</a>
                     <a href="#standings">Standings</a>
                     <a href="#scoreboard">Scoreboard</a>
                     <a href="#free-agents">Waivers</a>
@@ -161,6 +164,27 @@
                     </div>
                 </section>
 
+                <!-- Power rankings read the rosters, not the results: what each
+                     team can be expected to score a week from here, given
+                     who it has and which of them it can actually start. It
+                     leads because it is the one ranking the scoreboard
+                     cannot tell you. -->
+                <section class="board" id="power" data-board="power" aria-labelledby="powerTitle">
+                    <div class="board__head">
+                        <div>
+                            <h2 id="powerTitle">Power rankings</h2>
+                            <p class="board__lede">
+                                Ranked by rosters, not results: each team's best legal lineup
+                                in projected points a week, after the bench covers byes and
+                                injuries. Depth only counts when it could start.
+                            </p>
+                        </div>
+                        <span class="board__note" id="powerNote"></span>
+                    </div>
+                    <ol class="power-list" id="powerList"></ol>
+                    <p class="ledger__note" id="powerFootnote"></p>
+                </section>
+
                 <!-- Standings, power rankings and rosters used to be three
                      lists of the same ten teams. One table now, with a column
                      that changes — which is also what lets it survive a phone,
@@ -179,7 +203,7 @@
                     <div class="controls controls--ledger">
                         <div class="chip-row chip-row--scroll" id="ledgerColumns" role="group" aria-label="Sort and column"></div>
                         <label class="select-field">
-                            <span class="sr-only">Power ranking method</span>
+                            <span class="sr-only">Résumé ranking method</span>
                             <select id="powerAlgorithm"></select>
                         </label>
                     </div>
@@ -203,7 +227,7 @@
                             <select id="scoreboardWeek"></select>
                         </label>
                     </div>
-                    <div id="scoreboard" class="scoreboard"></div>
+                    <div id="scoreboardGrid" class="scoreboard"></div>
                 </section>
 
                 <!-- Who is actually claimable here, which is a fact about
@@ -254,8 +278,8 @@
     <script>window.FantasyHeader.mount({ page: "league" });</script>
     <script src="/shared/analytics.js?v=1"></script>
     <script src="/shared/api-base.js?v=1"></script>
-    <script src="format.js?v=4"></script>
+    <script src="format.js?v=5"></script>
     <script src="/fantasy/chat.js?v=1"></script>
-    <script src="app.js?v=10"></script>
+    <script src="app.js?v=13"></script>
 </body>
 </html>

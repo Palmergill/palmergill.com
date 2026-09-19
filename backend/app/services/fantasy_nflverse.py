@@ -24,10 +24,13 @@ from app.services.fantasy_common import coerce_float, coerce_int, normalize_posi
 
 # Lee Sharpe / nflverse schedule file — stable, one row per game, all seasons.
 DEFAULT_GAMES_URL = "https://raw.githubusercontent.com/nflverse/nfldata/master/data/games.csv"
-# Weekly player stats release. {season} is substituted per fetch.
+# Weekly player stats release. {season} is substituted per fetch. nflverse
+# retired the old `player_stats/player_stats_{season}.csv` asset (it 404s from
+# 2025 on); `stats_player` is its replacement, with `team` in place of
+# `recent_team` — the parser reads either.
 DEFAULT_WEEKLY_STATS_URL = (
     "https://github.com/nflverse/nflverse-data/releases/download/"
-    "player_stats/player_stats_{season}.csv"
+    "stats_player/stats_player_week_{season}.csv"
 )
 
 
@@ -118,7 +121,10 @@ def parse_weekly_stats_csv(text: str) -> List[Dict[str, Any]]:
         }
         rows.append(
             {
-                "gsis_id": gsis_id,
+                "gsis_id": gsis_id.strip(),
+                # Kept for the name crosswalk: Sleeper leaves most players'
+                # GSIS id blank, so the id alone matches a fraction of a week.
+                "name": _first(row, "player_display_name", "player_name"),
                 "season": coerce_int(_first(row, "season")),
                 "week": coerce_int(_first(row, "week")),
                 "team": _first(row, "recent_team", "team"),

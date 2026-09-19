@@ -248,7 +248,9 @@
 
     // ── awards ──────────────────────────────────────────────────────────
 
-    const FEATURED = ["top_score", "best_manager", "player_of_the_week"];
+    // The three facts a league chat would lead with: who won the week, whose
+    // bench cost them a game, and who carried a lineup.
+    const FEATURED = ["top_score", "benched_win", "player_of_the_week"];
 
     function awardCard(award, featured) {
         const card = el("article", `award${featured ? " award--featured" : ""}`);

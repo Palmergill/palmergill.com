@@ -588,19 +588,40 @@ def collect_weekly_stats(db: Session, season: int, client=None) -> FantasyCollec
         logger.warning("nflverse weekly stats fetch failed (%s): %s", season, exc)
         return _finish_run(db, run, "error", detail=str(exc))
 
-    # Map GSIS ids to canonical Sleeper player_ids; drop rows we can't map.
+    # Map GSIS ids to canonical Sleeper player_ids, then fall back to name and
+    # position. Sleeper carries a GSIS id for well under half its players (and
+    # some with stray whitespace), so the id alone dropped most of a week —
+    # including stars — and every lineup built on the feed came out
+    # unscoreable. A name shared by two players at a position is resolved by
+    # team, and left unmatched when that does not settle it.
+    players = db.query(FantasyPlayer).all()
     gsis_to_player = {
-        gsis: pid
-        for pid, gsis in db.query(FantasyPlayer.player_id, FantasyPlayer.gsis_id).all()
-        if gsis
+        player.gsis_id.strip(): player.player_id for player in players if player.gsis_id
     }
+    by_name_position: Dict[Tuple[str, str], List[FantasyPlayer]] = {}
+    for player in players:
+        if player.search_name and player.position:
+            by_name_position.setdefault((player.search_name, player.position), []).append(player)
+
+    def match(row: Dict[str, Any]) -> Optional[str]:
+        player_id = gsis_to_player.get((row.get("gsis_id") or "").strip())
+        if player_id:
+            return player_id
+        name = normalize_name(row.get("name"))
+        if not name:
+            return None
+        candidates = by_name_position.get((name, row.get("position"))) or []
+        if len(candidates) > 1:
+            candidates = [player for player in candidates if player.team == row.get("team")]
+        return candidates[0].player_id if len(candidates) == 1 else None
+
     existing = {
         (s.week, s.player_id): s
         for s in db.query(FantasyPlayerStat).filter(FantasyPlayerStat.season == season).all()
     }
     written = 0
     for row in rows:
-        player_id = gsis_to_player.get(row["gsis_id"])
+        player_id = match(row)
         if not player_id or row["week"] is None:
             continue
         fields = {

@@ -73,6 +73,7 @@ LEAGUE_ROUTES = (
     "/api/fantasy/league/teams/1",
     "/api/fantasy/league/teams/1/roster",
     "/api/fantasy/league/free-agents",
+    "/api/fantasy/league/roster-power",
     "/api/fantasy/league/teams/1/lineup",
     "/api/fantasy/league/teams/1/overview",
     "/api/fantasy/league/teams/1/rooms",
@@ -218,6 +219,27 @@ def test_member_may_read_every_route(seeded_db, route):
 
 def test_admin_may_read_too(seeded_db):
     assert admin_client().get("/api/fantasy/league/standings").status_code == 200
+
+
+def test_local_auth_user_signs_in_loopback_requests_only(seeded_db, monkeypatch):
+    member_client()  # ensures the "taylor" account exists and is active
+    route = "/api/fantasy/league/standings"
+    loopback = TestClient(app, client=("127.0.0.1", 50000))
+    remote = TestClient(app, client=("203.0.113.9", 50000))
+
+    # Off unless both flags are set: production never sets LOCAL_SITE_ROOT.
+    monkeypatch.setenv("LOCAL_AUTH_USER", "taylor")
+    monkeypatch.delenv("LOCAL_SITE_ROOT", raising=False)
+    assert loopback.get(route).status_code == 403
+
+    monkeypatch.setenv("LOCAL_SITE_ROOT", "true")
+    assert loopback.get(route).status_code == 200
+    # A spoofed Host header does not make a remote client local.
+    assert remote.get(route, headers={"Host": "localhost"}).status_code == 403
+
+    # An unknown account is ignored rather than invented.
+    monkeypatch.setenv("LOCAL_AUTH_USER", "nobody-here")
+    assert loopback.get(route).status_code == 403
 
 
 def test_league_paths_are_not_demo_paths():
