@@ -82,6 +82,7 @@ def test_an_empty_seat_is_filled_from_waivers_and_called_out_as_the_need():
     by_id = {team["team_id"]: team for team in teams}
     assert [p["key"] for p in by_id["thin"]["waiver_starters"]] == ["wQB"]
     assert by_id["thin"]["need"]["slot"] == "OP"
+    assert by_id["thin"]["need"]["seat"] == "OP"
     assert by_id["thin"]["need"]["from_waivers"] is True
     assert by_id["full"]["need"] is None or by_id["full"]["need"]["slot"] != "OP"
 
@@ -111,3 +112,12 @@ def test_player_value_blends_season_and_week_and_discounts_absences():
     assert out["out"] is True and out["ppg"] == pytest.approx(5.0)
     assert _player_value(170.0, 14.0, False, True)["ppg"] == pytest.approx(5.0)
     assert _player_value(None, None, False, False)["projected"] is False
+
+
+def test_a_need_in_a_multi_seat_slot_names_the_seat():
+    """A thin second running back is an RB2 problem, not an RB1 one."""
+    strong = roster_with_qbs(20, 17)
+    thin = [p for p in roster_with_qbs(20, 17) if p["key"] != "RB2"] + [player("RBx", "RB", 7)]
+    teams = rp.rank_rosters(SLOTS, {"strong": strong, "thin": thin}, WAIVERS, SLOT_ELIGIBILITY)
+    need = {team["team_id"]: team for team in teams}["thin"]["need"]
+    assert need["seat"] == "RB2"

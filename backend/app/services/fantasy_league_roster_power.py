@@ -316,6 +316,13 @@ def _annotate_needs(teams: List[Dict[str, Any]]) -> None:
             seats.append((seat, player))
         seats_for[team["team_id"]] = seats
 
+    # "RB2" when a slot has more than one seat, plain "TE" when it has one, so
+    # the page can say which seat is thin rather than naming a player as if
+    # he were the problem.
+    seats_per_slot: Dict[str, int] = {}
+    for slot, index in by_seat:
+        seats_per_slot[slot] = max(seats_per_slot.get(slot, 0), index)
+
     for team in teams:
         worst = None
         for seat, player in seats_for[team["team_id"]]:
@@ -325,6 +332,7 @@ def _annotate_needs(teams: List[Dict[str, Any]]) -> None:
             if worst is None or gap < worst["gap"]:
                 worst = {
                     "slot": seat[0],
+                    "seat": f"{seat[0]}{seat[1]}" if seats_per_slot[seat[0]] > 1 else seat[0],
                     "name": player.get("name"),
                     "position": player["position"],
                     "ppg": player["ppg"],

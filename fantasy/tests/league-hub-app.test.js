@@ -542,6 +542,8 @@ describe("league hub power rankings", () => {
                 surplus: [player({ player_id: "c", name: "Spare RB", position: "RB", ppg: 9.8 })],
                 need: {
                     slot: "OP",
+                    seat: "OP",
+                    position: "QB",
                     name: "Waiver QB",
                     ppg: 11.6,
                     league_average: 16.8,
@@ -562,9 +564,10 @@ describe("league hub power rankings", () => {
             TEAMS[0].name,
         ]);
         expect(rows[0].querySelector(".power-row__value strong").textContent).toBe("134.4");
-        expect(rows[1].querySelector(".power-note--need").textContent).toContain(
-            "nobody rostered — best on waivers is Waiver QB"
-        );
+        const need = rows[1].querySelector(".power-note--need").textContent;
+        expect(need).toContain("Weakest spot: OP");
+        expect(need).toContain("Nobody on the roster can fill it — the best free agent, Waiver QB (QB)");
+        expect(need).toContain("16.8 for other teams' OP starters");
         expect(rows[1].querySelector(".power-note--surplus").textContent).toContain("Spare RB (RB)");
         // The lineup behind the number folds away, waiver seat included.
         const detail = rows[1].querySelector("details.power-detail");

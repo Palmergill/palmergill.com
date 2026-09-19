@@ -1568,17 +1568,17 @@
 
             const notes = el("ul", "power-row__notes");
             if (team.need) {
-                const need = el("li", "power-note power-note--need");
-                need.appendChild(el("span", "power-note__label", "Need"));
-                const seat = team.need.from_waivers
-                    ? `${team.need.slot}: nobody rostered — best on waivers is ${team.need.name}`
-                    : `${team.need.slot}: ${team.need.name}`;
-                need.appendChild(
-                    document.createTextNode(
-                        `${seat}, ${F.formatPoints(team.need.ppg)} vs ${F.formatPoints(team.need.league_average)} league average`
-                    )
-                );
-                notes.appendChild(need);
+                const need = team.need;
+                const seat = need.seat || need.slot;
+                const item = el("li", "power-note power-note--need");
+                item.appendChild(el("span", "power-note__label", `Weakest spot: ${seat}`));
+                // Name the seat as the problem, not the player in it: a
+                // team's RB2 can be a fine back who is simply its second.
+                const text = need.from_waivers
+                    ? `Nobody on the roster can fill it — the best free agent, ${need.name} (${need.position}), projects ${F.formatPoints(need.ppg)} pts/game vs ${F.formatPoints(need.league_average)} for other teams' ${seat} starters.`
+                    : `${need.name} projects ${F.formatPoints(need.ppg)} pts/game; the average ${seat} in this league projects ${F.formatPoints(need.league_average)}.`;
+                item.appendChild(document.createTextNode(text));
+                notes.appendChild(item);
             }
             if (team.surplus.length) {
                 const spare = el("li", "power-note power-note--surplus");
