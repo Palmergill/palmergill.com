@@ -739,6 +739,43 @@ describe("the signed-out front door", () => {
 // page, above the season you came to read. A past year is worth a row
 // because of who won it, so it reads as a record at the foot instead.
 
+// Each board's heading and the jump-nav entry that points at it are two
+// names for the same thing, written in two places. They had already drifted
+// once: the nav said "Standings" and the board called itself "The table".
+
+describe("board names", () => {
+    afterEach(() => {
+        document.body.innerHTML = "";
+    });
+
+    test("every jump-nav entry points at a board that exists", () => {
+        document.body.innerHTML = bodySource;
+        const targets = [...document.querySelectorAll(".league-jump-nav a")].map((link) =>
+            link.getAttribute("href").slice(1)
+        );
+        expect(targets.length).toBeGreaterThan(0);
+        targets.forEach((id) => {
+            expect(document.getElementById(id)).not.toBeNull();
+        });
+    });
+
+    test("a board's heading starts with the name the nav calls it", () => {
+        // Prefix, not equality: the nav is a compact scrolling strip, so
+        // "Power" for "Power rankings" is a deliberate shortening. A
+        // different word for the same board is the drift worth catching —
+        // "Waivers" pointing at "Free agents", or "Standings" at "The table".
+        document.body.innerHTML = bodySource;
+        [...document.querySelectorAll(".league-jump-nav a")].forEach((link) => {
+            const board = document.getElementById(link.getAttribute("href").slice(1));
+            const heading = board.querySelector("h2");
+            if (!heading) return; // The assistant is a section, not a board.
+            expect(heading.textContent.trim().toLowerCase()).toMatch(
+                new RegExp(`^${link.textContent.trim().toLowerCase()}\\b`)
+            );
+        });
+    });
+});
+
 describe("the history board", () => {
     afterEach(() => {
         document.body.innerHTML = "";

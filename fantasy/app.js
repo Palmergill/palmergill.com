@@ -1474,7 +1474,7 @@
 
     // ── power rankings: the rosters ─────────────────────────────────────
     //
-    // The table ranks results. This ranks what each team holds: its best
+    // Standings rank results. This ranks what each team holds: its best
     // legal lineup in projected points a week, less what byes and injuries
     // cost once the bench covers them. The server does the lineup math; the
     // page's job is to make "why" legible — the weakest seat, and the good
