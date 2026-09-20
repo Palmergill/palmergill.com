@@ -344,6 +344,45 @@
 
     // What the column prints. Separate from ledgerValue because a rank sorts
     // as a negative and prints as "3".
+    // ── what each column means ──────────────────────────────────────────
+    //
+    // Half this table is derived, and the headers that carry the derivation
+    // are the ones a reader cannot guess: xW, All-play, Résumé, Luck. The
+    // lede under the heading could only ever define two of them before it
+    // became a paragraph nobody reads, so the definitions live on the
+    // headers themselves.
+    //
+    // Keyed by the same data-key the header and its cells carry, so a
+    // column cannot be added without the miss being visible here.
+    const LEDGER_HINTS = {
+        seed: "Position in this table, by whichever column it is sorted on.",
+        team: "The manager's team. Open one for its roster, results and start/sit.",
+        record: "Wins and losses as the schedule actually fell, ties included where there are any.",
+        points_for: "Total points scored so far this season.",
+        all_play:
+            "Record against every team that played that week, every week — what the "
+            + "season would look like if everyone played everyone. Ties count half.",
+        expected:
+            "Games played times all-play win percentage: the wins this team's scoring "
+            + "should have earned it against an average schedule.",
+        luck:
+            "Wins minus expected wins. It sums to zero across the league, so one "
+            + "team's kind schedule is another's cruel one.",
+        lineup:
+            "Share of each week's best legal lineup the manager actually started. "
+            + "100% means nothing startable was left on the bench.",
+        scoring: "Median weekly score. The bar spans this team's lowest week to its highest.",
+        power: "Rank by the résumé method chosen above the table.",
+        odds:
+            "How often this team makes the playoffs, simulating the rest of the "
+            + "schedule from each team's own scoring spread.",
+        form: "Power rank week by week, earliest week at the left.",
+    };
+
+    function ledgerHint(key) {
+        return LEDGER_HINTS[key] || "";
+    }
+
     function ledgerText(row, key) {
         if (!row) return "—";
         switch (key) {
@@ -599,6 +638,8 @@
         ledgerValue,
         ledgerText,
         ledgerMeta,
+        LEDGER_HINTS,
+        ledgerHint,
         sortLedger,
         divergingBar,
         dotPosition,

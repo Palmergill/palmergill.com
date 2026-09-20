@@ -523,25 +523,58 @@
         els.powerAlgorithm.disabled = !(algorithms || []).length;
     }
 
+    const LEDGER_HEADERS = [
+        ["record", "W-L"],
+        ["points_for", "PF"],
+        ["all_play", "All-play"],
+        ["expected", "xW"],
+        ["luck", "Luck"],
+        ["lineup", "Lineup"],
+        ["scoring", "Range"],
+        ["power", "Résumé"],
+        ["odds", "Odds"],
+        ["form", "Form"],
+    ];
+
+    // A header that carries its own definition. Hover is the obvious way in,
+    // but it is not the only one: the label takes focus and the bubble is
+    // wired up with aria-describedby, so the definition reaches a keyboard
+    // and a screen reader too. The phone hides this whole row — there is no
+    // hover there, and the column chooser names the column instead.
+    function headerLabel(key, label) {
+        const hint = F.ledgerHint(key);
+        if (!hint) return document.createTextNode(label);
+
+        const wrap = el("span", "col-hint");
+        wrap.tabIndex = 0;
+        wrap.appendChild(el("span", "col-hint__label", label));
+
+        const bubble = el("span", "col-hint__bubble", hint);
+        bubble.id = `ledger-hint-${key}`;
+        bubble.setAttribute("role", "tooltip");
+        wrap.setAttribute("aria-describedby", bubble.id);
+        wrap.appendChild(bubble);
+        return wrap;
+    }
+
     function ledgerHeadRow() {
         const row = el("tr");
-        row.appendChild(el("th", null, ""));
-        row.appendChild(el("th", null, "Team"));
-        [
-            ["record", "W-L"],
-            ["points_for", "PF"],
-            ["all_play", "All-play"],
-            ["expected", "xW"],
-            ["luck", "Luck"],
-            ["lineup", "Lineup"],
-            ["scoring", "Range"],
-            ["power", "Résumé"],
-            ["odds", "Odds"],
-            ["form", "Form"],
-        ].forEach(([key, label]) => {
-            const cell = el("th", null, label);
+
+        const seed = el("th", "ledger__seed-head");
+        seed.dataset.key = "seed";
+        seed.appendChild(headerLabel("seed", "#"));
+        row.appendChild(seed);
+
+        const team = el("th");
+        team.dataset.key = "team";
+        team.appendChild(headerLabel("team", "Team"));
+        row.appendChild(team);
+
+        LEDGER_HEADERS.forEach(([key, label]) => {
+            const cell = el("th");
             cell.dataset.key = key;
             if (key === state.column) cell.classList.add("is-active");
+            cell.appendChild(headerLabel(key, label));
             row.appendChild(cell);
         });
         return row;

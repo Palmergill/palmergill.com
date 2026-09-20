@@ -894,3 +894,106 @@ describe("the history board", () => {
         expect(viewing().textContent).toBe("Viewing the 2025 season");
     });
 });
+
+// ── column definitions ──────────────────────────────────────────────────
+//
+// Half this table is derived, and the headers carrying the derivation are
+// the ones nobody can guess: xW, All-play, Résumé, Luck. The lede under the
+// heading could only ever define two before becoming a paragraph nobody
+// reads, so the definitions hang off the headers themselves.
+
+describe("column hints", () => {
+    afterEach(() => {
+        document.body.innerHTML = "";
+        jest.restoreAllMocks();
+    });
+
+    const headers = () => [...document.querySelectorAll(".ledger-table thead th")];
+
+    async function bootLedger() {
+        boot();
+        await waitFor(() => document.querySelectorAll("#ledger tbody tr").length === 2);
+    }
+
+    test("every column header carries a hint, including # and Team", async () => {
+        await bootLedger();
+
+        const keys = headers().map((th) => th.dataset.key);
+        expect(keys).toEqual([
+            "seed", "team", "record", "points_for", "all_play", "expected",
+            "luck", "lineup", "scoring", "power", "odds", "form",
+        ]);
+        headers().forEach((th) => {
+            const bubble = th.querySelector(".col-hint__bubble");
+            expect(bubble).not.toBeNull();
+            expect(bubble.textContent).toBe(F.LEDGER_HINTS[th.dataset.key]);
+            expect(bubble.textContent.length).toBeGreaterThan(0);
+        });
+    });
+
+    test("a column with no hint would be caught here, not shipped blank", async () => {
+        await bootLedger();
+
+        const keys = headers().map((th) => th.dataset.key);
+        const missing = keys.filter((key) => !F.LEDGER_HINTS[key]);
+        expect(missing).toEqual([]);
+        // And the other way: no hint written for a column that is not there.
+        const orphans = Object.keys(F.LEDGER_HINTS).filter((key) => !keys.includes(key));
+        expect(orphans).toEqual([]);
+    });
+
+    test("the hint is wired to its label for a screen reader", async () => {
+        await bootLedger();
+
+        headers().forEach((th) => {
+            const label = th.querySelector(".col-hint");
+            const bubble = th.querySelector(".col-hint__bubble");
+            expect(bubble.id).toBe(`ledger-hint-${th.dataset.key}`);
+            expect(bubble.getAttribute("role")).toBe("tooltip");
+            expect(label.getAttribute("aria-describedby")).toBe(bubble.id);
+        });
+    });
+
+    test("hover is not the only way in: the label takes focus", async () => {
+        await bootLedger();
+
+        headers().forEach((th) => {
+            expect(th.querySelector(".col-hint").tabIndex).toBe(0);
+        });
+    });
+
+    test("the bubble stays in the accessibility tree rather than being hidden", async () => {
+        await bootLedger();
+
+        // A display:none bubble is not a description of anything, so the
+        // stylesheet hides it with visibility/opacity and nothing sets the
+        // hidden attribute. aria-describedby depends on this.
+        headers().forEach((th) => {
+            expect(th.querySelector(".col-hint__bubble").hidden).toBe(false);
+        });
+        expect(styleSource).toContain("visibility: hidden");
+        expect(appSource).not.toContain("bubble.hidden");
+    });
+
+    test("the definition is not styled as the small-caps label around it", async () => {
+        await bootLedger();
+
+        // The header is uppercase and letter-spaced. A sentence inheriting
+        // that arrives shouting and unwrappable.
+        expect(styleSource).toMatch(/\.col-hint__bubble[^}]*text-transform:\s*none/s);
+        expect(styleSource).toMatch(/\.col-hint__bubble[^}]*letter-spacing:\s*normal/s);
+    });
+
+    test("switching column does not lose the hints", async () => {
+        await bootLedger();
+        const chip = [...document.querySelectorAll("#ledgerColumns .chip")].find(
+            (node) => node.textContent === "Luck"
+        );
+        chip.click();
+        await waitFor(() =>
+            document.querySelector('.ledger-table th[data-key="luck"]').classList.contains("is-active")
+        );
+
+        expect(headers().every((th) => th.querySelector(".col-hint__bubble"))).toBe(true);
+    });
+});

@@ -1165,7 +1165,81 @@ button:focus-visible {
 }
 
 .ledger-table th[data-key="team"],
+.ledger-table th[data-key="seed"],
 .ledger__team { text-align: left; }
+
+/* ── what a column means ──────────────────────────────────────────── */
+/*
+   Half this table is derived and the headers carrying the derivation are
+   the ones nobody can guess — xW, All-play, Résumé. The dotted underline is
+   the part that matters as much as the bubble: without a mark on the label,
+   a reader has no reason to hover in the first place.
+
+   Hover is the obvious way in but not the only one. The label takes focus,
+   so the definition is a Tab away, and aria-describedby hands it to a
+   screen reader whether or not anything is pointed at. The phone hides this
+   whole row — there is no hover there — and the column chooser names the
+   column instead. */
+
+.col-hint {
+    position: relative;
+    display: inline-block;
+    /* currentColor, not a fixed grey: the active column's header is darker
+       than the rest, and a mark the reader cannot see is the same as no
+       mark at all — which is the state this whole block exists to fix. */
+    border-bottom: 1px dotted currentColor;
+    cursor: help;
+}
+
+.col-hint:focus-visible {
+    outline: 2px solid var(--sage, #5b7152);
+    outline-offset: 2px;
+}
+
+.col-hint__bubble {
+    position: absolute;
+    top: calc(100% + 7px);
+    left: 0;
+    z-index: 30;
+    width: max-content;
+    max-width: 260px;
+    padding: 9px 11px;
+    border: 1px solid var(--line, #ece4d8);
+    border-radius: 10px;
+    background: var(--card, #fffdf9);
+    box-shadow: 0 10px 24px rgba(47, 38, 28, 0.16);
+    color: var(--soft, #5d574e);
+    font-size: 12px;
+    font-weight: 500;
+    font-variant-numeric: normal;
+    line-height: 1.45;
+    text-align: left;
+    /* A sentence, inside a header styled as a small-caps label. Without
+       these three it inherits the label's treatment and the definition
+       arrives shouting, letter-spaced, and unwrappable. */
+    text-transform: none;
+    letter-spacing: normal;
+    white-space: normal;
+    /* Not `hidden`: aria-describedby has to be able to read it, and a
+       display:none bubble is not a description of anything. */
+    visibility: hidden;
+    opacity: 0;
+    transition: opacity .12s ease, visibility .12s;
+}
+
+.col-hint:hover .col-hint__bubble,
+.col-hint:focus-visible .col-hint__bubble,
+.col-hint:focus-within .col-hint__bubble {
+    visibility: visible;
+    opacity: 1;
+}
+
+/* The last columns sit at the right edge of a table that scrolls sideways,
+   so a left-anchored bubble would open into the clipped part of it. */
+.ledger-table th:nth-last-child(-n+3) .col-hint__bubble {
+    right: 0;
+    left: auto;
+}
 
 /* The chosen column is emphasised rather than isolated: on a wide screen
    the others are still worth reading. */

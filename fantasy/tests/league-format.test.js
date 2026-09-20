@@ -369,3 +369,27 @@ describe("league id parsing", () => {
         });
     });
 });
+
+describe("column hint copy", () => {
+    test("every hint is a sentence, not a restatement of the label", () => {
+        Object.entries(LeagueFormat.LEDGER_HINTS).forEach(([key, text]) => {
+            expect(text.length).toBeGreaterThan(24);
+            expect(text.trim()).toBe(text);
+            expect(text).toMatch(/[.!]$/);
+        });
+    });
+
+    test("an unknown column asks for a hint and gets an empty string, not undefined", () => {
+        // The header builder falls back to a plain label on "", so a column
+        // added without a hint degrades instead of printing "undefined".
+        expect(LeagueFormat.ledgerHint("not_a_column")).toBe("");
+        expect(LeagueFormat.ledgerHint(undefined)).toBe("");
+    });
+
+    test("the derived columns are the ones that actually explain themselves", () => {
+        // These four are why this exists: nobody can read "xW" off the label.
+        ["all_play", "expected", "luck", "power"].forEach((key) => {
+            expect(LeagueFormat.ledgerHint(key).length).toBeGreaterThan(40);
+        });
+    });
+});
