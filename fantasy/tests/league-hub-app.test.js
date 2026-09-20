@@ -610,6 +610,11 @@ describe("importing a league", () => {
             .dispatchEvent(new window.Event("submit", { bubbles: true, cancelable: true }));
     }
 
+    test("the field does not truncate a pasted ESPN URL before parsing it", () => {
+        document.body.innerHTML = bodySource;
+        expect(field().getAttribute("maxlength")).toBeNull();
+    });
+
     test("a typo is called a typo, not a failed import", async () => {
         boot({ overview: { ...OVERVIEW, league_id: "225965" } });
         await waitFor(() => document.querySelectorAll("#ledger tbody tr").length === 2);
