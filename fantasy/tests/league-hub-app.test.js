@@ -355,7 +355,10 @@ describe("league hub ledger", () => {
         );
     });
 
-    test("your own row is marked, and your start/sit moves reach the strip", async () => {
+    test("your own row is marked", async () => {
+        // The only thing /league/me is still read for on this view. The strip
+        // it used to feed is gone: "My Team" lives in the section nav, and
+        // the start/sit moves are on the team page itself.
         boot({
             me: {
                 status: "configured",
@@ -363,33 +366,31 @@ describe("league hub ledger", () => {
                 snapshot: {
                     team: { espn_team_id: 2, name: "Bravo" },
                     record: { wins: 5, losses: 0, ties: 0 },
-                    opponent: { name: "Alpha" },
-                    power_rank: 1,
                 },
             },
-            lineup: {
-                available: true,
-                gain: 9.1,
-                slots: ["QB"],
-                week: 6,
-                current: { total: 100 },
-                optimal: { total: 109.1 },
-                starts: [{ name: "Rome Odunze", slot: "FLEX", projected_points: 14.8 }],
-                sits: [{ name: "Zach Charbonnet", slot: "FLEX", projected_points: 9.2 }],
-            },
         });
-        await waitFor(() => document.querySelectorAll("#ledger tbody tr").length === 2);
-        await waitFor(() => document.querySelectorAll("#myTeamMoves li").length === 2);
+        await waitFor(() => document.querySelector(".ledger-row--mine") !== null);
 
         expect(document.querySelector(".ledger-row--mine .team-cell__name").textContent).toBe(
             "Bravo"
         );
-        expect(document.getElementById("myTeamAdvice").textContent).toContain("9.1");
-        const moves = [...document.querySelectorAll("#myTeamMoves li")].map(
-            (node) => node.textContent
-        );
-        expect(moves[0]).toContain("Rome Odunze");
-        expect(moves[1]).toContain("Zach Charbonnet");
+    });
+
+    test("the lineup is not fetched for a view that no longer shows it", async () => {
+        const fetchMock = boot({
+            me: {
+                status: "configured",
+                selected_team_id: 2,
+                snapshot: { team: { espn_team_id: 2, name: "Bravo" } },
+            },
+        });
+        await waitFor(() => document.querySelector(".ledger-row--mine") !== null);
+        await new Promise((resolve) => setTimeout(resolve, 0));
+
+        const lineupCalls = fetchMock.mock.calls
+            .map(([url]) => String(url))
+            .filter((url) => url.includes("/lineup"));
+        expect(lineupCalls).toEqual([]);
     });
 
     test("an unconfigured season clears the previous season's team highlight", async () => {
@@ -419,13 +420,11 @@ describe("league hub ledger", () => {
         });
         await waitFor(() => document.querySelector(".ledger-row--mine") !== null);
 
-        [...document.querySelectorAll("#seasonChips .chip")]
-            .find((chip) => chip.textContent === "2025")
-            .click();
+        // Switching season is a row in the History board now, not a chip.
+        [...document.querySelectorAll("#historyList .history__open")][0].click();
 
         await waitFor(() => window.location.search.includes("season=2025"));
         await waitFor(() => document.querySelector(".ledger-row--mine") === null);
-        expect(document.getElementById("myTeamStrip").hidden).toBe(true);
     });
 
     test("the table leads whatever the season's state, preseason included", () => {
@@ -731,5 +730,130 @@ describe("the signed-out front door", () => {
         await waitFor(() => !document.getElementById("signedOutView").hidden);
 
         expect(document.getElementById("signInLink").getAttribute("href")).toContain("/login/");
+    });
+});
+
+// ── history ─────────────────────────────────────────────────────────────
+//
+// Every season the league has kept used to be a chip row at the top of the
+// page, above the season you came to read. A past year is worth a row
+// because of who won it, so it reads as a record at the foot instead.
+
+describe("the history board", () => {
+    afterEach(() => {
+        document.body.innerHTML = "";
+        jest.restoreAllMocks();
+    });
+
+    const SEASONS = [
+        { season: 2026, status: "ok", available: true },
+        {
+            season: 2025,
+            status: "ok",
+            available: true,
+            size: 12,
+            champion: {
+                espn_team_id: 4,
+                name: "Bakin Rice",
+                owner_name: "Ray",
+                wins: 11,
+                losses: 3,
+                ties: 0,
+                runner_up: "Alpha",
+                final_score: { winner: 142.6, runner_up: 118.2 },
+            },
+        },
+        { season: 2024, status: "unauthorized", available: false },
+        { season: 2023, status: "ok", available: true, size: 10, champion: null },
+    ];
+
+    function bootWithSeasons(seasons = SEASONS) {
+        return boot({ overview: { ...OVERVIEW, seasons } });
+    }
+
+    const rows = () => [...document.querySelectorAll("#historyList .history__row")];
+    const years = () =>
+        rows().map((row) => row.querySelector(".history__year").textContent);
+
+    test("lists every earlier season and leaves out the one you are reading", async () => {
+        bootWithSeasons();
+        await waitFor(() => rows().length > 0);
+
+        expect(years()).toEqual(["2025", "2024", "2023"]);
+        expect(document.getElementById("historyNote").textContent).toBe("3 earlier seasons");
+    });
+
+    test("a season is a row about who won it", async () => {
+        bootWithSeasons();
+        await waitFor(() => rows().length > 0);
+
+        const row = rows()[0];
+        expect(row.querySelector(".history__title").textContent).toContain("Bakin Rice");
+        expect(row.querySelector(".history__title").textContent).toContain("Ray");
+        expect(row.querySelector(".history__detail").textContent).toBe(
+            "11-3 · beat Alpha, 142.6–118.2"
+        );
+    });
+
+    test("opening a season switches the hub without a page load", async () => {
+        bootWithSeasons();
+        await waitFor(() => rows().length > 0);
+
+        const open = rows()[0].querySelector(".history__open");
+        expect(open.getAttribute("href")).toBe("/fantasy/?season=2025");
+        open.click();
+        await waitFor(() => window.location.search.includes("season=2025"));
+    });
+
+    test("a private season is labelled, not dropped", async () => {
+        bootWithSeasons();
+        await waitFor(() => rows().length > 0);
+
+        const row = rows()[1];
+        expect(row.querySelector(".history__title").textContent).toBe("Private season");
+        expect(row.querySelector(".history__open")).toBeNull();
+    });
+
+    test("a season with no recorded champion says so rather than inventing one", async () => {
+        bootWithSeasons();
+        await waitFor(() => rows().length > 0);
+
+        const row = rows()[2];
+        expect(row.querySelector(".history__title").textContent).toBe("No champion recorded");
+        expect(row.querySelector(".history__detail").textContent).toBe("10 teams");
+        // Still openable: the table and scoreboard are there either way.
+        expect(row.querySelector(".history__open")).not.toBeNull();
+    });
+
+    test("a league in its first season says that instead of showing an empty board", async () => {
+        bootWithSeasons([{ season: 2026, status: "ok", available: true }]);
+        await waitFor(() => document.querySelectorAll("#ledger tbody tr").length === 2);
+
+        expect(rows()).toHaveLength(0);
+        expect(document.querySelector("#historyList .empty-note").textContent).toContain(
+            "first season"
+        );
+        expect(document.getElementById("historyNote").textContent).toBe("");
+    });
+
+    test("the seasons no longer sit at the top of the page", async () => {
+        bootWithSeasons();
+        await waitFor(() => rows().length > 0);
+
+        expect(document.getElementById("seasonChips")).toBeNull();
+        expect(pageSource).not.toContain("seasonChips");
+    });
+
+    test("reading a past season says so; reading the live one does not", async () => {
+        const viewing = () => document.getElementById("seasonViewing");
+
+        bootWithSeasons();
+        await waitFor(() => rows().length > 0);
+        expect(viewing().hidden).toBe(true);
+
+        document.body.innerHTML = "";
+        boot({ overview: { ...OVERVIEW, season: 2025, seasons: SEASONS } });
+        await waitFor(() => !viewing().hidden);
+        expect(viewing().textContent).toBe("Viewing the 2025 season");
     });
 });

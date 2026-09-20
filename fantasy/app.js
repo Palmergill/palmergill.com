@@ -56,7 +56,6 @@
         emptyView: byId("emptyView"),
         leagueView: byId("leagueView"),
         signInLink: byId("signInLink"),
-        seasonChips: byId("seasonChips"),
         leagueSections: byId("leagueSections"),
         powerList: byId("powerList"),
         powerNote: byId("powerNote"),
@@ -75,11 +74,9 @@
         freeAgents: byId("freeAgents"),
         freeAgentsNote: byId("freeAgentsNote"),
         freeAgentsToggle: byId("freeAgentsToggle"),
-        myTeamStrip: byId("myTeamStrip"),
-        myTeamName: byId("myTeamName"),
-        myTeamMeta: byId("myTeamMeta"),
-        myTeamAdvice: byId("myTeamAdvice"),
-        myTeamMoves: byId("myTeamMoves"),
+        seasonViewing: byId("seasonViewing"),
+        historyList: byId("historyList"),
+        historyNote: byId("historyNote"),
         teamView: byId("teamView"),
         teamBack: byId("teamBack"),
         teamLede: byId("teamLede"),
@@ -248,24 +245,114 @@
 
     // ── rendering ───────────────────────────────────────────────────────
 
-    function renderSeasonChips(seasons) {
-        els.seasonChips.replaceChildren();
-        seasons.forEach((season) => {
-            const chip = el("button", "chip", F.seasonLabel(season.season, season.status));
-            chip.type = "button";
-            if (!season.available) {
-                chip.disabled = true;
-                chip.classList.add("chip--disabled");
-                chip.title = "This season is private in ESPN's league settings.";
-            } else {
-                chip.addEventListener("click", () => selectSeason(season.season));
-            }
-            if (season.season === state.season) {
-                chip.classList.add("chip--active");
-                chip.setAttribute("aria-current", "true");
-            }
-            els.seasonChips.appendChild(chip);
+    // ── history ─────────────────────────────────────────────────────────
+    //
+    // This used to be a chip row at the top of the page: every season the
+    // league has ever had, listed above the one you came to read, as bare
+    // numbers to click. A past season is worth a row because of who won it,
+    // so it reads as a record down here instead.
+
+    function renderHistory(seasons) {
+        const past = (seasons || []).filter((entry) => entry.season !== state.season);
+        els.historyList.replaceChildren();
+        els.historyNote.textContent = past.length
+            ? `${past.length} earlier ${past.length === 1 ? "season" : "seasons"}`
+            : "";
+
+        if (!past.length) {
+            els.historyList.appendChild(
+                el("li", "empty-note", "This is the first season the league has kept.")
+            );
+            return;
+        }
+
+        past.forEach((entry) => {
+            els.historyList.appendChild(historyRow(entry));
         });
+    }
+
+    function historyRow(entry) {
+        const item = el("li", "history__row");
+        item.appendChild(el("span", "history__year", String(entry.season)));
+
+        const body = el("div", "history__body");
+
+        // A season ESPN has since made private is a stable expected gap, not
+        // a collector failure, so it says so rather than vanishing.
+        if (!entry.available) {
+            body.appendChild(el("p", "history__title history__title--quiet", "Private season"));
+            body.appendChild(
+                el("p", "history__detail", "This year is not public in ESPN's league settings.")
+            );
+            item.classList.add("history__row--quiet");
+            item.appendChild(body);
+            return item;
+        }
+
+        const champion = entry.champion;
+        if (champion) {
+            const title = el("p", "history__title");
+            title.appendChild(el("span", "history__trophy", "🏆"));
+            title.appendChild(el("strong", null, champion.name || "—"));
+            if (champion.owner_name) {
+                title.appendChild(el("span", "history__owner", champion.owner_name));
+            }
+            body.appendChild(title);
+            body.appendChild(el("p", "history__detail", championDetail(champion)));
+        } else {
+            // Mid-season, or a year whose bracket was never collected.
+            body.appendChild(el("p", "history__title history__title--quiet", "No champion recorded"));
+            body.appendChild(
+                el("p", "history__detail", entry.size ? `${entry.size} teams` : "")
+            );
+        }
+
+        const open = el("a", "history__open", "Open season →");
+        open.href = seasonHref(entry.season);
+        open.addEventListener("click", (event) => {
+            // Same-page navigation: the hub reloads into that season rather
+            // than doing a round trip for a document it already has.
+            event.preventDefault();
+            selectSeason(entry.season);
+        });
+
+        item.appendChild(body);
+        item.appendChild(open);
+        return item;
+    }
+
+    function championDetail(champion) {
+        const parts = [F.recordLabel(champion.wins, champion.losses, champion.ties)];
+        const score = champion.final_score || {};
+        if (score.winner != null && score.runner_up != null && champion.runner_up) {
+            // A comma, because team names end in anything: "beat 4th and 20
+            // 142.6–118.2" reads as one run-on number otherwise.
+            parts.push(
+                `beat ${champion.runner_up}, ` +
+                `${F.formatPoints(score.winner)}–${F.formatPoints(score.runner_up)}`
+            );
+        } else if (champion.runner_up) {
+            parts.push(`beat ${champion.runner_up}`);
+        }
+        return parts.filter(Boolean).join(" · ");
+    }
+
+    function seasonHref(season) {
+        const params = new URLSearchParams();
+        params.set("season", season);
+        return `/fantasy/?${params}`;
+    }
+
+    // Reading a finished season is a different act from reading the live one,
+    // and the masthead's year alone does not say which you are doing.
+    function renderSeasonViewing(overview) {
+        const isCurrent = !overview.seasons
+            || !overview.seasons.length
+            || overview.seasons[0].season === overview.season;
+        els.seasonViewing.hidden = isCurrent;
+        if (!isCurrent) {
+            els.seasonViewing.textContent = `Viewing the ${overview.season} season`;
+        }
     }
 
     function renderHeader(overview) {
@@ -1313,10 +1400,16 @@
 
     // ── your team ───────────────────────────────────────────────────────
     //
-    // The hub knew all twelve teams and not which one was yours, so start/sit
-    // — advice about one specific roster — was reachable only by recognising
-    // your own name in the Teams grid. /league/me already stores the mapping
-    // for the dashboard hero; this is the same read, used where the advice is.
+    // Two things need to know which of the twelve teams is yours: the ledger,
+    // which marks your row, and "My Team" in the section nav, which links to
+    // ?team=me because the nav cannot know your id. /league/me already stores
+    // that mapping for the dashboard hero, so this is the same read.
+    //
+    // It used to feed a "Your team" strip at the top of the page as well —
+    // your record, your opponent, and your start/sit moves. The nav carries
+    // the shortcut now, and the moves were a copy of the lineup card on the
+    // team page itself, so the strip was two duplications in the most
+    // expensive space on the page.
 
     async function loadMyTeam() {
         const generation = state.generation;
@@ -1327,7 +1420,6 @@
             if (stale(generation)) return;
             if (me.status !== "configured" || !me.snapshot || !me.selected_team_id) {
                 state.myTeamId = null;
-                els.myTeamStrip.hidden = true;
                 unresolvedMyTeam(
                     "Pick your team below and My Team will open straight to it."
                 );
@@ -1344,20 +1436,9 @@
                 state.teamId = me.selected_team_id;
                 writeUrlState(true);
             }
-            renderMyTeam(me);
-            // Advice is a second request and a nice-to-have: the strip is
-            // already useful as a shortcut without it.
-            const lineupParams = new URLSearchParams(params);
-            lineupParams.set("scoring", LEAGUE_SCORING);
-            const lineup = await fetchJson(
-                `${API_BASE}/teams/${me.selected_team_id}/lineup?${lineupParams}`
-            ).catch(() => null);
-            if (stale(generation)) return;
-            renderMyTeamAdvice(lineup, me.selected_team_id);
         } catch (error) {
             if (!stale(generation)) {
                 state.myTeamId = null;
-                els.myTeamStrip.hidden = true;
                 unresolvedMyTeam("Could not work out which team is yours.");
             }
         }
@@ -1378,68 +1459,6 @@
         els.routeBanner.hidden = false;
     }
 
-    function teamHref(teamId) {
-        const params = new URLSearchParams();
-        if (state.season) params.set("season", state.season);
-        params.set("team", String(teamId));
-        return `/fantasy/?${params}`;
-    }
-
-    function renderMyTeam(me) {
-        const snapshot = me.snapshot;
-        const team = snapshot.team || {};
-        els.myTeamStrip.hidden = false;
-        els.myTeamName.textContent = team.name || team.abbrev || "Your team";
-        els.myTeamName.href = teamHref(me.selected_team_id);
-        const record = snapshot.record || {};
-        els.myTeamMeta.textContent = [
-            F.recordLabel(record.wins, record.losses, record.ties),
-            snapshot.is_bye
-                ? "Bye"
-                : snapshot.opponent
-                    ? `vs ${snapshot.opponent.name || snapshot.opponent.abbrev}`
-                    : "",
-            snapshot.power_rank ? `Power #${snapshot.power_rank}` : "",
-        ].filter(Boolean).join(" · ");
-    }
-
-    function renderMyTeamAdvice(lineup, teamId) {
-        // Same rule the start/sit card follows: no advice is better than
-        // advice assembled from a season the projections do not cover.
-        els.myTeamMoves.replaceChildren();
-        if (!lineup || lineup.available === false || lineup.gain == null) {
-            els.myTeamAdvice.hidden = true;
-            return;
-        }
-        els.myTeamAdvice.hidden = false;
-        els.myTeamAdvice.href = teamHref(teamId);
-        els.myTeamAdvice.textContent = lineup.gain > 0
-            ? `Your lineup leaves ${F.formatPoints(lineup.gain)} on the bench →`
-            : "Your lineup is the best one available →";
-        els.myTeamAdvice.classList.toggle("my-team__advice--gain", lineup.gain > 0);
-
-        // Starts and sits are listed as two sets rather than paired swaps,
-        // because the lineup read deliberately does not pair them: with
-        // overlapping FLEX seats a change is not always one player for one.
-        const moves = []
-            .concat((lineup.starts || []).map((player) => ["Start", player]))
-            .concat((lineup.sits || []).map((player) => ["Sit", player]));
-        moves.slice(0, 4).forEach(([label, player]) => {
-            const item = el("li", `my-team__move my-team__move--${label.toLowerCase()}`);
-            item.appendChild(el("span", "my-team__move-label", label));
-            item.appendChild(el("span", "my-team__move-name", player.name || "—"));
-            item.appendChild(
-                el(
-                    "span",
-                    "my-team__move-points",
-                    player.projected_points == null
-                        ? "—"
-                        : F.formatPoints(player.projected_points)
-                )
-            );
-            els.myTeamMoves.appendChild(item);
-        });
-    }
 
     function scrollToRequestedBoard(hash = window.location.hash) {
         if (!hash || hash.length < 2) return;
@@ -1842,7 +1861,6 @@
         state.freeAgentsPayload = null;
         state.rosterPower = null;
         state.myTeamId = null;
-        els.myTeamStrip.hidden = true;
         els.routeBanner.hidden = true;
         clearError();
         try {
@@ -1861,7 +1879,8 @@
             state.leagueId = overview.league_id || null;
             setView("league");
             renderHeader(overview);
-            renderSeasonChips(overview.seasons);
+            renderSeasonViewing(overview);
+            renderHistory(overview.seasons);
             writeUrlState(true, requestedHash);
 
             const standings = await fetchJson(`${API_BASE}/standings?season=${state.season}`);

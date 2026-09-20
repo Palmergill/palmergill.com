@@ -434,3 +434,33 @@ and weights but fixed five defects, each locked by a regression test:
   whatever rate limiting that implies against ESPN. That is its own phase,
   not a redesign; `GET /overview` now returns `league_id` so the form can
   compare honestly in the meantime.
+
+- **Sep 2026 — the top of the page, cleared.** Two things sat above the
+  league and earned neither the space nor the position.
+
+  **The "Your team" strip is gone.** It existed because the hub knew all
+  twelve teams and not which one was yours, so a shortcut at the top was the
+  only way to your own roster. "My Team" is a slot in the section nav now,
+  on every page, so the shortcut was permanent furniture repeating something
+  already on screen — and its start/sit moves were a four-row copy of the
+  lineup card on the team page itself. `GET /league/me` is still read, for
+  the one thing that survives: marking your row in the table. The per-team
+  lineup request it used to fire on every league load is no longer made.
+
+  **The season chips moved to a History board at the foot of the page.**
+  Listing every year the league has ever had, above the year you came to
+  read, put the least live thing on the page in the most expensive space.
+  History gives each past season a row instead: the year in the margin, who
+  won it and what they beat in the final, and a link that switches the hub
+  into that season. A season bar entry remains at the top, but only as a
+  line that appears when you are reading a season that is not the current
+  one — the masthead's year alone does not say which you are doing.
+
+  `list_seasons` therefore carries a `champion` per season, derived from the
+  last complete `WINNERS_BRACKET` matchup with a decided winner. It declines
+  to answer rather than guessing: a season still being played, a league
+  whose playoff matchups were never collected, a consolation-ladder game, or
+  a tied final all yield `null`, and the row says "no champion recorded".
+  Promoting a semi-final winner to champion would be worse than saying
+  nothing. Private seasons keep their labelled row and are never read for a
+  champion.

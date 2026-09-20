@@ -39,7 +39,9 @@ The active public site is static:
 
 The section's information architecture is one league at home, your own team
 one click from anywhere, and the league-agnostic tools (`market`, `rankings`,
-`draft-order`) behind a menu — see `shared/fantasy-header.js`. Old URLs
+`draft-order`) behind a menu — see `shared/fantasy-header.js`. Past seasons
+are a History board at the foot of the hub, one row a year naming its
+champion, rather than a chip row above the season you came to read. Old URLs
 (`/fantasy/league/*`, and `/fantasy/` for the market board) redirect from
 `vercel.json`.
 - `/casino/` - casino landing page linking the browser table games

@@ -749,75 +749,8 @@ button:focus-visible {
 
 .roster__ppg.dim { font-weight: 500; color: var(--muted, #928a7d); }
 
-/* Your team. The first thing on the league page, because it is the only board
-   here about one specific roster — and the way into the advice about it. */
-.my-team {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: space-between;
-    gap: 10px 18px;
-    margin-bottom: 18px;
-    padding: 14px 18px;
-    border: 1px solid var(--line, #ece4d8);
-    border-left: 3px solid var(--sage, #5b7152);
-    border-radius: 14px;
-    background: var(--card, #fff);
-}
-
-.my-team__identity {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: baseline;
-    gap: 4px 10px;
-    min-width: 0;
-}
-
-.my-team__label {
-    font-size: 11px;
-    font-weight: 700;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    color: var(--muted, #928a7d);
-}
-
-.my-team__name {
-    font-size: 17px;
-    font-weight: 700;
-    color: var(--ink, #23201c);
-    text-decoration: none;
-}
-
-.my-team__name:hover,
-.my-team__name:focus-visible {
-    text-decoration: underline;
-    text-underline-offset: 3px;
-}
-
-.my-team__meta {
-    font-size: 12px;
-    color: var(--muted, #928a7d);
-}
-
-.my-team__advice {
-    font-size: 13px;
-    font-weight: 700;
-    color: var(--soft, #5d574e);
-    text-decoration: none;
-    white-space: nowrap;
-}
-
-.my-team__advice--gain { color: #3f6d4a; }
-
-.my-team__advice:hover,
-.my-team__advice:focus-visible {
-    text-decoration: underline;
-    text-underline-offset: 3px;
-}
 
 @media (max-width: 620px) {
-    .my-team { padding: 12px 14px; }
-    .my-team__advice { white-space: normal; }
 }
 
 /* Free agents. A ranked list, but the point is the subtraction: these are the
@@ -1164,14 +1097,27 @@ button:focus-visible {
     .season .dv { display: none; }
 }
 
-/* Way across to the draft recap. Sits with the season chips because it is a
-   sibling view of the same league, not a separate tool. */
+/* Way across to the two recaps: sibling views of the same league, not
+   separate tools. The season chips that used to share this row moved to the
+   History board at the foot of the page. */
 .season-bar {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     justify-content: space-between;
     gap: 10px;
+}
+
+/* Reading a finished season is a different act from reading the live one,
+   and the year in the masthead alone does not say which you are doing. */
+.season-bar__viewing {
+    margin: 0;
+    padding: 3px 10px;
+    border-radius: 999px;
+    background: var(--surface, #f3eee4);
+    color: var(--soft, #5d574e);
+    font-size: 12px;
+    font-weight: 600;
 }
 
 .league-link {
@@ -1441,50 +1387,6 @@ button:focus-visible {
     color: var(--muted, #928a7d);
 }
 
-/* ── your team, expanded ───────────────────────────────────────────── */
-
-.my-team__advice-block {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-end;
-    gap: 6px;
-}
-
-.my-team__moves {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: flex-end;
-    gap: 5px 8px;
-    margin: 0;
-    padding: 0;
-    list-style: none;
-}
-
-.my-team__move {
-    display: inline-flex;
-    align-items: baseline;
-    gap: 5px;
-    padding: 3px 8px;
-    border-radius: 999px;
-    background: var(--surface, #f3eee4);
-    font-size: 12px;
-}
-
-.my-team__move-label {
-    font-size: 10px;
-    font-weight: 700;
-    letter-spacing: 0.05em;
-    text-transform: uppercase;
-    color: var(--muted, #928a7d);
-}
-
-.my-team__move--start .my-team__move-label { color: #3f6d4a; }
-.my-team__move--sit .my-team__move-label { color: #8c3a1f; }
-.my-team__move-name { font-weight: 600; }
-.my-team__move-points {
-    color: var(--soft, #5d574e);
-    font-variant-numeric: tabular-nums;
-}
 
 /* ── the phone: one column at a time ───────────────────────────────── */
 
@@ -1566,8 +1468,6 @@ button:focus-visible {
         align-items: center;
     }
 
-    .my-team__advice-block { align-items: flex-start; }
-    .my-team__moves { justify-content: flex-start; }
 }
 
 /* ── the ledger's visual language ──────────────────────────────────────
@@ -1655,32 +1555,7 @@ button:focus-visible {
     color: var(--muted, #928a7d);
 }
 
-/* ── seasons read as a rule of links, not a row of pills ──────────── */
-
 .season-bar { margin: 14px 0 26px; }
-
-.season-bar .chip {
-    padding: 2px 0;
-    border: 0;
-    border-bottom: 1px solid transparent;
-    border-radius: 0;
-    background: none;
-    font-size: 13px;
-    font-weight: 600;
-    color: var(--muted, #928a7d);
-}
-
-.season-bar .chip-row { gap: 16px; }
-.season-bar .chip:hover:not(:disabled) { color: var(--ink, #23201c); }
-
-.season-bar .chip--active {
-    background: none;
-    color: var(--ink, #23201c);
-    border-bottom-color: var(--clay, #b96a4b);
-}
-
-.season-bar .chip--disabled,
-.season-bar .chip:disabled { color: var(--line-strong, #d8cdba); }
 
 /* This is a long document, so keep its local table of contents close to the
    global header. On phones it scrolls sideways instead of becoming another
@@ -1767,8 +1642,7 @@ button:focus-visible {
 /* The team page lost its cards along with the league view — it reads as a
    document about one roster now. The aside that carries a live decision is
    the one thing left that earns a box. */
-.lineup,
-.my-team {
+.lineup {
     border-radius: 14px;
 }
 
@@ -1790,17 +1664,6 @@ button:focus-visible {
     .league-jump-nav { margin-right: -14px; margin-left: -14px; border-right: 0; border-left: 0; border-radius: 0; }
 }
 
-/* The band is part of the document, not a card floating on it: it was the
-   only box left on the league view once the boards lost their chrome. */
-.my-team {
-    padding: 14px 0 16px;
-    background: none;
-    border: 0;
-    border-top: 2px solid var(--ink, #23201c);
-    border-bottom: 1px solid var(--line-strong, #d8cdba);
-    border-radius: 0;
-    margin-bottom: 30px;
-}
 
 /* The column chooser is a switcher, not a set of buttons competing with the
    masthead. Same treatment as the season rule — until a phone, where it is
@@ -1827,7 +1690,6 @@ button:focus-visible {
 }
 
 @media (max-width: 720px) {
-    .my-team { padding: 14px 0 16px; }
 
     /* Re-assert the stacked head: the card-less `.board__head` rule above
        sets flex-end, and same-specificity source order would otherwise push
@@ -1865,8 +1727,8 @@ button:focus-visible {
 }
 
 @media (max-width: 720px) {
-    /* Seasons on one scrolling line, the two recaps on the next — instead of
-       one recap wrapping onto a line of its own. */
+    /* The "viewing 2024" line on its own row above the two recaps, instead
+       of one recap wrapping onto a line by itself. */
     .season-bar {
         flex-direction: column;
         align-items: stretch;
@@ -2144,4 +2006,95 @@ button:focus-visible {
     .power-row__gap { margin: 4px 0 0; }
     .power-note__label { display: block; min-width: 0; margin: 0; }
     .power-detail summary { min-height: 36px; display: flex; align-items: center; }
+}
+
+/* ── history ──────────────────────────────────────────────────────── */
+/*
+   One row a season, reading as a record: the year in the margin, who won it
+   in the body, and the way in on the right. It replaced a chip row at the
+   top of the page, where every year the league has ever had sat above the
+   one you came to read. */
+
+.history {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    border-top: 1px solid var(--line, #ece4d8);
+}
+
+.history__row {
+    display: grid;
+    grid-template-columns: 4.5rem minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 6px 16px;
+    padding: 14px 4px;
+    border-bottom: 1px solid var(--line, #ece4d8);
+}
+
+.history__year {
+    font-family: Newsreader, Georgia, serif;
+    font-size: 1.5rem;
+    line-height: 1;
+    color: var(--ink, #23201c);
+}
+
+.history__row--quiet .history__year { color: var(--muted, #928a7d); }
+
+.history__body { min-width: 0; }
+
+.history__title {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 4px 8px;
+    margin: 0 0 3px;
+    font-size: 0.98rem;
+}
+
+.history__title--quiet {
+    color: var(--muted, #928a7d);
+    font-style: italic;
+}
+
+.history__trophy { font-size: 0.86em; }
+
+.history__owner {
+    color: var(--muted, #928a7d);
+    font-size: 0.82rem;
+    font-weight: 500;
+}
+
+.history__detail {
+    margin: 0;
+    color: var(--soft, #5d574e);
+    font-size: 0.82rem;
+}
+
+.history__open {
+    color: var(--sage, #5b7152);
+    font-size: 13px;
+    font-weight: 600;
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+.history__open:hover,
+.history__open:focus-visible {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+}
+
+@media (max-width: 620px) {
+    /* The year keeps the margin; the link drops under the body rather than
+       squeezing all three columns onto a phone. */
+    .history__row {
+        grid-template-columns: 3.2rem minmax(0, 1fr);
+    }
+
+    .history__year { font-size: 1.25rem; }
+
+    .history__open {
+        grid-column: 2;
+        justify-self: start;
+    }
 }

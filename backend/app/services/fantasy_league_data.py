@@ -83,25 +83,84 @@ def _iso(value) -> Optional[str]:
     return iso_utc(value) if value else None
 
 
+def _season_champion(db: Session, season: int) -> Optional[Dict[str, Any]]:
+    """Who won the season, from the last decided winners-bracket game.
+
+    ESPN gives the bracket as ordinary matchups tagged WINNERS_BRACKET, so
+    the final is simply the latest one with a winner. Returns None whenever
+    that is not unambiguous — a season still in progress, a league whose
+    playoff matchups were never collected, or a final that somehow tied.
+    A season list that silently promotes a semi-final winner to champion
+    would be worse than one that says nothing.
+    """
+    final = (
+        db.query(FantasyLeagueMatchup)
+        .filter(
+            FantasyLeagueMatchup.season == season,
+            FantasyLeagueMatchup.playoff_tier == "WINNERS_BRACKET",
+            FantasyLeagueMatchup.is_complete.is_(True),
+            FantasyLeagueMatchup.winner.in_(("HOME", "AWAY")),
+        )
+        .order_by(FantasyLeagueMatchup.matchup_period.desc())
+        .first()
+    )
+    if not final:
+        return None
+
+    won_home = final.winner == "HOME"
+    winner_id = final.home_team_id if won_home else final.away_team_id
+    runner_up_id = final.away_team_id if won_home else final.home_team_id
+    if winner_id is None:
+        return None
+
+    by_id = {row.espn_team_id: row for row in _team_rows(db, season)}
+    champion = by_id.get(winner_id)
+    if not champion:
+        return None
+    runner_up = by_id.get(runner_up_id)
+
+    return {
+        "espn_team_id": champion.espn_team_id,
+        "name": champion.name,
+        "owner_name": champion.owner_name,
+        "logo_url": champion.logo_url,
+        "wins": champion.wins or 0,
+        "losses": champion.losses or 0,
+        "ties": champion.ties or 0,
+        "points_for": champion.points_for,
+        "runner_up": runner_up.name if runner_up else None,
+        "final_score": {
+            "winner": final.home_points if won_home else final.away_points,
+            "runner_up": final.away_points if won_home else final.home_points,
+        },
+    }
+
+
 def list_seasons(db: Session) -> Dict[str, Any]:
     """Every season we know about, including the ones we cannot read.
 
     A private season is reported with status 'unauthorized' rather than
     omitted, so the UI can label the gap instead of silently skipping a year.
+
+    Finished seasons carry their champion. A year in this league's history is
+    worth a row because of who won it; without that it is only a number to
+    click, which is what the season chips already were.
     """
     rows = _season_rows(db)
     seasons = []
     for row in rows:
-        seasons.append(
-            {
-                "season": row.season,
-                "name": row.name,
-                "size": row.size,
-                "status": row.status,
-                "available": row.status == "ok",
-                "updated_at": _iso(row.updated_at),
-            }
-        )
+        entry = {
+            "season": row.season,
+            "name": row.name,
+            "size": row.size,
+            "status": row.status,
+            "available": row.status == "ok",
+            "updated_at": _iso(row.updated_at),
+            "champion": None,
+        }
+        if row.status == "ok":
+            entry["champion"] = _season_champion(db, row.season)
+        seasons.append(entry)
     return {"seasons": seasons, "league_id": configured_league_id()}
 
 
