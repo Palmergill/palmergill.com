@@ -9,11 +9,11 @@
 const fs = require("fs");
 const path = require("path");
 
-const fantasyDir = path.join(__dirname, "..");
+const fantasyDir = path.join(__dirname, "..", "market");
 const appSource = fs.readFileSync(path.join(fantasyDir, "app.js"), "utf8");
 const pageSource = fs.readFileSync(path.join(fantasyDir, "index.html"), "utf8");
 const bodySource = pageSource.match(/<body>([\s\S]*)<\/body>/)[1];
-const F = require("../format.js");
+const F = require("../market/format.js");
 
 function response(data, status = 200) {
     return Promise.resolve({
@@ -643,7 +643,7 @@ describe("season board position filter", () => {
 
         const link = document.querySelector("#memberTeam a");
         expect(link.textContent).toBe("Fourth & Twenty");
-        expect(link.getAttribute("href")).toBe("/fantasy/league/?season=2026&team=7");
+        expect(link.getAttribute("href")).toBe("/fantasy/?season=2026&team=7");
     });
 
     test("members get a way to the free agents they can actually claim", async () => {
@@ -654,7 +654,7 @@ describe("season board position filter", () => {
         await waitFor(() => !document.getElementById("leagueFreeAgentsLink").hidden);
 
         const link = document.getElementById("leagueFreeAgentsLink");
-        expect(link.getAttribute("href")).toBe("/fantasy/league/#free-agents");
+        expect(link.getAttribute("href")).toBe("/fantasy/#free-agents");
     });
 
     test("a visitor with no league sees no link to a members-only board", async () => {

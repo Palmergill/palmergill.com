@@ -266,6 +266,10 @@ def get_league_overview(db: Session, season: Optional[int] = None) -> Dict[str, 
     return {
         "season": season,
         "mode": mode,
+        # The page's import form compares a pasted ID against this, so it can
+        # tell "that is the league you are already looking at" apart from
+        # "this site does not serve that league".
+        "league_id": configured_league_id(),
         "name": row.name if row else None,
         "size": row.size if row else None,
         "current_matchup_period": row.current_matchup_period if row else None,

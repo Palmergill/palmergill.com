@@ -29,15 +29,25 @@ const PUBLIC_PREFIXES = [
 // is public here, and the origin treats '/fantasy' as demo), so they have to
 // be checked BEFORE the public short-circuit in isProtectedPath — otherwise
 // they inherit anonymous access from their parent.
+//
+// /fantasy/ itself is deliberately NOT here. It is the section's front door
+// and renders a teaser plus a sign-in prompt for anonymous visitors, which
+// it cannot do if the edge redirects them to /login/ first. The page is an
+// empty shell either way: every byte of league data comes from
+// /api/fantasy/league/*, which require_member gates on the origin. The two
+// recaps below have no teaser story — they are league content end to end —
+// so a deep link to them still lands on the login form.
 // Keep in sync with MEMBER_PATH_PREFIXES in backend/app/main.py.
 const MEMBER_PREFIXES = [
-  '/fantasy/league',
+  '/fantasy/week',
+  '/fantasy/draft-recap',
 ];
 
 const PROTECTED_PREFIXES = [
   '/admin',
   '/api',
-  '/fantasy/league',
+  '/fantasy/week',
+  '/fantasy/draft-recap',
 ];
 
 // Signed in is not enough here: these expose logs, analytics, and collector
@@ -533,8 +543,10 @@ export const config = {
     '/bitcoin-chat/:path*',
     '/admin/:path*',
     '/api/:path*',
-    // The rest of /fantasy is public and deliberately unmatched; only the
-    // members-only league hub runs through the edge.
-    '/fantasy/league/:path*',
+    // The rest of /fantasy is public and deliberately unmatched — including
+    // the league hub at /fantasy/, which serves a signed-out teaser. Only
+    // the two members-only recaps run through the edge.
+    '/fantasy/week/:path*',
+    '/fantasy/draft-recap/:path*',
   ],
 };

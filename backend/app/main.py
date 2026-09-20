@@ -259,13 +259,20 @@ DEMO_PATH_PREFIXES = (
 # Members-only pages. These sit UNDERNEATH a demo prefix ("/fantasy"), and
 # is_demo_path matches by prefix, so omitting them from DEMO_PATH_PREFIXES is
 # not enough — they inherit demo access and must be excluded explicitly.
-MEMBER_PATH_PREFIXES = ("/fantasy/league",)
+#
+# "/fantasy" itself is the league hub now and stays a demo path: it serves a
+# teaser and a sign-in prompt to anonymous visitors, which a login redirect
+# would pre-empt. The page holds no league data — that all comes from
+# /api/fantasy/league/*, where require_member is the real boundary.
+# Keep in sync with MEMBER_PREFIXES in middleware.js.
+MEMBER_PATH_PREFIXES = ("/fantasy/week", "/fantasy/draft-recap")
 PROTECTED_PATH_PREFIXES = (
     "/docs",
     "/openapi.json",
     "/api",
     "/admin",
-    "/fantasy/league",
+    "/fantasy/week",
+    "/fantasy/draft-recap",
 )
 # Signed in is not enough for these — they expose logs, analytics, and the
 # raw API surface, so they require the admin role specifically.

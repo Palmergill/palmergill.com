@@ -5,7 +5,7 @@
  * the numbers came from — all live in format.js, so they are tested here
  * rather than through the DOM.
  */
-const F = require("../league/draft/format.js");
+const F = require("../draft-recap/format.js");
 
 describe("reach and value", () => {
     test("a pick taken before ADP reads as a reach", () => {

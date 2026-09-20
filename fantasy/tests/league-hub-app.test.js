@@ -1,12 +1,12 @@
 const fs = require("fs");
 const path = require("path");
 
-const leagueDir = path.join(__dirname, "..", "league");
+const leagueDir = path.join(__dirname, "..");
 const appSource = fs.readFileSync(path.join(leagueDir, "app.js"), "utf8");
 const pageSource = fs.readFileSync(path.join(leagueDir, "index.html"), "utf8");
 const styleSource = fs.readFileSync(path.join(leagueDir, "style.css"), "utf8");
 const bodySource = pageSource.match(/<body>([\s\S]*)<\/body>/)[1];
-const F = require("../league/format.js");
+const F = require("../format.js");
 
 function response(data, status = 200) {
     return Promise.resolve({
@@ -110,7 +110,7 @@ async function waitFor(predicate) {
     throw new Error("Timed out waiting for the league hub controller");
 }
 
-function boot(overrides = {}, url = "/fantasy/league/") {
+function boot(overrides = {}, url = "/fantasy/") {
     document.body.innerHTML = bodySource;
     window.history.replaceState({}, "", url);
     window.LeagueFormat = F;
@@ -584,5 +584,147 @@ describe("league hub power rankings", () => {
         expect(document.querySelector("#powerList .empty-note").textContent).toContain(
             "only cover the current season"
         );
+    });
+});
+
+// ── the section's front door ────────────────────────────────────────────
+//
+// /fantasy/ used to be the market dashboard and the league hub lived a click
+// in. The hub is home now, so it owns two jobs it did not have before: it is
+// the first page a signed-out visitor sees, and it is where "My Team" in the
+// section nav lands from anywhere else in the section.
+
+describe("importing a league", () => {
+    afterEach(() => {
+        document.body.innerHTML = "";
+        jest.restoreAllMocks();
+    });
+
+    const status = () => document.getElementById("importStatus");
+    const field = () => document.getElementById("importLeagueId");
+
+    function submit(value) {
+        field().value = value;
+        document
+            .getElementById("importForm")
+            .dispatchEvent(new window.Event("submit", { bubbles: true, cancelable: true }));
+    }
+
+    test("a typo is called a typo, not a failed import", async () => {
+        boot({ overview: { ...OVERVIEW, league_id: "225965" } });
+        await waitFor(() => document.querySelectorAll("#ledger tbody tr").length === 2);
+
+        submit("my league");
+        expect(status().dataset.status).toBe("invalid");
+        expect(status().textContent).toContain("all digits");
+        expect(field().getAttribute("aria-invalid")).toBe("true");
+    });
+
+    test("the league already on screen says so", async () => {
+        boot({ overview: { ...OVERVIEW, league_id: "225965" } });
+        await waitFor(() => document.querySelectorAll("#ledger tbody tr").length === 2);
+
+        submit("225965");
+        expect(status().dataset.status).toBe("current");
+        expect(status().textContent).toContain("the one you are looking at");
+    });
+
+    test("a valid ID for another league gets a straight answer, not a spinner", async () => {
+        const fetchMock = boot({ overview: { ...OVERVIEW, league_id: "225965" } });
+        await waitFor(() => document.querySelectorAll("#ledger tbody tr").length === 2);
+        const before = fetchMock.mock.calls.length;
+
+        submit("998877");
+        expect(status().dataset.status).toBe("unsupported");
+        expect(status().textContent).toContain("cannot collect a second one yet");
+        // Nothing was requested: the form is honest about being a front end
+        // for work that has not landed.
+        expect(fetchMock.mock.calls.length).toBe(before);
+    });
+
+    test("pasting the whole ESPN URL reads the ID out of it", async () => {
+        boot({ overview: { ...OVERVIEW, league_id: "225965" } });
+        await waitFor(() => document.querySelectorAll("#ledger tbody tr").length === 2);
+
+        submit("https://fantasy.espn.com/football/league?leagueId=225965&seasonId=2026");
+        expect(status().dataset.status).toBe("current");
+        expect(field().value).toBe("225965");
+    });
+
+    test("typing again clears the last answer", async () => {
+        boot({ overview: { ...OVERVIEW, league_id: "225965" } });
+        await waitFor(() => document.querySelectorAll("#ledger tbody tr").length === 2);
+
+        submit("nope");
+        field().dispatchEvent(new window.Event("input", { bubbles: true }));
+        expect(status().textContent).toBe("");
+        expect(field().getAttribute("aria-invalid")).toBeNull();
+    });
+});
+
+describe("?team=me", () => {
+    afterEach(() => {
+        document.body.innerHTML = "";
+        jest.restoreAllMocks();
+    });
+
+    const CONFIGURED = {
+        status: "configured",
+        selected_team_id: 2,
+        snapshot: { team: { espn_team_id: 2, name: "Bravo", owner_name: "Ray" } },
+    };
+
+    test("resolves to your team and rewrites the URL to a real id", async () => {
+        boot({ me: CONFIGURED }, "/fantasy/?team=me");
+        await waitFor(() => !document.getElementById("teamView").hidden);
+
+        expect(new URLSearchParams(window.location.search).get("team")).toBe("2");
+        expect(document.getElementById("leagueSections").hidden).toBe(true);
+    });
+
+    test("with no team chosen it lands on the league and says why", async () => {
+        boot({ me: { status: "unconfigured" } }, "/fantasy/?team=me");
+        await waitFor(
+            () => !document.getElementById("routeBanner").hidden
+        );
+
+        expect(document.getElementById("routeBanner").textContent).toContain(
+            "Pick your team below"
+        );
+        // Not a blank team view: the league is what you get instead.
+        expect(document.getElementById("teamView").hidden).toBe(true);
+        expect(new URLSearchParams(window.location.search).get("team")).toBeNull();
+    });
+});
+
+describe("the signed-out front door", () => {
+    afterEach(() => {
+        document.body.innerHTML = "";
+        jest.restoreAllMocks();
+    });
+
+    test("a 403 shows the teaser, not a bare members-only box", async () => {
+        boot({ fetch: (target) => (target.includes("/overview") ? response({}, 403) : null) });
+        await waitFor(() => !document.getElementById("signedOutView").hidden);
+
+        const teaser = document.getElementById("signedOutView");
+        expect(teaser.classList.contains("teaser")).toBe(true);
+        expect(teaser.querySelectorAll(".teaser__list li").length).toBeGreaterThan(0);
+        expect(document.getElementById("leagueView").hidden).toBe(true);
+    });
+
+    test("it offers the one page that works without an account", async () => {
+        boot({ fetch: (target) => (target.includes("/overview") ? response({}, 403) : null) });
+        await waitFor(() => !document.getElementById("signedOutView").hidden);
+
+        const escape = document.querySelector(".teaser__escape a");
+        expect(escape.getAttribute("href")).toBe("/fantasy/market/");
+    });
+
+    test("signing in is still the primary action", async () => {
+        boot({ fetch: (target) => (target.includes("/overview") ? response({}, 403) : null) });
+        await waitFor(() => !document.getElementById("signedOutView").hidden);
+
+        expect(document.getElementById("signInLink").getAttribute("href")).toContain("/login/");
     });
 });

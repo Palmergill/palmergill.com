@@ -1,11 +1,11 @@
 const fs = require("fs");
 const path = require("path");
 
-const draftDir = path.join(__dirname, "..", "league", "draft");
+const draftDir = path.join(__dirname, "..", "draft-recap");
 const appSource = fs.readFileSync(path.join(draftDir, "app.js"), "utf8");
 const pageSource = fs.readFileSync(path.join(draftDir, "index.html"), "utf8");
 const bodySource = pageSource.match(/<body>([\s\S]*)<\/body>/)[1];
-const F = require("../league/draft/format.js");
+const F = require("../draft-recap/format.js");
 
 function response(data, status = 200) {
     return Promise.resolve({
@@ -72,7 +72,7 @@ async function waitFor(predicate) {
     throw new Error("Timed out waiting for the draft recap controller");
 }
 
-function boot(fetchImplementation, url = "/fantasy/league/draft/") {
+function boot(fetchImplementation, url = "/fantasy/draft-recap/") {
     document.body.innerHTML = bodySource;
     window.history.replaceState({}, "", url);
     window.DraftFormat = F;
@@ -135,7 +135,7 @@ describe("draft recap controller", () => {
             }
             if (requested.includes("/draft")) return response(recap(2026));
             throw new Error(`Unexpected request: ${requested}`);
-        }, "/fantasy/league/draft/?season=2026");
+        }, "/fantasy/draft-recap/?season=2026");
 
         await waitFor(() => !document.getElementById("draftView").hidden);
         document.querySelector(".grade__toggle").click();

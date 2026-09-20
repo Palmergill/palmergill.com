@@ -53,7 +53,7 @@ describe('edge authentication fallback', () => {
         ]);
         const request = {
             method: 'GET',
-            url: 'https://palmergill.com/fantasy/league/',
+            url: 'https://palmergill.com/fantasy/week/',
             headers: { get: (name) => headers.get(name.toLowerCase()) || null },
         };
 
@@ -95,7 +95,7 @@ describe('edge authentication fallback', () => {
         ]);
         const request = {
             method: 'GET',
-            url: 'https://palmergill.com/fantasy/league/',
+            url: 'https://palmergill.com/fantasy/week/',
             headers: { get: (name) => headers.get(name.toLowerCase()) || null },
         };
 

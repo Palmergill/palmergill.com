@@ -4,315 +4,353 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Fantasy Football — Palmer Gill</title>
-    <meta name="description" content="Fantasy football implied player value from betting markets, weekly boards graded against what actually happened, league snapshot, and waiver movement.">
-    <link rel="canonical" href="https://palmergill.com/fantasy/">
-    <meta name="theme-color" content="#f4efe5">
-    <meta property="og:type" content="website">
-    <meta property="og:url" content="https://palmergill.com/fantasy/">
-    <meta property="og:title" content="Fantasy Football — Palmer Gill">
-    <meta property="og:description" content="Implied player value from betting markets, weekly boards graded against what actually happened, and waiver movement.">
-    <meta property="og:image" content="https://palmergill.com/assets/palmer-gill-logo.png">
-    <meta property="og:image:width" content="960">
-    <meta property="og:image:height" content="960">
-    <meta name="twitter:card" content="summary">
-    <meta name="twitter:title" content="Fantasy Football — Palmer Gill">
-    <meta name="twitter:description" content="Implied player value from betting markets, weekly boards graded against what actually happened, and waiver movement.">
-    <meta name="twitter:image" content="https://palmergill.com/assets/palmer-gill-logo.png">
+    <meta name="description" content="Standings, power rankings, rosters, and results for a private ESPN fantasy football league.">
+    <meta name="theme-color" content="#faf6f0">
+    <!-- Members-only and about real people: keep it out of search results. -->
+    <meta name="robots" content="noindex, nofollow">
     <link rel="icon" type="image/png" href="/assets/palmer-gill-logo-small.png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Libre+Caslon+Display&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/shared/site-nav.css?v=14">
-    <link rel="stylesheet" href="style.css?v=32">
+    <link rel="stylesheet" href="/shared/fantasy-header.css?v=2">
+    <link rel="stylesheet" href="style.css?v=17">
 </head>
 <body>
 <noscript>
     <p class="site-noscript">This page builds its content with JavaScript, so it needs scripts enabled. <a href="/">Browse the other projects</a> in the meantime.</p>
 </noscript>
     <main class="app-shell">
-            <header class="editorial-hero">
-                <div class="editorial-hero__title">
-                    <span class="eyebrow">2026 Season</span>
-                    <h1>
-                        Fantasy Football</h1></div>
-                <div class="hero-snapshot" id="heroSnapshot" aria-live="polite">
-                    <div class="week-badge" id="weekBadge">
-                        <span class="week-badge__label" id="weekLabel">Week</span>
-                    <strong class="week-badge__value" id="weekValue">—</strong>
-                    <span class="week-badge__season" id="seasonValue"></span></div>
-                    <div class="hero-snapshot__member" id="memberSnapshot">
-                        <span class="hero-snapshot__status" id="memberStatus">Latest market</span>
-                    <strong id="memberTeam">—</strong>
-                        <div class="hero-snapshot__metrics" id="memberMetrics"></div>
-                        <button type="button" class="text-action" id="chooseTeam" hidden>Choose your team</button>
-                    <select id="teamSelect" class="control-select" aria-label="Choose your fantasy team" hidden></select></div></div></header>
-            <p id="offseasonBanner" class="banner" hidden></p>
-            <p id="errorBanner" class="banner banner--error" role="alert" hidden></p>
-            <nav class="tool-grid" aria-label="Fantasy tools">
-                <a class="tool-card tool-card--rankings" href="/fantasy/rankings/"><span class="tool-card__mark" aria-hidden="true">R</span><span><small>Draft board</small><strong>My Rankings</strong></span><span aria-hidden="true">↗</span></a>
-            <a class="tool-card tool-card--league" href="/fantasy/league/"><span class="tool-card__mark" aria-hidden="true">L</span><span><small>Members</small><strong>League Hub</strong></span><span aria-hidden="true">↗</span></a>
-            <a class="tool-card tool-card--draft" href="/fantasy/draft-order/"><span class="tool-card__mark tool-card__mark--cards" aria-hidden="true">A♠</span><span><small>Draft night</small><strong>Fourth &amp; Fortune</strong></span><span aria-hidden="true">↗</span></a></nav>
-            <section class="primary-grid" aria-label="Fantasy market dashboard">
-                <article class="editorial-card value-board" id="market-board" aria-labelledby="marketBoardTitle">
-                    <header class="card-head value-board__head">
-                        <div>
-                            <span class="eyebrow" id="marketBoardEyebrow">Season board</span>
-                            <h2 id="marketBoardTitle">
-                                Implied Value</h2></div>
-                        <div class="player-search market-board__search">
-                            <label class="sr-only" for="playerSearch">Search players</label><input id="playerSearch" type="search" class="player-search__input" placeholder="Search player" autocomplete="off" role="combobox" aria-expanded="false" aria-controls="searchResults" aria-autocomplete="list">
-                            <ul id="searchResults" class="search-results" role="listbox" hidden></ul>
-                        </div>
-                    </header>
-                    <div class="value-board__toolbar">
-                        <div id="boardMode" class="segmented" role="group" aria-label="Which board" hidden></div>
-                        <div class="week-step" id="weekStep" hidden>
-                            <button type="button" class="week-step__button" id="weekStepBack" aria-label="Previous week">‹</button>
-                            <span class="week-step__label" id="weekStepLabel" aria-live="polite"></span>
-                            <button type="button" class="week-step__button" id="weekStepNext" aria-label="Next week">›</button>
-                        </div>
-                        <div id="seasonFantasyScoring" class="segmented" role="group" aria-label="Scoring"></div>
-                        <div id="seasonFantasyPositions" class="chip-row" role="group" aria-label="Position"></div>
-                        <button type="button" class="button button--secondary button--columns" id="marketColumns" aria-expanded="false">More columns</button>
-                        <button type="button" class="button button--secondary" id="playerMarkets">Player lines</button></div>
-                    <div class="table-wrap" id="marketTableWrap">
-                        <table class="rank-table season-fantasy__table">
-                            <thead>
-                                <tr>
-                                    <th class="col-rank">
-                                        #</th>
-                                    <th aria-sort="none">
-                                        <button type="button" class="col-sort" data-sort="player">Player</button></th>
-                                    <th class="col-proj col-detail" aria-sort="none">
-                                        <button type="button" class="col-sort" data-sort="yard_points">Yard pts</button></th>
-                                    <th class="col-proj col-detail" aria-sort="none">
-                                        <button type="button" class="col-sort" data-sort="touchdown_points">TD pts</button></th>
-                                    <th class="col-proj col-detail" aria-sort="none">
-                                        <button type="button" class="col-sort" data-sort="rushing_points">Rush pts</button></th>
-                                    <th class="col-proj col-detail col-rec" aria-sort="none">
-                                        <button type="button" class="col-sort" data-sort="reception_points">Rec</button></th>
-                                    <th class="col-proj col-implied" aria-sort="descending">
-                                        <button type="button" class="col-sort" data-sort="fantasy_points" data-mobile-label="Impl pts">Implied points</button></th>
-                                    <th class="col-proj col-detail col-espn" aria-sort="none">
-                                        <button type="button" class="col-sort" data-sort="espn_rank">ESPN rank</button></th>
-                                    <th class="col-proj col-detail col-espn" aria-sort="none">
-                                        <button type="button" class="col-sort" data-sort="espn_points">ESPN proj</button></th>
-                                    <th class="col-proj col-detail col-sleeper" aria-sort="none">
-                                        <button type="button" class="col-sort" data-sort="sleeper_rank">Sleeper rank</button></th>
-                                    <th class="col-proj col-detail col-sleeper" aria-sort="none">
-                                        <button type="button" class="col-sort" data-sort="sleeper_points">Sleeper proj</button></th>
-                                    <th class="col-proj col-consensus" aria-sort="none">
-                                        <button type="button" class="col-sort" data-sort="projected_points" data-mobile-label="Proj" id="seasonFantasyProjHead">Proj</button></th>
-                                    <th class="col-proj col-diff" aria-sort="none">
-                                        <button type="button" class="col-sort" data-sort="projection_delta" data-mobile-label="Diff">Diff</button></th>
-                                    <th class="col-proj col-detail" aria-sort="none">
-                                        <button type="button" class="col-sort" data-sort="age">Age</button></th>
-                                    <th class="col-proj col-detail" aria-sort="none">
-                                        <button type="button" class="col-sort" data-sort="bye_week">Bye</button></th>
-                                    <th class="col-proj col-detail" aria-sort="none">
-                                        <button type="button" class="col-sort" data-sort="trending_add">Adds</button></th>
-                                    <th class="col-proj col-detail" aria-sort="none">
-                                        <button type="button" class="col-sort" data-sort="trending_drop">Drops</button></th></tr></thead>
-                            <tbody id="seasonFantasyLeaders"></tbody>
-                        </table>
-                    </div>
-                    <div class="table-wrap" id="weekBoardWrap" hidden>
-                        <table class="rank-table week-table">
-                            <thead id="weekBoardHead"></thead>
-                            <tbody id="weekLeaders"></tbody>
-                        </table>
-                    </div>
-                    <footer class="value-board__foot">
-                        <p class="season-props__note" id="seasonFantasyNote" role="status"></p>
-                        <button type="button" class="text-action" id="showAllMarket" aria-expanded="false">Show all</button></footer></article>
-                <aside class="insight-rail">
-                    <article class="editorial-card rail-card" aria-labelledby="moversTitle">
-                        <header class="card-head card-head--compact">
-                            <div>
-                                <span class="eyebrow">7 days</span>
-                                <h2 id="moversTitle">
-                                    Value Movers</h2></div></header>
-                        <div class="movers-toggle" role="group" aria-label="Market movers">
-                            <button class="is-active" type="button" data-movers="gainers" aria-pressed="true">Risers</button><button type="button" data-movers="fallers" aria-pressed="false">Fallers</button></div>
-                        <ol id="marketMovers" class="compact-list">
-                            <li class="empty-row">
-                                —</li></ol>
-                        <p id="marketMoversNote" class="card-note" role="status"></p>
-                    </article>
-                    <article class="editorial-card rail-card" aria-labelledby="trendingTitle">
-                        <header class="card-head card-head--compact">
-                            <div>
-                                <span class="eyebrow">Sleeper</span>
-                                <h2 id="trendingTitle">
-                                    Waiver Pulse</h2></div></header>
-                        <div class="trending">
-                            <div>
-                                <h3>
-                                    Adds</h3>
-                                <ol class="trending__list" id="trendingAdd">
-                                    <li class="trending__empty">
-                                        —</li></ol></div>
-                            <div>
-                                <h3>
-                                    Drops</h3>
-                                <ol class="trending__list" id="trendingDrop">
-                                    <li class="trending__empty">
-                                        —</li></ol></div></div>
-                        <!-- Sleeper's adds are the whole user base's opinion.
-                             League members can see who is actually claimable. -->
-                        <a class="card-link" id="leagueFreeAgentsLink" href="/fantasy/league/#free-agents" hidden>Who's free in your league →</a></article></aside></section>
-            <section class="support-grid">
-                <article class="editorial-card season-offenses" aria-labelledby="offensesTitle">
-                    <header class="card-head card-head--compact">
-                        <div>
-                            <span class="eyebrow">Team outlook</span>
-                            <h2 id="offensesTitle">
-                                Top Offenses</h2></div></header>
-                    <div class="table-wrap">
-                        <table class="rank-table season-offense__table">
-                            <thead>
-                                <tr>
-                                    <th class="col-rank">
-                                        #</th>
-                                    <th>
-                                        Team</th>
-                                    <th class="col-proj">
-                                        Yards</th>
-                                    <th class="col-proj">
-                                        TDs</th>
-                                    <th class="col-proj">
-                                        Implied pts</th></tr></thead>
-                            <tbody id="seasonOffenses"></tbody></table></div>
-                    <p id="seasonOffensesNote" class="card-note" role="status"></p>
-                </article>
-                <article class="editorial-card freshness-card" aria-labelledby="freshnessTitle">
-                    <header class="card-head card-head--compact">
-                        <div>
-                            <span class="eyebrow">Sources</span>
-                            <h2 id="freshnessTitle">
-                                Source Freshness</h2></div></header>
-                    <ul id="marketFreshness" class="freshness-list">
-                        <li class="empty-row">
-                            —</li></ul></article></section>
-            <details class="editorial-card disclosure" id="live-markets" hidden>
-                <summary>
-                    <h2 class="disclosure__title">
-                        <small>Available now</small>Betting Lines</h2>
-                    <span aria-hidden="true">＋</span></summary>
-                <div class="disclosure__body">
-                    <section class="market-group" id="marketGroup" hidden>
-                        <section class="betting" id="gamesSection" hidden>
-                            <div class="section-head">
-                                <h3>
-                                    Game lines</h3>
-                                <span id="gamesAsOf"></span></div>
-                            <div class="games-strip" id="gamesStrip"></div>
-                        </section>
-                        <section class="betting" id="propsSection" hidden>
-                            <div class="section-head">
-                                <h3>
-                                    Player props</h3>
-                                <span id="propsAsOf"></span></div>
-                            <div class="chip-row" id="propGameTabs" role="group" aria-label="Featured game"></div>
-                            <div id="propsBoard"></div>
-                        </section>
-                    </section>
-                    <section class="betting" id="futuresSection" hidden>
-                        <div class="section-head">
-                            <h3>
-                                Season futures</h3>
-                            <span id="futuresAsOf"></span></div>
-                        <div class="chip-row" id="futuresTabs" role="group" aria-label="Futures market"></div>
-                        <table class="rank-table futures-table">
-                            <thead>
-                                <tr>
-                                    <th>
-                                        #</th>
-                                    <th>
-                                        Outcome</th>
-                                    <th>
-                                        Odds</th></tr></thead>
-                            <tbody id="futuresBody"></tbody>
-                        </table>
-                    </section>
-                </div>
-            </details>
-            <details class="editorial-card disclosure methodology">
-                <summary>
-                    <h2 class="disclosure__title">
-                        <small>Scoring &amp; sources</small>Methodology</h2>
-                    <span aria-hidden="true">＋</span></summary>
-                <div class="disclosure__body prose">
-                    <p>
-                        Market values use 1 point per 25 passing yards, 4 per passing touchdown, 1 per 10 rushing or receiving yards, and 6 per rushing or receiving touchdown. Half PPR and PPR add projected reception points. Categories require both yardage and touchdown quotes.</p>
-                    <p>
-                        Each row names the categories its market value was built from, and flags any the market did not quote. Diff is implied points minus the adjacent season projection. When multiple projection providers are available, that projection is the per-player average of the sources named in the column header; otherwise the single source is named. The projection counts everything a player does, including categories with no market and the interceptions and fumbles nothing here quotes. Where a category is missing, Diff is underlined: that gap is partly missing data rather than market disagreement, and a running back with no receiving market will look far cheaper than he is.</p>
-                    <p class="betting-disclaimer">
-                        Market-implied values, contract lines, and prices are informational only, not betting advice. Availability and freshness vary by source.</p></div></details></main>
-
-    <div class="compare-tray" id="compareTray" hidden aria-live="polite">
-        <div class="compare-tray__chips" id="compareChips"></div>
-        <div class="compare-tray__actions">
-            <button type="button" class="compare-tray__clear" id="compareClear">Clear</button><button type="button" class="compare-tray__go" id="compareGo" disabled>Compare</button></div></div>
-    <div class="drawer drawer--modal" id="compareDrawer" hidden>
-        <div class="drawer__backdrop" id="compareBackdrop"></div>
-        <section class="drawer__panel drawer__panel--wide" role="dialog" aria-modal="true" aria-labelledby="compareTitle" tabindex="-1">
-            <button type="button" class="drawer__close" id="compareDrawerClose" aria-label="Close comparison">×</button>
-            <header class="drawer__head">
-                <h2 id="compareTitle">
-                    Compare</h2>
-                <p class="drawer__sub" id="compareSub"></p>
-            </header>
-            <div class="drawer__body" id="compareBody"></div>
-        </section>
-    </div>
-    <div class="drawer" id="playerDrawer" hidden>
-        <div class="drawer__backdrop" id="drawerBackdrop"></div>
-        <aside class="drawer__panel" role="dialog" aria-modal="true" aria-labelledby="drawerName" tabindex="-1">
-            <button type="button" class="drawer__close" id="drawerClose" aria-label="Close player details">×</button>
-            <header class="drawer__head">
-                <h2 id="drawerName">
-                    —</h2>
-                <p class="drawer__sub" id="drawerSub"></p>
-            </header>
-            <div class="drawer__body" id="drawerBody">
-                <p class="drawer__loading">
-                    Loading…</p></div></aside></div>
-    <div class="drawer drawer--markets" id="marketsDrawer" hidden>
-        <div class="drawer__backdrop" id="marketsBackdrop"></div>
-        <aside class="drawer__panel drawer__panel--wide" role="dialog" aria-modal="true" aria-labelledby="marketsTitle" tabindex="-1">
-            <button type="button" class="drawer__close" id="marketsClose" aria-label="Close player lines">×</button>
-            <header class="drawer__head">
-                <span class="eyebrow">Raw categories</span>
-                <h2 id="marketsTitle">
-                    Player Lines</h2>
-                <p class="drawer__sub" id="marketsSub"></p>
-            </header>
-            <div class="drawer__body">
-                <div id="seasonPropsTabs" class="chip-row" role="tablist" aria-label="Season market"></div>
-                <div id="seasonPropsPositions" class="chip-row" role="group" aria-label="Position"></div>
-                <div class="table-wrap">
-                    <table class="rank-table season-props__table">
-                        <thead>
-                            <tr>
-                                <th>
-                                    #</th>
-                                <th>
-                                    Player</th>
-                                <th>
-                                    Value</th>
-                                <th>
-                                    7d</th>
-                                <th>
-                                    Sources</th></tr></thead>
-                        <tbody id="seasonPropsLeaders"></tbody>
-                    </table>
-                </div>
-                <p class="season-props__note" id="seasonPropsNote" role="status"></p>
+        <div id="fantasy-header-mount"></div>
+        <!-- A masthead, not a page header: the league's name is the loudest
+             thing on the page and the season facts read as a standing line
+             under it, the way a ledger's own heading would. -->
+        <header class="masthead">
+            <div class="masthead__title">
+                <span class="eyebrow" id="mastheadEyebrow">Private league · ESPN</span>
+                <h1 id="leagueName">League Hub</h1>
+                <!-- The manager's name, on a team route only. -->
+                <p class="masthead__sub" id="leagueSub" hidden></p>
             </div>
-        </aside>
-    </div>
+            <dl class="masthead__meta" id="modeBadge" aria-live="polite">
+                <div class="masthead__fact">
+                    <dt id="modeLabel">Season</dt>
+                    <dd id="seasonValue">—</dd>
+                </div>
+                <div class="masthead__fact">
+                    <dt>Through</dt>
+                    <dd id="weekValue">—</dd>
+                </div>
+                <div class="masthead__fact">
+                    <dt>Scoring</dt>
+                    <dd>Half PPR</dd>
+                </div>
+            </dl>
+            <!-- The team route swaps this in for the league's facts rather
+                 than stacking a second masthead under the first. -->
+            <dl class="masthead__meta" id="teamBadge" aria-live="polite" hidden></dl>
+        </header>
+        <p class="masthead__freshness" id="freshnessValue"></p>
 
-    <script src="/shared/site-nav.js?v=16"></script><script src="/shared/analytics.js?v=1"></script><script src="/shared/api-base.js?v=1"></script><script src="format.js?v=12"></script><script src="app.js?v=29"></script>
+        <p id="errorBanner" class="banner banner--error" hidden></p>
+        <p id="modeBanner" class="banner" hidden></p>
+        <!-- Its own line, not modeBanner's: the preseason note is a fact
+             about the season and this is a reply to something you clicked. -->
+        <p id="routeBanner" class="banner" role="status" hidden></p>
+
+        <!-- Shown when the API returns 403: not signed in. This is now the
+             section's front door, so it has to say what is behind it rather
+             than only that the door is locked — and it has to offer the one
+             thing that works signed out, which is the league-agnostic
+             market board. -->
+        <section id="signedOutView" class="teaser" hidden>
+            <div class="teaser__pitch">
+                <span class="eyebrow">Members only</span>
+                <h2>A league that reads itself</h2>
+                <p class="teaser__lede">
+                    Point it at an ESPN league and it keeps the season: standings and
+                    power rankings from the rosters rather than the results, a start/sit
+                    call on your own lineup, who is genuinely claimable, and a weekly
+                    recap worth reading. Sign in to open yours.
+                </p>
+                <div class="signed-out__actions">
+                    <a class="button" id="signInLink" href="/login/">Sign in</a>
+                    <a class="button button--quiet" href="/signup/">Create an account</a>
+                </div>
+            </div>
+            <ul class="teaser__list">
+                <li>
+                    <strong>Power rankings from the roster</strong>
+                    Each team's best legal lineup in projected points a week, after the
+                    bench covers byes and injuries.
+                </li>
+                <li>
+                    <strong>Start/sit, already done</strong>
+                    Your lineup as set, against the best one the roster could field.
+                </li>
+                <li>
+                    <strong>Free agents that are actually free</strong>
+                    Claimable in your league, not trending across everyone's.
+                </li>
+            </ul>
+            <p class="teaser__escape">
+                No league here yet? The
+                <a href="/fantasy/market/">implied-value board</a> needs no account —
+                it prices every player off the betting markets.
+            </p>
+        </section>
+
+        <section id="emptyView" class="signed-out" hidden>
+            <h2>No league data yet</h2>
+            <p>The collector has not stored a season for this league yet.</p>
+        </section>
+
+        <div id="leagueView" hidden>
+            <nav class="season-bar" aria-label="Season">
+                <div class="chip-row" id="seasonChips" role="group" aria-label="Choose a season"></div>
+                <div class="season-bar__links">
+                    <a class="league-link" href="/fantasy/week/">Weekly recap →</a>
+                    <a class="league-link" href="/fantasy/draft-recap/">Draft recap →</a>
+                </div>
+            </nav>
+
+            <!-- Importing by ID is the obvious question this page invites the
+                 moment it calls itself the fantasy home page, so it asks and
+                 answers it here rather than leaving a visitor to guess. The
+                 form validates the ID for real; what it cannot yet do is
+                 serve a second league, and it says which of the two it is.
+                 See specs/q3-17 for the multi-league work that lands behind
+                 this same form. -->
+            <details class="import-league" id="importLeague">
+                <summary class="import-league__summary">
+                    <span class="import-league__title">Import a league</span>
+                    <span class="import-league__hint">Have an ESPN league ID?</span>
+                </summary>
+                <form class="import-league__form" id="importForm" novalidate>
+                    <div class="import-league__row">
+                        <label class="import-league__label" for="importLeagueId">
+                            ESPN league ID
+                        </label>
+                        <input
+                            id="importLeagueId"
+                            name="leagueId"
+                            class="import-league__input"
+                            type="text"
+                            inputmode="numeric"
+                            autocomplete="off"
+                            maxlength="12"
+                            placeholder="225965"
+                            aria-describedby="importHelp"
+                        >
+                        <button type="submit" class="button" id="importSubmit">Import</button>
+                    </div>
+                    <p class="import-league__status" id="importStatus" role="status"></p>
+                    <p class="import-league__help" id="importHelp">
+                        It is the <code>leagueId</code> in your league's ESPN URL —
+                        <code>fantasy.espn.com/football/league?leagueId=<strong>225965</strong></code>.
+                        The league has to be public in ESPN's league settings.
+                    </p>
+                </form>
+            </details>
+
+            <!-- Team detail replaces the league sections; it is a routed view
+                 on this page (?team=N) rather than a second HTML file. The
+                 team's own name rides in the masthead above, so this view
+                 opens on the paragraph the hub already writes about it. -->
+            <section id="teamView" class="team-view" hidden aria-labelledby="leagueName">
+                <button type="button" class="back-link" id="teamBack">← All teams</button>
+
+                <!-- The lede and the record, side by side. The overview used
+                     to sit in a grey box below the numbers, which is where
+                     writing goes to be skipped. -->
+                <div class="dossier">
+                    <div class="dossier__main">
+                        <div class="dossier__lede" id="teamLede" aria-live="polite"></div>
+                        <div class="dossier__foot">
+                            <span class="dossier__meta" id="teamOverviewMeta"></span>
+                            <button type="button" class="button button--quiet" id="teamOverviewRefresh">
+                                Check for updates
+                            </button>
+                        </div>
+                    </div>
+                    <dl class="colophon" id="teamColophon"></dl>
+                </div>
+
+                <!-- Start/sit: the lineup as set, against the best one this
+                     roster could field for the week. An aside here, because on
+                     six days out of seven it is the least live thing on the
+                     page — but the first thing worth doing on the seventh. -->
+                <section class="lineup" id="lineupCard" aria-labelledby="lineupTitle" hidden>
+                    <div class="lineup__head">
+                        <div>
+                            <h3 id="lineupTitle">Start/sit</h3>
+                            <p class="lineup__meta" id="lineupMeta"></p>
+                        </div>
+                        <dl class="lineup__totals" id="lineupTotals"></dl>
+                    </div>
+                    <ul class="lineup__changes" id="lineupChanges"></ul>
+                    <p class="lineup__note" id="lineupNote"></p>
+                </section>
+
+                <section class="board" data-board="season" aria-labelledby="teamResultsTitle">
+                    <div class="board__head">
+                        <h2 id="teamResultsTitle">The season, week by week</h2>
+                        <span class="board__note">Bar is the margin</span>
+                    </div>
+                    <div class="season" id="teamResults"></div>
+                </section>
+
+                <section class="board" data-board="rooms" aria-labelledby="teamRosterTitle">
+                    <div class="board__head">
+                        <div>
+                            <h2 id="teamRosterTitle">The roster, by room</h2>
+                            <p class="board__lede" id="roomsLede"></p>
+                        </div>
+                        <span class="board__note" id="rosterNote"></span>
+                    </div>
+                    <div id="teamRoster" class="rooms"></div>
+                </section>
+            </section>
+
+            <div id="leagueSections">
+                <nav class="league-jump-nav" aria-label="League sections">
+                    <a href="#power">Power</a>
+                    <a href="#standings">Standings</a>
+                    <a href="#scoreboard">Scoreboard</a>
+                    <a href="#free-agents">Waivers</a>
+                    <a href="#teams">Teams</a>
+                    <a href="#assistant">Ask</a>
+                </nav>
+                <!-- Your own team, first: the hub knew every team except which
+                     one was yours, so the advice about it was three clicks in. -->
+                <section class="my-team" id="myTeamStrip" hidden aria-labelledby="myTeamLabel">
+                    <div class="my-team__identity">
+                        <span class="my-team__label" id="myTeamLabel">Your team</span>
+                        <a class="my-team__name" id="myTeamName" href="/fantasy/"></a>
+                        <span class="my-team__meta" id="myTeamMeta"></span>
+                    </div>
+                    <div class="my-team__advice-block">
+                        <a class="my-team__advice" id="myTeamAdvice" href="/fantasy/" hidden></a>
+                        <ul class="my-team__moves" id="myTeamMoves"></ul>
+                    </div>
+                </section>
+
+                <!-- Power rankings read the rosters, not the results: what each
+                     team can be expected to score a week from here, given
+                     who it has and which of them it can actually start. It
+                     leads because it is the one ranking the scoreboard
+                     cannot tell you. -->
+                <section class="board" id="power" data-board="power" aria-labelledby="powerTitle">
+                    <div class="board__head">
+                        <div>
+                            <h2 id="powerTitle">Power rankings</h2>
+                            <p class="board__lede">
+                                Ranked by rosters, not results: each team's best legal lineup
+                                in projected points a week, after the bench covers byes and
+                                injuries. Depth only counts when it could start.
+                            </p>
+                        </div>
+                        <span class="board__note" id="powerNote"></span>
+                    </div>
+                    <ol class="power-list" id="powerList"></ol>
+                    <p class="ledger__note" id="powerFootnote"></p>
+                </section>
+
+                <!-- Standings, power rankings and rosters used to be three
+                     lists of the same ten teams. One table now, with a column
+                     that changes — which is also what lets it survive a phone,
+                     where the chosen column brings its chart into the row. -->
+                <section class="board" id="standings" data-board="ledger" aria-labelledby="ledgerTitle">
+                    <div class="board__head">
+                        <div>
+                            <h2 id="ledgerTitle">The table</h2>
+                            <p class="board__lede">
+                                All-play is your record against every team, every week.
+                                Luck is wins minus expected wins.
+                            </p>
+                        </div>
+                        <span class="board__note" id="ledgerNote"></span>
+                    </div>
+                    <div class="controls controls--ledger">
+                        <div class="chip-row chip-row--scroll" id="ledgerColumns" role="group" aria-label="Sort and column"></div>
+                        <label class="select-field">
+                            <span class="sr-only">Résumé ranking method</span>
+                            <select id="powerAlgorithm"></select>
+                        </label>
+                    </div>
+                    <div id="ledger" class="ledger"></div>
+                    <p class="ledger__note" id="ledgerFootnote"></p>
+                </section>
+
+                <section class="board" data-board="charts" aria-labelledby="chartsTitle" hidden>
+                    <div class="board__head">
+                        <h2 id="chartsTitle">Reading the season</h2>
+                        <span class="board__note" id="chartsNote"></span>
+                    </div>
+                    <div id="charts" class="charts"></div>
+                </section>
+
+                <section class="board" id="scoreboard" data-board="scoreboard" aria-labelledby="scoreboardTitle">
+                    <div class="board__head">
+                        <h2 id="scoreboardTitle">Scoreboard</h2>
+                        <label class="select-field">
+                            <span class="sr-only">Scoreboard week</span>
+                            <select id="scoreboardWeek"></select>
+                        </label>
+                    </div>
+                    <div id="scoreboardGrid" class="scoreboard"></div>
+                </section>
+
+                <!-- Who is actually claimable here, which is a fact about
+                     these rosters rather than about the player pool. -->
+                <section class="board" id="free-agents" data-board="free-agents" aria-labelledby="freeAgentsTitle">
+                    <div class="board__head">
+                        <h2 id="freeAgentsTitle">Free agents</h2>
+                        <span class="board__note" id="freeAgentsNote"></span>
+                    </div>
+                    <ol class="free-agents" id="freeAgents"></ol>
+                    <button type="button" class="league-more" id="freeAgentsToggle" aria-expanded="false" hidden>Show all</button>
+                </section>
+
+                <!-- Kept for the preseason, when the ledger's derived columns
+                     are all empty and this grid is the only way into a team. -->
+                <section class="board" id="teams" data-board="teams" aria-labelledby="teamsTitle">
+                    <div class="board__head">
+                        <h2 id="teamsTitle">Teams</h2>
+                    </div>
+                    <div id="teamsGrid" class="teams-grid"></div>
+                </section>
+            </div>
+
+            <section class="chat" id="assistant" aria-label="Fantasy assistant">
+                <div class="chat__head">
+                    <h2>Ask the fantasy assistant</h2>
+                    <span class="chat__note">Answers use only the data this site has collected.</span>
+                </div>
+                <div id="chatMessages" class="chat__messages" aria-live="polite">
+                    <div class="chat__starts" id="chatStarts">
+                        <button type="button" class="chat-chip" data-prompt="Show me this league's power rankings.">League power rankings</button>
+                        <button type="button" class="chat-chip" data-prompt="Who are the top 10 PPR running backs this week?">Top 10 PPR RBs</button>
+                        <button type="button" class="chat-chip" data-prompt="Who's trending on waivers right now?">Waiver trends</button>
+                        <button type="button" class="chat-chip" data-prompt="Compare Josh Allen and Jalen Hurts.">Compare two QBs</button>
+                    </div>
+                </div>
+                <form id="chatForm" class="chat__composer">
+                    <label class="sr-only" for="chatInput">Ask a fantasy question</label>
+                    <textarea id="chatInput" rows="1" maxlength="1000" placeholder="Ask about this league, a player, props, or lines…" required></textarea>
+                    <button type="submit" aria-label="Send message">↑</button>
+                </form>
+            </section>
+        </div>
+    </main>
+
+    <script src="/shared/site-nav.js?v=16"></script>
+    <script src="/shared/fantasy-header.js?v=2"></script>
+    <script>window.FantasyHeader.mount({ page: "home" });</script>
+    <script src="/shared/analytics.js?v=1"></script>
+    <script src="/shared/api-base.js?v=1"></script>
+    <script src="format.js?v=6"></script>
+    <script src="/fantasy/chat.js?v=1"></script>
+    <script src="app.js?v=15"></script>
 </body>
 </html>

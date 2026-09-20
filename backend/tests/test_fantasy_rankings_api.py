@@ -295,8 +295,9 @@ def test_rankings_page_stays_publicly_reachable():
     assert is_member_path("/fantasy/rankings/") is False
     assert is_demo_path("/fantasy/rankings/") is True
     assert is_demo_path("/api/fantasy/rankings/boards/mine") is True
-    # The members-only hub next door stays locked.
-    assert is_member_path("/fantasy/league/") is True
+    # The members-only recaps next door stay locked.
+    assert is_member_path("/fantasy/week/") is True
+    assert is_member_path("/fantasy/draft-recap/") is True
 
 
 def test_public_fantasy_dashboard_is_still_anonymous(seeded_db):

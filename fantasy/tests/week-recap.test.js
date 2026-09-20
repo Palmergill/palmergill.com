@@ -5,7 +5,7 @@
  * when a lineup could not be scored — all live in format.js, so they are
  * tested here rather than through the DOM.
  */
-const F = require("../league/week/format.js");
+const F = require("../week/format.js");
 
 describe("results", () => {
     test("a result names the verb, both scores and the opponent", () => {

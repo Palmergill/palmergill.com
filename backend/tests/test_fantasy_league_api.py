@@ -246,17 +246,23 @@ def test_league_paths_are_not_demo_paths():
     """The single assertion that catches an accidental demo-prefix regression.
 
     /fantasy and /api/fantasy are both demo prefixes, and matching is by
-    prefix, so the league hub inherits demo access unless excluded.
+    prefix, so the members-only recaps inherit demo access unless excluded.
     """
     from app.main import is_demo_path, is_member_path, is_protected_path
 
-    assert is_demo_path("/fantasy/league/") is False
-    assert is_demo_path("/fantasy/league") is False
-    assert is_member_path("/fantasy/league/") is True
-    assert is_protected_path("/fantasy/league/") is True
+    for path in ("/fantasy/week/", "/fantasy/week", "/fantasy/draft-recap/"):
+        assert is_demo_path(path) is False
+        assert is_member_path(path) is True
+        assert is_protected_path(path) is True
 
-    # The public dashboard around it must stay demo-accessible.
+    # The league hub at /fantasy/ is a shell that renders its own signed-out
+    # teaser, so it must stay reachable without an account. The data behind
+    # it is gated on the API, which the whole module above this line tests.
     assert is_demo_path("/fantasy/") is True
+    assert is_member_path("/fantasy/") is False
+
+    # And the league-agnostic pages around it.
+    assert is_demo_path("/fantasy/market/") is True
     assert is_demo_path("/fantasy/draft-order/") is True
     assert is_demo_path("/api/fantasy/rankings") is True
 

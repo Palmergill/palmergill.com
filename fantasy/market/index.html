@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Implied Value — Fantasy Football</title>
+    <meta name="description" content="Fantasy football implied player value from betting markets, weekly boards graded against what actually happened, league snapshot, and waiver movement.">
+    <link rel="canonical" href="https://palmergill.com/fantasy/market/">
+    <meta name="theme-color" content="#f4efe5">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://palmergill.com/fantasy/market/">
+    <meta property="og:title" content="Implied Value — Fantasy Football">
+    <meta property="og:description" content="Implied player value from betting markets, weekly boards graded against what actually happened, and waiver movement.">
+    <meta property="og:image" content="https://palmergill.com/assets/palmer-gill-logo.png">
+    <meta property="og:image:width" content="960">
+    <meta property="og:image:height" content="960">
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="Implied Value — Fantasy Football">
+    <meta name="twitter:description" content="Implied player value from betting markets, weekly boards graded against what actually happened, and waiver movement.">
+    <meta name="twitter:image" content="https://palmergill.com/assets/palmer-gill-logo.png">
+    <link rel="icon" type="image/png" href="/assets/palmer-gill-logo-small.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Libre+Caslon+Display&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/shared/site-nav.css?v=14">
+    <link rel="stylesheet" href="/shared/fantasy-header.css?v=2">
+    <link rel="stylesheet" href="style.css?v=32">
+</head>
+<body>
+<noscript>
+    <p class="site-noscript">This page builds its content with JavaScript, so it needs scripts enabled. <a href="/">Browse the other projects</a> in the meantime.</p>
+</noscript>
+    <main class="app-shell">
+            <div id="fantasy-header-mount"></div>
+            <header class="editorial-hero">
+                <div class="editorial-hero__title">
+                    <span class="eyebrow">2026 Season</span>
+                    <h1>
+                        Implied Value</h1></div>
+                <div class="hero-snapshot" id="heroSnapshot" aria-live="polite">
+                    <div class="week-badge" id="weekBadge">
+                        <span class="week-badge__label" id="weekLabel">Week</span>
+                    <strong class="week-badge__value" id="weekValue">—</strong>
+                    <span class="week-badge__season" id="seasonValue"></span></div>
+                    <div class="hero-snapshot__member" id="memberSnapshot">
+                        <span class="hero-snapshot__status" id="memberStatus">Latest market</span>
+                    <strong id="memberTeam">—</strong>
+                        <div class="hero-snapshot__metrics" id="memberMetrics"></div>
+                        <button type="button" class="text-action" id="chooseTeam" hidden>Choose your team</button>
+                    <select id="teamSelect" class="control-select" aria-label="Choose your fantasy team" hidden></select></div></div></header>
+            <p id="offseasonBanner" class="banner" hidden></p>
+            <p id="errorBanner" class="banner banner--error" role="alert" hidden></p>
+            <section class="primary-grid" aria-label="Fantasy market dashboard">
+                <article class="editorial-card value-board" id="market-board" aria-labelledby="marketBoardTitle">
+                    <header class="card-head value-board__head">
+                        <div>
+                            <span class="eyebrow" id="marketBoardEyebrow">Market value</span>
+                            <h2 id="marketBoardTitle">
+                                Season Board</h2></div>
+                        <div class="player-search market-board__search">
+                            <label class="sr-only" for="playerSearch">Search players</label><input id="playerSearch" type="search" class="player-search__input" placeholder="Search player" autocomplete="off" role="combobox" aria-expanded="false" aria-controls="searchResults" aria-autocomplete="list">
+                            <ul id="searchResults" class="search-results" role="listbox" hidden></ul>
+                        </div>
+                    </header>
+                    <div class="value-board__toolbar">
+                        <div id="boardMode" class="segmented" role="group" aria-label="Which board" hidden></div>
+                        <div class="week-step" id="weekStep" hidden>
+                            <button type="button" class="week-step__button" id="weekStepBack" aria-label="Previous week">‹</button>
+                            <span class="week-step__label" id="weekStepLabel" aria-live="polite"></span>
+                            <button type="button" class="week-step__button" id="weekStepNext" aria-label="Next week">›</button>
+                        </div>
+                        <div id="seasonFantasyScoring" class="segmented" role="group" aria-label="Scoring"></div>
+                        <div id="seasonFantasyPositions" class="chip-row" role="group" aria-label="Position"></div>
+                        <button type="button" class="button button--secondary button--columns" id="marketColumns" aria-expanded="false">More columns</button>
+                        <button type="button" class="button button--secondary" id="playerMarkets">Player lines</button></div>
+                    <div class="table-wrap" id="marketTableWrap">
+                        <table class="rank-table season-fantasy__table">
+                            <thead>
+                                <tr>
+                                    <th class="col-rank">
+                                        #</th>
+                                    <th aria-sort="none">
+                                        <button type="button" class="col-sort" data-sort="player">Player</button></th>
+                                    <th class="col-proj col-detail" aria-sort="none">
+                                        <button type="button" class="col-sort" data-sort="yard_points">Yard pts</button></th>
+                                    <th class="col-proj col-detail" aria-sort="none">
+                                        <button type="button" class="col-sort" data-sort="touchdown_points">TD pts</button></th>
+                                    <th class="col-proj col-detail" aria-sort="none">
+                                        <button type="button" class="col-sort" data-sort="rushing_points">Rush pts</button></th>
+                                    <th class="col-proj col-detail col-rec" aria-sort="none">
+                                        <button type="button" class="col-sort" data-sort="reception_points">Rec</button></th>
+                                    <th class="col-proj col-implied" aria-sort="descending">
+                                        <button type="button" class="col-sort" data-sort="fantasy_points" data-mobile-label="Impl pts">Implied points</button></th>
+                                    <th class="col-proj col-detail col-espn" aria-sort="none">
+                                        <button type="button" class="col-sort" data-sort="espn_rank">ESPN rank</button></th>
+                                    <th class="col-proj col-detail col-espn" aria-sort="none">
+                                        <button type="button" class="col-sort" data-sort="espn_points">ESPN proj</button></th>
+                                    <th class="col-proj col-detail col-sleeper" aria-sort="none">
+                                        <button type="button" class="col-sort" data-sort="sleeper_rank">Sleeper rank</button></th>
+                                    <th class="col-proj col-detail col-sleeper" aria-sort="none">
+                                        <button type="button" class="col-sort" data-sort="sleeper_points">Sleeper proj</button></th>
+                                    <th class="col-proj col-consensus" aria-sort="none">
+                                        <button type="button" class="col-sort" data-sort="projected_points" data-mobile-label="Proj" id="seasonFantasyProjHead">Proj</button></th>
+                                    <th class="col-proj col-diff" aria-sort="none">
+                                        <button type="button" class="col-sort" data-sort="projection_delta" data-mobile-label="Diff">Diff</button></th>
+                                    <th class="col-proj col-detail" aria-sort="none">
+                                        <button type="button" class="col-sort" data-sort="age">Age</button></th>
+                                    <th class="col-proj col-detail" aria-sort="none">
+                                        <button type="button" class="col-sort" data-sort="bye_week">Bye</button></th>
+                                    <th class="col-proj col-detail" aria-sort="none">
+                                        <button type="button" class="col-sort" data-sort="trending_add">Adds</button></th>
+                                    <th class="col-proj col-detail" aria-sort="none">
+                                        <button type="button" class="col-sort" data-sort="trending_drop">Drops</button></th></tr></thead>
+                            <tbody id="seasonFantasyLeaders"></tbody>
+                        </table>
+                    </div>
+                    <div class="table-wrap" id="weekBoardWrap" hidden>
+                        <table class="rank-table week-table">
+                            <thead id="weekBoardHead"></thead>
+                            <tbody id="weekLeaders"></tbody>
+                        </table>
+                    </div>
+                    <footer class="value-board__foot">
+                        <p class="season-props__note" id="seasonFantasyNote" role="status"></p>
+                        <button type="button" class="text-action" id="showAllMarket" aria-expanded="false">Show all</button></footer></article>
+                <aside class="insight-rail">
+                    <article class="editorial-card rail-card" aria-labelledby="moversTitle">
+                        <header class="card-head card-head--compact">
+                            <div>
+                                <span class="eyebrow">7 days</span>
+                                <h2 id="moversTitle">
+                                    Value Movers</h2></div></header>
+                        <div class="movers-toggle" role="group" aria-label="Market movers">
+                            <button class="is-active" type="button" data-movers="gainers" aria-pressed="true">Risers</button><button type="button" data-movers="fallers" aria-pressed="false">Fallers</button></div>
+                        <ol id="marketMovers" class="compact-list">
+                            <li class="empty-row">
+                                —</li></ol>
+                        <p id="marketMoversNote" class="card-note" role="status"></p>
+                    </article>
+                    <article class="editorial-card rail-card" aria-labelledby="trendingTitle">
+                        <header class="card-head card-head--compact">
+                            <div>
+                                <span class="eyebrow">Sleeper</span>
+                                <h2 id="trendingTitle">
+                                    Waiver Pulse</h2></div></header>
+                        <div class="trending">
+                            <div>
+                                <h3>
+                                    Adds</h3>
+                                <ol class="trending__list" id="trendingAdd">
+                                    <li class="trending__empty">
+                                        —</li></ol></div>
+                            <div>
+                                <h3>
+                                    Drops</h3>
+                                <ol class="trending__list" id="trendingDrop">
+                                    <li class="trending__empty">
+                                        —</li></ol></div></div>
+                        <!-- Sleeper's adds are the whole user base's opinion.
+                             League members can see who is actually claimable. -->
+                        <a class="card-link" id="leagueFreeAgentsLink" href="/fantasy/#free-agents" hidden>Who's free in your league →</a></article></aside></section>
+            <section class="support-grid">
+                <article class="editorial-card season-offenses" aria-labelledby="offensesTitle">
+                    <header class="card-head card-head--compact">
+                        <div>
+                            <span class="eyebrow">Team outlook</span>
+                            <h2 id="offensesTitle">
+                                Top Offenses</h2></div></header>
+                    <div class="table-wrap">
+                        <table class="rank-table season-offense__table">
+                            <thead>
+                                <tr>
+                                    <th class="col-rank">
+                                        #</th>
+                                    <th>
+                                        Team</th>
+                                    <th class="col-proj">
+                                        Yards</th>
+                                    <th class="col-proj">
+                                        TDs</th>
+                                    <th class="col-proj">
+                                        Implied pts</th></tr></thead>
+                            <tbody id="seasonOffenses"></tbody></table></div>
+                    <p id="seasonOffensesNote" class="card-note" role="status"></p>
+                </article>
+                <article class="editorial-card freshness-card" aria-labelledby="freshnessTitle">
+                    <header class="card-head card-head--compact">
+                        <div>
+                            <span class="eyebrow">Sources</span>
+                            <h2 id="freshnessTitle">
+                                Source Freshness</h2></div></header>
+                    <ul id="marketFreshness" class="freshness-list">
+                        <li class="empty-row">
+                            —</li></ul></article></section>
+            <details class="editorial-card disclosure" id="live-markets" hidden>
+                <summary>
+                    <h2 class="disclosure__title">
+                        <small>Available now</small>Betting Lines</h2>
+                    <span aria-hidden="true">＋</span></summary>
+                <div class="disclosure__body">
+                    <section class="market-group" id="marketGroup" hidden>
+                        <section class="betting" id="gamesSection" hidden>
+                            <div class="section-head">
+                                <h3>
+                                    Game lines</h3>
+                                <span id="gamesAsOf"></span></div>
+                            <div class="games-strip" id="gamesStrip"></div>
+                        </section>
+                        <section class="betting" id="propsSection" hidden>
+                            <div class="section-head">
+                                <h3>
+                                    Player props</h3>
+                                <span id="propsAsOf"></span></div>
+                            <div class="chip-row" id="propGameTabs" role="group" aria-label="Featured game"></div>
+                            <div id="propsBoard"></div>
+                        </section>
+                    </section>
+                    <section class="betting" id="futuresSection" hidden>
+                        <div class="section-head">
+                            <h3>
+                                Season futures</h3>
+                            <span id="futuresAsOf"></span></div>
+                        <div class="chip-row" id="futuresTabs" role="group" aria-label="Futures market"></div>
+                        <table class="rank-table futures-table">
+                            <thead>
+                                <tr>
+                                    <th>
+                                        #</th>
+                                    <th>
+                                        Outcome</th>
+                                    <th>
+                                        Odds</th></tr></thead>
+                            <tbody id="futuresBody"></tbody>
+                        </table>
+                    </section>
+                </div>
+            </details>
+            <details class="editorial-card disclosure methodology">
+                <summary>
+                    <h2 class="disclosure__title">
+                        <small>Scoring &amp; sources</small>Methodology</h2>
+                    <span aria-hidden="true">＋</span></summary>
+                <div class="disclosure__body prose">
+                    <p>
+                        Market values use 1 point per 25 passing yards, 4 per passing touchdown, 1 per 10 rushing or receiving yards, and 6 per rushing or receiving touchdown. Half PPR and PPR add projected reception points. Categories require both yardage and touchdown quotes.</p>
+                    <p>
+                        Each row names the categories its market value was built from, and flags any the market did not quote. Diff is implied points minus the adjacent season projection. When multiple projection providers are available, that projection is the per-player average of the sources named in the column header; otherwise the single source is named. The projection counts everything a player does, including categories with no market and the interceptions and fumbles nothing here quotes. Where a category is missing, Diff is underlined: that gap is partly missing data rather than market disagreement, and a running back with no receiving market will look far cheaper than he is.</p>
+                    <p class="betting-disclaimer">
+                        Market-implied values, contract lines, and prices are informational only, not betting advice. Availability and freshness vary by source.</p></div></details></main>
+
+    <div class="compare-tray" id="compareTray" hidden aria-live="polite">
+        <div class="compare-tray__chips" id="compareChips"></div>
+        <div class="compare-tray__actions">
+            <button type="button" class="compare-tray__clear" id="compareClear">Clear</button><button type="button" class="compare-tray__go" id="compareGo" disabled>Compare</button></div></div>
+    <div class="drawer drawer--modal" id="compareDrawer" hidden>
+        <div class="drawer__backdrop" id="compareBackdrop"></div>
+        <section class="drawer__panel drawer__panel--wide" role="dialog" aria-modal="true" aria-labelledby="compareTitle" tabindex="-1">
+            <button type="button" class="drawer__close" id="compareDrawerClose" aria-label="Close comparison">×</button>
+            <header class="drawer__head">
+                <h2 id="compareTitle">
+                    Compare</h2>
+                <p class="drawer__sub" id="compareSub"></p>
+            </header>
+            <div class="drawer__body" id="compareBody"></div>
+        </section>
+    </div>
+    <div class="drawer" id="playerDrawer" hidden>
+        <div class="drawer__backdrop" id="drawerBackdrop"></div>
+        <aside class="drawer__panel" role="dialog" aria-modal="true" aria-labelledby="drawerName" tabindex="-1">
+            <button type="button" class="drawer__close" id="drawerClose" aria-label="Close player details">×</button>
+            <header class="drawer__head">
+                <h2 id="drawerName">
+                    —</h2>
+                <p class="drawer__sub" id="drawerSub"></p>
+            </header>
+            <div class="drawer__body" id="drawerBody">
+                <p class="drawer__loading">
+                    Loading…</p></div></aside></div>
+    <div class="drawer drawer--markets" id="marketsDrawer" hidden>
+        <div class="drawer__backdrop" id="marketsBackdrop"></div>
+        <aside class="drawer__panel drawer__panel--wide" role="dialog" aria-modal="true" aria-labelledby="marketsTitle" tabindex="-1">
+            <button type="button" class="drawer__close" id="marketsClose" aria-label="Close player lines">×</button>
+            <header class="drawer__head">
+                <span class="eyebrow">Raw categories</span>
+                <h2 id="marketsTitle">
+                    Player Lines</h2>
+                <p class="drawer__sub" id="marketsSub"></p>
+            </header>
+            <div class="drawer__body">
+                <div id="seasonPropsTabs" class="chip-row" role="tablist" aria-label="Season market"></div>
+                <div id="seasonPropsPositions" class="chip-row" role="group" aria-label="Position"></div>
+                <div class="table-wrap">
+                    <table class="rank-table season-props__table">
+                        <thead>
+                            <tr>
+                                <th>
+                                    #</th>
+                                <th>
+                                    Player</th>
+                                <th>
+                                    Value</th>
+                                <th>
+                                    7d</th>
+                                <th>
+                                    Sources</th></tr></thead>
+                        <tbody id="seasonPropsLeaders"></tbody>
+                    </table>
+                </div>
+                <p class="season-props__note" id="seasonPropsNote" role="status"></p>
+            </div>
+        </aside>
+    </div>
+
+    <script src="/shared/site-nav.js?v=16"></script><script src="/shared/fantasy-header.js?v=2"></script><script>window.FantasyHeader.mount({ page: "market" });</script><script src="/shared/analytics.js?v=1"></script><script src="/shared/api-base.js?v=1"></script><script src="format.js?v=12"></script><script src="app.js?v=29"></script>
+</body>
+</html>

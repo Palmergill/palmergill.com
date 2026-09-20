@@ -1040,24 +1040,30 @@ def test_poker_rate_limit_uses_shared_rightmost_hop_helper(monkeypatch):
     assert list(poker._rate_limit_store.keys()) == ["9.9.9.9"]
 
 
-def test_league_hub_does_not_inherit_demo_access_from_fantasy():
+def test_league_recaps_do_not_inherit_demo_access_from_fantasy():
     """/fantasy and /api/fantasy are demo prefixes and matching is by prefix,
-    so /fantasy/league inherits anonymous demo access unless it is excluded
-    explicitly. Omitting it from DEMO_PATH_PREFIXES is NOT enough.
+    so the members-only league pages inherit anonymous demo access unless
+    they are excluded explicitly. Omitting them from DEMO_PATH_PREFIXES is
+    NOT enough.
 
     The equivalent lists in middleware.js must stay in sync; see
     MEMBER_PREFIXES there.
     """
     from app.main import is_demo_path, is_member_path, is_protected_path
 
-    assert is_member_path("/fantasy/league") is True
-    assert is_member_path("/fantasy/league/") is True
-    assert is_demo_path("/fantasy/league/") is False
-    assert is_protected_path("/fantasy/league/") is True
+    for path in ("/fantasy/week", "/fantasy/week/", "/fantasy/draft-recap/"):
+        assert is_member_path(path) is True
+        assert is_demo_path(path) is False
+        assert is_protected_path(path) is True
 
-    # ...without locking the public dashboard that surrounds it.
+    # ...without locking the pages around them. /fantasy/ is the league hub
+    # itself: an empty shell that renders a teaser and a sign-in prompt for
+    # anonymous visitors, which a login redirect would pre-empt. It holds no
+    # league data — that comes from /api/fantasy/league/*, where
+    # require_member is the real boundary (see test_fantasy_league_api.py).
     assert is_demo_path("/fantasy/") is True
-    assert is_demo_path("/fantasy/draft-order/") is True
     assert is_member_path("/fantasy/") is False
+    assert is_demo_path("/fantasy/market/") is True
+    assert is_demo_path("/fantasy/draft-order/") is True
     # A path that merely starts with the same characters is not a member path.
-    assert is_member_path("/fantasy/leaguelike/") is False
+    assert is_member_path("/fantasy/weekly-thing/") is False

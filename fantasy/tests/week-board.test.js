@@ -10,11 +10,11 @@
 const fs = require("fs");
 const path = require("path");
 
-const fantasyDir = path.join(__dirname, "..");
+const fantasyDir = path.join(__dirname, "..", "market");
 const appSource = fs.readFileSync(path.join(fantasyDir, "app.js"), "utf8");
 const pageSource = fs.readFileSync(path.join(fantasyDir, "index.html"), "utf8");
 const bodySource = pageSource.match(/<body>([\s\S]*)<\/body>/)[1];
-const F = require("../format.js");
+const F = require("../market/format.js");
 
 function response(data, status = 200) {
     return Promise.resolve({
@@ -213,7 +213,7 @@ describe("week board", () => {
         await waitFor(() => document.getElementById("weekValue").textContent === "2026");
 
         expect(document.getElementById("weekBoardWrap").hidden).toBe(true);
-        expect(document.getElementById("marketBoardTitle").textContent).toBe("Implied Value");
+        expect(document.getElementById("marketBoardTitle").textContent).toBe("Season Board");
         expect(window.location.search).not.toContain("board=week");
     });
 
@@ -228,7 +228,7 @@ describe("week board", () => {
 
         modeChips()[0].click();
         expect(document.getElementById("weekBoardWrap").hidden).toBe(true);
-        expect(document.getElementById("marketBoardTitle").textContent).toBe("Implied Value");
+        expect(document.getElementById("marketBoardTitle").textContent).toBe("Season Board");
         expect(window.location.search).not.toContain("board=week");
     });
 
@@ -409,32 +409,5 @@ describe("week board", () => {
         expect([...document.querySelectorAll("#seasonFantasyPositions .chip")]
             .map((chip) => chip.textContent)).toEqual(["All", "QB", "RB", "WR"]);
         expect(document.getElementById("seasonFantasyNote").textContent).toContain("Week 2");
-    });
-});
-
-describe("seasonal tool grid", () => {
-    afterEach(() => {
-        document.body.innerHTML = "";
-        jest.restoreAllMocks();
-    });
-
-    const draftCard = () => document.querySelector(".tool-card--draft");
-
-    test("the draft game recedes once games are being played", async () => {
-        boot(routes());
-        await waitFor(() => draftCard().classList.contains("tool-card--quiet"));
-
-        expect(draftCard().classList.contains("tool-card--lead")).toBe(false);
-        expect(draftCard().querySelector("small").textContent).toBe("Next draft");
-        // Still reachable — quieter, not hidden.
-        expect(draftCard().getAttribute("href")).toBe("/fantasy/draft-order/");
-    });
-
-    test("out of season it leads instead", async () => {
-        boot(routes({ "/state": OFFSEASON }));
-        await waitFor(() => draftCard().classList.contains("tool-card--lead"));
-
-        expect(draftCard().classList.contains("tool-card--quiet")).toBe(false);
-        expect(draftCard().querySelector("small").textContent).toBe("Draft night");
     });
 });

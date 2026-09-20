@@ -14,9 +14,11 @@ navigation chrome.
 - `/login/` - protected workspace sign-in
 - `/stock-research/` - polished stock research app
 - `/bitcoin-chat/` - Bitcoin chat app
-- `/fantasy/` - NFL rankings, projections, and league tools
+- `/fantasy/` - ESPN league hub and the section's home: standings, power rankings, enriched rosters, start/sit advice, league free agents, team overviews, and league-aware chat. Members only, with a teaser for everyone else
+- `/fantasy/week/` - weekly league recap (members only)
+- `/fantasy/draft-recap/` - draft recap for the league (members only)
+- `/fantasy/market/` - implied player value from betting markets, against the projections. Public and league-agnostic
 - `/fantasy/draft-order/` - account-backed, verifiable draft-order game with solo practice, games against bots, personal records, a top-10 all-runs leaderboard, and admin bot-test rooms
-- `/fantasy/league/` - members-only ESPN league hub with standings, power rankings, enriched rosters, start/sit advice, league free agents, team overviews, and league-aware chat
 - `/fantasy/rankings/` - personal ranking boards with tiers, a head-to-head "who would you draft first?" helper, publishable share links, and a site consensus built from published boards
 - `/casino/` - landing page linking the casino games
 - `/poker/` - Texas Hold'em poker app

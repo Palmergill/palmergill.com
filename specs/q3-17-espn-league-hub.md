@@ -3,14 +3,16 @@
 - **Quarter:** Q3 2026 (Jul–Sep)
 - **Status:** in progress — P1–P4 implemented; model-backed overview still needs a live `OPENAI_API_KEY`
 - **Depends on:** Spec 16 (fantasy data, player crosswalk, chat plumbing), site member accounts
-- **Areas:** `fantasy/league/`, `backend/app/services/fantasy_league_*.py`,
+- **Areas:** `fantasy/` (the hub; `fantasy/league/` until Sep 2026),
+  `backend/app/services/fantasy_league_*.py`,
   `backend/app/routers/fantasy_league.py`, `backend/app/services/fantasy_ai.py`,
   `backend/app/services/fantasy_tools.py`, `backend/app/database.py`,
   `backend/app/main.py`, `middleware.js`
 
 ## Summary
 
-A members-only hub at `/fantasy/league/` for ESPN league 225965: historical
+A members-only hub at `/fantasy/` (at `/fantasy/league/` until Sep 2026)
+for ESPN league 225965: historical
 and current standings, seven-method power rankings, weekly scoreboards, team
 results, roster snapshots enriched with the site's projections/rankings/props,
 and context-grounded team overviews and chat. ESPN is a keyless collection
@@ -387,3 +389,48 @@ and weights but fixed five defects, each locked by a regression test:
   (`ff_league_week_notes`, keyed on season/week/team): context digest, cached
   row, model or deterministic local fallback, generation behind an explicit
   POST so no page load and no schedule can bill for it.
+
+- **Sep 2026 — the league becomes the home page.** `/fantasy/` was the
+  market dashboard and the hub lived a click in, which had the section
+  leading with the thing that changes least. The league is what somebody
+  opens the section to see, so it moved to `/fantasy/`; the market board
+  moved to `/fantasy/market/`, and the two league recaps to `/fantasy/week/`
+  and `/fantasy/draft-recap/`. `vercel.json` redirects every old URL.
+
+  **The hub is no longer edge-gated, and that is the point.** It is the
+  section's front door now, so an anonymous visitor has to reach it to be
+  told what is behind it — a login redirect at the edge pre-empts that. The
+  page is an empty shell either way: every byte of league data comes from
+  `/api/fantasy/league/*`, where `require_member` is and always was the real
+  boundary. The two recaps have no teaser story, so they keep the edge gate
+  and `MEMBER_PATH_PREFIXES` now names them instead.
+
+  `shared/fantasy-header.js` carries the new shape in three slots: Home, My
+  Team, and a Tools menu for the pages that have nothing to do with any
+  league (market board, personal rankings, Fourth & Fortune). "My Team"
+  links to `?team=me` rather than a team id, because the nav cannot know
+  which team is yours; the hub resolves it against `GET /league/me` — which
+  it already reads for the ledger highlight — and rewrites the URL to the
+  real id. An account with no team chosen lands on the league with a line
+  saying to pick one, rather than on a blank team view.
+
+- **Sep 2026 — importing a league (front end only).** The page calls itself
+  the fantasy home page, which invites "can I point this at my league?"
+  immediately, so it asks and answers the question in a fold-out form on the
+  hub. The form is real: it parses an ESPN league ID, reads one out of a
+  pasted league URL, normalises leading zeros, and distinguishes three
+  outcomes — a typo, the league already on screen, and a well-formed ID for a
+  league the site cannot serve. It issues no request for the third, and says
+  so plainly rather than spinning.
+
+  **What it cannot do yet is import.** The backend is single-league by
+  construction: `configured_league_id()` reads `ESPN_LEAGUE_ID` from the
+  environment, and of the eleven `ff_league_*` tables only `ff_league_seasons`
+  carries `espn_league_id` — the rest key on `season` alone, with unique
+  constraints like `(season, espn_team_id)` that a second league in the same
+  season would collide on. Real multi-league support is a migration across
+  ten tables, a rewrite of ~109 query sites across four services, per-account
+  league selection, and on-demand collection for an arbitrary public ID with
+  whatever rate limiting that implies against ESPN. That is its own phase,
+  not a redesign; `GET /overview` now returns `league_id` so the form can
+  compare honestly in the meantime.

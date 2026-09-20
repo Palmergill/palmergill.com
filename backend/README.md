@@ -40,7 +40,7 @@ Poker, craps, craps strategy, blackjack, High Card Flush, login, `/api/poker/*`,
 
 ## Previewing the members-only league hub
 
-`/fantasy/league/` is behind the member gate and reads only from the local
+`/fantasy/` is the league hub, behind the member gate and reads only from the local
 database, so previewing it needs three things: a member account, some league
 data, and a server pointed at the database that holds both.
 
@@ -146,7 +146,7 @@ set -a && . backend/.env && set +a && LOCAL_SITE_ROOT=true \
 ```
 
 Then sign in at `http://127.0.0.1:8000/login/` as `LEAGUE_TEST_USER` and open
-`http://127.0.0.1:8000/fantasy/league/`.
+`http://127.0.0.1:8000/fantasy/`.
 
 To skip the login form, add `LOCAL_AUTH_USER=leaguetester` to `.env`: every
 request from loopback is then signed in as that member. It is ignored unless
@@ -159,7 +159,7 @@ The hub lands on the newest readable season and the table leads in every
 state. Before week 1 that table is mostly dashes — all-play, expected wins,
 luck and lineup efficiency have nothing to derive from until games are
 played — and a banner says so. To see it full, pick a played season:
-`http://127.0.0.1:8000/fantasy/league/?season=2024`.
+`http://127.0.0.1:8000/fantasy/?season=2024`.
 
 Columns stay blank when the data behind them is genuinely missing rather
 than zero, and the footnote under the table names the reason. Lineup
@@ -180,7 +180,7 @@ actuals, so it stays empty on a season collected for the first time.
 - `http://127.0.0.1:8000/high-card-flush/` - High Card Flush app
 - `http://127.0.0.1:8000/bitcoin-chat/` - Bitcoin chat app
 - `http://127.0.0.1:8000/admin/` - protected admin/log dashboard
-- `http://127.0.0.1:8000/fantasy/league/` - members-only league hub (see above)
+- `http://127.0.0.1:8000/fantasy/` - members-only league hub (see above)
 - `http://127.0.0.1:8000/health` - health check
 - `http://127.0.0.1:8000/docs` - protected FastAPI docs
 

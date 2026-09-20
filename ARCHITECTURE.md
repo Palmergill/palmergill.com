@@ -30,10 +30,18 @@ The active public site is static:
 - `/login/` - protected workspace sign-in
 - `/stock-research/` - stock research app
 - `/bitcoin-chat/` - Bitcoin chat app
-- `/fantasy/` - fantasy football dashboard
+- `/fantasy/` - ESPN league hub, and the section's home page. Deliberately NOT a member path: it renders a teaser plus a sign-in prompt for anonymous visitors, which an edge login redirect would pre-empt. The page is an empty shell — every byte of league data comes from `/api/fantasy/league/*`, where `require_member` is the real boundary.
+- `/fantasy/week/` - weekly recap for the league (members only; see `MEMBER_PATH_PREFIXES`)
+- `/fantasy/draft-recap/` - draft recap for the league (members only)
+- `/fantasy/market/` - implied player value from betting markets. League-agnostic, public, and the section's one indexed page.
 - `/fantasy/draft-order/` - Fourth & Fortune draft-order rooms
-- `/fantasy/league/` - ESPN league hub (members only; see `MEMBER_PATH_PREFIXES`)
-- `/fantasy/rankings/` - personal ranking boards (spec 18). Deliberately NOT a member path: published boards are shared by URL and the consensus is public, so the page must load for anonymous visitors. The board API gates itself per endpoint instead.
+- `/fantasy/rankings/` - personal ranking boards (spec 18). Deliberately NOT a member path, for the same reason as `/fantasy/`: published boards are shared by URL and the consensus is public, so the page must load for anonymous visitors. The board API gates itself per endpoint instead.
+
+The section's information architecture is one league at home, your own team
+one click from anywhere, and the league-agnostic tools (`market`, `rankings`,
+`draft-order`) behind a menu — see `shared/fantasy-header.js`. Old URLs
+(`/fantasy/league/*`, and `/fantasy/` for the market board) redirect from
+`vercel.json`.
 - `/casino/` - casino landing page linking the browser table games
 - `/poker/` - poker app
 - `/craps/` - craps app
@@ -48,11 +56,13 @@ felt-table surfaces and navigation chrome keep the dark casino treatment.
 
 Two section strips sit below the global nav, mounted by the pages that need
 them: `shared/casino-header.js` under the casino games, and
-`shared/fantasy-header.js` under `/fantasy/rankings/`, `/fantasy/league/` and
-`/fantasy/draft-order/`. Both exist for the same reason — the global nav marks
-one entry current for a whole section, so without a strip the sub-pages have no
-way back to their own landing page and none across to their siblings. Neither
-lobby (`/casino/`, `/fantasy/`) mounts its own strip.
+`shared/fantasy-header.js` under every page in `/fantasy/`. Both exist for the
+same reason — the global nav marks one entry current for a whole section, so
+without a strip the sub-pages have no way back to their own landing page and
+none across to their siblings. The casino lobby (`/casino/`) still does not
+mount its own strip; the fantasy nav does mount on `/fantasy/`, because that
+page is the league rather than a lobby and the strip is what carries "My
+Team" and the tools menu.
 
 ## Backend
 

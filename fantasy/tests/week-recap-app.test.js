@@ -10,11 +10,11 @@
 const fs = require("fs");
 const path = require("path");
 
-const weekDir = path.join(__dirname, "..", "league", "week");
+const weekDir = path.join(__dirname, "..", "week");
 const appSource = fs.readFileSync(path.join(weekDir, "app.js"), "utf8");
 const pageSource = fs.readFileSync(path.join(weekDir, "index.html"), "utf8");
 const bodySource = pageSource.match(/<body>([\s\S]*)<\/body>/)[1];
-const F = require("../league/week/format.js");
+const F = require("../week/format.js");
 
 function response(data, status = 200) {
     return Promise.resolve({
@@ -112,7 +112,7 @@ async function waitFor(predicate) {
     throw new Error("Timed out waiting for the weekly recap controller");
 }
 
-function boot(fetchImplementation, url = "/fantasy/league/week/") {
+function boot(fetchImplementation, url = "/fantasy/week/") {
     document.body.innerHTML = bodySource;
     window.history.replaceState({}, "", url);
     window.WeekFormat = F;
@@ -182,7 +182,7 @@ describe("weekly recap controller", () => {
             if (requested.includes("season=2024")) return response(recap(2024, 14));
             if (requested.includes("/week")) return response(recap(2026, 1));
             throw new Error(`Unexpected request: ${requested}`);
-        }, "/fantasy/league/week/?season=2026&week=1");
+        }, "/fantasy/week/?season=2026&week=1");
 
         await waitFor(() => !document.getElementById("weekView").hidden);
         [...document.querySelectorAll("#seasonChips .chip")]
@@ -213,11 +213,11 @@ describe("weekly recap controller", () => {
 
     test("signed-out sends the reader to login and keeps their destination", async () => {
         boot(() => response({ detail: "Sign in to view the league hub." }, 403),
-            "/fantasy/league/week/?season=2026&week=3");
+            "/fantasy/week/?season=2026&week=3");
 
         await waitFor(() => !document.getElementById("signedOutView").hidden);
         expect(document.getElementById("signInLink").href).toContain(
-            encodeURIComponent("/fantasy/league/week/?season=2026&week=3")
+            encodeURIComponent("/fantasy/week/?season=2026&week=3")
         );
         expect(document.getElementById("seasonBar").hidden).toBe(true);
     });
@@ -236,7 +236,7 @@ describe("weekly recap controller", () => {
             }
             if (requested.includes("/week")) return response(recap(2026, 1));
             throw new Error(`Unexpected request: ${requested}`);
-        }, "/fantasy/league/week/?season=2026&week=1");
+        }, "/fantasy/week/?season=2026&week=1");
 
         await waitFor(() => !document.getElementById("weekView").hidden);
         document.querySelector(".grade__toggle").click();

@@ -1,4 +1,4 @@
-const LeagueFormat = require("../league/format.js");
+const LeagueFormat = require("../format.js");
 
 // A small league whose numbers are chosen so every assertion below can be
 // checked by hand.

@@ -1,139 +1,118 @@
-// Fantasy dashboard controller. Vanilla JS, no build step. Reads the P1
-// fantasy API and renders the rankings board (with week switching, player
-// search, rank movement, matchups, injury badges, a consensus projection
-// source, and a compare tray), plus trending panels and a player slide-over.
-// Formatting/derivation lives in format.js (FantasyFormat). View state is
-// mirrored into the URL query string so a view is shareable/refresh-safe.
+// League hub controller. Pure formatting lives in format.js (LeagueFormat);
+// this file only fetches, holds view state, and renders.
 (function () {
     "use strict";
 
-    const API_BASE = `${window.API_ORIGIN || ""}/api/fantasy`;
-    // Half PPR is the format the league actually plays, and it is the only one
-    // of the three where the Rec column carries a number for everybody: in
-    // standard a reception is worth zero, so that column reads as missing data
-    // rather than as the scoring rule it is.
-    const DEFAULT_SCORING = "half";
-    const F = window.FantasyFormat;
-    const MAX_COMPARE = 4;
+    const F = window.LeagueFormat;
+    const API_BASE = `${window.API_ORIGIN || ""}/api/fantasy/league`;
+    const LEAGUE_SCORING = "half";
+    const LEAGUE_SCORING_LABEL = "Half PPR";
+    const LEAGUE_PROJECTION_FIELD = "pts_half_ppr";
+    const LEAGUE_ACTUAL_FIELD = "fantasy_points_half";
 
     const state = {
         season: null,
+        mode: null,
         week: null,
-        defaultWeek: null,
-        // "season" (market value, year-long) or "week" (one week's board).
-        boardMode: "season",
-        weekBoard: null,
-        // Which week the week board is showing. null follows the live week.
-        weekBoardWeek: null,
-        weekBoardSeq: 0,
-        inSeason: false,
-        seasonFantasyScoring: DEFAULT_SCORING,
-        seasonFantasyPosition: "ALL",
-        // The board's last payload, so a chip, a sort, or clearing the compare
-        // tray repaints from memory instead of refetching the same rows.
-        seasonFantasyData: null,
-        // The server ranks by market value; anything else is a local re-read
-        // of rows already in hand.
-        seasonFantasySort: { key: "fantasy_points", dir: "desc" },
-        seasonPropsPosition: "ALL",
-        seasonPropsMarket: null,
-        marketExpanded: false,
-        movers: null,
-        moversView: "gainers",
-        drawerPlayerId: null,
-        compare: [], // [{ player_id, name }]
+        scoreWeek: null,
+        algorithm: "composite",
+        // Which measure the ledger's switchable column is showing. On a
+        // phone this is the only column, so it is worth keeping in the URL.
+        column: "record",
+        teamId: null,
+        overview: null,
+        ledger: null,
+        ledgerRequest: 0,
+        freeAgentsExpanded: false,
+        freeAgentsPayload: null,
+        myTeamId: null,
+        // Set by ?team=me, which the header links to from every page in the
+        // section because it cannot know your team id. Resolved once
+        // /league/me answers, then cleared.
+        pendingMyTeam: false,
+        leagueId: null,
+        rosterPower: null,
+        // Bumped on every context change. A response that resolves with a
+        // stale generation is discarded — switching season fires several
+        // requests at once, so out-of-order replies are the normal case.
+        generation: 0,
     };
 
+    const byId = (id) => document.getElementById(id);
     const els = {
-        boardMode: document.getElementById("boardMode"),
-        marketBoardEyebrow: document.getElementById("marketBoardEyebrow"),
-        marketBoardTitle: document.getElementById("marketBoardTitle"),
-        marketTableWrap: document.getElementById("marketTableWrap"),
-        weekBoardWrap: document.getElementById("weekBoardWrap"),
-        weekLeaders: document.getElementById("weekLeaders"),
-        weekBoardHead: document.getElementById("weekBoardHead"),
-        weekStep: document.getElementById("weekStep"),
-        weekStepBack: document.getElementById("weekStepBack"),
-        weekStepNext: document.getElementById("weekStepNext"),
-        weekStepLabel: document.getElementById("weekStepLabel"),
-        weekLabel: document.getElementById("weekLabel"),
-        weekValue: document.getElementById("weekValue"),
-        seasonValue: document.getElementById("seasonValue"),
-        offseasonBanner: document.getElementById("offseasonBanner"),
-        errorBanner: document.getElementById("errorBanner"),
-        playerSearch: document.getElementById("playerSearch"),
-        searchResults: document.getElementById("searchResults"),
-        seasonPropsTabs: document.getElementById("seasonPropsTabs"),
-        seasonPropsLeaders: document.getElementById("seasonPropsLeaders"),
-        seasonPropsPositions: document.getElementById("seasonPropsPositions"),
-        seasonPropsNote: document.getElementById("seasonPropsNote"),
-        seasonFantasyLeaders: document.getElementById("seasonFantasyLeaders"),
-        seasonFantasyNote: document.getElementById("seasonFantasyNote"),
-        seasonFantasyScoring: document.getElementById("seasonFantasyScoring"),
-        seasonFantasyPositions: document.getElementById("seasonFantasyPositions"),
-        seasonFantasyProjHead: document.getElementById("seasonFantasyProjHead"),
-        seasonOffenses: document.getElementById("seasonOffenses"),
-        seasonOffensesNote: document.getElementById("seasonOffensesNote"),
-        showAllMarket: document.getElementById("showAllMarket"),
-        marketColumns: document.getElementById("marketColumns"),
-        playerMarkets: document.getElementById("playerMarkets"),
-        marketMovers: document.getElementById("marketMovers"),
-        marketMoversNote: document.getElementById("marketMoversNote"),
-        marketFreshness: document.getElementById("marketFreshness"),
-        memberStatus: document.getElementById("memberStatus"),
-        memberTeam: document.getElementById("memberTeam"),
-        memberMetrics: document.getElementById("memberMetrics"),
-        chooseTeam: document.getElementById("chooseTeam"),
-        teamSelect: document.getElementById("teamSelect"),
-        leagueFreeAgentsLink: document.getElementById("leagueFreeAgentsLink"),
-        trendingAdd: document.getElementById("trendingAdd"),
-        trendingDrop: document.getElementById("trendingDrop"),
-        gamesSection: document.getElementById("gamesSection"),
-        gamesStrip: document.getElementById("gamesStrip"),
-        gamesAsOf: document.getElementById("gamesAsOf"),
-        marketGroup: document.getElementById("marketGroup"),
-        liveMarkets: document.getElementById("live-markets"),
-        propsSection: document.getElementById("propsSection"),
-        propGameTabs: document.getElementById("propGameTabs"),
-        propsBoard: document.getElementById("propsBoard"),
-        propsAsOf: document.getElementById("propsAsOf"),
-        futuresSection: document.getElementById("futuresSection"),
-        futuresTabs: document.getElementById("futuresTabs"),
-        futuresBody: document.getElementById("futuresBody"),
-        futuresAsOf: document.getElementById("futuresAsOf"),
-        drawer: document.getElementById("playerDrawer"),
-        drawerBackdrop: document.getElementById("drawerBackdrop"),
-        drawerClose: document.getElementById("drawerClose"),
-        drawerName: document.getElementById("drawerName"),
-        drawerSub: document.getElementById("drawerSub"),
-        drawerBody: document.getElementById("drawerBody"),
-        compareTray: document.getElementById("compareTray"),
-        compareChips: document.getElementById("compareChips"),
-        compareClear: document.getElementById("compareClear"),
-        compareGo: document.getElementById("compareGo"),
-        compareDrawer: document.getElementById("compareDrawer"),
-        compareBackdrop: document.getElementById("compareBackdrop"),
-        compareDrawerClose: document.getElementById("compareDrawerClose"),
-        compareSub: document.getElementById("compareSub"),
-        compareBody: document.getElementById("compareBody"),
-        marketsDrawer: document.getElementById("marketsDrawer"),
-        marketsBackdrop: document.getElementById("marketsBackdrop"),
-        marketsClose: document.getElementById("marketsClose"),
-        marketsSub: document.getElementById("marketsSub"),
+        leagueName: byId("leagueName"),
+        leagueSub: byId("leagueSub"),
+        mastheadEyebrow: byId("mastheadEyebrow"),
+        modeBadge: byId("modeBadge"),
+        teamBadge: byId("teamBadge"),
+        modeLabel: byId("modeLabel"),
+        seasonValue: byId("seasonValue"),
+        weekValue: byId("weekValue"),
+        freshnessValue: byId("freshnessValue"),
+        errorBanner: byId("errorBanner"),
+        modeBanner: byId("modeBanner"),
+        routeBanner: byId("routeBanner"),
+        signedOutView: byId("signedOutView"),
+        emptyView: byId("emptyView"),
+        leagueView: byId("leagueView"),
+        signInLink: byId("signInLink"),
+        seasonChips: byId("seasonChips"),
+        leagueSections: byId("leagueSections"),
+        powerList: byId("powerList"),
+        powerNote: byId("powerNote"),
+        powerFootnote: byId("powerFootnote"),
+        ledger: byId("ledger"),
+        ledgerColumns: byId("ledgerColumns"),
+        ledgerNote: byId("ledgerNote"),
+        ledgerFootnote: byId("ledgerFootnote"),
+        powerAlgorithm: byId("powerAlgorithm"),
+        chartsBoard: document.querySelector('[data-board="charts"]'),
+        charts: byId("charts"),
+        chartsNote: byId("chartsNote"),
+        scoreboardWeek: byId("scoreboardWeek"),
+        scoreboard: byId("scoreboardGrid"),
+        teamsGrid: byId("teamsGrid"),
+        freeAgents: byId("freeAgents"),
+        freeAgentsNote: byId("freeAgentsNote"),
+        freeAgentsToggle: byId("freeAgentsToggle"),
+        myTeamStrip: byId("myTeamStrip"),
+        myTeamName: byId("myTeamName"),
+        myTeamMeta: byId("myTeamMeta"),
+        myTeamAdvice: byId("myTeamAdvice"),
+        myTeamMoves: byId("myTeamMoves"),
+        teamView: byId("teamView"),
+        teamBack: byId("teamBack"),
+        teamLede: byId("teamLede"),
+        teamColophon: byId("teamColophon"),
+        roomsLede: byId("roomsLede"),
+        teamOverviewMeta: byId("teamOverviewMeta"),
+        teamOverviewRefresh: byId("teamOverviewRefresh"),
+        teamResults: byId("teamResults"),
+        teamRoster: byId("teamRoster"),
+        rosterNote: byId("rosterNote"),
+        lineupCard: byId("lineupCard"),
+        lineupMeta: byId("lineupMeta"),
+        lineupTotals: byId("lineupTotals"),
+        lineupChanges: byId("lineupChanges"),
+        lineupNote: byId("lineupNote"),
+        importForm: byId("importForm"),
+        importInput: byId("importLeagueId"),
+        importStatus: byId("importStatus"),
+        importDetails: byId("importLeague"),
     };
 
-    async function fetchJson(url) {
-        const response = await fetch(url, { credentials: "include" });
+    class ForbiddenError extends Error {}
+
+    async function fetchJson(url, options = {}) {
+        const response = await fetch(url, { credentials: "include", ...options });
+        if (response.status === 403) {
+            throw new ForbiddenError("Sign in to view the league hub.");
+        }
         if (!response.ok) {
             const body = await response.json().catch(() => ({}));
             throw new Error(body.detail || `Request failed with ${response.status}`);
         }
         return response.json();
-    }
-
-    function showError(message) {
-        els.errorBanner.textContent = message;
-        els.errorBanner.hidden = false;
     }
 
     function el(tag, className, text) {
@@ -143,2289 +122,1869 @@
         return node;
     }
 
-    function providerLink(provider) {
-        const link = el("a", "source-link", provider.label);
-        link.href = provider.url;
-        link.target = "_blank";
-        link.rel = "noopener noreferrer";
-        return link;
+    // ESPN logo URLs rot (a manager's uploaded image, a dead CDN path). A
+    // broken-image glyph reads as the page being broken, so hide it — but keep
+    // its box, or that team's name sits out of line with the others.
+    function hideIfBroken(img) {
+        img.addEventListener("error", () => { img.style.visibility = "hidden"; }, { once: true });
     }
 
-    // The picker these labels used to come from is gone, and fetching
-    // /projection-sources purely to caption a drawer heading would be a
-    // network call for a control that no longer exists.
-    const PROVIDERS = {
-        sleeper: { id: "sleeper", label: "Sleeper", url: "https://sleeper.com/" },
-        espn: { id: "espn", label: "ESPN", url: "https://www.espn.com/fantasy/football/" },
-        fantasypros: { id: "fantasypros", label: "FantasyPros", url: "https://www.fantasypros.com/nfl/" },
-        consensus: { id: "consensus", label: "Consensus", url: null },
-    };
-
-    const PROVIDER_SHORT_LABELS = {
-        sleeper: "SLP",
-        espn: "ESPN",
-        fantasypros: "FPros",
-    };
-
-    function providerFor(sourceId) {
-        return PROVIDERS[sourceId] || {
-            id: sourceId,
-            label: sourceId ? sourceId.replace(/\b\w/g, (char) => char.toUpperCase()) : "Unknown",
-            url: null,
-        };
+    function appendInline(parent, text) {
+        String(text).split(/(\*\*[^*]+\*\*)/g).forEach((part) => {
+            if (/^\*\*[^*]+\*\*$/.test(part)) {
+                parent.appendChild(el("strong", null, part.slice(2, -2)));
+            } else if (part) {
+                parent.appendChild(document.createTextNode(part));
+            }
+        });
     }
 
-    let overlayFocus = null;
-
-    function rememberOverlayFocus() {
-        overlayFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    // Team overviews can come from the model, so render only the small safe
+    // Markdown subset the chat panel supports. Raw HTML is always text.
+    function renderMarkdown(container, text) {
+        container.replaceChildren();
+        String(text || "").split(/\n{2,}/).forEach((block) => {
+            const lines = block.split("\n");
+            const isList = lines.every((line) => line.trim().startsWith("- ") || !line.trim());
+            const node = el(isList ? "ul" : "p", isList ? "team-overview__list" : null);
+            if (isList) {
+                lines.filter((line) => line.trim().startsWith("- ")).forEach((line) => {
+                    const item = el("li");
+                    appendInline(item, line.trim().slice(2));
+                    node.appendChild(item);
+                });
+            } else {
+                lines.forEach((line, index) => {
+                    if (index) node.appendChild(document.createElement("br"));
+                    appendInline(node, line);
+                });
+            }
+            container.appendChild(node);
+        });
     }
 
-    function restoreOverlayFocus() {
-        if (overlayFocus && document.contains(overlayFocus)) overlayFocus.focus();
-        overlayFocus = null;
+    function setView(name) {
+        els.signedOutView.hidden = name !== "signedOut";
+        els.emptyView.hidden = name !== "empty";
+        els.leagueView.hidden = name !== "league";
+        // Signed out there is no league to be the masthead of: a row of
+        // dashes under "Private league · ESPN" is noise on what is now the
+        // section's front door, and it announces somebody else's league to a
+        // visitor who has none. Leave the name as the section's own.
+        const anonymous = name === "signedOut";
+        els.modeBadge.hidden = anonymous;
+        els.mastheadEyebrow.textContent = anonymous
+            ? "Fantasy football"
+            : "Private league · ESPN";
+        els.freshnessValue.hidden = anonymous;
     }
 
-    function syncDrawerBody() {
-        const open = !els.drawer.hidden || !els.compareDrawer.hidden || !els.marketsDrawer.hidden;
-        document.body.classList.toggle("drawer-open", open);
+    function showError(message) {
+        els.errorBanner.textContent = message;
+        els.errorBanner.hidden = false;
     }
 
-    function visibleDialog() {
-        const overlay = [els.marketsDrawer, els.compareDrawer, els.drawer]
-            .find((node) => node && !node.hidden);
-        return overlay ? overlay.querySelector('[role="dialog"]') : null;
+    function clearError() {
+        els.errorBanner.hidden = true;
     }
 
-    function trapDialogFocus(event) {
-        if (event.key !== "Tab") return;
-        const dialog = visibleDialog();
-        if (!dialog) return;
-        const focusable = Array.from(dialog.querySelectorAll(
-            'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
-        )).filter((node) => !node.hidden && node.offsetParent !== null);
-        if (!focusable.length) { event.preventDefault(); dialog.focus(); return; }
-        const first = focusable[0];
-        const last = focusable[focusable.length - 1];
-        if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
-        else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+    function handleFailure(error) {
+        if (error instanceof ForbiddenError) {
+            // Preserve where they were headed so login can bounce them back.
+            const next = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+            els.signInLink.href = `/login/?next=${encodeURIComponent(next)}`;
+            setView("signedOut");
+            return true;
+        }
+        showError(error.message || "Something went wrong.");
+        return false;
     }
 
-    // ── URL state (shareable deep links) ────────────────────────────────
+    // ── url state ───────────────────────────────────────────────────────
 
-    // `pos` and `scoring` keep their names and vocabulary from the retired
-    // projection board, so old deep links still land somewhere sensible; they
-    // now address the market board. `week` is deliberately not read — there is
-    // no week control left, so an old ?week=5 link would pin the game lines to
-    // a week the reader cannot change.
     function readUrlState() {
         const params = new URLSearchParams(window.location.search);
-        if (params.has("pos")) state.seasonFantasyPosition = params.get("pos").toUpperCase();
-        if (params.has("scoring")) state.seasonFantasyScoring = params.get("scoring");
-        // Applied once /state says whether there is a week to show; until then
-        // it is only a request.
-        if (params.get("board") === "week") state.boardMode = "week";
-        // "delta", "delta:asc" — an unknown column is ignored rather than
-        // leaving the board sorted by nothing.
-        if (params.has("sort")) {
-            const [key, dir] = params.get("sort").split(":");
-            if (MARKET_SORTS[key]) {
-                state.seasonFantasySort = { key, dir: dir === "asc" ? "asc" : "desc" };
-            }
+        const season = parseInt(params.get("season"), 10);
+        const week = parseInt(params.get("week"), 10);
+        const rawTeam = params.get("team");
+        const team = parseInt(rawTeam, 10);
+        if (Number.isFinite(season)) state.season = season;
+        if (Number.isFinite(week)) state.week = week;
+        if (Number.isFinite(team)) state.teamId = team;
+        else if (rawTeam === "me") state.pendingMyTeam = true;
+        const algo = params.get("algo");
+        if (algo) state.algorithm = algo;
+        const column = params.get("col");
+        if (column && F.LEDGER_COLUMNS.some((entry) => entry.key === column)) {
+            state.column = column;
         }
-        state.seasonPropsMarket = params.get("category");
-        return { player: params.get("player"), category: state.seasonPropsMarket };
     }
 
-    function writeUrlState(push) {
+    function writeUrlState(replace, hash = "") {
         const params = new URLSearchParams();
-        if (state.seasonFantasyPosition && state.seasonFantasyPosition !== "ALL") {
-            params.set("pos", state.seasonFantasyPosition);
+        if (state.season) params.set("season", state.season);
+        if (state.teamId) {
+            params.set("team", state.teamId);
+        } else if (state.pendingMyTeam) {
+            params.set("team", "me");
+        } else {
+            if (state.week) params.set("week", state.week);
+            if (state.algorithm && state.algorithm !== "composite") {
+                params.set("algo", state.algorithm);
+            }
+            if (state.column && state.column !== "record") {
+                params.set("col", state.column);
+            }
         }
-        if (state.seasonFantasyScoring && state.seasonFantasyScoring !== DEFAULT_SCORING) {
-            params.set("scoring", state.seasonFantasyScoring);
-        }
-        if (state.boardMode === "week") params.set("board", "week");
-        const sort = state.seasonFantasySort;
-        // The sort belongs to the market table; the week board is ranked.
-        if (state.boardMode !== "week" && (sort.key !== "fantasy_points" || sort.dir !== "desc")) {
-            params.set("sort", `${sort.key}:${sort.dir}`);
-        }
-        if (state.drawerPlayerId && !els.drawer.hidden) params.set("player", state.drawerPlayerId);
-        if (state.seasonPropsMarket && !els.marketsDrawer.hidden) params.set("category", state.seasonPropsMarket);
         const query = params.toString();
-        const url = query ? `${window.location.pathname}?${query}` : window.location.pathname;
-        window.history[push ? "pushState" : "replaceState"](null, "", url);
-    }
-
-    // ── player search ───────────────────────────────────────────────────
-
-    let searchTimer = null;
-    let searchSeq = 0;
-
-    function initSearch() {
-        els.playerSearch.addEventListener("input", () => {
-            const term = els.playerSearch.value.trim();
-            window.clearTimeout(searchTimer);
-            if (term.length < 2) {
-                hideSearchResults();
-                return;
-            }
-            searchTimer = window.setTimeout(() => runSearch(term), 180);
-        });
-        els.playerSearch.addEventListener("keydown", (e) => {
-            if (e.key === "Escape") hideSearchResults();
-        });
-        document.addEventListener("click", (e) => {
-            if (!e.target.closest(".player-search")) hideSearchResults();
-        });
-    }
-
-    async function runSearch(term) {
-        const seq = ++searchSeq;
-        try {
-            const data = await fetchJson(`${API_BASE}/players/search?q=${encodeURIComponent(term)}&limit=8`);
-            if (seq !== searchSeq) return;
-            renderSearchResults(data.results || []);
-        } catch (err) {
-            hideSearchResults();
-        }
-    }
-
-    function renderSearchResults(results) {
-        els.searchResults.innerHTML = "";
-        if (results.length === 0) {
-            hideSearchResults();
-            return;
-        }
-        results.forEach((player) => {
-            const li = el("li", "search-results__item");
-            li.setAttribute("role", "option");
-            li.tabIndex = 0;
-            const name = el("span", "search-results__name", player.name || player.player_id);
-            const meta = el("span", "search-results__meta",
-                `${F.positionLabel(player.position) || ""} ${player.team || ""}`.trim());
-            li.appendChild(name);
-            li.appendChild(meta);
-            const pick = () => {
-                hideSearchResults();
-                els.playerSearch.value = "";
-                openPlayer(player.player_id);
-            };
-            li.addEventListener("click", pick);
-            li.addEventListener("keydown", (e) => {
-                if (e.key === "Enter" || e.key === " ") { e.preventDefault(); pick(); }
-            });
-            els.searchResults.appendChild(li);
-        });
-        els.searchResults.hidden = false;
-        els.playerSearch.setAttribute("aria-expanded", "true");
-    }
-
-    function hideSearchResults() {
-        els.searchResults.hidden = true;
-        els.searchResults.innerHTML = "";
-        els.playerSearch.setAttribute("aria-expanded", "false");
-    }
-
-    // ── season player lines lookup ─────────────────────────────────────
-
-    let seasonPropsTimer = null;
-    let seasonPropsSeq = 0;
-
-    // Fetched separately from the player record so a slow season-props lookup
-    // never delays the rest of the drawer — the card drops into its reserved
-    // slot when it arrives, the same way news does.
-    async function loadPlayerSeasonProps(playerId) {
-        const slot = els.drawerMarket;
-        if (!slot) return;
-        slot.innerHTML = "";
-        slot.appendChild(el("p", "drawer__loading", "Loading season lines…"));
-        try {
-            const params = state.season != null ? `?season=${encodeURIComponent(state.season)}` : "";
-            const data = await fetchJson(`${API_BASE}/players/${encodeURIComponent(playerId)}/season-props${params}`);
-            if (state.drawerPlayerId !== playerId || els.drawer.hidden) return;
-            slot.innerHTML = "";
-            slot.appendChild(seasonMarketCard(data));
-            window.pgAnalytics?.track?.("fantasy_season_props", { player_id: playerId });
-        } catch (err) {
-            if (state.drawerPlayerId !== playerId || els.drawer.hidden) return;
-            slot.innerHTML = "";
-            slot.appendChild(el("p", "season-props__status season-props__status--error", "Season lines are unavailable right now."));
-        }
-    }
-
-    async function loadPlayerMarketHistory(playerId) {
-        const slot = els.drawerHistory;
-        if (!slot) return;
-        try {
-            const params = new URLSearchParams({ scoring: state.seasonFantasyScoring, days: "30" });
-            if (state.season != null) params.set("season", state.season);
-            const data = await fetchJson(`${API_BASE}/players/${encodeURIComponent(playerId)}/season-fantasy-history?${params}`);
-            if (state.drawerPlayerId !== playerId || els.drawer.hidden || !(data.points || []).length) return;
-            slot.innerHTML = "";
-            const card = el("div", "drawer-card");
-            card.appendChild(el("h3", "drawer-card__title", "30-day value"));
-            const values = data.points.map((point) => point.market).filter((value) => value != null);
-            const spark = F.sparkline(values, 420, 92, 5);
-            if (spark) {
-                const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-                svg.setAttribute("viewBox", "0 0 420 92");
-                svg.setAttribute("class", "sparkline sparkline--market");
-                svg.setAttribute("role", "img");
-                svg.setAttribute("aria-label", `Market value from ${F.formatPoints(spark.first)} to ${F.formatPoints(spark.last)}`);
-                const line = document.createElementNS("http://www.w3.org/2000/svg", "polyline");
-                line.setAttribute("points", spark.points);
-                line.setAttribute("fill", "none");
-                line.setAttribute("stroke", "currentColor");
-                line.setAttribute("stroke-width", "2.5");
-                svg.appendChild(line);
-                card.appendChild(svg);
-            }
-            slot.appendChild(card);
-        } catch (err) { /* history is optional */ }
-    }
-
-    function seasonMarketCard(data) {
-        const card = el("div", "drawer-card");
-        const head = el("div", "season-props__player");
-        head.appendChild(el("h3", "drawer-card__title",
-            `${data.season || ""} season market lines`.trim()));
-        // Each provider's own last movement, not the fetch time. A board can
-        // be collected minutes ago and still be quoting eleven-day-old prices.
-        head.appendChild(el("span", "season-props__asof",
-            F.marketSources(data.sources) || data.source || ""));
-        card.appendChild(head);
-
-        const markets = data.markets || [];
-        const posted = markets.filter((market) => market.line != null).length;
-        if (posted === 0) {
-            card.appendChild(el(
-                "p",
-                "season-props__status",
-                "No usable regular-season market data for this player yet. Only a few hundred players have a quote or bounded last trade."
-            ));
-            return card;
-        }
-
-        const grid = el("div", "season-props__grid");
-        markets.forEach((market) => grid.appendChild(seasonPropCard(market)));
-        card.appendChild(grid);
-        return card;
-    }
-
-    function seasonPropCard(market) {
-        const card = el("article", "season-line");
-        card.appendChild(el("h5", "season-line__label", market.label));
-        if (market.line == null) {
-            card.classList.add("season-line--empty");
-            card.appendChild(el("p", "season-line__missing", "Not posted"));
-            return card;
-        }
-        const line = Number(market.line);
-        card.appendChild(el("p", "season-line__total", Number.isFinite(line) ? line.toLocaleString(undefined, { maximumFractionDigits: 1 }) : market.line));
-        const prices = el("div", "season-line__prices");
-        prices.appendChild(seasonPrice("Over", market.over_price));
-        prices.appendChild(seasonPrice("Under", market.under_price));
-        card.appendChild(prices);
-        if (market.implied_value != null) {
-            card.appendChild(el("p", "season-line__implied",
-                `${F.seasonLine(market.implied_value)} implied`));
-        }
-        const books = market.books || [];
-        const detail = books
-            .map((book) => book.implied_value == null
-                ? book.bookmaker
-                : `${book.bookmaker} ${F.seasonLine(book.implied_value)}`)
-            .join(" · ");
-        card.appendChild(el("p", "season-line__books", detail || "Consensus line"));
-        return card;
-    }
-
-    function seasonPrice(label, price) {
-        const item = el("span", "season-price");
-        item.appendChild(el("small", null, label));
-        item.appendChild(el("b", null, price == null ? "—" : F.americanOdds(price)));
-        return item;
-    }
-
-    // The exchange covers barely a hundred of the several thousand players in
-    // the catalog, so a bare search box is a guessing game: most names a
-    // manager thinks to type have no market at all. The board leads with who
-    // actually has usable data, and the search is there to jump to one of them.
-    async function loadSeasonPropLeaders(market) {
-        if (!els.seasonPropsLeaders) return;
-        try {
-            const params = new URLSearchParams({ limit: "200" });
-            if (market) params.set("market", market);
-            if (state.season != null) params.set("season", state.season);
-            const data = await fetchJson(`${API_BASE}/season-props?${params.toString()}`);
-            state.seasonPropsMarket = data.market;
-            if (!els.marketsDrawer.hidden) writeUrlState();
-            renderSeasonPropTabs(data);
-            renderSeasonPropLeaders(data);
-        } catch (err) {
-            els.seasonPropsLeaders.innerHTML = "";
-            els.seasonPropsNote.textContent = "Season lines are unavailable right now.";
-        }
-    }
-
-    function renderSeasonPropTabs(data) {
-        els.seasonPropsTabs.innerHTML = "";
-        (data.markets || []).forEach((entry) => {
-            const tab = el("button", "chip", entry.label);
-            tab.type = "button";
-            tab.setAttribute("aria-pressed", String(entry.market === data.market));
-            // A category with nothing trading stays visible but unclickable,
-            // so the board reads as "not quoted" rather than "not built".
-            tab.disabled = entry.players === 0;
-            tab.title = entry.players === 0
-                ? `${entry.label} — no usable market data`
-                : `${entry.label} — ${entry.players} players with market data`;
-            tab.addEventListener("click", () => {
-                state.seasonPropsMarket = entry.market;
-                writeUrlState(true);
-                loadSeasonPropLeaders(entry.market);
-            });
-            els.seasonPropsTabs.appendChild(tab);
-        });
-    }
-
-    // Both season boards rank the same market data, so they share one
-    // position filter. The rows are already in hand, so a chip re-renders
-    // locally — the request would only return the identical payload.
-    function renderSeasonPositionChips(container, leaders, active, onPick) {
-        if (!container) return;
-        container.innerHTML = "";
-        const options = [
-            { position: "ALL", count: leaders.length },
-            ...F.seasonPositionCounts(leaders),
-        ];
-        options.forEach(({ position, count }) => {
-            const chip = el("button", "chip",
-                position === "ALL" ? "All" : F.positionLabel(position));
-            chip.type = "button";
-            chip.dataset.position = position;
-            chip.setAttribute("aria-pressed", String(position === active));
-            chip.title = `${count} player${count === 1 ? "" : "s"}`;
-            chip.addEventListener("click", () => onPick(position));
-            container.appendChild(chip);
-        });
-    }
-
-    // Changing scoring or market category swaps the player set underneath the
-    // filter, so one the new set cannot satisfy falls back to the whole board
-    // rather than leaving the user looking at an empty table.
-    function resolveSeasonPosition(leaders, position) {
-        if (!position || position === "ALL") return "ALL";
-        return leaders.some((entry) => F.seasonPositionMatches(entry, position))
-            ? position
-            : "ALL";
-    }
-
-    function renderSeasonPropLeaders(data) {
-        const all = data.leaders || [];
-        const position = resolveSeasonPosition(all, state.seasonPropsPosition);
-        state.seasonPropsPosition = position;
-        renderSeasonPositionChips(els.seasonPropsPositions, all, position, (pick) => {
-            state.seasonPropsPosition = pick;
-            renderSeasonPropLeaders(data);
-        });
-
-        // Rank within the filtered view, keeping the board-wide rank so a
-        // positional board still says where its players sit overall.
-        const rows = all
-            .map((entry, index) => ({ entry, overall: index + 1 }))
-            .filter(({ entry }) => F.seasonPositionMatches(entry, position));
-
-        els.seasonPropsLeaders.innerHTML = "";
-        rows.forEach(({ entry, overall }, index) => {
-            const player = entry.player || {};
-            const tr = el("tr", "season-leader");
-            tr.tabIndex = 0;
-            tr.setAttribute("role", "button");
-            tr.setAttribute("aria-label", `Open ${player.name || "player"} season lines`);
-            tr.appendChild(el("td", "col-rank", index + 1));
-            const who = el("td", "col-player");
-            who.appendChild(el("span", "season-leader__name", player.name || player.player_id));
-            const overallDetail = position === "ALL" ? "" : ` · ${overall} overall`;
-            who.appendChild(el("span", "season-leader__meta",
-                `${player.position || ""} ${player.team || ""}${overallDetail}`.trim()));
-            tr.appendChild(who);
-            tr.appendChild(el("td", "col-proj", F.seasonLine(entry.implied_value)));
-            const movement = el("td", "col-proj season-fantasy__delta",
-                entry.movement == null ? "—" : F.formatSigned(entry.movement, 1));
-            if (entry.movement != null) movement.classList.add(entry.movement >= 0 ? "is-over" : "is-under");
-            tr.appendChild(movement);
-            tr.appendChild(seasonBookCell(entry.books, entry.book_values));
-            const open = () => {
-                if (player.player_id) openPlayer(player.player_id);
-            };
-            tr.addEventListener("click", open);
-            tr.addEventListener("keydown", (event) => {
-                if (event.key === "Enter" || event.key === " ") {
-                    event.preventDefault();
-                    open();
-                }
-            });
-            els.seasonPropsLeaders.appendChild(tr);
-        });
-
-        if (!rows.length) {
-            els.seasonPropsNote.textContent = "Nothing is quoted in this category yet.";
-            return;
-        }
-        els.seasonPropsNote.textContent = [
-            position === "ALL" ? `${rows.length} quoted` : `${rows.length} of ${all.length} ${position}s`,
-            data.baseline_as_of ? `7d baseline ${F.formatAsOf(data.baseline_as_of)}` : "",
-            F.marketSources(data.sources),
-        ].filter(Boolean).join(" · ");
-    }
-
-    // How many providers stand behind a number, with the spread between them
-    // on hover. One source and three sources are different claims, and the
-    // board has no other way to say which one it is making.
-    // Adds the compare toggle (and injury flag) to a market row's player cell.
-    // Stops the row's own click so adding to the tray does not also open the
-    // drawer over the board you are picking from.
-    function attachRowCompare(cell, player) {
-        const badge = F.injuryBadge(player.injury_status);
-        if (badge) {
-            cell.appendChild(el("span", `injury-badge injury-badge--${badge.severity}`, badge.label));
-        }
-        if (!player.player_id) return;
-        const button = el("button", "row-compare", inCompare(player.player_id) ? "✓" : "+");
-        button.type = "button";
-        button.setAttribute("aria-label", `Compare ${player.name || "player"}`);
-        if (inCompare(player.player_id)) button.classList.add("row-compare--on");
-        button.addEventListener("click", (event) => {
-            event.stopPropagation();
-            toggleCompare(player);
-            const on = inCompare(player.player_id);
-            button.classList.toggle("row-compare--on", on);
-            button.textContent = on ? "✓" : "+";
-        });
-        cell.appendChild(button);
-    }
-
-    function seasonBookCell(books, values) {
-        const list = books || [];
-        const cell = el("td", "col-books", list.length ? String(list.length) : "—");
-        if (list.length) {
-            cell.title = list
-                .map((book) => values && values[book] != null
-                    ? `${book} ${F.seasonLine(values[book])}`
-                    : book)
-                .join("\n");
-        }
-        return cell;
-    }
-
-    async function loadSeasonFantasyLeaders() {
-        if (!els.seasonFantasyLeaders) return;
-        try {
-            const params = new URLSearchParams({
-                limit: "100",
-                scoring: state.seasonFantasyScoring,
-            });
-            const data = await fetchJson(`${API_BASE}/season-fantasy-points?${params.toString()}`);
-            state.seasonFantasyData = data;
-            if (state.boardMode === "week") renderMarketFreshness(data.sources || []);
-            else renderSeasonFantasyLeaders(data);
-            if (els.memberStatus?.textContent === "Latest market") {
-                els.memberTeam.textContent = F.formatAsOf(data.as_of) || "—";
-            }
-        } catch (err) {
-            els.seasonFantasyLeaders.innerHTML = "";
-            els.seasonFantasyNote.textContent = "";
-            // This board is the page now, so its failure is the page's.
-            showError("Could not load the implied-value board.");
-        }
-    }
-
-    const providerBoard = (entry, source) => (entry.provider_boards || {})[source] || {};
-
-    // Text sorts A–Z on first click, numbers biggest-first — nobody opens a
-    // points column hoping to see the smallest number. `low` marks the
-    // columns where small is good: a rank of 1 and an early bye are the
-    // answers those columns are read for, and burying them under the
-    // hundreds would make the first click useless.
-    const MARKET_SORTS = {
-        player: { value: (e) => (e.player || {}).name || "", text: true },
-        yard_points: { value: (e) => e.yard_points },
-        touchdown_points: { value: (e) => e.touchdown_points },
-        rushing_points: { value: (e) => e.rushing_points },
-        reception_points: { value: (e) => e.reception_points },
-        fantasy_points: { value: (e) => e.fantasy_points },
-        espn_rank: { value: (e) => providerBoard(e, "espn").rank, low: true },
-        espn_points: { value: (e) => providerBoard(e, "espn").points },
-        sleeper_rank: { value: (e) => providerBoard(e, "sleeper").rank, low: true },
-        sleeper_points: { value: (e) => providerBoard(e, "sleeper").points },
-        projected_points: { value: (e) => e.projected_points },
-        projection_delta: { value: (e) => e.projection_delta },
-        age: { value: (e) => e.age, low: true },
-        bye_week: { value: (e) => e.bye_week, low: true },
-        trending_add: { value: (e) => e.trending_add },
-        trending_drop: { value: (e) => e.trending_drop },
-    };
-
-    const firstSortDirection = (key) => {
-        const sort = MARKET_SORTS[key];
-        return sort.text || sort.low ? "asc" : "desc";
-    };
-
-    function sortMarketRows(rows) {
-        const { key, dir } = state.seasonFantasySort;
-        const sort = MARKET_SORTS[key];
-        if (!sort) return rows;
-        const sign = dir === "asc" ? 1 : -1;
-        return rows.slice().sort((a, b) => {
-            const left = sort.value(a.entry);
-            const right = sort.value(b.entry);
-            // A player the market or the projection feed never covered has no
-            // place at either end of the order, so blanks sink either way.
-            const leftMissing = left == null || left === "";
-            const rightMissing = right == null || right === "";
-            if (leftMissing || rightMissing) return leftMissing - rightMissing;
-            if (sort.text) return sign * String(left).localeCompare(String(right));
-            if (left !== right) return sign * (left - right);
-            // Ties keep the board's own ranking rather than shuffling.
-            return a.overall - b.overall;
-        });
-    }
-
-    function initMarketSort() {
-        document.querySelectorAll("#market-board .col-sort").forEach((button) => {
-            button.addEventListener("click", () => {
-                const key = button.dataset.sort;
-                const current = state.seasonFantasySort;
-                const first = firstSortDirection(key);
-                state.seasonFantasySort = {
-                    key,
-                    dir: current.key === key && current.dir === first
-                        ? (first === "asc" ? "desc" : "asc")
-                        : first,
-                };
-                writeUrlState();
-                if (state.seasonFantasyData) renderSeasonFantasyLeaders(state.seasonFantasyData);
-            });
-        });
-    }
-
-    function syncMarketSortHeaders() {
-        const { key, dir } = state.seasonFantasySort;
-        document.querySelectorAll("#market-board .col-sort").forEach((button) => {
-            const active = button.dataset.sort === key;
-            button.classList.toggle("is-sorted", active);
-            button.classList.toggle("is-asc", active && dir === "asc");
-            const cell = button.closest("th");
-            if (cell) cell.setAttribute("aria-sort", active ? (dir === "asc" ? "ascending" : "descending") : "none");
-        });
-    }
-
-    // In standard scoring a reception is worth zero, so the Rec column is a
-    // rule of the format rendering as a column of zeros — which reads as
-    // missing data. Hidden rather than blanked: the market total genuinely
-    // excludes receptions there, so there is no number being withheld.
-    function syncRecColumn() {
-        const standard = state.seasonFantasyScoring === "std";
-        const table = document.querySelector(".season-fantasy__table");
-        if (table) table.classList.toggle("hide-rec", standard);
-        // A board sorted by a column nobody can see is a state with no way
-        // out, so a standard board falls back to its default order. The URL is
-        // rewritten here rather than at the two call sites that can reach this
-        // state (the scoring chip, and a deep link that arrives sorted that
-        // way); the guard means it fires once, on the switch itself.
-        if (standard && state.seasonFantasySort.key === "reception_points") {
-            state.seasonFantasySort = { key: "fantasy_points", dir: "desc" };
-            writeUrlState();
-        }
-    }
-
-    // A provider the collector has no season-long run for would render as a
-    // column of dashes, which reads as "nobody ranks these players" rather
-    // than "we did not fetch this feed". The response says which boards it
-    // built, so the columns follow it.
-    function syncProviderColumns(data) {
-        const table = document.querySelector(".season-fantasy__table");
-        if (!table) return;
-        const built = data.provider_boards || [];
-        ["espn", "sleeper"].forEach((source) => {
-            const missing = !built.includes(source);
-            table.classList.toggle(`hide-${source}`, missing);
-            // Same trap as the Rec column: a board sorted by a column that
-            // just disappeared has no way back to a visible order.
-            if (missing && state.seasonFantasySort.key.startsWith(source)) {
-                state.seasonFantasySort = { key: "fantasy_points", dir: "desc" };
-                writeUrlState();
-            }
-        });
-    }
-
-    function renderSeasonFantasyLeaders(data) {
-        const all = data.leaders || [];
-        syncRecColumn();
-        syncProviderColumns(data);
-        const position = resolveSeasonPosition(all, state.seasonFantasyPosition);
-        state.seasonFantasyPosition = position;
-        renderSeasonPositionChips(els.seasonFantasyPositions, all, position, (pick) => {
-            state.seasonFantasyPosition = pick;
-            writeUrlState();
-            renderSeasonFantasyLeaders(data);
-        });
-
-        // `overall` is fixed to the server's market-value ranking before any
-        // local sort, so it keeps meaning "where this player sits on the
-        // board" rather than "where this view happens to put him".
-        const rows = sortMarketRows(all
-            .map((entry, index) => ({ entry, overall: index + 1 }))
-            .filter(({ entry }) => F.seasonPositionMatches(entry, position)));
-        syncMarketSortHeaders();
-
-        const visibleRows = state.marketExpanded ? rows : rows.slice(0, 10);
-        els.seasonFantasyLeaders.innerHTML = "";
-        visibleRows.forEach(({ entry, overall }, index) => {
-            const player = entry.player || {};
-            const tr = el("tr", "season-leader");
-            tr.tabIndex = 0;
-            tr.setAttribute("role", "button");
-            tr.setAttribute("aria-label", `Open ${player.name || "player"} season lines`);
-            tr.appendChild(el("td", "col-rank", index + 1));
-            const who = el("td", "col-player");
-            who.appendChild(el("span", "season-leader__name", player.name || player.player_id));
-            const receptionDetail = data.scoring !== "std" && entry.projected_receptions != null
-                ? ` · ${F.seasonLine(entry.projected_receptions)} rec proj`
-                : "";
-            const bookDetail = (entry.books || []).length
-                ? ` · ${entry.books.length} source${entry.books.length === 1 ? "" : "s"}`
-                : "";
-            const sorted = state.seasonFantasySort;
-            const boardOrder = sorted.key === "fantasy_points" && sorted.dir === "desc";
-            const overallDetail = position === "ALL" && boardOrder ? "" : ` · ${overall} overall`;
-            // A discarded category is a caveat about the total, not another
-            // fact about the player, so it is marked rather than run in.
-            const pairs = F.seasonPairDetail(entry.pairs_used, entry.partial_pairs, entry.missing_pairs);
-            const scoredDetail = pairs.scored ? ` · ${pairs.scored}` : "";
-            const meta = el("span", "season-leader__meta",
-                `${player.position || ""} ${player.team || ""}${overallDetail}${scoredDetail}`.trim());
-            // Directly after the categories it qualifies, ahead of the source
-            // count, so it reads as a note on them rather than a trailing aside.
-            if (pairs.missing) meta.appendChild(el("span", "season-leader__gap", ` · ${pairs.missing}`));
-            if (bookDetail || receptionDetail) {
-                meta.appendChild(document.createTextNode(`${bookDetail}${receptionDetail}`));
-            }
-            who.appendChild(meta);
-            attachRowCompare(who, player);
-            tr.appendChild(who);
-            tr.appendChild(el("td", "col-proj col-detail", F.formatPoints(entry.yard_points)));
-            tr.appendChild(el("td", "col-proj col-detail", F.formatPoints(entry.touchdown_points)));
-            tr.appendChild(el("td", "col-proj col-detail", F.formatPoints(entry.rushing_points)));
-            tr.appendChild(el("td", "col-proj col-detail col-rec", F.formatPoints(entry.reception_points)));
-            tr.appendChild(el("td", "col-proj col-implied season-fantasy__total", F.formatPoints(entry.fantasy_points)));
-            providerRankCell(tr, entry, "espn");
-            providerRankCell(tr, entry, "sleeper");
-            tr.appendChild(el("td", "col-proj col-consensus season-fantasy__proj", F.formatPoints(entry.projected_points)));
-            tr.appendChild(deltaCell(entry));
-            tr.appendChild(el("td", "col-proj col-detail", entry.age ?? "—"));
-            tr.appendChild(el("td", "col-proj col-detail", entry.bye_week ?? "—"));
-            tr.appendChild(trendingCell(entry.trending_add));
-            tr.appendChild(trendingCell(entry.trending_drop));
-            const open = () => {
-                if (player.player_id) openPlayer(player.player_id);
-            };
-            tr.addEventListener("click", open);
-            tr.addEventListener("keydown", (event) => {
-                if (event.key === "Enter" || event.key === " ") {
-                    event.preventDefault();
-                    open();
-                }
-            });
-            els.seasonFantasyLeaders.appendChild(tr);
-        });
-
-        // Name the feeds behind an average instead of asking the reader to
-        // decode "Consensus". The compact label is visual-only at the phone
-        // breakpoint; the button's accessible name remains the full source
-        // list, and the tooltip spells out the calculation.
-        if (els.seasonFantasyProjHead) {
-            const src = data.projection_source;
-            const providerIds = Array.isArray(data.projection_providers)
-                ? data.projection_providers.filter(Boolean)
-                : [];
-            const providerLabels = providerIds.map((id) => providerFor(id).label);
-            const providerList = providerLabels.length > 2
-                ? `${providerLabels.slice(0, -1).join(", ")}, and ${providerLabels[providerLabels.length - 1]}`
-                : providerLabels.join(" and ");
-            if (src === "consensus" && providerLabels.length) {
-                els.seasonFantasyProjHead.textContent = `${providerLabels.join(" + ")} avg`;
-                els.seasonFantasyProjHead.dataset.mobileLabel = providerIds.length > 2
-                    ? `${providerIds.length}-src avg`
-                    : providerIds
-                        .map((id) => PROVIDER_SHORT_LABELS[id] || providerFor(id).label)
-                        .join("+");
-                els.seasonFantasyProjHead.title =
-                    `Season-long projected points: per-player average across available data from ${providerList}.`;
-            } else if (src === "consensus") {
-                els.seasonFantasyProjHead.textContent = "Avg projection";
-                els.seasonFantasyProjHead.dataset.mobileLabel = "Avg proj";
-                els.seasonFantasyProjHead.title =
-                    "Season-long projected points averaged across multiple sources; source names unavailable.";
-            } else if (src) {
-                const provider = providerFor(src);
-                els.seasonFantasyProjHead.textContent = `${provider.label} proj`;
-                els.seasonFantasyProjHead.dataset.mobileLabel =
-                    `${PROVIDER_SHORT_LABELS[src] || provider.label} proj`;
-                els.seasonFantasyProjHead.title = `Season-long projected points from ${provider.label}.`;
-            } else {
-                els.seasonFantasyProjHead.textContent = "Projection";
-                els.seasonFantasyProjHead.dataset.mobileLabel = "Proj";
-                els.seasonFantasyProjHead.title = "Season-long projected points; source unavailable.";
-            }
-        }
-
-        const positionMetric = position === "ALL" ? "" : ` · ${rows.length} of ${all.length} ${position}`;
-        const excludedMetric = data.excluded_without_projection
-            ? ` · ${data.excluded_without_projection} quoted player${data.excluded_without_projection === 1 ? "" : "s"} hidden — no reception projection`
-            : "";
-        els.seasonFantasyNote.textContent = rows.length
-            ? `${visibleRows.length} of ${rows.length}${positionMetric}${excludedMetric} · ${F.formatAsOf(data.as_of) || "latest"}`
-            : "";
-        if (els.showAllMarket) {
-            els.showAllMarket.hidden = rows.length <= 10;
-            els.showAllMarket.textContent = state.marketExpanded ? "Show less" : `Show all ${rows.length}`;
-            els.showAllMarket.setAttribute("aria-expanded", String(state.marketExpanded));
-        }
-        renderMarketFreshness(data.sources || []);
-        if (!rows.length) renderMarketBoardEmpty(all.length, position);
-    }
-
-    // ── week board ──────────────────────────────────────────────────────────
-    //
-    // In-season the collector already snapshots weekly projections and rebuilds
-    // the derived rankings every week, and /rankings already attaches the
-    // opponent from the schedule and the movement since last week's board.
-    // None of it was rendered: the page showed a season-long market board
-    // straight through the games it exists to help with. This is that stored
-    // data, nothing new collected.
-    //
-    // It is a second table rather than a re-columned market table. The two
-    // share no column but the player, and the market table's widths are tuned
-    // per column down to the phone breakpoints — re-columning it in place
-    // would mean every one of those rules had to know which board it was in.
-
-    function weekBoardAvailable() {
-        return !!state.inSeason && state.week != null && state.week > 0;
-    }
-
-    function renderBoardMode() {
-        if (!els.boardMode) return;
-        const available = weekBoardAvailable();
-        els.boardMode.hidden = !available;
-        if (!available) {
-            els.boardMode.innerHTML = "";
-            return;
-        }
-        els.boardMode.innerHTML = "";
-        [
-            { key: "season", label: "Season" },
-            { key: "week", label: `Week ${state.week}` },
-        ].forEach((option) => {
-            const chip = el("button", "chip", option.label);
-            chip.type = "button";
-            chip.dataset.board = option.key;
-            chip.setAttribute("aria-pressed", String(option.key === state.boardMode));
-            chip.addEventListener("click", () => setBoardMode(option.key));
-            els.boardMode.appendChild(chip);
-        });
-    }
-
-    // Clamps to the season board whenever there is no week to show, so an old
-    // ?board=week link in the offseason lands on something real.
-    function setBoardMode(mode) {
-        const week = mode === "week" && weekBoardAvailable();
-        state.boardMode = week ? "week" : "season";
-        if (!week) {
-            // The week board names itself as it renders, once it knows whether
-            // the week it is showing has been played.
-            if (els.marketBoardEyebrow) els.marketBoardEyebrow.textContent = "Season board";
-            if (els.marketBoardTitle) els.marketBoardTitle.textContent = "Implied Value";
-        }
-        if (els.marketTableWrap) els.marketTableWrap.hidden = week;
-        if (els.weekBoardWrap) els.weekBoardWrap.hidden = !week;
-        renderBoardMode();
-        renderWeekStep();
-        writeUrlState();
-        renderActiveBoard();
-    }
-
-    function renderActiveBoard() {
-        if (state.boardMode === "week") {
-            if (state.weekBoard) renderWeekBoard();
-            else loadWeekBoard();
-            return;
-        }
-        if (state.seasonFantasyData) renderSeasonFantasyLeaders(state.seasonFantasyData);
-    }
-
-    // Which week the board is on: the live week unless the reader has stepped
-    // back, clamped in case the NFL week has advanced past where they were.
-    function weekBoardWeek() {
-        if (!weekBoardAvailable()) return null;
-        if (state.weekBoardWeek == null) return state.week;
-        return Math.max(1, Math.min(state.weekBoardWeek, state.week));
-    }
-
-    // A week that has already been played grades itself: the collector has
-    // nflverse actuals for it, so the board shows what happened against what
-    // it said would happen. The live week has nothing to grade yet.
-    function weekBoardIsResults() {
-        const week = weekBoardWeek();
-        return week != null && week < state.week;
-    }
-
-    function stepWeekBoard(offset) {
-        const week = weekBoardWeek();
-        if (week == null) return;
-        const next = Math.max(1, Math.min(week + offset, state.week));
-        if (next === week) return;
-        state.weekBoardWeek = next;
-        state.weekBoard = null;
-        renderWeekStep();
-        loadWeekBoard();
-    }
-
-    function renderWeekStep() {
-        if (!els.weekStep) return;
-        const showing = state.boardMode === "week" && weekBoardAvailable();
-        els.weekStep.hidden = !showing;
-        if (!showing) return;
-        const week = weekBoardWeek();
-        els.weekStepLabel.textContent = `Week ${week}`;
-        els.weekStepBack.disabled = week <= 1;
-        els.weekStepNext.disabled = week >= state.week;
-    }
-
-    async function loadWeekBoard() {
-        if (!els.weekLeaders || !weekBoardAvailable()) return;
-        const week = weekBoardWeek();
-        const results = weekBoardIsResults();
-        const seq = (state.weekBoardSeq += 1);
-        if (state.boardMode === "week") renderWeekBoardLoading(week, results);
-        const params = new URLSearchParams({
-            scoring: state.seasonFantasyScoring,
-            week: String(week),
-            limit: "200",
-        });
-        if (state.season != null) params.set("season", state.season);
-        let board;
-        try {
-            const path = results ? "week-results" : "rankings";
-            const data = await fetchJson(`${API_BASE}/${path}?${params.toString()}`);
-            board = results ? normalizeWeekResults(data) : normalizeWeekBoard(data);
-        } catch (err) {
-            board = { kind: results ? "results" : "projected", week, as_of: null, leaders: [] };
-        }
-        // A reply for a week the reader has already stepped off, or one that
-        // lands after they have gone back to the season board, is discarded.
-        if (seq !== state.weekBoardSeq) return;
-        state.weekBoard = board;
-        if (state.boardMode === "week") renderWeekBoard();
-    }
-
-    // Both payloads are flat — one player per row — while every board helper
-    // here expects {player: {...}}. Reshaping on arrival keeps the position
-    // chips, the injury badge and the compare tray working unchanged.
-    function normalizeWeekBoard(data) {
-        return {
-            kind: "projected",
-            season: data.season,
-            week: data.week,
-            as_of: data.as_of,
-            leaders: (data.rankings || []).map((row) => ({
-                player: weekPlayer(row),
-                rank: row.rank,
-                projected_points: row.projected_points,
-                prev_rank: row.prev_rank,
-                opponent: row.opponent,
-                home: row.home,
-                bye: row.bye,
-            })),
-        };
-    }
-
-    function normalizeWeekResults(data) {
-        return {
-            kind: "results",
-            season: data.season,
-            week: data.week,
-            as_of: data.as_of,
-            played: data.played,
-            projected: data.projected,
-            meanAbsoluteError: data.mean_absolute_error,
-            leaders: (data.entries || []).map((row) => ({
-                player: weekPlayer(row),
-                rank: row.rank,
-                actual_points: row.actual_points,
-                projected_points: row.projected_points,
-                projection_delta: row.projection_delta,
-                projected_rank: row.projected_rank,
-                opponent: row.opponent,
-                home: row.home,
-                bye: row.bye,
-            })),
-        };
-    }
-
-    function weekPlayer(row) {
-        return {
-            player_id: row.player_id,
-            name: row.name,
-            team: row.team,
-            position: row.position,
-            injury_status: row.injury_status,
-        };
-    }
-
-    // "@ BUF", "vs BUF", "BYE", or nothing when no schedule is loaded — the
-    // API distinguishes a team absent from a loaded week (a bye) from a week
-    // it has no schedule for at all, and so does this.
-    function weekMatchupLabel(entry) {
-        if (entry.bye) return "BYE";
-        if (!entry.opponent) return "";
-        return `${entry.home === false ? "@" : "vs"} ${entry.opponent}`;
-    }
-
-    // The two week views answer different questions, so they carry different
-    // columns: what a player is projected to do, or what he did.
-    const WEEK_COLUMNS = {
-        projected: [
-            { label: "#", className: "col-rank" },
-            { label: "Player" },
-            { label: "Proj", className: "col-proj", title: "Consensus projected points" },
-            { label: "Move", className: "col-proj", title: "Rank movement since last week's board" },
-        ],
-        results: [
-            { label: "#", className: "col-rank" },
-            { label: "Player" },
-            {
-                label: "Proj",
-                className: "col-proj col-week-proj",
-                title: "What this board projected before the week was played",
-            },
-            { label: "Actual", className: "col-proj", title: "Points actually scored" },
-            { label: "+/-", className: "col-proj", title: "Actual minus projected" },
-        ],
-    };
-
-    function renderWeekHead(kind) {
-        if (!els.weekBoardHead) return;
-        els.weekBoardHead.innerHTML = "";
-        const row = el("tr");
-        (WEEK_COLUMNS[kind] || WEEK_COLUMNS.projected).forEach((column) => {
-            const cell = el("th", column.className || null, column.label);
-            if (column.title) cell.title = column.title;
-            row.appendChild(cell);
-        });
-        els.weekBoardHead.appendChild(row);
-    }
-
-    function renderWeekBoardLoading(week, results) {
-        const kind = results ? "results" : "projected";
-        renderWeekHead(kind);
-        renderWeekStep();
-        if (els.marketBoardTitle) {
-            els.marketBoardTitle.textContent = results ? "Week Results" : "Week Board";
-        }
-        if (els.marketBoardEyebrow) els.marketBoardEyebrow.textContent = `Week ${week}`;
-        if (els.seasonFantasyPositions) els.seasonFantasyPositions.replaceChildren();
-        els.weekLeaders.replaceChildren();
-        const row = el("tr", "week-board__loading");
-        const cell = el("td", "table-empty", `Loading week ${week}…`);
-        cell.colSpan = WEEK_COLUMNS[kind].length;
-        row.appendChild(cell);
-        els.weekLeaders.appendChild(row);
-        if (els.seasonFantasyNote) els.seasonFantasyNote.textContent = "";
-        if (els.showAllMarket) els.showAllMarket.hidden = true;
-    }
-
-    function renderWeekBoard() {
-        if (!els.weekLeaders) return;
-        const data = state.weekBoard || { kind: weekBoardIsResults() ? "results" : "projected", leaders: [] };
-        const results = data.kind === "results";
-        const week = data.week != null ? data.week : weekBoardWeek();
-        const all = data.leaders || [];
-        renderWeekHead(data.kind);
-        renderWeekStep();
-        if (els.marketBoardTitle) {
-            els.marketBoardTitle.textContent = results ? "Week Results" : "Week Board";
-        }
-        if (els.marketBoardEyebrow) els.marketBoardEyebrow.textContent = `Week ${week}`;
-
-        const position = resolveSeasonPosition(all, state.seasonFantasyPosition);
-        state.seasonFantasyPosition = position;
-        renderSeasonPositionChips(els.seasonFantasyPositions, all, position, (pick) => {
-            state.seasonFantasyPosition = pick;
-            writeUrlState();
-            renderWeekBoard();
-        });
-
-        const rows = all
-            .map((entry, index) => ({ entry, overall: index + 1 }))
-            .filter(({ entry }) => F.seasonPositionMatches(entry, position));
-        const visibleRows = state.marketExpanded ? rows : rows.slice(0, 10);
-
-        els.weekLeaders.innerHTML = "";
-        visibleRows.forEach(({ entry, overall }, index) => {
-            const player = entry.player || {};
-            const tr = el("tr", "season-leader");
-            tr.tabIndex = 0;
-            tr.setAttribute("role", "button");
-            tr.setAttribute("aria-label", `Open ${player.name || "player"} season lines`);
-            tr.appendChild(el("td", "col-rank", index + 1));
-
-            const who = el("td", "col-player");
-            who.appendChild(el("span", "season-leader__name", player.name || player.player_id));
-            const matchup = weekMatchupLabel(entry);
-            const overallDetail = position === "ALL" ? "" : ` · ${overall} overall`;
-            const meta = el("span", "season-leader__meta",
-                `${player.position || ""} ${player.team || ""}${overallDetail}`.trim());
-            // The opponent is the reason to read a weekly board rather than a
-            // season one, so it sits apart from the identity that precedes it.
-            if (matchup) {
-                const opponent = el("span", "season-leader__matchup", ` · ${matchup}`);
-                if (entry.bye) opponent.classList.add("season-leader__matchup--bye");
-                meta.appendChild(opponent);
-            }
-            who.appendChild(meta);
-            attachRowCompare(who, player);
-            tr.appendChild(who);
-
-            if (results) {
-                const projected = el("td", "col-proj col-week-proj season-fantasy__proj",
-                    F.formatPoints(entry.projected_points));
-                if (entry.projected_rank) projected.title = `Ranked ${entry.projected_rank} that week`;
-                tr.appendChild(projected);
-                tr.appendChild(el("td", "col-proj season-fantasy__total",
-                    F.formatPoints(entry.actual_points)));
-                tr.appendChild(weekDeltaCell(entry));
-            } else {
-                tr.appendChild(el("td", "col-proj season-fantasy__total",
-                    F.formatPoints(entry.projected_points)));
-                tr.appendChild(weekMoveCell(entry));
-            }
-
-            const open = () => {
-                if (player.player_id) openPlayer(player.player_id);
-            };
-            tr.addEventListener("click", open);
-            tr.addEventListener("keydown", (event) => {
-                if (event.key === "Enter" || event.key === " ") {
-                    event.preventDefault();
-                    open();
-                }
-            });
-            els.weekLeaders.appendChild(tr);
-        });
-
-        const positionMetric = position === "ALL" ? "" : ` · ${rows.length} of ${all.length} ${position}`;
-        // What the board got wrong, said out loud. A projection nobody grades
-        // is just a number, and this page publishes the number.
-        const accuracy = results && data.meanAbsoluteError != null
-            ? ` · projections missed by ${F.formatPoints(data.meanAbsoluteError)} on average across ${data.projected} players`
-            : "";
-        els.seasonFantasyNote.textContent = rows.length
-            ? `${visibleRows.length} of ${rows.length}${positionMetric} · Week ${week}${results ? " results" : ""}${accuracy} · ${F.formatAsOf(data.as_of) || "latest"}`
-            : "";
-        if (els.showAllMarket) {
-            els.showAllMarket.hidden = rows.length <= 10;
-            els.showAllMarket.textContent = state.marketExpanded ? "Show less" : `Show all ${rows.length}`;
-            els.showAllMarket.setAttribute("aria-expanded", String(state.marketExpanded));
-        }
-        if (!rows.length) renderWeekBoardEmpty(all.length, position, week, results);
-    }
-
-    // Rank movement against last week's board, which the API computes by
-    // ranking the prior week the same way. A player who was not ranked then
-    // has no move to report rather than a move of zero.
-    function weekMoveCell(entry) {
-        if (entry.prev_rank == null || entry.rank == null) {
-            const blank = el("td", "col-proj season-fantasy__delta", "—");
-            blank.title = "Not on last week's board";
-            return blank;
-        }
-        const move = entry.prev_rank - entry.rank;
-        const cell = el("td", "col-proj season-fantasy__delta", move === 0 ? "—" : F.formatSigned(move, 0));
-        if (move !== 0) cell.classList.add(move > 0 ? "is-over" : "is-under");
-        cell.title = `Was ${entry.prev_rank} last week`;
-        return cell;
-    }
-
-    // Actual minus projected. Blank for a player the board never projected —
-    // there is nothing to have been wrong about.
-    function weekDeltaCell(entry) {
-        if (entry.projection_delta == null) {
-            const blank = el("td", "col-proj season-fantasy__delta", "—");
-            blank.title = "Not projected that week";
-            return blank;
-        }
-        const cell = el("td", "col-proj season-fantasy__delta",
-            F.formatSigned(entry.projection_delta, 1));
-        cell.classList.add(entry.projection_delta >= 0 ? "is-over" : "is-under");
-        cell.title = `${F.formatPoints(entry.actual_points)} scored against ${F.formatPoints(entry.projected_points)} projected`;
-        return cell;
-    }
-
-    function renderWeekBoardEmpty(total, position, week, results) {
-        const row = el("tr");
-        const cell = el("td", "table-empty");
-        cell.colSpan = (WEEK_COLUMNS[results ? "results" : "projected"] || []).length;
-        cell.textContent = total
-            ? `No ${position} ${results ? `scored in week ${week}` : `is projected for week ${week}`} yet.`
-            : results
-                ? `Week ${week} results have not been collected yet.`
-                : `Week ${week} projections have not been collected yet.`;
-        row.appendChild(cell);
-        els.weekLeaders.appendChild(row);
-    }
-
-    function renderMarketFreshness(sources) {
-        if (!els.marketFreshness) return;
-        els.marketFreshness.innerHTML = "";
-        (sources || []).forEach((source) => {
-            const item = el("li");
-            const label = el("span", "freshness-source");
-            const dot = el("span", "freshness-dot");
-            const quoted = source.quoted_at ? new Date(source.quoted_at) : null;
-            if (!quoted || Date.now() - quoted.getTime() > 7 * 86400000) dot.classList.add("is-stale");
-            label.appendChild(dot);
-            label.append(source.bookmaker || "Source");
-            item.appendChild(label);
-            item.appendChild(el("span", "freshness-time", F.formatAsOf(source.quoted_at) || "Unknown"));
-            els.marketFreshness.appendChild(item);
-        });
-        if (!els.marketFreshness.childElementCount) {
-            els.marketFreshness.appendChild(el("li", "empty-row", "Unavailable"));
-        }
-    }
-
-    // How far the implied value sits from the adjacent projection. The signed number is the point
-    // of the column; the percentage rides along in the tooltip because +30 on
-    // a 320-point quarterback and +30 on a 95-point tight end are not the
-    // same claim.
-    // A provider publishes points, and the rank is this site counting them.
-    // Overall rank alone reads oddly across positions — every quarterback
-    // outprojects every back, so the top of the column is all QBs — so the
-    // positional rank rides in the same cell, which is the number a roster
-    // decision actually turns on.
-    function providerRankCell(tr, entry, source) {
-        const board = (entry.provider_boards || {})[source] || {};
-        const rank = el("td", `col-proj col-detail col-${source}`);
-        if (board.rank == null) {
-            rank.textContent = "—";
+        const suffix = hash.startsWith("#") ? hash : "";
+        const url = `${query ? `?${query}` : window.location.pathname}${suffix}`;
+        if (replace) {
+            window.history.replaceState({}, "", url);
         } else {
-            rank.appendChild(el("span", "provider-rank__overall", board.rank));
-            const position = (entry.player || {}).position;
-            const positionRank = board.position_rank != null && position
-                ? `${position}${board.position_rank}`
-                : null;
-            if (positionRank) {
-                // The separator is in the text, not the margin: read aloud,
-                // "2 RB1" and "2RB1" are the same string of digits.
-                rank.appendChild(el("span", "provider-rank__position", ` · ${positionRank}`));
-            }
-            rank.title = [
-                `${providerFor(source).label}'s own season projection ranks him`,
-                `${F.ordinal(board.rank)} overall`,
-                positionRank ? `and ${positionRank}` : "",
-            ].filter(Boolean).join(" ");
+            window.history.pushState({}, "", url);
         }
-        tr.appendChild(rank);
-        tr.appendChild(el(
-            "td",
-            `col-proj col-detail col-${source}`,
-            F.formatPoints(board.points)
-        ));
     }
 
-    // Sleeper publishes a top-N trending list, so a player who is not on it
-    // has a real zero rather than a missing number. Zeroes are muted so the
-    // column reads as the handful of players actually moving.
-    function trendingCell(count) {
-        const cell = el("td", "col-proj col-detail", F.compactCount(count));
-        if (!count) cell.classList.add("is-quiet");
-        return cell;
-    }
+    // ── rendering ───────────────────────────────────────────────────────
 
-    function deltaCell(entry) {
-        const delta = entry.projection_delta;
-        if (delta == null) return el("td", "col-proj col-diff season-fantasy__delta");
-        const cell = el("td", "col-proj col-diff season-fantasy__delta", F.formatSigned(delta, 1));
-        cell.classList.add(delta >= 0 ? "is-over" : "is-under");
-        const detail = entry.projected_points
-            ? [`${F.formatSigned(delta, 1)} vs ${F.formatPoints(entry.projected_points)} projected`,
-               `(${F.formatSigned((delta / entry.projected_points) * 100, 1)}%)`].join(" ")
-            : "";
-        // A total missing a category the projection still counts produces a
-        // gap that looks like market disagreement and is not. Marked, not
-        // hidden — it remains the closest comparison there is, and the reader
-        // can see from the row which categories the market number is built on.
-        const pairs = F.seasonPairDetail(entry.pairs_used, entry.partial_pairs, entry.missing_pairs);
-        if (entry.edge_is_qualified) {
-            cell.classList.add("is-qualified");
-            cell.appendChild(el("span", "sr-only", ` (${pairs.missing})`));
-        }
-        const title = [detail, entry.edge_is_qualified
-            ? `Market total covers ${pairs.scored || "nothing"} only — ${pairs.missing}, so this gap is partly missing data, not market disagreement.`
-            : ""].filter(Boolean).join(" · ");
-        if (title) cell.title = title;
-        return cell;
-    }
-
-    // The board is the page's front door; a bare table with no rows reads as
-    // broken rather than as "not collected yet".
-    function renderMarketBoardEmpty(total, position) {
-        const row = el("tr");
-        const cell = el("td", "table-empty");
-        cell.colSpan = 9;
-        cell.textContent = total
-            ? `No ${position} has a complete yardage and touchdown market pair yet.`
-            : "No betting lines have been collected yet. The research panels below and your league tools still work.";
-        row.appendChild(cell);
-        els.seasonFantasyLeaders.appendChild(row);
-    }
-
-    function initSeasonFantasyScoring() {
-        if (!els.seasonFantasyScoring) return;
-        const options = [
-            { key: "std", label: "Standard" },
-            { key: "half", label: "Half PPR" },
-            { key: "ppr", label: "PPR" },
-        ];
-        options.forEach((option) => {
-            const chip = el("button", "chip", option.label);
+    function renderSeasonChips(seasons) {
+        els.seasonChips.replaceChildren();
+        seasons.forEach((season) => {
+            const chip = el("button", "chip", F.seasonLabel(season.season, season.status));
             chip.type = "button";
-            chip.dataset.scoring = option.key;
-            chip.setAttribute("aria-pressed", String(option.key === state.seasonFantasyScoring));
-            chip.addEventListener("click", () => {
-                state.seasonFantasyScoring = option.key;
-                writeUrlState();
-                els.seasonFantasyScoring.querySelectorAll(".chip").forEach((item) => {
-                    item.setAttribute("aria-pressed", String(item.dataset.scoring === option.key));
-                });
-                loadSeasonFantasyLeaders();
-                state.weekBoard = null;
-                if (state.boardMode === "week") loadWeekBoard();
-                loadMarketMovers();
-                loadMemberSnapshot();
-            });
-            els.seasonFantasyScoring.appendChild(chip);
-        });
-    }
-
-    async function loadSeasonOffenses() {
-        if (!els.seasonOffenses) return;
-        try {
-            const data = await fetchJson(`${API_BASE}/season-offenses?limit=10`);
-            const teams = data.teams || [];
-            renderSeasonOffenses(teams);
-            els.seasonOffensesNote.textContent = [
-                `${teams.length} team${teams.length === 1 ? "" : "s"} · points at standard scoring`,
-                F.marketSources(data.sources),
-            ].filter(Boolean).join(" · ");
-        } catch (err) {
-            renderSeasonOffenses([]);
-            els.seasonOffensesNote.textContent = "Team offense rankings are unavailable right now.";
-        }
-    }
-
-    // Season yardage runs to four figures, where a tenth of a yard is noise
-    // that only makes the column ragged next to a team quoted at a round
-    // number. Touchdowns keep their decimal, which is most of their range.
-    function offenseYards(value) {
-        if (value === null || value === undefined || Number.isNaN(Number(value))) return "—";
-        return Math.round(Number(value)).toLocaleString();
-    }
-
-    function renderSeasonOffenses(rows) {
-        els.seasonOffenses.innerHTML = "";
-        if (!rows || rows.length === 0) {
-            const empty = el("tr", "season-offense");
-            const cell = el("td", "season-offense__empty", "Not enough quoted markets yet.");
-            cell.colSpan = 5;
-            empty.appendChild(cell);
-            els.seasonOffenses.appendChild(empty);
-            return;
-        }
-        rows.forEach((entry, index) => {
-            const yards = entry.yards || {};
-            const touchdowns = entry.touchdowns || {};
-            const tr = el("tr", "season-offense");
-            tr.appendChild(el("td", "col-rank", index + 1));
-            const who = el("td", "col-team");
-            who.appendChild(el("b", "season-offense__team", entry.team));
-            // The split is what the two totals are made of, and a receiving
-            // fallback changes how the points column scores them, so both
-            // stay visible rather than being folded into a bare total.
-            const fallback = yards.air_source === "receiving" || touchdowns.air_source === "receiving";
-            who.appendChild(el(
-                "span",
-                "season-offense__detail",
-                `${offenseYards(yards.air)} air + ${offenseYards(yards.ground)} rush yards`
-                    + (fallback ? " · receiving fallback" : "")
-            ));
-            tr.appendChild(who);
-            tr.appendChild(el("td", "col-proj", offenseYards(yards.total)));
-            tr.appendChild(el("td", "col-proj", F.formatPoints(touchdowns.total)));
-            tr.appendChild(el("td", "col-proj season-offense__total", F.formatPoints(entry.points)));
-            els.seasonOffenses.appendChild(tr);
-        });
-    }
-
-    // ── trending ────────────────────────────────────────────────────────
-
-    function renderTrending(listEl, players) {
-        listEl.innerHTML = "";
-        if (!players || players.length === 0) {
-            listEl.appendChild(el("li", "trending__empty", "—"));
-            return;
-        }
-        players.forEach((player) => {
-            const li = el("li", "trending__item");
-            li.tabIndex = 0;
-            li.setAttribute("role", "button");
-            const name = el("span", "trending__name", player.name || player.player_id);
-            const meta = el(
-                "span",
-                "trending__meta",
-                `${F.positionLabel(player.position) || ""} ${player.team || ""}`.trim()
-            );
-            li.appendChild(name);
-            li.appendChild(meta);
-            const open = () => openPlayer(player.player_id);
-            li.addEventListener("click", open);
-            li.addEventListener("keydown", (e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    open();
-                }
-            });
-            listEl.appendChild(li);
-        });
-    }
-
-    async function loadDashboard() {
-        try {
-            const data = await fetchJson(`${API_BASE}/dashboard`);
-            renderTrending(els.trendingAdd, data.trending_add);
-            renderTrending(els.trendingDrop, data.trending_drop);
-        } catch (err) {
-            renderTrending(els.trendingAdd, []);
-            renderTrending(els.trendingDrop, []);
-        }
-    }
-
-    async function loadMarketMovers() {
-        if (!els.marketMovers) return;
-        try {
-            const params = new URLSearchParams({
-                scoring: state.seasonFantasyScoring,
-                days: "7",
-                limit: "5",
-            });
-            if (state.season != null) params.set("season", state.season);
-            state.movers = await fetchJson(`${API_BASE}/season-fantasy-movers?${params}`);
-            renderMarketMovers();
-        } catch (err) {
-            state.movers = null;
-            renderMarketMovers();
-        }
-    }
-
-    function renderMarketMovers() {
-        els.marketMovers.innerHTML = "";
-        const rows = state.movers ? (state.movers[state.moversView] || []) : [];
-        rows.forEach((entry) => {
-            const item = el("li");
-            const left = el("span");
-            left.appendChild(el("span", "mover-name", entry.player.name || entry.player.player_id));
-            left.appendChild(el("span", "mover-value", ` ${F.formatPoints(entry.current_value)}`));
-            item.appendChild(left);
-            const delta = el("strong", "mover-delta", F.formatSigned(entry.delta, 1));
-            if (entry.delta < 0) delta.classList.add("is-down");
-            item.appendChild(delta);
-            item.tabIndex = 0;
-            item.setAttribute("role", "button");
-            item.addEventListener("click", () => openPlayer(entry.player.player_id));
-            item.addEventListener("keydown", (event) => {
-                if (event.key === "Enter" || event.key === " ") {
-                    event.preventDefault();
-                    openPlayer(entry.player.player_id);
-                }
-            });
-            els.marketMovers.appendChild(item);
-        });
-        if (!rows.length) els.marketMovers.appendChild(el("li", "empty-row", "No 7-day baseline"));
-        els.marketMoversNote.textContent = state.movers?.baseline_as_of
-            ? `Baseline ${F.formatAsOf(state.movers.baseline_as_of)}` : "";
-    }
-
-    async function loadMemberSnapshot() {
-        if (!els.memberStatus || state.season == null) return;
-        const params = new URLSearchParams({ season: state.season, scoring: state.seasonFantasyScoring });
-        if (state.week != null) params.set("week", state.week);
-        try {
-            const data = await fetchJson(`${API_BASE}/league/me?${params}`);
-            renderMemberSnapshot(data);
-        } catch (err) {
-            els.memberStatus.textContent = "Latest market";
-            els.memberTeam.textContent = state.seasonFantasyData?.as_of
-                ? F.formatAsOf(state.seasonFantasyData.as_of) : "—";
-            els.memberMetrics.innerHTML = "";
-            els.chooseTeam.hidden = true;
-            els.teamSelect.hidden = true;
-            if (els.leagueFreeAgentsLink) els.leagueFreeAgentsLink.hidden = true;
-        }
-    }
-
-    function renderMemberSnapshot(data) {
-        // The free-agent board is members-only, and "free in your league" is
-        // not a claim that means anything to a visitor without one.
-        if (els.leagueFreeAgentsLink) els.leagueFreeAgentsLink.hidden = false;
-        els.teamSelect.innerHTML = "";
-        els.teamSelect.appendChild(new Option("Choose your team", ""));
-        (data.teams || []).forEach((team) => {
-            els.teamSelect.appendChild(new Option(team.name || team.abbrev, team.espn_team_id));
-        });
-        if (data.status !== "configured" || !data.snapshot) {
-            els.memberStatus.textContent = "League snapshot";
-            els.memberTeam.textContent = "Choose your team";
-            els.memberMetrics.innerHTML = "";
-            els.chooseTeam.hidden = false;
-            els.teamSelect.hidden = true;
-            return;
-        }
-        const snapshot = data.snapshot;
-        const team = snapshot.team || {};
-        els.memberStatus.textContent = team.owner_name || "Your team";
-        // The most personal thing on the page used to be static text, while
-        // the start/sit advice about this exact team sat three clicks away.
-        // The hub routes on ?team= already, so this is the whole shortcut.
-        els.memberTeam.replaceChildren();
-        const teamLink = el("a", "hero-snapshot__team", team.name || team.abbrev || "Team");
-        teamLink.href = `/fantasy/league/?season=${encodeURIComponent(state.season)}` +
-            `&team=${encodeURIComponent(data.selected_team_id)}`;
-        teamLink.title = "Open your team in the league hub";
-        els.memberTeam.appendChild(teamLink);
-        els.memberMetrics.innerHTML = "";
-        const record = snapshot.record || {};
-        const values = [
-            `${record.wins || 0}–${record.losses || 0}${record.ties ? `–${record.ties}` : ""}`,
-            snapshot.opponent ? `vs ${snapshot.opponent.abbrev || snapshot.opponent.name}` : (snapshot.is_bye ? "Bye" : ""),
-            snapshot.power_rank ? `Power #${snapshot.power_rank}` : "",
-            snapshot.waiver_rank ? `Waiver #${snapshot.waiver_rank}` : "",
-            snapshot.starter_projection != null ? `${F.formatPoints(snapshot.starter_projection)} proj` : "",
-        ].filter(Boolean);
-        values.forEach((value) => els.memberMetrics.appendChild(el("span", null, value)));
-        els.chooseTeam.hidden = false;
-        els.chooseTeam.textContent = "Change team";
-        els.teamSelect.value = String(data.selected_team_id);
-        els.teamSelect.hidden = true;
-    }
-
-    async function saveMemberTeam() {
-        const teamId = Number(els.teamSelect.value);
-        if (!teamId || state.season == null) return;
-        try {
-            const response = await fetch(`${API_BASE}/league/me`, {
-                method: "PUT",
-                credentials: "include",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ season: state.season, espn_team_id: teamId }),
-            });
-            if (!response.ok) throw new Error("Could not save team");
-            renderMemberSnapshot(await response.json());
-        } catch (err) {
-            showError("Could not save your league team.");
-        }
-    }
-
-    // ── betting: games, props, futures ──────────────────────────────────
-
-    /* The group wraps game lines and player props behind one heading, so it
-       stays hidden until at least one of them has something to show. */
-    function syncMarketGroup() {
-        els.marketGroup.hidden = els.gamesSection.hidden && els.propsSection.hidden;
-        syncLiveMarkets();
-    }
-
-    // The zone has no content of its own, so an empty one is just a heading
-    // over nothing — which is what the offseason looks like.
-    function syncLiveMarkets() {
-        if (!els.liveMarkets) return;
-        const empty = els.marketGroup.hidden && els.futuresSection.hidden;
-        els.liveMarkets.hidden = empty;
-    }
-
-    async function loadGames() {
-        try {
-            const params = new URLSearchParams();
-            if (state.week != null) params.set("week", state.week);
-            const data = await fetchJson(`${API_BASE}/games?${params.toString()}`);
-            const withLines = (data.games || []).filter((g) => g.lines);
-            if (withLines.length === 0) {
-                els.gamesSection.hidden = true;
-                return;
-            }
-            els.gamesAsOf.textContent = F.formatAsOf(data.as_of);
-            els.gamesStrip.innerHTML = "";
-            withLines.forEach((game) => els.gamesStrip.appendChild(gameCard(game)));
-            els.gamesSection.hidden = false;
-        } catch (err) { /* leave hidden */ } finally { syncMarketGroup(); }
-    }
-
-    function gameCard(game) {
-        const card = el("div", "game-card");
-        const head = el("div", "game-card__teams");
-        head.appendChild(el("span", "game-card__team", `${game.away_team} @ ${game.home_team}`));
-        card.appendChild(head);
-
-        const lines = game.lines;
-        const row = el("div", "game-card__lines");
-        row.appendChild(lineCell("Spread", F.formatSpread(lines.spread_home), spreadMoveText(game)));
-        row.appendChild(lineCell("Total", lines.total != null ? `O/U ${lines.total}` : "—"));
-        const ml = lines.moneyline_home != null || lines.moneyline_away != null
-            ? `${F.americanOdds(lines.moneyline_away)} / ${F.americanOdds(lines.moneyline_home)}`
-            : "—";
-        row.appendChild(lineCell("ML (A/H)", ml));
-        card.appendChild(row);
-        return card;
-    }
-
-    function spreadMoveText(game) {
-        if (game.spread_move == null || game.spread_move === 0) return "";
-        return `${F.formatSigned(game.spread_move, 1)} since open`;
-    }
-
-    function lineCell(label, value, sub) {
-        const cell = el("div", "line-cell");
-        cell.appendChild(el("span", "line-cell__label", label));
-        cell.appendChild(el("span", "line-cell__value", value));
-        if (sub) cell.appendChild(el("span", "line-cell__sub", sub));
-        return cell;
-    }
-
-    async function loadProps() {
-        try {
-            const data = await fetchJson(`${API_BASE}/props`);
-            const featured = data.featured || [];
-            if (featured.length === 0) return;
-            els.propsAsOf.textContent = F.formatAsOf(data.as_of);
-            els.propGameTabs.innerHTML = "";
-            featured.forEach((game, index) => {
-                const label = `${game.away_team || "?"} @ ${game.home_team || "?"}`;
-                const tab = el("button", "chip", label);
-                tab.type = "button";
-                tab.dataset.index = String(index);
-                tab.setAttribute("aria-pressed", String(index === 0));
-                tab.addEventListener("click", () => {
-                    els.propGameTabs.querySelectorAll(".chip").forEach((c) =>
-                        c.setAttribute("aria-pressed", String(c === tab)));
-                    renderPropsBoard(game);
-                });
-                els.propGameTabs.appendChild(tab);
-            });
-            renderPropsBoard(featured[0]);
-            els.propsSection.hidden = false;
-        } catch (err) { /* leave hidden */ } finally { syncMarketGroup(); }
-    }
-
-    function renderPropsBoard(game) {
-        els.propsBoard.innerHTML = "";
-        (game.markets || []).forEach((market) => {
-            const block = el("div", "prop-market");
-            block.appendChild(el("h5", "prop-market__title", market.label));
-            const table = el("table", "mini-table");
-            const tbody = el("tbody");
-            market.lines.slice(0, 8).forEach((line) => {
-                const tr = el("tr");
-                tr.appendChild(el("td", "mini-opp", line.player_name || "—"));
-                const pt = market.market === "player_anytime_td" ? "" : (line.point != null ? String(line.point) : "—");
-                tr.appendChild(el("td", "mini-week", pt));
-                tr.appendChild(el("td", "mini-pts", F.americanOdds(line.price)));
-                tbody.appendChild(tr);
-            });
-            table.appendChild(tbody);
-            block.appendChild(table);
-            els.propsBoard.appendChild(block);
-        });
-    }
-
-    async function loadFutures() {
-        try {
-            const data = await fetchJson(`${API_BASE}/futures`);
-            if (!data.outcomes || data.outcomes.length === 0) return;
-            els.futuresAsOf.textContent = F.formatAsOf(data.as_of);
-            renderFutures(data);
-            els.futuresTabs.innerHTML = "";
-            (data.markets || []).forEach((marketKey) => {
-                const tab = el("button", "chip", futuresLabel(marketKey));
-                tab.type = "button";
-                tab.setAttribute("aria-pressed", String(marketKey === data.market));
-                tab.addEventListener("click", async () => {
-                    const next = await fetchJson(`${API_BASE}/futures?market=${encodeURIComponent(marketKey)}`);
-                    els.futuresTabs.querySelectorAll(".chip").forEach((c) =>
-                        c.setAttribute("aria-pressed", String(c === tab)));
-                    renderFutures(next);
-                });
-                els.futuresTabs.appendChild(tab);
-            });
-            els.futuresSection.hidden = false;
-            syncLiveMarkets();
-        } catch (err) { /* leave hidden */ }
-    }
-
-    function futuresLabel(key) {
-        return key
-            .replace(/^americanfootball_nfl_/, "")
-            .replace(/_/g, " ")
-            .replace(/\b\w/g, (c) => c.toUpperCase());
-    }
-
-    function renderFutures(data) {
-        els.futuresBody.innerHTML = "";
-        (data.outcomes || []).forEach((row, index) => {
-            const tr = el("tr");
-            tr.appendChild(el("td", "col-rank", index + 1));
-            tr.appendChild(el("td", "col-player", row.outcome));
-            tr.appendChild(el("td", "col-proj", F.americanOdds(row.price)));
-            els.futuresBody.appendChild(tr);
-        });
-    }
-
-    // ── drawers and comparison ──────────────────────────────────────────
-
-    function openMarkets(category, pushHistory = true) {
-        if (!els.drawer.hidden) closeDrawer(false);
-        if (!els.compareDrawer.hidden) closeCompare();
-        rememberOverlayFocus();
-        state.seasonPropsMarket = category || state.seasonPropsMarket || "season_pass_yds";
-        els.marketsDrawer.hidden = false;
-        document.body.classList.add("drawer-open");
-        writeUrlState(pushHistory);
-        loadSeasonPropLeaders(state.seasonPropsMarket);
-        els.marketsClose.focus();
-    }
-
-    function closeMarkets(pushHistory = true) {
-        if (!els.marketsDrawer || els.marketsDrawer.hidden) return;
-        els.marketsDrawer.hidden = true;
-        state.seasonPropsMarket = null;
-        syncDrawerBody();
-        writeUrlState(pushHistory);
-        restoreOverlayFocus();
-    }
-
-    function inCompare(playerId) {
-        return state.compare.some((p) => p.player_id === playerId);
-    }
-
-    function toggleCompare(player) {
-        if (!player.player_id) return;
-        if (inCompare(player.player_id)) {
-            state.compare = state.compare.filter((p) => p.player_id !== player.player_id);
-        } else {
-            if (state.compare.length >= MAX_COMPARE) return;
-            state.compare.push({ player_id: player.player_id, name: player.name });
-        }
-        renderCompareTray();
-    }
-
-    function renderCompareTray() {
-        els.compareChips.innerHTML = "";
-        state.compare.forEach((player) => {
-            const chip = el("span", "compare-chip");
-            chip.appendChild(el("span", "compare-chip__name", player.name || player.player_id));
-            const remove = el("button", "compare-chip__x", "×");
-            remove.type = "button";
-            remove.setAttribute("aria-label", `Remove ${player.name || "player"}`);
-            remove.addEventListener("click", () => toggleCompare(player));
-            chip.appendChild(remove);
-            els.compareChips.appendChild(chip);
-        });
-        els.compareTray.hidden = state.compare.length === 0;
-        els.compareGo.disabled = state.compare.length < 2;
-        els.compareGo.textContent = `Compare (${state.compare.length})`;
-    }
-
-    async function openCompare() {
-        if (state.compare.length < 2) return;
-        closeMarkets(false);
-        if (!els.drawer.hidden) closeDrawer(false);
-        rememberOverlayFocus();
-        els.compareDrawer.hidden = false;
-        document.body.classList.add("drawer-open");
-        els.compareSub.textContent = "Loading…";
-        els.compareBody.innerHTML = "";
-        els.compareDrawerClose.focus();
-        // Same ppr|half|std vocabulary as the market board's toggle, applied
-        // to a different subject — the reader's league format does not change
-        // between the two, so one control is right.
-        const params = new URLSearchParams({
-            ids: state.compare.map((p) => p.player_id).join(","),
-            scoring: state.seasonFantasyScoring,
-        });
-        try {
-            const data = await fetchJson(`${API_BASE}/compare?${params.toString()}`);
-            renderCompare(data);
-            window.pgAnalytics?.track?.("fantasy_compare", { count: state.compare.length });
-        } catch (err) {
-            els.compareSub.textContent = "";
-            els.compareBody.appendChild(el("p", "drawer__loading", "Could not load the comparison."));
-        }
-    }
-
-    // The board's payload holds every quoted player, so absence from it is
-    // the answer "this player has no season market", not a cache miss.
-    function marketRowFor(playerId) {
-        const leaders = (state.seasonFantasyData || {}).leaders || [];
-        return leaders.find((entry) => (entry.player || {}).player_id === playerId) || null;
-    }
-
-    function renderCompare(data) {
-        const provider = providerFor(data.source);
-        const when = data.week === 0 ? `${data.season} season-long` : `Week ${data.week}`;
-        els.compareSub.textContent = `${when} · ${data.scoring.toUpperCase()} · ${provider.label}`;
-        els.compareBody.innerHTML = "";
-
-        const players = data.players || [];
-        if (players.length === 0) {
-            els.compareBody.appendChild(el("p", "drawer__loading", "No players to compare."));
-            return;
-        }
-        const best = Math.max(...players.map((p) => p.projected_points || 0));
-        const bestMarket = Math.max(...players.map((p) => p.market?.total || 0));
-        const grid = el("div", "compare-grid");
-        grid.style.gridTemplateColumns = `repeat(${players.length}, minmax(0, 1fr))`;
-        players.forEach((player) => {
-            const col = el("div", "compare-col");
-            col.appendChild(el("h3", "compare-col__name", player.name || player.player_id));
-            const meta = [F.positionLabel(player.position), player.team, F.formatMatchup(player)]
-                .filter(Boolean).join(" · ");
-            col.appendChild(el("p", "compare-col__meta", meta));
-
-            // Market value first: it is what this page ranks on. The rows are
-            // already loaded for the board, so no second request is needed —
-            // and a player absent from that payload has no market at all,
-            // which is a fact worth stating rather than hiding.
-            const marketEntry = player.market || marketRowFor(player.player_id);
-            const marketWrap = el("div", "compare-col__proj");
-            const marketValue = el("span", "compare-col__proj-value",
-                marketEntry ? F.formatPoints(marketEntry.total ?? marketEntry.fantasy_points) : "—");
-            if (marketEntry && (marketEntry.total ?? marketEntry.fantasy_points ?? 0) === bestMarket && bestMarket > 0) {
-                marketValue.classList.add("is-best");
-            }
-            marketWrap.appendChild(marketValue);
-            marketWrap.appendChild(el("span", "compare-col__proj-label",
-                marketEntry ? "market pts" : "not quoted"));
-            col.appendChild(marketWrap);
-
-            if (marketEntry && (marketEntry.total ?? marketEntry.fantasy_points) != null) {
-                // The gap note is the same either way: quoted_categories names
-                // the raw markets behind the total, pairs_used names the
-                // scoring categories, but a category the total is missing has
-                // to show up in both shapes or the edge below reads as market
-                // disagreement when it is missing data.
-                const gaps = F.seasonPairDetail(
-                    marketEntry.pairs_used, marketEntry.partial_pairs, marketEntry.missing_pairs);
-                const scored = marketEntry.quoted_categories
-                    ? marketEntry.quoted_categories.map((key) => key.replace(/^season_/, "").replaceAll("_", " ")).join(" · ")
-                    : gaps.scored;
-                const detail = [scored, gaps.missing].filter(Boolean).join(" · ");
-                if (detail) col.appendChild(el("p", "compare-col__market-detail", detail));
-                const edge = marketEntry.edge ?? marketEntry.projection_delta;
-                const projection = marketEntry.projection ?? marketEntry.projected_points;
-                if (edge != null) {
-                    const delta = el("p", "compare-col__delta",
-                        `${F.formatSigned(edge, 1)} vs ${F.formatPoints(projection)} season proj`);
-                    delta.classList.add(edge >= 0 ? "is-over" : "is-under");
-                    if (marketEntry.edge_is_qualified) {
-                        delta.classList.add("is-qualified");
-                        // `scored`, not `gaps.scored`: compare sends the raw
-                        // quoted markets rather than the scoring categories,
-                        // so the resolved string is the one with content.
-                        delta.title = `Market total covers ${scored} only — ${gaps.missing}, so this gap is partly missing data, not market disagreement.`;
-                    }
-                    col.appendChild(delta);
-                }
-            }
-
-            const projWrap = el("div", "compare-col__proj compare-col__proj--weekly");
-            const projValue = el("span", "compare-col__proj-value", F.formatPoints(player.projected_points));
-            if ((player.projected_points || 0) === best && best > 0) projValue.classList.add("is-best");
-            projWrap.appendChild(projValue);
-            projWrap.appendChild(el("span", "compare-col__proj-label",
-                data.week === 0 ? "season proj" : `wk ${data.week} proj`));
-            col.appendChild(projWrap);
-
-            const badge = F.injuryBadge(player.injury_status);
-            if (badge) {
-                const chip = el("span", `injury-badge injury-badge--${badge.severity}`, badge.label);
-                col.appendChild(chip);
-            }
-
-            const recent = player.recent_ppr || [];
-            if (recent.length > 0) {
-                col.appendChild(el("p", "compare-col__section", "Last games (PPR)"));
-                const list = el("ul", "compare-col__games");
-                recent.forEach((game) => {
-                    const li = el("li", null,
-                        `Wk ${game.week}${game.opponent ? ` vs ${game.opponent}` : ""}: ${F.formatPoints(game.fantasy_points_ppr)}`);
-                    list.appendChild(li);
-                });
-                col.appendChild(list);
-            }
-            grid.appendChild(col);
-        });
-        els.compareBody.appendChild(grid);
-    }
-
-    function closeCompare() {
-        els.compareDrawer.hidden = true;
-        syncDrawerBody();
-        restoreOverlayFocus();
-    }
-
-    // ── player drawer ───────────────────────────────────────────────────
-
-    async function openPlayer(playerId, pushHistory = true) {
-        if (!playerId) return;
-        closeMarkets(false);
-        if (!els.compareDrawer.hidden) closeCompare();
-        rememberOverlayFocus();
-        state.drawerPlayerId = playerId;
-        els.drawer.hidden = false;
-        document.body.classList.add("drawer-open");
-        writeUrlState(pushHistory);
-        els.drawerName.textContent = "—";
-        els.drawerSub.textContent = "";
-        els.drawerBody.innerHTML = '<p class="drawer__loading">Loading…</p>';
-        els.drawerClose.focus();
-        window.pgAnalytics?.track?.("fantasy_player_view", { player_id: playerId });
-
-        try {
-            // No source parameter: the server resolves Sleeper-first then any
-            // provider, which is the same run the market board compares its
-            // projection column against — so drawer and board agree by
-            // construction rather than by passing the same value around.
-            const player = await fetchJson(`${API_BASE}/players/${encodeURIComponent(playerId)}`);
-            if (state.drawerPlayerId !== playerId) return;
-            renderPlayer(player);
-        } catch (err) {
-            if (state.drawerPlayerId !== playerId) return;
-            els.drawerBody.innerHTML = "";
-            els.drawerBody.appendChild(el("p", "drawer__loading", "Could not load this player."));
-            return;
-        }
-        loadPlayerSeasonProps(playerId);
-        loadPlayerMarketHistory(playerId);
-        loadPlayerNews(playerId);
-    }
-
-    // News is fetched separately so a slow (or failed) ESPN lookup never
-    // delays the projection/stats cards; the card just appears when ready.
-    async function loadPlayerNews(playerId) {
-        try {
-            const news = await fetchJson(`${API_BASE}/players/${encodeURIComponent(playerId)}/news`);
-            if (state.drawerPlayerId !== playerId || els.drawer.hidden) return;
-            const articles = news.articles || [];
-            if (articles.length === 0) return;
-
-            const card = el("div", "drawer-card");
-            card.appendChild(el("h3", "drawer-card__title", "Recent articles"));
-            const list = el("ul", "news-list");
-            articles.slice(0, 5).forEach((article) => {
-                if (!/^https?:\/\//.test(article.url || "")) return;
-                const item = el("li", "news-item");
-                const link = el("a", "news-item__title", article.headline || "Untitled");
-                link.href = article.url;
-                link.target = "_blank";
-                link.rel = "noopener noreferrer";
-                item.appendChild(link);
-                const meta = [F.formatArticleDate(article.published_at), article.byline]
-                    .filter(Boolean)
-                    .join(" · ");
-                if (meta) item.appendChild(el("span", "news-item__meta", meta));
-                list.appendChild(item);
-            });
-            if (!list.childElementCount) return;
-            card.appendChild(list);
-            els.drawerBody.appendChild(card);
-        } catch (err) { /* drawer works without news */ }
-    }
-
-    function renderPlayer(player) {
-        els.drawerName.textContent = player.name || "Unknown player";
-        const bits = [F.positionLabel(player.position), player.team].filter(Boolean);
-        const matchup = F.formatMatchup(player);
-        if (matchup) bits.push(matchup);
-        if (player.injury_status) bits.push(player.injury_status);
-        els.drawerSub.textContent = bits.join(" · ");
-
-        els.drawerBody.innerHTML = "";
-        const actions = el("div", "drawer-actions");
-        actions.appendChild(compareToggleButton(player));
-        const rankings = el("a", "drawer-compare__btn", "Open Rankings");
-        rankings.href = `/fantasy/rankings/?player=${encodeURIComponent(player.player_id)}`;
-        actions.appendChild(rankings);
-        els.drawerBody.appendChild(actions);
-        const marketEntry = marketRowFor(player.player_id);
-        if (marketEntry) {
-            const card = el("div", "drawer-card drawer-card--value");
-            card.appendChild(el("h3", "drawer-card__title", "Market value"));
-            const grid = el("div", "proj-grid");
-            grid.appendChild(statBlock("Market", F.formatPoints(marketEntry.fantasy_points)));
-            grid.appendChild(statBlock("Projection", F.formatPoints(marketEntry.projected_points)));
-            grid.appendChild(statBlock("Diff", F.formatSigned(marketEntry.projection_delta, 1)));
-            card.appendChild(grid);
-            els.drawerBody.appendChild(card);
-        }
-        // Reserved up front so the market card can sit first despite being
-        // the last thing to arrive.
-        els.drawerMarket = el("div", "drawer-market");
-        els.drawerBody.appendChild(els.drawerMarket);
-        els.drawerHistory = el("div", "drawer-history");
-        els.drawerBody.appendChild(els.drawerHistory);
-
-        if (player.projection) {
-            const proj = player.projection;
-            const card = el("div", "drawer-card");
-            const projTitle = proj.week === 0 ? `${proj.season} season projection` : `Week ${proj.week} projection`;
-            card.appendChild(el("h3", "drawer-card__title", projTitle));
-            const grid = el("div", "proj-grid");
-            grid.appendChild(statBlock("PPR", F.formatPoints(proj.pts_ppr)));
-            grid.appendChild(statBlock("Half", F.formatPoints(proj.pts_half_ppr)));
-            grid.appendChild(statBlock("Std", F.formatPoints(proj.pts_std)));
-            card.appendChild(grid);
-            const source = el("p", "projection-source");
-            source.append("Projection by ");
-            const provider = providerFor(proj.source);
-            if (provider.url) {
-                source.appendChild(providerLink(provider));
+            if (!season.available) {
+                chip.disabled = true;
+                chip.classList.add("chip--disabled");
+                chip.title = "This season is private in ESPN's league settings.";
             } else {
-                source.append(provider.label);
+                chip.addEventListener("click", () => selectSeason(season.season));
             }
-            if (proj.source === "consensus" && Array.isArray(proj.providers)) {
-                source.append(` (avg of ${proj.providers.join(", ")})`);
+            if (season.season === state.season) {
+                chip.classList.add("chip--active");
+                chip.setAttribute("aria-current", "true");
             }
-            const asOf = F.formatAsOf(proj.as_of);
-            if (asOf) source.append(` · ${asOf}`);
-            card.appendChild(source);
-            els.drawerBody.appendChild(card);
-        }
+            els.seasonChips.appendChild(chip);
+        });
+    }
 
-        const spark = buildSparkline(player.projection_history);
-        if (spark) {
-            const card = el("div", "drawer-card");
-            card.appendChild(el("h3", "drawer-card__title", "Projection movement"));
-            card.appendChild(spark);
-            els.drawerBody.appendChild(card);
-        }
+    function renderHeader(overview) {
+        els.leagueName.textContent = overview.name || "League Hub";
+        els.seasonValue.textContent = overview.season || "—";
+        els.modeLabel.textContent = F.modeLabel(overview.mode) || "Season";
+        els.weekValue.textContent = overview.latest_week
+            ? `Week ${overview.latest_week}`
+            : "Preseason";
+        els.freshnessValue.textContent = F.formatAsOf(overview.freshness.league_sync);
 
-        const accuracy = buildAccuracy(player.projection_vs_actual);
-        if (accuracy) {
-            const card = el("div", "drawer-card");
-            card.appendChild(el("h3", "drawer-card__title", "Projected vs actual"));
-            card.appendChild(accuracy);
-            els.drawerBody.appendChild(card);
-        }
-
-        const props = player.props || [];
-        if (props.length > 0) {
-            const card = el("div", "drawer-card");
-            card.appendChild(el("h3", "drawer-card__title", "Player props"));
-            const table = el("table", "mini-table");
-            const tbody = el("tbody");
-            props.forEach((prop) => {
-                const tr = el("tr");
-                tr.appendChild(el("td", "mini-opp", prop.label));
-                tr.appendChild(el("td", "mini-week", prop.point != null ? String(prop.point) : ""));
-                tr.appendChild(el("td", "mini-pts", F.americanOdds(prop.price)));
-                tbody.appendChild(tr);
-            });
-            table.appendChild(tbody);
-            card.appendChild(table);
-            els.drawerBody.appendChild(card);
-        }
-
-        const games = player.recent_games || [];
-        if (games.length > 0) {
-            const card = el("div", "drawer-card");
-            card.appendChild(el("h3", "drawer-card__title", "Recent games"));
-            const table = el("table", "mini-table");
-            const tbody = el("tbody");
-            games.forEach((game) => {
-                const tr = el("tr");
-                tr.appendChild(el("td", "mini-week", `Wk ${game.week}`));
-                tr.appendChild(el("td", "mini-opp", game.opponent ? `vs ${game.opponent}` : "—"));
-                tr.appendChild(el("td", "mini-pts", `${F.formatPoints(game.fantasy_points_ppr)} pts`));
-                tbody.appendChild(tr);
-            });
-            table.appendChild(tbody);
-            card.appendChild(table);
-            els.drawerBody.appendChild(card);
-        }
-
-        if (!player.projection && games.length === 0 && !spark && !accuracy && props.length === 0) {
-            els.drawerBody.appendChild(el("p", "drawer__loading", "No projection or game data collected yet."));
+        if (overview.mode === "preseason") {
+            els.modeBanner.textContent =
+                "The season hasn't kicked off yet — rosters are drafted, but no games have been played. Every column in the table fills in from week 1.";
+            els.modeBanner.hidden = false;
+        } else {
+            els.modeBanner.hidden = true;
         }
     }
 
-    function compareToggleButton(player) {
-        const wrap = el("div", "drawer-compare");
-        const btn = el("button", "drawer-compare__btn", inCompare(player.player_id) ? "✓ In compare" : "+ Add to compare");
-        btn.type = "button";
-        if (inCompare(player.player_id)) btn.classList.add("is-on");
-        btn.addEventListener("click", () => {
-            toggleCompare({ player_id: player.player_id, name: player.name });
-            const on = inCompare(player.player_id);
-            btn.textContent = on ? "✓ In compare" : "+ Add to compare";
-            btn.classList.toggle("is-on", on);
-        });
-        wrap.appendChild(btn);
+    function teamCell(team) {
+        const wrap = el("div", "team-cell");
+        if (team.logo_url) {
+            const logo = el("img", "team-cell__logo");
+            logo.src = team.logo_url;
+            logo.alt = "";
+            logo.loading = "lazy";
+            hideIfBroken(logo);
+            wrap.appendChild(logo);
+        }
+        const text = el("div", "team-cell__text");
+        const link = el("button", "team-cell__name", team.name || "—");
+        link.type = "button";
+        link.addEventListener("click", () => selectTeam(team.espn_team_id));
+        text.appendChild(link);
+        if (team.owner_name) text.appendChild(el("span", "team-cell__owner", team.owner_name));
+        wrap.appendChild(text);
         return wrap;
     }
 
-    function statBlock(label, value) {
-        const block = el("div", "proj-stat");
-        block.appendChild(el("span", "proj-stat__value", value));
-        block.appendChild(el("span", "proj-stat__label", label));
-        return block;
+    // ── the ledger ──────────────────────────────────────────────────────
+
+    // Scales are computed once per payload rather than per row: every chart
+    // in a column has to share an axis or the bars are not comparable, which
+    // is the whole point of putting them in one table.
+    function ledgerScales(teams) {
+        return {
+            luckMax: F.maxAbs(teams.map((team) => team.luck)),
+            efficiency: F.niceAxis(
+                teams.map((team) => team.lineup && team.lineup.efficiency),
+                0.02
+            ),
+            scoring: F.niceAxis(
+                teams.reduce((values, team) => {
+                    const scoring = team.scoring || {};
+                    return values.concat([scoring.low, scoring.high]);
+                }, []),
+                10
+            ),
+        };
     }
 
-    function buildSparkline(history) {
-        const values = (history || []).map((h) => h.pts_ppr).filter((v) => v != null);
-        const spark = F.sparkline(values, 240, 56, 4);
-        if (!spark) return null;
-
-        const svgNs = "http://www.w3.org/2000/svg";
-        const svg = document.createElementNS(svgNs, "svg");
-        svg.setAttribute("viewBox", "0 0 240 56");
-        svg.setAttribute("class", "sparkline");
-        svg.setAttribute("role", "img");
-        svg.setAttribute("aria-label", `Projection trend from ${F.formatPoints(spark.first)} to ${F.formatPoints(spark.last)} PPR points`);
-        const line = document.createElementNS(svgNs, "polyline");
-        line.setAttribute("points", spark.points);
-        line.setAttribute("fill", "none");
-        line.setAttribute("stroke", "currentColor");
-        line.setAttribute("stroke-width", "2");
-        line.setAttribute("stroke-linecap", "round");
-        line.setAttribute("stroke-linejoin", "round");
+    function sparkSvg(ranks, width, height, pad) {
+        const path = F.sparkline(ranks, width, height, pad);
+        if (!path) return null;
+        const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+        svg.setAttribute("class", "spark");
+        svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
+        svg.setAttribute("aria-hidden", "true");
+        const line = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        line.setAttribute("d", path);
         svg.appendChild(line);
-
-        const wrap = el("div", "sparkline-wrap");
-        wrap.appendChild(svg);
-        const caption = el("p", "sparkline-caption",
-            `${F.formatPoints(spark.first)} → ${F.formatPoints(spark.last)} PPR across ${values.length} snapshots`);
-        wrap.appendChild(caption);
-        return wrap;
+        return svg;
     }
 
-    // Projected-vs-actual: a compact per-week table with paired bars. Only
-    // weeks that have an actual result are worth charting.
-    function buildAccuracy(series) {
-        const rows = (series || []).filter((row) => row.actual != null);
-        if (rows.length === 0) return null;
-        const max = Math.max(
-            ...rows.map((row) => Math.max(row.projected || 0, row.actual || 0)),
-            1
-        );
-        const wrap = el("div", "accuracy");
-        rows.slice(-8).forEach((row) => {
-            const line = el("div", "accuracy__row");
-            line.appendChild(el("span", "accuracy__week", `Wk ${row.week}`));
-            const bars = el("div", "accuracy__bars");
-            bars.appendChild(accuracyBar("proj", row.projected, max, "Proj"));
-            bars.appendChild(accuracyBar("actual", row.actual, max, "Actual"));
-            line.appendChild(bars);
-            const diff = row.projected != null && row.actual != null
-                ? row.actual - row.projected : null;
-            const diffText = diff == null ? "" : F.formatSigned(diff, 1);
-            const diffEl = el("span", "accuracy__diff", diffText);
-            if (diff != null) diffEl.classList.add(diff >= 0 ? "is-up" : "is-down");
-            line.appendChild(diffEl);
-            wrap.appendChild(line);
-        });
-        const legend = el("p", "accuracy__legend");
-        legend.appendChild(el("span", "accuracy__key accuracy__key--proj", "Projected"));
-        legend.appendChild(el("span", "accuracy__key accuracy__key--actual", "Actual"));
-        wrap.appendChild(legend);
-        return wrap;
-    }
-
-    function accuracyBar(kind, value, max, label) {
-        const track = el("div", `accuracy__bar accuracy__bar--${kind}`);
-        const fill = el("div", "accuracy__fill");
-        fill.style.width = `${Math.max(0, Math.min(100, ((value || 0) / max) * 100))}%`;
-        fill.title = `${label}: ${F.formatPoints(value)}`;
+    function meterEl(percent) {
+        const track = el("div", "meter");
+        const fill = el("div", "meter__fill");
+        fill.style.width = `${Math.max(0, Math.min(100, percent || 0))}%`;
         track.appendChild(fill);
-        track.appendChild(el("span", "accuracy__value", F.formatPoints(value)));
         return track;
     }
 
-    function closeDrawer(pushHistory = true) {
-        els.drawer.hidden = true;
-        state.drawerPlayerId = null;
-        syncDrawerBody();
-        writeUrlState(pushHistory);
-        restoreOverlayFocus();
+    // The chart that rides in the row. Polarity always reads from which side
+    // of the zero rule a bar sits on, and a value the measure could not be
+    // computed for draws nothing rather than a bar of length zero — those
+    // look identical and mean opposite things.
+    function ledgerChart(team, columnKey, scales) {
+        const column = F.ledgerColumn(columnKey);
+        if (column.chart === "diverging") {
+            const bar = F.divergingBar(team.luck, scales.luckMax);
+            const track = el("div", "dv");
+            track.appendChild(el("div", "dv__zero"));
+            if (bar.side !== "zero") {
+                const fill = el("div", `dv__bar dv__bar--${bar.side}`);
+                fill.style.width = `${bar.width}%`;
+                track.appendChild(fill);
+            }
+            return track;
+        }
+        if (column.chart === "dot") {
+            const axis = scales.efficiency;
+            const value = team.lineup && team.lineup.efficiency;
+            const position = axis ? F.dotPosition(value, axis.min, axis.max) : null;
+            if (position === null) return null;
+            const track = el("div", "dot");
+            track.appendChild(el("div", "dot__line"));
+            const point = el("div", "dot__pt");
+            point.style.left = `${position}%`;
+            track.appendChild(point);
+            return track;
+        }
+        if (column.chart === "range") {
+            const axis = scales.scoring;
+            const scoring = team.scoring || {};
+            const band = axis ? F.rangeBand(scoring.low, scoring.high, axis.min, axis.max) : null;
+            if (!band) return null;
+            const track = el("div", "rng");
+            const span = el("div", "rng__span");
+            span.style.left = `${band.left}%`;
+            span.style.width = `${band.width}%`;
+            track.appendChild(span);
+            const median = F.dotPosition(scoring.median, axis.min, axis.max);
+            if (median !== null) {
+                const point = el("div", "rng__med");
+                point.style.left = `${median}%`;
+                track.appendChild(point);
+            }
+            return track;
+        }
+        if (column.chart === "meter") {
+            const value = F.ledgerValue(team, columnKey);
+            if (value === null || value === undefined) return null;
+            return meterEl(value * 100);
+        }
+        if (column.chart === "spark") {
+            const ranks = ((team.power && team.power.history) || []).map((point) => point.rank);
+            return sparkSvg(ranks, 72, 22, 3);
+        }
+        return null;
     }
 
-    // ── header / state ──────────────────────────────────────────────────
+    function renderColumnChips() {
+        els.ledgerColumns.replaceChildren();
+        // A phone hides the ranking-method picker unless it is the column in
+        // view; it only changes the Power column.
+        els.ledgerColumns.parentElement.dataset.column = state.column;
+        F.LEDGER_COLUMNS.forEach((column) => {
+            const chip = el("button", "chip", column.label);
+            chip.type = "button";
+            if (column.key === state.column) {
+                chip.classList.add("chip--active");
+                chip.setAttribute("aria-current", "true");
+            }
+            chip.addEventListener("click", () => selectColumn(column.key));
+            els.ledgerColumns.appendChild(chip);
+        });
+    }
 
-    function renderWeekBadge() {
-        const seasonLong = state.week === 0;
-        if (seasonLong) {
-            // "Season" over the year already says season-long; the badge is a
-            // narrow column and the old third line wrapped to three rows in it.
-            els.weekLabel.textContent = "Season";
-            els.weekValue.textContent = state.season != null ? state.season : "—";
-            els.seasonValue.textContent = "";
-        } else {
-            els.weekLabel.textContent = "Week";
-            els.weekValue.textContent = state.week != null ? state.week : "—";
-            els.seasonValue.textContent = state.season ? String(state.season) : "";
+    function renderAlgorithmSelect(algorithms) {
+        els.powerAlgorithm.replaceChildren();
+        (algorithms || []).forEach((algorithm) => {
+            const option = el("option", null, F.algorithmLabel(algorithm));
+            option.value = algorithm;
+            if (algorithm === state.algorithm) option.selected = true;
+            els.powerAlgorithm.appendChild(option);
+        });
+        els.powerAlgorithm.disabled = !(algorithms || []).length;
+    }
+
+    function ledgerHeadRow() {
+        const row = el("tr");
+        row.appendChild(el("th", null, ""));
+        row.appendChild(el("th", null, "Team"));
+        [
+            ["record", "W-L"],
+            ["points_for", "PF"],
+            ["all_play", "All-play"],
+            ["expected", "xW"],
+            ["luck", "Luck"],
+            ["lineup", "Lineup"],
+            ["scoring", "Range"],
+            ["power", "Résumé"],
+            ["odds", "Odds"],
+            ["form", "Form"],
+        ].forEach(([key, label]) => {
+            const cell = el("th", null, label);
+            cell.dataset.key = key;
+            if (key === state.column) cell.classList.add("is-active");
+            row.appendChild(cell);
+        });
+        return row;
+    }
+
+    function valueCell(key, text) {
+        const cell = el("td", "ledger__cell", text);
+        cell.dataset.key = key;
+        if (key === state.column) cell.classList.add("is-active");
+        return cell;
+    }
+
+    function renderLedger(payload) {
+        const teams = payload.teams || [];
+        els.ledger.replaceChildren();
+        if (!teams.length) {
+            els.ledger.appendChild(el("p", "empty-note", "No teams collected for this season."));
+            els.ledgerNote.textContent = "";
+            return;
+        }
+
+        const scales = ledgerScales(teams);
+        const ordered = F.sortLedger(teams, state.column);
+        const table = el("table", "rank-table ledger-table");
+        const head = el("thead");
+        head.appendChild(ledgerHeadRow());
+        table.appendChild(head);
+
+        const body = el("tbody");
+        ordered.forEach((team, index) => {
+            const row = el("tr");
+            if (state.myTeamId && team.espn_team_id === state.myTeamId) {
+                row.classList.add("ledger-row--mine");
+            }
+            row.appendChild(el("td", "cell-seed", String(index + 1)));
+
+            const nameCell = el("td", "ledger__team");
+            nameCell.dataset.key = "team";
+            nameCell.appendChild(teamCell(team));
+            // Mobile only: the chosen column's context and chart move into
+            // the identity cell, because a phone shows one column at a time.
+            nameCell.appendChild(el("span", "ledger__meta", F.ledgerMeta(team, state.column)));
+            const chart = ledgerChart(team, state.column, scales);
+            if (chart) {
+                const holder = el("div", "ledger__chart");
+                holder.appendChild(chart);
+                nameCell.appendChild(holder);
+            }
+            row.appendChild(nameCell);
+
+            row.appendChild(valueCell("record", F.ledgerText(team, "record")));
+            row.appendChild(valueCell("points_for", F.ledgerText(team, "points_for")));
+            row.appendChild(valueCell("all_play", F.ledgerText(team, "all_play")));
+            row.appendChild(
+                valueCell(
+                    "expected",
+                    team.expected_wins === null || team.expected_wins === undefined
+                        ? "—"
+                        : Number(team.expected_wins).toFixed(1)
+                )
+            );
+
+            const luckCell = valueCell("luck", F.ledgerText(team, "luck"));
+            if (team.luck > 0) luckCell.classList.add("cell-above");
+            if (team.luck < 0) luckCell.classList.add("cell-below");
+            row.appendChild(luckCell);
+
+            row.appendChild(valueCell("lineup", F.ledgerText(team, "lineup")));
+            row.appendChild(valueCell("scoring", F.ledgerText(team, "scoring")));
+
+            const powerCell = valueCell("power", F.ledgerText(team, "power"));
+            const movement = F.rankMovement(team.power && team.power.rank_delta);
+            powerCell.appendChild(
+                el("span", `ledger__move ledger__move--${movement.direction}`, movement.label)
+            );
+            row.appendChild(powerCell);
+
+            const oddsCell = valueCell("odds", "");
+            const odds = team.playoff && team.playoff.odds;
+            if (odds === null || odds === undefined) {
+                oddsCell.textContent = "—";
+            } else {
+                const wrap = el("div", "ledger__odds");
+                wrap.appendChild(meterEl(odds * 100));
+                wrap.appendChild(el("span", "ledger__odds-value", `${Math.round(odds * 100)}%`));
+                oddsCell.appendChild(wrap);
+            }
+            row.appendChild(oddsCell);
+
+            const formCell = valueCell("form", "");
+            const spark = sparkSvg(
+                ((team.power && team.power.history) || []).map((point) => point.rank),
+                60,
+                20,
+                3
+            );
+            if (spark) formCell.appendChild(spark);
+            row.appendChild(formCell);
+
+            body.appendChild(row);
+        });
+        table.appendChild(body);
+        els.ledger.appendChild(table);
+
+        els.ledgerNote.textContent = payload.power_week
+            ? `${teams.length} teams · power through week ${payload.power_week}`
+            : `${teams.length} teams`;
+
+        const rating = payload.manager_rating || {};
+        const excluded = rating.excluded_slots || [];
+        const exclusionNote = excluded.length
+            ? ` ${excluded.join("/")} is excluded because its aggregate actuals are not in the weekly player feed.`
+            : "";
+        els.ledgerFootnote.textContent = rating.available
+            ? `Lineup is the share of each week's best legal lineup a manager actually started, ` +
+              `over ${rating.weeks.length} scored week${rating.weeks.length === 1 ? "" : "s"}. ` +
+              `League average ${(rating.league_average * 100).toFixed(1)}%.` + exclusionNote
+            : LINEUP_UNAVAILABLE[rating.reason] || "";
+    }
+
+    // Why a column is blank, in the reader's terms. A metric that silently
+    // shows nothing is indistinguishable from one that is broken.
+    const LINEUP_UNAVAILABLE = {
+        no_lineup_settings:
+            "Lineup efficiency needs this league's roster settings, which have not been collected yet.",
+        no_roster_snapshots:
+            "Lineup efficiency needs stored weekly rosters. None have been collected for this season.",
+        no_actuals:
+            "Lineup efficiency needs each player's actual points, which have not been collected for this season.",
+        no_scorable_weeks:
+            "No week has a full set of starter results yet, so lineup efficiency cannot be scored.",
+    };
+
+    // ── the season charts ───────────────────────────────────────────────
+
+    function chartRow(team, valueText, chart, highlight) {
+        const row = el("div", "chart-row");
+        if (highlight) row.classList.add("chart-row--mine");
+        const name = el("button", "chart-row__name", team.name || "—");
+        name.type = "button";
+        name.addEventListener("click", () => selectTeam(team.espn_team_id));
+        row.appendChild(name);
+        const holder = el("div", "chart-row__track");
+        if (chart) holder.appendChild(chart);
+        row.appendChild(holder);
+        row.appendChild(el("span", "chart-row__value", valueText));
+        return row;
+    }
+
+    function chartPanel(title, lede, rows, axis) {
+        const panel = el("section", "chart");
+        panel.appendChild(el("h3", "chart__title", title));
+        panel.appendChild(el("p", "chart__lede", lede));
+        rows.forEach((row) => panel.appendChild(row));
+        if (axis) {
+            const scale = el("div", "chart__axis");
+            scale.appendChild(el("span", null, axis[0]));
+            scale.appendChild(el("span", null, axis[1]));
+            panel.appendChild(scale);
+        }
+        return panel;
+    }
+
+    function renderCharts(payload) {
+        const teams = payload.teams || [];
+        els.charts.replaceChildren();
+        const scored = teams.filter((team) => (team.all_play || {}).games);
+        if (!scored.length) {
+            els.chartsBoard.hidden = true;
+            return;
+        }
+        els.chartsBoard.hidden = false;
+        const scales = ledgerScales(teams);
+
+        els.charts.appendChild(
+            chartPanel(
+                "Luck index",
+                "Wins minus expected wins. Left of the line is below, right is above.",
+                F.sortLedger(scored, "luck").map((team) =>
+                    chartRow(
+                        team,
+                        F.ledgerText(team, "luck"),
+                        ledgerChart(team, "luck", scales),
+                        team.espn_team_id === state.myTeamId
+                    )
+                )
+            )
+        );
+
+        const rated = scored.filter(
+            (team) => team.lineup && team.lineup.efficiency !== null && team.lineup.efficiency !== undefined
+        );
+        if (rated.length) {
+            const axis = scales.efficiency;
+            els.charts.appendChild(
+                chartPanel(
+                    "Manager rating",
+                    "Points started as a share of the best legal lineup that week.",
+                    F.sortLedger(rated, "lineup").map((team) =>
+                        chartRow(
+                            team,
+                            F.ledgerText(team, "lineup"),
+                            ledgerChart(team, "lineup", scales),
+                            team.espn_team_id === state.myTeamId
+                        )
+                    ),
+                    axis
+                        ? [`${(axis.min * 100).toFixed(0)}%`, `${(axis.max * 100).toFixed(0)}%`]
+                        : null
+                )
+            );
+        }
+
+        const axis = scales.scoring;
+        els.charts.appendChild(
+            chartPanel(
+                "Weekly range",
+                "Lowest to highest week, with the median. Long bars are boom-or-bust.",
+                F.sortLedger(scored, "scoring").map((team) =>
+                    chartRow(
+                        team,
+                        F.formatPoints(team.scoring && team.scoring.median),
+                        ledgerChart(team, "scoring", scales),
+                        team.espn_team_id === state.myTeamId
+                    )
+                ),
+                axis ? [String(axis.min), String(axis.max)] : null
+            )
+        );
+
+        els.chartsNote.textContent = `${scored.length} teams with completed games`;
+    }
+
+    function fillWeekSelect(select, weeks, selected) {
+        select.replaceChildren();
+        weeks.forEach((week) => {
+            const option = el("option", null, `Week ${week}`);
+            option.value = week;
+            if (week === selected) option.selected = true;
+            select.appendChild(option);
+        });
+        select.disabled = weeks.length === 0;
+    }
+
+    function renderScoreboard(payload) {
+        els.scoreboard.replaceChildren();
+        if (!payload.matchups.length) {
+            els.scoreboard.appendChild(el("p", "empty-note", "No matchups for this week."));
+            return;
+        }
+
+        payload.matchups.forEach((matchup) => {
+            const card = el("article", "matchup");
+            if (matchup.playoff_tier && matchup.playoff_tier !== "NONE") {
+                card.appendChild(
+                    el("span", "matchup__tier", matchup.playoff_tier.replace(/_/g, " ").toLowerCase())
+                );
+            }
+
+            if (matchup.is_bye) {
+                card.classList.add("matchup--bye");
+                card.appendChild(el("p", "matchup__bye", `${matchup.home.name || "—"} — bye`));
+                els.scoreboard.appendChild(card);
+                return;
+            }
+
+            [matchup.home, matchup.away].forEach((side, index) => {
+                if (!side) return;
+                const isWinner =
+                    matchup.is_complete &&
+                    ((index === 0 && matchup.winner === "HOME") ||
+                        (index === 1 && matchup.winner === "AWAY"));
+                const line = el("div", `matchup__side${isWinner ? " matchup__side--win" : ""}`);
+                const nameButton = el("button", "matchup__name", side.name || "—");
+                nameButton.type = "button";
+                nameButton.addEventListener("click", () => selectTeam(side.espn_team_id));
+                line.appendChild(nameButton);
+                line.appendChild(el("span", "matchup__score", F.formatPoints(side.points)));
+                card.appendChild(line);
+            });
+
+            if (!matchup.is_complete) {
+                card.appendChild(el("span", "matchup__pending", "Not played"));
+            }
+            els.scoreboard.appendChild(card);
+        });
+    }
+
+    function renderTeamsGrid(payload) {
+        els.teamsGrid.replaceChildren();
+        payload.teams.forEach((team) => {
+            const card = el("button", "team-card");
+            card.type = "button";
+            card.addEventListener("click", () => selectTeam(team.espn_team_id));
+            if (team.logo_url) {
+                const logo = el("img", "team-card__logo");
+                logo.src = team.logo_url;
+                logo.alt = "";
+                logo.loading = "lazy";
+                hideIfBroken(logo);
+                card.appendChild(logo);
+            }
+            card.appendChild(el("span", "team-card__name", team.name || "—"));
+            if (team.owner_name) card.appendChild(el("span", "team-card__owner", team.owner_name));
+            card.appendChild(
+                el("span", "team-card__record", F.recordLabel(team.wins, team.losses, team.ties))
+            );
+            els.teamsGrid.appendChild(card);
+        });
+    }
+
+    // ── the team as a document ──────────────────────────────────────────
+    //
+    // A team page is a detail view about one roster, but it is also the only
+    // page on this site that gets a paragraph written about it every week.
+    // So it opens on the writing, with the record set beside it the way a
+    // colophon sits beside a lede, and the numbers that used to be a header
+    // card become the facts under that lede.
+
+    function fact(label, value, sub) {
+        const wrap = el("div", "masthead__fact");
+        wrap.appendChild(el("dt", null, label));
+        const dd = el("dd", null, value);
+        if (sub) dd.appendChild(el("small", null, sub));
+        wrap.appendChild(dd);
+        return wrap;
+    }
+
+    // The masthead carries whichever thing the page is currently about.
+    // Two mastheads stacked would mean neither is the loudest.
+    function renderTeamMasthead(detail) {
+        const season = (detail && detail.season) || state.season || "";
+        const played = (detail && detail.games_played) || 0;
+        els.mastheadEyebrow.textContent = played
+            ? `Team dossier · ${season} · through ${played} game${played === 1 ? "" : "s"}`
+            : `Team dossier · ${season}`;
+        els.leagueName.textContent = (detail && detail.name) || "—";
+        els.leagueSub.textContent = (detail && detail.owner_name) || "";
+        els.leagueSub.hidden = !els.leagueSub.textContent;
+
+        els.teamBadge.replaceChildren();
+        if (!detail) return;
+        els.teamBadge.appendChild(
+            fact("Record", F.recordLabel(detail.wins, detail.losses, detail.ties))
+        );
+        els.teamBadge.appendChild(fact("Points for", F.formatPoints(detail.points_for)));
+        els.teamBadge.appendChild(fact("Against", F.formatPoints(detail.points_against)));
+        els.teamBadge.appendChild(
+            fact(
+                "Per game",
+                F.formatPoints(F.pointsPerGame(detail.points_for, detail.games_played))
+            )
+        );
+    }
+
+    // Which of the two fact lists the masthead is showing. Called before the
+    // team payload lands so the league's numbers are never left standing
+    // under a team's name.
+    function setMastheadMode(showingTeam) {
+        els.modeBadge.hidden = showingTeam;
+        els.teamBadge.hidden = !showingTeam;
+        els.freshnessValue.hidden = showingTeam;
+        if (!showingTeam) {
+            els.leagueSub.hidden = true;
+            els.teamBadge.replaceChildren();
+            if (state.overview) renderHeader(state.overview);
         }
     }
 
-    // Fourth & Fortune is a draft-night tool. Once the season starts it is a
-    // curiosity, and it should stop sitting level with the two tools somebody
-    // opens every week; before the draft it is the reason to be here at all.
-    function renderToolGrid() {
-        const draft = document.querySelector(".tool-card--draft");
-        if (!draft) return;
-        const inSeason = !!state.inSeason;
-        draft.classList.toggle("tool-card--quiet", inSeason);
-        draft.classList.toggle("tool-card--lead", !inSeason);
-        const hint = draft.querySelector("small");
-        if (hint) hint.textContent = inSeason ? "Next draft" : "Draft night";
+    // Where this team sits among the ten on one ledger column. The ledger is
+    // already loaded — it is fetched before the route is applied and stays in
+    // state — so none of these six facts costs a request.
+    function ledgerRank(rows, key, teamId) {
+        const ranked = F.sortLedger(rows, key).filter(
+            (row) => F.ledgerValue(row, key) !== null
+        );
+        const index = ranked.findIndex((row) => row.espn_team_id === teamId);
+        return index === -1 ? null : { rank: index + 1, of: ranked.length };
     }
 
-    function renderHeader(data) {
-        state.inSeason = !!data.in_season;
-        state.defaultWeek = data.default_week != null ? data.default_week : data.week;
-        state.season = data.default_season != null ? data.default_season : data.season;
-        // URL week wins if provided; otherwise the resolved default.
-        if (state.week == null) {
-            state.week = state.defaultWeek;
+    function rankSub(rows, key, teamId) {
+        const placing = ledgerRank(rows, key, teamId);
+        return placing ? `${F.ordinal(placing.rank)} of ${placing.of}` : "";
+    }
+
+    function renderColophon(detail) {
+        els.teamColophon.replaceChildren();
+        const rows = (state.ledger && state.ledger.teams) || [];
+        const row = rows.find((entry) => entry.espn_team_id === detail.espn_team_id);
+        const history = detail.power_history || [];
+        const latest = history.length ? history[history.length - 1] : null;
+
+        els.teamColophon.appendChild(
+            fact(
+                "Record",
+                F.recordLabel(detail.wins, detail.losses, detail.ties),
+                rankSub(rows, "record", detail.espn_team_id)
+            )
+        );
+        const roster = rosterPowerTeam(detail.espn_team_id);
+        if (roster) {
+            els.teamColophon.appendChild(
+                fact("Power", `#${roster.rank}`, `${F.formatPoints(roster.expected)} pts a week`)
+            );
         }
-        renderWeekBadge();
-        renderToolGrid();
-        // Re-applies ?board=week now that there is a week to apply it to, and
-        // falls back to the season board when there is not.
-        setBoardMode(state.boardMode);
+        els.teamColophon.appendChild(
+            fact(
+                "Résumé",
+                latest ? `#${latest.rank}` : "—",
+                history.length > 1 ? `from #${history[0].rank} in week ${history[0].week}` : ""
+            )
+        );
+        els.teamColophon.appendChild(
+            fact(
+                "Points for",
+                F.formatPoints(detail.points_for),
+                `${F.formatPoints(F.pointsPerGame(detail.points_for, detail.games_played))} per game`
+            )
+        );
+        els.teamColophon.appendChild(
+            fact(
+                "Against",
+                F.formatPoints(detail.points_against),
+                `${F.formatPoints(F.pointsPerGame(detail.points_against, detail.games_played))} per game`
+            )
+        );
+        // The last two come off the ledger. When the ledger failed — it is
+        // fetched alongside the team and its errors are deliberately quiet —
+        // they print a dash rather than a plausible zero.
+        els.teamColophon.appendChild(
+            fact(
+                "All-play",
+                row ? F.ledgerText(row, "all_play") : "—",
+                row ? rankSub(rows, "all_play", detail.espn_team_id) : ""
+            )
+        );
+        els.teamColophon.appendChild(
+            fact(
+                "Lineup",
+                row ? F.ledgerText(row, "lineup") : "—",
+                row && row.luck !== null && row.luck !== undefined
+                    ? `${F.formatSigned(row.luck)} wins on luck`
+                    : ""
+            )
+        );
+    }
 
-        const seasonLong = state.week === 0;
-        if (!data.in_season || data.is_fallback) {
-            els.offseasonBanner.textContent = seasonLong
-                ? `Offseason · ${state.season} season-long`
-                : `Offseason · ${state.season || ""} Week ${state.week || "—"}`;
-            els.offseasonBanner.hidden = false;
+    // ── the season, week by week ────────────────────────────────────────
+
+    function seasonRow(result, scale) {
+        const row = el("div", `season__wk${result.is_bye ? " season__wk--bye" : ""}`);
+        row.appendChild(el("span", "season__n", `Wk ${result.week}`));
+
+        if (result.is_bye) {
+            row.appendChild(el("span", "season__outcome season__outcome--bye", "BYE"));
+            row.appendChild(el("span", "season__opp dim", "—"));
+            row.appendChild(el("span", "season__score dim", "—"));
+            row.appendChild(el("span", "dv"));
+            return row;
         }
+
+        // Modifier comes from a fixed set, never from the display text — the
+        // pending state renders an em-dash, which is not a class name.
+        const modifier = { W: "w", L: "l", T: "t" }[result.outcome] || "pending";
+        row.appendChild(
+            el("span", `season__outcome season__outcome--${modifier}`, result.outcome || "—")
+        );
+
+        const opponent = result.opponent || {};
+        const opp = el("span", "season__opp");
+        opp.appendChild(document.createTextNode(opponent.name || "—"));
+        if (opponent.wins !== null && opponent.wins !== undefined) {
+            opp.appendChild(
+                el(
+                    "small",
+                    null,
+                    ` · ${F.recordLabel(opponent.wins, opponent.losses, opponent.ties)}`
+                )
+            );
+        }
+        row.appendChild(opp);
+
+        row.appendChild(
+            el(
+                "span",
+                "season__score",
+                result.points === null || result.points === undefined
+                    ? "—"
+                    : `${F.formatPoints(result.points)}–${F.formatPoints(result.opponent_points)}`
+            )
+        );
+
+        // One scale across the season: a margin bar is only readable against
+        // the other weeks on the same axis. A week not yet played draws no
+        // axis at all — divergingBar reports a missing margin and a genuine
+        // tie identically, and a lone zero rule under an unplayed week reads
+        // as a result that has not happened.
+        const holder = el("div", "dv");
+        if (result.margin !== null && result.margin !== undefined) {
+            holder.appendChild(el("div", "dv__zero"));
+            const bar = F.divergingBar(result.margin, scale);
+            if (bar.side !== "zero") {
+                const fill = el("div", `dv__bar dv__bar--${bar.side}`);
+                fill.style.width = `${bar.width}%`;
+                holder.appendChild(fill);
+            }
+        }
+        row.appendChild(holder);
+        return row;
     }
 
-    function initCompareControls() {
-        els.compareClear.addEventListener("click", () => {
-            state.compare = [];
-            renderCompareTray();
-            // Repaint the board's row buttons from the payload already in hand.
-            renderActiveBoard();
-        });
-        els.compareGo.addEventListener("click", openCompare);
-        els.compareDrawerClose.addEventListener("click", closeCompare);
-        els.compareBackdrop.addEventListener("click", closeCompare);
+    function renderTeamDetail(detail) {
+        renderTeamMasthead(detail);
+        renderColophon(detail);
+
+        els.teamResults.replaceChildren();
+        const results = detail.results || [];
+        if (!results.length) {
+            els.teamResults.appendChild(el("p", "empty-note", "No games recorded yet."));
+            return;
+        }
+        const scale = F.maxAbs(results.map((result) => result.margin));
+        results.forEach((result) => els.teamResults.appendChild(seasonRow(result, scale)));
     }
 
-    async function init() {
-        const urlState = readUrlState();
-        initSearch();
-        initMarketSort();
-        loadSeasonPropLeaders(state.seasonPropsMarket);
-        initSeasonFantasyScoring();
-        loadSeasonFantasyLeaders();
-        loadSeasonOffenses();
-        initCompareControls();
-        renderCompareTray();
-        els.showAllMarket.addEventListener("click", () => {
-            state.marketExpanded = !state.marketExpanded;
-            renderActiveBoard();
-        });
-        els.marketColumns.addEventListener("click", () => {
-            const expanded = document.getElementById("market-board").classList.toggle("show-details");
-            els.marketColumns.textContent = expanded ? "Fewer columns" : "More columns";
-            els.marketColumns.setAttribute("aria-expanded", String(expanded));
-        });
-        els.weekStepBack.addEventListener("click", () => stepWeekBoard(-1));
-        els.weekStepNext.addEventListener("click", () => stepWeekBoard(1));
-        els.playerMarkets.addEventListener("click", () => openMarkets());
-        els.marketsClose.addEventListener("click", () => closeMarkets());
-        els.marketsBackdrop.addEventListener("click", () => closeMarkets());
-        document.querySelectorAll("[data-movers]").forEach((button) => {
-            button.addEventListener("click", () => {
-                state.moversView = button.dataset.movers;
-                document.querySelectorAll("[data-movers]").forEach((item) => {
-                    const on = item === button;
-                    item.classList.toggle("is-active", on);
-                    item.setAttribute("aria-pressed", String(on));
-                });
-                renderMarketMovers();
+    // ── the roster, by room ─────────────────────────────────────────────
+
+    function playerRow(entry, line, measured) {
+        const item = el("li", `roster__row${entry.matched ? "" : " roster__row--unmatched"}`);
+        item.appendChild(el("span", "roster__slot", entry.lineup_slot || "—"));
+
+        const main = el("div", "roster__main");
+        main.appendChild(el("span", "roster__name", entry.name || "—"));
+        const meta = [entry.position, entry.pro_team].filter(Boolean).join(" · ");
+        main.appendChild(el("span", "roster__meta", meta));
+        if (entry.matched) {
+            const detail = [];
+            if (entry.projection && entry.projection[LEAGUE_PROJECTION_FIELD] != null) {
+                detail.push(`Proj ${F.formatPoints(entry.projection[LEAGUE_PROJECTION_FIELD])}`);
+            }
+            if (entry.ranking && entry.ranking.rank != null) {
+                const position = entry.ranking.position === "DEF" ? "DST" : entry.ranking.position;
+                detail.push(`${position || LEAGUE_SCORING_LABEL} #${entry.ranking.rank}`);
+            }
+            const actual = (entry.recent_actuals || [])[0];
+            if (actual && actual[LEAGUE_ACTUAL_FIELD] != null) {
+                detail.push(`Last ${F.formatPoints(actual[LEAGUE_ACTUAL_FIELD])}`);
+            }
+            if (detail.length) main.appendChild(el("span", "roster__data", detail.join(" · ")));
+            const prop = (entry.props || [])[0];
+            if (prop) {
+                const point = prop.point == null ? "" : ` ${prop.point}`;
+                main.appendChild(el("span", "roster__prop", `${prop.label}${point}`));
+            }
+        }
+        item.appendChild(main);
+
+        const badge = F.injuryBadge(entry.injury_status);
+        if (badge) item.appendChild(el("span", "roster__injury", badge));
+        // Season points per game, in a room that has any. A dash means "this
+        // player has not played", which is only worth saying where the rest
+        // of the room has numbers — an unmeasurable room gets no column at
+        // all rather than one dash per name.
+        if (measured) {
+            const played = line && line.points_per_game != null;
+            item.appendChild(
+                el(
+                    "span",
+                    `roster__ppg${played ? "" : " dim"}`,
+                    played ? F.formatPoints(line.points_per_game) : "—"
+                )
+            );
+        }
+        return item;
+    }
+
+    // The bar is the room against the league at the same position, with a
+    // tick where the league average falls. Position, not length alone, is
+    // what makes "above average" readable.
+    // Each room's axis runs to 1.6x the league average at that position,
+    // which puts the average tick at the same place in every room unless a
+    // room is strong enough to run past it. That fixed anchor is the point:
+    // it is what lets you compare a quarterback room to a tight end room by
+    // eye, when the two positions score nothing like the same number.
+    function roomStrength(room) {
+        const best = Math.max(
+            room.points_per_game || 0,
+            (room.league_average || 0) * 1.6,
+            1
+        );
+        const wrap = el("div", "room__strength");
+        const track = el("div", "meter");
+        const fill = el("div", "meter__fill");
+        fill.style.width = `${Math.min(100, (room.points_per_game / best) * 100)}%`;
+        track.appendChild(fill);
+        if (room.league_average != null) {
+            const tick = el("div", "meter__avg");
+            tick.style.left = `${Math.min(100, (room.league_average / best) * 100)}%`;
+            track.appendChild(tick);
+        }
+        wrap.appendChild(track);
+        wrap.appendChild(
+            el(
+                "span",
+                "room__scale",
+                `${F.formatPoints(room.points_per_game)} / ${F.formatPoints(room.league_average)} avg`
+            )
+        );
+        return wrap;
+    }
+
+    function roomSection(group, measure, production) {
+        const section = el("div", "room");
+        const head = el("div", "room__head");
+        head.appendChild(el("h3", null, group.label));
+        if (measure && measure.rank) {
+            const rank = el("span", "room__rank");
+            rank.appendChild(el("b", null, F.ordinal(measure.rank)));
+            rank.appendChild(document.createTextNode(` of ${measure.teams}`));
+            head.appendChild(rank);
+        }
+        section.appendChild(head);
+
+        const measured = Boolean(measure && measure.points_per_game != null);
+        if (measured) section.appendChild(roomStrength(measure));
+
+        const list = el("ul", "roster");
+        group.entries.forEach((entry) =>
+            list.appendChild(playerRow(entry, production[entry.player_id], measured))
+        );
+        section.appendChild(list);
+        return section;
+    }
+
+    function renderRoster(payload, rooms) {
+        els.teamRoster.replaceChildren();
+        if (!payload.entries.length) {
+            els.teamRoster.appendChild(el("p", "empty-note", "No roster snapshot yet."));
+            els.rosterNote.textContent = "";
+            els.roomsLede.textContent = "";
+            return;
+        }
+
+        // The measurement is optional. Without it the rooms still group and
+        // still list, they just carry no bar and no rank.
+        const measures = {};
+        const production = {};
+        ((rooms && rooms.rooms) || []).forEach((room) => {
+            measures[room.position] = room;
+            Object.keys(room.players || {}).forEach((playerId) => {
+                production[playerId] = room.players[playerId];
             });
         });
-        els.chooseTeam.addEventListener("click", () => {
-            els.teamSelect.hidden = false;
-            els.teamSelect.focus();
-        });
-        els.teamSelect.addEventListener("change", saveMemberTeam);
-        els.drawerClose.addEventListener("click", closeDrawer);
-        els.drawerBackdrop.addEventListener("click", closeDrawer);
-        document.addEventListener("keydown", (e) => {
-            trapDialogFocus(e);
-            if (e.key !== "Escape") return;
-            if (!els.marketsDrawer.hidden) closeMarkets();
-            else if (!els.compareDrawer.hidden) closeCompare();
-            else if (!els.drawer.hidden) closeDrawer();
-        });
-        window.addEventListener("popstate", () => {
-            const params = new URLSearchParams(window.location.search);
-            const player = params.get("player");
-            const category = params.get("category");
-            els.drawer.hidden = true;
-            els.compareDrawer.hidden = true;
-            els.marketsDrawer.hidden = true;
-            state.drawerPlayerId = null;
-            state.seasonPropsMarket = null;
-            syncDrawerBody();
-            if (player) openPlayer(player, false);
-            else if (category) openMarkets(category, false);
+        els.roomsLede.textContent = rooms && rooms.available
+            ? "Season points per game, for the players on this roster now, against the league average at each position."
+            : "";
+
+        F.groupByPosition(payload.entries).forEach((group) => {
+            els.teamRoster.appendChild(
+                roomSection(group, measures[group.position], production)
+            );
         });
 
-        try {
-            const stateData = await fetchJson(`${API_BASE}/state`);
-            renderHeader(stateData);
-            loadMemberSnapshot();
-            loadMarketMovers();
-        } catch (err) {
-            showError("Could not load the current NFL week.");
+        const notes = [F.formatAsOf(payload.as_of)];
+        if (payload.player_data && payload.player_data.season) {
+            const week = payload.player_data.week === 0
+                ? "season-long"
+                : `week ${payload.player_data.week}`;
+            notes.push(`${payload.player_data.season} ${week} player data`);
+        }
+        els.rosterNote.textContent = notes.filter(Boolean).join(" · ");
+    }
+
+    // ── start/sit ───────────────────────────────────────────────────────
+    //
+    // The roster read already joins every spot to the week's projection and
+    // the league already stores its lineup slot counts, so the best legal
+    // lineup is arithmetic on data the hub was fetching anyway. The card
+    // shows the decision, not the assignment: who belongs in and who belongs
+    // out. Those are separate sets because a multi-slot lineup does not imply
+    // a legal or meaningful one-for-one swap pairing.
+
+    function renderLineup(payload) {
+        // A league whose lineup settings were never collected has no lineup to
+        // grade, and a card that says nothing is worse than no card.
+        if (!payload || payload.available === false || !(payload.slots || []).length) {
+            els.lineupCard.hidden = true;
+            return;
+        }
+        els.lineupCard.hidden = false;
+
+        const week = payload.week === 0 ? "season-long" : `week ${payload.week}`;
+        els.lineupMeta.textContent = `Best legal lineup for ${week}, on ${LEAGUE_SCORING_LABEL} projections`;
+
+        els.lineupTotals.replaceChildren();
+        els.lineupTotals.appendChild(lineupTotal("Started", F.formatPoints(payload.current.total)));
+        els.lineupTotals.appendChild(lineupTotal("Best possible", F.formatPoints(payload.optimal.total)));
+        const gain = lineupTotal(
+            "On the bench",
+            payload.gain != null && payload.gain > 0 ? `+${F.formatPoints(payload.gain)}` : "—"
+        );
+        if (payload.gain != null && payload.gain > 0) gain.classList.add("lineup__total--gain");
+        els.lineupTotals.appendChild(gain);
+
+        const starts = payload.starts || [];
+        const sits = payload.sits || [];
+        els.lineupChanges.replaceChildren();
+        if (!starts.length && !sits.length) {
+            const complete = !payload.unprojected_starters && !payload.unfilled_slots;
+            els.lineupChanges.appendChild(
+                el(
+                    "li",
+                    "lineup__ok",
+                    complete
+                        ? "This is the best lineup this roster can field."
+                        : "A complete lineup comparison is not available."
+                )
+            );
+        }
+        starts.forEach((player) => els.lineupChanges.appendChild(lineupChange("Start", player)));
+        sits.forEach((player) => els.lineupChanges.appendChild(lineupChange("Sit", player)));
+
+        const notes = [];
+        if (payload.unprojected_starters) {
+            const count = payload.unprojected_starters;
+            notes.push(
+                `${count} starter${count === 1 ? " has" : "s have"} no projection this week, ` +
+                    "so the overall gain cannot be calculated"
+            );
+        }
+        if (payload.unfilled_slots) {
+            notes.push(`${payload.unfilled_slots} slot${payload.unfilled_slots === 1 ? "" : "s"} could not be filled`);
+        }
+        notes.push(F.formatAsOf(payload.projection_as_of || payload.as_of));
+        els.lineupNote.textContent = notes.filter(Boolean).join(" · ");
+    }
+
+    function lineupTotal(label, value) {
+        const wrap = el("div", "lineup__total");
+        wrap.appendChild(el("dt", null, label));
+        wrap.appendChild(el("dd", null, value));
+        return wrap;
+    }
+
+    function lineupSide(label, player) {
+        const side = el("div", `lineup__side lineup__side--${label.toLowerCase()}`);
+        side.appendChild(el("span", "lineup__label", label));
+        side.appendChild(el("span", "lineup__name", player.name || "—"));
+        const meta = [player.position, player.pro_team].filter(Boolean).join(" · ");
+        const points = player.projected_points == null
+            ? "no projection"
+            : F.formatPoints(player.projected_points);
+        side.appendChild(el("span", "lineup__points", [meta, points].filter(Boolean).join(" · ")));
+        return side;
+    }
+
+    function lineupChange(label, player) {
+        const item = el("li", "lineup__change");
+        item.appendChild(el("span", "lineup__slot", player.slot || "—"));
+        item.appendChild(lineupSide(label, player));
+        return item;
+    }
+
+    function renderTeamOverview(payload) {
+        // "missing" means nothing has been written for this team/week yet.
+        // Generating costs a model call, so it stays an explicit choice
+        // rather than something a page view triggers.
+        if (payload.status === "missing") {
+            els.teamLede.replaceChildren(
+                el("p", "empty-note", "No overview written for this team yet.")
+            );
+            els.teamOverviewMeta.textContent = "";
+            els.teamOverviewRefresh.textContent = "Write overview";
+            return;
         }
 
-        await Promise.all([
-            loadDashboard(),
-            loadGames(),
-            loadProps(),
-            loadFutures(),
-        ]);
+        renderMarkdown(els.teamLede, payload.overview_md || "No overview available.");
+        const source = payload.source === "model" ? "Model summary" : "Local summary";
+        const parts = [source, `Week ${payload.week}`];
+        if (payload.status === "stale") {
+            parts.push("team data has changed");
+        } else if (!payload.cache_hit) {
+            parts.push("updated");
+        }
+        els.teamOverviewMeta.textContent = parts.join(" · ");
+        els.teamOverviewRefresh.textContent =
+            payload.status === "stale" ? "Refresh overview" : "Check for updates";
+    }
 
-        if (urlState.player) openPlayer(urlState.player, false);
-        else if (urlState.category) openMarkets(urlState.category, false);
+    // ── loading ─────────────────────────────────────────────────────────
+
+    function stale(generation) {
+        return generation !== state.generation;
+    }
+
+    async function loadLedger() {
+        const generation = state.generation;
+        const request = ++state.ledgerRequest;
+        const params = new URLSearchParams({ algorithm: state.algorithm });
+        if (state.season) params.set("season", state.season);
+        try {
+            const payload = await fetchJson(`${API_BASE}/ledger?${params}`);
+            if (stale(generation) || request !== state.ledgerRequest) return;
+            state.ledger = payload;
+            renderAlgorithmSelect(payload.algorithms);
+            renderColumnChips();
+            renderLedger(payload);
+            renderCharts(payload);
+        } catch (error) {
+            if (stale(generation) || request !== state.ledgerRequest) return;
+            // Being signed out is a whole-page condition; anything else is
+            // this board's problem alone. The ledger is also fetched while a
+            // team page is open, and a failure there should not put an error
+            // banner over a view the table is not even on.
+            if (error instanceof ForbiddenError) {
+                handleFailure(error);
+                return;
+            }
+            state.ledger = null;
+            els.ledger.replaceChildren(el("p", "empty-note", "The table is unavailable right now."));
+            els.ledgerNote.textContent = "";
+            els.ledgerFootnote.textContent = "";
+            els.chartsBoard.hidden = true;
+        }
+    }
+
+    // Switching column re-sorts and redraws from the payload already in
+    // hand; only the power *method* costs a request, because the ranks
+    // themselves are computed server-side.
+    function selectColumn(key) {
+        if (key === state.column) return;
+        state.column = key;
+        writeUrlState(true);
+        renderColumnChips();
+        if (state.ledger) {
+            renderLedger(state.ledger);
+            renderCharts(state.ledger);
+        }
+    }
+
+    async function loadScoreboard() {
+        const generation = state.generation;
+        const params = new URLSearchParams();
+        if (state.season) params.set("season", state.season);
+        if (state.scoreWeek) params.set("week", state.scoreWeek);
+        try {
+            const payload = await fetchJson(`${API_BASE}/scoreboard?${params}`);
+            if (stale(generation)) return;
+            state.scoreWeek = payload.week;
+            fillWeekSelect(els.scoreboardWeek, payload.available_weeks, payload.week);
+            renderScoreboard(payload);
+        } catch (error) {
+            if (!stale(generation)) handleFailure(error);
+        }
+    }
+
+    // ── your team ───────────────────────────────────────────────────────
+    //
+    // The hub knew all twelve teams and not which one was yours, so start/sit
+    // — advice about one specific roster — was reachable only by recognising
+    // your own name in the Teams grid. /league/me already stores the mapping
+    // for the dashboard hero; this is the same read, used where the advice is.
+
+    async function loadMyTeam() {
+        const generation = state.generation;
+        const params = new URLSearchParams({ scoring: LEAGUE_SCORING });
+        if (state.season) params.set("season", state.season);
+        try {
+            const me = await fetchJson(`${API_BASE}/me?${params}`);
+            if (stale(generation)) return;
+            if (me.status !== "configured" || !me.snapshot || !me.selected_team_id) {
+                state.myTeamId = null;
+                els.myTeamStrip.hidden = true;
+                unresolvedMyTeam(
+                    "Pick your team below and My Team will open straight to it."
+                );
+                return;
+            }
+            // The ledger highlights your row, so it needs to know which one
+            // is yours before it draws.
+            state.myTeamId = me.selected_team_id;
+            // "My Team" in the section nav is a link to ?team=me, because the
+            // nav has no way to know your team id. This is where that becomes
+            // a real team.
+            if (state.pendingMyTeam) {
+                state.pendingMyTeam = false;
+                state.teamId = me.selected_team_id;
+                writeUrlState(true);
+            }
+            renderMyTeam(me);
+            // Advice is a second request and a nice-to-have: the strip is
+            // already useful as a shortcut without it.
+            const lineupParams = new URLSearchParams(params);
+            lineupParams.set("scoring", LEAGUE_SCORING);
+            const lineup = await fetchJson(
+                `${API_BASE}/teams/${me.selected_team_id}/lineup?${lineupParams}`
+            ).catch(() => null);
+            if (stale(generation)) return;
+            renderMyTeamAdvice(lineup, me.selected_team_id);
+        } catch (error) {
+            if (!stale(generation)) {
+                state.myTeamId = null;
+                els.myTeamStrip.hidden = true;
+                unresolvedMyTeam("Could not work out which team is yours.");
+            }
+        }
+    }
+
+    // ?team=me that resolves to nobody must not leave the page on a blank
+    // team view. Fall back to the league, and say why.
+    function unresolvedMyTeam(message) {
+        if (!state.pendingMyTeam) return;
+        state.pendingMyTeam = false;
+        state.teamId = null;
+        writeUrlState(true);
+        showNotice(message);
+    }
+
+    function showNotice(message) {
+        els.routeBanner.textContent = message;
+        els.routeBanner.hidden = false;
+    }
+
+    function teamHref(teamId) {
+        const params = new URLSearchParams();
+        if (state.season) params.set("season", state.season);
+        params.set("team", String(teamId));
+        return `/fantasy/?${params}`;
+    }
+
+    function renderMyTeam(me) {
+        const snapshot = me.snapshot;
+        const team = snapshot.team || {};
+        els.myTeamStrip.hidden = false;
+        els.myTeamName.textContent = team.name || team.abbrev || "Your team";
+        els.myTeamName.href = teamHref(me.selected_team_id);
+        const record = snapshot.record || {};
+        els.myTeamMeta.textContent = [
+            F.recordLabel(record.wins, record.losses, record.ties),
+            snapshot.is_bye
+                ? "Bye"
+                : snapshot.opponent
+                    ? `vs ${snapshot.opponent.name || snapshot.opponent.abbrev}`
+                    : "",
+            snapshot.power_rank ? `Power #${snapshot.power_rank}` : "",
+        ].filter(Boolean).join(" · ");
+    }
+
+    function renderMyTeamAdvice(lineup, teamId) {
+        // Same rule the start/sit card follows: no advice is better than
+        // advice assembled from a season the projections do not cover.
+        els.myTeamMoves.replaceChildren();
+        if (!lineup || lineup.available === false || lineup.gain == null) {
+            els.myTeamAdvice.hidden = true;
+            return;
+        }
+        els.myTeamAdvice.hidden = false;
+        els.myTeamAdvice.href = teamHref(teamId);
+        els.myTeamAdvice.textContent = lineup.gain > 0
+            ? `Your lineup leaves ${F.formatPoints(lineup.gain)} on the bench →`
+            : "Your lineup is the best one available →";
+        els.myTeamAdvice.classList.toggle("my-team__advice--gain", lineup.gain > 0);
+
+        // Starts and sits are listed as two sets rather than paired swaps,
+        // because the lineup read deliberately does not pair them: with
+        // overlapping FLEX seats a change is not always one player for one.
+        const moves = []
+            .concat((lineup.starts || []).map((player) => ["Start", player]))
+            .concat((lineup.sits || []).map((player) => ["Sit", player]));
+        moves.slice(0, 4).forEach(([label, player]) => {
+            const item = el("li", `my-team__move my-team__move--${label.toLowerCase()}`);
+            item.appendChild(el("span", "my-team__move-label", label));
+            item.appendChild(el("span", "my-team__move-name", player.name || "—"));
+            item.appendChild(
+                el(
+                    "span",
+                    "my-team__move-points",
+                    player.projected_points == null
+                        ? "—"
+                        : F.formatPoints(player.projected_points)
+                )
+            );
+            els.myTeamMoves.appendChild(item);
+        });
+    }
+
+    function scrollToRequestedBoard(hash = window.location.hash) {
+        if (!hash || hash.length < 2) return;
+        let id;
+        try {
+            id = decodeURIComponent(hash.slice(1));
+        } catch (_error) {
+            return;
+        }
+        const target = document.getElementById(id);
+        if (target) target.scrollIntoView({ block: "start" });
+    }
+
+    // ── power rankings: the rosters ─────────────────────────────────────
+    //
+    // The table ranks results. This ranks what each team holds: its best
+    // legal lineup in projected points a week, less what byes and injuries
+    // cost once the bench covers them. The server does the lineup math; the
+    // page's job is to make "why" legible — the weakest seat, and the good
+    // players a roster cannot use.
+
+    const UNAVAILABLE_POWER = {
+        projection_season_mismatch:
+            "Power rankings use this season's projections, so they only cover the current season.",
+        missing_lineup_settings: "This season has no stored lineup settings to build lineups from.",
+        missing_roster_snapshot: "No roster snapshot has been collected for this season yet.",
+        missing_projections: "No player projections have been collected yet.",
+    };
+
+    function rosterPowerTeam(teamId) {
+        const payload = state.rosterPower;
+        if (!payload || !payload.available) return null;
+        return payload.teams.find((team) => team.espn_team_id === teamId) || null;
+    }
+
+    async function loadRosterPower() {
+        const generation = state.generation;
+        const params = new URLSearchParams({ scoring: LEAGUE_SCORING });
+        if (state.season) params.set("season", state.season);
+        try {
+            const payload = await fetchJson(`${API_BASE}/roster-power?${params}`);
+            if (stale(generation)) return;
+            state.rosterPower = payload;
+            renderRosterPower(payload);
+        } catch (error) {
+            if (stale(generation)) return;
+            state.rosterPower = null;
+            els.powerList.replaceChildren();
+            els.powerNote.textContent = "";
+            els.powerFootnote.textContent = "";
+            els.powerList.appendChild(el("li", "empty-note", "Power rankings are unavailable right now."));
+        }
+    }
+
+    function ordinal(n) {
+        const tens = n % 100;
+        if (tens >= 11 && tens <= 13) return `${n}th`;
+        return `${n}${{ 1: "st", 2: "nd", 3: "rd" }[n % 10] || "th"}`;
+    }
+
+    function playerLabel(player) {
+        return `${player.name || "—"} (${player.position})`;
+    }
+
+    function powerDetail(team) {
+        const detail = el("details", "power-detail");
+        detail.appendChild(el("summary", null, "Lineup and what each player adds"));
+        const table = el("table", "power-detail__table");
+        const head = el("tr");
+        ["Slot", "Player", "Pts/g", "Adds"].forEach((label) => head.appendChild(el("th", null, label)));
+        const thead = el("thead");
+        thead.appendChild(head);
+        table.appendChild(thead);
+        const body = el("tbody");
+        const surplusIds = new Set(team.surplus.map((player) => player.player_id));
+        const starters = team.players.filter((player) => player.slot);
+        const waivers = team.waiver_starters || [];
+        const bench = team.players.filter((player) => !player.slot);
+        const row = (player, slotText, kind) => {
+            const tr = el("tr", kind ? `power-detail__row--${kind}` : null);
+            tr.appendChild(el("td", "power-detail__slot", slotText));
+            const name = el("td", "power-detail__name", player.name || "—");
+            const tags = [player.position];
+            if (player.pro_team) tags.push(player.pro_team);
+            if (player.out) tags.push("out");
+            if (kind === "waiver") tags.push("waivers");
+            if (surplusIds.has(player.player_id)) tags.push("surplus");
+            name.appendChild(el("small", null, tags.join(" · ")));
+            tr.appendChild(name);
+            tr.appendChild(el("td", "power-detail__num", F.formatPoints(player.ppg)));
+            tr.appendChild(
+                el(
+                    "td",
+                    "power-detail__num",
+                    player.marginal === null || player.marginal === undefined
+                        ? "—"
+                        : `+${F.formatPoints(Math.max(0, player.marginal))}`
+                )
+            );
+            body.appendChild(tr);
+        };
+        starters.forEach((player) => row(player, player.slot));
+        waivers.forEach((player) => row(player, player.slot, "waiver"));
+        bench.forEach((player) => row(player, "Bench", "bench"));
+        table.appendChild(body);
+        detail.appendChild(table);
+        detail.appendChild(
+            el(
+                "p",
+                "power-detail__note",
+                "Adds: expected points a week this team loses without the player. A starter is worth his gap over the next man up; a backup is worth only the weeks he would fill in."
+            )
+        );
+        return detail;
+    }
+
+    function renderRosterPower(payload) {
+        els.powerList.replaceChildren();
+        els.powerFootnote.textContent = "";
+        if (!payload.available) {
+            els.powerNote.textContent = "";
+            els.powerList.appendChild(
+                el("li", "empty-note", UNAVAILABLE_POWER[payload.unavailable_reason] || "Power rankings are unavailable.")
+            );
+            return;
+        }
+
+        const teams = payload.teams;
+        const axis = F.niceAxis(teams.map((team) => team.expected), 2);
+        els.powerNote.textContent = payload.week
+            ? `Projections through week ${payload.week} · ${payload.scoring === "half" ? "Half PPR" : payload.scoring}`
+            : "";
+
+        teams.forEach((team) => {
+            const item = el("li", "power-row");
+            if (team.espn_team_id === state.myTeamId) item.classList.add("power-row--mine");
+
+            item.appendChild(el("span", "power-row__rank", String(team.rank)));
+
+            const who = el("div", "power-row__team");
+            who.appendChild(teamCell(team));
+            const meta = el("span", "power-row__meta");
+            const record = F.recordLabel(team.wins, team.losses, team.ties);
+            meta.appendChild(document.createTextNode(record));
+            if (team.standings_rank) {
+                meta.appendChild(document.createTextNode(` · ${ordinal(team.standings_rank)} in standings`));
+                const gap = team.standings_rank - team.rank;
+                // Only a real disagreement is worth a mark; one place either
+                // way is a tiebreaker, not a story.
+                if (Math.abs(gap) >= 3) {
+                    meta.appendChild(
+                        el(
+                            "span",
+                            `power-row__gap power-row__gap--${gap > 0 ? "up" : "down"}`,
+                            gap > 0 ? "roster better than record" : "record better than roster"
+                        )
+                    );
+                }
+            }
+            who.appendChild(meta);
+            item.appendChild(who);
+
+            const value = el("div", "power-row__value");
+            value.appendChild(el("strong", null, F.formatPoints(team.expected)));
+            value.appendChild(el("small", null, "pts/wk"));
+            item.appendChild(value);
+
+            const position = axis ? F.dotPosition(team.expected, axis.min, axis.max) : null;
+            if (position !== null) {
+                const track = el("div", "dot power-row__chart");
+                track.appendChild(el("div", "dot__line"));
+                const point = el("div", "dot__pt");
+                point.style.left = `${position}%`;
+                track.appendChild(point);
+                item.appendChild(track);
+            }
+
+            const notes = el("ul", "power-row__notes");
+            if (team.need) {
+                const need = team.need;
+                const seat = need.seat || need.slot;
+                const item = el("li", "power-note power-note--need");
+                item.appendChild(el("span", "power-note__label", `Weakest spot: ${seat}`));
+                // Name the seat as the problem, not the player in it: a
+                // team's RB2 can be a fine back who is simply its second.
+                const text = need.from_waivers
+                    ? `Nobody on the roster can fill it — the best free agent, ${need.name} (${need.position}), projects ${F.formatPoints(need.ppg)} pts/game vs ${F.formatPoints(need.league_average)} for other teams' ${seat} starters.`
+                    : `${need.name} projects ${F.formatPoints(need.ppg)} pts/game; the average ${seat} in this league projects ${F.formatPoints(need.league_average)}.`;
+                item.appendChild(document.createTextNode(text));
+                notes.appendChild(item);
+            }
+            if (team.surplus.length) {
+                const spare = el("li", "power-note power-note--surplus");
+                spare.appendChild(el("span", "power-note__label", "Surplus"));
+                spare.appendChild(
+                    document.createTextNode(
+                        `${team.surplus.map(playerLabel).join(", ")} — ${
+                            team.surplus.length === 1 ? "adds" : "add"
+                        } almost nothing here`
+                    )
+                );
+                notes.appendChild(spare);
+            }
+            if (notes.childNodes.length) item.appendChild(notes);
+
+            item.appendChild(powerDetail(team));
+            els.powerList.appendChild(item);
+        });
+
+        const waivers = Object.entries(payload.replacements || {})
+            .map(([position, player]) => `${position} ${F.formatPoints(player.ppg)}`)
+            .join(", ");
+        els.powerFootnote.textContent =
+            `Player values average the season-long projection with this week's; a player projected for zero this week, or on IR, counts at half. ` +
+            `Starters are assumed to miss ${Math.round(payload.absence_rate * 100)}% of weeks. ` +
+            (waivers ? `Waiver replacement level (pts/g): ${waivers}.` : "");
+    }
+
+    // ── free agents ─────────────────────────────────────────────────────
+    //
+    // Every other waiver list on the internet ranks the player pool. This one
+    // subtracts twelve rosters from it, which is the only version of the
+    // question anybody actually asks. The hub stores all twelve, so the
+    // subtraction is a set difference rather than a guess.
+
+    async function loadFreeAgents() {
+        const generation = state.generation;
+        const params = new URLSearchParams({ scoring: LEAGUE_SCORING, limit: "25" });
+        if (state.season) params.set("season", state.season);
+        try {
+            const payload = await fetchJson(`${API_BASE}/free-agents?${params}`);
+            if (stale(generation)) return;
+            renderFreeAgents(payload);
+        } catch (error) {
+            if (stale(generation)) return;
+            // A read that failed is a different thing from a league where
+            // everyone is rostered, and an empty list would read as the
+            // second. The board stays, and says which one this is.
+            els.freeAgents.replaceChildren();
+            els.freeAgentsNote.textContent = "Unavailable right now.";
+            els.freeAgentsToggle.hidden = true;
+            state.freeAgentsPayload = null;
+        }
+    }
+
+    function renderFreeAgents(payload) {
+        els.freeAgents.replaceChildren();
+        state.freeAgentsPayload = payload;
+        // Same rule the start/sit card follows: with no roster snapshot to
+        // subtract, or rankings from a different season than the one being
+        // browsed, there is no claim to make and the board says nothing by
+        // not being there.
+        const board = els.freeAgents.closest(".board");
+        if (!payload || payload.available === false) {
+            if (board) board.hidden = true;
+            els.freeAgentsNote.textContent = "";
+            els.freeAgentsToggle.hidden = true;
+            return;
+        }
+        if (board) board.hidden = false;
+
+        if (!payload.entries.length) {
+            els.freeAgents.appendChild(
+                el("li", "empty-note", "Every ranked player is on a roster.")
+            );
+            els.freeAgentsNote.textContent = "";
+            els.freeAgentsToggle.hidden = true;
+            return;
+        }
+
+        const visibleEntries = state.freeAgentsExpanded
+            ? payload.entries
+            : payload.entries.slice(0, 10);
+        visibleEntries.forEach((entry) => {
+            const item = el("li", "free-agent");
+            item.appendChild(el("span", "free-agent__rank", `#${entry.rank}`));
+            const main = el("div", "free-agent__main");
+            main.appendChild(el("span", "free-agent__name", entry.name || "—"));
+            const meta = [entry.position, entry.team].filter(Boolean).join(" · ");
+            main.appendChild(el("span", "free-agent__meta", meta));
+            item.appendChild(main);
+            if (entry.trending_adds) {
+                // Sleeper's whole user base, not this league — a measure of how
+                // contested the pickup is, not of whether he is good.
+                const hot = el("span", "free-agent__trend", `+${F.compactCount(entry.trending_adds)} adds`);
+                hot.title = `${entry.trending_adds.toLocaleString()} Sleeper adds in the last day`;
+                item.appendChild(hot);
+            }
+            item.appendChild(
+                el("span", "free-agent__points", F.formatPoints(entry.projected_points))
+            );
+            const badge = F.injuryBadge(entry.injury_status);
+            if (badge) item.appendChild(el("span", "roster__injury", badge));
+            els.freeAgents.appendChild(item);
+        });
+
+        els.freeAgentsToggle.hidden = payload.entries.length <= 10;
+        els.freeAgentsToggle.textContent = state.freeAgentsExpanded
+            ? "Show top 10"
+            : `Show all ${payload.entries.length}`;
+        els.freeAgentsToggle.setAttribute("aria-expanded", String(state.freeAgentsExpanded));
+
+        const week = payload.week === 0 ? "season-long" : `week ${payload.week}`;
+        els.freeAgentsNote.textContent = [
+            `${payload.rostered} players rostered`,
+            `${week} ${LEAGUE_SCORING_LABEL} projections`,
+            // The exclusion is only as fresh as the last league sync, and a
+            // stale claim here is the difference between a waiver and a laugh.
+            `rosters ${F.formatAsOf(payload.roster_as_of) || "unknown"}`,
+        ].join(" · ");
+    }
+
+    async function loadTeam() {
+        const generation = state.generation;
+        const params = new URLSearchParams();
+        if (state.season) params.set("season", state.season);
+        // Clear the whole view, not only the overview: without this the
+        // previous team's roster and results sit under the new team's name
+        // for as long as the fetch takes.
+        els.teamLede.replaceChildren();
+        els.teamOverviewMeta.textContent = "";
+        els.teamColophon.replaceChildren();
+        els.teamResults.replaceChildren();
+        els.teamRoster.replaceChildren();
+        els.rosterNote.textContent = "";
+        els.roomsLede.textContent = "";
+        els.lineupCard.hidden = true;
+        try {
+            const lineupParams = new URLSearchParams(params);
+            // The roster list below prints Half PPR projections, so the lineup that
+            // grades them has to be scored the same way.
+            lineupParams.set("scoring", LEAGUE_SCORING);
+            const [detail, roster, lineup, rooms] = await Promise.all([
+                fetchJson(`${API_BASE}/teams/${state.teamId}?${params}`),
+                fetchJson(`${API_BASE}/teams/${state.teamId}/roster?${params}`),
+                fetchJson(`${API_BASE}/teams/${state.teamId}/lineup?${lineupParams}`).catch(
+                    // Advice is the one part of this page that can be missing
+                    // without the page being broken.
+                    () => null
+                ),
+                // Nor is the league-wide measurement: without it the rooms
+                // still group and list, they just carry no bar and no rank.
+                fetchJson(`${API_BASE}/teams/${state.teamId}/rooms?${params}`).catch(
+                    () => null
+                ),
+            ]);
+            if (stale(generation)) return;
+            renderTeamDetail(detail);
+            renderRoster(roster, rooms);
+            renderLineup(lineup);
+            loadTeamOverview(false);
+        } catch (error) {
+            if (!stale(generation)) handleFailure(error);
+        }
+    }
+
+    // write=false is a plain read and never generates; write=true POSTs and
+    // may spend a model call, so it only ever runs from an explicit click.
+    async function loadTeamOverview(write) {
+        const generation = state.generation;
+        const params = new URLSearchParams();
+        if (state.season) params.set("season", state.season);
+        els.teamOverviewRefresh.disabled = true;
+        els.teamOverviewMeta.textContent = write ? "Writing…" : "Loading…";
+        try {
+            const payload = await fetchJson(`${API_BASE}/teams/${state.teamId}/overview?${params}`, {
+                method: write ? "POST" : "GET",
+            });
+            if (stale(generation)) return;
+            renderTeamOverview(payload);
+        } catch (error) {
+            if (!stale(generation)) {
+                els.teamOverviewMeta.textContent = "";
+                els.teamLede.replaceChildren(
+                    el("p", "empty-note", error.message || "Overview unavailable.")
+                );
+            }
+        } finally {
+            if (!stale(generation)) els.teamOverviewRefresh.disabled = false;
+        }
+    }
+
+    function applyRoute() {
+        const showingTeam = Boolean(state.teamId);
+        els.teamView.hidden = !showingTeam;
+        els.leagueSections.hidden = showingTeam;
+        // Swap the masthead before the fetch, not after it: the league's
+        // record must never stand for a frame under a team's name.
+        setMastheadMode(showingTeam);
+        if (showingTeam) {
+            renderTeamMasthead(null);
+            loadTeam();
+        }
+    }
+
+    async function loadSeason() {
+        const generation = ++state.generation;
+        const requestedHash = window.location.hash;
+        state.freeAgentsExpanded = false;
+        state.freeAgentsPayload = null;
+        state.rosterPower = null;
+        state.myTeamId = null;
+        els.myTeamStrip.hidden = true;
+        els.routeBanner.hidden = true;
+        clearError();
+        try {
+            const params = state.season ? `?season=${state.season}` : "";
+            const overview = await fetchJson(`${API_BASE}/overview${params}`);
+            if (stale(generation)) return;
+
+            if (!overview.season) {
+                setView("empty");
+                return;
+            }
+
+            state.overview = overview;
+            state.season = overview.season;
+            state.mode = overview.mode;
+            state.leagueId = overview.league_id || null;
+            setView("league");
+            renderHeader(overview);
+            renderSeasonChips(overview.seasons);
+            writeUrlState(true, requestedHash);
+
+            const standings = await fetchJson(`${API_BASE}/standings?season=${state.season}`);
+            if (stale(generation)) return;
+            renderTeamsGrid(standings);
+
+            // The ledger is the page; it loads before the boards under it so
+            // the table is readable while the rest fills in.
+            await loadMyTeam();
+            await Promise.all([
+                loadRosterPower(),
+                loadLedger(),
+                loadScoreboard(),
+                loadFreeAgents(),
+            ]);
+            applyRoute();
+            // A cross-link from the dashboard's Waiver Pulse lands on the
+            // free-agent board, which anchors immediately but fills in late.
+            scrollToRequestedBoard(requestedHash);
+        } catch (error) {
+            if (!stale(generation)) handleFailure(error);
+        }
+    }
+
+    // ── navigation ──────────────────────────────────────────────────────
+
+    function selectSeason(season) {
+        if (season === state.season) return;
+        state.season = season;
+        state.week = null;
+        state.scoreWeek = null;
+        state.teamId = null;
+        state.pendingMyTeam = false;
+        writeUrlState(false);
+        loadSeason();
+    }
+
+    function selectTeam(teamId) {
+        state.teamId = teamId;
+        state.pendingMyTeam = false;
+        writeUrlState(false);
+        state.generation += 1;
+        applyRoute();
+        window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
+    function clearTeam() {
+        state.teamId = null;
+        state.pendingMyTeam = false;
+        writeUrlState(false);
+        state.generation += 1;
+        applyRoute();
+    }
+
+    // ── importing a league ──────────────────────────────────────────────
+    //
+    // The ID is validated for real — a typo gets told it is a typo — and a
+    // well-formed ID for a league this site cannot collect gets told exactly
+    // that, rather than a spinner that never resolves. See specs/q3-17 for
+    // the multi-league work this form is the front of.
+
+    function handleImport(event) {
+        event.preventDefault();
+        const outcome = F.importOutcome(els.importInput.value, state.leagueId);
+        els.importStatus.textContent = outcome.message;
+        els.importStatus.dataset.status = outcome.status;
+        if (outcome.status === "invalid") {
+            els.importInput.setAttribute("aria-invalid", "true");
+            els.importInput.focus();
+            return;
+        }
+        els.importInput.removeAttribute("aria-invalid");
+        // A well-formed ID is worth normalising in place: pasting the whole
+        // ESPN URL is the common case, and showing what was read out of it
+        // is how you tell a misparse from a real refusal.
+        els.importInput.value = outcome.leagueId;
+    }
+
+    function bindEvents() {
+        els.teamBack.addEventListener("click", clearTeam);
+        if (els.importForm) {
+            els.importForm.addEventListener("submit", handleImport);
+            els.importInput.addEventListener("input", () => {
+                els.importStatus.textContent = "";
+                delete els.importStatus.dataset.status;
+                els.importInput.removeAttribute("aria-invalid");
+            });
+        }
+        els.teamOverviewRefresh.addEventListener("click", () => loadTeamOverview(true));
+
+        els.powerAlgorithm.addEventListener("change", (event) => {
+            state.algorithm = event.target.value;
+            writeUrlState(true);
+            loadLedger();
+        });
+
+        els.scoreboardWeek.addEventListener("change", (event) => {
+            state.scoreWeek = parseInt(event.target.value, 10);
+            loadScoreboard();
+        });
+
+        els.freeAgentsToggle.addEventListener("click", () => {
+            if (!state.freeAgentsPayload) return;
+            state.freeAgentsExpanded = !state.freeAgentsExpanded;
+            renderFreeAgents(state.freeAgentsPayload);
+        });
+
+        window.addEventListener("popstate", () => {
+            state.season = null;
+            state.week = null;
+            state.teamId = null;
+            state.pendingMyTeam = false;
+            state.algorithm = "composite";
+            state.column = "record";
+            readUrlState();
+            loadSeason();
+        });
+    }
+
+    function init() {
+        readUrlState();
+        bindEvents();
+        loadSeason();
     }
 
     if (document.readyState === "loading") {

@@ -1,4 +1,4 @@
-const FantasyFormat = require('../format.js');
+const FantasyFormat = require('../market/format.js');
 
 describe('FantasyFormat', () => {
     test('positionLabel/positionQuery map DEF <-> DST', () => {

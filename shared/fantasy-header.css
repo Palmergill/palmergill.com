@@ -1,10 +1,10 @@
-/* Shared fantasy section strip, mounted by shared/fantasy-header.js under
-   /fantasy/rankings/, /fantasy/league/ and /fantasy/draft-order/.
+/* Shared fantasy section nav, mounted by shared/fantasy-header.js on every
+   page under /fantasy/.
 
-   Self-contained on purpose: the three pages define different palette tokens
-   (--fantasy-* on the dashboard, --line/--card/--ink on the others), so every
-   colour here carries its own fallback and the strip looks the same wherever
-   it mounts. */
+   Self-contained on purpose: the pages define different palette tokens
+   (--fantasy-* on the market dashboard, --line/--card/--ink on the others),
+   so every colour here carries its own fallback and the nav looks the same
+   wherever it mounts. */
 .fantasy-header {
     margin-bottom: 18px;
 }
@@ -18,22 +18,13 @@
     border-bottom: 1px solid var(--line, #ece4d8);
 }
 
-.fantasy-header__home {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
+.fantasy-header__brand {
     color: var(--fantasy-clay, #b86f52);
     font-size: 0.82rem;
     font-weight: 700;
-    letter-spacing: 0.02em;
-    text-decoration: none;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
     white-space: nowrap;
-}
-
-.fantasy-header__home:hover,
-.fantasy-header__home:focus-visible {
-    text-decoration: underline;
-    text-underline-offset: 3px;
 }
 
 .fantasy-header__links {
@@ -45,14 +36,20 @@
 }
 
 .fantasy-header__link {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
     padding: 5px 10px;
     border: 1px solid transparent;
     border-radius: 999px;
+    background: none;
     color: var(--muted, #928a7d);
+    font: inherit;
     font-size: 0.78rem;
     font-weight: 600;
     text-decoration: none;
     white-space: nowrap;
+    cursor: pointer;
 }
 
 .fantasy-header__link:hover,
@@ -66,8 +63,74 @@
 .fantasy-header__link.is-current {
     background: var(--surface, #f3eee5);
     color: var(--fantasy-forest, #2f4a37);
+}
+
+span.fantasy-header__link.is-current {
     cursor: default;
 }
+
+.fantasy-header__caret {
+    font-size: 0.68em;
+    line-height: 1;
+}
+
+.fantasy-header__tools {
+    position: relative;
+}
+
+.fantasy-header__menu {
+    position: absolute;
+    right: 0;
+    z-index: 40;
+    min-width: 232px;
+    margin: 6px 0 0;
+    padding: 6px;
+    border: 1px solid var(--line, #ece4d8);
+    border-radius: 12px;
+    background: var(--card, #fffdf9);
+    box-shadow: 0 12px 28px rgba(47, 38, 28, 0.14);
+    list-style: none;
+}
+
+.fantasy-header__menu-item {
+    margin: 0;
+}
+
+.fantasy-header__menu-link {
+    display: block;
+    padding: 8px 10px;
+    border-radius: 8px;
+    color: var(--ink, #2f261c);
+    text-decoration: none;
+}
+
+.fantasy-header__menu-link:hover,
+.fantasy-header__menu-link:focus-visible {
+    background: var(--surface, #f3eee5);
+}
+
+.fantasy-header__menu-link.is-current {
+    background: var(--surface, #f3eee5);
+}
+
+.fantasy-header__menu-label {
+    display: block;
+    font-size: 0.82rem;
+    font-weight: 700;
+}
+
+.fantasy-header__menu-note {
+    display: block;
+    margin-top: 2px;
+    color: var(--muted, #928a7d);
+    font-size: 0.72rem;
+    line-height: 1.35;
+}
+
+/* The pages this mounts on set `hidden` in JS, and a `display` rule would
+   outrank the UA stylesheet's [hidden]. The menu is the thing that would
+   hang open. */
+[hidden] { display: none !important; }
 
 @media (max-width: 620px) {
     .fantasy-header__inner {
@@ -83,5 +146,19 @@
     .fantasy-header__link {
         padding: 5px 9px;
         font-size: 0.74rem;
+    }
+
+    /* On a phone the nav wraps onto its own full-width row and the Tools
+       button sits near the left of it, so a popup anchored to the button
+       runs off one edge or the other whichever way it opens. Hand the
+       containing block to the row instead and let the menu span it. */
+    .fantasy-header__tools { position: static; }
+
+    .fantasy-header__links { position: relative; }
+
+    .fantasy-header__menu {
+        right: 0;
+        left: 0;
+        min-width: 0;
     }
 }

@@ -11,12 +11,12 @@
 const fs = require("fs");
 const path = require("path");
 
-const leagueDir = path.join(__dirname, "..", "league");
+const leagueDir = path.join(__dirname, "..");
 const appSource = fs.readFileSync(path.join(leagueDir, "app.js"), "utf8");
 const pageSource = fs.readFileSync(path.join(leagueDir, "index.html"), "utf8");
 const styleSource = fs.readFileSync(path.join(leagueDir, "style.css"), "utf8");
 const bodySource = pageSource.match(/<body>([\s\S]*)<\/body>/)[1];
-const F = require("../league/format.js");
+const F = require("../format.js");
 
 function response(data, status = 200) {
     return Promise.resolve({
@@ -141,7 +141,7 @@ function routes(overrides = {}) {
     };
 }
 
-function boot(table, url = "/fantasy/league/?season=2026&team=1") {
+function boot(table, url = "/fantasy/?season=2026&team=1") {
     document.body.innerHTML = bodySource;
     window.history.replaceState({}, "", url);
     window.LeagueFormat = F;
@@ -711,7 +711,7 @@ describe("free agents", () => {
         });
         boot(
             routes({ "/free-agents": POOL }),
-            "/fantasy/league/#free-agents"
+            "/fantasy/#free-agents"
         );
         await waitFor(() => agents().length === 2);
 
@@ -801,7 +801,7 @@ describe("your team strip", () => {
 
         const name = document.getElementById("myTeamName");
         expect(name.textContent).toBe("Test Team");
-        expect(name.getAttribute("href")).toBe("/fantasy/league/?season=2026&team=1");
+        expect(name.getAttribute("href")).toBe("/fantasy/?season=2026&team=1");
         expect(document.getElementById("myTeamMeta").textContent).toBe("1-0 · vs Rivals · Power #3");
     });
 
@@ -810,7 +810,7 @@ describe("your team strip", () => {
         await waitFor(() => !advice().hidden);
 
         expect(advice().textContent).toBe("Your lineup leaves 9.0 on the bench →");
-        expect(advice().getAttribute("href")).toBe("/fantasy/league/?season=2026&team=1");
+        expect(advice().getAttribute("href")).toBe("/fantasy/?season=2026&team=1");
     });
 
     test("says so when the lineup is already the best one", async () => {
