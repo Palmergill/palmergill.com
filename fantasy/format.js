@@ -374,8 +374,9 @@
         scoring: "Median weekly score. The bar spans this team's lowest week to its highest.",
         power: "Rank by the résumé method chosen above the table.",
         odds:
-            "How often this team makes the playoffs, simulating the rest of the "
-            + "schedule from each team's own scoring spread.",
+            "How often this team makes the playoffs across ten thousand simulated "
+            + "seasons. Early on a team's scoring average is weighted against the "
+            + "league's, because one good week is not a season.",
         form: "Power rank week by week, earliest week at the left.",
     };
 
@@ -391,8 +392,9 @@
             "The team's best legal lineup in projected points a week, after the bench "
             + "covers byes and injuries. Depth only counts when it could start.",
         odds:
-            "How often this team makes the playoffs, simulating the rest of the "
-            + "schedule from each team's own scoring spread.",
+            "How often this team makes the playoffs across ten thousand simulated "
+            + "seasons. Early on a team's scoring average is weighted against the "
+            + "league's, because one good week is not a season.",
     };
 
     function powerHint(key) {

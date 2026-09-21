@@ -423,3 +423,155 @@ def test_a_flex_receiver_lands_in_the_receiver_room():
     )
 
     assert room["points_per_game"] == 12.0
+
+
+# ── playoff odds early in a season ──────────────────────────────────────
+#
+# These are the regression for the September 2026 bug: one week into the
+# season the hub was reporting 98% for one team and 0% for another. The
+# simulation was fitting each team's average to the handful of weeks it had
+# played and then treating that average as settled fact for the thirteen
+# games left, so it played out the same season ten thousand times.
+#
+# The fix is in _scoring_model: a team's own average is pulled toward the
+# league's by how many games it has actually played, and the leftover
+# uncertainty in that average is drawn once per simulated season. The tests
+# below pin the behaviour that matters — early odds are uncertain, late odds
+# are not, and the total is always the number of places on offer.
+
+
+def league_of(scores_by_week, teams=10):
+    """Build metrics from [{team_id: score}, ...], one dict per week."""
+    season = []
+    for week, scores in enumerate(scores_by_week, start=1):
+        ids = sorted(scores)
+        for home, away in zip(ids[::2], ids[1::2]):
+            season.append(matchup(week, home, away, scores[home], scores[away]))
+    return metrics_for([team(i) for i in range(1, teams + 1)], season)
+
+
+def schedule_after(played, weeks, teams=10):
+    """Every remaining regular-season game, round-robin style."""
+    games = []
+    ids = list(range(1, teams + 1))
+    for week in range(played + 1, weeks + 1):
+        rot = ids[1:]
+        k = (week - 1) % len(rot)
+        order = [ids[0]] + rot[k:] + rot[:k]
+        for i in range(teams // 2):
+            games.append(
+                {
+                    "matchup_period": week,
+                    "playoff_tier": "NONE",
+                    "home_team_id": order[i],
+                    "away_team_id": order[teams - 1 - i],
+                    "home_points": None,
+                    "away_points": None,
+                    "is_bye": False,
+                    "is_complete": False,
+                }
+            )
+    return games
+
+
+# One blowout week: the spread a real league produces on any given Sunday.
+WEEK_ONE = {1: 168.0, 2: 151.0, 3: 140.0, 4: 128.0, 5: 119.0,
+            6: 111.0, 7: 101.0, 8: 92.0, 9: 78.0, 10: 61.0}
+
+
+def test_one_week_in_nobody_is_in_and_nobody_is_out():
+    odds = A.playoff_odds(
+        league_of([WEEK_ONE]), schedule_after(1, 14), 4, simulations=4000
+    )
+    values = [row["odds"] for row in odds.values()]
+
+    # The bug produced 0.98 and 0.00 off exactly this kind of week.
+    assert max(values) < 0.85, f"too sure after one week: {sorted(values)}"
+    assert min(values) > 0.05, f"too dismissive after one week: {sorted(values)}"
+
+
+def test_the_week_one_blowout_still_counts_for_something():
+    odds = A.playoff_odds(
+        league_of([WEEK_ONE]), schedule_after(1, 14), 4, simulations=4000
+    )
+
+    # Uncertain is not the same as uninformative: 168 beats 61.
+    assert odds[1]["odds"] > odds[10]["odds"]
+
+
+def test_confidence_grows_as_the_season_does():
+    """The same team, the same scores, more weeks of them."""
+    spreads = []
+    for played in (1, 4, 8, 12):
+        weeks = [WEEK_ONE] * played
+        odds = A.playoff_odds(
+            league_of(weeks), schedule_after(played, 14), 4, simulations=4000
+        )
+        values = [row["odds"] for row in odds.values()]
+        spreads.append(max(values) - min(values))
+
+    assert spreads == sorted(spreads), f"confidence did not grow: {spreads}"
+    # And by week 12 the league really is close to settled.
+    assert spreads[-1] > 0.8
+
+
+def test_a_finished_season_is_a_fact_not_a_forecast():
+    weeks = [WEEK_ONE] * 14
+    odds = A.playoff_odds(league_of(weeks), [], 4, simulations=200)
+    values = sorted(row["odds"] for row in odds.values())
+
+    assert values == [0.0] * 6 + [1.0] * 4
+
+
+def test_odds_total_the_places_on_offer_at_every_point_in_the_season():
+    for played in (1, 2, 5, 9, 13, 14):
+        odds = A.playoff_odds(
+            league_of([WEEK_ONE] * played),
+            schedule_after(played, 14),
+            4,
+            simulations=1000,
+        )
+        total = sum(row["odds"] for row in odds.values())
+        assert total == pytest.approx(4.0), f"week {played}: {total}"
+
+
+def test_a_team_with_no_games_played_sits_at_the_league_average():
+    model = A._scoring_model(league_of([WEEK_ONE]))
+    played = model[1]
+
+    # Every team here has one week, so each is pulled most of the way back
+    # to the league. The top scorer's 168 must not survive as its average.
+    assert played["mean"] < 130.0
+    assert played["mean"] > A._scoring_model(league_of([WEEK_ONE]))[10]["mean"]
+
+
+def test_the_uncertainty_in_a_team_average_shrinks_with_evidence():
+    one = A._scoring_model(league_of([WEEK_ONE]))[1]["mean_stdev"]
+    many = A._scoring_model(league_of([WEEK_ONE] * 12))[1]["mean_stdev"]
+
+    assert many < one
+    # And it is never zero, or the simulation goes back to treating a
+    # measured average as a settled one.
+    assert many > 0.0
+
+
+def test_a_league_with_no_measurable_spread_is_not_treated_as_predictable():
+    """Every team scoring the same every week is thin data, not certainty.
+
+    It is also the shape a synthetic fixture takes, and without a floor on
+    the spread the simulation becomes deterministic — the same 100%/0% the
+    shrinkage above exists to prevent, arriving through the variance instead
+    of the mean.
+    """
+    flat = {i: 100.0 for i in range(1, 11)}
+    model = A._scoring_model(league_of([flat] * 10))
+
+    assert all(row["stdev"] >= A.MIN_STDEV for row in model.values())
+    assert all(row["mean_stdev"] > 0.0 for row in model.values())
+
+    odds = A.playoff_odds(league_of([flat] * 5), schedule_after(5, 14), 4,
+                          simulations=2000)
+    values = [row["odds"] for row in odds.values()]
+    # Ten identical teams, four places: everyone is near 40%, nobody is sure.
+    assert max(values) < 0.75
+    assert min(values) > 0.10

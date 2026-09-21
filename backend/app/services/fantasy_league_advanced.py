@@ -22,6 +22,7 @@ Three ideas carry the ledger:
   * **Playoff odds** simulate the rest of the schedule from each team's own
     scoring distribution.
 """
+import math
 import random
 import statistics
 from typing import Any, Dict, Iterable, List, Optional
@@ -37,6 +38,27 @@ DEFAULT_SIMULATIONS = 10000
 # of every simulated game deterministic), fall back to how much the league as
 # a whole varies week to week.
 FALLBACK_STDEV = 25.0
+
+# How many games of evidence it takes before a team's own scoring average
+# outweighs the league's. This is the one number that keeps early-season
+# playoff odds honest, and it is not arbitrary: for a normal-normal model the
+# correct weight is the ratio of week-to-week variance to true between-team
+# variance. Fantasy weeks swing about 26 points (a bad Sunday from two
+# starters), while real talent separates teams by 11 or 12 a week, and
+# 26² / 12² is close to five.
+#
+# What it buys: after one week a team is judged 1/6 on the week it played and
+# 5/6 on the league, which is the honest reading of a single game. Without
+# it the simulation treats a 150-point opening week as a 150-point team for
+# the next thirteen, and hands out 98% and 0% before anyone has played twice.
+PRIOR_GAMES = 5.0
+
+# No fantasy team scores the same every week. A measured spread anywhere near
+# zero means the data is thin, not that the team is a metronome — and a
+# stdev of zero makes every simulated game deterministic, which is the same
+# overconfidence PRIOR_GAMES exists to prevent, arriving by a different door.
+# Real leagues sit well above this, so it never binds on live data.
+MIN_STDEV = 10.0
 
 
 def _weekly_scores(metrics: Dict[int, TeamMetrics]) -> Dict[int, Dict[int, float]]:
@@ -162,24 +184,59 @@ def scoring_summary(metrics: Dict[int, TeamMetrics]) -> Dict[int, Dict[str, Any]
 
 
 def _scoring_model(metrics: Dict[int, TeamMetrics]) -> Dict[int, Dict[str, float]]:
-    """Per-team mean and spread used to draw simulated scores."""
+    """What each team is worth a week, and how sure we are.
+
+    Three numbers per team:
+
+      * ``mean`` — the team's own scoring average pulled toward the league's,
+        by how many games it has actually played. See ``PRIOR_GAMES``.
+      * ``stdev`` — how much that team swings week to week, its own spread
+        pooled with the league's on the same sliding weight, because a
+        standard deviation from three weeks is mostly noise too.
+      * ``mean_stdev`` — how uncertain ``mean`` itself is. The simulation
+        draws a season-long strength from this once per run, so a team with
+        two weeks on the board gets a genuinely wide range of seasons
+        rather than thirteen more copies of the two it has played.
+
+    That last one is the difference between a forecast and a restatement of
+    the standings. A point estimate treated as fact makes every remaining
+    game a foregone conclusion.
+    """
     summary = scoring_summary(metrics)
     league_means = [row["mean"] for row in summary.values() if row["mean"] is not None]
     league_stdevs = [
         row["stdev"] for row in summary.values() if row["stdev"] is not None
     ]
-    default_mean = statistics.fmean(league_means) if league_means else 100.0
-    default_stdev = (
-        statistics.fmean(league_stdevs) if league_stdevs else FALLBACK_STDEV
+    league_mean = statistics.fmean(league_means) if league_means else 100.0
+    # Pooled, not averaged per team: a league two weeks in has a handful of
+    # teams with any spread at all, and they should not speak for everyone.
+    league_stdev = max(
+        statistics.fmean(league_stdevs) if league_stdevs else FALLBACK_STDEV,
+        MIN_STDEV,
     )
 
-    return {
-        team_id: {
-            "mean": row["mean"] if row["mean"] is not None else default_mean,
-            "stdev": row["stdev"] if row["stdev"] is not None else default_stdev,
+    model: Dict[int, Dict[str, float]] = {}
+    for team_id, row in summary.items():
+        games = row["weeks"] or 0
+        weight = games / (games + PRIOR_GAMES) if games else 0.0
+
+        own_mean = row["mean"] if row["mean"] is not None else league_mean
+        mean = weight * own_mean + (1.0 - weight) * league_mean
+
+        own_stdev = row["stdev"] if row["stdev"] is not None else league_stdev
+        # Blend variances, not standard deviations: variance is what adds.
+        variance = weight * (own_stdev ** 2) + (1.0 - weight) * (league_stdev ** 2)
+        stdev = max(math.sqrt(variance), MIN_STDEV)
+
+        model[team_id] = {
+            "mean": mean,
+            "stdev": stdev,
+            # Standard error of the shrunk mean. The prior counts as games
+            # already played, so this starts finite rather than infinite and
+            # tightens as the season gives it real ones.
+            "mean_stdev": stdev / math.sqrt(games + PRIOR_GAMES),
         }
-        for team_id, row in summary.items()
-    }
+    return model
 
 
 def playoff_odds(
@@ -191,9 +248,16 @@ def playoff_odds(
 ) -> Dict[int, Dict[str, Any]]:
     """Simulate the rest of the schedule and count how often each team seeds in.
 
-    Scores are drawn per team from a normal fitted to that team's own weeks,
-    so a boom-or-bust roster correctly gets a wider spread of outcomes than a
-    metronome on the same average.
+    Each run draws a team's season-long strength once, from the uncertainty
+    in its shrunk average (see ``_scoring_model``), then draws each week
+    around that strength. Both layers matter and they answer different
+    questions: the weekly draw is "how much does this team swing", the
+    strength draw is "how much of what we have seen was actually the team".
+
+    Skipping the second is what made these odds unusable in September. A
+    simulation that treats one week's score as a team's settled average
+    plays out the same season ten thousand times and reports near-certainty
+    about a league nobody has seen yet.
 
     Seeding is wins, then points for. Real leagues often seed division winners
     first; the hub does not store this league's tiebreak settings, and
@@ -230,9 +294,16 @@ def playoff_odds(
     for _ in range(runs):
         wins = dict(base_wins)
         points = dict(base_points)
+        # One roll of "what is this team really worth" per simulated season,
+        # held fixed across that season's games. Re-drawing it per game would
+        # average the uncertainty away again and put us back where we started.
+        strength = {
+            team_id: rng.gauss(row["mean"], row["mean_stdev"])
+            for team_id, row in model.items()
+        }
         for home_id, away_id in games:
-            home_score = rng.gauss(model[home_id]["mean"], model[home_id]["stdev"])
-            away_score = rng.gauss(model[away_id]["mean"], model[away_id]["stdev"])
+            home_score = rng.gauss(strength[home_id], model[home_id]["stdev"])
+            away_score = rng.gauss(strength[away_id], model[away_id]["stdev"])
             points[home_id] += home_score
             points[away_id] += away_score
             if home_score > away_score:

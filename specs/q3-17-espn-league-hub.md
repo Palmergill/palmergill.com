@@ -486,3 +486,30 @@ and weights but fixed five defects, each locked by a regression test:
   here in a way it does not on the table, which hides its header row on a
   phone entirely — these labels are on screen at every width, and
   `:focus-within` is what makes them answer a tap.
+
+- **Sep 2026 — playoff odds that survive September.** One week into the
+  season the hub was reporting 98% for one team and 0% for another. The
+  simulation was sound in structure and wrong in its inputs: it fitted each
+  team's scoring average to the handful of weeks it had played, then treated
+  that average as settled fact across the thirteen games left. A team that
+  opened with 150 was modelled as a 150-point team for the rest of the year,
+  so it won essentially every simulated game.
+
+  Two changes, both in `_scoring_model`. A team's own average is now pulled
+  toward the league's on a sliding weight, `games / (games + PRIOR_GAMES)`.
+  `PRIOR_GAMES` is 5, which is not a taste call: for a normal-normal model
+  the correct weight is the ratio of week-to-week variance to true
+  between-team variance, and fantasy weeks swing about 26 points against a
+  talent spread of 11 or 12 — 26²/12² ≈ 5. And the leftover uncertainty in
+  that average is now drawn once per simulated season, so a league two weeks
+  old produces a genuinely wide range of seasons rather than thirteen more
+  copies of the two it has played. Variances are blended, not standard
+  deviations, and a `MIN_STDEV` floor stops a league with no measurable
+  spread from becoming deterministic by the other door.
+
+  On a synthetic ten-team league the top-to-bottom spread after one week
+  went from 98–0 to 61–13, with nothing at either extreme, while the
+  invariants held throughout: odds always total the number of places on
+  offer, the week-one blowout still helps the team that scored it, and a
+  finished season still reports exactly 0 or 1. Confidence now grows with
+  the season instead of arriving with it.
