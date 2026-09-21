@@ -393,3 +393,120 @@ describe("column hint copy", () => {
         });
     });
 });
+
+// ── the season-long rank chart ──────────────────────────────────────────
+//
+// Geometry only. The awkward parts are an axis that deliberately runs past
+// the data, a rank scale with 1 at the top, and a season that is one week
+// old — all of which are easier to pin here than through a DOM.
+
+describe("rank chart geometry", () => {
+    const team = (id, points) => ({ espn_team_id: id, name: `T${id}`, points });
+    const season = (ranks) =>
+        ranks.map((row, i) => team(i + 1, row.map((rank, w) => ({ week: w + 1, rank }))));
+
+    test("rank 1 sits at the top and the worst rank at the bottom", () => {
+        const g = LeagueFormat.rankChartGeometry(
+            season([[1, 1], [4, 4]]), 14, { width: 600, height: 300 }
+        );
+        const [best, worst] = g.lines;
+        expect(best.points[0].y).toBeLessThan(worst.points[0].y);
+        expect(best.points[0].y).toBe(g.pad.top);
+    });
+
+    test("the axis runs to the playoffs, not to the last week played", () => {
+        // One week in, the chart must not draw that week across the whole
+        // box and then rescale itself every Tuesday.
+        const g = LeagueFormat.rankChartGeometry(season([[1], [2]]), 14, {});
+        expect(g.firstWeek).toBe(1);
+        // One slot past the last regular-season week, which is where the
+        // playoff marker stands so it never lands on the final results.
+        expect(g.finalWeek).toBe(15);
+        expect(g.weekTicks[g.weekTicks.length - 1]).toBe(14);
+        // And that single week sits at the left, not stretched across.
+        expect(g.lines[0].points[0].x).toBe(g.pad.left);
+    });
+
+    test("the rank scale covers the league, not just the teams charted", () => {
+        // Two of twelve teams must not be stretched over the whole height.
+        const rows = Array.from({ length: 12 }, (_u, i) => team(i + 1, [{ week: 1, rank: i + 1 }]));
+        const g = LeagueFormat.rankChartGeometry(rows, 14, {});
+        expect(g.worstRank).toBe(12);
+    });
+
+    test("a single week is a dot, not a line", () => {
+        const g = LeagueFormat.rankChartGeometry(season([[1]]), 14, {});
+        expect(g.lines[0].d).toBe("");
+        expect(g.lines[0].points).toHaveLength(1);
+        expect(g.lines[0].last.week).toBe(1);
+    });
+
+    test("a team's colour follows the team, never its position", () => {
+        const first = LeagueFormat.rankChartGeometry(season([[1, 2], [2, 1]]), 14, {});
+        // Same teams, same order in the payload, ranks swapped.
+        const second = LeagueFormat.rankChartGeometry(season([[2, 1], [1, 2]]), 14, {});
+        expect(first.lines[0].color).toBe(second.lines[0].color);
+        expect(first.lines[0].color).not.toBe(first.lines[1].color);
+    });
+
+    test("more teams than colours wraps rather than running out", () => {
+        const many = Array.from({ length: 20 }, (_u, i) => team(i + 1, [{ week: 1, rank: i + 1 }]));
+        const g = LeagueFormat.rankChartGeometry(many, 14, {});
+        expect(g.lines).toHaveLength(20);
+        expect(g.lines.every((line) => typeof line.color === "string")).toBe(true);
+    });
+
+    test("a team with gaps in its season keeps the weeks it has", () => {
+        const g = LeagueFormat.rankChartGeometry(
+            [team(1, [{ week: 1, rank: 1 }, { week: 4, rank: 3 }])], 14, {}
+        );
+        expect(g.lines[0].points.map((p) => p.week)).toEqual([1, 4]);
+        // The gap is a straight segment, not a break — the rank did not
+        // stop existing, we just did not sample it.
+        expect(g.lines[0].d.split("L")).toHaveLength(2);
+    });
+
+    test("a rank that is not a number is dropped rather than drawn at zero", () => {
+        const g = LeagueFormat.rankChartGeometry(
+            [team(1, [{ week: 1, rank: 1 }, { week: 2, rank: null }])], 14, {}
+        );
+        expect(g.lines[0].points).toHaveLength(1);
+    });
+
+    test("nothing to chart returns nothing, rather than an empty frame", () => {
+        expect(LeagueFormat.rankChartGeometry([], 14, {})).toBeNull();
+        expect(LeagueFormat.rankChartGeometry(null, 14, {})).toBeNull();
+        expect(LeagueFormat.rankChartGeometry([team(1, [])], 14, {})).toBeNull();
+        // Points with no usable rank are the same as no points.
+        expect(
+            LeagueFormat.rankChartGeometry([team(1, [{ week: 1, rank: null }])], 14, {})
+        ).toBeNull();
+    });
+
+    test("week ticks thin out as the season gets long", () => {
+        expect(LeagueFormat.rankChartTicks(1, 6)).toEqual([1, 2, 3, 4, 5, 6]);
+        expect(LeagueFormat.rankChartTicks(1, 14)).toEqual([1, 3, 5, 7, 9, 11, 13, 14]);
+        expect(LeagueFormat.rankChartTicks(1, 22).length).toBeLessThan(12);
+        // The last week is always labelled, whatever the step lands on.
+        [6, 14, 17, 22].forEach((last) => {
+            const ticks = LeagueFormat.rankChartTicks(1, last);
+            expect(ticks[ticks.length - 1]).toBe(last);
+        });
+    });
+
+    test("rank ticks stay readable for a big league and complete for a small one", () => {
+        expect(LeagueFormat.rankChartRankTicks(4)).toEqual([1, 2, 3, 4]);
+        const twelve = LeagueFormat.rankChartRankTicks(12);
+        expect(twelve[0]).toBe(1);
+        expect(twelve[twelve.length - 1]).toBe(12);
+        expect(twelve.length).toBeLessThan(7);
+    });
+
+    test("the hovered value reads in the units of the series on screen", () => {
+        const point = { week: 3, rank: 2, value: 128.44 };
+        expect(LeagueFormat.rankChartValueLabel(point, "resume")).toBe("#2");
+        expect(LeagueFormat.rankChartValueLabel(point, "roster")).toBe("128.4 pts/wk");
+        expect(LeagueFormat.rankChartValueLabel({ rank: 1, value: null }, "roster")).toBe("—");
+        expect(LeagueFormat.rankChartValueLabel(null, "resume")).toBe("—");
+    });
+});

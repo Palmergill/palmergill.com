@@ -32,6 +32,14 @@
         pendingMyTeam: false,
         leagueId: null,
         rosterPower: null,
+        // Which series the season chart is showing, and its own request
+        // generation — switching metric fires a fetch that can land after
+        // the next one.
+        chartMetric: "resume",
+        chartRequest: 0,
+        // Kept so a rotation can redraw at the other aspect ratio without
+        // going back to the network for data that has not changed.
+        chartPayload: null,
         // Bumped on every context change. A response that resolves with a
         // stale generation is discarded — switching season fires several
         // requests at once, so out-of-order replies are the normal case.
@@ -59,6 +67,14 @@
         leagueSections: byId("leagueSections"),
         powerList: byId("powerList"),
         powerNote: byId("powerNote"),
+        powerChartBoard: byId("power-chart"),
+        powerChart: byId("powerChart"),
+        powerChartNote: byId("powerChartNote"),
+        powerChartEmpty: byId("powerChartEmpty"),
+        powerChartLegend: byId("powerChartLegend"),
+        powerChartMetric: byId("powerChartMetric"),
+        powerChartAlgorithm: byId("powerChartAlgorithm"),
+        powerChartAlgoField: byId("powerChartAlgoField"),
         ledger: byId("ledger"),
         ledgerColumns: byId("ledgerColumns"),
         ledgerNote: byId("ledgerNote"),
@@ -512,14 +528,18 @@
     }
 
     function renderAlgorithmSelect(algorithms) {
-        els.powerAlgorithm.replaceChildren();
-        (algorithms || []).forEach((algorithm) => {
-            const option = el("option", null, F.algorithmLabel(algorithm));
-            option.value = algorithm;
-            if (algorithm === state.algorithm) option.selected = true;
-            els.powerAlgorithm.appendChild(option);
+        // Both boards that rank by a résumé method get the same options and
+        // the same current value — see the change handlers in bindEvents.
+        [els.powerAlgorithm, els.powerChartAlgorithm].forEach((select) => {
+            select.replaceChildren();
+            (algorithms || []).forEach((algorithm) => {
+                const option = el("option", null, F.algorithmLabel(algorithm));
+                option.value = algorithm;
+                if (algorithm === state.algorithm) option.selected = true;
+                select.appendChild(option);
+            });
+            select.disabled = !(algorithms || []).length;
         });
-        els.powerAlgorithm.disabled = !(algorithms || []).length;
     }
 
     const LEDGER_HEADERS = [
@@ -1608,6 +1628,266 @@
         });
     }
 
+    // ── power over time ─────────────────────────────────────────────────
+    //
+    // The same ranking as a season rather than a snapshot. Two series behind
+    // one toggle: résumé ranks what a team has earned, roster ranks what it
+    // holds. They disagree, and the disagreement is the interesting part —
+    // a 6-1 team on a kind schedule and a 2-5 team with the best roster in
+    // the league both show up here as a line going the wrong way.
+
+    const SVG_NS = "http://www.w3.org/2000/svg";
+
+    const CHART_METRICS = [
+        { key: "resume", label: "Résumé", note: "What each team has earned" },
+        { key: "roster", label: "Roster", note: "What each team holds" },
+    ];
+
+    const CHART_UNAVAILABLE = {
+        roster_power_not_recorded:
+            "Roster power is written down as the season runs, and this site only " +
+            "started keeping it in September 2026. Earlier seasons hold one " +
+            "end-of-year roster snapshot rather than one a week, so this line " +
+            "cannot be drawn for them.",
+        missing_rankings: "No rankings have been computed for this season yet.",
+    };
+
+    function svg(tag, attrs) {
+        const node = document.createElementNS(SVG_NS, tag);
+        Object.entries(attrs || {}).forEach(([key, value]) => {
+            if (value !== null && value !== undefined) node.setAttribute(key, value);
+        });
+        return node;
+    }
+
+    function renderChartMetricChips() {
+        els.powerChartMetric.replaceChildren();
+        CHART_METRICS.forEach((metric) => {
+            const chip = el("button", "chip", metric.label);
+            chip.type = "button";
+            chip.title = metric.note;
+            if (metric.key === state.chartMetric) {
+                chip.classList.add("chip--active");
+                chip.setAttribute("aria-current", "true");
+            }
+            chip.addEventListener("click", () => selectChartMetric(metric.key));
+            els.powerChartMetric.appendChild(chip);
+        });
+        // The résumé line is ranked by a method; the roster line is not.
+        els.powerChartAlgoField.hidden = state.chartMetric !== "resume";
+    }
+
+    function selectChartMetric(metric) {
+        if (metric === state.chartMetric) return;
+        state.chartMetric = metric;
+        renderChartMetricChips();
+        loadPowerChart();
+    }
+
+    async function loadPowerChart() {
+        const generation = state.generation;
+        const request = ++state.chartRequest;
+        const params = new URLSearchParams({ metric: state.chartMetric });
+        if (state.season) params.set("season", state.season);
+        if (state.chartMetric === "resume") params.set("algorithm", state.algorithm);
+        try {
+            const payload = await fetchJson(`${API_BASE}/power-history?${params}`);
+            if (stale(generation) || request !== state.chartRequest) return;
+            renderPowerChart(payload);
+        } catch (error) {
+            if (stale(generation) || request !== state.chartRequest) return;
+            renderPowerChart(null);
+        }
+    }
+
+    function renderPowerChart(payload) {
+        state.chartPayload = payload;
+        els.powerChart.replaceChildren();
+        els.powerChartLegend.replaceChildren();
+
+        if (!payload) {
+            els.powerChartNote.textContent = "";
+            showChartEmpty("The chart is unavailable right now.");
+            return;
+        }
+
+        els.powerChartAlgorithm.value = state.algorithm;
+
+        if (!payload.available) {
+            els.powerChartNote.textContent = "";
+            showChartEmpty(
+                CHART_UNAVAILABLE[payload.unavailable_reason] ||
+                    "Nothing to chart for this season yet."
+            );
+            return;
+        }
+
+        const geometry = F.rankChartGeometry(payload.teams, payload.last_week, chartBox());
+        if (!geometry) {
+            showChartEmpty("Nothing to chart for this season yet.");
+            return;
+        }
+
+        els.powerChartEmpty.hidden = true;
+        // The dashed line's label lives here rather than in the chart: at
+        // 375px the axis slot it would sit in is 22px wide, and it collided
+        // with the last week's tick.
+        const played = payload.weeks.length;
+        const parts = [played === 1 ? "1 week played" : `${played} weeks played`];
+        if (payload.last_week) {
+            parts.push(`playoffs after week ${payload.last_week}`);
+        }
+        els.powerChartNote.textContent = parts.join(" · ");
+
+        els.powerChart.appendChild(buildRankChart(geometry, payload));
+        renderChartLegend(geometry);
+    }
+
+    // matchMedia is the right question to ask, but it is not everywhere —
+    // and a missing API here would take the whole page down at init, not
+    // merely draw a chart at the wrong aspect.
+    function isNarrow() {
+        if (typeof window.matchMedia === "function") {
+            return window.matchMedia("(max-width: 720px)").matches;
+        }
+        return window.innerWidth <= 720;
+    }
+
+    // A phone gets a taller box, not a shrunken one. Twelve lines across a
+    // 16:9 letterbox at 375px leaves about 13px a rank, which is narrower
+    // than the gap between two of them.
+    function chartBox() {
+        return isNarrow()
+            ? { width: 420, height: 420, pad: { top: 10, right: 12, bottom: 26, left: 24 } }
+            : { width: 680, height: 320 };
+    }
+
+    function showChartEmpty(message) {
+        els.powerChartEmpty.textContent = message;
+        els.powerChartEmpty.hidden = false;
+    }
+
+    function buildRankChart(geometry, payload) {
+        const { width, height, pad } = geometry;
+        const root = svg("svg", {
+            viewBox: `0 0 ${width} ${height}`,
+            class: "rank-chart__svg",
+            role: "img",
+            preserveAspectRatio: "xMidYMid meet",
+        });
+        const metricLabel = state.chartMetric === "roster" ? "roster power" : "résumé rank";
+        root.appendChild(
+            svg("title", {})
+        ).textContent = `Weekly ${metricLabel} for every team, weeks ${geometry.firstWeek} to ${geometry.finalWeek}.`;
+
+        // Rank gridlines first, so every line draws over them.
+        geometry.rankTicks.forEach((rank) => {
+            const y = geometry.yFor(rank);
+            root.appendChild(
+                svg("line", {
+                    x1: pad.left, x2: width - pad.right, y1: y, y2: y,
+                    class: "rank-chart__grid",
+                })
+            );
+            const label = svg("text", {
+                x: pad.left - 8, y: y + 3, class: "rank-chart__tick",
+                "text-anchor": "end",
+            });
+            label.textContent = rank;
+            root.appendChild(label);
+        });
+
+        geometry.weekTicks.forEach((week) => {
+            const x = geometry.xFor(week);
+            const label = svg("text", {
+                x, y: height - pad.bottom + 16, class: "rank-chart__tick",
+                "text-anchor": "middle",
+            });
+            label.textContent = week;
+            root.appendChild(label);
+        });
+
+        // Where the season stops being the regular season. It stands in the
+        // axis slot past the last week, so it never lands on top of the
+        // results it is marking the end of — and it is drawn even when the
+        // data has not reached it, which is the point of an axis that runs
+        // the whole way.
+        if (payload.last_week) {
+            const x = geometry.xFor(payload.last_week + 1);
+            root.appendChild(
+                svg("line", {
+                    x1: x, x2: x, y1: pad.top, y2: height - pad.bottom,
+                    class: "rank-chart__playoffs",
+                })
+            );
+        }
+
+        geometry.lines.forEach((line) => {
+            const group = svg("g", { class: "rank-chart__line" });
+            group.dataset.teamId = line.espn_team_id;
+            if (line.espn_team_id === state.myTeamId) {
+                group.classList.add("rank-chart__line--mine");
+            }
+            if (line.d) {
+                group.appendChild(
+                    svg("path", { d: line.d, fill: "none", stroke: line.color,
+                                  "stroke-width": 2, "stroke-linejoin": "round",
+                                  "stroke-linecap": "round" })
+                );
+            }
+            // The end of each line carries the dot, so the current order is
+            // readable down the right-hand edge without a legend lookup.
+            if (line.last) {
+                group.appendChild(
+                    svg("circle", { cx: line.last.x, cy: line.last.y, r: 4,
+                                    fill: line.color, stroke: "var(--bg, #faf6f0)",
+                                    "stroke-width": 2 })
+                );
+            }
+            line.points.forEach((point) => {
+                const hit = svg("circle", { cx: point.x, cy: point.y, r: 9,
+                                            fill: "transparent" });
+                const tip = svg("title", {});
+                tip.textContent =
+                    `${line.name} · week ${point.week} · ` +
+                    F.rankChartValueLabel(point, state.chartMetric);
+                hit.appendChild(tip);
+                group.appendChild(hit);
+            });
+            root.appendChild(group);
+        });
+
+        return root;
+    }
+
+    function renderChartLegend(geometry) {
+        geometry.lines.forEach((line) => {
+            const item = el("li", "rank-chart__legend-item");
+            if (line.espn_team_id === state.myTeamId) {
+                item.classList.add("rank-chart__legend-item--mine");
+            }
+            const swatch = el("span", "rank-chart__swatch");
+            swatch.style.background = line.color;
+            item.appendChild(swatch);
+            item.appendChild(el("span", "rank-chart__legend-name", line.name || "—"));
+            // Hovering a legend entry lifts its line out of the tangle, which
+            // is the only way ten of them are readable at once.
+            item.addEventListener("mouseenter", () => highlightLine(line.espn_team_id));
+            item.addEventListener("mouseleave", () => highlightLine(null));
+            els.powerChartLegend.appendChild(item);
+        });
+    }
+
+    function highlightLine(teamId) {
+        els.powerChart.classList.toggle("rank-chart--focused", teamId !== null);
+        els.powerChart.querySelectorAll(".rank-chart__line").forEach((group) => {
+            group.classList.toggle(
+                "is-dimmed",
+                teamId !== null && Number(group.dataset.teamId) !== teamId
+            );
+        });
+    }
+
     // ── free agents ─────────────────────────────────────────────────────
     //
     // Every other waiver list on the internet ranks the player pool. This one
@@ -1821,11 +2101,13 @@
             // The ledger is the page; it loads before the boards under it so
             // the table is readable while the rest fills in.
             await loadMyTeam();
+            renderChartMetricChips();
             await Promise.all([
                 loadRosterPower(),
                 loadLedger(),
                 loadScoreboard(),
                 loadFreeAgents(),
+                loadPowerChart(),
             ]);
             applyRoute();
             // A cross-link from the dashboard's Waiver Pulse lands on the
@@ -1906,6 +2188,17 @@
             state.algorithm = event.target.value;
             writeUrlState(true);
             loadLedger();
+            if (state.chartMetric === "resume") loadPowerChart();
+        });
+
+        // Two selects, one choice: the résumé method belongs to the ranking,
+        // not to whichever board is asking about it.
+        els.powerChartAlgorithm.addEventListener("change", (event) => {
+            state.algorithm = event.target.value;
+            els.powerAlgorithm.value = state.algorithm;
+            writeUrlState(true);
+            loadLedger();
+            loadPowerChart();
         });
 
         els.scoreboardWeek.addEventListener("change", (event) => {
@@ -1917,6 +2210,20 @@
             if (!state.freeAgentsPayload) return;
             state.freeAgentsExpanded = !state.freeAgentsExpanded;
             renderFreeAgents(state.freeAgentsPayload);
+        });
+
+        // Rotating a phone crosses the breakpoint the chart box is chosen
+        // on, and the SVG's own viewBox cannot follow that on its own.
+        let resizeTimer = null;
+        let wasNarrow = isNarrow();
+        window.addEventListener("resize", () => {
+            const narrow = isNarrow();
+            if (narrow === wasNarrow) return;
+            wasNarrow = narrow;
+            window.clearTimeout(resizeTimer);
+            resizeTimer = window.setTimeout(() => {
+                if (state.chartPayload) renderPowerChart(state.chartPayload);
+            }, 120);
         });
 
         window.addEventListener("popstate", () => {

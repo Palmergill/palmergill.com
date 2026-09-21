@@ -273,7 +273,9 @@
     // Dependency-free SVG path for a rank sparkline. Ranks invert (1 is best)
     // so the line reads the way people expect: up means improving.
     function sparkline(ranks, width, height, pad) {
-        const values = (ranks || []).filter((value) => Number.isFinite(Number(value)));
+        const values = (ranks || [])
+            .map(finiteNumber)
+            .filter((value) => value !== null);
         if (values.length < 2) return "";
         const w = width || 80;
         const h = height || 24;
@@ -399,6 +401,158 @@
 
     function powerHint(key) {
         return POWER_HINTS[key] || "";
+    }
+
+    // ── the season-long rank chart ──────────────────────────────────────
+    //
+    // Geometry only: takes the history payload and returns the points every
+    // line needs, in an SVG coordinate space the caller sizes. Kept out of
+    // app.js so the awkward parts — an axis that runs past the data, a rank
+    // scale that puts 1 at the top, a team with gaps in its season — are
+    // testable without a DOM.
+
+    // Ten lines need ten colours that survive being next to each other. This
+    // is the categorical set, in a fixed order: a team's colour follows the
+    // team, never its current position, so filtering or re-sorting never
+    // repaints the chart.
+    const RANK_CHART_COLORS = [
+        "#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4",
+        "#6250d6", "#008300", "#e34948", "#5f5e5a", "#0f6e56",
+        "#993c1d", "#378add",
+    ];
+
+    // Number(null) is 0 and Number("") is 0, both of which Number.isFinite
+    // accepts — so a missing rank sails through a naive check and plots at
+    // the top of the chart, or off it entirely.
+    function finiteNumber(value) {
+        if (value === null || value === undefined || value === "") return null;
+        const parsed = Number(value);
+        return Number.isFinite(parsed) ? parsed : null;
+    }
+
+    function rankChartColor(index) {
+        return RANK_CHART_COLORS[index % RANK_CHART_COLORS.length];
+    }
+
+    // `teams` is the payload's team list; `lastWeek` is where the regular
+    // season ends, which is deliberately not where the data ends — the axis
+    // holds still as the season fills it in.
+    function rankChartGeometry(teams, lastWeek, box) {
+        const rows = (teams || []).filter((team) => (team.points || []).length);
+        if (!rows.length) return null;
+
+        const width = (box && box.width) || 680;
+        const height = (box && box.height) || 300;
+        const pad = Object.assign(
+            { top: 12, right: 14, bottom: 26, left: 30 },
+            (box && box.pad) || {}
+        );
+
+        const weeks = rows.reduce(
+            (all, team) => all.concat(team.points.map((point) => point.week)),
+            []
+        );
+        const firstWeek = Math.min.apply(null, weeks);
+        // An axis that stopped at the last played week would redraw itself
+        // every Tuesday. It runs to the playoffs and waits — one slot past
+        // the last regular-season week, so the playoff marker has somewhere
+        // to stand that is not on top of the final results.
+        const finalWeek = Math.max(lastWeek || 0, Math.max.apply(null, weeks)) + 1;
+        const weekSpan = Math.max(1, finalWeek - firstWeek);
+
+        // Rank 1 sits at the top, and the scale covers every team rather than
+        // only the ranks that happen to appear — a league of twelve with two
+        // teams charted must not stretch those two across the whole box.
+        const ranks = rows.reduce(
+            (all, team) =>
+                all.concat(
+                    team.points
+                        .map((point) => finiteNumber(point.rank))
+                        .filter((rank) => rank !== null)
+                ),
+            []
+        );
+        if (!ranks.length) return null;
+        const worstRank = Math.max(rows.length, Math.max.apply(null, ranks));
+        const rankSpan = Math.max(1, worstRank - 1);
+
+        const plotWidth = width - pad.left - pad.right;
+        const plotHeight = height - pad.top - pad.bottom;
+        const xFor = (week) => pad.left + ((week - firstWeek) / weekSpan) * plotWidth;
+        const yFor = (rank) => pad.top + ((rank - 1) / rankSpan) * plotHeight;
+
+        const lines = rows.map((team, index) => {
+            const points = team.points
+                .filter((point) => finiteNumber(point.rank) !== null)
+                .map((point) => ({
+                    week: point.week,
+                    rank: point.rank,
+                    value: point.value,
+                    x: xFor(point.week),
+                    y: yFor(point.rank),
+                }));
+            return {
+                espn_team_id: team.espn_team_id,
+                name: team.name,
+                abbrev: team.abbrev,
+                color: rankChartColor(index),
+                points,
+                // A single week is a dot, not a line; `d` stays empty so the
+                // caller draws the marker and nothing else. A lone "M" would
+                // render as nothing either way, but it would make the check
+                // for "is there a line here" a lie.
+                d: points.length < 2
+                    ? ""
+                    : points
+                        .map((point, i) => `${i === 0 ? "M" : "L"}${point.x.toFixed(1)},${point.y.toFixed(1)}`)
+                        .join(" "),
+                last: points.length ? points[points.length - 1] : null,
+            };
+        });
+
+        return {
+            width,
+            height,
+            pad,
+            firstWeek,
+            finalWeek,
+            worstRank,
+            xFor,
+            yFor,
+            lines,
+            weekTicks: rankChartTicks(firstWeek, finalWeek - 1),
+            rankTicks: rankChartRankTicks(worstRank),
+        };
+    }
+
+    // Every week when there is room, every other week when there is not.
+    function rankChartTicks(first, last) {
+        const span = last - first;
+        const step = span > 18 ? 3 : span > 9 ? 2 : 1;
+        const ticks = [];
+        for (let week = first; week <= last; week += step) ticks.push(week);
+        if (ticks[ticks.length - 1] !== last) ticks.push(last);
+        return ticks;
+    }
+
+    function rankChartRankTicks(worst) {
+        if (worst <= 6) {
+            return Array.from({ length: worst }, (_unused, i) => i + 1);
+        }
+        const ticks = [1];
+        for (let rank = 4; rank < worst; rank += 3) ticks.push(rank);
+        if (ticks[ticks.length - 1] !== worst) ticks.push(worst);
+        return ticks;
+    }
+
+    // What the hovered week says for one team, in the units of whichever
+    // series is on screen.
+    function rankChartValueLabel(point, metric) {
+        if (!point) return "—";
+        if (metric === "roster") {
+            return point.value == null ? "—" : `${formatPoints(point.value)} pts/wk`;
+        }
+        return `#${point.rank}`;
     }
 
     function ledgerText(row, key) {
@@ -658,6 +812,13 @@
         ledgerMeta,
         LEDGER_HINTS,
         ledgerHint,
+        finiteNumber,
+        RANK_CHART_COLORS,
+        rankChartColor,
+        rankChartGeometry,
+        rankChartTicks,
+        rankChartRankTicks,
+        rankChartValueLabel,
         POWER_HINTS,
         powerHint,
         sortLedger,

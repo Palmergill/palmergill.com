@@ -150,6 +150,36 @@ def power_rankings(
         raise HTTPException(status_code=404, detail=str(exc))
 
 
+@router.get("/power-history")
+def power_history(
+    season: Optional[int] = None,
+    metric: str = Query(
+        fantasy_league_data.RESUME_METRIC, pattern="^(resume|roster)$"
+    ),
+    algorithm: str = Query("composite", pattern="^[a-z_]+$"),
+    _: Dict[str, Any] = Depends(require_member),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """One line per team, week by week, for the season-long power chart.
+
+    Two series behind one route because they answer the same question about
+    different things: ``resume`` ranks what a team has earned, ``roster``
+    ranks what it holds. Only the first can be read back for a season that
+    finished before the second started being recorded.
+    """
+    if algorithm not in ALGORITHMS:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Unknown algorithm '{algorithm}'. Valid: {', '.join(ALGORITHMS)}",
+        )
+    try:
+        return fantasy_league_data.get_power_history(
+            db, season=season, metric=metric, algorithm=algorithm
+        )
+    except UnknownSeasonError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+
+
 @router.get("/ledger")
 def ledger(
     season: Optional[int] = None,

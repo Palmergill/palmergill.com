@@ -1192,6 +1192,24 @@ def _mark_draft_next_due(
     _mark_league_next_due(db, "league_draft", season, now, in_season, completed)
 
 
+def _record_roster_power(db: Session, season: int) -> None:
+    """Store roster power for every completed week that can still be valued.
+
+    See ``fantasy_league_data.backfill_roster_power``. Run on each league
+    pass rather than on its own timer: it reads only local rows, and the week
+    it needs to write is the one the pass just finished collecting.
+    """
+    from app.services import fantasy_league_data
+
+    written = fantasy_league_data.backfill_roster_power(db, season)
+    if written:
+        logger.info(
+            "Stored roster power for season %s weeks %s",
+            season,
+            sorted(written),
+        )
+
+
 def _mark_provider_next_due(
     db: Session, source: str, season: int, week: int, now: datetime, in_season: bool
 ) -> None:
@@ -1303,6 +1321,19 @@ def run_scheduled(db: Session, now: Optional[datetime] = None) -> List[Dict[str,
             slow = completed or runs[0].status == "skipped"
             _mark_league_next_due(db, job, league_season, now, in_season, slow)
         _mark_draft_next_due(db, league_season, now, in_season, completed)
+
+        # What each roster is worth has to be written down as the season
+        # runs. The board recomputes it live from the newest snapshot, which
+        # forgets last week the moment a trade lands; the season-long line
+        # needs the value that was true in the week it belongs to. Cheap and
+        # idempotent — it re-stores completed weeks rather than stacking a
+        # second opinion on any of them.
+        if not completed:
+            try:
+                _record_roster_power(db, league_season)
+            except Exception:
+                # A derived series is never worth failing a collection over.
+                logger.exception("Roster power history failed for %s", league_season)
 
     # The draft board gets its own trigger rather than riding the league_sync
     # tick. A draft runs for a couple of hours once a year, and a recap that

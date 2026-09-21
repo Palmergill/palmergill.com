@@ -102,6 +102,36 @@ function ledger(overrides) {
     );
 }
 
+const POWER_HISTORY = {
+    season: 2026,
+    metric: "resume",
+    algorithm: "composite",
+    algorithms: OVERVIEW.algorithms,
+    playoff_start_week: 15,
+    last_week: 14,
+    available: true,
+    unavailable_reason: null,
+    weeks: [1, 2],
+    teams: [
+        {
+            espn_team_id: 1,
+            name: "Alpha",
+            points: [
+                { week: 1, rank: 2, value: 0.51 },
+                { week: 2, rank: 1, value: 0.72 },
+            ],
+        },
+        {
+            espn_team_id: 2,
+            name: "Bravo",
+            points: [
+                { week: 1, rank: 1, value: 0.88 },
+                { week: 2, rank: 2, value: 0.64 },
+            ],
+        },
+    ],
+};
+
 async function waitFor(predicate) {
     for (let attempt = 0; attempt < 60; attempt += 1) {
         if (predicate()) return;
@@ -133,6 +163,11 @@ function boot(overrides = {}, url = "/fantasy/") {
             return response(overrides.rosterPower || { available: false, unavailable_reason: "missing_projections" });
         }
         if (target.includes("/lineup")) return response(overrides.lineup || { available: false });
+        if (target.includes("/power-history")) {
+            const metric = new URL(target, "https://x").searchParams.get("metric");
+            const key = metric === "roster" ? "rosterHistory" : "resumeHistory";
+            return response(overrides[key] || POWER_HISTORY);
+        }
         if (target.includes("/me")) return response(overrides.me || { status: "unconfigured" });
         throw new Error(`Unexpected request: ${target}`);
     });
@@ -1062,5 +1097,145 @@ describe("column hints", () => {
         );
 
         expect(headers().every((th) => th.querySelector(".col-hint__bubble"))).toBe(true);
+    });
+});
+
+// ── power over time ─────────────────────────────────────────────────────
+//
+// The board that answers "how did we get here". Two series behind one
+// toggle: résumé ranks what a team has earned, roster ranks what it holds.
+// They come from different places and only one of them can reach back, so
+// most of what is worth pinning here is how the chart behaves when the
+// series it is asked for does not exist yet.
+
+describe("the power chart", () => {
+    afterEach(() => {
+        document.body.innerHTML = "";
+        jest.restoreAllMocks();
+    });
+
+    const lines = () => [...document.querySelectorAll(".rank-chart__line")];
+    const legend = () => [...document.querySelectorAll(".rank-chart__legend-item")];
+    const chips = () => [...document.querySelectorAll("#powerChartMetric .chip")];
+    const empty = () => document.getElementById("powerChartEmpty");
+
+    async function bootChart(overrides = {}) {
+        boot(overrides);
+        await waitFor(() => lines().length > 0 || !empty().hidden);
+    }
+
+    test("draws one line per team, with a legend to match", async () => {
+        await bootChart();
+
+        expect(lines()).toHaveLength(2);
+        expect(legend().map((item) => item.textContent)).toEqual(["Alpha", "Bravo"]);
+        expect(document.getElementById("powerChartNote").textContent).toBe(
+            "2 weeks played · playoffs after week 14"
+        );
+    });
+
+    test("the toggle starts on the series that always has history", async () => {
+        await bootChart();
+
+        expect(chips().map((chip) => chip.textContent)).toEqual(["Résumé", "Roster"]);
+        expect(chips()[0].classList.contains("chip--active")).toBe(true);
+    });
+
+    test("switching to roster asks for the roster series", async () => {
+        const fetchMock = boot();
+        await waitFor(() => lines().length > 0);
+
+        chips()[1].click();
+        await waitFor(() =>
+            fetchMock.mock.calls.some(([url]) => String(url).includes("metric=roster"))
+        );
+        expect(chips()[1].classList.contains("chip--active")).toBe(true);
+    });
+
+    test("a season recorded before the roster series existed explains itself", async () => {
+        await bootChart({
+            rosterHistory: {
+                ...POWER_HISTORY,
+                available: false,
+                metric: "roster",
+                unavailable_reason: "roster_power_not_recorded",
+                weeks: [],
+                teams: [],
+            },
+        });
+        chips()[1].click();
+        await waitFor(() => !empty().hidden);
+
+        // Not a blank frame: the reader is told why the line stops.
+        expect(empty().textContent).toContain("September 2026");
+        expect(document.querySelector(".rank-chart__svg")).toBeNull();
+        expect(legend()).toHaveLength(0);
+    });
+
+    test("the résumé method only applies to the series that has one", async () => {
+        await bootChart();
+        const field = document.getElementById("powerChartAlgoField");
+        expect(field.hidden).toBe(false);
+
+        chips()[1].click();
+        await waitFor(() => field.hidden);
+    });
+
+    test("the two method selects are one choice, not two", async () => {
+        await bootChart();
+        const board = document.getElementById("powerAlgorithm");
+        const chart = document.getElementById("powerChartAlgorithm");
+
+        chart.value = "recent_form";
+        chart.dispatchEvent(new window.Event("change"));
+        expect(board.value).toBe("recent_form");
+        await waitFor(() => window.location.search.includes("algo=recent_form"));
+    });
+
+    test("hovering a legend entry lifts its line out of the tangle", async () => {
+        await bootChart();
+
+        legend()[0].dispatchEvent(new window.MouseEvent("mouseenter"));
+        const dimmed = lines().filter((line) => line.classList.contains("is-dimmed"));
+        // The others stay as context rather than disappearing — where a team
+        // sits among them is the whole point.
+        expect(dimmed).toHaveLength(1);
+        expect(dimmed[0].dataset.teamId).toBe("2");
+
+        legend()[0].dispatchEvent(new window.MouseEvent("mouseleave"));
+        expect(lines().filter((l) => l.classList.contains("is-dimmed"))).toHaveLength(0);
+    });
+
+    test("every point carries what it was, in the units on screen", async () => {
+        await bootChart();
+
+        const tips = [...lines()[0].querySelectorAll("title")].map((t) => t.textContent);
+        expect(tips).toEqual([
+            "Alpha · week 1 · #2",
+            "Alpha · week 2 · #1",
+        ]);
+    });
+
+    test("a failed read says so rather than leaving the last chart up", async () => {
+        await bootChart();
+        expect(lines().length).toBeGreaterThan(0);
+
+        document.body.innerHTML = "";
+        boot({
+            fetch: (target) =>
+                target.includes("/power-history") ? response({}, 500) : null,
+        });
+        await waitFor(() => !empty().hidden);
+        expect(empty().textContent).toContain("unavailable");
+        expect(document.querySelector(".rank-chart__svg")).toBeNull();
+    });
+
+    test("the chart sits below the table, not between it and the rankings", async () => {
+        await bootChart();
+
+        const boards = [...document.querySelectorAll("#leagueSections .board")]
+            .map((board) => board.dataset.board);
+        expect(boards.indexOf("power-chart")).toBeGreaterThan(boards.indexOf("ledger"));
+        expect(boards.indexOf("ledger")).toBe(boards.indexOf("power") + 1);
     });
 });

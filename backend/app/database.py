@@ -702,6 +702,44 @@ class FantasyLeaguePowerRanking(Base):
     computed_at = Column(DateTime, default=utc_now, index=True)
 
 
+class FantasyLeagueRosterPower(Base):
+    """What each roster was worth, week by week.
+
+    The roster-power board computes this live from the newest snapshot, which
+    answers "who has the best team right now" and forgets the answer the
+    moment the rosters change. A line over the season needs the value that
+    was true *in* week N, using week N's projections as they stood — so it is
+    stored when it is computed rather than recomputed later from projections
+    that have since been revised.
+
+    Cannot be backfilled before Sep 2026: weekly projections do not exist for
+    earlier seasons, and those seasons hold a single end-of-year roster
+    snapshot rather than one per week.
+    """
+
+    __tablename__ = "ff_league_roster_power"
+    __table_args__ = (
+        UniqueConstraint(
+            "espn_league_id", "season", "week", "espn_team_id",
+            name="uq_ff_league_roster_power",
+        ),
+        Index("ix_ff_league_roster_power_ctx", "season", "week"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    espn_league_id = Column(String, index=True)
+    season = Column(Integer, index=True)
+    week = Column(Integer, index=True)
+    espn_team_id = Column(Integer, index=True)
+    # Projected points a week from the best legal lineup this roster could
+    # field, after the bench covers byes and injuries.
+    expected = Column(Float, nullable=True)
+    rank = Column(Integer, nullable=True)
+    scoring = Column(String, nullable=True)
+    run_id = Column(Integer, nullable=True, index=True)
+    computed_at = Column(DateTime, default=utc_now, index=True)
+
+
 class FantasyLeagueTeamOverview(Base):
     __tablename__ = "ff_league_team_overviews"
     __table_args__ = (

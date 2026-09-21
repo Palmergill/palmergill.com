@@ -77,7 +77,7 @@ Important routes:
 - `/api/craps/*`
 - `/api/bitcoin/*`
 - `/api/fantasy/*` (public fantasy reads, account-gated persistent draft rooms, and `POST /api/fantasy/chat`, which is member-gated because it spends model budget per request)
-- `/api/fantasy/league/*` (members-only ESPN league reads and digest-cached team overviews; 403 for anonymous callers)
+- `/api/fantasy/league/*` (members-only ESPN league reads and digest-cached team overviews; 403 for anonymous callers). `GET /power-history` serves the season-long rank chart: `metric=resume` reads `ff_league_power_rankings`, which covers every stored season, while `metric=roster` reads `ff_league_roster_power`, which the collector only began writing in Sep 2026 and cannot be backfilled — earlier seasons have no weekly roster snapshots or weekly projections.
 - `/api/fantasy/rankings/*` (personal ranking boards; every `/boards` route is account-owned and returns JSON 403 to anonymous callers, 404 for someone else's board — including to the admin)
 - `/api/analytics/*` (public client analytics ingest)
 - `/api/admin/*` (logs, analytics aggregates, retention, and `GET /api/admin/users` — the member account roster)

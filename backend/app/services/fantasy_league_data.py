@@ -17,10 +17,12 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.database import (
+    FantasyCollectionRun,
     FantasyLeagueAccountTeam,
     FantasyLeagueMatchup,
     FantasyLeaguePowerRanking,
     FantasyLeagueRosterEntry,
+    FantasyLeagueRosterPower,
     FantasyLeagueSeason,
     FantasyLeagueTeam,
     FantasyPlayer,
@@ -28,6 +30,7 @@ from app.database import (
     FantasyRanking,
     FantasyTrendingSnapshot,
     iso_utc,
+    utc_now,
 )
 from app.services import fantasy_data
 from app.services import fantasy_league_advanced
@@ -1350,14 +1353,227 @@ def _player_value(
     }
 
 
+# ── power over time ─────────────────────────────────────────────────────
+#
+# Two different questions, plotted the same way. The résumé line ranks what a
+# team has earned — it comes free, because the collector already writes one
+# row per team per week per algorithm. The roster line ranks what a team
+# holds, and that has to be stored as it happens: a value recomputed later
+# from revised projections would quietly rewrite its own history.
+#
+# The roster line therefore starts in Sep 2026 and cannot reach back. Earlier
+# seasons hold one end-of-year roster snapshot rather than one per week, and
+# no weekly projections at all. The payload says so rather than drawing a
+# line that trails off for reasons the reader cannot see.
+
+ROSTER_POWER_METRIC = "roster"
+RESUME_METRIC = "resume"
+POWER_METRICS = (RESUME_METRIC, ROSTER_POWER_METRIC)
+
+
+def playoff_start_week(db: Session, season: int) -> Optional[int]:
+    """The first week that is no longer the regular season.
+
+    ESPN tags playoff matchups with a tier, so a finished season answers this
+    from its own schedule. A season whose bracket has not been drawn yet
+    falls back to the stored count of regular-season periods.
+    """
+    tiered = (
+        db.query(func.min(FantasyLeagueMatchup.matchup_period))
+        .filter(
+            FantasyLeagueMatchup.season == season,
+            FantasyLeagueMatchup.playoff_tier.isnot(None),
+            FantasyLeagueMatchup.playoff_tier != "NONE",
+        )
+        .scalar()
+    )
+    if tiered:
+        return int(tiered)
+    row = next((entry for entry in _season_rows(db) if entry.season == season), None)
+    if row and row.matchup_period_count:
+        return int(row.matchup_period_count) + 1
+    return None
+
+
+def _completed_weeks(db: Session, season: int) -> List[int]:
+    rows = (
+        db.query(FantasyLeagueMatchup.matchup_period)
+        .filter(
+            FantasyLeagueMatchup.season == season,
+            FantasyLeagueMatchup.is_complete.is_(True),
+            (FantasyLeagueMatchup.playoff_tier.is_(None))
+            | (FantasyLeagueMatchup.playoff_tier == "NONE"),
+        )
+        .distinct()
+        .all()
+    )
+    return sorted({period for (period,) in rows if period})
+
+
+def store_roster_power(
+    db: Session, season: int, week: int, scoring: str = LEAGUE_SCORING
+) -> int:
+    """Record what every roster was worth in one week. Returns rows written.
+
+    Idempotent: re-running a week replaces its rows rather than stacking a
+    second opinion on the same week.
+    """
+    payload = get_roster_power(db, season, scoring=scoring, week=week)
+    if not payload.get("available") or not payload.get("teams"):
+        return 0
+
+    league_id = configured_league_id()
+    existing = {
+        row.espn_team_id: row
+        for row in db.query(FantasyLeagueRosterPower).filter(
+            FantasyLeagueRosterPower.espn_league_id == league_id,
+            FantasyLeagueRosterPower.season == season,
+            FantasyLeagueRosterPower.week == week,
+        )
+    }
+    written = 0
+    for team in payload["teams"]:
+        row = existing.get(team["espn_team_id"])
+        if row is None:
+            row = FantasyLeagueRosterPower(
+                espn_league_id=league_id,
+                season=season,
+                week=week,
+                espn_team_id=team["espn_team_id"],
+            )
+            db.add(row)
+        row.expected = team.get("expected")
+        row.rank = team.get("rank")
+        row.scoring = payload.get("scoring")
+        row.computed_at = utc_now()
+        written += 1
+    db.commit()
+    return written
+
+
+def backfill_roster_power(
+    db: Session, season: int, scoring: str = LEAGUE_SCORING
+) -> Dict[int, int]:
+    """Store every completed week that still has the inputs to be valued.
+
+    Only weeks with their own projections qualify. Valuing week 6 against
+    season-long numbers alone would put a point on the chart that means
+    something different from the ones either side of it.
+    """
+    written: Dict[int, int] = {}
+    for week in _completed_weeks(db, season):
+        week_map, _ = fantasy_data._consensus_projection_map(db, season, week)
+        if not week_map:
+            continue
+        count = store_roster_power(db, season, week, scoring)
+        if count:
+            written[week] = count
+    return written
+
+
+def _roster_power_history(db: Session, season: int) -> Dict[int, List[Dict[str, Any]]]:
+    rows = (
+        db.query(FantasyLeagueRosterPower)
+        .filter(
+            FantasyLeagueRosterPower.espn_league_id == configured_league_id(),
+            FantasyLeagueRosterPower.season == season,
+        )
+        .order_by(FantasyLeagueRosterPower.week)
+        .all()
+    )
+    history: Dict[int, List[Dict[str, Any]]] = {}
+    for row in rows:
+        history.setdefault(row.espn_team_id, []).append(
+            {"week": row.week, "rank": row.rank, "value": row.expected}
+        )
+    return history
+
+
+def get_power_history(
+    db: Session,
+    season: Optional[int] = None,
+    metric: str = RESUME_METRIC,
+    algorithm: str = DEFAULT_ALGORITHM,
+) -> Dict[str, Any]:
+    """One line per team, week by week, for whichever ranking is asked for."""
+    season = _require_season(db, season)
+    if metric not in POWER_METRICS:
+        metric = RESUME_METRIC
+    if algorithm not in ALGORITHMS:
+        algorithm = DEFAULT_ALGORITHM
+
+    playoffs = playoff_start_week(db, season)
+    team_rows = {row.espn_team_id: row for row in _team_rows(db, season)}
+    base = {
+        "season": season,
+        "metric": metric,
+        "algorithm": algorithm if metric == RESUME_METRIC else None,
+        "algorithms": list(ALGORITHMS),
+        "playoff_start_week": playoffs,
+        # The axis runs the whole regular season even before it is played, so
+        # the chart does not rescale itself every week.
+        "last_week": (playoffs - 1) if playoffs else None,
+    }
+
+    if metric == RESUME_METRIC:
+        run = latest_successful_run(db, "league_rankings", season)
+        history = _power_history(db, run.id, season, algorithm) if run else {}
+        points = {
+            team_id: [
+                {"week": row["week"], "rank": row["rank"], "value": row["score"]}
+                for row in rows
+            ]
+            for team_id, rows in history.items()
+        }
+    else:
+        points = _roster_power_history(db, season)
+
+    teams = [
+        {
+            "espn_team_id": team_id,
+            "name": (team_rows[team_id].name if team_id in team_rows else None),
+            "abbrev": (team_rows[team_id].abbrev if team_id in team_rows else None),
+            "logo_url": (team_rows[team_id].logo_url if team_id in team_rows else None),
+            "points": rows,
+        }
+        for team_id, rows in sorted(points.items())
+        if rows
+    ]
+    weeks = sorted({row["week"] for team in teams for row in team["points"]})
+
+    if not teams:
+        return {
+            **base,
+            "available": False,
+            "unavailable_reason": (
+                "roster_power_not_recorded"
+                if metric == ROSTER_POWER_METRIC
+                else "missing_rankings"
+            ),
+            "weeks": [],
+            "teams": [],
+        }
+
+    return {**base, "available": True, "unavailable_reason": None,
+            "weeks": weeks, "teams": teams}
+
+
 def get_roster_power(
-    db: Session, season: Optional[int] = None, scoring: str = LEAGUE_SCORING
+    db: Session,
+    season: Optional[int] = None,
+    scoring: str = LEAGUE_SCORING,
+    week: Optional[int] = None,
 ) -> Dict[str, Any]:
     """Every team ranked by the players on it, not by its results.
 
     See ``fantasy_league_roster_power`` for the model. This function is the
-    join: the newest roster snapshot, the league's own starting slots, and the
-    dashboard's consensus projections — season-long and this week's.
+    join: a roster snapshot, the league's own starting slots, and the
+    dashboard's consensus projections — season-long and that week's.
+
+    ``week`` defaults to the current NFL week and the newest snapshot, which
+    is the board on the hub. Passing an earlier week values the roster as it
+    stood *then*, against that week's projections — that is how the
+    season-long line is built, one week at a time as the season runs.
     """
     season = _require_season(db, season)
     scoring = normalize_scoring(scoring)
@@ -1365,16 +1581,30 @@ def get_roster_power(
     context = fantasy_data.default_context(db)
     season_row = next((row for row in _season_rows(db) if row.season == season), None)
     slots = _starting_slots(season_row)
-    roster_run = latest_successful_run(db, "league_rosters", season)
+
+    if week is None:
+        week = context.get("week")
+        roster_run = latest_successful_run(db, "league_rosters", season)
+        roster_run_id = roster_run.id if roster_run else None
+        roster_as_of = _iso(roster_run.finished_at) if roster_run else None
+    else:
+        # The snapshot that was standing last in that week. Before week 1 the
+        # collector writes a preseason snapshot and then skips identical
+        # ones, so an early week correctly carries it forward.
+        snapshots = _latest_roster_run_by_week(db, season)
+        usable = [period for period in snapshots if period <= week]
+        roster_run_id = snapshots[max(usable)] if usable else None
+        run = db.get(FantasyCollectionRun, roster_run_id) if roster_run_id else None
+        roster_as_of = _iso(run.finished_at) if run else None
 
     base = {
         "season": season,
         "scoring": scoring,
-        "week": context.get("week"),
+        "week": week,
         "slots": slots,
         "absence_rate": roster_power.ABSENCE_RATE,
         "out_discount": roster_power.OUT_DISCOUNT,
-        "roster_as_of": _iso(roster_run.finished_at) if roster_run else None,
+        "roster_as_of": roster_as_of,
     }
     # Same boundary the lineup and free-agent boards draw: projections are for
     # one season, and a 2024 roster valued with 2026 numbers answers nothing.
@@ -1383,18 +1613,16 @@ def get_roster_power(
         unavailable_reason = "projection_season_mismatch"
     elif not slots:
         unavailable_reason = "missing_lineup_settings"
-    elif roster_run is None:
+    elif roster_run_id is None:
         unavailable_reason = "missing_roster_snapshot"
     season_map, season_as_of = fantasy_data._consensus_projection_map(db, season, 0)
-    week_map, week_as_of = fantasy_data._consensus_projection_map(
-        db, season, context.get("week")
-    )
+    week_map, week_as_of = fantasy_data._consensus_projection_map(db, season, week)
     if unavailable_reason is None and not season_map and not week_map:
         unavailable_reason = "missing_projections"
     if unavailable_reason:
         return {**base, "available": False, "unavailable_reason": unavailable_reason, "teams": []}
 
-    matchups = fantasy_data._week_matchups(db, season, context.get("week"))
+    matchups = fantasy_data._week_matchups(db, season, week)
 
     def value_for(player_id, pro_team, on_ir):
         season_points = (season_map.get(player_id) or {}).get(scoring_field)
@@ -1404,7 +1632,7 @@ def get_roster_power(
 
     roster_rows = (
         db.query(FantasyLeagueRosterEntry)
-        .filter(FantasyLeagueRosterEntry.run_id == roster_run.id)
+        .filter(FantasyLeagueRosterEntry.run_id == roster_run_id)
         .all()
     )
     rostered_ids = {row.player_id for row in roster_rows if row.player_id}

@@ -513,3 +513,29 @@ and weights but fixed five defects, each locked by a regression test:
   offer, the week-one blowout still helps the team that scored it, and a
   finished season still reports exactly 0 or 1. Confidence now grows with
   the season instead of arriving with it.
+
+- **Sep 2026 — power over time.** The hub had two rankings and no way to see
+  either as a season. A line chart under the table draws one line a team,
+  week 1 to the playoffs, with a toggle between the two.
+
+  **Résumé comes free.** `ff_league_power_rankings` already holds a row per
+  team per week per algorithm, which is what the Form sparkline in the table
+  was drawing from; `GET /power-history?metric=resume` is that table read
+  wide instead of narrow. It reaches back over every stored season.
+
+  **Roster power had to be recorded.** The board computes it live from the
+  newest snapshot, which forgets last week the moment a trade lands, so a
+  new table stores what each roster was worth in the week it belongs to —
+  written by the collector on each league pass, from that week's rosters and
+  that week's projections. It cannot be backfilled before Sep 2026: earlier
+  seasons hold a single end-of-year roster snapshot rather than one a week,
+  and weekly projections do not exist for them at all. The payload reports
+  `roster_power_not_recorded` and the board says so in prose, because a line
+  that simply stops is a bug as far as the reader can tell.
+
+  Two details worth keeping. The axis runs to the playoff week even when the
+  data is one point long, so the chart does not rescale itself every Tuesday
+  — and the playoff marker stands in the slot *past* the last week, or it
+  lands on top of the results it is marking the end of. And `get_roster_power`
+  grew a `week` parameter rather than a parallel implementation, so the board
+  and the chart cannot drift in how they value a roster.

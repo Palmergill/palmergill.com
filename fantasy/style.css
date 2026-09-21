@@ -2060,3 +2060,114 @@ button:focus-visible {
         justify-self: start;
     }
 }
+
+/* ── power over time ──────────────────────────────────────────────── */
+/*
+   Ten or twelve lines over a season. The tangle in the middle is the honest
+   shape of the data — what makes it readable is the end dots, which put the
+   current order down the right edge, and the legend, which lifts one line
+   out on hover. */
+
+.controls--chart {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 14px;
+}
+
+.rank-chart {
+    width: 100%;
+}
+
+.rank-chart__svg {
+    display: block;
+    width: 100%;
+    height: auto;
+    overflow: visible;
+}
+
+.rank-chart__grid {
+    stroke: var(--line, #ece4d8);
+    stroke-width: 1;
+}
+
+/* Where the regular season stops. Drawn even before the data reaches it —
+   that is the point of an axis that does not move every week. */
+.rank-chart__playoffs {
+    stroke: var(--line-strong, #d8cdba);
+    stroke-width: 1;
+    stroke-dasharray: 3 4;
+}
+
+.rank-chart__tick {
+    fill: var(--muted, #928a7d);
+    font-size: 11px;
+    font-family: inherit;
+}
+
+.rank-chart__line { transition: opacity .12s ease; }
+
+/* One line lifted out of the tangle; the rest stay as context rather than
+   disappearing, because the whole point is where it sits among them. */
+.rank-chart__line.is-dimmed { opacity: 0.16; }
+
+.rank-chart__line--mine path { stroke-width: 3; }
+
+.rank-chart__empty {
+    margin: 8px 0 0;
+    padding: 18px;
+    border: 1px dashed var(--line-strong, #d8cdba);
+    border-radius: 12px;
+    color: var(--soft, #5d574e);
+    font-size: 0.86rem;
+    line-height: 1.5;
+}
+
+.rank-chart__legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 16px;
+    margin: 14px 0 0;
+    padding: 0;
+    list-style: none;
+}
+
+.rank-chart__legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--soft, #5d574e);
+    font-size: 0.78rem;
+    cursor: default;
+}
+
+.rank-chart__legend-item--mine {
+    color: var(--ink, #23201c);
+    font-weight: 700;
+}
+
+.rank-chart__swatch {
+    width: 10px;
+    height: 10px;
+    border-radius: 2px;
+    flex: 0 0 auto;
+}
+
+.rank-chart__legend-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 20ch;
+}
+
+@media (max-width: 720px) {
+    /* Twelve lines do not survive 375px of width. The chart keeps its
+       aspect ratio and the legend wraps under it. */
+    /* SVG user units: the narrow viewBox scales down, so this is about 11px
+       on screen rather than 13. */
+    .rank-chart__tick { font-size: 13px; }
+    .rank-chart__legend { gap: 5px 12px; }
+    .rank-chart__legend-item { font-size: 0.72rem; }
+}

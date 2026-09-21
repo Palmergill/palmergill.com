@@ -14,7 +14,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/shared/site-nav.css?v=14">
     <link rel="stylesheet" href="/shared/fantasy-header.css?v=2">
-    <link rel="stylesheet" href="style.css?v=22">
+    <link rel="stylesheet" href="style.css?v=23">
 </head>
 <body>
 <noscript>
@@ -220,6 +220,7 @@
                 <nav class="league-jump-nav" aria-label="League sections">
                     <a href="#power">Power</a>
                     <a href="#standings">Standings</a>
+                    <a href="#power-chart">Power over time</a>
                     <a href="#scoreboard">Scoreboard</a>
                     <a href="#free-agents">Free agents</a>
                     <a href="#teams">Teams</a>
@@ -272,6 +273,33 @@
                     <div id="ledger" class="ledger"></div>
                     <p class="ledger__note" id="ledgerFootnote"></p>
                 </section>
+                <!-- The same ranking as a season. Two series behind one
+                     toggle because they answer the same question about
+                     different things: what a team has earned, and what it
+                     holds. The résumé line reaches back over every stored
+                     season; the roster line only as far as Sep 2026, when
+                     the hub started writing it down. -->
+                <section class="board" id="power-chart" data-board="power-chart"
+                         aria-labelledby="powerChartTitle">
+                    <div class="board__head">
+                        <div>
+                            <h2 id="powerChartTitle">Power over time</h2>
+                        </div>
+                        <span class="board__note" id="powerChartNote"></span>
+                    </div>
+                    <div class="controls controls--chart">
+                        <div class="chip-row" id="powerChartMetric" role="group"
+                             aria-label="Which ranking"></div>
+                        <label class="select-field" id="powerChartAlgoField">
+                            <span class="sr-only">Résumé ranking method</span>
+                            <select id="powerChartAlgorithm"></select>
+                        </label>
+                    </div>
+                    <div class="rank-chart" id="powerChart"></div>
+                    <p class="rank-chart__empty" id="powerChartEmpty" hidden></p>
+                    <ul class="rank-chart__legend" id="powerChartLegend"></ul>
+                </section>
+
 
                 <section class="board" data-board="charts" aria-labelledby="chartsTitle" hidden>
                     <div class="board__head">
@@ -358,8 +386,8 @@
     <script>window.FantasyHeader.mount({ page: "home" });</script>
     <script src="/shared/analytics.js?v=1"></script>
     <script src="/shared/api-base.js?v=1"></script>
-    <script src="format.js?v=9"></script>
+    <script src="format.js?v=10"></script>
     <script src="/fantasy/chat.js?v=1"></script>
-    <script src="app.js?v=18"></script>
+    <script src="app.js?v=19"></script>
 </body>
 </html>
