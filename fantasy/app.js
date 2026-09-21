@@ -59,7 +59,6 @@
         leagueSections: byId("leagueSections"),
         powerList: byId("powerList"),
         powerNote: byId("powerNote"),
-        powerFootnote: byId("powerFootnote"),
         ledger: byId("ledger"),
         ledgerColumns: byId("ledgerColumns"),
         ledgerNote: byId("ledgerNote"),
@@ -536,25 +535,29 @@
         ["form", "Form"],
     ];
 
-    // A header that carries its own definition. Hover is the obvious way in,
+    // A label that carries its own definition. Hover is the obvious way in,
     // but it is not the only one: the label takes focus and the bubble is
     // wired up with aria-describedby, so the definition reaches a keyboard
-    // and a screen reader too. The phone hides this whole row — there is no
-    // hover there, and the column chooser names the column instead.
-    function headerLabel(key, label) {
-        const hint = F.ledgerHint(key);
+    // and a screen reader too. Used by the table's column headers and by the
+    // power board's two stats, which is where the method went when the lede
+    // and the footnote came off that board.
+    function hintLabel(tag, id, label, hint) {
         if (!hint) return document.createTextNode(label);
 
-        const wrap = el("span", "col-hint");
+        const wrap = el(tag, "col-hint");
         wrap.tabIndex = 0;
         wrap.appendChild(el("span", "col-hint__label", label));
 
         const bubble = el("span", "col-hint__bubble", hint);
-        bubble.id = `ledger-hint-${key}`;
+        bubble.id = id;
         bubble.setAttribute("role", "tooltip");
         wrap.setAttribute("aria-describedby", bubble.id);
         wrap.appendChild(bubble);
         return wrap;
+    }
+
+    function headerLabel(key, label) {
+        return hintLabel("span", `ledger-hint-${key}`, label, F.ledgerHint(key));
     }
 
     function ledgerHeadRow() {
@@ -1383,6 +1386,12 @@
             renderColumnChips();
             renderLedger(payload);
             renderCharts(payload);
+            // The power rankings borrow playoff odds from this payload, and
+            // the two requests race. If power drew first, its odds column is
+            // still dashes.
+            if (state.rosterPower && state.rosterPower.available) {
+                renderRosterPower(state.rosterPower);
+            }
         } catch (error) {
             if (stale(generation) || request !== state.ledgerRequest) return;
             // Being signed out is a whole-page condition; anything else is
@@ -1541,76 +1550,30 @@
             state.rosterPower = null;
             els.powerList.replaceChildren();
             els.powerNote.textContent = "";
-            els.powerFootnote.textContent = "";
             els.powerList.appendChild(el("li", "empty-note", "Power rankings are unavailable right now."));
         }
     }
 
-    function ordinal(n) {
-        const tens = n % 100;
-        if (tens >= 11 && tens <= 13) return `${n}th`;
-        return `${n}${{ 1: "st", 2: "nd", 3: "rd" }[n % 10] || "th"}`;
+    // Playoff odds are simulated in the ledger payload, not the roster-power
+    // one, and the two land in either order. Whichever arrives second
+    // re-renders, so the row is never left showing a permanent dash for a
+    // number the page already has.
+    function playoffOdds(teamId) {
+        const teams = (state.ledger && state.ledger.teams) || [];
+        const team = teams.find((row) => row.espn_team_id === teamId);
+        const odds = team && team.playoff && team.playoff.odds;
+        return odds === null || odds === undefined ? null : odds;
     }
 
-    function playerLabel(player) {
-        return `${player.name || "—"} (${player.position})`;
-    }
-
-    function powerDetail(team) {
-        const detail = el("details", "power-detail");
-        detail.appendChild(el("summary", null, "Lineup and what each player adds"));
-        const table = el("table", "power-detail__table");
-        const head = el("tr");
-        ["Slot", "Player", "Pts/g", "Adds"].forEach((label) => head.appendChild(el("th", null, label)));
-        const thead = el("thead");
-        thead.appendChild(head);
-        table.appendChild(thead);
-        const body = el("tbody");
-        const surplusIds = new Set(team.surplus.map((player) => player.player_id));
-        const starters = team.players.filter((player) => player.slot);
-        const waivers = team.waiver_starters || [];
-        const bench = team.players.filter((player) => !player.slot);
-        const row = (player, slotText, kind) => {
-            const tr = el("tr", kind ? `power-detail__row--${kind}` : null);
-            tr.appendChild(el("td", "power-detail__slot", slotText));
-            const name = el("td", "power-detail__name", player.name || "—");
-            const tags = [player.position];
-            if (player.pro_team) tags.push(player.pro_team);
-            if (player.out) tags.push("out");
-            if (kind === "waiver") tags.push("waivers");
-            if (surplusIds.has(player.player_id)) tags.push("surplus");
-            name.appendChild(el("small", null, tags.join(" · ")));
-            tr.appendChild(name);
-            tr.appendChild(el("td", "power-detail__num", F.formatPoints(player.ppg)));
-            tr.appendChild(
-                el(
-                    "td",
-                    "power-detail__num",
-                    player.marginal === null || player.marginal === undefined
-                        ? "—"
-                        : `+${F.formatPoints(Math.max(0, player.marginal))}`
-                )
-            );
-            body.appendChild(tr);
-        };
-        starters.forEach((player) => row(player, player.slot));
-        waivers.forEach((player) => row(player, player.slot, "waiver"));
-        bench.forEach((player) => row(player, "Bench", "bench"));
-        table.appendChild(body);
-        detail.appendChild(table);
-        detail.appendChild(
-            el(
-                "p",
-                "power-detail__note",
-                "Adds: expected points a week this team loses without the player. A starter is worth his gap over the next man up; a backup is worth only the weeks he would fill in."
-            )
-        );
-        return detail;
+    function powerStat(key, value, label) {
+        const stat = el("div", `power-row__stat power-row__stat--${key}`);
+        stat.appendChild(el("strong", null, value));
+        stat.appendChild(hintLabel("small", `power-hint-${key}`, label, F.powerHint(key)));
+        return stat;
     }
 
     function renderRosterPower(payload) {
         els.powerList.replaceChildren();
-        els.powerFootnote.textContent = "";
         if (!payload.available) {
             els.powerNote.textContent = "";
             els.powerList.appendChild(
@@ -1620,7 +1583,6 @@
         }
 
         const teams = payload.teams;
-        const axis = F.niceAxis(teams.map((team) => team.expected), 2);
         els.powerNote.textContent = payload.week
             ? `Projections through week ${payload.week} · ${payload.scoring === "half" ? "Half PPR" : payload.scoring}`
             : "";
@@ -1633,81 +1595,17 @@
 
             const who = el("div", "power-row__team");
             who.appendChild(teamCell(team));
-            const meta = el("span", "power-row__meta");
-            const record = F.recordLabel(team.wins, team.losses, team.ties);
-            meta.appendChild(document.createTextNode(record));
-            if (team.standings_rank) {
-                meta.appendChild(document.createTextNode(` · ${ordinal(team.standings_rank)} in standings`));
-                const gap = team.standings_rank - team.rank;
-                // Only a real disagreement is worth a mark; one place either
-                // way is a tiebreaker, not a story.
-                if (Math.abs(gap) >= 3) {
-                    meta.appendChild(
-                        el(
-                            "span",
-                            `power-row__gap power-row__gap--${gap > 0 ? "up" : "down"}`,
-                            gap > 0 ? "roster better than record" : "record better than roster"
-                        )
-                    );
-                }
-            }
-            who.appendChild(meta);
             item.appendChild(who);
 
-            const value = el("div", "power-row__value");
-            value.appendChild(el("strong", null, F.formatPoints(team.expected)));
-            value.appendChild(el("small", null, "pts/wk"));
-            item.appendChild(value);
+            item.appendChild(powerStat("expected", F.formatPoints(team.expected), "pts/wk"));
 
-            const position = axis ? F.dotPosition(team.expected, axis.min, axis.max) : null;
-            if (position !== null) {
-                const track = el("div", "dot power-row__chart");
-                track.appendChild(el("div", "dot__line"));
-                const point = el("div", "dot__pt");
-                point.style.left = `${position}%`;
-                track.appendChild(point);
-                item.appendChild(track);
-            }
+            const odds = playoffOdds(team.espn_team_id);
+            item.appendChild(
+                powerStat("odds", odds === null ? "—" : `${Math.round(odds * 100)}%`, "playoffs")
+            );
 
-            const notes = el("ul", "power-row__notes");
-            if (team.need) {
-                const need = team.need;
-                const seat = need.seat || need.slot;
-                const item = el("li", "power-note power-note--need");
-                item.appendChild(el("span", "power-note__label", `Weakest spot: ${seat}`));
-                // Name the seat as the problem, not the player in it: a
-                // team's RB2 can be a fine back who is simply its second.
-                const text = need.from_waivers
-                    ? `Nobody on the roster can fill it — the best free agent, ${need.name} (${need.position}), projects ${F.formatPoints(need.ppg)} pts/game vs ${F.formatPoints(need.league_average)} for other teams' ${seat} starters.`
-                    : `${need.name} projects ${F.formatPoints(need.ppg)} pts/game; the average ${seat} in this league projects ${F.formatPoints(need.league_average)}.`;
-                item.appendChild(document.createTextNode(text));
-                notes.appendChild(item);
-            }
-            if (team.surplus.length) {
-                const spare = el("li", "power-note power-note--surplus");
-                spare.appendChild(el("span", "power-note__label", "Surplus"));
-                spare.appendChild(
-                    document.createTextNode(
-                        `${team.surplus.map(playerLabel).join(", ")} — ${
-                            team.surplus.length === 1 ? "adds" : "add"
-                        } almost nothing here`
-                    )
-                );
-                notes.appendChild(spare);
-            }
-            if (notes.childNodes.length) item.appendChild(notes);
-
-            item.appendChild(powerDetail(team));
             els.powerList.appendChild(item);
         });
-
-        const waivers = Object.entries(payload.replacements || {})
-            .map(([position, player]) => `${position} ${F.formatPoints(player.ppg)}`)
-            .join(", ");
-        els.powerFootnote.textContent =
-            `Player values average the season-long projection with this week's; a player projected for zero this week, or on IR, counts at half. ` +
-            `Starters are assumed to miss ${Math.round(payload.absence_rate * 100)}% of weeks. ` +
-            (waivers ? `Waiver replacement level (pts/g): ${waivers}.` : "");
     }
 
     // ── free agents ─────────────────────────────────────────────────────

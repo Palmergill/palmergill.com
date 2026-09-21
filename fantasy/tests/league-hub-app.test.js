@@ -553,26 +553,89 @@ describe("league hub power rankings", () => {
         ],
     };
 
-    test("ranks rosters with the reasons under each team", async () => {
-        boot({ rosterPower: ROSTER_POWER });
-        await waitFor(() => document.querySelectorAll("#powerList .power-row").length === 2);
+    const rows = () => [...document.querySelectorAll("#powerList .power-row")];
+    const stat = (row, key) =>
+        row.querySelector(`.power-row__stat--${key} strong`).textContent;
 
-        const rows = [...document.querySelectorAll("#powerList .power-row")];
-        expect(rows.map((row) => row.querySelector(".team-cell__name").textContent)).toEqual([
+    test("ranks rosters, and says nothing else about them", async () => {
+        boot({ rosterPower: ROSTER_POWER });
+        await waitFor(() => rows().length === 2);
+
+        expect(rows().map((row) => row.querySelector(".team-cell__name").textContent)).toEqual([
             TEAMS[1].name,
             TEAMS[0].name,
         ]);
-        expect(rows[0].querySelector(".power-row__value strong").textContent).toBe("134.4");
-        const need = rows[1].querySelector(".power-note--need").textContent;
-        expect(need).toContain("Weakest spot: OP");
-        expect(need).toContain("Nobody on the roster can fill it — the best free agent, Waiver QB (QB)");
-        expect(need).toContain("16.8 for other teams' OP starters");
-        expect(rows[1].querySelector(".power-note--surplus").textContent).toContain("Spare RB (RB)");
-        // The lineup behind the number folds away, waiver seat included.
-        const detail = rows[1].querySelector("details.power-detail");
-        expect(detail.open).toBe(false);
-        expect(detail.querySelector(".power-detail__row--waiver").textContent).toContain("waivers");
-        expect(document.getElementById("powerFootnote").textContent).toContain("15% of weeks");
+        expect(rows().map((row) => row.querySelector(".power-row__rank").textContent)).toEqual([
+            "1",
+            "2",
+        ]);
+        expect(stat(rows()[0], "expected")).toBe("134.4");
+        expect(stat(rows()[1], "expected")).toBe("120.1");
+    });
+
+    test("the prose that used to hang off every row is gone", async () => {
+        boot({ rosterPower: ROSTER_POWER });
+        await waitFor(() => rows().length === 2);
+
+        // The weakest-seat sentence, the surplus list, the foldaway lineup
+        // table, the lede and the footnote. A board whose job is an order
+        // does not get to be an essay.
+        [".power-note", ".power-note--need", ".power-note--surplus", "details.power-detail"]
+            .forEach((selector) => {
+                expect(document.querySelector(`#powerList ${selector}`)).toBeNull();
+            });
+        expect(document.querySelector("#power .board__lede")).toBeNull();
+        expect(document.getElementById("powerFootnote")).toBeNull();
+        expect(pageSource).not.toContain("powerFootnote");
+    });
+
+    test("each row is rank, team and two numbers — nothing more", async () => {
+        boot({ rosterPower: ROSTER_POWER });
+        await waitFor(() => rows().length === 2);
+
+        const parts = [...rows()[0].children].map((node) => node.className);
+        expect(parts).toEqual([
+            "power-row__rank",
+            "power-row__team",
+            "power-row__stat power-row__stat--expected",
+            "power-row__stat power-row__stat--odds",
+        ]);
+    });
+
+    test("playoff odds join from the ledger, whichever payload lands first", async () => {
+        boot({ rosterPower: ROSTER_POWER });
+        await waitFor(() => rows().length === 2);
+        // TEAMS[1] is Bravo at 98%, TEAMS[0] is Alpha at 91%.
+        await waitFor(() => stat(rows()[0], "odds") !== "—");
+
+        expect(stat(rows()[0], "odds")).toBe("98%");
+        expect(stat(rows()[1], "odds")).toBe("91%");
+    });
+
+    test("a team the ledger has no odds for prints a dash, not a zero", async () => {
+        boot({
+            rosterPower: ROSTER_POWER,
+            ledger: ledger({
+                teams: TEAMS.map((team) => Object.assign({}, team, { playoff: null })),
+            }),
+        });
+        await waitFor(() => rows().length === 2);
+
+        expect(stat(rows()[0], "odds")).toBe("—");
+    });
+
+    test("the method moved onto the two stat labels", async () => {
+        boot({ rosterPower: ROSTER_POWER });
+        await waitFor(() => rows().length === 2);
+
+        const row = rows()[0];
+        ["expected", "odds"].forEach((key) => {
+            const hint = row.querySelector(`.power-row__stat--${key} .col-hint`);
+            const bubble = hint.querySelector(".col-hint__bubble");
+            expect(hint.tabIndex).toBe(0);
+            expect(bubble.textContent).toBe(F.POWER_HINTS[key]);
+            expect(hint.getAttribute("aria-describedby")).toBe(bubble.id);
+        });
     });
 
     test("says why it is empty for a season without projections", async () => {
@@ -973,6 +1036,10 @@ describe("column hints", () => {
         });
         expect(styleSource).toContain("visibility: hidden");
         expect(appSource).not.toContain("bubble.hidden");
+        // focus-within, not just focus-visible: a tap focuses the label but
+        // does not match focus-visible, so this is the only path a phone has
+        // to a definition it cannot hover.
+        expect(styleSource).toContain(".col-hint:focus-within .col-hint__bubble");
     });
 
     test("the definition is not styled as the small-caps label around it", async () => {

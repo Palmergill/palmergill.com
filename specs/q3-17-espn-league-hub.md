@@ -464,3 +464,25 @@ and weights but fixed five defects, each locked by a regression test:
   Promoting a semi-final winner to champion would be worse than saying
   nothing. Private seasons keep their labelled row and are never read for a
   champion.
+
+- **Sep 2026 — the power board is two numbers.** It had grown a lede, a
+  footnote, a weakest-seat sentence, a surplus list and a foldaway lineup
+  table per row. All of it was true and most of it went unread: the board's
+  job is an order, and a reader standing in front of a ranking wants to know
+  where each team sits, not to be walked through the arithmetic that put it
+  there.
+
+  A row is now rank, team, projected points a week, and playoff odds.
+  Nothing else. The points figure is the one the board was always built on;
+  the odds come from the ledger payload, where they are already simulated,
+  joined client-side rather than re-simulated in `/roster-power`. The two
+  requests race, so whichever lands second re-renders — a row is never left
+  showing a permanent dash for a number the page already has, and a team the
+  ledger genuinely has no odds for prints a dash rather than a zero.
+
+  The method did not disappear, it moved: both stat labels carry the same
+  hint affordance the standings columns use, so "pts/wk" explains the best-
+  legal-lineup calculation on hover, focus, or a tap. That last one matters
+  here in a way it does not on the table, which hides its header row on a
+  phone entirely — these labels are on screen at every width, and
+  `:focus-within` is what makes them answer a tap.

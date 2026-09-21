@@ -383,6 +383,22 @@
         return LEDGER_HINTS[key] || "";
     }
 
+    // The power board used to carry its method in a lede and a footnote, and
+    // a reasons list under every row. It is two numbers now, so the method
+    // hangs off their labels the same way the table's columns do.
+    const POWER_HINTS = {
+        expected:
+            "The team's best legal lineup in projected points a week, after the bench "
+            + "covers byes and injuries. Depth only counts when it could start.",
+        odds:
+            "How often this team makes the playoffs, simulating the rest of the "
+            + "schedule from each team's own scoring spread.",
+    };
+
+    function powerHint(key) {
+        return POWER_HINTS[key] || "";
+    }
+
     function ledgerText(row, key) {
         if (!row) return "—";
         switch (key) {
@@ -640,6 +656,8 @@
         ledgerMeta,
         LEDGER_HINTS,
         ledgerHint,
+        POWER_HINTS,
+        powerHint,
         sortLedger,
         divergingBar,
         dotPosition,
