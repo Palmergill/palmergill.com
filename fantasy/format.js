@@ -377,10 +377,9 @@
             + "100% means nothing startable was left on the bench.",
         scoring: "Median weekly score. The bar spans this team's lowest week to its highest.",
         power:
-            "Where this team ranks on its results so far. By default it weighs record "
-            + "most, then points scored minus points allowed, then how tough the "
-            + "schedule was, with consistency and recent form as tie-breakers. The "
-            + "dropdown beside the column buttons ranks on just one of those instead.",
+            "Where this team ranks on its results so far. It weighs record most, "
+            + "then points scored minus points allowed, then how tough the "
+            + "schedule was, with consistency and recent form as tie-breakers.",
         odds:
             "How often this team makes the playoffs across ten thousand simulated "
             + "seasons. Early on a team's scoring average is weighted against the "

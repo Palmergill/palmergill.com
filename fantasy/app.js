@@ -15,6 +15,9 @@
         mode: null,
         week: null,
         scoreWeek: null,
+        // Résumé is always ranked on every factor at once. The server offers
+        // single-factor methods too, but a menu of them confused more than it
+        // answered, so the page no longer asks.
         algorithm: "composite",
         // Which measure the ledger's switchable column is showing. On a
         // phone this is the only column, so it is worth keeping in the URL.
@@ -77,13 +80,10 @@
         powerChartEmpty: byId("powerChartEmpty"),
         powerChartLegend: byId("powerChartLegend"),
         powerChartMetric: byId("powerChartMetric"),
-        powerChartAlgorithm: byId("powerChartAlgorithm"),
-        powerChartAlgoField: byId("powerChartAlgoField"),
         ledger: byId("ledger"),
         ledgerColumns: byId("ledgerColumns"),
         ledgerNote: byId("ledgerNote"),
         ledgerFootnote: byId("ledgerFootnote"),
-        powerAlgorithm: byId("powerAlgorithm"),
         chartsBoard: document.querySelector('[data-board="charts"]'),
         charts: byId("charts"),
         chartsNote: byId("chartsNote"),
@@ -228,8 +228,6 @@
         if (Number.isFinite(week)) state.week = week;
         if (Number.isFinite(team)) state.teamId = team;
         else if (rawTeam === "me") state.pendingMyTeam = true;
-        const algo = params.get("algo");
-        if (algo) state.algorithm = algo;
         const column = params.get("col");
         if (column && F.LEDGER_COLUMNS.some((entry) => entry.key === column)) {
             state.column = column;
@@ -245,9 +243,6 @@
             params.set("team", "me");
         } else {
             if (state.week) params.set("week", state.week);
-            if (state.algorithm && state.algorithm !== "composite") {
-                params.set("algo", state.algorithm);
-            }
             if (state.column && state.column !== "record") {
                 params.set("col", state.column);
             }
@@ -528,21 +523,6 @@
             }
             chip.addEventListener("click", () => selectColumn(column.key));
             els.ledgerColumns.appendChild(chip);
-        });
-    }
-
-    function renderAlgorithmSelect(algorithms) {
-        // Both boards that rank by a résumé method get the same options and
-        // the same current value — see the change handlers in bindEvents.
-        [els.powerAlgorithm, els.powerChartAlgorithm].forEach((select) => {
-            select.replaceChildren();
-            (algorithms || []).forEach((algorithm) => {
-                const option = el("option", null, F.algorithmLabel(algorithm));
-                option.value = algorithm;
-                if (algorithm === state.algorithm) option.selected = true;
-                select.appendChild(option);
-            });
-            select.disabled = !(algorithms || []).length;
         });
     }
 
@@ -1406,7 +1386,6 @@
             const payload = await fetchJson(`${API_BASE}/ledger?${params}`);
             if (stale(generation) || request !== state.ledgerRequest) return;
             state.ledger = payload;
-            renderAlgorithmSelect(payload.algorithms);
             renderColumnChips();
             renderLedger(payload);
             renderCharts(payload);
@@ -1685,8 +1664,6 @@
             });
             els.powerChartMetric.appendChild(chip);
         });
-        // The résumé line is ranked by a method; the roster line is not.
-        els.powerChartAlgoField.hidden = state.chartMetric !== "resume";
     }
 
     function selectChartMetric(metric) {
@@ -1733,8 +1710,6 @@
             showChartEmpty("The chart is unavailable right now.");
             return;
         }
-
-        els.powerChartAlgorithm.value = state.algorithm;
 
         if (!payload.available) {
             els.powerChartNote.textContent = "";
@@ -2208,23 +2183,6 @@
         }
         els.teamOverviewRefresh.addEventListener("click", () => loadTeamOverview(true));
 
-        els.powerAlgorithm.addEventListener("change", (event) => {
-            state.algorithm = event.target.value;
-            writeUrlState(true);
-            loadLedger();
-            if (state.chartMetric === "resume") loadPowerChart();
-        });
-
-        // Two selects, one choice: the résumé method belongs to the ranking,
-        // not to whichever board is asking about it.
-        els.powerChartAlgorithm.addEventListener("change", (event) => {
-            state.algorithm = event.target.value;
-            els.powerAlgorithm.value = state.algorithm;
-            writeUrlState(true);
-            loadLedger();
-            loadPowerChart();
-        });
-
         els.scoreboardWeek.addEventListener("change", (event) => {
             state.scoreWeek = parseInt(event.target.value, 10);
             loadScoreboard();
@@ -2255,7 +2213,6 @@
             state.week = null;
             state.teamId = null;
             state.pendingMyTeam = false;
-            state.algorithm = "composite";
             state.column = "record";
             readUrlState();
             loadSeason();

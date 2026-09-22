@@ -541,7 +541,13 @@ and weights but fixed five defects, each locked by a regression test:
   ends on the live board ranking for the week in progress — the chart's right
   edge and the list above it are the same order by construction. The
   Résumé column's hover, which said only "the résumé method chosen above the
-  table", now says what goes into it; "Composite" is "All factors".
+  table", now says what goes into it.
+
+  **No method menu.** Both boards had a dropdown for the résumé method
+  (All factors, Record, Point diff, Schedule…). It confused more than it
+  answered, so both are gone and the page always asks for `composite`. The
+  API still takes `algorithm`; only the page stopped offering the choice,
+  and the old `?algo=` URL parameter is ignored.
 
   Two details worth keeping. The axis runs to the playoff week even when the
   data is one point long, so the chart does not rescale itself every Tuesday

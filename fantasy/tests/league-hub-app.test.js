@@ -282,57 +282,17 @@ describe("league hub ledger", () => {
         expect(updated.querySelector(".ledger__chart .dot__pt")).not.toBeNull();
     });
 
-    test("changing the power method refetches, because the ranks are server-side", async () => {
+    test("résumé is always ranked on every factor, with no method to pick", async () => {
         const fetchMock = boot();
         await waitFor(() => document.querySelectorAll("#ledger tbody tr").length === 2);
-        const before = fetchMock.mock.calls.length;
 
-        const select = document.getElementById("powerAlgorithm");
-        expect([...select.options].map((option) => option.value)).toEqual(OVERVIEW.algorithms);
-        select.value = "recent_form";
-        select.dispatchEvent(new window.Event("change"));
-
-        await waitFor(() => fetchMock.mock.calls.length > before);
+        // The method menu confused more than it answered, so it is gone.
+        expect(document.querySelector("#standings select")).toBeNull();
         expect(
             fetchMock.mock.calls.some((call) =>
-                String(call[0]).includes("/ledger?algorithm=recent_form")
+                String(call[0]).includes("/ledger?algorithm=composite")
             )
         ).toBe(true);
-    });
-
-    test("an older power-method response cannot overwrite the latest choice", async () => {
-        let resolveRecord;
-        let resolveRecent;
-        const recordResponse = new Promise((resolve) => { resolveRecord = resolve; });
-        const recentResponse = new Promise((resolve) => { resolveRecent = resolve; });
-        boot({
-            fetch: (target) => {
-                if (target.includes("/ledger?algorithm=record")) return recordResponse;
-                if (target.includes("/ledger?algorithm=recent_form")) return recentResponse;
-                return null;
-            },
-        });
-        await waitFor(() => document.querySelectorAll("#ledger tbody tr").length === 2);
-
-        const select = document.getElementById("powerAlgorithm");
-        select.value = "record";
-        select.dispatchEvent(new window.Event("change"));
-        select.value = "recent_form";
-        select.dispatchEvent(new window.Event("change"));
-
-        const withRank = (rank, algorithm) => ledger({
-            algorithm,
-            teams: TEAMS.map((entry) => Object.assign({}, entry, {
-                power: Object.assign({}, entry.power, { rank }),
-            })),
-        });
-        resolveRecent(response(withRank(8, "recent_form")));
-        await waitFor(() => document.querySelector('td[data-key="power"]').textContent.startsWith("8"));
-        resolveRecord(response(withRank(3, "record")));
-        await new Promise((resolve) => setTimeout(resolve, 0));
-
-        expect(document.querySelector('td[data-key="power"]').textContent.startsWith("8")).toBe(true);
-        expect(document.getElementById("powerAlgorithm").value).toBe("recent_form");
     });
 
     test("the three charts read across the same teams", async () => {
@@ -1187,24 +1147,17 @@ describe("the power chart", () => {
         expect(legend()).toHaveLength(0);
     });
 
-    test("the résumé method only applies to the series that has one", async () => {
-        await bootChart();
-        const field = document.getElementById("powerChartAlgoField");
-        expect(field.hidden).toBe(true);
+    test("the chart has the toggle and nothing else to set", async () => {
+        const fetchMock = boot();
+        await waitFor(() => lines().length > 0);
+        expect(document.querySelector("#power-chart select")).toBeNull();
 
         chips()[1].click();
-        await waitFor(() => !field.hidden);
-    });
-
-    test("the two method selects are one choice, not two", async () => {
-        await bootChart();
-        const board = document.getElementById("powerAlgorithm");
-        const chart = document.getElementById("powerChartAlgorithm");
-
-        chart.value = "recent_form";
-        chart.dispatchEvent(new window.Event("change"));
-        expect(board.value).toBe("recent_form");
-        await waitFor(() => window.location.search.includes("algo=recent_form"));
+        await waitFor(() =>
+            fetchMock.mock.calls.some(([url]) =>
+                String(url).includes("metric=resume") && String(url).includes("algorithm=composite")
+            )
+        );
     });
 
     test("hovering a legend entry lifts its line out of the tangle", async () => {

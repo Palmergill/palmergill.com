@@ -1535,8 +1535,7 @@ button:focus-visible {
     }
 
     /* Every control clears a thumb. */
-    .chip-row--scroll .chip,
-    .controls--ledger select {
+    .chip-row--scroll .chip {
         min-height: 44px;
         display: inline-flex;
         align-items: center;
@@ -1818,9 +1817,6 @@ button:focus-visible {
     .season-bar .chip-row::-webkit-scrollbar { display: none; }
     .season-bar .chip { flex: 0 0 auto; }
 
-    /* The ranking method only changes the Power column, so on a phone —
-       where one column shows at a time — it appears with that column. */
-    .controls--ledger:not([data-column="power"]) .select-field { display: none; }
 
     .scoreboard {
         grid-template-columns: minmax(0, 1fr);
