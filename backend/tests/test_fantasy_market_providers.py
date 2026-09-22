@@ -283,11 +283,12 @@ def test_kalshi_raises_when_every_series_fails():
 class StubProvider:
     """A provider that answers with fixed rows, or refuses to answer."""
 
-    def __init__(self, name, rows=None, error=None, configured=True):
+    def __init__(self, name, rows=None, error=None, configured=True, preseason_only=False):
         self.name = name
         self._rows = rows or []
         self._error = error
         self.configured = configured
+        self.preseason_only = preseason_only
 
     def collect(self, season):
         if self._error:
@@ -387,6 +388,40 @@ def test_collector_ignores_providers_that_are_switched_off(db):
 
     assert run.status == "success"
     assert run.source == "kalshi"
+
+
+def test_collector_stops_asking_a_closed_book_once_the_season_starts(db):
+    """Underdog pulls its season-long lines at kickoff; that is not a failure."""
+    fc.set_meta(db, "nfl_state", json.dumps({"season": 2026, "week": 3, "season_type": "regular"}))
+    db.commit()
+    closed = StubProvider("Underdog", error=SeasonPropsError("HTTP 426"), preseason_only=True)
+
+    run = fc.collect_season_props(db, providers=[
+        StubProvider("Kalshi", pair("Alpha Receiver", "season_rec_yds", 999.5, 100, "Kalshi")),
+        closed,
+    ])
+
+    assert run.status == "success"
+    assert run.source == "kalshi"
+
+
+def test_a_preseason_only_book_is_still_asked_before_kickoff(db):
+    run = fc.collect_season_props(db, providers=[
+        StubProvider("Kalshi", pair("Alpha Receiver", "season_rec_yds", 999.5, 100, "Kalshi")),
+        StubProvider(
+            "Underdog",
+            pair("Alpha Receiver", "season_rec_yds", 1099.5, 100, "Underdog"),
+            preseason_only=True,
+        ),
+    ])
+
+    assert run.source == "kalshi,underdog"
+
+
+def test_underdog_is_preseason_only_and_asks_for_nfl_on_v2():
+    client = UnderdogClient()
+    assert client.preseason_only is True
+    assert "/v2/over_under_lines" in client.base_url
 
 
 # ── consensus across providers ──────────────────────────────────────────

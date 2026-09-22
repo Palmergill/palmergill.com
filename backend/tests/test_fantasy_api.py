@@ -107,6 +107,23 @@ def test_state_reports_season_and_jobs():
     assert {"players", "projections", "rankings"} <= job_names
 
 
+def test_state_shows_a_job_that_keeps_finishing_partial():
+    """last_success alone hid a provider outage for two weeks in Sep 2026."""
+    session = SessionLocal()
+    try:
+        ok = fc.start_run(session, "season_props", season=2025)
+        fc.finish_run(session, ok, "success", rows_written=10)
+        partial = fc.start_run(session, "season_props", season=2025)
+        fc.finish_run(session, partial, "partial", rows_written=4, detail="Underdog: HTTP 426")
+    finally:
+        session.close()
+
+    job = next(j for j in client.get("/api/fantasy/state").json()["jobs"] if j["job"] == "season_props")
+    assert job["rows_written"] == 10
+    assert job["last_run_status"] == "partial"
+    assert job["last_run_at"] is not None
+
+
 def _seed_offseason():
     """Re-seed as the 2026 offseason: off state + week-0 season-long rankings."""
     session = SessionLocal()

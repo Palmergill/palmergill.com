@@ -153,12 +153,16 @@ def parse_underdog_props(payload: Any) -> List[Dict[str, Any]]:
 
 class UnderdogClient:
     name = BOOKMAKER
+    # Underdog pulls its NFL season-long lines when the regular season
+    # starts (in 2026 its old endpoint also began answering HTTP 426), so the
+    # collector only asks during the offseason and preseason.
+    preseason_only = True
 
     def __init__(self, base_url: Optional[str] = None, timeout: Optional[float] = None):
         self.base_url = (
             base_url
             or os.getenv("UNDERDOG_API_URL")
-            or "https://api.underdogfantasy.com/beta/v6/over_under_lines"
+            or "https://api.underdogfantasy.com/v2/over_under_lines"
         )
         self.timeout = timeout or float(os.getenv("UNDERDOG_TIMEOUT_SECONDS", "45"))
 
@@ -168,11 +172,16 @@ class UnderdogClient:
         return os.getenv("UNDERDOG_ENABLED", "true").strip().lower() not in ("0", "false", "no")
 
     def get_season_props(self) -> Dict[str, Any]:
-        # One request returns every open line in every sport; the parser does
-        # the narrowing. A longer default timeout than the other providers is
+        # One request returns every open NFL line; the parser picks out the
+        # season-long ones. A longer default timeout than the other providers is
         # deliberate -- the document runs to tens of megabytes.
+        # beta/v6 began answering HTTP 426 in September 2026. v2 needs a
+        # product and a sport, which also trims the other sports out of it.
         payload = request_json(
-            self.base_url, None, self.timeout, "the Underdog season props API"
+            self.base_url,
+            {"product": "fantasy", "sport_id": SPORT},
+            self.timeout,
+            "the Underdog season props API",
         )
         if not isinstance(payload, dict):
             raise SeasonPropsError("Underdog returned an unexpected response")

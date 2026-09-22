@@ -292,11 +292,22 @@ def get_state(db: Session) -> Dict[str, Any]:
     jobs = []
     for job in TRACKED_JOBS:
         run = latest_successful_run(db, job)
+        # The newest run of any status: a job that keeps finishing "partial"
+        # never moves last_success, and that should show rather than read
+        # as a job that simply has not run.
+        latest = (
+            db.query(FantasyCollectionRun)
+            .filter(FantasyCollectionRun.job == job)
+            .order_by(FantasyCollectionRun.id.desc())
+            .first()
+        )
         jobs.append(
             {
                 "job": job,
                 "last_success": iso_utc(run.finished_at) if run else None,
                 "rows_written": run.rows_written if run else None,
+                "last_run_status": latest.status if latest else None,
+                "last_run_at": iso_utc(latest.finished_at or latest.started_at) if latest else None,
             }
         )
     return {

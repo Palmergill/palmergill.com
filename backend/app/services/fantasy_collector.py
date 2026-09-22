@@ -1049,14 +1049,19 @@ def collect_season_props(
     elif providers is None:
         providers = SEASON_PROP_PROVIDERS
 
-    season = current_season_week(db)["season"]
+    ctx = current_season_week(db)
+    season = ctx["season"]
     run = _start_run(db, "season_props", None, season=season)
     if not season:
         return _finish_run(db, run, "skipped", detail="no NFL season known — run the state job first")
 
     available = [provider for provider in providers if getattr(provider, "configured", False)]
+    # A sportsbook takes its season-long lines down at kickoff; only the
+    # exchanges keep trading them. Asking a closed book is not a failure.
+    if is_in_season(ctx["season_type"]):
+        available = [p for p in available if not getattr(p, "preseason_only", False)]
     if not available:
-        return _finish_run(db, run, "skipped", detail="no season props provider is configured")
+        return _finish_run(db, run, "skipped", detail="no season props provider is open")
 
     rows: List[Dict[str, Any]] = []
     collected: List[str] = []

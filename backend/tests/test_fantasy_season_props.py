@@ -231,7 +231,7 @@ def test_collector_skips_when_provider_unavailable(db):
 
     run = fc.collect_season_props(db, client=Unavailable())
     assert run.status == "skipped"
-    assert run.detail == "no season props provider is configured"
+    assert run.detail == "no season props provider is open"
 
 
 def test_leaderboard_lists_who_is_quoted_and_ranks_them(db):
