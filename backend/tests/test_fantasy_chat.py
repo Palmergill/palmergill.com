@@ -226,35 +226,7 @@ def test_a_turn_without_league_access_has_no_private_league_tool(db, monkeypatch
 # ── endpoint contract ───────────────────────────────────────────────────
 
 
-def test_chat_endpoint_answers_a_member_and_sets_the_session_cookie(db):
-    response = member_client().post(
-        "/api/fantasy/chat", json={"message": "top RBs this week"}
-    )
-    assert response.status_code == 200
-    body = response.json()
-    assert "answer" in body and "tools_used" in body
-    assert "pg_fantasy_session" in response.cookies
+def test_the_chat_route_is_gone():
+    # The Ask panel was removed from the hub; nothing may still answer.
+    assert member_client().post("/api/fantasy/chat", json={"message": "hi"}).status_code in (404, 405)
 
-
-def test_chat_endpoint_refuses_anonymous_callers_without_touching_the_model(db, monkeypatch):
-    """The panel has been members-only since the redesign; the route now is too.
-
-    Before this gate the anonymous branch answered from the local router, so
-    deleting that branch without gating the route would have dropped anonymous
-    callers into the model — a public endpoint that spends money per request.
-    """
-    def _boom(*args, **kwargs):
-        raise AssertionError("an anonymous caller must never reach the model")
-
-    monkeypatch.setattr(fantasy_ai, "_openai_response", _boom)
-    response = client.post("/api/fantasy/chat", json={"message": "top RBs this week"})
-
-    assert response.status_code == 403
-    # JSON, never a WWW-Authenticate 401: a challenge makes the browser throw
-    # a native credential modal over a fetch().
-    assert "sign in" in response.json()["detail"].lower()
-    assert "www-authenticate" not in {k.lower() for k in response.headers}
-
-
-def test_chat_endpoint_rejects_empty_message():
-    assert member_client().post("/api/fantasy/chat", json={"message": ""}).status_code == 422

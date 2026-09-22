@@ -455,13 +455,15 @@ describe("the colophon", () => {
 
 describe("the lede", () => {
     test("an empty state is a note, not a lede with a drop cap", async () => {
-        // The drop cap keys off the first paragraph, and "No overview written
-        // for this team yet." is a paragraph too — it must not get one.
+        // The drop cap keys off the first paragraph, and the "written every
+        // Tuesday" note is a paragraph too — it must not get one.
         await openTeam();
         await waitFor(() => document.querySelector("#teamLede .empty-note") !== null);
 
         const note = document.querySelector("#teamLede .empty-note");
-        expect(note.textContent).toContain("No overview written");
+        // Nothing to click: overviews are written on a schedule now.
+        expect(note.textContent).toContain("every Tuesday morning");
+        expect(document.getElementById("teamOverviewRefresh")).toBeNull();
         expect(styleSource).toContain(
             '.dossier__lede > p:first-child:not(.empty-note)::first-letter'
         );

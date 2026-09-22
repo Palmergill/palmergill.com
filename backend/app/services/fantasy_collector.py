@@ -111,6 +111,16 @@ JOB_INTERVALS_SECONDS = {
     "league_draft": {"in_season": 6 * 3600, "off_season": 24 * 3600},
 }
 
+# Team overviews are written once a week, not on demand: Tuesday morning,
+# after Monday night's game has settled the week. 12:00 UTC is 8am Eastern in
+# football season (7am once the clocks go back in November). A pass missed on
+# Tuesday catches up any day through Saturday; Sunday and Monday are left
+# alone because the next week is being played.
+OVERVIEW_WEEKDAY = 1  # Tuesday
+OVERVIEW_HOUR_UTC = 12
+OVERVIEW_LAST_CATCH_UP_WEEKDAY = 5  # Saturday
+_OVERVIEW_META_PREFIX = "overviews:"
+
 # A finished season never changes, so polling it on the live cadence is pure
 # waste. Applied to every season before the current one.
 COMPLETED_SEASON_INTERVAL_SECONDS = 30 * 24 * 3600
@@ -1210,6 +1220,36 @@ def _record_roster_power(db: Session, season: int) -> None:
         )
 
 
+def _in_overview_window(now: datetime) -> bool:
+    weekday = now.weekday()
+    if weekday == OVERVIEW_WEEKDAY:
+        return now.hour >= OVERVIEW_HOUR_UTC
+    return OVERVIEW_WEEKDAY < weekday <= OVERVIEW_LAST_CATCH_UP_WEEKDAY
+
+
+def _write_weekly_overviews(db: Session, season: int, now: datetime) -> Optional[int]:
+    """Write every team's weekly overview once per completed week.
+
+    Returns the week written, or None when nothing was due.
+    """
+    if not _in_overview_window(now):
+        return None
+    from app.services import fantasy_ai, fantasy_league_data
+
+    weeks = fantasy_league_data._completed_weeks(db, season)
+    if not weeks:
+        return None
+    week = weeks[-1]
+    key = f"{_OVERVIEW_META_PREFIX}{season}:{week}"
+    if get_meta(db, key):
+        return None
+    written = fantasy_ai.generate_weekly_overviews(db, season, week)
+    set_meta(db, key, now.isoformat())
+    db.commit()
+    logger.info("Wrote week %s overviews for %s teams", week, len(written))
+    return week
+
+
 def _mark_provider_next_due(
     db: Session, source: str, season: int, week: int, now: datetime, in_season: bool
 ) -> None:
@@ -1352,6 +1392,14 @@ def run_scheduled(db: Session, now: Optional[datetime] = None) -> List[Dict[str,
         run = fantasy_league_collector.collect_league_draft(db, league_season)
         summaries.append(_summary(run))
         _mark_draft_next_due(db, league_season, now, in_season, completed)
+
+    # The weekly team overviews, after the league pass above so they read
+    # the freshest results.
+    if current_league and in_season:
+        try:
+            _write_weekly_overviews(db, current_league, now)
+        except Exception:
+            logger.exception("Weekly overviews failed for %s", current_league)
 
     return summaries
 

@@ -134,9 +134,6 @@
                         <div class="dossier__lede" id="teamLede" aria-live="polite"></div>
                         <div class="dossier__foot">
                             <span class="dossier__meta" id="teamOverviewMeta"></span>
-                            <button type="button" class="button button--quiet" id="teamOverviewRefresh">
-                                Check for updates
-                            </button>
                         </div>
                     </div>
                     <dl class="colophon" id="teamColophon"></dl>
@@ -187,7 +184,6 @@
                     <a href="#free-agents">Free agents</a>
                     <a href="#teams">Teams</a>
                     <a href="#history">History</a>
-                    <a href="#assistant">Ask</a>
                 </nav>
 
                 <!-- Power rankings read the rosters, not the results: what each
@@ -313,26 +309,6 @@
                 </section>
             </div>
 
-            <section class="chat" id="assistant" aria-label="Fantasy assistant">
-                <div class="chat__head">
-                    <h2>Ask the fantasy assistant</h2>
-                    <span class="chat__note">Answers use only the data this site has collected.</span>
-                </div>
-                <div id="chatMessages" class="chat__messages" aria-live="polite">
-                    <div class="chat__starts" id="chatStarts">
-                        <button type="button" class="chat-chip" data-prompt="Show me this league's power rankings.">League power rankings</button>
-                        <button type="button" class="chat-chip" data-prompt="Who are the top 10 PPR running backs this week?">Top 10 PPR RBs</button>
-                        <button type="button" class="chat-chip" data-prompt="Who's trending on waivers right now?">Waiver trends</button>
-                        <button type="button" class="chat-chip" data-prompt="Compare Josh Allen and Jalen Hurts.">Compare two QBs</button>
-                    </div>
-                </div>
-                <form id="chatForm" class="chat__composer">
-                    <label class="sr-only" for="chatInput">Ask a fantasy question</label>
-                    <textarea id="chatInput" rows="1" maxlength="1000" placeholder="Ask about this league, a player, props, or lines…" required></textarea>
-                    <button type="submit" aria-label="Send message">↑</button>
-                </form>
-            </section>
-
             <!-- Importing by ID is a one-time question, so the form is hidden
                  until "Import a league" in the Tools menu asks for it
                  (/fantasy/#importLeague), rather than above the league on
@@ -380,7 +356,6 @@
     <script src="/shared/analytics.js?v=1"></script>
     <script src="/shared/api-base.js?v=1"></script>
     <script src="format.js?v=12"></script>
-    <script src="/fantasy/chat.js?v=1"></script>
     <script src="app.js?v=23"></script>
 </body>
 </html>

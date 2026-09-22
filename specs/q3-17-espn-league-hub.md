@@ -555,3 +555,16 @@ and weights but fixed five defects, each locked by a regression test:
   lands on top of the results it is marking the end of. And `get_roster_power`
   grew a `week` parameter rather than a parallel implementation, so the board
   and the chart cannot drift in how they value a roster.
+
+- **Sep 2026 — overviews on a schedule, no Ask panel.** The team overview had
+  a "Write overview / Check for updates" button that spent a model call per
+  click, and the hub ended in an Ask chat. Both are gone. The scheduler writes
+  every team's overview once per completed week — a **Last week** recap and a
+  **This week** look-ahead at the next opponent — on Tuesday from 12:00 UTC
+  (8am Eastern), catching up through Saturday if a pass is missed, and never
+  on Sunday or Monday while the next week is being played. An `ff_meta` key
+  per season and week makes it write each week once. The read serves the
+  newest overview at or before the current week, so the page keeps last
+  week's note until Tuesday's is written. `POST /teams/{id}/overview` and
+  `POST /api/fantasy/chat` are removed; the chat engine in `fantasy_ai` is
+  unused and left for a separate cleanup.

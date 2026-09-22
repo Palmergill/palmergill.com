@@ -9,8 +9,7 @@ import asyncio
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from fastapi.responses import JSONResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.database import SessionLocal, get_db
@@ -19,8 +18,6 @@ from app.services import fantasy_ai, fantasy_collector, fantasy_data, fantasy_ne
 router = APIRouter(prefix="/api/fantasy", tags=["fantasy"])
 
 # Opaque conversation id issued as an HttpOnly cookie (mirrors bitcoin chat).
-FANTASY_SESSION_COOKIE = "pg_fantasy_session"
-FANTASY_SESSION_TTL_SECONDS = 30 * 24 * 60 * 60
 
 
 def is_demo_request(request: Request) -> bool:
@@ -69,19 +66,6 @@ class RefreshResponse(BaseModel):
     # assuming the one they asked for.
     season: Optional[int] = None
     detail: Optional[str] = None
-
-
-class FantasyChatRequest(BaseModel):
-    message: str = Field(..., min_length=1, max_length=1000)
-    session_id: Optional[str] = None
-    timezone: Optional[str] = None
-
-
-class FantasyChatResponse(BaseModel):
-    answer: str
-    tools_used: List[str]
-    data: Dict[str, Any]
-    warnings: List[str] = []
 
 
 @router.get("/state")
@@ -315,38 +299,6 @@ def futures(
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     return fantasy_data.get_futures(db, market=market, limit=limit)
-
-
-@router.post("/chat", response_model=FantasyChatResponse)
-async def fantasy_chat(
-    http_request: Request,
-    request: FantasyChatRequest,
-    _: Dict[str, Any] = Depends(require_member),
-):
-    # Prefer the cookie over the body so a stolen body token can't be replayed.
-    session_id = http_request.cookies.get(FANTASY_SESSION_COOKIE) or request.session_id
-
-    result = await run_blocking(
-        fantasy_ai.answer_chat,
-        request.message,
-        session_id,
-        request.timezone,
-        league_access=True,
-    )
-
-    cookie_session_id = result["session_id"]
-    body = {key: value for key, value in result.items() if key != "session_id"}
-    response = JSONResponse(content=body)
-    response.set_cookie(
-        FANTASY_SESSION_COOKIE,
-        cookie_session_id,
-        max_age=FANTASY_SESSION_TTL_SECONDS,
-        httponly=True,
-        samesite="lax",
-        secure=http_request.url.scheme == "https",
-        path="/api/fantasy",
-    )
-    return response
 
 
 @router.post("/admin/refresh", response_model=RefreshResponse)

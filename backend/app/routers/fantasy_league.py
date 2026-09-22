@@ -334,45 +334,14 @@ def team_overview(
     _: Dict[str, Any] = Depends(require_member),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
-    """Read a stored overview. Never generates.
+    """Read the newest stored overview. Never generates.
 
-    Writing here would put a paid model call and a database write behind an
-    ordinary page load — every first visit to a team page would bill. A miss
-    returns status "missing" and the client offers to generate.
+    Overviews are written by the scheduler every Tuesday morning — a recap of
+    the week just played and a look ahead — and nowhere else. A miss returns
+    status "missing".
     """
     resolved = _resolved_season(db, season, team_id)
     return fantasy_ai.read_team_overview(db, resolved, team_id, week)
-
-
-@router.post("/teams/{team_id}/overview", status_code=201)
-async def regenerate_team_overview(
-    team_id: int,
-    season: Optional[int] = None,
-    week: Optional[int] = None,
-    force: bool = False,
-    _: Dict[str, Any] = Depends(require_member),
-    db: Session = Depends(get_db),
-) -> Dict[str, Any]:
-    """Generate an overview (or reuse an unchanged one).
-
-    The model call is blocking, so it runs off the event loop like the other
-    model-backed endpoints.
-    """
-    resolved = _resolved_season(db, season, team_id)
-
-    def _generate() -> Dict[str, Any]:
-        # Own session: the request-scoped one belongs to the event loop, and
-        # SQLAlchemy sessions are not safe to hand to another thread. Mirrors
-        # how admin_refresh runs its collector work.
-        worker = SessionLocal()
-        try:
-            return fantasy_ai.generate_team_overview(
-                worker, resolved, team_id, week, force=force
-            )
-        finally:
-            worker.close()
-
-    return await run_blocking(_generate)
 
 
 # ── weekly recap ────────────────────────────────────────────────────────
@@ -426,8 +395,8 @@ async def write_week_note(
     """Write one team's weekly recap, reusing an unchanged one."""
 
     def _generate() -> Dict[str, Any]:
-        # Own session, for the same reason regenerate_team_overview needs one:
-        # the request-scoped session belongs to the event loop.
+        # Own session: the request-scoped one belongs to the event loop, and
+        # SQLAlchemy sessions are not safe to hand to another thread.
         worker = SessionLocal()
         try:
             return fantasy_ai.generate_week_note(
@@ -492,8 +461,8 @@ async def write_draft_note(
     resolved = _resolved_draft_season(db, season)
 
     def _generate() -> Dict[str, Any]:
-        # Own session, for the same reason regenerate_team_overview needs one:
-        # the request-scoped session belongs to the event loop.
+        # Own session: the request-scoped one belongs to the event loop, and
+        # SQLAlchemy sessions are not safe to hand to another thread.
         worker = SessionLocal()
         try:
             return fantasy_ai.generate_draft_note(worker, resolved, team_id, force=force)

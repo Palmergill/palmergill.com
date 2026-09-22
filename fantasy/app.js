@@ -102,7 +102,6 @@
         teamColophon: byId("teamColophon"),
         roomsLede: byId("roomsLede"),
         teamOverviewMeta: byId("teamOverviewMeta"),
-        teamOverviewRefresh: byId("teamOverviewRefresh"),
         teamResults: byId("teamResults"),
         teamRoster: byId("teamRoster"),
         rosterNote: byId("rosterNote"),
@@ -156,7 +155,7 @@
     }
 
     // Team overviews can come from the model, so render only the small safe
-    // Markdown subset the chat panel supports. Raw HTML is always text.
+    // Markdown subset the team overview uses. Raw HTML is always text.
     function renderMarkdown(container, text) {
         container.replaceChildren();
         String(text || "").split(/\n{2,}/).forEach((block) => {
@@ -1345,30 +1344,26 @@
         return item;
     }
 
+    // Written by the server every Tuesday morning — a recap of the week just
+    // played and a look at the next one. There is nothing to generate here.
     function renderTeamOverview(payload) {
-        // "missing" means nothing has been written for this team/week yet.
-        // Generating costs a model call, so it stays an explicit choice
-        // rather than something a page view triggers.
         if (payload.status === "missing") {
             els.teamLede.replaceChildren(
-                el("p", "empty-note", "No overview written for this team yet.")
+                el(
+                    "p",
+                    "empty-note",
+                    "The weekly recap and look-ahead is written every Tuesday morning, once the week's games are final."
+                )
             );
             els.teamOverviewMeta.textContent = "";
-            els.teamOverviewRefresh.textContent = "Write overview";
             return;
         }
 
         renderMarkdown(els.teamLede, payload.overview_md || "No overview available.");
-        const source = payload.source === "model" ? "Model summary" : "Local summary";
-        const parts = [source, `Week ${payload.week}`];
-        if (payload.status === "stale") {
-            parts.push("team data has changed");
-        } else if (!payload.cache_hit) {
-            parts.push("updated");
-        }
+        const parts = [`Week ${payload.week} recap & look ahead`];
+        const written = F.formatAsOf(payload.generated_at);
+        if (written) parts.push(written.replace(/^as of/, "written"));
         els.teamOverviewMeta.textContent = parts.join(" · ");
-        els.teamOverviewRefresh.textContent =
-            payload.status === "stale" ? "Refresh overview" : "Check for updates";
     }
 
     // ── loading ─────────────────────────────────────────────────────────
@@ -2032,24 +2027,19 @@
             renderTeamDetail(detail);
             renderRoster(roster, rooms);
             renderLineup(lineup);
-            loadTeamOverview(false);
+            loadTeamOverview();
         } catch (error) {
             if (!stale(generation)) handleFailure(error);
         }
     }
 
-    // write=false is a plain read and never generates; write=true POSTs and
-    // may spend a model call, so it only ever runs from an explicit click.
-    async function loadTeamOverview(write) {
+    async function loadTeamOverview() {
         const generation = state.generation;
         const params = new URLSearchParams();
         if (state.season) params.set("season", state.season);
-        els.teamOverviewRefresh.disabled = true;
-        els.teamOverviewMeta.textContent = write ? "Writing…" : "Loading…";
+        els.teamOverviewMeta.textContent = "Loading…";
         try {
-            const payload = await fetchJson(`${API_BASE}/teams/${state.teamId}/overview?${params}`, {
-                method: write ? "POST" : "GET",
-            });
+            const payload = await fetchJson(`${API_BASE}/teams/${state.teamId}/overview?${params}`);
             if (stale(generation)) return;
             renderTeamOverview(payload);
         } catch (error) {
@@ -2059,8 +2049,6 @@
                     el("p", "empty-note", error.message || "Overview unavailable.")
                 );
             }
-        } finally {
-            if (!stale(generation)) els.teamOverviewRefresh.disabled = false;
         }
     }
 
@@ -2195,7 +2183,6 @@
                 els.importInput.removeAttribute("aria-invalid");
             });
         }
-        els.teamOverviewRefresh.addEventListener("click", () => loadTeamOverview(true));
 
         els.scoreboardWeek.addEventListener("change", (event) => {
             state.scoreWeek = parseInt(event.target.value, 10);

@@ -566,64 +566,38 @@ def test_reading_an_overview_never_generates_one(seeded_db, monkeypatch):
     assert seeded_db.query(FantasyLeagueTeamOverview).count() == 0
 
 
-def test_writing_an_overview_requires_a_post(seeded_db, monkeypatch):
+def test_there_is_no_way_to_generate_an_overview_on_demand(seeded_db):
+    # Overviews are written by the Tuesday job and nowhere else.
+    assert member_client().post(OVERVIEW_ROUTE).status_code == 405
+    assert seeded_db.query(FantasyLeagueTeamOverview).count() == 0
+
+
+def test_the_weekly_writer_covers_every_team_and_the_read_serves_it(seeded_db, monkeypatch):
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
-    written = member_client().post(OVERVIEW_ROUTE).json()
+    written = fantasy_ai.generate_weekly_overviews(seeded_db, 2024, 2)
 
-    assert written["source"] == "local"
-    assert written["status"] == "current"
-    assert written["overview_md"]
-    assert seeded_db.query(FantasyLeagueTeamOverview).count() == 1
-
-    read_back = member_client().get(OVERVIEW_ROUTE).json()
-    assert read_back["status"] == "current"
-    assert read_back["cache_hit"] is True
-    assert read_back["overview_md"] == written["overview_md"]
+    teams = seeded_db.query(FantasyLeagueTeam).filter_by(season=2024).count()
+    assert len(written) == teams
+    body = member_client().get(OVERVIEW_ROUTE).json()
+    assert body["status"] == "current"
+    assert body["week"] == 2
+    assert body["overview_md"]
 
 
-def test_overview_goes_stale_when_team_data_changes(seeded_db, monkeypatch):
+def test_a_later_week_keeps_showing_the_last_overview_written(seeded_db, monkeypatch):
+    # Between Monday night and Tuesday's run the page must not go blank.
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
-    member_client().post(OVERVIEW_ROUTE)
-    team = seeded_db.query(FantasyLeagueTeam).filter_by(season=2024, espn_team_id=1).one()
-    team.points_for += 5
-    seeded_db.commit()
+    fantasy_ai.generate_weekly_overviews(seeded_db, 2024, 1)
 
-    # The read reports staleness rather than silently regenerating.
-    assert member_client().get(OVERVIEW_ROUTE).json()["status"] == "stale"
-
-    refreshed = member_client().post(OVERVIEW_ROUTE).json()
-    assert refreshed["cache_hit"] is False
-    assert seeded_db.query(FantasyLeagueTeamOverview).count() == 1
+    body = member_client().get(OVERVIEW_ROUTE).json()
+    assert body["status"] == "current"
+    assert body["week"] == 1
 
 
-def test_a_local_fallback_is_replaced_once_a_model_is_available(seeded_db, monkeypatch):
-    """Regression: a transient model failure used to pin the local template.
-
-    The fallback was stored with the current digest, so every later read was a
-    cache hit and the UI's non-forcing refresh button could never recover it.
-    """
-    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
-    first = member_client().post(OVERVIEW_ROUTE).json()
-    assert first["source"] == "local"
-
-    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
-    monkeypatch.setattr(
-        fantasy_ai,
-        "_openai_response",
-        lambda *a, **k: {"output_text": "**Model overview.**"},
-    )
-
-    # A plain read still does not generate, but it does report the staleness.
-    assert member_client().get(OVERVIEW_ROUTE).json()["status"] == "stale"
-
-    # And a non-forcing refresh now upgrades it.
-    upgraded = member_client().post(OVERVIEW_ROUTE).json()
-    assert upgraded["source"] == "model"
-    assert upgraded["overview_md"] == "**Model overview.**"
-
-    # A model-written overview is a genuine cache hit; it is not rewritten.
-    assert member_client().get(OVERVIEW_ROUTE).json()["status"] == "current"
-    assert member_client().post(OVERVIEW_ROUTE).json()["cache_hit"] is True
+def test_the_overview_context_carries_last_week_and_next_week(seeded_db):
+    context = fantasy_ai._team_overview_context(seeded_db, 2024, 1, 1)
+    assert context["last_result"]["week"] == 1
+    assert context["next_matchup"]["week"] == 2
 
 
 def test_team_overview_reuses_model_plumbing_without_tools(seeded_db, monkeypatch):
@@ -644,24 +618,6 @@ def test_team_overview_reuses_model_plumbing_without_tools(seeded_db, monkeypatc
     assert body["overview_md"] == "**Model overview.**"
     assert captured["tools"] == []
     assert captured["instructions"] == fantasy_ai.TEAM_OVERVIEW_PROMPT
-
-
-def test_authenticated_chat_turn_enables_private_league_tools(seeded_db, monkeypatch):
-    captured = {}
-
-    def fake_answer(message, session_id=None, timezone_name=None, level=None, league_access=False):
-        captured["league_access"] = league_access
-        return {
-            "answer": "ok", "session_id": session_id or "session",
-            "tools_used": [], "data": {}, "warnings": [],
-        }
-
-    monkeypatch.setattr(fantasy_ai, "answer_chat", fake_answer)
-    response = member_client().post(
-        "/api/fantasy/chat", json={"message": "Show league standings"}
-    )
-    assert response.status_code == 200
-    assert captured["league_access"] is True
 
 
 def test_member_local_chat_can_answer_league_power_rankings(seeded_db, monkeypatch):
