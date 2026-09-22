@@ -1103,7 +1103,8 @@ describe("column hints", () => {
 // ── power over time ─────────────────────────────────────────────────────
 //
 // The board that answers "how did we get here". Two series behind one
-// toggle: résumé ranks what a team has earned, roster ranks what it holds.
+// toggle: "Power rankings" is the board above, week by week; résumé ranks
+// what a team has earned.
 // They come from different places and only one of them can reach back, so
 // most of what is worth pinning here is how the chart behaves when the
 // series it is asked for does not exist yet.
@@ -1134,36 +1135,50 @@ describe("the power chart", () => {
         );
     });
 
-    test("the toggle starts on the series that always has history", async () => {
-        await bootChart();
+    const NOT_RECORDED = {
+        ...POWER_HISTORY,
+        available: false,
+        metric: "roster",
+        unavailable_reason: "roster_power_not_recorded",
+        weeks: [],
+        teams: [],
+    };
 
-        expect(chips().map((chip) => chip.textContent)).toEqual(["Résumé", "Roster"]);
+    test("the toggle is named after the board above and starts on it", async () => {
+        const fetchMock = boot();
+        await waitFor(() => lines().length > 0);
+
+        // "Roster" meant nothing to a reader; the board is called Power rankings.
+        expect(chips().map((chip) => chip.textContent)).toEqual(["Power rankings", "Résumé"]);
         expect(chips()[0].classList.contains("chip--active")).toBe(true);
+        expect(
+            fetchMock.mock.calls.some(([url]) => String(url).includes("metric=roster"))
+        ).toBe(true);
     });
 
-    test("switching to roster asks for the roster series", async () => {
+    test("switching to résumé asks for the résumé series", async () => {
         const fetchMock = boot();
         await waitFor(() => lines().length > 0);
 
         chips()[1].click();
         await waitFor(() =>
-            fetchMock.mock.calls.some(([url]) => String(url).includes("metric=roster"))
+            fetchMock.mock.calls.some(([url]) => String(url).includes("metric=resume"))
         );
         expect(chips()[1].classList.contains("chip--active")).toBe(true);
     });
 
-    test("a season recorded before the roster series existed explains itself", async () => {
-        await bootChart({
-            rosterHistory: {
-                ...POWER_HISTORY,
-                available: false,
-                metric: "roster",
-                unavailable_reason: "roster_power_not_recorded",
-                weeks: [],
-                teams: [],
-            },
-        });
-        chips()[1].click();
+    test("a season that never recorded power rankings opens on résumé instead", async () => {
+        await bootChart({ rosterHistory: NOT_RECORDED });
+        await waitFor(() => chips()[1].classList.contains("chip--active"));
+        await waitFor(() => lines().length > 0);
+
+        expect(empty().hidden).toBe(true);
+    });
+
+    test("asking for power rankings on such a season explains itself", async () => {
+        await bootChart({ rosterHistory: NOT_RECORDED });
+        await waitFor(() => chips()[1].classList.contains("chip--active"));
+        chips()[0].click();
         await waitFor(() => !empty().hidden);
 
         // Not a blank frame: the reader is told why the line stops.
@@ -1175,10 +1190,10 @@ describe("the power chart", () => {
     test("the résumé method only applies to the series that has one", async () => {
         await bootChart();
         const field = document.getElementById("powerChartAlgoField");
-        expect(field.hidden).toBe(false);
+        expect(field.hidden).toBe(true);
 
         chips()[1].click();
-        await waitFor(() => field.hidden);
+        await waitFor(() => !field.hidden);
     });
 
     test("the two method selects are one choice, not two", async () => {
@@ -1208,9 +1223,19 @@ describe("the power chart", () => {
 
     test("every point carries what it was, in the units on screen", async () => {
         await bootChart();
+        const tips = () =>
+            [...lines()[0].querySelectorAll("title")].map((t) => t.textContent);
 
-        const tips = [...lines()[0].querySelectorAll("title")].map((t) => t.textContent);
-        expect(tips).toEqual([
+        // Power rankings read in the board's own unit…
+        expect(tips()).toEqual([
+            "Alpha · week 1 · 0.5 pts/wk",
+            "Alpha · week 2 · 0.7 pts/wk",
+        ]);
+
+        // …and résumé in ranks.
+        chips()[1].click();
+        await waitFor(() => tips()[0] === "Alpha · week 1 · #2");
+        expect(tips()).toEqual([
             "Alpha · week 1 · #2",
             "Alpha · week 2 · #1",
         ]);

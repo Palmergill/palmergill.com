@@ -160,6 +160,35 @@ def test_roster_points_come_back_as_one_line_per_team(db):
     assert first["points"][0]["value"] == 129.0
 
 
+def test_the_roster_line_ends_on_the_boards_own_order(db, monkeypatch):
+    # Stored rows stop at the last finished week; the Power rankings board
+    # ranks the week in progress. The chart's last point is the board, and a
+    # stored row for that same week gives way to it.
+    season_row(db)
+    for team_id in (1, 2):
+        roster_point(db, 2026, 1, team_id, 120.0, team_id)
+        roster_point(db, 2026, 2, team_id, 120.0, team_id)
+    db.commit()
+    monkeypatch.setattr(
+        D,
+        "get_roster_power",
+        lambda db, season=None, **kw: {
+            "available": True,
+            "week": 2,
+            "teams": [
+                {"espn_team_id": 2, "rank": 1, "expected": 131.0},
+                {"espn_team_id": 1, "rank": 2, "expected": 128.0},
+            ],
+        },
+    )
+
+    payload = D.get_power_history(db, 2026, metric="roster")
+    by_team = {team["espn_team_id"]: team["points"] for team in payload["teams"]}
+    assert [point["week"] for point in by_team[2]] == [1, 2]
+    assert by_team[2][-1] == {"week": 2, "rank": 1, "value": 131.0}
+    assert by_team[1][-1]["rank"] == 2
+
+
 def test_a_season_recorded_before_the_series_existed_says_so(db):
     season_row(db, season=2024)
     matchup(db, 2024, 1, 1, 2)

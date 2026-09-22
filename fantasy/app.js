@@ -35,7 +35,11 @@
         // Which series the season chart is showing, and its own request
         // generation — switching metric fires a fetch that can land after
         // the next one.
-        chartMetric: "resume",
+        // The chart opens on the same ranking as the board above it. A
+        // season that never recorded that series falls back to résumé on
+        // its own — unless the reader picked a series themselves.
+        chartMetric: "roster",
+        chartMetricChosen: false,
         chartRequest: 0,
         // Kept so a rotation can redraw at the other aspect ratio without
         // going back to the network for data that has not changed.
@@ -1631,22 +1635,27 @@
     // ── power over time ─────────────────────────────────────────────────
     //
     // The same ranking as a season rather than a snapshot. Two series behind
-    // one toggle: résumé ranks what a team has earned, roster ranks what it
-    // holds. They disagree, and the disagreement is the interesting part —
+    // one toggle: "Power rankings" is the board above, week by week — what
+    // each roster is projected to score — and résumé ranks what a team has
+    // earned. They disagree, and the disagreement is the interesting part —
     // a 6-1 team on a kind schedule and a 2-5 team with the best roster in
     // the league both show up here as a line going the wrong way.
 
     const SVG_NS = "http://www.w3.org/2000/svg";
 
     const CHART_METRICS = [
-        { key: "resume", label: "Résumé", note: "What each team has earned" },
-        { key: "roster", label: "Roster", note: "What each team holds" },
+        { key: "roster", label: "Power rankings", note: "The board above, week by week" },
+        {
+            key: "resume",
+            label: "Résumé",
+            note: "Ranked on results so far: record, points, schedule and form",
+        },
     ];
 
     const CHART_UNAVAILABLE = {
         roster_power_not_recorded:
-            "Roster power is written down as the season runs, and this site only " +
-            "started keeping it in September 2026. Earlier seasons hold one " +
+            "Power rankings are written down as the season runs, and this site only " +
+            "started keeping them in September 2026. Earlier seasons hold one " +
             "end-of-year roster snapshot rather than one a week, so this line " +
             "cannot be drawn for them.",
         missing_rankings: "No rankings have been computed for this season yet.",
@@ -1670,7 +1679,10 @@
                 chip.classList.add("chip--active");
                 chip.setAttribute("aria-current", "true");
             }
-            chip.addEventListener("click", () => selectChartMetric(metric.key));
+            chip.addEventListener("click", () => {
+                state.chartMetricChosen = true;
+                selectChartMetric(metric.key);
+            });
             els.powerChartMetric.appendChild(chip);
         });
         // The résumé line is ranked by a method; the roster line is not.
@@ -1693,6 +1705,17 @@
         try {
             const payload = await fetchJson(`${API_BASE}/power-history?${params}`);
             if (stale(generation) || request !== state.chartRequest) return;
+            if (
+                payload &&
+                !payload.available &&
+                state.chartMetric === "roster" &&
+                !state.chartMetricChosen
+            ) {
+                state.chartMetric = "resume";
+                renderChartMetricChips();
+                loadPowerChart();
+                return;
+            }
             renderPowerChart(payload);
         } catch (error) {
             if (stale(generation) || request !== state.chartRequest) return;
@@ -1775,7 +1798,7 @@
             role: "img",
             preserveAspectRatio: "xMidYMid meet",
         });
-        const metricLabel = state.chartMetric === "roster" ? "roster power" : "résumé rank";
+        const metricLabel = state.chartMetric === "roster" ? "power ranking" : "résumé rank";
         root.appendChild(
             svg("title", {})
         ).textContent = `Weekly ${metricLabel} for every team, weeks ${geometry.firstWeek} to ${geometry.finalWeek}.`;
@@ -2101,6 +2124,7 @@
             // The ledger is the page; it loads before the boards under it so
             // the table is readable while the rest fills in.
             await loadMyTeam();
+            if (!state.chartMetricChosen) state.chartMetric = "roster";
             renderChartMetricChips();
             await Promise.all([
                 loadRosterPower(),

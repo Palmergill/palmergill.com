@@ -533,6 +533,16 @@ and weights but fixed five defects, each locked by a regression test:
   `roster_power_not_recorded` and the board says so in prose, because a line
   that simply stops is a bug as far as the reader can tell.
 
+  **Named after the board, not the model.** The toggle first read "Résumé |
+  Roster", and "Roster" meant nothing to a reader looking at a board called
+  Power rankings directly above it. It now reads "Power rankings | Résumé",
+  opens on Power rankings, and quietly falls back to Résumé on a season that
+  never recorded it. Stored rows only cover finished weeks, so the series
+  ends on the live board ranking for the week in progress — the chart's right
+  edge and the list above it are the same order by construction. The
+  Résumé column's hover, which said only "the résumé method chosen above the
+  table", now says what goes into it; "Composite" is "All factors".
+
   Two details worth keeping. The axis runs to the playoff week even when the
   data is one point long, so the chart does not rescale itself every Tuesday
   — and the playoff marker stands in the slot *past* the last week, or it

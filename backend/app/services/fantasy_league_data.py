@@ -1527,6 +1527,20 @@ def get_power_history(
         }
     else:
         points = _roster_power_history(db, season)
+        # The stored rows cover weeks that are over; the board above the
+        # chart ranks the week in progress. End every line on the board's own
+        # order, so the chart's right edge and the list agree.
+        live = get_roster_power(db, season)
+        if live.get("available") and live.get("week"):
+            for team in live["teams"]:
+                rows = [
+                    row for row in points.get(team["espn_team_id"], [])
+                    if row["week"] != live["week"]
+                ]
+                rows.append(
+                    {"week": live["week"], "rank": team["rank"], "value": team["expected"]}
+                )
+                points[team["espn_team_id"]] = sorted(rows, key=lambda row: row["week"])
 
     teams = [
         {
