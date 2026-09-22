@@ -2,8 +2,8 @@
 
 Unlike the rest of /api/fantasy, which serves anonymous demo callers because
 its data is free and public, these endpoints expose a private league: real
-managers' names, their rosters, and their results. Every route requires a
-signed-in account.
+managers' names, their rosters, and their results. Signup is public, so every
+route requires an admin or an account named in ``FANTASY_LEAGUE_MEMBERS``.
 
 The membership check lives here rather than in the transport layer on
 purpose. ``/api/fantasy`` is a demo prefix at the edge and in main.py, and a
@@ -12,13 +12,16 @@ Basic`` — which some browsers surface as a native credential modal on a
 ``fetch()``. A JSON 403 lets the page render "sign in to view the league"
 instead. This mirrors how ``POST /api/fantasy/admin/refresh`` already works.
 """
-from typing import Any, Dict, Optional
+import os
+from datetime import datetime, timezone
+from typing import Any, Dict, Optional, Set
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 
-from app.database import SessionLocal, get_db
+from app.accounts import ROLE_ADMIN
+from app.database import SessionLocal, get_db, utc_now
 from app.services import (
     fantasy_ai,
     fantasy_league_data,
@@ -38,14 +41,63 @@ class LeagueTeamSelectionRequest(BaseModel):
     espn_team_id: int
 
 
+# Tells the page which 403 it got, so a signed-in stranger is not told to
+# sign in again.
+ACCESS_HEADER = "X-Fantasy-League-Access"
+
+# A forced rewrite bypasses the fact-digest cache and spends a model call, so
+# one note can be rewritten at most this often.
+REWRITE_COOLDOWN_SECONDS = 10 * 60
+
+
+def league_members() -> Set[str]:
+    """Usernames allowed into the league, from ``FANTASY_LEAGUE_MEMBERS``.
+
+    Signup is public, so being signed in is not enough: the league holds
+    real managers' names and rosters. Unset means admins only — the gate
+    fails closed.
+    """
+    raw = os.getenv("FANTASY_LEAGUE_MEMBERS", "")
+    return {name.strip().lower() for name in raw.split(",") if name.strip()}
+
+
 def require_member(request: Request) -> Dict[str, Any]:
-    """Any signed-in account may read the league; anonymous callers may not."""
-    if getattr(request.state, "demo_mode", False):
-        raise HTTPException(status_code=403, detail="Sign in to view the league hub.")
-    identity = getattr(request.state, "app_user", None)
+    """Admins and allowlisted accounts may read the league; nobody else."""
+    identity = None
+    if not getattr(request.state, "demo_mode", False):
+        identity = getattr(request.state, "app_user", None)
     if not identity:
-        raise HTTPException(status_code=403, detail="Sign in to view the league hub.")
+        raise HTTPException(
+            status_code=403,
+            detail="Sign in to view the league hub.",
+            headers={ACCESS_HEADER: "signed-out"},
+        )
+    if identity.get("role") == ROLE_ADMIN:
+        return identity
+    username = str(identity.get("username") or identity.get("name") or "").lower()
+    if username not in league_members():
+        raise HTTPException(
+            status_code=403,
+            detail="This league is private, and your account is not on its member list.",
+            headers={ACCESS_HEADER: "not-member"},
+        )
     return identity
+
+
+def _check_rewrite_cooldown(identity: Dict[str, Any], existing: Dict[str, Any]) -> None:
+    """Refuse a forced rewrite of a note that was written moments ago."""
+    if identity.get("role") == ROLE_ADMIN or not existing.get("generated_at"):
+        return
+    generated_at = datetime.fromisoformat(existing["generated_at"])
+    if generated_at.tzinfo is not None:
+        generated_at = generated_at.astimezone(timezone.utc).replace(tzinfo=None)
+    age = (utc_now() - generated_at).total_seconds()
+    if age < REWRITE_COOLDOWN_SECONDS:
+        wait = max(1, int((REWRITE_COOLDOWN_SECONDS - age) // 60) + 1)
+        raise HTTPException(
+            status_code=429,
+            detail=f"This recap was just written. Try a rewrite again in {wait} min.",
+        )
 
 
 def _member_username(identity: Dict[str, Any]) -> str:
@@ -389,10 +441,17 @@ async def write_week_note(
     season: Optional[int] = None,
     week: Optional[int] = None,
     force: bool = False,
-    _: Dict[str, Any] = Depends(require_member),
+    identity: Dict[str, Any] = Depends(require_member),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """Write one team's weekly recap, reusing an unchanged one."""
+    if force:
+        try:
+            _check_rewrite_cooldown(identity, fantasy_ai.read_week_note(db, season, week, team_id))
+        except UnknownSeasonError as exc:
+            raise HTTPException(status_code=404, detail=str(exc))
+        except fantasy_ai.UnknownWeekTeamError as exc:
+            raise HTTPException(status_code=404, detail=str(exc))
 
     def _generate() -> Dict[str, Any]:
         # Own session: the request-scoped one belongs to the event loop, and
@@ -454,11 +513,16 @@ async def write_draft_note(
     team_id: int,
     season: Optional[int] = None,
     force: bool = False,
-    _: Dict[str, Any] = Depends(require_member),
+    identity: Dict[str, Any] = Depends(require_member),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """Write one team's draft recap, reusing an unchanged one."""
     resolved = _resolved_draft_season(db, season)
+    if force:
+        try:
+            _check_rewrite_cooldown(identity, fantasy_ai.read_draft_note(db, resolved, team_id))
+        except fantasy_ai.UnknownDraftTeamError as exc:
+            raise HTTPException(status_code=404, detail=str(exc))
 
     def _generate() -> Dict[str, Any]:
         # Own session: the request-scoped one belongs to the event loop, and

@@ -8,10 +8,11 @@ const styleSource = fs.readFileSync(path.join(leagueDir, "style.css"), "utf8");
 const bodySource = pageSource.match(/<body>([\s\S]*)<\/body>/)[1];
 const F = require("../format.js");
 
-function response(data, status = 200) {
+function response(data, status = 200, headers = {}) {
     return Promise.resolve({
         status,
         ok: status >= 200 && status < 300,
+        headers: { get: (name) => headers[name] ?? null },
         json: () => Promise.resolve(data),
     });
 }
@@ -653,95 +654,6 @@ describe("league hub power rankings", () => {
 // the first page a signed-out visitor sees, and it is where "My Team" in the
 // section nav lands from anywhere else in the section.
 
-describe("importing a league", () => {
-    afterEach(() => {
-        document.body.innerHTML = "";
-        jest.restoreAllMocks();
-    });
-
-    const status = () => document.getElementById("importStatus");
-    const field = () => document.getElementById("importLeagueId");
-
-    function submit(value) {
-        field().value = value;
-        document
-            .getElementById("importForm")
-            .dispatchEvent(new window.Event("submit", { bubbles: true, cancelable: true }));
-    }
-
-    test("the field does not truncate a pasted ESPN URL before parsing it", () => {
-        document.body.innerHTML = bodySource;
-        expect(field().getAttribute("maxlength")).toBeNull();
-    });
-
-    test("the form stays out of the way until the Tools menu asks for it", async () => {
-        boot();
-        await waitFor(() => document.querySelectorAll("#ledger tbody tr").length === 2);
-        expect(document.getElementById("importLeague").hidden).toBe(true);
-    });
-
-    test("arriving on #importLeague opens it and puts the cursor in it", async () => {
-        Element.prototype.scrollIntoView = Element.prototype.scrollIntoView || (() => {});
-        boot({}, "/fantasy/#importLeague");
-        const details = document.getElementById("importLeague");
-        await waitFor(() => !details.hidden);
-
-        expect(details.open).toBe(true);
-        expect(document.activeElement).toBe(field());
-    });
-
-    test("a typo is called a typo, not a failed import", async () => {
-        boot({ overview: { ...OVERVIEW, league_id: "225965" } });
-        await waitFor(() => document.querySelectorAll("#ledger tbody tr").length === 2);
-
-        submit("my league");
-        expect(status().dataset.status).toBe("invalid");
-        expect(status().textContent).toContain("all digits");
-        expect(field().getAttribute("aria-invalid")).toBe("true");
-    });
-
-    test("the league already on screen says so", async () => {
-        boot({ overview: { ...OVERVIEW, league_id: "225965" } });
-        await waitFor(() => document.querySelectorAll("#ledger tbody tr").length === 2);
-
-        submit("225965");
-        expect(status().dataset.status).toBe("current");
-        expect(status().textContent).toContain("the one you are looking at");
-    });
-
-    test("a valid ID for another league gets a straight answer, not a spinner", async () => {
-        const fetchMock = boot({ overview: { ...OVERVIEW, league_id: "225965" } });
-        await waitFor(() => document.querySelectorAll("#ledger tbody tr").length === 2);
-        const before = fetchMock.mock.calls.length;
-
-        submit("998877");
-        expect(status().dataset.status).toBe("unsupported");
-        expect(status().textContent).toContain("cannot collect a second one yet");
-        // Nothing was requested: the form is honest about being a front end
-        // for work that has not landed.
-        expect(fetchMock.mock.calls.length).toBe(before);
-    });
-
-    test("pasting the whole ESPN URL reads the ID out of it", async () => {
-        boot({ overview: { ...OVERVIEW, league_id: "225965" } });
-        await waitFor(() => document.querySelectorAll("#ledger tbody tr").length === 2);
-
-        submit("https://fantasy.espn.com/football/league?leagueId=225965&seasonId=2026");
-        expect(status().dataset.status).toBe("current");
-        expect(field().value).toBe("225965");
-    });
-
-    test("typing again clears the last answer", async () => {
-        boot({ overview: { ...OVERVIEW, league_id: "225965" } });
-        await waitFor(() => document.querySelectorAll("#ledger tbody tr").length === 2);
-
-        submit("nope");
-        field().dispatchEvent(new window.Event("input", { bubbles: true }));
-        expect(status().textContent).toBe("");
-        expect(field().getAttribute("aria-invalid")).toBeNull();
-    });
-});
-
 describe("?team=me", () => {
     afterEach(() => {
         document.body.innerHTML = "";
@@ -806,6 +718,28 @@ describe("the signed-out front door", () => {
         await waitFor(() => !document.getElementById("signedOutView").hidden);
 
         expect(document.getElementById("signInLink").getAttribute("href")).toContain("/login/");
+        expect(document.getElementById("teaserActions").hidden).toBe(false);
+    });
+
+    test("a signed-in stranger is told the league is private, not to sign in", async () => {
+        const notMember = { "X-Fantasy-League-Access": "not-member" };
+        boot({
+            fetch: (target) =>
+                target.includes("/overview") ? response({}, 403, notMember) : null,
+        });
+        await waitFor(() => !document.getElementById("signedOutView").hidden);
+
+        expect(document.getElementById("teaserTitle").textContent).toBe("This league is private");
+        expect(document.getElementById("teaserLede").textContent).toContain("member list");
+        expect(document.getElementById("teaserActions").hidden).toBe(true);
+    });
+
+    test("the pitch describes one private league, not a league of your own", () => {
+        document.body.innerHTML = bodySource;
+        const lede = document.getElementById("teaserLede").textContent;
+        expect(lede).toContain("one private ESPN league");
+        expect(lede).not.toContain("open yours");
+        expect(document.querySelector('#signedOutView a[href="/signup/"]')).toBeNull();
     });
 });
 

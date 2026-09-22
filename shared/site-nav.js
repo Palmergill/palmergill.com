@@ -204,14 +204,16 @@
                 cache: "no-store",
                 headers: { "Accept": "application/json" }
             });
-            if (!response.ok) return;
+            if (!response.ok) return null;
 
             const session = await response.json();
             const username = typeof session.username === "string" ? session.username.trim() : "";
             if (session.authenticated && username) renderAuthenticatedState(nav, username);
+            return session;
         } catch {
             // Authentication status is progressive enhancement; keep Login visible
             // if the status check is unavailable.
+            return null;
         }
     }
 
@@ -259,7 +261,9 @@
         document.body.prepend(nav);
         ensureSkipLink();
         ensureFavicon();
-        hydrateAuthState(nav);
+        // Shared so a page can skip calls that need an account without
+        // fetching the session a second time. Resolves null when unknown.
+        window.SiteSession = hydrateAuthState(nav);
 
         const toggle = nav.querySelector(".site-nav__toggle");
         const backdrop = nav.querySelector(".site-nav__backdrop");

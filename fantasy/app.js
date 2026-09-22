@@ -107,10 +107,6 @@
         lineupTotals: byId("lineupTotals"),
         lineupChanges: byId("lineupChanges"),
         lineupNote: byId("lineupNote"),
-        importForm: byId("importForm"),
-        importInput: byId("importLeagueId"),
-        importStatus: byId("importStatus"),
-        importDetails: byId("importLeague"),
     };
 
     class ForbiddenError extends Error {}
@@ -118,7 +114,13 @@
     async function fetchJson(url, options = {}) {
         const response = await fetch(url, { credentials: "include", ...options });
         if (response.status === 403) {
-            throw new ForbiddenError("Sign in to view the league hub.");
+            const error = new ForbiddenError("Sign in to view the league hub.");
+            // A signed-in account the league does not list gets a different
+            // 403 from an anonymous one; telling it to sign in is a loop.
+            error.notMember =
+                Boolean(response.headers) &&
+                response.headers.get("X-Fantasy-League-Access") === "not-member";
+            throw error;
         }
         if (!response.ok) {
             const body = await response.json().catch(() => ({}));
@@ -199,7 +201,20 @@
         els.errorBanner.hidden = true;
     }
 
+    function showNotMember() {
+        byId("teaserTitle").textContent = "This league is private";
+        byId("teaserLede").textContent =
+            "You are signed in, but your account is not on the league's member " +
+            "list. Ask the commissioner to add your username.";
+        byId("teaserActions").hidden = true;
+        setView("signedOut");
+    }
+
     function handleFailure(error) {
+        if (error instanceof ForbiddenError && error.notMember) {
+            showNotMember();
+            return true;
+        }
         if (error instanceof ForbiddenError) {
             // Preserve where they were headed so login can bounce them back.
             const next = `${window.location.pathname}${window.location.search}${window.location.hash}`;
@@ -1490,21 +1505,7 @@
     }
 
 
-    // The import form is hidden until the Tools menu links to it. Arriving
-    // on that hash — from another page, or from this one — opens it.
-    const IMPORT_HASH = "#importLeague";
-
-    function revealImport(hash = window.location.hash) {
-        if (hash !== IMPORT_HASH) return false;
-        els.importDetails.hidden = false;
-        els.importDetails.open = true;
-        els.importDetails.scrollIntoView({ block: "start" });
-        els.importInput.focus({ preventScroll: true });
-        return true;
-    }
-
     function scrollToRequestedBoard(hash = window.location.hash) {
-        if (revealImport(hash)) return;
         if (!hash || hash.length < 2) return;
         let id;
         try {
@@ -2146,41 +2147,8 @@
         applyRoute();
     }
 
-    // ── importing a league ──────────────────────────────────────────────
-    //
-    // The ID is validated for real — a typo gets told it is a typo — and a
-    // well-formed ID for a league this site cannot collect gets told exactly
-    // that, rather than a spinner that never resolves. See specs/q3-17 for
-    // the multi-league work this form is the front of.
-
-    function handleImport(event) {
-        event.preventDefault();
-        const outcome = F.importOutcome(els.importInput.value, state.leagueId);
-        els.importStatus.textContent = outcome.message;
-        els.importStatus.dataset.status = outcome.status;
-        if (outcome.status === "invalid") {
-            els.importInput.setAttribute("aria-invalid", "true");
-            els.importInput.focus();
-            return;
-        }
-        els.importInput.removeAttribute("aria-invalid");
-        // A well-formed ID is worth normalising in place: pasting the whole
-        // ESPN URL is the common case, and showing what was read out of it
-        // is how you tell a misparse from a real refusal.
-        els.importInput.value = outcome.leagueId;
-    }
-
     function bindEvents() {
         els.teamBack.addEventListener("click", clearTeam);
-        if (els.importForm) {
-            els.importForm.addEventListener("submit", handleImport);
-            els.importInput.addEventListener("input", () => {
-                els.importStatus.textContent = "";
-                delete els.importStatus.dataset.status;
-                els.importInput.removeAttribute("aria-invalid");
-            });
-        }
-
         els.scoreboardWeek.addEventListener("change", (event) => {
             state.scoreWeek = parseInt(event.target.value, 10);
             loadScoreboard();
@@ -2206,12 +2174,7 @@
             }, 120);
         });
 
-        // "Import a league" in the Tools menu, clicked while already here, is
-        // a fragment change and nothing else — open the form, don't reload.
-        window.addEventListener("hashchange", () => revealImport());
-
         window.addEventListener("popstate", () => {
-            if (window.location.hash === IMPORT_HASH) return;
             state.season = null;
             state.week = null;
             state.teamId = null;

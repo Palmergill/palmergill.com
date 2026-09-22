@@ -793,7 +793,7 @@
             tr.appendChild(el("td", "col-rank", index + 1));
             const who = el("td", "col-player");
             who.appendChild(el("span", "season-leader__name", player.name || player.player_id));
-            const receptionDetail = data.scoring !== "std" && entry.projected_receptions != null
+            const receptionDetail = data.scoring !== "std" && entry.projected_receptions > 0
                 ? ` · ${F.seasonLine(entry.projected_receptions)} rec proj`
                 : "";
             const bookDetail = (entry.books || []).length
@@ -1574,6 +1574,10 @@
         const params = new URLSearchParams({ season: state.season, scoring: state.seasonFantasyScoring });
         if (state.week != null) params.set("week", state.week);
         try {
+            // A signed-out visitor has no league to snapshot; asking would
+            // only log a 403. An unknown session still asks.
+            const session = await (window.SiteSession || Promise.resolve(null));
+            if (session && !session.authenticated) throw new Error("signed out");
             const data = await fetchJson(`${API_BASE}/league/me?${params}`);
             renderMemberSnapshot(data);
         } catch (err) {

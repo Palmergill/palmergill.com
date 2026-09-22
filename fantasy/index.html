@@ -14,7 +14,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/shared/site-nav.css?v=14">
     <link rel="stylesheet" href="/shared/fantasy-header.css?v=2">
-    <link rel="stylesheet" href="style.css?v=26">
+    <link rel="stylesheet" href="style.css?v=27">
 </head>
 <body>
 <noscript>
@@ -54,7 +54,9 @@
              about the season and this is a reply to something you clicked. -->
         <p id="routeBanner" class="banner" role="status" hidden></p>
 
-        <!-- Shown when the API returns 403: not signed in. This is now the
+        <!-- Shown when the API returns 403: not signed in, or signed in but
+             not on the league's member list (app.js rewrites it for the
+             second case). This is now the
              section's front door, so it has to say what is behind it rather
              than only that the door is locked — and it has to offer the one
              thing that works signed out, which is the league-agnostic
@@ -62,16 +64,15 @@
         <section id="signedOutView" class="teaser" hidden>
             <div class="teaser__pitch">
                 <span class="eyebrow">Members only</span>
-                <h2>A league that reads itself</h2>
-                <p class="teaser__lede">
-                    Point it at an ESPN league and it keeps the season: standings and
+                <h2 id="teaserTitle">A league that reads itself</h2>
+                <p class="teaser__lede" id="teaserLede">
+                    This hub keeps one private ESPN league's season: standings and
                     power rankings from the rosters rather than the results, a start/sit
-                    call on your own lineup, who is genuinely claimable, and a weekly
-                    recap worth reading. Sign in to open yours.
+                    call on each lineup, who is genuinely claimable, and a weekly
+                    recap worth reading. League managers can sign in to open it.
                 </p>
-                <div class="signed-out__actions">
+                <div class="signed-out__actions" id="teaserActions">
                     <a class="button" id="signInLink" href="/login/">Sign in</a>
-                    <a class="button button--quiet" href="/signup/">Create an account</a>
                 </div>
             </div>
             <ul class="teaser__list">
@@ -90,7 +91,7 @@
                 </li>
             </ul>
             <p class="teaser__escape">
-                No league here yet? The
+                Not in the league? The
                 <a href="/fantasy/market/">implied-value board</a> needs no account —
                 it prices every player off the betting markets.
             </p>
@@ -281,54 +282,15 @@
                     <ol class="history" id="historyList"></ol>
                 </section>
             </div>
-
-            <!-- Importing by ID is a one-time question, so the form is hidden
-                 until "Import a league" in the Tools menu asks for it
-                 (/fantasy/#importLeague), rather than above the league on
-                 every visit. The
-                 form validates the ID for real; what it cannot yet do is
-                 serve a second league, and it says which of the two it is.
-                 See specs/q3-17 for the multi-league work that lands behind
-                 this same form. -->
-            <details class="import-league" id="importLeague" hidden>
-                <summary class="import-league__summary">
-                    <span class="import-league__title">Import a league</span>
-                    <span class="import-league__hint">Have an ESPN league ID?</span>
-                </summary>
-                <form class="import-league__form" id="importForm" novalidate>
-                    <div class="import-league__row">
-                        <label class="import-league__label" for="importLeagueId">
-                            ESPN league ID
-                        </label>
-                        <input
-                            id="importLeagueId"
-                            name="leagueId"
-                            class="import-league__input"
-                            type="text"
-                            inputmode="numeric"
-                            autocomplete="off"
-                            placeholder="225965"
-                            aria-describedby="importHelp"
-                        >
-                        <button type="submit" class="button" id="importSubmit">Import</button>
-                    </div>
-                    <p class="import-league__status" id="importStatus" role="status"></p>
-                    <p class="import-league__help" id="importHelp">
-                        It is the <code>leagueId</code> in your league's ESPN URL —
-                        <code>fantasy.espn.com/football/league?leagueId=<strong>225965</strong></code>.
-                        The league has to be public in ESPN's league settings.
-                    </p>
-                </form>
-            </details>
         </div>
     </main>
 
-    <script src="/shared/site-nav.js?v=16"></script>
-    <script src="/shared/fantasy-header.js?v=3"></script>
+    <script src="/shared/site-nav.js?v=17"></script>
+    <script src="/shared/fantasy-header.js?v=4"></script>
     <script>window.FantasyHeader.mount({ page: "home" });</script>
     <script src="/shared/analytics.js?v=1"></script>
     <script src="/shared/api-base.js?v=1"></script>
-    <script src="format.js?v=12"></script>
-    <script src="app.js?v=24"></script>
+    <script src="format.js?v=13"></script>
+    <script src="app.js?v=25"></script>
 </body>
 </html>

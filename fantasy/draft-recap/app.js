@@ -51,7 +51,13 @@
     async function fetchJson(url, options = {}) {
         const response = await fetch(url, { credentials: "include", ...options });
         if (response.status === 403) {
-            throw new ForbiddenError("Sign in to view the draft recap.");
+            const error = new ForbiddenError("Sign in to view the draft recap.");
+            // A signed-in account the league does not list gets a different
+            // 403 from an anonymous one; telling it to sign in is a loop.
+            error.notMember =
+                Boolean(response.headers) &&
+                response.headers.get("X-Fantasy-League-Access") === "not-member";
+            throw error;
         }
         if (!response.ok) {
             const body = await response.json().catch(() => ({}));
@@ -142,7 +148,21 @@
         els.errorBanner.hidden = false;
     }
 
+    function showNotMember() {
+        const view = els.signedOutView;
+        view.querySelector("h2").textContent = "This league is private";
+        view.querySelector("p").textContent =
+            "You are signed in, but your account is not on the league's " +
+            "member list. Ask the commissioner to add your username.";
+        view.querySelector(".signed-out__actions").hidden = true;
+        setView("signedOut");
+    }
+
     function handleFailure(error) {
+        if (error instanceof ForbiddenError && error.notMember) {
+            showNotMember();
+            return;
+        }
         if (error instanceof ForbiddenError) {
             // Preserve where they were headed so login can bounce them back.
             const next = `${window.location.pathname}${window.location.search}`;

@@ -5,6 +5,8 @@ that the route is behind the same JSON 403 as the rest of the league hub, and
 that the note endpoints keep the split the draft notes established — the GET
 never bills for a model call, the POST is the only thing that writes.
 """
+from datetime import timedelta
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -28,6 +30,7 @@ def auth_env(monkeypatch):
     monkeypatch.setenv("APP_AUTH_USERNAME", ADMIN_USERNAME)
     monkeypatch.setenv("APP_AUTH_PASSWORD", ADMIN_PASSWORD)
     monkeypatch.setenv("ESPN_LEAGUE_ID", "225965")
+    monkeypatch.setenv("FANTASY_LEAGUE_MEMBERS", "taylor")
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
 
 
@@ -174,3 +177,29 @@ def test_a_team_with_no_result_in_the_week_is_a_404(seeded_db):
         f"/api/fantasy/league/week/notes/9?season={SEASON}&week={WEEK}"
     )
     assert response.status_code == 404
+
+
+# ── forced rewrites ─────────────────────────────────────────────────────
+
+
+def test_a_member_cannot_force_a_rewrite_of_a_fresh_note(seeded_db):
+    """force=true skips the cache and spends a model call, so it cools down."""
+    client = member_client()
+    client.post(NOTE_ROUTE)
+    response = client.post(f"{NOTE_ROUTE}&force=true")
+    assert response.status_code == 429
+    assert "min" in response.json()["detail"]
+
+
+def test_a_member_may_force_a_rewrite_once_the_note_is_old(seeded_db):
+    client = member_client()
+    client.post(NOTE_ROUTE)
+    row = seeded_db.query(FantasyLeagueWeekNote).filter_by(season=SEASON).first()
+    seeded_db.refresh(row)
+    row.generated_at = row.generated_at - timedelta(minutes=11)
+    seeded_db.commit()
+    assert client.post(f"{NOTE_ROUTE}&force=true").status_code == 201
+
+
+def test_a_member_may_force_the_first_note(seeded_db):
+    assert member_client().post(f"{NOTE_ROUTE}&force=true").status_code == 201

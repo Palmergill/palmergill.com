@@ -752,60 +752,6 @@
     }
 
 
-    // ── importing a league ──────────────────────────────────────────────
-    //
-    // The form takes an ESPN league ID and has three honest answers: the ID
-    // is not an ID, the ID is the league already on screen, or the ID is a
-    // league this site cannot serve yet. Only the third is a "not yet", and
-    // conflating it with the first two is what makes a scaffolded form feel
-    // like a broken one.
-
-    // ESPN league IDs are positive integers. They have grown over the years —
-    // old leagues are five or six digits, new ones ten or more — so the only
-    // safe rule is "digits, not absurdly long, not zero".
-    function parseLeagueId(raw) {
-        const trimmed = String(raw == null ? "" : raw).trim();
-        if (!trimmed) return { ok: false, reason: "empty" };
-        // Pasting the whole ESPN URL is the common case, so read the ID out
-        // of it rather than rejecting it.
-        const fromUrl = trimmed.match(/[?&]leagueId=(\d+)/i);
-        const candidate = fromUrl ? fromUrl[1] : trimmed;
-        if (!/^\d+$/.test(candidate)) return { ok: false, reason: "not-numeric" };
-        if (candidate.length > 12) return { ok: false, reason: "too-long" };
-        const normalized = candidate.replace(/^0+(?=\d)/, "");
-        if (normalized === "0") return { ok: false, reason: "not-numeric" };
-        return { ok: true, leagueId: normalized };
-    }
-
-    const IMPORT_MESSAGES = {
-        empty: "Enter a league ID first.",
-        "not-numeric": "A league ID is all digits — try the number from your ESPN URL.",
-        "too-long": "That is longer than any ESPN league ID.",
-    };
-
-    // `current` is the league this page is already showing, or null before
-    // the overview has landed.
-    function importOutcome(raw, current) {
-        const parsed = parseLeagueId(raw);
-        if (!parsed.ok) {
-            return { status: "invalid", message: IMPORT_MESSAGES[parsed.reason] };
-        }
-        if (current && String(current) === parsed.leagueId) {
-            return {
-                status: "current",
-                leagueId: parsed.leagueId,
-                message: `League ${parsed.leagueId} is the one you are looking at.`,
-            };
-        }
-        return {
-            status: "unsupported",
-            leagueId: parsed.leagueId,
-            message:
-                `League ${parsed.leagueId} looks like a valid ID, but this site ` +
-                "serves one league at a time and cannot collect a second one yet.",
-        };
-    }
-
     return {
         ALGORITHM_LABELS,
         SLOT_ORDER,
@@ -857,7 +803,5 @@
         sparkline,
         injuryBadge,
         compactCount,
-        parseLeagueId,
-        importOutcome,
     };
 });

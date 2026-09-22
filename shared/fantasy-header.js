@@ -52,15 +52,6 @@
             href: "/fantasy/draft-order/",
             note: "Draft-order game for draft night",
         },
-        {
-            // Not a page: the form lives, collapsed and hidden, at the foot
-            // of the hub, and this link is the only way to it. Asked once,
-            // so it has no business above the league on every visit.
-            key: "import",
-            label: "Import a league",
-            href: "/fantasy/#importLeague",
-            note: "Bring in an ESPN league by its ID",
-        },
     ];
 
     // Longest path first: every fantasy path starts with /fantasy/, so a

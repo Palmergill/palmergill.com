@@ -319,57 +319,6 @@ describe("ordinal", () => {
     });
 });
 
-describe("league id parsing", () => {
-    test("accepts an ID however it was copied", () => {
-        expect(LeagueFormat.parseLeagueId("225965")).toEqual({ ok: true, leagueId: "225965" });
-        expect(LeagueFormat.parseLeagueId("  225965  ")).toEqual({ ok: true, leagueId: "225965" });
-        // Ten-plus digits: ESPN's newer leagues.
-        expect(LeagueFormat.parseLeagueId("1234567890")).toEqual({
-            ok: true,
-            leagueId: "1234567890",
-        });
-        // Pasting the URL is the common case, not an error.
-        expect(
-            LeagueFormat.parseLeagueId(
-                "https://fantasy.espn.com/football/league?leagueId=98765&seasonId=2026"
-            )
-        ).toEqual({ ok: true, leagueId: "98765" });
-    });
-
-    test("rejects what is not an ID, with a reason", () => {
-        expect(LeagueFormat.parseLeagueId("")).toEqual({ ok: false, reason: "empty" });
-        expect(LeagueFormat.parseLeagueId("   ")).toEqual({ ok: false, reason: "empty" });
-        expect(LeagueFormat.parseLeagueId(null)).toEqual({ ok: false, reason: "empty" });
-        expect(LeagueFormat.parseLeagueId("22 59 65").ok).toBe(false);
-        expect(LeagueFormat.parseLeagueId("abc").reason).toBe("not-numeric");
-        expect(LeagueFormat.parseLeagueId("-5").reason).toBe("not-numeric");
-        expect(LeagueFormat.parseLeagueId("0").reason).toBe("not-numeric");
-        expect(LeagueFormat.parseLeagueId("000").reason).toBe("not-numeric");
-        expect(LeagueFormat.parseLeagueId("1234567890123").reason).toBe("too-long");
-    });
-
-    test("leading zeros normalise rather than making two IDs of one league", () => {
-        expect(LeagueFormat.parseLeagueId("00225965").leagueId).toBe("225965");
-    });
-
-    test("the three outcomes are distinguishable, which is the whole point", () => {
-        expect(LeagueFormat.importOutcome("nope", "225965").status).toBe("invalid");
-        expect(LeagueFormat.importOutcome("225965", "225965").status).toBe("current");
-        expect(LeagueFormat.importOutcome("998877", "225965").status).toBe("unsupported");
-        // Before the overview lands there is nothing to compare against, so a
-        // valid ID cannot be claimed to be the current one.
-        expect(LeagueFormat.importOutcome("225965", null).status).toBe("unsupported");
-    });
-
-    test("every outcome carries a message the page can show as-is", () => {
-        ["nope", "225965", "998877"].forEach((value) => {
-            const outcome = LeagueFormat.importOutcome(value, "225965");
-            expect(typeof outcome.message).toBe("string");
-            expect(outcome.message.length).toBeGreaterThan(0);
-        });
-    });
-});
-
 describe("column hint copy", () => {
     test("every hint is a sentence, not a restatement of the label", () => {
         Object.entries(LeagueFormat.LEDGER_HINTS).forEach(([key, text]) => {
