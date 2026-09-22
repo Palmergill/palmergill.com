@@ -32,25 +32,21 @@
                 <!-- The manager's name, on a team route only. -->
                 <p class="masthead__sub" id="leagueSub" hidden></p>
             </div>
-            <dl class="masthead__meta" id="modeBadge" aria-live="polite">
-                <div class="masthead__fact">
-                    <dt id="modeLabel">Season</dt>
-                    <dd id="seasonValue">—</dd>
+            <!-- The league's side of the masthead: how fresh the data is and
+                 the two recaps. The season, week and scoring figures that
+                 used to sit here said nothing the page below does not. -->
+            <div class="masthead__aside" id="modeBadge" aria-live="polite">
+                <p class="masthead__freshness" id="freshnessValue"></p>
+                <p class="season-bar__viewing" id="seasonViewing" hidden></p>
+                <div class="masthead__links">
+                    <a class="league-link" href="/fantasy/week/">Weekly recap →</a>
+                    <a class="league-link" href="/fantasy/draft-recap/">Draft recap →</a>
                 </div>
-                <div class="masthead__fact">
-                    <dt>Through</dt>
-                    <dd id="weekValue">—</dd>
-                </div>
-                <div class="masthead__fact">
-                    <dt>Scoring</dt>
-                    <dd>Half PPR</dd>
-                </div>
-            </dl>
+            </div>
             <!-- The team route swaps this in for the league's facts rather
                  than stacking a second masthead under the first. -->
             <dl class="masthead__meta" id="teamBadge" aria-live="polite" hidden></dl>
         </header>
-        <p class="masthead__freshness" id="freshnessValue"></p>
 
         <p id="errorBanner" class="banner banner--error" hidden></p>
         <p id="modeBanner" class="banner" hidden></p>
@@ -106,19 +102,6 @@
         </section>
 
         <div id="leagueView" hidden>
-            <!-- The chips that used to sit here listed every season the
-                 league has ever had, at the top of a page about this one.
-                 Choosing a past season is a historical act; it moved to the
-                 History board at the foot of the page, where each year is a
-                 row about who won it rather than a number to click. -->
-            <nav class="season-bar" aria-label="Season">
-                <p class="season-bar__viewing" id="seasonViewing" hidden></p>
-                <div class="season-bar__links">
-                    <a class="league-link" href="/fantasy/week/">Weekly recap →</a>
-                    <a class="league-link" href="/fantasy/draft-recap/">Draft recap →</a>
-                </div>
-            </nav>
-
             <!-- Team detail replaces the league sections; it is a routed view
                  on this page (?team=N) rather than a second HTML file. The
                  team's own name rides in the masthead above, so this view

@@ -303,8 +303,6 @@ body {
 
 /* ── chips and controls ───────────────────────────────────────────── */
 
-.season-bar { margin-bottom: 20px; }
-
 .chip-row {
     display: flex;
     flex-wrap: wrap;
@@ -1021,17 +1019,6 @@ button:focus-visible {
     .season .dv { display: none; }
 }
 
-/* Way across to the two recaps: sibling views of the same league, not
-   separate tools. The season chips that used to share this row moved to the
-   History board at the foot of the page. */
-.season-bar {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: space-between;
-    gap: 10px;
-}
-
 /* Reading a finished season is a different act from reading the live one,
    and the year in the masthead alone does not say which you are doing. */
 .season-bar__viewing {
@@ -1546,13 +1533,27 @@ button:focus-visible {
     font-variant-numeric: tabular-nums;
 }
 
+/* Freshness and the two recaps, right-aligned against the league's name. */
+.masthead__aside {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 6px;
+    padding-bottom: 4px;
+}
+
 .masthead__freshness {
-    margin: 8px 0 0;
+    margin: 0;
     font-size: 12px;
     color: var(--muted, #928a7d);
 }
 
-.season-bar { margin: 14px 0 26px; }
+.masthead__links {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 6px 16px;
+}
 
 /* This is a long document, so keep its local table of contents close to the
    global header. On phones it scrolls sideways instead of becoming another
@@ -1656,8 +1657,9 @@ button:focus-visible {
 
     .masthead__fact { align-items: flex-start; }
     .masthead__fact dd { font-size: 17px; }
+    .masthead__aside { align-items: flex-start; padding-bottom: 0; }
+    .masthead__links { justify-content: flex-start; }
     .board__head h2 { font-size: 22px; }
-    .season-bar .chip { min-height: 44px; display: inline-flex; align-items: center; }
     .league-jump-nav { margin-right: -14px; margin-left: -14px; border-right: 0; border-left: 0; border-radius: 0; }
 }
 
@@ -1717,30 +1719,7 @@ button:focus-visible {
    scoreboard and the teams grid kept theirs, and a two-up grid of cards
    turned ten teams into a screen and a half of scrolling. */
 
-.season-bar__links {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px 16px;
-}
-
 @media (max-width: 720px) {
-    /* The "viewing 2024" line on its own row above the two recaps, instead
-       of one recap wrapping onto a line by itself. */
-    .season-bar {
-        flex-direction: column;
-        align-items: stretch;
-        gap: 2px;
-    }
-
-    .season-bar .chip-row {
-        flex-wrap: nowrap;
-        overflow-x: auto;
-        scrollbar-width: none;
-    }
-
-    .season-bar .chip-row::-webkit-scrollbar { display: none; }
-    .season-bar .chip { flex: 0 0 auto; }
-
 
     .scoreboard {
         grid-template-columns: minmax(0, 1fr);

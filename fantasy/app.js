@@ -60,9 +60,6 @@
         mastheadEyebrow: byId("mastheadEyebrow"),
         modeBadge: byId("modeBadge"),
         teamBadge: byId("teamBadge"),
-        modeLabel: byId("modeLabel"),
-        seasonValue: byId("seasonValue"),
-        weekValue: byId("weekValue"),
         freshnessValue: byId("freshnessValue"),
         errorBanner: byId("errorBanner"),
         modeBanner: byId("modeBanner"),
@@ -191,7 +188,6 @@
         els.mastheadEyebrow.textContent = anonymous
             ? "Fantasy football"
             : "Private league · ESPN";
-        els.freshnessValue.hidden = anonymous;
     }
 
     function showError(message) {
@@ -370,11 +366,6 @@
 
     function renderHeader(overview) {
         els.leagueName.textContent = overview.name || "League Hub";
-        els.seasonValue.textContent = overview.season || "—";
-        els.modeLabel.textContent = F.modeLabel(overview.mode) || "Season";
-        els.weekValue.textContent = overview.latest_week
-            ? `Week ${overview.latest_week}`
-            : "Preseason";
         els.freshnessValue.textContent = F.formatAsOf(overview.freshness.league_sync);
 
         if (overview.mode === "preseason") {
@@ -942,7 +933,6 @@
     function setMastheadMode(showingTeam) {
         els.modeBadge.hidden = showingTeam;
         els.teamBadge.hidden = !showingTeam;
-        els.freshnessValue.hidden = showingTeam;
         if (!showingTeam) {
             els.leagueSub.hidden = true;
             els.teamBadge.replaceChildren();
