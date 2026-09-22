@@ -120,6 +120,8 @@ OVERVIEW_WEEKDAY = 1  # Tuesday
 OVERVIEW_HOUR_UTC = 12
 OVERVIEW_LAST_CATCH_UP_WEEKDAY = 5  # Saturday
 _OVERVIEW_META_PREFIX = "overviews:"
+_WEEK_NOTES_META_PREFIX = "week_notes:"
+_DRAFT_NOTES_META_PREFIX = "draft_notes:"
 
 # A finished season never changes, so polling it on the live cadence is pure
 # waste. Applied to every season before the current one.
@@ -1255,6 +1257,50 @@ def _write_weekly_overviews(db: Session, season: int, now: datetime) -> Optional
     return week
 
 
+def _write_week_notes(db: Session, season: int, now: datetime) -> List[int]:
+    """Write every team's weekly recap for each completed week lacking one.
+
+    Same Tuesday window as the overviews. Every completed week is checked,
+    not only the newest, so a week the scheduler missed still gets its
+    recaps. Returns the weeks written.
+    """
+    if not _in_overview_window(now):
+        return []
+    from app.services import fantasy_ai, fantasy_league_data
+
+    done: List[int] = []
+    for week in fantasy_league_data._completed_weeks(db, season):
+        key = f"{_WEEK_NOTES_META_PREFIX}{season}:{week}"
+        if get_meta(db, key):
+            continue
+        written = fantasy_ai.generate_week_notes(db, season, week)
+        set_meta(db, key, now.isoformat())
+        db.commit()
+        logger.info("Wrote week %s recaps for %s teams", week, len(written))
+        done.append(week)
+    return done
+
+
+def _write_draft_notes(db: Session, season: int, now: datetime) -> bool:
+    """Write the draft recaps once, on the first Tuesday after the draft."""
+    if not _in_overview_window(now):
+        return False
+    key = f"{_DRAFT_NOTES_META_PREFIX}{season}"
+    if get_meta(db, key):
+        return False
+    from app.services import fantasy_ai
+    from app.services.fantasy_league_draft import DraftUnavailable
+
+    try:
+        written = fantasy_ai.generate_missing_draft_notes(db, season)
+    except DraftUnavailable:
+        return False  # no completed draft yet; try again next tick
+    set_meta(db, key, now.isoformat())
+    db.commit()
+    logger.info("Wrote draft recaps for %s teams", len(written))
+    return True
+
+
 def _mark_provider_next_due(
     db: Session, source: str, season: int, week: int, now: datetime, in_season: bool
 ) -> None:
@@ -1398,13 +1444,24 @@ def run_scheduled(db: Session, now: Optional[datetime] = None) -> List[Dict[str,
         summaries.append(_summary(run))
         _mark_draft_next_due(db, league_season, now, in_season, completed)
 
-    # The weekly team overviews, after the league pass above so they read
-    # the freshest results.
+    # The weekly team overviews and recaps, after the league pass above so
+    # they read the freshest results. Nothing else writes them.
     if current_league and in_season:
         try:
             _write_weekly_overviews(db, current_league, now)
         except Exception:
             logger.exception("Weekly overviews failed for %s", current_league)
+        try:
+            _write_week_notes(db, current_league, now)
+        except Exception:
+            logger.exception("Weekly recaps failed for %s", current_league)
+    # The draft is usually before week 1, so its recaps are not gated on the
+    # regular season.
+    if current_league:
+        try:
+            _write_draft_notes(db, current_league, now)
+        except Exception:
+            logger.exception("Draft recaps failed for %s", current_league)
 
     return summaries
 

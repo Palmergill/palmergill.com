@@ -5,8 +5,6 @@ that the route is behind the same JSON 403 as the rest of the league hub, and
 that the note endpoints keep the split the draft notes established — the GET
 never bills for a model call, the POST is the only thing that writes.
 """
-from datetime import timedelta
-
 import pytest
 from fastapi.testclient import TestClient
 
@@ -81,8 +79,20 @@ def test_anonymous_is_refused_with_json_403(seeded_db, route):
     assert "sign in" in response.json()["detail"].lower()
 
 
-def test_writing_a_note_is_gated_too(seeded_db):
-    assert TestClient(app).post(NOTE_ROUTE).status_code == 403
+def test_nobody_can_write_a_note_over_http(seeded_db):
+    """Only the Tuesday scheduler writes recaps; there is no button."""
+    assert TestClient(app).post(NOTE_ROUTE).status_code == 405
+    assert member_client().post(NOTE_ROUTE).status_code == 405
+    assert member_client().post("/api/fantasy/league/draft/notes/1").status_code == 405
+
+
+def write(team_id=1):
+    """What the scheduler does for one team, outside the request cycle."""
+    session = SessionLocal()
+    try:
+        return fantasy_ai.generate_week_note(session, SEASON, WEEK, team_id)
+    finally:
+        session.close()
 
 
 # ── the recap ───────────────────────────────────────────────────────────
@@ -117,7 +127,7 @@ def test_reading_a_note_never_writes_one(seeded_db):
 
 
 def test_the_local_fallback_names_the_result_and_the_bench(seeded_db):
-    written = member_client().post(NOTE_ROUTE).json()
+    written = write()
     assert written["source"] == "local"
     assert "Team 1" in written["note_md"]
     assert "Team 2" in written["note_md"]
@@ -130,8 +140,7 @@ def test_the_local_fallback_names_the_result_and_the_bench(seeded_db):
 
 
 def test_a_benched_week_is_reported_as_one(seeded_db):
-    route = f"/api/fantasy/league/week/notes/2?season={SEASON}&week={WEEK}"
-    note = member_client().post(route).json()["note_md"]
+    note = write(2)["note_md"]
     assert "49 points stayed on the bench" in note
     assert "T2B1" in note
 
@@ -146,7 +155,7 @@ def test_the_note_reuses_the_model_plumbing_without_tools(seeded_db, monkeypatch
         return {"output_text": "**A model recap.**"}
 
     monkeypatch.setattr(fantasy_ai, "_openai_response", fake_openai)
-    payload = member_client().post(NOTE_ROUTE).json()
+    payload = write()
 
     assert payload["source"] == "model"
     assert payload["note_md"] == "**A model recap.**"
@@ -155,7 +164,7 @@ def test_the_note_reuses_the_model_plumbing_without_tools(seeded_db, monkeypatch
 
 
 def test_a_note_goes_stale_when_the_week_moves_under_it(seeded_db, monkeypatch):
-    member_client().post(NOTE_ROUTE)
+    write()
     from app.database import FantasyLeagueMatchup
 
     row = (
@@ -167,7 +176,7 @@ def test_a_note_goes_stale_when_the_week_moves_under_it(seeded_db, monkeypatch):
     seeded_db.commit()
 
     assert member_client().get(NOTE_ROUTE).json()["status"] == "stale"
-    assert member_client().post(NOTE_ROUTE).json()["cache_hit"] is False
+    assert write()["cache_hit"] is False
     assert seeded_db.query(FantasyLeagueWeekNote).count() == 1
 
 
@@ -177,28 +186,3 @@ def test_a_team_with_no_result_in_the_week_is_a_404(seeded_db):
     )
     assert response.status_code == 404
 
-
-# ── forced rewrites ─────────────────────────────────────────────────────
-
-
-def test_a_member_cannot_force_a_rewrite_of_a_fresh_note(seeded_db):
-    """force=true skips the cache and spends a model call, so it cools down."""
-    client = member_client()
-    client.post(NOTE_ROUTE)
-    response = client.post(f"{NOTE_ROUTE}&force=true")
-    assert response.status_code == 429
-    assert "min" in response.json()["detail"]
-
-
-def test_a_member_may_force_a_rewrite_once_the_note_is_old(seeded_db):
-    client = member_client()
-    client.post(NOTE_ROUTE)
-    row = seeded_db.query(FantasyLeagueWeekNote).filter_by(season=SEASON).first()
-    seeded_db.refresh(row)
-    row.generated_at = row.generated_at - timedelta(minutes=11)
-    seeded_db.commit()
-    assert client.post(f"{NOTE_ROUTE}&force=true").status_code == 201
-
-
-def test_a_member_may_force_the_first_note(seeded_db):
-    assert member_client().post(f"{NOTE_ROUTE}&force=true").status_code == 201

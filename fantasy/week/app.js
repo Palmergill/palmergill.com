@@ -426,22 +426,16 @@
             );
         }
 
+        // Recaps are written by the scheduler on Tuesdays; the page only
+        // reads them.
         const note = el("div", "grade__note");
         const noteBody = el("div", "grade__note-body");
         noteBody.setAttribute("aria-live", "polite");
-        const write = el("button", "button button--quiet", "Write recap");
-        write.type = "button";
-        write.addEventListener("click", () => writeNote(row.espn_team_id, noteBody, write));
         note.appendChild(noteBody);
-        note.appendChild(write);
         body.appendChild(note);
 
         const stored = state.notes[row.espn_team_id];
-        if (stored && stored.note_md) {
-            renderMarkdown(noteBody, stored.note_md);
-            write.textContent = "Rewrite";
-            write.dataset.hasNote = "true";
-        }
+        if (stored) renderStoredNote(noteBody, stored);
 
         toggle.addEventListener("click", () => {
             body.hidden = !body.hidden;
@@ -450,7 +444,7 @@
             else {
                 state.expanded.add(row.espn_team_id);
                 if (!Object.prototype.hasOwnProperty.call(state.notes, row.espn_team_id)) {
-                    loadStoredNote(row.espn_team_id, noteBody, write);
+                    loadStoredNote(row.espn_team_id, noteBody);
                 }
             }
         });
@@ -466,51 +460,24 @@
         return params;
     }
 
-    async function loadStoredNote(teamId, container, button) {
+    const PENDING_NOTE = "The recap for this week is written on Tuesday morning.";
+
+    function renderStoredNote(container, payload) {
+        if (payload && payload.note_md) renderMarkdown(container, payload.note_md);
+        else container.replaceChildren(el("p", "empty-note", PENDING_NOTE));
+    }
+
+    async function loadStoredNote(teamId, container) {
         const generation = state.generation;
-        button.disabled = true;
         try {
             const payload = await fetchJson(
                 `${API_BASE}/week/notes/${teamId}?${noteParams()}`
             );
             if (generation !== state.generation) return;
             state.notes[teamId] = payload;
-            if (payload.note_md) {
-                renderMarkdown(container, payload.note_md);
-                button.textContent = "Rewrite";
-                button.dataset.hasNote = "true";
-            }
+            renderStoredNote(container, payload);
         } catch (_error) {
-            // A note is optional. Keep generation available even if its read
-            // endpoint is temporarily unavailable.
-        } finally {
-            if (generation === state.generation) button.disabled = false;
-        }
-    }
-
-    async function writeNote(teamId, container, button) {
-        button.disabled = true;
-        const original = button.textContent;
-        const force = button.dataset.hasNote === "true";
-        button.textContent = "Writing…";
-        try {
-            const params = noteParams();
-            if (force) params.set("force", "true");
-            const payload = await fetchJson(
-                `${API_BASE}/week/notes/${teamId}?${params}`,
-                { method: "POST" }
-            );
-            state.notes[teamId] = payload;
-            renderMarkdown(container, payload.note_md || "No recap available.");
-            button.textContent = "Rewrite";
-            button.dataset.hasNote = "true";
-        } catch (error) {
-            container.replaceChildren(
-                el("p", "grade__error", error.message || "Could not write a recap.")
-            );
-            button.textContent = original;
-        } finally {
-            button.disabled = false;
+            // A note is optional; the rest of the card stands without it.
         }
     }
 

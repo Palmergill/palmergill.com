@@ -99,3 +99,73 @@ def test_nothing_is_written_outside_the_window_or_before_week_one(db, calls):
     db.commit()
     assert C._write_weekly_overviews(db, 2026, SUNDAY) is None
     assert calls == []
+
+
+# ── weekly and draft recaps ride the same window ────────────────────────
+
+
+@pytest.fixture
+def recap_calls(db, monkeypatch):
+    def clear():
+        for prefix in ("week_notes:%", "draft_notes:%"):
+            db.query(FantasyMeta).filter(FantasyMeta.key.like(prefix)).delete(
+                synchronize_session=False
+            )
+        db.commit()
+
+    clear()
+    seen = {"week": [], "draft": []}
+    monkeypatch.setattr(
+        fantasy_ai,
+        "generate_week_notes",
+        lambda db, season, week: seen["week"].append((season, week)) or {1: "local"},
+    )
+    monkeypatch.setattr(
+        fantasy_ai,
+        "generate_missing_draft_notes",
+        lambda db, season: seen["draft"].append(season) or {1: "local"},
+    )
+    yield seen
+    clear()
+
+
+def test_tuesday_writes_a_recap_for_every_completed_week_once(db, recap_calls):
+    season_row(db)
+    matchup(db, 2026, 1, 1, 2)
+    matchup(db, 2026, 2, 1, 2)
+    matchup(db, 2026, 3, 1, 2, complete=False)
+    db.commit()
+
+    # A week the scheduler never wrote still gets its recaps.
+    assert C._write_week_notes(db, 2026, TUESDAY_MORNING) == [1, 2]
+    assert C._write_week_notes(db, 2026, FRIDAY) == []
+    assert recap_calls["week"] == [(2026, 1), (2026, 2)]
+
+
+def test_no_weekly_recap_outside_the_window(db, recap_calls):
+    season_row(db)
+    matchup(db, 2026, 1, 1, 2)
+    db.commit()
+    assert C._write_week_notes(db, 2026, SUNDAY) == []
+    assert C._write_week_notes(db, 2026, TUESDAY_EARLY) == []
+    assert recap_calls["week"] == []
+
+
+def test_draft_recaps_are_written_once_on_a_tuesday(db, recap_calls):
+    assert C._write_draft_notes(db, 2026, SUNDAY) is False
+    assert C._write_draft_notes(db, 2026, TUESDAY_MORNING) is True
+    assert C._write_draft_notes(db, 2026, FRIDAY) is False
+    assert recap_calls["draft"] == [2026]
+
+
+def test_draft_recaps_wait_for_a_draft(db, recap_calls, monkeypatch):
+    from app.services.fantasy_league_draft import DraftUnavailable
+
+    def no_draft(db, season):
+        raise DraftUnavailable("not drafted")
+
+    monkeypatch.setattr(fantasy_ai, "generate_missing_draft_notes", no_draft)
+    assert C._write_draft_notes(db, 2026, TUESDAY_MORNING) is False
+    # Nothing was marked done, so a later tick tries again.
+    monkeypatch.setattr(fantasy_ai, "generate_missing_draft_notes", lambda db, season: {})
+    assert C._write_draft_notes(db, 2026, FRIDAY) is True

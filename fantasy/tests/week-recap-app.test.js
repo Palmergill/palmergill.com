@@ -4,8 +4,7 @@
  * What is worth pinning here is everything the format module cannot see: the
  * two-axis chip bar (season and week), the fact that an unplayed week is
  * unpressable rather than a route to an empty page, and the note lifecycle —
- * a stored note is read without generating, and only the explicit Rewrite
- * forces a new one.
+ * a stored note is only ever read; the Tuesday scheduler writes them.
  */
 const fs = require("fs");
 const path = require("path");
@@ -223,18 +222,13 @@ describe("weekly recap controller", () => {
         expect(document.getElementById("seasonBar").hidden).toBe(true);
     });
 
-    test("loads a stored note and forces the Rewrite action", async () => {
+    test("shows the stored note with no way to write or rewrite one", async () => {
         const requests = [];
         boot((url, options = {}) => {
             const requested = String(url);
             requests.push({ url: requested, method: options.method || "GET" });
             if (requested.endsWith("/seasons")) return response(SEASONS);
-            if (requested.includes("/week/notes/1")) {
-                if (options.method === "POST") {
-                    return response({ note_md: "A newly written recap." });
-                }
-                return response({ note_md: "A stored recap." });
-            }
+            if (requested.includes("/week/notes/1")) return response({ note_md: "A stored recap." });
             if (requested.includes("/week")) return response(recap(2026, 1));
             throw new Error(`Unexpected request: ${requested}`);
         }, "/fantasy/week/?season=2026&week=1");
@@ -245,20 +239,25 @@ describe("weekly recap controller", () => {
             document.querySelector(".grade__note-body").textContent.includes("stored")
         );
 
-        // A plain expand must never bill for a model call.
-        expect(requests.filter((request) => request.method === "POST")).toHaveLength(0);
+        // The Tuesday scheduler is the only writer; the page never asks.
+        expect(requests.filter((request) => request.method !== "GET")).toHaveLength(0);
+        expect(document.querySelector(".grade__note button")).toBeNull();
+    });
 
-        const rewrite = document.querySelector(".grade__note .button");
-        expect(rewrite.textContent).toBe("Rewrite");
-        rewrite.click();
+    test("says when a missing note will be written", async () => {
+        boot((url) => {
+            const requested = String(url);
+            if (requested.endsWith("/seasons")) return response(SEASONS);
+            if (requested.includes("/week/notes/1")) return response({ note_md: null, status: "missing" });
+            if (requested.includes("/week")) return response(recap(2026, 1));
+            throw new Error(`Unexpected request: ${requested}`);
+        }, "/fantasy/week/?season=2026&week=1");
 
+        await waitFor(() => !document.getElementById("weekView").hidden);
+        document.querySelector(".grade__toggle").click();
         await waitFor(() =>
-            document.querySelector(".grade__note-body").textContent.includes("newly")
+            document.querySelector(".grade__note-body").textContent.includes("Tuesday")
         );
-        const post = requests.find((request) => request.method === "POST");
-        expect(post.url).toContain("season=2026");
-        expect(post.url).toContain("week=1");
-        expect(post.url).toContain("force=true");
     });
 
     test("a lineup that could not be scored says why instead of showing zero", async () => {

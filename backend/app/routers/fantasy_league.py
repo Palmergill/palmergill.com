@@ -12,15 +12,13 @@ Basic`` — which some browsers surface as a native credential modal on a
 ``fetch()``. A JSON 403 lets the page render "sign in to view the league"
 instead. This mirrors how ``POST /api/fantasy/admin/refresh`` already works.
 """
-from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 
-from app.accounts import ROLE_ADMIN
-from app.database import SessionLocal, get_db, utc_now
+from app.database import get_db
 from app.services import (
     fantasy_ai,
     fantasy_league_data,
@@ -30,7 +28,6 @@ from app.services import (
 from app.services.fantasy_league_data import UnknownSeasonError, UnknownTeamError
 from app.services.fantasy_league_draft import DraftUnavailable
 from app.services.fantasy_league_rankings import ALGORITHMS
-from app.routers.fantasy import run_blocking
 
 router = APIRouter(prefix="/api/fantasy/league", tags=["fantasy-league"])
 
@@ -38,11 +35,6 @@ router = APIRouter(prefix="/api/fantasy/league", tags=["fantasy-league"])
 class LeagueTeamSelectionRequest(BaseModel):
     season: int
     espn_team_id: int
-
-
-# A forced rewrite bypasses the fact-digest cache and spends a model call, so
-# one note can be rewritten at most this often.
-REWRITE_COOLDOWN_SECONDS = 10 * 60
 
 
 def require_member(request: Request) -> Dict[str, Any]:
@@ -53,22 +45,6 @@ def require_member(request: Request) -> Dict[str, Any]:
     if not identity:
         raise HTTPException(status_code=403, detail="Sign in to view the league hub.")
     return identity
-
-
-def _check_rewrite_cooldown(identity: Dict[str, Any], existing: Dict[str, Any]) -> None:
-    """Refuse a forced rewrite of a note that was written moments ago."""
-    if identity.get("role") == ROLE_ADMIN or not existing.get("generated_at"):
-        return
-    generated_at = datetime.fromisoformat(existing["generated_at"])
-    if generated_at.tzinfo is not None:
-        generated_at = generated_at.astimezone(timezone.utc).replace(tzinfo=None)
-    age = (utc_now() - generated_at).total_seconds()
-    if age < REWRITE_COOLDOWN_SECONDS:
-        wait = max(1, int((REWRITE_COOLDOWN_SECONDS - age) // 60) + 1)
-        raise HTTPException(
-            status_code=429,
-            detail=f"This recap was just written. Try a rewrite again in {wait} min.",
-        )
 
 
 def _member_username(identity: Dict[str, Any]) -> str:
@@ -397,46 +373,9 @@ def week_note(
     _: Dict[str, Any] = Depends(require_member),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
-    """Read a stored weekly recap. Never generates — see the POST."""
+    """Read a stored weekly recap. Only the Tuesday scheduler writes them."""
     try:
         return fantasy_ai.read_week_note(db, season, week, team_id)
-    except UnknownSeasonError as exc:
-        raise HTTPException(status_code=404, detail=str(exc))
-    except fantasy_ai.UnknownWeekTeamError as exc:
-        raise HTTPException(status_code=404, detail=str(exc))
-
-
-@router.post("/week/notes/{team_id}", status_code=201)
-async def write_week_note(
-    team_id: int,
-    season: Optional[int] = None,
-    week: Optional[int] = None,
-    force: bool = False,
-    identity: Dict[str, Any] = Depends(require_member),
-    db: Session = Depends(get_db),
-) -> Dict[str, Any]:
-    """Write one team's weekly recap, reusing an unchanged one."""
-    if force:
-        try:
-            _check_rewrite_cooldown(identity, fantasy_ai.read_week_note(db, season, week, team_id))
-        except UnknownSeasonError as exc:
-            raise HTTPException(status_code=404, detail=str(exc))
-        except fantasy_ai.UnknownWeekTeamError as exc:
-            raise HTTPException(status_code=404, detail=str(exc))
-
-    def _generate() -> Dict[str, Any]:
-        # Own session: the request-scoped one belongs to the event loop, and
-        # SQLAlchemy sessions are not safe to hand to another thread.
-        worker = SessionLocal()
-        try:
-            return fantasy_ai.generate_week_note(
-                worker, season, week, team_id, force=force
-            )
-        finally:
-            worker.close()
-
-    try:
-        return await run_blocking(_generate)
     except UnknownSeasonError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
     except fantasy_ai.UnknownWeekTeamError as exc:
@@ -471,41 +410,10 @@ def draft_note(
     _: Dict[str, Any] = Depends(require_member),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
-    """Read a stored draft recap. Never generates — see the POST."""
+    """Read a stored draft recap. Only the Tuesday scheduler writes them."""
     resolved = _resolved_draft_season(db, season)
     try:
         return fantasy_ai.read_draft_note(db, resolved, team_id)
-    except fantasy_ai.UnknownDraftTeamError as exc:
-        raise HTTPException(status_code=404, detail=str(exc))
-
-
-@router.post("/draft/notes/{team_id}", status_code=201)
-async def write_draft_note(
-    team_id: int,
-    season: Optional[int] = None,
-    force: bool = False,
-    identity: Dict[str, Any] = Depends(require_member),
-    db: Session = Depends(get_db),
-) -> Dict[str, Any]:
-    """Write one team's draft recap, reusing an unchanged one."""
-    resolved = _resolved_draft_season(db, season)
-    if force:
-        try:
-            _check_rewrite_cooldown(identity, fantasy_ai.read_draft_note(db, resolved, team_id))
-        except fantasy_ai.UnknownDraftTeamError as exc:
-            raise HTTPException(status_code=404, detail=str(exc))
-
-    def _generate() -> Dict[str, Any]:
-        # Own session: the request-scoped one belongs to the event loop, and
-        # SQLAlchemy sessions are not safe to hand to another thread.
-        worker = SessionLocal()
-        try:
-            return fantasy_ai.generate_draft_note(worker, resolved, team_id, force=force)
-        finally:
-            worker.close()
-
-    try:
-        return await run_blocking(_generate)
     except fantasy_ai.UnknownDraftTeamError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
 

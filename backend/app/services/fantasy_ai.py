@@ -1073,13 +1073,13 @@ def read_draft_note(db, season: int, team_id: int) -> Dict[str, Any]:
 
 
 def generate_draft_note(
-    db, season: int, team_id: int, force: bool = False
+    db, season: int, team_id: int
 ) -> Dict[str, Any]:
     """Generate or reuse one team's draft recap, keyed by its facts."""
     context = _draft_note_context(db, season, team_id)
     canonical, digest = _overview_digest(context)
     row = _draft_note_row(db, context["season"], team_id)
-    if _is_fresh(row, digest) and not force:
+    if _is_fresh(row, digest):
         payload = _draft_note_payload(row, cache_hit=True)
         payload["status"] = "current"
         return payload
@@ -1117,6 +1117,31 @@ def generate_draft_note(
     payload = _draft_note_payload(row, cache_hit=False, warnings=warnings)
     payload["status"] = "current"
     return payload
+
+
+def generate_missing_draft_notes(db, season: int) -> Dict[int, str]:
+    """Write a draft recap for every drafted team that has none yet.
+
+    The only writer of draft recaps: the scheduler calls it on Tuesdays. A
+    draft happens once, so a team that already has a recap keeps it even if
+    the ADP board later nudges its grade. Returns each written team's source.
+    """
+    from app.services import fantasy_league_draft
+
+    recap = fantasy_league_draft.get_draft_recap(db, season)
+    written: Dict[int, str] = {}
+    for grade in recap["grades"]:
+        team_id = grade["espn_team_id"]
+        if _draft_note_row(db, season, team_id) is not None:
+            continue
+        try:
+            payload = generate_draft_note(db, season, team_id)
+        except Exception:  # noqa: BLE001 — one team must not sink the league
+            logger.exception("Draft recap failed for team %s", team_id)
+            db.rollback()
+            continue
+        written[team_id] = payload["source"]
+    return written
 
 
 # ── weekly recap notes ─────────────────────────────────────────────────
@@ -1260,13 +1285,13 @@ def read_week_note(
 
 
 def generate_week_note(
-    db, season: int, week: Optional[int], team_id: int, force: bool = False
+    db, season: int, week: Optional[int], team_id: int
 ) -> Dict[str, Any]:
     """Generate or reuse one team's weekly recap, keyed by its facts."""
     context = _week_note_context(db, season, week, team_id)
     canonical, digest = _overview_digest(context)
     row = _week_note_row(db, context["season"], context["week"], team_id)
-    if _is_fresh(row, digest) and not force:
+    if _is_fresh(row, digest):
         payload = _week_note_payload(row, cache_hit=True)
         payload["status"] = "current"
         return payload
@@ -1306,6 +1331,30 @@ def generate_week_note(
     payload = _week_note_payload(row, cache_hit=False, warnings=warnings)
     payload["status"] = "current"
     return payload
+
+
+def generate_week_notes(db, season: int, week: int) -> Dict[int, str]:
+    """Write every team's recap of one completed week.
+
+    The only writer of weekly recaps: the scheduler calls it on Tuesday
+    morning, once Monday night's game has settled the week. Returns each
+    team's source. A team with no result that week is skipped, and one team
+    failing does not stop the rest.
+    """
+    from app.services import fantasy_league_data
+
+    written: Dict[int, str] = {}
+    for team in fantasy_league_data._team_rows(db, season):
+        try:
+            payload = generate_week_note(db, season, week, team.espn_team_id)
+        except UnknownWeekTeamError:
+            continue
+        except Exception:  # noqa: BLE001 — one team must not sink the league
+            logger.exception("Weekly recap failed for team %s", team.espn_team_id)
+            db.rollback()
+            continue
+        written[team.espn_team_id] = payload["source"]
+    return written
 
 
 # ── topic guard ─────────────────────────────────────────────────────────

@@ -118,39 +118,43 @@ describe("draft recap controller", () => {
         expect(document.querySelector("#seasonChips .chip--active").textContent).toBe("2025");
     });
 
-    test("loads a stored note and forces the Rewrite action", async () => {
+    test("shows the stored note with no way to write or rewrite one", async () => {
         const requests = [];
-        const fetchMock = boot((url, options = {}) => {
+        boot((url, options = {}) => {
             const requested = String(url);
             requests.push({ url: requested, method: options.method || "GET" });
-            if (requested.endsWith("/seasons")) {
-                return response({
-                    seasons: [{ season: 2026, status: "ok", available: true }],
-                });
-            }
-            if (requested.includes("/draft/notes/1")) {
-                if (options.method === "POST") {
-                    return response({ note_md: "A newly written recap." });
-                }
-                return response({ note_md: "A stored recap." });
-            }
+            if (requested.endsWith("/seasons")) return response({ seasons: [{ season: 2026, status: "ok", available: true }] });
+            if (requested.includes("/draft/notes/1")) return response({ note_md: "A stored recap." });
             if (requested.includes("/draft")) return response(recap(2026));
             throw new Error(`Unexpected request: ${requested}`);
         }, "/fantasy/draft-recap/?season=2026");
 
         await waitFor(() => !document.getElementById("draftView").hidden);
         document.querySelector(".grade__toggle").click();
-        await waitFor(() => document.querySelector(".grade__note-body").textContent.includes("stored"));
+        await waitFor(() =>
+            document.querySelector(".grade__note-body").textContent.includes("stored")
+        );
 
-        const rewrite = document.querySelector(".grade__note .button");
-        expect(rewrite.textContent).toBe("Rewrite");
-        rewrite.click();
-
-        await waitFor(() => document.querySelector(".grade__note-body").textContent.includes("newly"));
-        const post = requests.find((request) => request.method === "POST");
-        expect(post.url).toContain("season=2026");
-        expect(post.url).toContain("force=true");
-        expect(fetchMock).toHaveBeenCalled();
+        // The Tuesday scheduler is the only writer; the page never asks.
+        expect(requests.filter((request) => request.method !== "GET")).toHaveLength(0);
+        expect(document.querySelector(".grade__note button")).toBeNull();
     });
+
+    test("says when a missing note will be written", async () => {
+        boot((url) => {
+            const requested = String(url);
+            if (requested.endsWith("/seasons")) return response({ seasons: [{ season: 2026, status: "ok", available: true }] });
+            if (requested.includes("/draft/notes/1")) return response({ note_md: null, status: "missing" });
+            if (requested.includes("/draft")) return response(recap(2026));
+            throw new Error(`Unexpected request: ${requested}`);
+        }, "/fantasy/draft-recap/?season=2026");
+
+        await waitFor(() => !document.getElementById("draftView").hidden);
+        document.querySelector(".grade__toggle").click();
+        await waitFor(() =>
+            document.querySelector(".grade__note-body").textContent.includes("Tuesday")
+        );
+    });
+
 });
 

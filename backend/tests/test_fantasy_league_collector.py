@@ -575,6 +575,16 @@ def test_league_jobs_are_refreshable():
 # ── the scheduling gate ─────────────────────────────────────────────────
 
 
+@pytest.fixture(autouse=True)
+def no_tuesday_writers(monkeypatch):
+    """run_scheduled reads the wall clock; on a real Tuesday it would write
+    overviews and recaps into tables other suites count. Those writers have
+    their own tests (test_fantasy_weekly_overviews.py)."""
+    monkeypatch.setattr(fc, "_write_weekly_overviews", lambda db, season, now: None)
+    monkeypatch.setattr(fc, "_write_week_notes", lambda db, season, now: [])
+    monkeypatch.setattr(fc, "_write_draft_notes", lambda db, season, now: False)
+
+
 def defer_non_league_jobs(db):
     """Push every non-league job past its next-due stamp.
 
