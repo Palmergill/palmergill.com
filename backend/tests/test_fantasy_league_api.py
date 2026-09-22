@@ -594,10 +594,29 @@ def test_a_later_week_keeps_showing_the_last_overview_written(seeded_db, monkeyp
     assert body["week"] == 1
 
 
-def test_the_overview_context_carries_last_week_and_next_week(seeded_db):
+def test_the_overview_is_about_the_team_not_a_week(seeded_db):
     context = fantasy_ai._team_overview_context(seeded_db, 2024, 1, 1)
-    assert context["last_result"]["week"] == 1
-    assert context["next_matchup"]["week"] == 2
+    # No game-by-game recap: the page no longer reads week by week.
+    assert "last_result" not in context
+    assert "next_matchup" not in context
+    assert "results" not in context
+    assert set(context["moves"]) == {"pickups", "trades"}
+    assert "rooms" in context and "need" in context
+
+
+def test_the_local_overview_has_the_team_and_its_moves(seeded_db, monkeypatch):
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    body = fantasy_ai.generate_team_overview(seeded_db, 2024, 1, 2)
+    assert "**The team**" in body["overview_md"]
+    assert "**Moves to consider**" in body["overview_md"]
+    assert "Last week" not in body["overview_md"]
+
+
+def test_moves_route_answers_for_a_team(seeded_db):
+    body = member_client().get("/api/fantasy/league/teams/1/moves?season=2024").json()
+    assert body["espn_team_id"] == 1
+    assert {"pickups", "trades", "available"} <= set(body)
+    assert TestClient(app).get("/api/fantasy/league/teams/1/moves").status_code == 403
 
 
 def test_team_overview_reuses_model_plumbing_without_tools(seeded_db, monkeypatch):

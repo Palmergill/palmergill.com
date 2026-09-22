@@ -14,7 +14,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/shared/site-nav.css?v=14">
     <link rel="stylesheet" href="/shared/fantasy-header.css?v=2">
-    <link rel="stylesheet" href="style.css?v=27">
+    <link rel="stylesheet" href="style.css?v=28">
 </head>
 <body>
 <noscript>
@@ -109,7 +109,7 @@
             <section id="teamView" class="team-view" hidden aria-labelledby="leagueName">
                 <button type="button" class="back-link" id="teamBack">← All teams</button>
 
-                <!-- The lede and the record, side by side. The overview used
+                <!-- The lede and the numbers, side by side. The overview used
                      to sit in a grey box below the numbers, which is where
                      writing goes to be skipped. -->
                 <div class="dossier">
@@ -121,6 +121,19 @@
                     </div>
                     <dl class="colophon" id="teamColophon"></dl>
                 </div>
+
+                <!-- Moves: the pickups and trades the roster-power board
+                     prices as upgrades. The team as it stands, not a week. -->
+                <section class="board" data-board="moves" aria-labelledby="teamMovesTitle">
+                    <div class="board__head">
+                        <div>
+                            <h2 id="teamMovesTitle">Moves to consider</h2>
+                            <p class="board__lede" id="movesLede"></p>
+                        </div>
+                        <span class="board__note">Projected points a game</span>
+                    </div>
+                    <div class="moves" id="teamMoves"></div>
+                </section>
 
                 <!-- Start/sit: the lineup as set, against the best one this
                      roster could field for the week. An aside here, because on
@@ -138,13 +151,6 @@
                     <p class="lineup__note" id="lineupNote"></p>
                 </section>
 
-                <section class="board" data-board="season" aria-labelledby="teamResultsTitle">
-                    <div class="board__head">
-                        <h2 id="teamResultsTitle">The season, week by week</h2>
-                        <span class="board__note">Bar is the margin</span>
-                    </div>
-                    <div class="season" id="teamResults"></div>
-                </section>
 
                 <section class="board" data-board="rooms" aria-labelledby="teamRosterTitle">
                     <div class="board__head">
@@ -290,6 +296,6 @@
     <script src="/shared/analytics.js?v=1"></script>
     <script src="/shared/api-base.js?v=1"></script>
     <script src="format.js?v=13"></script>
-    <script src="app.js?v=26"></script>
+    <script src="app.js?v=28"></script>
 </body>
 </html>

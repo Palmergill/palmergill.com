@@ -531,47 +531,61 @@ button:focus-visible {
     color: var(--muted, #928a7d);
 }
 
-/* ── the season, week by week ─────────────────────────────────────── */
+/* ── moves to consider ────────────────────────────────────────────── */
 
-.season__wk {
+.moves { display: grid; gap: 22px; }
+
+.moves__group h3 {
+    margin: 0 0 8px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--muted, #928a7d);
+}
+
+.moves__list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
     display: grid;
-    grid-template-columns: 42px 26px minmax(0, 1fr) 96px minmax(110px, 168px);
+    gap: 8px;
+}
+
+.move {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
     align-items: center;
     gap: 12px;
-    padding: 8px 0;
-    border-bottom: 1px solid var(--line, #ece4d8);
-    font-size: 13px;
+    padding: 10px 12px;
+    border: 1px solid var(--line, #ece4d8);
+    border-radius: 12px;
+    background: var(--surface, #f3eee5);
 }
 
-.season__wk:last-child { border-bottom: none; }
-.season__wk--bye { color: var(--muted, #928a7d); }
+.move__side { min-width: 0; }
+.move__side--in .lineup__label { color: #3f6d4a; }
+.move__side--out .lineup__label { color: #8c3a1f; }
 
-.season__n {
-    font-size: 12px;
-    color: var(--muted, #928a7d);
-    font-variant-numeric: tabular-nums;
-    white-space: nowrap;
-}
-
-.season__outcome { font-weight: 700; }
-.season__outcome--w { color: var(--sage, #5b7152); }
-.season__outcome--l { color: var(--clay, #b96a4b); }
-.season__outcome--t,
-.season__outcome--bye,
-.season__outcome--pending { color: var(--muted, #928a7d); }
-
-.season__opp {
-    color: var(--soft, #5d574e);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.season__opp small { color: var(--muted, #928a7d); }
-
-.season__score {
+.move__gain {
     text-align: right;
+    font-size: 13px;
+    font-weight: 700;
+    color: #3f6d4a;
     font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.move__gain small {
+    display: block;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--muted, #928a7d);
+}
+
+@media (max-width: 620px) {
+    .move { grid-template-columns: minmax(0, 1fr); gap: 6px; }
+    .move__gain { text-align: left; }
 }
 
 /* ── the roster, by room ──────────────────────────────────────────── */
@@ -901,11 +915,6 @@ button:focus-visible {
     .app-shell { padding: 20px var(--shell-pad) 60px; }
     .dossier__foot { align-items: flex-start; flex-direction: column; }
 
-    /* A margin bar needs room either side of its zero rule; below this the
-       week, the outcome and the opponent are the readable part. */
-    .season__wk { grid-template-columns: 42px 26px minmax(0, 1fr); }
-    .season__score,
-    .season .dv { display: none; }
 }
 
 /* Reading a finished season is a different act from reading the live one,

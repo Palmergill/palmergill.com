@@ -243,6 +243,22 @@ def team_roster(
         raise HTTPException(status_code=404, detail=str(exc))
 
 
+@router.get("/teams/{team_id}/moves")
+def team_moves(
+    team_id: int,
+    season: Optional[int] = None,
+    _: Dict[str, Any] = Depends(require_member),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """Suggested waiver pickups and trade ideas for one team."""
+    try:
+        return fantasy_league_data.get_team_moves(db, season, team_id)
+    except UnknownSeasonError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except UnknownTeamError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+
+
 @router.get("/roster-power")
 def roster_power(
     season: Optional[int] = None,

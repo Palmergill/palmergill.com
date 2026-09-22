@@ -121,6 +121,7 @@ function routes(overrides = {}) {
         "/teams/1/roster": ROSTER,
         "/teams/1/lineup": lineup(),
         "/teams/1/rooms": rooms(),
+        "/teams/1/moves": { available: false, unavailable_reason: "missing_projections", pickups: [], trades: [] },
         "/teams/1/overview": { status: "missing" },
         "/teams/1": TEAM,
         "/overview": OVERVIEW,
@@ -431,12 +432,13 @@ describe("the colophon", () => {
         // Second of the two rated teams on all-play.
         expect(subFor("All-play")).toBe("2nd of 2");
         expect(subFor("Lineup")).toBe("+0.7 wins on luck");
-        // Four team routes and no fifth: the ledger was already in hand.
+        // The team's own routes and no more: the ledger was already in hand.
         expect(teamRequests()).toEqual([
             "/teams/1",
             "/teams/1/roster",
             "/teams/1/lineup",
             "/teams/1/rooms",
+            "/teams/1/moves",
             "/teams/1/overview",
         ]);
     });
@@ -488,77 +490,66 @@ describe("the lede", () => {
     });
 });
 
-describe("the season, week by week", () => {
-    const week = (overrides = {}) => ({
-        week: 1,
-        is_bye: false,
-        is_complete: true,
-        outcome: "W",
-        points: 120.0,
-        opponent_points: 99.0,
-        margin: 21.0,
-        opponent: { espn_team_id: 2, name: "Rivals", abbrev: "RIV", wins: 4, losses: 8, ties: 0 },
-        ...overrides,
-    });
-
-    const weeks = async (results) => {
-        await openTeam(routes({ "/teams/1": Object.assign({}, TEAM, { results }) }));
-        await waitFor(() => document.querySelectorAll("#teamResults .season__wk").length > 0);
-        return [...document.querySelectorAll("#teamResults .season__wk")];
+describe("moves to consider", () => {
+    const MOVES = {
+        available: true,
+        need: { seat: "WR2", slot: "WR", ppg: 6.0, league_average: 11.0 },
+        pickups: [
+            {
+                add: { name: "Free Agent", position: "WR", pro_team: "NYJ", ppg: 8.5 },
+                replaces: { name: "Weak Starter", ppg: 6.0 },
+                slot: "WR",
+                gain: 2.5,
+                drop: { name: "Bench Guy", position: "WR", pro_team: "KC", ppg: 3.0 },
+            },
+        ],
+        trades: [
+            {
+                partner: { espn_team_id: 2, name: "Rivals" },
+                give: { name: "Spare Back", position: "RB", pro_team: "KC", ppg: 12.0 },
+                get: { name: "Their Receiver", position: "WR", pro_team: "DAL", ppg: 11.5 },
+                my_gain: 5.5,
+                their_gain: 5.0,
+            },
+        ],
     };
 
-    test("names the opponent and the record it carried", async () => {
-        const rows = await weeks([week()]);
-        expect(rows[0].querySelector(".season__opp").textContent).toBe("Rivals · 4-8");
-        expect(rows[0].querySelector(".season__score").textContent).toBe("120.0–99.0");
+    const moveRows = async (moves) => {
+        await openTeam(routes({ "/teams/1/moves": moves }));
+        await waitFor(() => document.getElementById("teamMoves").children.length > 0);
+        return [...document.querySelectorAll("#teamMoves .move")];
+    };
+
+    test("there is no week-by-week board any more", () => {
+        document.body.innerHTML = bodySource;
+        expect(document.getElementById("teamResults")).toBeNull();
+        expect(document.getElementById("teamMoves")).not.toBeNull();
     });
 
-    test("puts every margin on one scale, so the weeks are comparable", async () => {
-        const rows = await weeks([
-            week({ week: 1, margin: 20.0 }),
-            week({ week: 2, outcome: "L", points: 90.0, opponent_points: 130.0, margin: -40.0 }),
-        ]);
-
-        const bars = rows.map((row) => row.querySelector(".dv__bar"));
-        expect(bars[0].className).toContain("dv__bar--positive");
-        expect(bars[1].className).toContain("dv__bar--negative");
-        // Half the reach of the biggest margin in the season.
-        expect(parseFloat(bars[0].style.width)).toBeCloseTo(
-            parseFloat(bars[1].style.width) / 2
-        );
+    test("lists a pickup with its drop and a trade with its partner", async () => {
+        const rows = await moveRows(MOVES);
+        expect(rows).toHaveLength(2);
+        expect(rows[0].textContent).toContain("Free Agent");
+        expect(rows[0].textContent).toContain("Bench Guy");
+        expect(rows[0].querySelector(".move__gain").textContent).toContain("+2.5");
+        expect(rows[1].textContent).toContain("Get from Rivals");
+        expect(rows[1].textContent).toContain("Their Receiver");
+        expect(rows[1].textContent).toContain("Spare Back");
+        expect(document.getElementById("movesLede").textContent).toContain("WR2");
     });
 
-    test("a bye has no opponent, no score and no bar", async () => {
-        const rows = await weeks([
-            week({ week: 1, is_bye: true, outcome: null, points: null, opponent_points: null, margin: null, opponent: null }),
-        ]);
-
-        expect(rows[0].querySelector(".season__outcome").textContent).toBe("BYE");
-        expect(rows[0].querySelector(".dv__bar")).toBeNull();
+    test("says so when nothing clearly upgrades the roster", async () => {
+        await openTeam(routes({ "/teams/1/moves": { available: true, need: null, pickups: [], trades: [] } }));
+        await waitFor(() => document.getElementById("teamMoves").textContent.includes("No pickup"));
+        expect(document.querySelectorAll("#teamMoves .move")).toHaveLength(0);
     });
 
-    test("a week not yet played prints a dash, not a result", async () => {
-        const rows = await weeks([
-            week({ week: 3, is_complete: false, outcome: null, points: null, opponent_points: null, margin: null }),
-        ]);
-
-        expect(rows[0].querySelector(".season__outcome").textContent).toBe("—");
-        expect(rows[0].querySelector(".season__score").textContent).toBe("—");
-        // Not even the axis: a zero rule under an unplayed week reads as a
-        // result, and divergingBar cannot tell a missing margin from a tie.
-        expect(rows[0].querySelector(".dv__zero")).toBeNull();
-    });
-
-    test("a tie keeps the axis it sits on", async () => {
-        const rows = await weeks([
-            week({ outcome: "T", points: 110.0, opponent_points: 110.0, margin: 0 }),
-        ]);
-
-        expect(rows[0].querySelector(".dv__zero")).not.toBeNull();
-        expect(rows[0].querySelector(".dv__bar")).toBeNull();
+    test("a failed moves read leaves the rest of the page standing", async () => {
+        await openTeam(routes({ "/teams/1/moves": response({}, 500) }));
+        await waitFor(() => document.getElementById("teamMoves").textContent.includes("projections"));
+        expect(document.getElementById("errorBanner").hidden).toBe(true);
     });
 });
-
 describe("the roster, by room", () => {
     const ENTRIES = [
         { player_id: "wr1", name: "Split End", position: "WR", lineup_slot: "WR", matched: true, props: [], recent_actuals: [] },

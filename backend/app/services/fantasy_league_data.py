@@ -34,6 +34,7 @@ from app.database import (
 )
 from app.services import fantasy_data
 from app.services import fantasy_league_advanced
+from app.services import fantasy_league_moves
 from app.services import fantasy_league_roster_power as roster_power
 from app.services.fantasy_collector import latest_successful_run
 from app.services.fantasy_league_espn import ESPN_LINEUP_SLOTS, configured_league_id
@@ -1774,11 +1775,49 @@ def get_roster_power(
         "projection_as_of": _iso(as_of),
         "unmatched": unmatched,
         "replacements": {
-            position: {"name": player.get("name"), "ppg": round(player["ppg"], 1)}
+            position: {
+                "player_id": player.get("player_id"),
+                "name": player.get("name"),
+                "position": player["position"],
+                "pro_team": player.get("pro_team"),
+                "ppg": round(player["ppg"], 1),
+            }
             for position, player in sorted(replacements.items())
         },
         "teams": teams,
     }
+
+
+def get_team_moves(
+    db: Session, season: Optional[int], team_id: int, scoring: str = LEAGUE_SCORING
+) -> Dict[str, Any]:
+    """Suggested pickups and trade ideas for one team.
+
+    Read off the roster-power board, so a move is priced in the same
+    projected points per game as the power rankings. See
+    ``fantasy_league_moves`` for what counts as worth suggesting.
+    """
+    season = _require_season(db, season)
+    _require_team(db, season, team_id)
+    board = get_roster_power(db, season=season, scoring=scoring)
+    base = {
+        "season": season,
+        "espn_team_id": team_id,
+        "week": board.get("week"),
+        "projection_as_of": board.get("projection_as_of"),
+        "roster_as_of": board.get("roster_as_of"),
+    }
+    if not board.get("available"):
+        return {
+            **base,
+            "available": False,
+            "unavailable_reason": board.get("unavailable_reason"),
+            "need": None,
+            "surplus": [],
+            "pickups": [],
+            "trades": [],
+        }
+    return {**base, **fantasy_league_moves.team_moves(team_id, board, SLOT_ELIGIBILITY)}
 
 
 def _matchup_dicts(db: Session, season: int) -> List[Dict[str, Any]]:

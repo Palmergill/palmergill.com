@@ -119,7 +119,9 @@ JOB_INTERVALS_SECONDS = {
 OVERVIEW_WEEKDAY = 1  # Tuesday
 OVERVIEW_HOUR_UTC = 12
 OVERVIEW_LAST_CATCH_UP_WEEKDAY = 5  # Saturday
-_OVERVIEW_META_PREFIX = "overviews:"
+# "v2": overviews became about the team and its moves (Sep 2026), so the
+# weeks already written in the old recap format are written again once.
+_OVERVIEW_META_PREFIX = "overviews:v2:"
 _WEEK_NOTES_META_PREFIX = "week_notes:"
 _DRAFT_NOTES_META_PREFIX = "draft_notes:"
 
