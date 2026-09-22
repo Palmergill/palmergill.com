@@ -718,20 +718,6 @@ describe("the signed-out front door", () => {
         await waitFor(() => !document.getElementById("signedOutView").hidden);
 
         expect(document.getElementById("signInLink").getAttribute("href")).toContain("/login/");
-        expect(document.getElementById("teaserActions").hidden).toBe(false);
-    });
-
-    test("a signed-in stranger is told the league is private, not to sign in", async () => {
-        const notMember = { "X-Fantasy-League-Access": "not-member" };
-        boot({
-            fetch: (target) =>
-                target.includes("/overview") ? response({}, 403, notMember) : null,
-        });
-        await waitFor(() => !document.getElementById("signedOutView").hidden);
-
-        expect(document.getElementById("teaserTitle").textContent).toBe("This league is private");
-        expect(document.getElementById("teaserLede").textContent).toContain("member list");
-        expect(document.getElementById("teaserActions").hidden).toBe(true);
     });
 
     test("the pitch describes one private league, not a league of your own", () => {
@@ -739,7 +725,7 @@ describe("the signed-out front door", () => {
         const lede = document.getElementById("teaserLede").textContent;
         expect(lede).toContain("one private ESPN league");
         expect(lede).not.toContain("open yours");
-        expect(document.querySelector('#signedOutView a[href="/signup/"]')).toBeNull();
+        expect(document.querySelector('#signedOutView a[href="/signup/"]')).not.toBeNull();
     });
 });
 

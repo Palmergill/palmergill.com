@@ -2,8 +2,8 @@
 
 Unlike the rest of /api/fantasy, which serves anonymous demo callers because
 its data is free and public, these endpoints expose a private league: real
-managers' names, their rosters, and their results. Signup is public, so every
-route requires an admin or an account named in ``FANTASY_LEAGUE_MEMBERS``.
+managers' names, their rosters, and their results. Every route requires a
+signed-in account.
 
 The membership check lives here rather than in the transport layer on
 purpose. ``/api/fantasy`` is a demo prefix at the edge and in main.py, and a
@@ -12,9 +12,8 @@ Basic`` — which some browsers surface as a native credential modal on a
 ``fetch()``. A JSON 403 lets the page render "sign in to view the league"
 instead. This mirrors how ``POST /api/fantasy/admin/refresh`` already works.
 """
-import os
 from datetime import datetime, timezone
-from typing import Any, Dict, Optional, Set
+from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
@@ -41,46 +40,18 @@ class LeagueTeamSelectionRequest(BaseModel):
     espn_team_id: int
 
 
-# Tells the page which 403 it got, so a signed-in stranger is not told to
-# sign in again.
-ACCESS_HEADER = "X-Fantasy-League-Access"
-
 # A forced rewrite bypasses the fact-digest cache and spends a model call, so
 # one note can be rewritten at most this often.
 REWRITE_COOLDOWN_SECONDS = 10 * 60
 
 
-def league_members() -> Set[str]:
-    """Usernames allowed into the league, from ``FANTASY_LEAGUE_MEMBERS``.
-
-    Signup is public, so being signed in is not enough: the league holds
-    real managers' names and rosters. Unset means admins only — the gate
-    fails closed.
-    """
-    raw = os.getenv("FANTASY_LEAGUE_MEMBERS", "")
-    return {name.strip().lower() for name in raw.split(",") if name.strip()}
-
-
 def require_member(request: Request) -> Dict[str, Any]:
-    """Admins and allowlisted accounts may read the league; nobody else."""
-    identity = None
-    if not getattr(request.state, "demo_mode", False):
-        identity = getattr(request.state, "app_user", None)
+    """Any signed-in account may read the league; anonymous callers may not."""
+    if getattr(request.state, "demo_mode", False):
+        raise HTTPException(status_code=403, detail="Sign in to view the league hub.")
+    identity = getattr(request.state, "app_user", None)
     if not identity:
-        raise HTTPException(
-            status_code=403,
-            detail="Sign in to view the league hub.",
-            headers={ACCESS_HEADER: "signed-out"},
-        )
-    if identity.get("role") == ROLE_ADMIN:
-        return identity
-    username = str(identity.get("username") or identity.get("name") or "").lower()
-    if username not in league_members():
-        raise HTTPException(
-            status_code=403,
-            detail="This league is private, and your account is not on its member list.",
-            headers={ACCESS_HEADER: "not-member"},
-        )
+        raise HTTPException(status_code=403, detail="Sign in to view the league hub.")
     return identity
 
 

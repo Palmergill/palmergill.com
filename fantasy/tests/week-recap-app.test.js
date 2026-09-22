@@ -306,20 +306,3 @@ describe("weekly recap controller", () => {
     });
 });
 
-
-describe("a signed-in account the league does not list", () => {
-    afterEach(() => {
-        document.body.innerHTML = "";
-        jest.restoreAllMocks();
-    });
-
-    test("is told the league is private, with no sign-in loop", async () => {
-        boot(() =>
-            response({ detail: "private" }, 403, { "X-Fantasy-League-Access": "not-member" })
-        );
-        await waitFor(() => !document.getElementById("signedOutView").hidden);
-        const view = document.getElementById("signedOutView");
-        expect(view.querySelector("h2").textContent).toBe("This league is private");
-        expect(view.querySelector(".signed-out__actions").hidden).toBe(true);
-    });
-});

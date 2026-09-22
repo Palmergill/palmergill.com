@@ -40,7 +40,6 @@ def auth_env(monkeypatch):
     monkeypatch.setenv("APP_AUTH_USERNAME", ADMIN_USERNAME)
     monkeypatch.setenv("APP_AUTH_PASSWORD", ADMIN_PASSWORD)
     monkeypatch.setenv("ESPN_LEAGUE_ID", "225965")
-    monkeypatch.setenv("FANTASY_LEAGUE_MEMBERS", "taylor")
 
 
 @pytest.fixture

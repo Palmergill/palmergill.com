@@ -54,25 +54,24 @@
              about the season and this is a reply to something you clicked. -->
         <p id="routeBanner" class="banner" role="status" hidden></p>
 
-        <!-- Shown when the API returns 403: not signed in, or signed in but
-             not on the league's member list (app.js rewrites it for the
-             second case). This is now the
+        <!-- Shown when the API returns 403: not signed in. This is now the
              section's front door, so it has to say what is behind it rather
              than only that the door is locked — and it has to offer the one
              thing that works signed out, which is the league-agnostic
              market board. -->
         <section id="signedOutView" class="teaser" hidden>
             <div class="teaser__pitch">
-                <span class="eyebrow">Members only</span>
-                <h2 id="teaserTitle">A league that reads itself</h2>
+                <span class="eyebrow">Sign in to read it</span>
+                <h2>A league that reads itself</h2>
                 <p class="teaser__lede" id="teaserLede">
                     This hub keeps one private ESPN league's season: standings and
                     power rankings from the rosters rather than the results, a start/sit
                     call on each lineup, who is genuinely claimable, and a weekly
-                    recap worth reading. League managers can sign in to open it.
+                    recap worth reading. Sign in to open it.
                 </p>
-                <div class="signed-out__actions" id="teaserActions">
+                <div class="signed-out__actions">
                     <a class="button" id="signInLink" href="/login/">Sign in</a>
+                    <a class="button button--quiet" href="/signup/">Create an account</a>
                 </div>
             </div>
             <ul class="teaser__list">
@@ -291,6 +290,6 @@
     <script src="/shared/analytics.js?v=1"></script>
     <script src="/shared/api-base.js?v=1"></script>
     <script src="format.js?v=13"></script>
-    <script src="app.js?v=25"></script>
+    <script src="app.js?v=26"></script>
 </body>
 </html>

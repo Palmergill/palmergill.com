@@ -85,7 +85,6 @@ def auth_env(monkeypatch):
     monkeypatch.setenv("APP_AUTH_USERNAME", ADMIN_USERNAME)
     monkeypatch.setenv("APP_AUTH_PASSWORD", ADMIN_PASSWORD)
     monkeypatch.setenv("ESPN_LEAGUE_ID", "225965")
-    monkeypatch.setenv("FANTASY_LEAGUE_MEMBERS", "taylor")
 
 
 @pytest.fixture
@@ -1166,50 +1165,3 @@ def test_free_agents_are_empty_without_a_rankings_run(seeded_db):
     assert body["entries"] == []
     assert body["rostered"] == 1
 
-
-def _stranger_client():
-    """A real, active account that signed up but is not in the league."""
-    db = SessionLocal()
-    try:
-        if accounts.get_user(db, "stranger") is None:
-            accounts.create_user(db, "stranger", "fixture-password-123")
-    finally:
-        db.close()
-    client = TestClient(app)
-    client.cookies.set(
-        SESSION_COOKIE_NAME,
-        create_app_session_token("stranger", ADMIN_PASSWORD, role=ROLE_MEMBER),
-    )
-    return client
-
-
-@pytest.mark.parametrize("route", LEAGUE_ROUTES)
-def test_a_signed_in_stranger_is_refused(seeded_db, route):
-    """Signup is public, so an account alone must not open a private league."""
-    response = _stranger_client().get(route)
-    assert response.status_code == 403
-    assert response.headers["X-Fantasy-League-Access"] == "not-member"
-    assert "sign in" not in response.json()["detail"].lower()
-
-
-def test_a_stranger_cannot_write_notes_either(seeded_db):
-    client = _stranger_client()
-    assert client.post("/api/fantasy/league/week/notes/1?force=true").status_code == 403
-    assert client.post("/api/fantasy/league/draft/notes/1?force=true").status_code == 403
-
-
-def test_an_unset_member_list_admits_admins_only(seeded_db, monkeypatch):
-    monkeypatch.delenv("FANTASY_LEAGUE_MEMBERS", raising=False)
-    route = "/api/fantasy/league/standings"
-    assert member_client().get(route).status_code == 403
-    assert admin_client().get(route).status_code == 200
-
-
-def test_the_member_list_ignores_case_and_spacing(seeded_db, monkeypatch):
-    monkeypatch.setenv("FANTASY_LEAGUE_MEMBERS", " someone , Taylor ")
-    assert member_client().get("/api/fantasy/league/standings").status_code == 200
-
-
-def test_anonymous_refusal_says_signed_out(seeded_db):
-    response = TestClient(app).get("/api/fantasy/league/standings")
-    assert response.headers["X-Fantasy-League-Access"] == "signed-out"
