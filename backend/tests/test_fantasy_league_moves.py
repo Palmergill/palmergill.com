@@ -44,6 +44,7 @@ THEIRS = team(2, [
     player("wr9", "WR", 12.5),
     player("wr8", "WR", 12.0),
     player("wr7", "WR", 11.5),
+    player("wr6", "WR", 10.0),
     player("dst9", "DEF", 7.0),
 ], name="Theirs")
 
@@ -80,15 +81,63 @@ def test_an_empty_seat_takes_the_free_agent_at_full_value():
     assert pickup["drop"]["name"] == "Bench_Wr"
 
 
+REPLACEMENTS = {
+    "QB": fa("fa_qb", "QB", 10.0),
+    "RB": fa("fa_rb", "RB", 5.0),
+    "WR": fa("fa_wr", "WR", 5.0),
+    "TE": fa("fa_te", "TE", 4.0),
+    "DEF": fa("fa_d", "DEF", 5.0),
+}
+
+
 def test_a_trade_needs_both_lineups_to_come_out_ahead():
-    trades = suggest_trades(MINE, [MINE, THEIRS], SLOTS, SLOT_ELIGIBILITY)
+    trades = suggest_trades(MINE, [MINE, THEIRS], SLOTS, SLOT_ELIGIBILITY, REPLACEMENTS)
     assert len(trades) == 1
     trade = trades[0]
     assert trade["partner"]["name"] == "Theirs"
-    # My fourth running back is spare; their third receiver is.
-    assert trade["give"]["position"] == "RB"
-    assert trade["get"]["position"] == "WR"
-    assert trade["my_gain"] >= 0.5 and trade["their_gain"] >= 0.5
+    # My spare running back for their spare receiver.
+    assert [p["position"] for p in trade["give"]] == ["RB"]
+    assert [p["position"] for p in trade["get"]] == ["WR"]
+    assert trade["my_gain"] >= 1.0 and trade["their_gain"] >= 1.0
+    assert trade["my_drop"] is None and trade["their_drop"] is None
+
+
+def test_two_spare_players_can_buy_one_better_one():
+    # Their one tradeable player is a star no single player of mine matches
+    # in value; everyone else they have is replacement level.
+    deep = team(1, [
+        player("qb1", "QB", 20.0),
+        player("rb1", "RB", 15.0),
+        player("rb2", "RB", 14.0),
+        player("rb3", "RB", 13.0),
+        player("rb4", "RB", 11.0),
+        player("wr1", "WR", 13.0),
+        player("wr2", "WR", 6.0),
+        player("dst1", "DEF", 6.0),
+    ])
+    thin = team(2, [
+        player("qb9", "QB", 19.0),
+        player("rb9", "RB", 5.0),
+        player("rb8", "RB", 5.0),
+        player("wr9", "WR", 17.0),
+        player("wr8", "WR", 5.0),
+        player("wr7", "WR", 5.0),
+        player("dst9", "DEF", 7.0),
+    ], name="Thin")
+    trades = suggest_trades(deep, [deep, thin], SLOTS, SLOT_ELIGIBILITY, REPLACEMENTS)
+    assert trades, "expected a trade"
+    trade = trades[0]
+    assert len(trade["give"]) == 2 and len(trade["get"]) == 1
+    assert trade["get"][0]["name"] == "Wr9"
+    # They take two for one, so they cut someone; I do not.
+    assert trade["their_drop"] is not None
+    assert trade["my_drop"] is None
+
+
+def test_a_package_never_exceeds_two_a_side():
+    trades = suggest_trades(MINE, [MINE, THEIRS], SLOTS, SLOT_ELIGIBILITY, REPLACEMENTS)
+    for trade in trades:
+        assert 1 <= len(trade["give"]) <= 2 and 1 <= len(trade["get"]) <= 2
 
 
 def test_no_trade_when_only_one_side_wins():
@@ -96,14 +145,14 @@ def test_no_trade_when_only_one_side_wins():
     rich = team(3, [player("qbx", "QB", 25.0), player("rbx", "RB", 20.0), player("rby", "RB", 19.0),
                     player("wrx", "WR", 18.0), player("wry", "WR", 17.0), player("wrz", "WR", 16.0),
                     player("dstx", "DEF", 9.0)])
-    assert suggest_trades(MINE, [MINE, rich], SLOTS, SLOT_ELIGIBILITY) == []
+    assert suggest_trades(MINE, [MINE, rich], SLOTS, SLOT_ELIGIBILITY, REPLACEMENTS) == []
 
 
 def test_team_moves_reads_one_team_off_the_board():
     board = {
         "slots": SLOTS,
         "teams": [{**MINE, "need": {"seat": "WR2"}, "surplus": []}, THEIRS],
-        "replacements": {"WR": fa("fa_wr", "WR", 8.5)},
+        "replacements": {**REPLACEMENTS, "WR": fa("fa_wr", "WR", 8.5)},
     }
     moves = team_moves(1, board, SLOT_ELIGIBILITY)
     assert moves["available"] is True

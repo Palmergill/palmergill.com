@@ -1025,15 +1025,18 @@
     // Priced off the roster-power board, so a move is worth what it adds to
     // the expected points a week the power rankings already print.
 
-    function moveSide(kind, label, player, fallback) {
+    // One side of a move: a player, several (a trade package), or nobody.
+    function moveSide(kind, label, players, fallback) {
+        const list = (Array.isArray(players) ? players : [players]).filter(Boolean);
         const side = el("div", `move__side move__side--${kind}`);
         side.appendChild(el("span", "lineup__label", label));
-        side.appendChild(el("span", "lineup__name", player ? player.name || "—" : fallback));
-        if (player) {
+        if (!list.length) side.appendChild(el("span", "lineup__name", fallback || "—"));
+        list.forEach((player) => {
+            side.appendChild(el("span", "lineup__name", player.name || "—"));
             const meta = [player.position, player.pro_team].filter(Boolean).join(" · ");
             const ppg = player.ppg == null ? "" : `${F.formatPoints(player.ppg)} a game`;
             side.appendChild(el("span", "lineup__points", [meta, ppg].filter(Boolean).join(" · ")));
-        }
+        });
         return side;
     }
 
@@ -1065,12 +1068,10 @@
         const partner = (trade.partner && trade.partner.name) || "another team";
         row.appendChild(moveSide("in", `Get from ${partner}`, trade.get));
         row.appendChild(moveSide("out", "Give", trade.give));
-        row.appendChild(
-            moveGain(
-                trade.my_gain,
-                `a week for you; +${F.formatPoints(trade.their_gain)} for them`
-            )
-        );
+        const notes = [`a week for you; +${F.formatPoints(trade.their_gain)} for them`];
+        if (trade.my_drop) notes.push(`you cut ${trade.my_drop.name}`);
+        if (trade.their_drop) notes.push(`they cut ${trade.their_drop.name}`);
+        row.appendChild(moveGain(trade.my_gain, notes.join("; ")));
         return row;
     }
 

@@ -506,8 +506,13 @@ describe("moves to consider", () => {
         trades: [
             {
                 partner: { espn_team_id: 2, name: "Rivals" },
-                give: { name: "Spare Back", position: "RB", pro_team: "KC", ppg: 12.0 },
-                get: { name: "Their Receiver", position: "WR", pro_team: "DAL", ppg: 11.5 },
+                give: [
+                    { name: "Spare Back", position: "RB", pro_team: "KC", ppg: 12.0 },
+                    { name: "Spare Tight End", position: "TE", pro_team: "KC", ppg: 6.0 },
+                ],
+                get: [{ name: "Their Receiver", position: "WR", pro_team: "DAL", ppg: 15.5 }],
+                my_drop: null,
+                their_drop: { name: "Their Bench", position: "WR", pro_team: "DAL", ppg: 2.0 },
                 my_gain: 5.5,
                 their_gain: 5.0,
             },
@@ -535,6 +540,9 @@ describe("moves to consider", () => {
         expect(rows[1].textContent).toContain("Get from Rivals");
         expect(rows[1].textContent).toContain("Their Receiver");
         expect(rows[1].textContent).toContain("Spare Back");
+        // A two-for-one names both players it sends and who the other side cuts.
+        expect(rows[1].textContent).toContain("Spare Tight End");
+        expect(rows[1].textContent).toContain("they cut Their Bench");
         expect(document.getElementById("movesLede").textContent).toContain("WR2");
     });
 

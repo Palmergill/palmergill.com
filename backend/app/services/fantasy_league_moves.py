@@ -14,14 +14,16 @@ the bench, or a defense that only beats the one already rostered by a point.
   lifts the lineup by at least ``MIN_PICKUP_GAIN``. The drop is the player he
   displaces when they share a position (a defense for a defense), otherwise
   the weakest player left on the bench.
-* **Trades.** One-for-one swaps close to even on projected points, where
-  *both* lineups come out ahead. A trade only one side wins is not an idea,
-  it is a request.
+* **Trades.** Up to two players a side, close to even in value over
+  replacement, where *both* lineups come out ahead. A trade only one side
+  wins is not an idea, it is a request. A side that takes in more players
+  than it sends is told who it would cut.
 
 These are starting points for a conversation, and the page says so. They know
 nothing about a manager's attachment to a player or about keeper rules.
 """
-from typing import Any, Dict, List, Optional, Sequence
+from itertools import combinations
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 from app.services.fantasy_league_roster_power import best_lineup, normalize_position
 
@@ -29,9 +31,15 @@ from app.services.fantasy_league_roster_power import best_lineup, normalize_posi
 # waiver claim is churn.
 MIN_PICKUP_GAIN = 1.0
 # Each side of a trade has to gain at least this much.
-MIN_TRADE_GAIN = 0.5
-# A swap further apart than this on projected points is lopsided on paper.
+MIN_TRADE_GAIN = 1.0
+# Packages further apart than this in value over replacement (points a
+# game) are lopsided on paper.
 FAIR_BAND = 3.0
+# Up to this many players on each side of a trade.
+MAX_PACKAGE = 2
+# Each player beyond a one-for-one costs this much of a trade's combined
+# gain when ranking, so a simpler trade wins a near tie.
+EXTRA_PLAYER_PENALTY = 0.5
 MAX_PICKUPS = 3
 MAX_TRADES = 3
 
@@ -110,45 +118,98 @@ def suggest_pickups(
     return pickups[:MAX_PICKUPS]
 
 
+def _value_over_replacement(
+    player: Dict[str, Any], replacements: Dict[str, Dict[str, Any]]
+) -> float:
+    floor = replacements.get(player["position"]) or {}
+    return player["ppg"] - float(floor.get("ppg") or 0.0)
+
+
+def _packages(
+    players: Sequence[Dict[str, Any]], replacements: Dict[str, Dict[str, Any]]
+) -> List[Tuple[List[Dict[str, Any]], float]]:
+    """Every tradeable single and pair, with its value over replacement.
+
+    A player at or below what waivers offer is worth nothing in a trade, so
+    he is left out; that is also what keeps the pair search small.
+    """
+    tradeable = [
+        (p, _value_over_replacement(p, replacements))
+        for p in players
+        if p["ppg"] > 0 and not p.get("out")
+    ]
+    tradeable = [(p, v) for p, v in tradeable if v > 0]
+    packages = [([p], v) for p, v in tradeable]
+    for size in range(2, MAX_PACKAGE + 1):
+        for combo in combinations(tradeable, size):
+            packages.append(([p for p, _v in combo], sum(v for _p, v in combo)))
+    return packages
+
+
+def _roster_after(roster, outgoing, incoming):
+    gone = {id(p) for p in outgoing}
+    return [p for p in roster if id(p) not in gone] + list(incoming)
+
+
+def _cut(roster_before, roster_after, slots, eligibility):
+    """Who goes when a trade leaves a roster one player bigger."""
+    if len(roster_after) <= len(roster_before):
+        return None
+    _points, keys, _filled = _lineup(slots, roster_after, eligibility)
+    bench = [p for p in roster_after if p["key"] not in keys]
+    return min(bench, key=lambda p: p["ppg"]) if bench else None
+
+
 def suggest_trades(
     team: Dict[str, Any],
     teams: List[Dict[str, Any]],
     slots: Sequence[str],
     eligibility: Dict[str, frozenset],
+    replacements: Optional[Dict[str, Dict[str, Any]]] = None,
 ) -> List[Dict[str, Any]]:
-    """Near-even one-for-one swaps that lift both lineups; one per partner."""
+    """Trades of up to two players a side that lift both lineups.
+
+    Fairness is judged on value over replacement rather than raw points,
+    because two decent players are not worth one star when only one of them
+    can start. The best trade per partner is kept; a simpler trade wins a
+    near tie with a bigger one.
+    """
+    replacements = replacements or {}
     mine = _lineup_input(team.get("players") or [])
     my_base, _, _ = _lineup(slots, mine, eligibility)
+    my_packages = _packages(mine, replacements)
     ideas = []
     for partner in teams:
         if partner.get("espn_team_id") == team.get("espn_team_id"):
             continue
         theirs = _lineup_input(partner.get("players") or [])
         their_base, _, _ = _lineup(slots, theirs, eligibility)
+        their_packages = _packages(theirs, replacements)
         best = None
-        for give in mine:
-            if give["ppg"] <= 0 or give.get("out"):
-                continue
-            for get in theirs:
-                if get["ppg"] <= 0 or get.get("out"):
+        for give, give_value in my_packages:
+            for get, get_value in their_packages:
+                if abs(get_value - give_value) > FAIR_BAND:
                     continue
-                if abs(get["ppg"] - give["ppg"]) > FAIR_BAND:
-                    continue
-                my_after = [p for p in mine if p is not give] + [get]
+                my_after = _roster_after(mine, give, get)
                 my_gain = _lineup(slots, my_after, eligibility)[0] - my_base
                 if my_gain < MIN_TRADE_GAIN:
                     continue
-                their_after = [p for p in theirs if p is not get] + [give]
+                their_after = _roster_after(theirs, get, give)
                 their_gain = _lineup(slots, their_after, eligibility)[0] - their_base
                 if their_gain < MIN_TRADE_GAIN:
                     continue
-                # The biggest combined lift, then the closest to even.
-                key = (-(my_gain + their_gain), abs(get["ppg"] - give["ppg"]))
+                extra = len(give) + len(get) - 2
+                key = (
+                    -(my_gain + their_gain) + EXTRA_PLAYER_PENALTY * extra,
+                    abs(get_value - give_value),
+                )
                 if best is None or key < best[0]:
-                    best = (key, give, get, my_gain, their_gain)
+                    best = (key, give, get, my_gain, their_gain, my_after, their_after)
         if best is None:
             continue
-        _key, give, get, my_gain, their_gain = best
+        _key, give, get, my_gain, their_gain, my_after, their_after = best
+        my_cut = _cut(mine, my_after, slots, eligibility)
+        their_cut = _cut(theirs, their_after, slots, eligibility)
         ideas.append(
             {
                 "partner": {
@@ -157,10 +218,13 @@ def suggest_trades(
                     "abbrev": partner.get("abbrev"),
                     "owner_name": partner.get("owner_name"),
                 },
-                "give": _player(give),
-                "get": _player(get),
+                "give": [_player(p) for p in give],
+                "get": [_player(p) for p in get],
                 "my_gain": round(my_gain, 1),
                 "their_gain": round(their_gain, 1),
+                # A side taking more players than it sends has to cut one.
+                "my_drop": _player(my_cut),
+                "their_drop": _player(their_cut),
             }
         )
     ideas.sort(key=lambda idea: -(idea["my_gain"] + idea["their_gain"]))
@@ -185,5 +249,11 @@ def team_moves(
         "pickups": suggest_pickups(
             team, board.get("replacements") or {}, board.get("slots") or [], eligibility
         ),
-        "trades": suggest_trades(team, teams, board.get("slots") or [], eligibility),
+        "trades": suggest_trades(
+            team,
+            teams,
+            board.get("slots") or [],
+            eligibility,
+            board.get("replacements") or {},
+        ),
     }
