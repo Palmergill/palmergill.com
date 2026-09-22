@@ -1753,7 +1753,16 @@ button:focus-visible {
    number is the claim; the need and the surplus under it are the reasons,
    and the lineup behind them folds away until someone asks. */
 
+/* Two columns, filled down then across — 1–5 on the left, 6–10 on the
+   right — so the whole order fits in half the height. The row count comes
+   from the page (--power-rows), because a league can be ten teams or
+   twelve. */
 .power-list {
+    display: grid;
+    grid-auto-flow: column;
+    grid-template-rows: repeat(var(--power-rows, 5), auto);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: 48px;
     margin: 0;
     padding: 0;
     list-style: none;
@@ -1765,14 +1774,16 @@ button:focus-visible {
    method moved onto the two stat labels as a hover. */
 .power-row {
     display: grid;
-    grid-template-columns: 28px minmax(0, 1fr) 84px 84px;
+    grid-template-columns: 22px minmax(0, 1fr) 64px 58px;
     align-items: center;
-    column-gap: 16px;
-    padding: 12px 0;
+    column-gap: 12px;
+    padding: 8px 0;
     border-bottom: 1px solid var(--line, #ece4d8);
 }
 
-.power-row:last-child { border-bottom: none; }
+/* The owner's name doubled every row's height for a fact the Teams board
+   already carries. */
+.power-row .team-cell__owner { display: none; }
 
 .power-row--mine {
     margin: 0 -10px;
@@ -1784,7 +1795,7 @@ button:focus-visible {
 
 .power-row__rank {
     font-family: "Newsreader", Georgia, "Times New Roman", serif;
-    font-size: 22px;
+    font-size: 19px;
     color: var(--sage-dim, #4c6044);
     font-variant-numeric: tabular-nums;
 }
@@ -1798,7 +1809,7 @@ button:focus-visible {
 
 .power-row__stat strong {
     display: block;
-    font-size: 19px;
+    font-size: 16px;
     font-weight: 800;
     font-variant-numeric: tabular-nums;
 }
@@ -1821,21 +1832,27 @@ button:focus-visible {
     left: auto;
 }
 
-/* The last rows would open a downward bubble off the end of the board. */
-.power-row:nth-last-child(-n+3) .col-hint__bubble {
+/* The bottom rows of each column would open a downward bubble off the end
+   of the board. The page marks them, since which rows those are depends on
+   the league's size. */
+.power-row--low .col-hint__bubble {
     top: auto;
     bottom: calc(100% + 7px);
 }
 
 @media (max-width: 720px) {
+    /* One column on a phone: two would leave each team name about 60px. */
+    .power-list {
+        grid-auto-flow: row;
+        grid-template-rows: none;
+        grid-template-columns: minmax(0, 1fr);
+    }
+
     .power-row {
         grid-template-columns: 22px minmax(0, 1fr) auto auto;
-        column-gap: 12px;
     }
 
     .power-row--mine { margin: 0 -8px; padding-left: 8px; padding-right: 8px; }
-    .power-row__rank { font-size: 19px; }
-    .power-row__stat strong { font-size: 17px; }
 }
 
 /* ── history ──────────────────────────────────────────────────────── */

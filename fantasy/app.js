@@ -1589,9 +1589,16 @@
             ? `Projections through week ${payload.week} · ${payload.scoring === "half" ? "Half PPR" : payload.scoring}`
             : "";
 
-        teams.forEach((team) => {
+        // Two columns, filled down: the list needs to know how tall a column is.
+        const rows = Math.ceil(teams.length / 2);
+        els.powerList.style.setProperty("--power-rows", String(rows));
+
+        teams.forEach((team, index) => {
             const item = el("li", "power-row");
             if (team.espn_team_id === state.myTeamId) item.classList.add("power-row--mine");
+            // Last two rows of either column open their hover bubble upward.
+            const inColumn = index % rows;
+            if (inColumn >= rows - 2) item.classList.add("power-row--low");
 
             item.appendChild(el("span", "power-row__rank", String(team.rank)));
 

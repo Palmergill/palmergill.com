@@ -13,39 +13,13 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.database import SessionLocal, get_db
-from app.services import fantasy_ai, fantasy_collector, fantasy_data, fantasy_news
+from app.services import fantasy_collector, fantasy_data, fantasy_news
 
 router = APIRouter(prefix="/api/fantasy", tags=["fantasy"])
-
-# Opaque conversation id issued as an HttpOnly cookie (mirrors bitcoin chat).
 
 
 def is_demo_request(request: Request) -> bool:
     return bool(getattr(request.state, "demo_mode", False))
-
-
-def is_authenticated(request: Request) -> bool:
-    return bool(getattr(request.state, "app_auth_authenticated", False))
-
-
-def require_member(request: Request) -> Dict[str, Any]:
-    """Chat is the one route here that spends money, so it is not public.
-
-    Mirrors fantasy_league.require_member, including the JSON 403 rather than
-    a 401: a transport-level rejection carries ``WWW-Authenticate: Basic``,
-    which some browsers turn into a native credential modal on a ``fetch()``.
-
-    Its panel has lived behind the members-only league hub since the dashboard
-    redesign, so this is the gate the UI already implied. Without it, removing
-    the (unreachable) demo branch below would drop anonymous callers straight
-    into the model.
-    """
-    if is_demo_request(request):
-        raise HTTPException(status_code=403, detail="Sign in to use the fantasy assistant.")
-    identity = getattr(request.state, "app_user", None)
-    if not identity:
-        raise HTTPException(status_code=403, detail="Sign in to use the fantasy assistant.")
-    return identity
 
 
 def is_admin(request: Request) -> bool:
