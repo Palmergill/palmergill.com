@@ -455,11 +455,13 @@ describe("league hub ledger", () => {
         });
         await waitFor(() => document.querySelectorAll("#ledger tbody tr").length === 2);
 
-        // Power rankings read rosters, so they lead in every state; the
-        // table is next, present even while it is all dashes.
+        // Power rankings read rosters, so they lead in every state, with
+        // their own chart under them; the table is next, present even while
+        // it is all dashes.
         const boards = [...document.querySelectorAll("#leagueSections .board")];
         expect(boards[0].dataset.board).toBe("power");
-        expect(boards[1].dataset.board).toBe("ledger");
+        expect(boards[1].dataset.board).toBe("power-chart");
+        expect(boards[2].dataset.board).toBe("ledger");
         expect(document.getElementById("leagueSections").className).toBe("");
         // Empty, but present and explained rather than reordered away.
         expect(document.getElementById("modeBanner").hidden).toBe(false);
@@ -1187,12 +1189,12 @@ describe("the power chart", () => {
         expect(document.querySelector(".rank-chart__svg")).toBeNull();
     });
 
-    test("the chart sits below the table, not between it and the rankings", async () => {
+    test("the chart sits directly under the board it charts", async () => {
         await bootChart();
 
         const boards = [...document.querySelectorAll("#leagueSections .board")]
             .map((board) => board.dataset.board);
-        expect(boards.indexOf("power-chart")).toBeGreaterThan(boards.indexOf("ledger"));
-        expect(boards.indexOf("ledger")).toBe(boards.indexOf("power") + 1);
+        expect(boards.indexOf("power-chart")).toBe(boards.indexOf("power") + 1);
+        expect(boards.indexOf("ledger")).toBeGreaterThan(boards.indexOf("power-chart"));
     });
 });

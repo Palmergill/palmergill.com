@@ -515,8 +515,9 @@ and weights but fixed five defects, each locked by a regression test:
   the season instead of arriving with it.
 
 - **Sep 2026 — power over time.** The hub had two rankings and no way to see
-  either as a season. A line chart under the table draws one line a team,
-  week 1 to the playoffs, with a toggle between the two.
+  either as a season. A line chart draws one line a team, week 1 to the
+  playoffs, with a toggle between the two. It sits directly under the Power
+  rankings board it charts.
 
   **Résumé comes free.** `ff_league_power_rankings` already holds a row per
   team per week per algorithm, which is what the Form sparkline in the table
