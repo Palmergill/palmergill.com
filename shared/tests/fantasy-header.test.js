@@ -72,6 +72,7 @@ describe("fantasy header", () => {
             { label: "Implied Value", href: "/fantasy/market/", current: null },
             { label: "My Rankings", href: "/fantasy/rankings/", current: null },
             { label: "Fourth & Fortune", href: "/fantasy/draft-order/", current: null },
+            { label: "Import a league", href: "/fantasy/#importLeague", current: null },
         ]);
     });
 

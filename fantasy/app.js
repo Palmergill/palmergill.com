@@ -1505,7 +1505,21 @@
     }
 
 
+    // The import form is hidden until the Tools menu links to it. Arriving
+    // on that hash — from another page, or from this one — opens it.
+    const IMPORT_HASH = "#importLeague";
+
+    function revealImport(hash = window.location.hash) {
+        if (hash !== IMPORT_HASH) return false;
+        els.importDetails.hidden = false;
+        els.importDetails.open = true;
+        els.importDetails.scrollIntoView({ block: "start" });
+        els.importInput.focus({ preventScroll: true });
+        return true;
+    }
+
     function scrollToRequestedBoard(hash = window.location.hash) {
+        if (revealImport(hash)) return;
         if (!hash || hash.length < 2) return;
         let id;
         try {
@@ -2208,7 +2222,12 @@
             }, 120);
         });
 
+        // "Import a league" in the Tools menu, clicked while already here, is
+        // a fragment change and nothing else — open the form, don't reload.
+        window.addEventListener("hashchange", () => revealImport());
+
         window.addEventListener("popstate", () => {
+            if (window.location.hash === IMPORT_HASH) return;
             state.season = null;
             state.week = null;
             state.teamId = null;

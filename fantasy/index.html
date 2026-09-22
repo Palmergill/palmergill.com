@@ -14,7 +14,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/shared/site-nav.css?v=14">
     <link rel="stylesheet" href="/shared/fantasy-header.css?v=2">
-    <link rel="stylesheet" href="style.css?v=24">
+    <link rel="stylesheet" href="style.css?v=25">
 </head>
 <body>
 <noscript>
@@ -118,44 +118,6 @@
                     <a class="league-link" href="/fantasy/draft-recap/">Draft recap →</a>
                 </div>
             </nav>
-
-            <!-- Importing by ID is the obvious question this page invites the
-                 moment it calls itself the fantasy home page, so it asks and
-                 answers it here rather than leaving a visitor to guess. The
-                 form validates the ID for real; what it cannot yet do is
-                 serve a second league, and it says which of the two it is.
-                 See specs/q3-17 for the multi-league work that lands behind
-                 this same form. -->
-            <details class="import-league" id="importLeague">
-                <summary class="import-league__summary">
-                    <span class="import-league__title">Import a league</span>
-                    <span class="import-league__hint">Have an ESPN league ID?</span>
-                </summary>
-                <form class="import-league__form" id="importForm" novalidate>
-                    <div class="import-league__row">
-                        <label class="import-league__label" for="importLeagueId">
-                            ESPN league ID
-                        </label>
-                        <input
-                            id="importLeagueId"
-                            name="leagueId"
-                            class="import-league__input"
-                            type="text"
-                            inputmode="numeric"
-                            autocomplete="off"
-                            placeholder="225965"
-                            aria-describedby="importHelp"
-                        >
-                        <button type="submit" class="button" id="importSubmit">Import</button>
-                    </div>
-                    <p class="import-league__status" id="importStatus" role="status"></p>
-                    <p class="import-league__help" id="importHelp">
-                        It is the <code>leagueId</code> in your league's ESPN URL —
-                        <code>fantasy.espn.com/football/league?leagueId=<strong>225965</strong></code>.
-                        The league has to be public in ESPN's league settings.
-                    </p>
-                </form>
-            </details>
 
             <!-- Team detail replaces the league sections; it is a routed view
                  on this page (?team=N) rather than a second HTML file. The
@@ -370,16 +332,55 @@
                     <button type="submit" aria-label="Send message">↑</button>
                 </form>
             </section>
+
+            <!-- Importing by ID is a one-time question, so the form is hidden
+                 until "Import a league" in the Tools menu asks for it
+                 (/fantasy/#importLeague), rather than above the league on
+                 every visit. The
+                 form validates the ID for real; what it cannot yet do is
+                 serve a second league, and it says which of the two it is.
+                 See specs/q3-17 for the multi-league work that lands behind
+                 this same form. -->
+            <details class="import-league" id="importLeague" hidden>
+                <summary class="import-league__summary">
+                    <span class="import-league__title">Import a league</span>
+                    <span class="import-league__hint">Have an ESPN league ID?</span>
+                </summary>
+                <form class="import-league__form" id="importForm" novalidate>
+                    <div class="import-league__row">
+                        <label class="import-league__label" for="importLeagueId">
+                            ESPN league ID
+                        </label>
+                        <input
+                            id="importLeagueId"
+                            name="leagueId"
+                            class="import-league__input"
+                            type="text"
+                            inputmode="numeric"
+                            autocomplete="off"
+                            placeholder="225965"
+                            aria-describedby="importHelp"
+                        >
+                        <button type="submit" class="button" id="importSubmit">Import</button>
+                    </div>
+                    <p class="import-league__status" id="importStatus" role="status"></p>
+                    <p class="import-league__help" id="importHelp">
+                        It is the <code>leagueId</code> in your league's ESPN URL —
+                        <code>fantasy.espn.com/football/league?leagueId=<strong>225965</strong></code>.
+                        The league has to be public in ESPN's league settings.
+                    </p>
+                </form>
+            </details>
         </div>
     </main>
 
     <script src="/shared/site-nav.js?v=16"></script>
-    <script src="/shared/fantasy-header.js?v=2"></script>
+    <script src="/shared/fantasy-header.js?v=3"></script>
     <script>window.FantasyHeader.mount({ page: "home" });</script>
     <script src="/shared/analytics.js?v=1"></script>
     <script src="/shared/api-base.js?v=1"></script>
     <script src="format.js?v=12"></script>
     <script src="/fantasy/chat.js?v=1"></script>
-    <script src="app.js?v=22"></script>
+    <script src="app.js?v=23"></script>
 </body>
 </html>

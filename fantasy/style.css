@@ -185,7 +185,7 @@ body {
    putting above the league somebody came here to read. */
 
 .import-league {
-    margin: 0 0 24px;
+    margin: 32px 0 0;
     border: 1px solid var(--line, #ece4d8);
     border-radius: 12px;
     background: var(--card, #fff);

@@ -672,6 +672,22 @@ describe("importing a league", () => {
         expect(field().getAttribute("maxlength")).toBeNull();
     });
 
+    test("the form stays out of the way until the Tools menu asks for it", async () => {
+        boot();
+        await waitFor(() => document.querySelectorAll("#ledger tbody tr").length === 2);
+        expect(document.getElementById("importLeague").hidden).toBe(true);
+    });
+
+    test("arriving on #importLeague opens it and puts the cursor in it", async () => {
+        Element.prototype.scrollIntoView = Element.prototype.scrollIntoView || (() => {});
+        boot({}, "/fantasy/#importLeague");
+        const details = document.getElementById("importLeague");
+        await waitFor(() => !details.hidden);
+
+        expect(details.open).toBe(true);
+        expect(document.activeElement).toBe(field());
+    });
+
     test("a typo is called a typo, not a failed import", async () => {
         boot({ overview: { ...OVERVIEW, league_id: "225965" } });
         await waitFor(() => document.querySelectorAll("#ledger tbody tr").length === 2);
