@@ -147,10 +147,10 @@ function boot(overrides = {}, url = "/fantasy/") {
     window.LeagueFormat = F;
     window.API_ORIGIN = "";
     window.FantasyHeader = { mount: () => null };
-    window.fetch = jest.fn((requested) => {
+    window.fetch = jest.fn((requested, options) => {
         const target = String(requested);
         if (overrides.fetch) {
-            const custom = overrides.fetch(target);
+            const custom = overrides.fetch(target, options);
             if (custom) return custom;
         }
         if (target.includes("/overview")) return response(overrides.overview || OVERVIEW);
@@ -1116,5 +1116,71 @@ describe("the power chart", () => {
             .map((board) => board.dataset.board);
         expect(boards.indexOf("power-chart")).toBe(boards.indexOf("power") + 1);
         expect(boards.indexOf("ledger")).toBeGreaterThan(boards.indexOf("power-chart"));
+    });
+});
+
+
+describe("league hub regression coverage", () => {
+    afterEach(() => {
+        document.body.innerHTML = "";
+        jest.restoreAllMocks();
+    });
+
+    test.each([200, 500])("ignores an older scoreboard response (%s)", async (status) => {
+        let finishFirst;
+        boot({ fetch: (target) => {
+            if (target.includes("/scoreboard?") && target.includes("week=1")) {
+                return new Promise(resolve => { finishFirst = resolve; });
+            }
+        }});
+        const select = document.getElementById("scoreboardWeek");
+        await waitFor(() => select.value === "2");
+        select.value = "1";
+        select.dispatchEvent(new Event("change"));
+        select.value = "2";
+        select.dispatchEvent(new Event("change"));
+        await new Promise(resolve => setTimeout(resolve, 0));
+        finishFirst(await response({ season: 2026, week: 1, available_weeks: [1, 2], matchups: [], detail: "Old failure" }, status));
+        await new Promise(resolve => setTimeout(resolve, 0));
+        expect(select.value).toBe("2");
+        expect(document.getElementById("errorBanner").hidden).toBe(true);
+    });
+
+    test("saves a team from the hub and resolves My Team on the next visit", async () => {
+        let savedId = null;
+        const fetchMock = boot({ fetch: (target, options = {}) => {
+            if (!target.includes("/me")) return;
+            if (options.method === "PUT") savedId = JSON.parse(options.body).espn_team_id;
+            return response({
+                status: savedId ? "configured" : "unconfigured", teams: TEAMS,
+                selected_team_id: savedId,
+                snapshot: savedId ? { team: TEAMS.find(t => t.espn_team_id === savedId) } : null,
+            });
+        }}, "/fantasy/?team=me");
+        await waitFor(() => !document.getElementById("myTeamForm").hidden);
+        document.getElementById("myTeamSelect").value = "2";
+        document.getElementById("myTeamForm").dispatchEvent(new Event("submit", { cancelable: true }));
+        await waitFor(() => !document.getElementById("teamView").hidden);
+        const put = fetchMock.mock.calls.find(([, options]) => options.method === "PUT");
+        expect(JSON.parse(put[1].body)).toEqual({ season: 2026, espn_team_id: 2 });
+        expect(put[1].credentials).toBe("include");
+        expect(document.getElementById("myTeamSelect").value).toBe("2");
+        expect(new URLSearchParams(window.location.search).get("team")).toBe("2");
+        window.history.replaceState({}, "", "/fantasy/?team=me");
+        window.dispatchEvent(new PopStateEvent("popstate"));
+        await waitFor(() => new URLSearchParams(window.location.search).get("team") === "2");
+    });
+
+    test("a failed save leaves the picker available for retry", async () => {
+        boot({ me: { status: "unconfigured", teams: TEAMS }, fetch: (target, options = {}) => {
+            if (options.method === "PUT") return response({ detail: "Save failed" }, 500);
+        }});
+        await waitFor(() => !document.getElementById("myTeamForm").hidden);
+        document.getElementById("myTeamSelect").value = "1";
+        document.getElementById("myTeamForm").dispatchEvent(new Event("submit", { cancelable: true }));
+        await waitFor(() => document.getElementById("myTeamStatus").textContent === "Save failed");
+        expect(document.getElementById("myTeamSave").disabled).toBe(false);
+        expect(document.getElementById("myTeamSelect").disabled).toBe(false);
+        expect(new URLSearchParams(window.location.search).get("team")).toBeNull();
     });
 });

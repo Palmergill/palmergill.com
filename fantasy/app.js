@@ -15,6 +15,7 @@
         mode: null,
         week: null,
         scoreWeek: null,
+        scoreboardRequest: 0,
         // Résumé is always ranked on every factor at once. The server offers
         // single-factor methods too, but a menu of them confused more than it
         // answered, so the page no longer asks.
@@ -29,6 +30,7 @@
         freeAgentsExpanded: false,
         freeAgentsPayload: null,
         myTeamId: null,
+        myTeamSaveRequest: 0,
         // Set by ?team=me, which the header links to from every page in the
         // section because it cannot know your team id. Resolved once
         // /league/me answers, then cleared.
@@ -64,6 +66,10 @@
         errorBanner: byId("errorBanner"),
         modeBanner: byId("modeBanner"),
         routeBanner: byId("routeBanner"),
+        myTeamForm: byId("myTeamForm"),
+        myTeamSelect: byId("myTeamSelect"),
+        myTeamSave: byId("myTeamSave"),
+        myTeamStatus: byId("myTeamStatus"),
         signedOutView: byId("signedOutView"),
         emptyView: byId("emptyView"),
         leagueView: byId("leagueView"),
@@ -1431,17 +1437,18 @@
 
     async function loadScoreboard() {
         const generation = state.generation;
+        const request = ++state.scoreboardRequest;
         const params = new URLSearchParams();
         if (state.season) params.set("season", state.season);
         if (state.scoreWeek) params.set("week", state.scoreWeek);
         try {
             const payload = await fetchJson(`${API_BASE}/scoreboard?${params}`);
-            if (stale(generation)) return;
+            if (stale(generation) || request !== state.scoreboardRequest) return;
             state.scoreWeek = payload.week;
             fillWeekSelect(els.scoreboardWeek, payload.available_weeks, payload.week);
             renderScoreboard(payload);
         } catch (error) {
-            if (!stale(generation)) handleFailure(error);
+            if (!stale(generation) && request === state.scoreboardRequest) handleFailure(error);
         }
     }
 
@@ -1465,6 +1472,7 @@
         try {
             const me = await fetchJson(`${API_BASE}/me?${params}`);
             if (stale(generation)) return;
+            renderMyTeamPicker(me);
             if (me.status !== "configured" || !me.snapshot || !me.selected_team_id) {
                 state.myTeamId = null;
                 unresolvedMyTeam(
@@ -1487,6 +1495,53 @@
             if (!stale(generation)) {
                 state.myTeamId = null;
                 unresolvedMyTeam("Could not work out which team is yours.");
+            }
+        }
+    }
+
+    function renderMyTeamPicker(me) {
+        state.myTeamSaveRequest += 1;
+        const teams = me.teams || [];
+        els.myTeamForm.hidden = !teams.length;
+        els.myTeamSelect.replaceChildren(new Option("Choose your team", ""));
+        teams.forEach((team) => {
+            els.myTeamSelect.appendChild(new Option(team.name || team.abbrev, team.espn_team_id));
+        });
+        els.myTeamSelect.value = me.selected_team_id ? String(me.selected_team_id) : "";
+        els.myTeamSelect.disabled = false;
+        els.myTeamSave.disabled = false;
+        els.myTeamStatus.textContent = "";
+    }
+
+    async function saveMyTeam(event) {
+        event.preventDefault();
+        const teamId = Number(els.myTeamSelect.value);
+        if (!teamId || !state.season || els.myTeamSave.disabled) return;
+        const generation = state.generation;
+        const request = ++state.myTeamSaveRequest;
+        els.myTeamSelect.disabled = true;
+        els.myTeamSave.disabled = true;
+        els.myTeamStatus.textContent = "Saving…";
+        try {
+            await fetchJson(`${API_BASE}/me`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ season: state.season, espn_team_id: teamId }),
+            });
+            if (stale(generation)) return;
+            state.teamId = teamId;
+            state.pendingMyTeam = false;
+            writeUrlState(false);
+            // Reload the member mapping and highlights along with the team route.
+            loadSeason();
+        } catch (error) {
+            if (!stale(generation)) {
+                els.myTeamStatus.textContent = error.message || "Could not save your team. Try again.";
+            }
+        } finally {
+            if (request === state.myTeamSaveRequest) {
+                els.myTeamSelect.disabled = false;
+                els.myTeamSave.disabled = false;
             }
         }
     }
@@ -2079,6 +2134,7 @@
         state.rosterPower = null;
         state.myTeamId = null;
         els.routeBanner.hidden = true;
+        els.myTeamForm.hidden = true;
         clearError();
         try {
             const params = state.season ? `?season=${state.season}` : "";
@@ -2107,6 +2163,7 @@
             // The ledger is the page; it loads before the boards under it so
             // the table is readable while the rest fills in.
             await loadMyTeam();
+            if (stale(generation)) return;
             if (!state.chartMetricChosen) state.chartMetric = "roster";
             renderChartMetricChips();
             await Promise.all([
@@ -2116,6 +2173,7 @@
                 loadFreeAgents(),
                 loadPowerChart(),
             ]);
+            if (stale(generation)) return;
             applyRoute();
             // A cross-link from the dashboard's Waiver Pulse lands on the
             // free-agent board, which anchors immediately but fills in late.
@@ -2156,6 +2214,7 @@
     }
 
     function bindEvents() {
+        els.myTeamForm.addEventListener("submit", saveMyTeam);
         els.teamBack.addEventListener("click", clearTeam);
         els.scoreboardWeek.addEventListener("change", (event) => {
             state.scoreWeek = parseInt(event.target.value, 10);

@@ -1953,3 +1953,22 @@ button:focus-visible {
     .rank-chart__legend { gap: 5px 12px; }
     .rank-chart__legend-item { font-size: 0.72rem; }
 }
+
+.my-team-picker {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
+}
+.my-team-picker select {
+    min-width: 0;
+    max-width: 100%;
+    padding: 0.5rem;
+    font: inherit;
+    color: inherit;
+    background: var(--surface, #f3eee4);
+    border: 1px solid var(--border, #d8d2c7);
+    border-radius: 4px;
+}
+.my-team-picker button:disabled { opacity: 0.6; cursor: wait; }
