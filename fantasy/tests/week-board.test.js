@@ -189,14 +189,25 @@ describe("week board", () => {
         jest.restoreAllMocks();
     });
 
-    test("the toggle names the current week and starts on the season board", async () => {
+    test("the toggle names the current week and starts on the week board in season", async () => {
         boot(routes());
         await waitFor(() => modeChips().length === 2);
 
         expect(modeLabels()).toEqual(["Season", "Week 2"]);
+        expect(pressedMode()).toBe("Week 2");
+        expect(document.getElementById("weekBoardWrap").hidden).toBe(false);
+        expect(document.getElementById("marketTableWrap").hidden).toBe(true);
+        // The default board is not written into the URL.
+        expect(window.location.search).not.toContain("board=");
+    });
+
+    test("a ?board=season link keeps the season board in season", async () => {
+        boot(routes(), { url: "/fantasy/?board=season" });
+        await waitFor(() => modeChips().length === 2);
+
         expect(pressedMode()).toBe("Season");
         expect(document.getElementById("weekBoardWrap").hidden).toBe(true);
-        expect(document.getElementById("marketTableWrap").hidden).toBe(false);
+        expect(window.location.search).toContain("board=season");
     });
 
     test("there is no week to offer in the offseason", async () => {
@@ -224,12 +235,15 @@ describe("week board", () => {
         expect(document.getElementById("marketTableWrap").hidden).toBe(true);
         expect(document.getElementById("marketBoardTitle").textContent).toBe("Week Board");
         expect(document.getElementById("marketBoardEyebrow").textContent).toBe("Week 2");
-        expect(window.location.search).toContain("board=week");
+        expect(window.location.search).not.toContain("board=");
 
         modeChips()[0].click();
         expect(document.getElementById("weekBoardWrap").hidden).toBe(true);
         expect(document.getElementById("marketBoardTitle").textContent).toBe("Season Board");
-        expect(window.location.search).not.toContain("board=week");
+        expect(window.location.search).toContain("board=season");
+
+        modeChips()[1].click();
+        expect(window.location.search).not.toContain("board=");
     });
 
     test("a deep link opens the week board once the week resolves", async () => {

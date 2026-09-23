@@ -21,7 +21,9 @@
         week: null,
         defaultWeek: null,
         // "season" (market value, year-long) or "week" (one week's board).
-        boardMode: "season",
+        // null until /state resolves: in season it lands on the week board,
+        // in the offseason on the season board.
+        boardMode: null,
         weekBoard: null,
         // Which week the week board is showing. null follows the live week.
         weekBoardWeek: null,
@@ -224,7 +226,8 @@
         if (params.has("scoring")) state.seasonFantasyScoring = params.get("scoring");
         // Applied once /state says whether there is a week to show; until then
         // it is only a request.
-        if (params.get("board") === "week") state.boardMode = "week";
+        const board = params.get("board");
+        if (board === "week" || board === "season") state.boardMode = board;
         // "delta", "delta:asc" — an unknown column is ignored rather than
         // leaving the board sorted by nothing.
         if (params.has("sort")) {
@@ -245,7 +248,9 @@
         if (state.seasonFantasyScoring && state.seasonFantasyScoring !== DEFAULT_SCORING) {
             params.set("scoring", state.seasonFantasyScoring);
         }
-        if (state.boardMode === "week") params.set("board", "week");
+        // Only the non-default board is written, so a plain link follows the
+        // calendar: the week board in season, the season board out of it.
+        if (state.boardMode && state.boardMode !== defaultBoardMode()) params.set("board", state.boardMode);
         const sort = state.seasonFantasySort;
         // The sort belongs to the market table; the week board is ranked.
         if (state.boardMode !== "week" && (sort.key !== "fantasy_points" || sort.dir !== "desc")) {
@@ -915,6 +920,10 @@
 
     function weekBoardAvailable() {
         return !!state.inSeason && state.week != null && state.week > 0;
+    }
+
+    function defaultBoardMode() {
+        return weekBoardAvailable() ? "week" : "season";
     }
 
     function renderBoardMode() {
@@ -2321,9 +2330,10 @@
             state.week = state.defaultWeek;
         }
         renderWeekBadge();
-        // Re-applies ?board=week now that there is a week to apply it to, and
-        // falls back to the season board when there is not.
-        setBoardMode(state.boardMode);
+        // Re-applies ?board= now that there is a week to apply it to, and
+        // falls back to the season board when there is not. With no request
+        // the week board is the in-season default.
+        setBoardMode(state.boardMode || defaultBoardMode());
 
         const seasonLong = state.week === 0;
         if (!data.in_season || data.is_fallback) {
