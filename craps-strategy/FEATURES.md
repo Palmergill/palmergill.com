@@ -67,10 +67,7 @@ reproducibly (per-trial RNG seeded from `baseSeed`).
    validation. Please run one live translation (or point me at a key) to confirm the
    `/v1/responses` `text.format` json_schema call shape and output parsing are right for
    the model you use.
-2. **Casino card artwork.** The new "Strategy Lab" card reuses `craps.png` as a
-   placeholder screenshot. Want a real screenshot of the simulator captured for
-   `assets/project-screenshots/`?
-3. **Hardway lifecycle.** ~~`crapsRules.resolveHardwayBets` takes a hardway *down* on a
+2. **Hardway lifecycle.** ~~`crapsRules.resolveHardwayBets` takes a hardway *down* on a
    win; my engine re-arms it on the next placement.~~ **Resolved 2026-06-23:** hardways now
    resolve on *every* roll (matching their default `when: "always"`), so hardway-only
    strategies work and a winner is re-armed next placement. Open sub-question: should a
