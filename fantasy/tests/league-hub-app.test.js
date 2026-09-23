@@ -208,7 +208,7 @@ describe("league hub ledger", () => {
             "form",
         ]);
         expect(document.getElementById("ledgerNote").textContent).toBe(
-            "2 teams · power through week 2"
+            "2 teams · results through week 2"
         );
     });
 
@@ -1009,8 +1009,8 @@ describe("the power chart", () => {
         const fetchMock = boot();
         await waitFor(() => lines().length > 0);
 
-        // "Roster" meant nothing to a reader; the board is called Power rankings.
-        expect(chips().map((chip) => chip.textContent)).toEqual(["Power rankings", "Résumé"]);
+        // Both metrics use the same names as their corresponding boards.
+        expect(chips().map((chip) => chip.textContent)).toEqual(["Roster power", "Results rank"]);
         expect(chips()[0].classList.contains("chip--active")).toBe(true);
         expect(
             fetchMock.mock.calls.some(([url]) => String(url).includes("metric=roster"))
@@ -1182,5 +1182,27 @@ describe("league hub regression coverage", () => {
         expect(document.getElementById("myTeamSave").disabled).toBe(false);
         expect(document.getElementById("myTeamSelect").disabled).toBe(false);
         expect(new URLSearchParams(window.location.search).get("team")).toBeNull();
+    });
+});
+
+
+describe("accessible power chart", () => {
+    afterEach(() => { document.body.innerHTML = ""; jest.restoreAllMocks(); });
+    test("legend selection persists, exposes exact ranks, and supports full-season context", async () => {
+        boot();
+        await waitFor(() => document.querySelectorAll(".chart-legend-button").length === 2);
+        const button = document.querySelector(".chart-legend-button");
+        const compactPath = document.querySelector(".rank-chart__line path").getAttribute("d");
+        button.click();
+        expect(button.getAttribute("aria-pressed")).toBe("true");
+        expect(document.getElementById("chartSelection").textContent).toContain("week 1 — #2");
+        expect(document.querySelectorAll(".rank-chart__line.is-dimmed")).toHaveLength(1);
+        button.parentElement.dispatchEvent(new Event("mouseleave"));
+        expect(document.querySelectorAll(".rank-chart__line.is-dimmed")).toHaveLength(1);
+        expect(document.querySelectorAll("#chartTable tbody tr")).toHaveLength(2);
+        const full = document.getElementById("chartFullSeason");
+        full.checked = true; full.dispatchEvent(new Event("change"));
+        expect(document.querySelector(".rank-chart__line path").getAttribute("d")).not.toBe(compactPath);
+        expect(document.getElementById("chartSelection").textContent).toBe("");
     });
 });

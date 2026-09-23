@@ -1,0 +1,77 @@
+/* Shared fantasy reading rhythm and accessible responsive controls. */
+:root { --fantasy-radius: 10px; }
+.app-shell { max-width: 1120px; margin-inline: auto; }
+.masthead h1, .editorial-hero h1 { font-family: "Newsreader", Georgia, serif; font-size: clamp(2rem, 4vw, 3.4rem); line-height: 1.1; }
+.editorial-card, .board-card, .panel { border-radius: var(--fantasy-radius); }
+button:focus-visible, select:focus-visible, summary:focus-visible, a:focus-visible { outline: 2px solid #526649; outline-offset: 3px; }
+.my-team-picker, .my-team-summary { padding: 12px 0; margin-bottom: 20px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.team-context { margin: 24px 0; border-block: 1px solid #d8d2c7; padding: 16px 0; }
+.team-context summary, .chart-data summary { cursor: pointer; font-weight: 600; padding: 8px 0; }
+.team-context .dossier { margin-top: 20px; }
+.chart-range { display: inline-flex; gap: 8px; align-items: center; margin: 10px 0; }
+.chart-legend-button { display: inline-flex; gap: 6px; align-items: center; font: inherit; color: inherit; background: transparent; border: 1px solid transparent; border-radius: 6px; padding: 8px; cursor: pointer; }
+.chart-legend-button[aria-pressed="true"] { background: #e6ecdf; border-color: #526649; }
+.chart-data { margin-top: 16px; }
+.chart-data .table-wrap { overflow-x: auto; }
+.rank-data-table { border-collapse: collapse; width: 100%; }
+.rank-data-table th, .rank-data-table td { padding: 8px; text-align: left; border-bottom: 1px solid #d8d2c7; white-space: nowrap; }
+@media (max-width: 720px) {
+ .insight-rail, .support-grid { grid-template-columns: minmax(0, 1fr); }
+ .insight-rail > *, .support-grid > *, .trending > * { min-width: 0; }
+ .trending { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+ .trending li, .freshness-list li { overflow-wrap: anywhere; }
+ .freshness-list li { grid-template-columns: minmax(0, 1fr) auto; }
+ .row-compare { opacity: 1; min-width: 32px; min-height: 32px; }
+ .season-bar .chip-row--weeks { flex: 1 1 100%; }
+}
+@media (max-width: 620px) {
+ body.has-site-nav .app-shell { padding-top: 12px; }
+ .fantasy-header { margin-bottom: 16px; padding-block: 12px; }
+ .editorial-hero { margin-block: 16px; }
+ .editorial-hero h1 { margin-block: 6px; font-size: 2.2rem; }
+ .hero-snapshot { margin-top: 10px; grid-template-columns: 70px minmax(0, 1fr); box-shadow: none; }
+ .week-badge, .hero-snapshot__member { padding: 8px 10px; }
+ .week-badge__value { font-size: 1.5rem; }
+ .value-board__head { padding: 14px; gap: 10px; }
+ .value-board__head h2 { font-size: 1.5rem; }
+ .value-board__toolbar { padding: 10px; }
+ #market-board .season-fantasy__table { min-width: 0; table-layout: auto; font-size: .78rem; }
+ #market-board .season-fantasy__table .col-detail, #market-board .season-fantasy__table .col-consensus { display: none; }
+ #market-board .season-fantasy__table th:first-child { width: 24px; }
+ #market-board .season-fantasy__table th:nth-child(7), #market-board .season-fantasy__table th:nth-child(9) { width: 64px; }
+ #market-board .season-leader__name, #market-board .season-leader__meta { white-space: normal; overflow-wrap: anywhere; }
+ #market-board .season-leader__name { font-size: .82rem; }
+ #market-board .season-leader__meta { font-size: .7rem; }
+ .season-bar { gap: 8px; }
+ .team-context .dossier { display: block; }
+ .my-team-picker select { flex: 1 1 180px; }
+}
+
+.quote-coverage { margin: 0; padding: 10px 14px; font-size: .8rem; background: #f6eddc; color: #66502c; white-space: normal; }
+@media (max-width: 620px) {
+ #market-board .season-fantasy__table .col-diff { width: 75px; white-space: normal; overflow-wrap: anywhere; }
+ #market-board .season-fantasy__table .col-implied { width: 64px; }
+ .freshness-time { text-align: right; white-space: normal; }
+ .rank-chart__legend { gap: 2px; }
+}
+.page-head h1 { font-family: "Newsreader", Georgia, serif; font-size: clamp(2rem, 4vw, 3.4rem); line-height: 1.1; }
+@media (max-width: 620px) {
+ .fantasy-header__inner { flex-wrap: nowrap; gap: 4px; }
+ .fantasy-header__links { width: auto; margin-left: auto; }
+ .fantasy-header__menu { width: min(320px, calc(100vw - 32px)); left: auto; right: 0; }
+ .editorial-hero { padding-top: 0; padding-bottom: 10px; margin-top: 6px; margin-bottom: 12px; }
+ .editorial-hero__title > .eyebrow { display: none; }
+ .hero-snapshot { margin-top: 6px; border: 0; background: transparent; }
+ .week-badge { flex-direction: row; gap: 6px; padding: 6px; }
+ .week-badge__value { font-size: 1.2rem; }
+ .hero-snapshot__member { padding: 4px 10px; }
+ .hero-snapshot__member > strong { font-size: 1rem; }
+ .hero-snapshot__metrics:empty { display: none; }
+ .value-board__head > div > .eyebrow { display: none; }
+ .value-board__head h2 { font-size: 1.3rem; }
+ .value-board__toolbar .chip { min-height: 36px; }
+ .page-head { gap: 10px; margin-bottom: 16px; }
+ .page-head .lede { font-size: .9rem; line-height: 1.45; }
+ .page-head .week-badge { align-self: flex-start; padding: 8px 12px; }
+ .page-head .week-badge__label { display: none; }
+}

@@ -305,3 +305,21 @@ describe("weekly recap controller", () => {
     });
 });
 
+
+
+test("shows played weeks and one upcoming week, with comparable lineup totals", async () => {
+    boot(url => {
+        if (String(url).endsWith("/seasons")) return response(SEASONS);
+        const payload = recap(2026, 2);
+        payload.available_weeks = Array.from({length:14}, (_,i)=>i+1);
+        payload.played_weeks = [1,2];
+        payload.grades[0].started = 120;
+        payload.grades[0].optimal = 126.6;
+        return response(payload);
+    });
+    await waitFor(() => !document.getElementById("weekView").hidden);
+    expect([...document.querySelectorAll("#weekChips button")].map(b=>b.textContent)).toEqual(["Wk 1","Wk 2","Wk 3"]);
+    expect(document.querySelector("#weekChips button:last-child").disabled).toBe(true);
+    expect(document.getElementById("teamRows").textContent).toContain("120.0");
+    expect(document.getElementById("teamRows").textContent).toContain("126.6");
+});

@@ -1083,6 +1083,7 @@ def _grade_teams(
                     if expectation is None
                     else _round(result["points"] - expectation, 1)
                 ),
+                "started": lineup.get("started"),
                 "optimal": lineup.get("optimal"),
                 "efficiency": lineup.get("efficiency"),
                 "points_left": lineup.get("points_left"),

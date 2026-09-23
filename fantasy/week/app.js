@@ -164,12 +164,15 @@
     function renderWeekChips(recap) {
         els.weekChips.replaceChildren();
         const played = new Set(recap.played_weeks || []);
-        (recap.available_weeks || []).forEach((week) => {
+        const nextWeek = Math.max(0, ...played) + 1;
+        const visibleWeeks = (recap.available_weeks || []).filter(
+            week => played.has(week) || week === nextWeek || week === recap.week
+        );
+        visibleWeeks.forEach((week) => {
             const chip = el("button", "chip", `Wk ${week}`);
             chip.type = "button";
-            // A week nobody has played has nothing to recap. It stays visible
-            // so the length of the season is legible, and stays unpressable
-            // so a click cannot land on an empty page.
+            // Keep one upcoming week for context without filling the phone
+            // with disabled controls. Unplayed weeks cannot be opened.
             if (!played.has(week)) {
                 chip.disabled = true;
                 chip.classList.add("chip--disabled");
@@ -509,6 +512,7 @@
             tr.appendChild(el("td", "col-result", F.resultLine(row) || "—"));
             tr.appendChild(el("td", "col-num", F.formatPoints(row.points)));
             tr.appendChild(el("td", "col-num", F.formatSigned(row.vs_projection)));
+            tr.appendChild(el("td", "col-num", F.formatPoints(row.started)));
             tr.appendChild(el("td", "col-num", F.formatPoints(row.optimal)));
             tr.appendChild(el("td", "col-num", F.formatPercent(row.efficiency)));
             tr.appendChild(el("td", "col-num", F.formatPoints(row.points_left)));
@@ -578,7 +582,7 @@
 
         if (callouts.movers && callouts.movers.length) {
             const card = el("article", "callout");
-            card.appendChild(el("h3", null, "Power ranking movement"));
+            card.appendChild(el("h3", null, "Results rank movement"));
             const list = el("ol", "compact-list");
             callouts.movers.forEach((mover) => {
                 const item = el("li");

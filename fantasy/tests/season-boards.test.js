@@ -663,7 +663,7 @@ describe("season board position filter", () => {
         boot(routes({
             "/state": { default_season: 2026, default_week: 1, season: 2026, week: 1, in_season: true },
         }));
-        await waitFor(() => document.getElementById("memberStatus").textContent === "Latest market");
+        await waitFor(() => document.getElementById("memberStatus").textContent === "Latest sync");
 
         expect(document.getElementById("leagueFreeAgentsLink").hidden).toBe(true);
         expect(document.querySelector("#memberTeam a")).toBeNull();

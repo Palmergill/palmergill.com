@@ -96,9 +96,9 @@ describe("grade presentation", () => {
 
 describe("power movement", () => {
     test("movement is an arrow, and standing still is not an arrow", () => {
-        expect(F.movementLabel({ rank: 2, rank_delta: 3 })).toBe("Power 2 ▲3");
-        expect(F.movementLabel({ rank: 5, rank_delta: -1 })).toBe("Power 5 ▼1");
-        expect(F.movementLabel({ rank: 5, rank_delta: 0 })).toBe("Power 5");
+        expect(F.movementLabel({ rank: 2, rank_delta: 3 })).toBe("Results rank 2 ▲3");
+        expect(F.movementLabel({ rank: 5, rank_delta: -1 })).toBe("Results rank 5 ▼1");
+        expect(F.movementLabel({ rank: 5, rank_delta: 0 })).toBe("Results rank 5");
         expect(F.movementLabel(null)).toBe("");
     });
 });

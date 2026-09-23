@@ -15,6 +15,7 @@
     <link rel="stylesheet" href="/shared/site-nav.css?v=14">
     <link rel="stylesheet" href="/shared/fantasy-header.css?v=2">
     <link rel="stylesheet" href="style.css?v=29">
+    <link rel="stylesheet" href="/shared/fantasy-design.css?v=1">
 </head>
 <body>
 <noscript>
@@ -102,6 +103,7 @@
         </section>
 
         <div id="leagueView" hidden>
+            <div id="myTeamSummary" class="my-team-summary" hidden><span id="myTeamName"></span> <button id="myTeamChange" type="button" class="button button--quiet">Change team</button></div>
             <form id="myTeamForm" class="my-team-picker" hidden>
                 <label for="myTeamSelect">My team</label>
                 <select id="myTeamSelect" required></select>
@@ -115,18 +117,17 @@
             <section id="teamView" class="team-view" hidden aria-labelledby="leagueName">
                 <button type="button" class="back-link" id="teamBack">← All teams</button>
 
-                <!-- The lede and the numbers, side by side. The overview used
-                     to sit in a grey box below the numbers, which is where
-                     writing goes to be skipped. -->
-                <div class="dossier">
-                    <div class="dossier__main">
-                        <div class="dossier__lede" id="teamLede" aria-live="polite"></div>
-                        <div class="dossier__foot">
-                            <span class="dossier__meta" id="teamOverviewMeta"></span>
+                <section class="lineup" id="lineupCard" aria-labelledby="lineupTitle" hidden>
+                    <div class="lineup__head">
+                        <div>
+                            <h3 id="lineupTitle">Start/sit</h3>
+                            <p class="lineup__meta" id="lineupMeta"></p>
                         </div>
+                        <dl class="lineup__totals" id="lineupTotals"></dl>
                     </div>
-                    <dl class="colophon" id="teamColophon"></dl>
-                </div>
+                    <ul class="lineup__changes" id="lineupChanges"></ul>
+                    <p class="lineup__note" id="lineupNote"></p>
+                </section>
 
                 <!-- Moves: the pickups and trades the roster-power board
                      prices as upgrades. The team as it stands, not a week. -->
@@ -141,23 +142,20 @@
                     <div class="moves" id="teamMoves"></div>
                 </section>
 
-                <!-- Start/sit: the lineup as set, against the best one this
-                     roster could field for the week. An aside here, because on
-                     six days out of seven it is the least live thing on the
-                     page — but the first thing worth doing on the seventh. -->
-                <section class="lineup" id="lineupCard" aria-labelledby="lineupTitle" hidden>
-                    <div class="lineup__head">
-                        <div>
-                            <h3 id="lineupTitle">Start/sit</h3>
-                            <p class="lineup__meta" id="lineupMeta"></p>
+                <!-- Keep the weekly decisions above optional season context. -->
+                <details class="team-context">
+                    <summary>Season stats and team overview</summary>
+                <div class="dossier">
+                    <div class="dossier__main">
+                        <div class="dossier__lede" id="teamLede" aria-live="polite"></div>
+                        <div class="dossier__foot">
+                            <span class="dossier__meta" id="teamOverviewMeta"></span>
                         </div>
-                        <dl class="lineup__totals" id="lineupTotals"></dl>
                     </div>
-                    <ul class="lineup__changes" id="lineupChanges"></ul>
-                    <p class="lineup__note" id="lineupNote"></p>
-                </section>
+                    <dl class="colophon" id="teamColophon"></dl>
+                </div>
 
-
+                </details>
                 <section class="board" data-board="rooms" aria-labelledby="teamRosterTitle">
                     <div class="board__head">
                         <div>
@@ -179,7 +177,7 @@
                 <section class="board" id="power" data-board="power" aria-labelledby="powerTitle">
                     <div class="board__head">
                         <div>
-                            <h2 id="powerTitle">Power rankings</h2>
+                            <h2 id="powerTitle">Roster power</h2>
                         </div>
                         <span class="board__note" id="powerNote"></span>
                     </div>
@@ -201,7 +199,7 @@
                          aria-labelledby="powerChartTitle">
                     <div class="board__head">
                         <div>
-                            <h2 id="powerChartTitle">Power over time</h2>
+                            <h2 id="powerChartTitle">Rankings over time</h2>
                         </div>
                         <span class="board__note" id="powerChartNote"></span>
                     </div>
@@ -209,9 +207,12 @@
                         <div class="chip-row" id="powerChartMetric" role="group"
                              aria-label="Which ranking"></div>
                     </div>
+                    <label class="chart-range"><input type="checkbox" id="chartFullSeason"> Full season</label>
                     <div class="rank-chart" id="powerChart"></div>
                     <p class="rank-chart__empty" id="powerChartEmpty" hidden></p>
                     <ul class="rank-chart__legend" id="powerChartLegend"></ul>
+                    <p id="chartSelection" role="status"></p>
+                    <details class="chart-data"><summary>View weekly ranks as a table</summary><div id="chartTable" class="table-wrap"></div></details>
                 </section>
 
                 <!-- Standings, power rankings and rosters used to be three
@@ -301,7 +302,7 @@
     <script>window.FantasyHeader.mount({ page: "home" });</script>
     <script src="/shared/analytics.js?v=1"></script>
     <script src="/shared/api-base.js?v=1"></script>
-    <script src="format.js?v=13"></script>
-    <script src="app.js?v=30"></script>
+    <script src="format.js?v=15"></script>
+    <script src="app.js?v=31"></script>
 </body>
 </html>

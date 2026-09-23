@@ -1684,7 +1684,7 @@
                 ? `${reader.boardCount} published ${reader.boardCount === 1 ? "board" : "boards"}. ` +
                     `Players must appear on at least ${reader.appearanceFloor}. Avg is the mean rank; ` +
                     `the range is best–worst, and the last number is appearances.`
-                : "Consensus appears after someone publishes a board for this format.";
+                : "";
             renderChipRow(
                 els.consensusScoringChips,
                 [

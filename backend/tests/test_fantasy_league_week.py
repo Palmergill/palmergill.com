@@ -345,6 +345,7 @@ def test_efficiency_is_what_was_started_over_what_could_have_been(db):
 
     # Team 2 started 18 with a 40-point running back and a 22-point receiver
     # on the bench: the optimum is 5 + 40 + 22 = 67.
+    assert grade(recap, 2)["started"] == 18.0
     assert grade(recap, 2)["optimal"] == 67.0
     assert grade(recap, 2)["points_left"] == 49.0
 

@@ -309,7 +309,7 @@
         { key: "luck", label: "Luck", header: "W − xW", chart: "diverging" },
         { key: "lineup", label: "Lineup", header: "% of best", chart: "dot" },
         { key: "scoring", label: "Range", header: "Low–high", chart: "range" },
-        { key: "power", label: "Résumé", header: "Rank", chart: "spark" },
+        { key: "power", label: "Results rank", header: "Rank", chart: "spark" },
         { key: "odds", label: "Playoff odds", header: "Odds", chart: "meter" },
     ];
 
@@ -384,7 +384,7 @@
             "How often this team makes the playoffs across ten thousand simulated "
             + "seasons. Early on a team's scoring average is weighted against the "
             + "league's, because one good week is not a season.",
-        form: "Power rank week by week, earliest week at the left.",
+        form: "Results rank week by week, earliest week at the left.",
     };
 
     function ledgerHint(key) {
@@ -462,7 +462,9 @@
         // every Tuesday. It runs to the playoffs and waits — one slot past
         // the last regular-season week, so the playoff marker has somewhere
         // to stand that is not on top of the final results.
-        const finalWeek = Math.max(lastWeek || 0, Math.max.apply(null, weeks)) + 1;
+        const fitData = Boolean(box && box.fitData);
+        const finalWeek = fitData ? Math.max.apply(null, weeks)
+            : Math.max(lastWeek || 0, Math.max.apply(null, weeks)) + 1;
         const weekSpan = Math.max(1, finalWeek - firstWeek);
 
         // Rank 1 sits at the top, and the scale covers every team rather than
@@ -525,7 +527,7 @@
             xFor,
             yFor,
             lines,
-            weekTicks: rankChartTicks(firstWeek, finalWeek - 1),
+            weekTicks: rankChartTicks(firstWeek, fitData ? finalWeek : finalWeek - 1),
             rankTicks: rankChartRankTicks(worstRank),
         };
     }

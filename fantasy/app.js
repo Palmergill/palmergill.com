@@ -49,6 +49,7 @@
         // Kept so a rotation can redraw at the other aspect ratio without
         // going back to the network for data that has not changed.
         chartPayload: null,
+        chartSelectedTeam: null,
         // Bumped on every context change. A response that resolves with a
         // stale generation is discarded — switching season fires several
         // requests at once, so out-of-order replies are the normal case.
@@ -67,6 +68,12 @@
         modeBanner: byId("modeBanner"),
         routeBanner: byId("routeBanner"),
         myTeamForm: byId("myTeamForm"),
+        myTeamSummary: byId("myTeamSummary"),
+        myTeamName: byId("myTeamName"),
+        myTeamChange: byId("myTeamChange"),
+        chartFullSeason: byId("chartFullSeason"),
+        chartSelection: byId("chartSelection"),
+        chartTable: byId("chartTable"),
         myTeamSelect: byId("myTeamSelect"),
         myTeamSave: byId("myTeamSave"),
         myTeamStatus: byId("myTeamStatus"),
@@ -527,7 +534,7 @@
         ["luck", "Luck"],
         ["lineup", "Lineup"],
         ["scoring", "Range"],
-        ["power", "Résumé"],
+        ["power", "Results rank"],
         ["odds", "Odds"],
         ["form", "Form"],
     ];
@@ -680,7 +687,7 @@
         els.ledger.appendChild(table);
 
         els.ledgerNote.textContent = payload.power_week
-            ? `${teams.length} teams · power through week ${payload.power_week}`
+            ? `${teams.length} teams · results through week ${payload.power_week}`
             : `${teams.length} teams`;
 
         const rating = payload.manager_rating || {};
@@ -976,12 +983,12 @@
         const roster = rosterPowerTeam(detail.espn_team_id);
         if (roster) {
             els.teamColophon.appendChild(
-                fact("Power", `#${roster.rank}`, `${F.formatPoints(roster.expected)} pts a week`)
+                fact("Roster power", `#${roster.rank}`, `${F.formatPoints(roster.expected)} pts a week`)
             );
         }
         els.teamColophon.appendChild(
             fact(
-                "Résumé",
+                "Results rank",
                 latest ? `#${latest.rank}` : "—",
                 history.length > 1 ? `from #${history[0].rank} in week ${history[0].week}` : ""
             )
@@ -1373,7 +1380,8 @@
         }
 
         renderMarkdown(els.teamLede, payload.overview_md || "No overview available.");
-        const parts = ["Team overview"];
+        const legacy = /Power rank:|starter leaders \(PPR\)/i.test(payload.overview_md || "");
+        const parts = [legacy ? "Archived overview — power rank means results rank; projections below use PPR. Current advice above uses Half PPR." : "Team overview · Half PPR"];
         const written = F.formatAsOf(payload.generated_at);
         if (written) parts.push(written.replace(/^as of/, "written"));
         els.teamOverviewMeta.textContent = parts.join(" · ");
@@ -1502,7 +1510,10 @@
     function renderMyTeamPicker(me) {
         state.myTeamSaveRequest += 1;
         const teams = me.teams || [];
-        els.myTeamForm.hidden = !teams.length;
+        const selected = teams.find(team => team.espn_team_id === me.selected_team_id);
+        els.myTeamForm.hidden = !teams.length || Boolean(selected);
+        els.myTeamSummary.hidden = !selected;
+        els.myTeamName.textContent = selected ? `My team: ${selected.name || selected.abbrev}` : "";
         els.myTeamSelect.replaceChildren(new Option("Choose your team", ""));
         teams.forEach((team) => {
             els.myTeamSelect.appendChild(new Option(team.name || team.abbrev, team.espn_team_id));
@@ -1687,10 +1698,10 @@
     const SVG_NS = "http://www.w3.org/2000/svg";
 
     const CHART_METRICS = [
-        { key: "roster", label: "Power rankings", note: "The board above, week by week" },
+        { key: "roster", label: "Roster power", note: "The board above, week by week" },
         {
             key: "resume",
-            label: "Résumé",
+            label: "Results rank",
             note: "Ranked on results so far: record, points, schedule and form",
         },
     ];
@@ -1768,6 +1779,10 @@
         state.chartPayload = payload;
         els.powerChart.replaceChildren();
         els.powerChartLegend.replaceChildren();
+        els.chartTable.replaceChildren();
+        els.chartSelection.textContent = "";
+        state.chartSelectedTeam = null;
+        highlightLine(null);
 
         if (!payload) {
             els.powerChartNote.textContent = "";
@@ -1784,7 +1799,7 @@
             return;
         }
 
-        const geometry = F.rankChartGeometry(payload.teams, payload.last_week, chartBox());
+        const geometry = F.rankChartGeometry(payload.teams, payload.last_week, { ...chartBox(), fitData: !els.chartFullSeason.checked });
         if (!geometry) {
             showChartEmpty("Nothing to chart for this season yet.");
             return;
@@ -1803,6 +1818,22 @@
 
         els.powerChart.appendChild(buildRankChart(geometry, payload));
         renderChartLegend(geometry);
+        const table = el("table", "rank-data-table");
+        const header = el("tr");
+        header.appendChild(el("th", null, "Team"));
+        payload.weeks.forEach(week => header.appendChild(el("th", null, `Week ${week}`)));
+        const head = el("thead"); head.appendChild(header); table.appendChild(head);
+        const body = el("tbody");
+        geometry.lines.forEach(line => {
+            const row = el("tr");
+            const name = el("th", null, line.name); name.scope = "row"; row.appendChild(name);
+            payload.weeks.forEach(week => {
+                const point = line.points.find(point => point.week === week);
+                row.appendChild(el("td", null, point ? `#${point.rank}` : "—"));
+            });
+            body.appendChild(row);
+        });
+        table.appendChild(body); els.chartTable.appendChild(table);
     }
 
     // matchMedia is the right question to ask, but it is not everywhere —
@@ -1874,7 +1905,7 @@
         // results it is marking the end of — and it is drawn even when the
         // data has not reached it, which is the point of an axis that runs
         // the whole way.
-        if (payload.last_week) {
+        if (payload.last_week && els.chartFullSeason.checked) {
             const x = geometry.xFor(payload.last_week + 1);
             root.appendChild(
                 svg("line", {
@@ -1930,12 +1961,24 @@
             }
             const swatch = el("span", "rank-chart__swatch");
             swatch.style.background = line.color;
-            item.appendChild(swatch);
-            item.appendChild(el("span", "rank-chart__legend-name", line.name || "—"));
+            const button = el("button", "chart-legend-button");
+            button.type = "button";
+            button.setAttribute("aria-pressed", "false");
+            button.appendChild(swatch);
+            button.appendChild(el("span", "rank-chart__legend-name", line.name || "—"));
+            item.appendChild(button);
+            button.addEventListener("click", () => {
+                state.chartSelectedTeam = state.chartSelectedTeam === line.espn_team_id ? null : line.espn_team_id;
+                els.powerChartLegend.querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", "false"));
+                button.setAttribute("aria-pressed", String(state.chartSelectedTeam !== null));
+                highlightLine(state.chartSelectedTeam);
+                els.chartSelection.textContent = state.chartSelectedTeam === null ? "" :
+                    `${line.name}: ${line.points.map(point => `week ${point.week} — #${point.rank}`).join("; ")}`;
+            });
             // Hovering a legend entry lifts its line out of the tangle, which
             // is the only way ten of them are readable at once.
             item.addEventListener("mouseenter", () => highlightLine(line.espn_team_id));
-            item.addEventListener("mouseleave", () => highlightLine(null));
+            item.addEventListener("mouseleave", () => highlightLine(state.chartSelectedTeam));
             els.powerChartLegend.appendChild(item);
         });
     }
@@ -2135,6 +2178,7 @@
         state.myTeamId = null;
         els.routeBanner.hidden = true;
         els.myTeamForm.hidden = true;
+        els.myTeamSummary.hidden = true;
         clearError();
         try {
             const params = state.season ? `?season=${state.season}` : "";
@@ -2215,6 +2259,12 @@
 
     function bindEvents() {
         els.myTeamForm.addEventListener("submit", saveMyTeam);
+        els.myTeamChange.addEventListener("click", () => {
+            els.myTeamForm.hidden = false;
+            els.myTeamSummary.hidden = true;
+            els.myTeamSelect.focus();
+        });
+        els.chartFullSeason.addEventListener("change", () => renderPowerChart(state.chartPayload));
         els.teamBack.addEventListener("click", clearTeam);
         els.scoreboardWeek.addEventListener("change", (event) => {
             state.scoreWeek = parseInt(event.target.value, 10);

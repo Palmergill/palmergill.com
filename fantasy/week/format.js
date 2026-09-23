@@ -128,9 +128,9 @@
     function movementLabel(power) {
         if (!power || !power.rank) return "";
         const delta = power.rank_delta;
-        if (!delta) return `Power ${power.rank}`;
+        if (!delta) return `Results rank ${power.rank}`;
         const arrow = delta > 0 ? "▲" : "▼";
-        return `Power ${power.rank} ${arrow}${Math.abs(delta)}`;
+        return `Results rank ${power.rank} ${arrow}${Math.abs(delta)}`;
     }
 
     // The recap has to be able to say why half of it is missing.

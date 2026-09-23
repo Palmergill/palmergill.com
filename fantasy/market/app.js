@@ -577,7 +577,7 @@
         }
         els.seasonPropsNote.textContent = [
             position === "ALL" ? `${rows.length} quoted` : `${rows.length} of ${all.length} ${position}s`,
-            data.baseline_as_of ? `7d baseline ${F.formatAsOf(data.baseline_as_of)}` : "",
+            data.baseline_as_of ? `Baseline ${F.formatAsOf(data.baseline_as_of)}` : "",
             F.marketSources(data.sources),
         ].filter(Boolean).join(" · ");
     }
@@ -632,7 +632,7 @@
             state.seasonFantasyData = data;
             if (state.boardMode === "week") renderMarketFreshness(data.sources || []);
             else renderSeasonFantasyLeaders(data);
-            if (els.memberStatus?.textContent === "Latest market") {
+            if (els.memberStatus?.textContent === "Latest sync") {
                 els.memberTeam.textContent = F.formatAsOf(data.as_of) || "—";
             }
         } catch (err) {
@@ -1289,6 +1289,13 @@
     }
 
     function renderMarketFreshness(sources) {
+        const coverage = document.getElementById("quoteCoverage");
+        const staleSources = (sources || []).filter(source => !source.quoted_at || Date.now() - new Date(source.quoted_at).getTime() > 7 * 86400000);
+        if (coverage) {
+            coverage.hidden = !staleSources.length;
+            coverage.textContent = staleSources.length
+                ? `Older quotes included: ${F.marketSources(staleSources)}.` : "";
+        }
         if (!els.marketFreshness) return;
         els.marketFreshness.innerHTML = "";
         (sources || []).forEach((source) => {
@@ -1300,7 +1307,7 @@
             label.appendChild(dot);
             label.append(source.bookmaker || "Source");
             item.appendChild(label);
-            item.appendChild(el("span", "freshness-time", F.formatAsOf(source.quoted_at) || "Unknown"));
+            item.appendChild(el("span", "freshness-time", `${F.quoteAge(source.quoted_at) || "Age unknown"} · ${F.formatAsOf(source.quoted_at) || "Date unknown"}`));
             els.marketFreshness.appendChild(item);
         });
         if (!els.marketFreshness.childElementCount) {
@@ -1542,6 +1549,10 @@
     }
 
     function renderMarketMovers() {
+        const windowLabel = document.getElementById("moversWindow");
+        if (windowLabel) windowLabel.textContent = state.movers?.baseline_as_of
+            ? `Since ${new Date(state.movers.baseline_as_of).toLocaleDateString(undefined, {month: "short", day: "numeric"})}`
+            : "Value changes";
         els.marketMovers.innerHTML = "";
         const rows = state.movers ? (state.movers[state.moversView] || []) : [];
         rows.forEach((entry) => {
@@ -1564,7 +1575,7 @@
             });
             els.marketMovers.appendChild(item);
         });
-        if (!rows.length) els.marketMovers.appendChild(el("li", "empty-row", "No 7-day baseline"));
+        if (!rows.length) els.marketMovers.appendChild(el("li", "empty-row", "No comparison baseline available"));
         els.marketMoversNote.textContent = state.movers?.baseline_as_of
             ? `Baseline ${F.formatAsOf(state.movers.baseline_as_of)}` : "";
     }
@@ -1581,7 +1592,7 @@
             const data = await fetchJson(`${API_BASE}/league/me?${params}`);
             renderMemberSnapshot(data);
         } catch (err) {
-            els.memberStatus.textContent = "Latest market";
+            els.memberStatus.textContent = "Latest sync";
             els.memberTeam.textContent = state.seasonFantasyData?.as_of
                 ? F.formatAsOf(state.seasonFantasyData.as_of) : "—";
             els.memberMetrics.innerHTML = "";
