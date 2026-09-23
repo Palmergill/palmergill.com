@@ -260,6 +260,19 @@
         } else {
             window.history.pushState({}, "", url);
         }
+        syncNav();
+    }
+
+    // The nav is mounted as "home" before this script runs, but the hub is
+    // also the team page. Home is current on the league view, My Team on
+    // your own team, and neither on anyone else's, so both stay clickable.
+    function syncNav() {
+        const header = window.FantasyHeader;
+        if (!header || !header.setPage) return;
+        let page = "home";
+        if (state.pendingMyTeam) page = "my-team";
+        else if (state.teamId) page = state.teamId === state.myTeamId ? "my-team" : null;
+        header.setPage(page);
     }
 
     // ── rendering ───────────────────────────────────────────────────────
@@ -1491,6 +1504,7 @@
             // The ledger highlights your row, so it needs to know which one
             // is yours before it draws.
             state.myTeamId = me.selected_team_id;
+            syncNav();
             // "My Team" in the section nav is a link to ?team=me, because the
             // nav has no way to know your team id. This is where that becomes
             // a real team.
@@ -2298,12 +2312,14 @@
             state.pendingMyTeam = false;
             state.column = "record";
             readUrlState();
+            syncNav();
             loadSeason();
         });
     }
 
     function init() {
         readUrlState();
+        syncNav();
         bindEvents();
         loadSeason();
     }

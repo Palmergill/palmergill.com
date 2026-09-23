@@ -12,7 +12,7 @@
 // Usage:
 //   <link rel="stylesheet" href="/shared/fantasy-header.css?v=2">
 //   <div id="fantasy-header-mount"></div>
-//   <script src="/shared/fantasy-header.js?v=2"></script>
+//   <script src="/shared/fantasy-header.js?v=5"></script>
 //   <script>FantasyHeader.mount({ page: 'home' });</script>
 //
 // `page` may be omitted — the current section is inferred from the path — but
@@ -21,6 +21,8 @@
     if (window.FantasyHeader) return;
 
     const BRAND = "Fantasy";
+
+    let mounted = null;
 
     // The league's own pages. Home is the only one with a slot; week and
     // draft-recap are reached from the hub, so they mark nothing current and
@@ -189,7 +191,22 @@
             nav.appendChild(links);
 
             root.replaceChildren(nav);
+            mounted = { root, links, tools, page };
             return { root, page, closeTools: tools.close };
+        },
+
+        // The hub is one URL showing either the league or a team, and it
+        // switches between them without a page load, so it tells the nav
+        // which one it is on. `null` means neither slot is current — someone
+        // else's team — which leaves both Home and My Team live links.
+        setPage(page) {
+            if (!mounted || mounted.page === page) return;
+            mounted.page = page;
+            const slots = PRIMARY.map((item) => primarySlot(item, page));
+            mounted.links
+                .querySelectorAll(":scope > .fantasy-header__link")
+                .forEach((node) => node.remove());
+            mounted.links.prepend(...slots);
         },
     };
 

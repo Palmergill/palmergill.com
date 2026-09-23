@@ -75,6 +75,23 @@ describe("fantasy header", () => {
         ]);
     });
 
+    test("the hub can move the current slot between Home and My Team", () => {
+        mountAt("/fantasy/", { page: "home" });
+        window.FantasyHeader.setPage("my-team");
+        expect(primary()).toEqual([
+            { label: "Home", href: "/fantasy/", current: null, tag: "A" },
+            { label: "My Team", href: null, current: "page", tag: "SPAN" },
+        ]);
+
+        // Someone else's team: neither slot is current, so both link out.
+        window.FantasyHeader.setPage(null);
+        expect(primary().map((slot) => slot.tag)).toEqual(["A", "A"]);
+
+        window.FantasyHeader.setPage("home");
+        expect(primary().map((slot) => slot.current)).toEqual(["page", null]);
+        expect(toolsButton().textContent).toContain("Tools");
+    });
+
     test("the menu starts closed and toggles on the button", () => {
         mountAt("/fantasy/", { page: "home" });
         expect(toolsMenu().hidden).toBe(true);

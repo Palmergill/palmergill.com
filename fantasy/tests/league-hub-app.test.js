@@ -146,7 +146,7 @@ function boot(overrides = {}, url = "/fantasy/") {
     window.history.replaceState({}, "", url);
     window.LeagueFormat = F;
     window.API_ORIGIN = "";
-    window.FantasyHeader = { mount: () => null };
+    window.FantasyHeader = { mount: () => null, setPage: jest.fn() };
     window.fetch = jest.fn((requested, options) => {
         const target = String(requested);
         if (overrides.fetch) {
@@ -672,6 +672,17 @@ describe("?team=me", () => {
 
         expect(new URLSearchParams(window.location.search).get("team")).toBe("2");
         expect(document.getElementById("leagueSections").hidden).toBe(true);
+    });
+
+    test("marks My Team current in the nav, and Home again on the way back", async () => {
+        boot({ me: CONFIGURED }, "/fantasy/?team=me");
+        await waitFor(() => !document.getElementById("teamView").hidden);
+        const setPage = window.FantasyHeader.setPage;
+        expect(setPage).toHaveBeenLastCalledWith("my-team");
+
+        window.history.replaceState({}, "", "/fantasy/");
+        window.dispatchEvent(new PopStateEvent("popstate"));
+        expect(setPage).toHaveBeenLastCalledWith("home");
     });
 
     test("with no team chosen it lands on the league and says why", async () => {
