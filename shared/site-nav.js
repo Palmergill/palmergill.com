@@ -138,10 +138,19 @@
         return `/login/?next=${encodeURIComponent(next || "/")}`;
     }
 
-    function close(nav, toggle) {
+    function close(nav, toggle, panel, mobileQuery) {
+        if (mobileQuery.matches && nav.classList.contains("is-open") && panel.contains(document.activeElement)) toggle.focus();
         nav.classList.remove("is-open");
         toggle.setAttribute("aria-expanded", "false");
         toggle.setAttribute("aria-label", "Open navigation");
+        syncPanel(nav, panel, mobileQuery);
+    }
+
+    function syncPanel(nav, panel, mobileQuery) {
+        const isClosedMobile = mobileQuery.matches && !nav.classList.contains("is-open");
+        panel.inert = isClosedMobile;
+        if (isClosedMobile) panel.setAttribute("aria-hidden", "true");
+        else panel.removeAttribute("aria-hidden");
     }
 
     async function logOut(button) {
@@ -267,14 +276,25 @@
 
         const toggle = nav.querySelector(".site-nav__toggle");
         const backdrop = nav.querySelector(".site-nav__backdrop");
+        const panel = nav.querySelector(".site-nav__panel");
+        const mobileQuery = window.matchMedia ? window.matchMedia("(max-width: 979px)") : { matches: false };
+        syncPanel(nav, panel, mobileQuery);
+        mobileQuery.addEventListener?.("change", () => {
+            if (!mobileQuery.matches) close(nav, toggle, panel, mobileQuery);
+            else syncPanel(nav, panel, mobileQuery);
+        });
         toggle.addEventListener("click", () => {
             const isOpen = nav.classList.toggle("is-open");
             toggle.setAttribute("aria-expanded", String(isOpen));
             toggle.setAttribute("aria-label", isOpen ? "Close navigation" : "Open navigation");
+            syncPanel(nav, panel, mobileQuery);
         });
-        backdrop.addEventListener("click", () => close(nav, toggle));
+        backdrop.addEventListener("click", () => close(nav, toggle, panel, mobileQuery));
         document.addEventListener("keydown", (event) => {
-            if (event.key === "Escape") close(nav, toggle);
+            if (event.key === "Escape" && nav.classList.contains("is-open")) {
+                close(nav, toggle, panel, mobileQuery);
+                toggle.focus();
+            }
         });
     }
 

@@ -206,6 +206,16 @@ header {
 .watchlist-section { margin-bottom: 12px; }
 
 .compare-section { margin-bottom: 16px; }
+.compare-demo-notice {
+    margin: 0 0 12px;
+    padding: 10px 12px;
+    border: 1px solid rgba(185, 126, 53, 0.35);
+    border-radius: 8px;
+    background: rgba(185, 126, 53, 0.1);
+    color: #8a5a26;
+    font-size: 13px;
+    line-height: 1.4;
+}
 .compare-hint { color: var(--muted); font-size: 12px; }
 .compare-form {
     display: flex;

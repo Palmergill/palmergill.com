@@ -22,7 +22,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/shared/site-nav.css?v=14">
+    <link rel="stylesheet" href="/shared/site-nav.css?v=15">
     <style>
         :root {
             --plum: #8a6d8a;
@@ -491,6 +491,7 @@
         @media (max-width: 820px) {
             .hero { grid-template-columns: 1fr; gap: 24px; padding-top: 32px; }
             .portrait { max-width: 320px; aspect-ratio: 4 / 3; }
+            .portrait img { object-position: center 55%; }
             .card { grid-template-columns: 1fr; min-height: 0; }
             .card .thumb {
                 border-right: 0;
@@ -539,10 +540,11 @@
             <div>
                 <h1 class="name"><span class="mask"><span class="word">Palmer</span></span> <span class="mask"><span class="word">Gill</span></span></h1>
                 <p class="role">Full Stack Software Engineer</p>
-                <p class="lede">Hello I'm Palmer Gill, welcome to my website! Here I have a collection of apps that I have created, feel free to check them out. If you have any questions or feedback please let me know!</p>
+                <p class="lede">I build full stack software with a focus on backend systems and identity and access management at H-E-B. Explore my projects across markets, Bitcoin, and browser games. Questions or feedback are welcome.</p>
                 <div class="cta">
                     <a class="btn solid" href="#work">See my work</a>
                     <a class="btn ghost" href="/about/">About me</a>
+                    <a class="btn ghost" href="https://www.linkedin.com/in/palmer-gill-0081a7129/" target="_blank" rel="noopener noreferrer">Contact on LinkedIn</a>
                     <a class="btn ghost" href="/assets/Resume2026.pdf">Résumé</a>
                 </div>
             </div>
@@ -641,7 +643,7 @@
         </footer>
     </div>
 
-    <script src="/shared/site-nav.js?v=17"></script>
+    <script src="/shared/site-nav.js?v=18"></script>
     <script src="/shared/analytics.js?v=1"></script>
     <script>
         (() => {

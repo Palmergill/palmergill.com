@@ -9,6 +9,7 @@
     // Module-private cache of fetched ticker data. Cleared between renders so the
     // table reflects current input.
     const cache = new Map();
+    let renderId = 0;
 
     function readTickers() {
         try {
@@ -84,7 +85,9 @@
                 marketCap: summary.market_cap ?? null,
                 peRatio: summary.pe_ratio ?? null,
                 eps: summary.eps ?? null,
-                dividendYield: summary.dividend_yield ?? null
+                dividendYield: summary.dividend_yield ?? null,
+                demo: Boolean(data._demo || priceData?._demo),
+                warning: data._warning || priceData?._warning || null
             };
             cache.set(t, row);
             return row;
@@ -123,6 +126,7 @@
     async function renderTable() {
         const tableEl = document.getElementById('compareTable');
         if (!tableEl) return;
+        const currentRender = ++renderId;
         const list = readTickers();
         if (list.length === 0) {
             tableEl.hidden = true;
@@ -137,6 +141,15 @@
         tableEl.appendChild(loading);
 
         const rows = await Promise.all(list.map(fetchTicker));
+        if (currentRender !== renderId) return;
+
+        const demoRows = rows.filter((row) => row.demo);
+        const notice = document.createElement('p');
+        if (demoRows.length) {
+            notice.className = 'compare-demo-notice';
+            notice.setAttribute('role', 'status');
+            notice.textContent = `Sample data: ${demoRows.map((row) => row.ticker).join(', ')} ${demoRows.length === 1 ? 'uses' : 'use'} generated stock values. Sign in for live market data.`;
+        }
 
         const table = document.createElement('table');
         const thead = document.createElement('thead');
@@ -186,7 +199,7 @@
         });
         table.appendChild(tbody);
 
-        tableEl.replaceChildren(table);
+        tableEl.replaceChildren(...(demoRows.length ? [notice, table] : [table]));
     }
 
     function addTicker(input) {

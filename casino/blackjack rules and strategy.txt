@@ -266,7 +266,8 @@ EASY-TO-REMEMBER RULES OF THUMB:
   - Stand on hard 17 or more, always.
   - Double hard 11, including against Ace on this H17 table.
   - Double hard 10 except vs 10/Ace.
-  - Hard 12-16 is the "stiff" zone: stand vs dealer 2-6, hit vs 7-Ace.
+  - Hard 12: stand vs dealer 4-6; hit vs 2-3 or 7-Ace.
+  - Hard 13-16: stand vs dealer 2-6; hit vs 7-Ace.
   - With a soft 18 (A,7): double vs 2-6, stand vs 7/8, hit vs 9/10/A.
   - With a soft 19 (A,8): double vs 6, otherwise stand.
   - Never take insurance.

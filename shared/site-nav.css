@@ -410,6 +410,7 @@ button.site-nav__link:disabled,
     .site-nav.is-open .site-nav__top-login {
         opacity: 0;
         pointer-events: none;
+        visibility: hidden;
     }
 
     .site-nav__mobile-logo {

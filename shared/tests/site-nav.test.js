@@ -79,3 +79,44 @@ describe('site navigation authentication', () => {
         }));
     });
 });
+
+describe('mobile navigation panel', () => {
+    let mobileQuery;
+
+    beforeEach(() => {
+        document.head.innerHTML = '';
+        document.body.innerHTML = '<main id="main"><input id="username"></main>';
+        global.fetch = jest.fn().mockResolvedValue({ ok: true, json: async () => ({ authenticated: false }) });
+        mobileQuery = { matches: true, addEventListener: jest.fn() };
+        window.matchMedia = jest.fn(() => mobileQuery);
+    });
+
+    afterEach(() => {
+        delete global.fetch;
+        delete window.matchMedia;
+    });
+
+    test('keeps closed links inert, restores them on open and desktop, and returns focus on Escape', async () => {
+        await loadNav();
+        const panel = document.querySelector('.site-nav__panel');
+        const toggle = document.querySelector('.site-nav__toggle');
+        expect(panel.inert).toBe(true);
+        expect(panel.getAttribute('aria-hidden')).toBe('true');
+
+        toggle.click();
+        expect(panel.inert).toBe(false);
+        expect(panel.hasAttribute('aria-hidden')).toBe(false);
+        expect(toggle.getAttribute('aria-expanded')).toBe('true');
+
+        panel.querySelector('a').focus();
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+        expect(document.activeElement).toBe(toggle);
+        expect(panel.inert).toBe(true);
+        expect(toggle.getAttribute('aria-expanded')).toBe('false');
+
+        mobileQuery.matches = false;
+        mobileQuery.addEventListener.mock.calls[0][1]();
+        expect(panel.inert).toBe(false);
+        expect(panel.hasAttribute('aria-hidden')).toBe(false);
+    });
+});
