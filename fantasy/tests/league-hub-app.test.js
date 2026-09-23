@@ -1021,7 +1021,7 @@ describe("the power chart", () => {
         await waitFor(() => lines().length > 0);
 
         // Both metrics use the same names as their corresponding boards.
-        expect(chips().map((chip) => chip.textContent)).toEqual(["Roster power", "Results rank"]);
+        expect(chips().map((chip) => chip.textContent)).toEqual(["Power Rankings", "Results rank"]);
         expect(chips()[0].classList.contains("chip--active")).toBe(true);
         expect(
             fetchMock.mock.calls.some(([url]) => String(url).includes("metric=roster"))

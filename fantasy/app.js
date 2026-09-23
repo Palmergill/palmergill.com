@@ -996,7 +996,7 @@
         const roster = rosterPowerTeam(detail.espn_team_id);
         if (roster) {
             els.teamColophon.appendChild(
-                fact("Roster power", `#${roster.rank}`, `${F.formatPoints(roster.expected)} pts a week`)
+                fact("Power ranking", `#${roster.rank}`, `${F.formatPoints(roster.expected)} pts a week`)
             );
         }
         els.teamColophon.appendChild(
@@ -1712,7 +1712,7 @@
     const SVG_NS = "http://www.w3.org/2000/svg";
 
     const CHART_METRICS = [
-        { key: "roster", label: "Roster power", note: "The board above, week by week" },
+        { key: "roster", label: "Power Rankings", note: "The board above, week by week" },
         {
             key: "resume",
             label: "Results rank",
