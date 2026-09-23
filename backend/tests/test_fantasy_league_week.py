@@ -462,7 +462,9 @@ def test_a_loss_the_bench_would_have_won_is_called_out_with_the_swap(db):
     benched = award(recap, "benched_win")
     assert benched["winner"]["espn_team_id"] == 2
     assert benched["winner"]["value"] == 9.0
-    assert "sat T2B1 (40) for T2RB (6)" in benched["winner"]["detail"]
+    # 49 is two swaps, not one, and the card names both so the total adds
+    # up: (40 + 22) - (7 + 6) = 49.
+    assert "sat T2B1 (40), T2B2 (22) for T2WR (7), T2RB (6)" in benched["winner"]["detail"]
 
 
 def test_a_loss_the_bench_could_not_have_saved_is_not_blamed_on_it(db):

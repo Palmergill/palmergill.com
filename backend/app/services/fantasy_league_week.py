@@ -457,6 +457,14 @@ def _lineups(
             for entry in optimal_entries
             if entry["player_id"] and entry["player_id"] not in started_ids
         ]
+        optimal_ids = {
+            entry["player_id"] for entry in optimal_entries if entry["player_id"]
+        }
+        should_have_sat = [
+            entry
+            for entry in starters
+            if entry["player_id"] and entry["player_id"] not in optimal_ids
+        ]
         scorable = starters_known and optimal > 0
 
         # The single swap that cost the most: a bench player who could
@@ -489,6 +497,7 @@ def _lineups(
             "starters": [_entry_payload(entry) for entry in starters],
             "bench": [_entry_payload(entry) for entry in bench],
             "should_have_started": [_entry_payload(entry) for entry in should_have],
+            "should_have_sat": [_entry_payload(entry) for entry in should_have_sat],
             "worst_call": (
                 {
                     "gap": _round(worst_call[0], 1),
@@ -699,14 +708,23 @@ def _accolades(
     # A loss the manager's own bench would have won. Both sides exclude the
     # same unscored seats (D/ST), so adding the points left on the bench to
     # the real score is a like-for-like comparison with the opponent's.
+    #
+    # The number is the whole best lineup, which can take more than one
+    # swap, so the card names every swap in it. Naming only the worst one
+    # left a total nobody could add up from what the card said.
     def benched_detail(team_id: int) -> Dict[str, Any]:
         described = team_of(team_id)
-        call = (lineup_teams.get(team_id) or {}).get("worst_call")
-        if call:
+        lineup = lineup_teams.get(team_id) or {}
+        players = lambda rows: ", ".join(
+            f"{row['name']} ({row['points']:g})"
+            for row in sorted(rows, key=lambda row: -row["points"])
+        )
+        sat = lineup.get("should_have_started") or []
+        started = lineup.get("should_have_sat") or []
+        if sat and started:
+            swaps = f"sat {players(sat)} for {players(started)}"
             described["detail"] = (
-                f"{described['detail']} · sat {call['benched']['name']} "
-                f"({call['benched']['points']:g}) for {call['started']['name']} "
-                f"({call['started']['points']:g})"
+                f"{described['detail']} · {swaps}" if described.get("detail") else swaps
             )
         return described
 
