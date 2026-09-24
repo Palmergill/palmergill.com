@@ -3,47 +3,13 @@
   "version": "2.1.0",
   "description": "Personal project site with shared API-backed apps",
   "scripts": {
-    "test": "jest",
-    "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage"
+    "test": "playwright test",
+    "test:ui": "playwright test --ui"
   },
   "dependencies": {
     "@vercel/functions": "^3.5.0"
   },
   "devDependencies": {
-    "jest": "^29.7.0",
-    "jest-environment-jsdom": "^29.7.0"
-  },
-  "jest": {
-    "testEnvironment": "jsdom",
-    "roots": [
-      "poker/tests",
-      "craps/tests",
-      "blackjack/tests",
-      "high-card-flush/tests",
-      "craps-strategy/tests",
-      "shared/tests",
-      "fantasy/tests"
-    ],
-    "testMatch": [
-      "**/*.test.js"
-    ],
-    "collectCoverageFrom": [
-      "poker/**/*.js",
-      "high-card-flush/**/*.js",
-      "craps-strategy/**/*.js",
-      "shared/*.js",
-      "fantasy/*.js",
-      "fantasy/market/*.js",
-      "fantasy/week/*.js",
-      "fantasy/draft-recap/*.js",
-      "fantasy/rankings/*.js",
-      "!craps-strategy/tests/**",
-      "!poker/tests/**",
-      "!high-card-flush/tests/**",
-      "!shared/tests/**",
-      "!fantasy/tests/**",
-      "!**/node_modules/**"
-    ]
+    "@playwright/test": "^1.63.0"
   }
 }

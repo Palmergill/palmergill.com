@@ -97,12 +97,10 @@ sequenceDiagram
 
 ## Tests
 
-Root JavaScript tests are run with:
+The site's end-to-end suite runs with:
 
 ```bash
 npm test
 ```
 
-The root Jest config currently includes `poker/tests`, `craps/tests`, and `blackjack/tests`.
-
-Add backend API tests under the shared backend if poker router behavior changes.
+It seats a player at a bot table through the real poker API; extend `e2e/casino.spec.js` when poker behavior changes.

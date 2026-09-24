@@ -63,7 +63,10 @@ async def lifespan(app: FastAPI):
         analytics_writer_task,
         rate_limit_sweep_task,
     ]
-    background_tasks.append(asyncio.create_task(_periodic_fantasy_collection()))
+    # E2E runs set this so a fresh test database never reaches out to ESPN,
+    # Sleeper and friends on boot.
+    if os.getenv("FANTASY_COLLECTION_DISABLED", "").lower() not in {"1", "true", "yes"}:
+        background_tasks.append(asyncio.create_task(_periodic_fantasy_collection()))
     try:
         yield
     finally:

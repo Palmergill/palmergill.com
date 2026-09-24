@@ -5,8 +5,7 @@ testable without a database and the collector can hold the persistence.
 
 Prior art: ported from the standalone fantasyfootball prototype
 (github.com/Palmergill/fantasyfootball, `backend/app/utils/ranking_algorithms.py`).
-Five defects were fixed in the port; each has a regression test in
-`tests/test_fantasy_league_rankings.py`:
+Five defects were fixed in the port:
 
   1. Recent form ordered scores by *value* and took the last four, so it
      scored the four best weeks rather than the four most recent.

@@ -753,14 +753,12 @@
             <section id="testing" class="doc-section">
                 <p class="section-kicker">Testing</p>
                 <h2>Available test commands</h2>
-                <p>Jest is configured for browser-game logic tests under poker, craps, craps strategy, blackjack, High Card Flush, and shared casino modules.</p>
+                <p>Testing is end-to-end. Playwright boots the backend against a throwaway SQLite database, serves the site from the same process, and drives every page in Chromium; any script or console error fails the test.</p>
                 <pre><code>npm test</code></pre>
-                <pre><code>npm run test:watch</code></pre>
-                <pre><code>npm run test:coverage</code></pre>
-                <p>Backend API behavior is covered by pytest under <code>backend/tests/</code>.</p>
+                <pre><code>npm run test:ui</code></pre>
+                <p>A small pytest file under <code>backend/tests/</code> keeps the security invariants a browser cannot see.</p>
                 <pre><code>cd backend
-source venv/bin/activate
-pytest</code></pre>
+venv/bin/pytest</code></pre>
             </section>
 
             <section id="repo-layout" class="doc-section">

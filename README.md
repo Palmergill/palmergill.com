@@ -75,26 +75,26 @@ logs/backend.log
 
 ## Testing
 
-Backend (pytest, no network access, no live LLM/provider calls — external
-services are always monkeypatched):
-
-```bash
-cd backend
-source venv/bin/activate  # or: pip install -r requirements-dev.txt
-pytest
-```
-
-Frontend suites (Jest, covers `poker/tests`, `craps/tests`,
-`blackjack/tests`, `high-card-flush/tests`, `craps-strategy/tests`,
-`fantasy/tests`, and `shared/tests`):
+Testing is end-to-end: Playwright boots the FastAPI backend with
+`LOCAL_SITE_ROOT=true` against a throwaway SQLite file and drives the real
+pages in Chromium (specs live in `e2e/`). Each test fails on any page
+script error or console error.
 
 ```bash
 npm install
-npm test
+npx playwright install chromium
+npm test            # expects backend/venv; set E2E_PYTHON to use another interpreter
 ```
 
-Both run automatically on every push/PR via
-`.github/workflows/ci-cd.yml`.
+The only unit tests left are backend security invariants that a browser
+cannot observe (token signing, proxy-hop parsing, CSV injection, log
+redaction):
+
+```bash
+cd backend && venv/bin/pytest
+```
+
+Both run on every push/PR via `.github/workflows/ci-cd.yml`.
 
 ## Deployment Model
 

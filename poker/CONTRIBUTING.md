@@ -57,7 +57,7 @@ http://127.0.0.1:8000/poker/
 npm test
 ```
 
-The root Jest config runs frontend tests for poker, craps, and blackjack.
+This runs the site's Playwright end-to-end suite (`e2e/`), which plays a hand of poker against the bots.
 
 ## Code Style
 
