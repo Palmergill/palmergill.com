@@ -13,27 +13,32 @@ async function signIn(page, username, password = PASSWORD) {
     await page.getByRole('button', { name: 'Sign in' }).click();
 }
 
-test('sign up, log out from the nav, and sign back in to a member page', async ({ page }) => {
-    const username = await signUp(page);
+test.describe('member session', () => {
+    // The week page's league API answers 404 on the empty test database.
+    test.use({ allowErrors: [/status of 404/] });
 
-    await page.goto('/fantasy/week/');
-    await expect(page).toHaveURL(/\/fantasy\/week\//);
+    test('sign up, log out from the nav, and sign back in to a member page', async ({ page }) => {
+        const username = await signUp(page);
 
-    await page.goto('/');
-    await expect(page.locator('.site-nav__username')).toHaveText(username);
-    await page.locator('.site-nav__logout').click();
-    await expect(page).toHaveURL(/\/login\//);
+        await page.goto('/fantasy/week/');
+        await expect(page).toHaveURL(/\/fantasy\/week\//);
 
-    // Ask the server directly: the browser may serve the page from cache.
-    const guarded = await page.request.get('/fantasy/week/', {
-        headers: { accept: 'text/html' },
-        maxRedirects: 0,
+        await page.goto('/');
+        await expect(page.locator('.site-nav__username')).toHaveText(username);
+        await page.locator('.site-nav__logout').click();
+        await expect(page).toHaveURL(/\/login\//);
+
+        // Ask the server directly: the browser may serve the page from cache.
+        const guarded = await page.request.get('/fantasy/week/', {
+            headers: { accept: 'text/html' },
+            maxRedirects: 0,
+        });
+        expect(guarded.status()).toBe(302);
+
+        await page.goto('/login/?next=/fantasy/week/');
+        await signIn(page, username);
+        await expect(page).toHaveURL(/\/fantasy\/week\//);
     });
-    expect(guarded.status()).toBe(302);
-
-    await page.goto('/login/?next=/fantasy/week/');
-    await signIn(page, username);
-    await expect(page).toHaveURL(/\/fantasy\/week\//);
 });
 
 test('login ignores an off-site next target', async ({ page }) => {
