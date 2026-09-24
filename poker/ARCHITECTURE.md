@@ -39,7 +39,6 @@ The active frontend is a static vanilla HTML/CSS/JS app:
 - `poker/index.html` - markup and most CSS.
 - `poker/app.js` - game UI, API calls, polling, stats, audio, haptics, themes, and multiplayer lobby flow.
 - `poker/sw.js` and `poker/manifest.json` - PWA support.
-- `poker/tests/` - Jest utility tests.
 
 The frontend subscribes to a WebSocket push channel at `/api/poker/games/{game_id}/ws` and falls back to polling. The server fans a `state_changed` ping to subscribed sockets whenever a mutating action lands; the client then fetches the latest state via the regular `GET /api/poker/games/{game_id}` endpoint with `process_ai=false`. Polling continues at a 3s cadence as a fallback. AI turns are advanced separately with `POST /api/poker/games/{game_id}/process-ai`.
 

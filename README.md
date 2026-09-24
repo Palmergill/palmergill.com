@@ -118,11 +118,12 @@ stock-research/   Active stock research frontend
 bitcoin-chat/     Active Bitcoin chat frontend
 fantasy/          Fantasy dashboard, Fourth & Fortune draft-order game, and the ESPN league hub
 casino/           Casino landing page and game rules
-poker/            Active poker frontend and supporting docs/tests
+poker/            Active poker frontend and supporting docs
 craps/            Active craps frontend
 craps-strategy/   Active craps strategy simulator
-blackjack/        Active blackjack frontend and tests
-high-card-flush/  High Card Flush frontend, PWA shell, and tests
+blackjack/        Active blackjack frontend
+high-card-flush/  High Card Flush frontend and PWA shell
+e2e/              Playwright end-to-end suite (config in playwright.config.js)
 ```
 
 ## Notes

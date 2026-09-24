@@ -106,6 +106,21 @@ Logs:
 logs/backend.log
 ```
 
+## Testing
+
+`npm test` runs the Playwright suite in `e2e/`. `playwright.config.js` starts
+the backend itself (`LOCAL_SITE_ROOT=true`, a throwaway SQLite file under the
+OS temp dir, `FANTASY_COLLECTION_DISABLED=true` so nothing reaches ESPN or the
+market providers, and a raised `DAILY_SIGNUP_LIMIT` so every test can sign up
+its own account), then drives the real pages in Chromium. A shared fixture in
+`e2e/helpers.js` fails any test whose page throws or logs a console error;
+tests that expect one (a 403 on a signed-out member page, a 404 from a league
+API with no data yet) opt out with `test.use({ allowErrors: [...] })`.
+
+The only unit tests are `backend/tests/test_security_regressions.py`, for
+invariants no page exposes: session-token signing, proxy-hop IP parsing, CSV
+formula injection, log redaction, and rate limits. CI runs both.
+
 ## Deployment
 
 - Static site hosting serves the root static files and project directories.

@@ -54,7 +54,7 @@ reproducibly (per-trial RNG seeded from `baseSeed`).
 | Step | Status | Notes |
 |------|--------|-------|
 | Backend: `curl POST /api/craps/translate` returns valid spec or 503 fallback | ◧ | Reaches handler: 503 (no key here) + 422 on bad input verified. **Live LLM path untested — no OPENAI_API_KEY in this env.** |
-| `npm test` — simulator + root suites green | ☑ | 139/139 tests pass as of 2026-07-04; simulator coverage remains in `craps-strategy/tests/` |
+| `npm test` — simulator + root suites green | ☑ | 139/139 tests pass as of 2026-07-04. Unit tests were removed 2026-09-24; `e2e/casino.spec.js` now runs a preset simulation end to end |
 | Preview: translate + run a strategy, screenshot charts + stats | ☑ | Preset → run → 100-line chart + histogram + stats; determinism confirmed |
 | Preview: console + network clean | ☑ | No console errors |
 | Preview: mobile-width layout holds | ☑ | 375px: fields stack, theme intact |
