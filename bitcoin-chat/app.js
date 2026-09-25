@@ -252,9 +252,9 @@ function renderRichText(parent, text) {
     appendParagraph(parent, paragraphLines);
 }
 
-function setNodeStatus(text, available = true) {
+function setNodeStatus(text, state = 'live') {
     const dot = document.createElement('span');
-    dot.className = `status-dot${available ? '' : ' muted'}`;
+    dot.className = `status-dot${state === 'live' ? '' : ` ${state}`}`;
     dot.setAttribute('aria-hidden', 'true');
     nodeStatus.replaceChildren(dot, document.createTextNode(text));
 }
@@ -1049,9 +1049,9 @@ async function refreshStatus() {
             : status.source === 'mempool.space'
                 ? 'mempool.space online'
                 : 'demo mode';
-        setNodeStatus(`${source} · ${chain} · ${sync}`, liveSource);
+        setNodeStatus(`${source} · ${chain} · ${sync}`, liveSource ? 'live' : 'demo');
     } catch {
-        setNodeStatus('bitcoin data unavailable', false);
+        setNodeStatus('bitcoin data unavailable', 'offline');
     }
 }
 

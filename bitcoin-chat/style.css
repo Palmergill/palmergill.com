@@ -121,7 +121,11 @@ button {
     background: var(--green);
 }
 
-.status-dot.muted {
+.status-dot.demo {
+    background: var(--soft);
+}
+
+.status-dot.offline {
     background: var(--danger);
 }
 
@@ -1269,17 +1273,17 @@ textarea::placeholder {
 
 /* Resilient dashboard states: failures read as a deliberate status instead of
    a collection of unrelated dashes. */
-.term-titlebar:has(.status-dot.muted) {
+.term-titlebar:has(.status-dot.offline) {
     border-bottom-color: rgba(179, 64, 47, 0.24);
     background: linear-gradient(90deg, rgba(179, 64, 47, 0.055), var(--paper) 38%);
 }
 
-.term-titlebar:has(.status-dot.muted) .term-status {
+.term-titlebar:has(.status-dot.offline) .term-status {
     color: #8f4135;
     font-weight: 600;
 }
 
-body:has(.status-dot.muted) .metric-grid {
+body:has(.status-dot.offline) .metric-grid {
     display: block;
     margin: 0 0 18px;
     padding: 14px 16px;
@@ -1291,15 +1295,15 @@ body:has(.status-dot.muted) .metric-grid {
     line-height: 1.5;
 }
 
-body:has(.status-dot.muted) .metric-grid::before {
+body:has(.status-dot.offline) .metric-grid::before {
     content: "Network metrics will return automatically when the live data service reconnects.";
 }
 
-body:has(.status-dot.muted) .metric-grid .stat-tile {
+body:has(.status-dot.offline) .metric-grid .stat-tile {
     display: none;
 }
 
-body:has(.status-dot.muted) .blocks-section {
+body:has(.status-dot.offline) .blocks-section {
     padding: 14px 16px;
     border: 1px solid var(--line);
     border-radius: 10px;
