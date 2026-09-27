@@ -239,12 +239,59 @@ def _scoring_model(metrics: Dict[int, TeamMetrics]) -> Dict[int, Dict[str, float
     return model
 
 
+def seed_playoffs(
+    order: List[int],
+    divisions: Dict[int, Any],
+    playoff_team_count: int,
+) -> Dict[str, Any]:
+    """Seed a playoff field from teams already ranked best first.
+
+    This league's rule: the best team in each division takes a top seed and
+    a first-round bye, and the rest of the field is the next best records
+    regardless of division. Division winners are ordered among themselves by
+    the same ranking, so the better one is the 1.
+
+    A league with one division (or none recorded) has nobody to crown, so it
+    seeds straight down the ranking with no byes.
+    """
+    count = min(max(playoff_team_count, 0), len(order))
+    division_ids = {divisions.get(team_id) for team_id in order} - {None}
+    winners: List[int] = []
+    if len(division_ids) > 1:
+        seen = set()
+        for team_id in order:
+            division = divisions.get(team_id)
+            if division is not None and division not in seen:
+                seen.add(division)
+                winners.append(team_id)
+        if len(winners) > count:
+            winners = []
+
+    rest = [team_id for team_id in order if team_id not in winners]
+    seeds = (winners + rest)[:count]
+    byes = len(winners)
+
+    # High seed hosts low seed among everyone without a bye. When there is
+    # one game per bye the bracket is fixed the usual way: the 1 waits for
+    # the lowest-seeded game, so 4/5 feeds the 1 and 3/6 feeds the 2.
+    playing = list(range(byes + 1, count + 1))
+    games = []
+    while len(playing) >= 2:
+        games.append({"seeds": [playing.pop(0), playing.pop()]})
+    if byes and len(games) == byes:
+        for index, game in enumerate(games):
+            game["winner_meets"] = byes - index
+
+    return {"seeds": seeds, "byes": byes, "first_round": games}
+
+
 def playoff_odds(
     metrics: Dict[int, TeamMetrics],
     remaining: Iterable[Dict[str, Any]],
     playoff_team_count: int,
     simulations: int = DEFAULT_SIMULATIONS,
     seed: int = 17,
+    divisions: Optional[Dict[int, Any]] = None,
 ) -> Dict[int, Dict[str, Any]]:
     """Simulate the rest of the schedule and count how often each team seeds in.
 
@@ -259,9 +306,9 @@ def playoff_odds(
     plays out the same season ten thousand times and reports near-certainty
     about a league nobody has seen yet.
 
-    Seeding is wins, then points for. Real leagues often seed division winners
-    first; the hub does not store this league's tiebreak settings, and
-    inventing one would make the number less trustworthy rather than more.
+    Teams rank on wins, then points for, and ``seed_playoffs`` turns that
+    into a field: division winners take the byes, the next best records
+    fill the rest. ``bye_odds`` counts how often a team is a division winner.
 
     ``seed`` is fixed so the same stored data produces the same odds on every
     request. A page that reshuffles its own numbers on reload reads as broken
@@ -270,7 +317,12 @@ def playoff_odds(
     remaining = list(remaining)
     if playoff_team_count <= 0 or not metrics:
         return {
-            team_id: {"odds": None, "projected_wins": None, "projected_losses": None}
+            team_id: {
+                "odds": None,
+                "bye_odds": None,
+                "projected_wins": None,
+                "projected_losses": None,
+            }
             for team_id in metrics
         }
 
@@ -282,7 +334,9 @@ def playoff_odds(
     ]
 
     rng = random.Random(seed)
+    divisions = divisions or {}
     made = {team_id: 0 for team_id in metrics}
+    byes = {team_id: 0 for team_id in metrics}
     total_wins = {team_id: 0.0 for team_id in metrics}
 
     base_wins = {
@@ -318,8 +372,11 @@ def playoff_odds(
             metrics,
             key=lambda team_id: (-wins[team_id], -points[team_id], team_id),
         )
-        for team_id in seeded[:playoff_team_count]:
+        field = seed_playoffs(seeded, divisions, playoff_team_count)
+        for index, team_id in enumerate(field["seeds"]):
             made[team_id] += 1
+            if index < field["byes"]:
+                byes[team_id] += 1
         for team_id in metrics:
             total_wins[team_id] += wins[team_id]
 
@@ -331,6 +388,7 @@ def playoff_odds(
     return {
         team_id: {
             "odds": made[team_id] / runs,
+            "bye_odds": byes[team_id] / runs,
             "projected_wins": total_wins[team_id] / runs,
             "projected_losses": games_each[team_id] - (total_wins[team_id] / runs),
         }
@@ -343,6 +401,7 @@ def ledger_rows(
     remaining: Iterable[Dict[str, Any]],
     playoff_team_count: int,
     simulations: int = DEFAULT_SIMULATIONS,
+    divisions: Optional[Dict[int, Any]] = None,
 ) -> Dict[int, Dict[str, Any]]:
     """Every derived measure for every team, keyed by ESPN team id.
 
@@ -353,7 +412,9 @@ def ledger_rows(
     expected = expected_wins(metrics, all_play)
     luck = luck_index(metrics, expected)
     scoring = scoring_summary(metrics)
-    odds = playoff_odds(metrics, remaining, playoff_team_count, simulations)
+    odds = playoff_odds(
+        metrics, remaining, playoff_team_count, simulations, divisions=divisions
+    )
 
     return {
         team_id: {

@@ -2099,6 +2099,59 @@ def _manager_ratings(db: Session, season: int) -> Dict[str, Any]:
     }
 
 
+def _playoff_picture(
+    rows: List[Dict[str, Any]],
+    divisions: Dict[int, Any],
+    playoff_team_count: int,
+    has_remaining: bool,
+) -> Optional[Dict[str, Any]]:
+    """The playoff field two ways: as the season is projected to finish, and
+    as it would be seeded if the regular season ended today.
+
+    Projected seeding ranks on the simulation's average final wins, so it is
+    the most likely finish rather than any one simulated season. Points for
+    breaks ties in both, which is also what the simulation uses. Teams are
+    returned by id; the page already holds every row in ``teams``.
+    """
+    if playoff_team_count <= 0 or not rows:
+        return None
+    if not any(row["games_played"] for row in rows):
+        return None
+
+    def current_wins(row: Dict[str, Any]) -> float:
+        return row["wins"] + 0.5 * row["ties"]
+
+    def projected_wins(row: Dict[str, Any]) -> float:
+        value = (row.get("playoff") or {}).get("projected_wins")
+        return current_wins(row) if value is None else value
+
+    def bracket(wins_of) -> Dict[str, Any]:
+        order = [
+            row["espn_team_id"]
+            for row in sorted(
+                rows,
+                key=lambda row: (-wins_of(row), -row["points_for"], row["espn_team_id"]),
+            )
+        ]
+        field = fantasy_league_advanced.seed_playoffs(order, divisions, playoff_team_count)
+        seeded = set(field["seeds"])
+        return {
+            "seeds": [
+                {"seed": index + 1, "espn_team_id": team_id, "bye": index < field["byes"]}
+                for index, team_id in enumerate(field["seeds"])
+            ],
+            "byes": field["byes"],
+            "first_round": field["first_round"],
+            # First two out, so the view can say who is chasing the last spot.
+            "bubble": [team_id for team_id in order if team_id not in seeded][:2],
+        }
+
+    return {
+        "projected": bracket(projected_wins) if has_remaining else None,
+        "current": bracket(current_wins),
+    }
+
+
 def get_league_ledger(
     db: Session,
     season: Optional[int] = None,
@@ -2130,8 +2183,10 @@ def get_league_ledger(
     )
     playoff_team_count = (season_row.playoff_team_count if season_row else 0) or 0
 
+    divisions = {team["espn_team_id"]: team["division_id"] for team in teams}
+    remaining = _remaining_schedule(matchups)
     derived = fantasy_league_advanced.ledger_rows(
-        metrics, _remaining_schedule(matchups), playoff_team_count
+        metrics, remaining, playoff_team_count, divisions=divisions
     )
     ratings = _manager_ratings(db, season)
     power = get_power_rankings(db, season, algorithm=algorithm)
@@ -2182,6 +2237,9 @@ def get_league_ledger(
         "algorithms": list(ALGORITHMS),
         "power_week": power.get("week"),
         "playoff_team_count": playoff_team_count,
+        "playoff_picture": _playoff_picture(
+            rows, divisions, playoff_team_count, bool(remaining)
+        ),
         "manager_rating": {
             "available": ratings["available"],
             "reason": ratings["reason"],

@@ -14,7 +14,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/shared/site-nav.css?v=15">
     <link rel="stylesheet" href="/shared/fantasy-header.css?v=2">
-    <link rel="stylesheet" href="style.css?v=29">
+    <link rel="stylesheet" href="style.css?v=30">
     <link rel="stylesheet" href="/shared/fantasy-design.css?v=1">
 </head>
 <body>
@@ -237,6 +237,25 @@
                     <div id="ledger" class="ledger"></div>
                     <p class="ledger__note" id="ledgerFootnote"></p>
                 </section>
+                <!-- The field as it stands to finish: division winners take
+                     the top seeds and the byes, the next best records fill
+                     out the rest. Seeded from the same simulation as the
+                     odds column, so the two never disagree about the rule. -->
+                <section class="board" id="playoffs" data-board="playoffs" aria-labelledby="playoffsTitle" hidden>
+                    <div class="board__head">
+                        <div>
+                            <h2 id="playoffsTitle">Playoff picture</h2>
+                            <p class="board__lede" id="playoffsLede"></p>
+                        </div>
+                        <span class="board__note" id="playoffsNote"></span>
+                    </div>
+                    <div class="controls">
+                        <div class="chip-row" id="playoffsBasis" role="group" aria-label="Seeding basis"></div>
+                    </div>
+                    <div class="bracket" id="playoffBracket"></div>
+                    <div class="bracket__bubble" id="playoffBubble"></div>
+                </section>
+
                 <section class="board" data-board="charts" aria-labelledby="chartsTitle" hidden>
                     <div class="board__head">
                         <h2 id="chartsTitle">Reading the season</h2>
@@ -303,6 +322,6 @@
     <script src="/shared/analytics.js?v=1"></script>
     <script src="/shared/api-base.js?v=1"></script>
     <script src="format.js?v=15"></script>
-    <script src="app.js?v=33"></script>
+    <script src="app.js?v=34"></script>
 </body>
 </html>
