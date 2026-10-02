@@ -12,7 +12,7 @@ test.describe('signed out', () => {
     test('anonymous visitors see the teaser and a sign-in link', async ({ page }) => {
         await page.goto('/gifts/');
         await expect(page.getByRole('heading', { name: 'Sign in to start your gift board' })).toBeVisible();
-        await expect(page.locator('#signInLink')).toHaveAttribute('href', '/login/?next=/gifts/');
+        await expect(page.locator('#signInLink')).toHaveAttribute('href', `/login/?next=${encodeURIComponent('/gifts/')}`);
         await expect(page.locator('#boardView')).toBeHidden();
     });
 });
@@ -74,4 +74,65 @@ test('a member keeps private ideas and a wishlist, and nobody else sees them', a
     await expect(other.locator('.card')).toHaveCount(0);
     await expect(other.locator('#board')).not.toContainText('Pasta maker');
     await otherContext.close();
+});
+
+test('members browse each other\'s wishlists, link a contact, and save ideas from it', async ({ page, browser }) => {
+    // Member A: one private idea, one wishlist item.
+    const aliceContext = await browser.newContext();
+    const alice = await aliceContext.newPage();
+    const aliceName = await signUp(alice);
+    await alice.goto('/gifts/');
+    await alice.getByPlaceholder('Name, e.g. Mom').fill('Dad');
+    await alice.getByPlaceholder('Name, e.g. Mom').press('Enter');
+    await alice.getByPlaceholder('+ Add an idea for Dad').fill('Top secret watch');
+    await alice.getByPlaceholder('+ Add an idea for Dad').press('Enter');
+    await alice.getByPlaceholder("+ Add something you'd like").fill('Pour-over kettle');
+    await alice.getByPlaceholder("+ Add something you'd like").press('Enter');
+    await expect(column(alice, 'My wishlist').locator('.card')).toHaveCount(1);
+    await aliceContext.close();
+
+    // Member B finds A under Wishlists: the wishlist item, never the idea.
+    await signUp(page);
+    await page.goto('/gifts/');
+    await page.getByRole('link', { name: 'Wishlists' }).click();
+    await page.locator('.member-card', { hasText: aliceName }).click();
+    await expect(page).toHaveURL(new RegExp(`#wishlist/${aliceName.toLowerCase()}$`));
+    await expect(page.locator('#wishlistTitle')).toHaveText(`${aliceName}'s wishlist`);
+    await expect(page.locator('.wish')).toHaveCount(1);
+    await expect(page.locator('#wishList')).toContainText('Pour-over kettle');
+    await expect(page.locator('main')).not.toContainText('Top secret watch');
+
+    // One click makes A a linked person on B's board, then save the item as an idea.
+    await page.getByRole('button', { name: `Add ${aliceName} to my board` }).click();
+    await expect(page.locator('#wishlistActions')).toContainText(`Linked to ${aliceName}`);
+    await page.getByRole('button', { name: `Save as idea for ${aliceName}` }).click();
+    await expect(page.locator('.wish')).toContainText(`Saved to ${aliceName}`);
+
+    // On the board, A's column has the idea and the linked wishlist marked saved.
+    await page.getByRole('link', { name: 'My board' }).click();
+    const aliceColumn = column(page, aliceName);
+    await expect(aliceColumn.locator('.card', { hasText: 'Pour-over kettle' })).toContainText('Idea');
+    await expect(aliceColumn.locator('.linked')).toContainText(`From ${aliceName}'s wishlist (1)`);
+    await expect(aliceColumn.locator('.linked__saved')).toHaveText('Saved');
+
+    // The graph shows the same gifts as the board, and the choice sticks.
+    const cardCount = await page.locator('.card').count();
+    await page.getByRole('button', { name: 'Graph' }).click();
+    await expect(page.locator('#graph')).toBeVisible();
+    await expect(page.locator('.graph__item')).toHaveCount(cardCount);
+    await expect(page.locator('.graph__person')).toHaveCount(1);
+    await page.reload();
+    await expect(page.locator('#graph')).toBeVisible();
+    await page.getByRole('button', { name: 'Edit Pour-over kettle' }).locator('.graph__dot').click();
+    await expect(page.locator('#itemEditor')).toBeVisible();
+    await expect(page.locator('#itemEditor').getByLabel('Gift')).toHaveValue('Pour-over kettle');
+});
+
+test.describe('wishlist links', () => {
+    test.use({ allowErrors: [/status of 403/] });
+
+    test('a shared wishlist link survives the sign-in redirect', async ({ page }) => {
+        await page.goto('/gifts/#wishlist/someone');
+        await expect(page.locator('#signInLink')).toHaveAttribute('href', `/login/?next=${encodeURIComponent('/gifts/#wishlist/someone')}`);
+    });
 });

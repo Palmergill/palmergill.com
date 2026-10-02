@@ -1085,6 +1085,10 @@ class GiftPerson(Base):
     name = Column(String, nullable=False)
     note = Column(Text, nullable=True)
     birthday = Column(Date, nullable=True)
+    # Optional, one-way link to a site account (spec 21 P4). It lets the owner
+    # see that member's public wishlist in this person's column. Nothing flows
+    # the other way: the linked member is never told and sees nothing new.
+    linked_username = Column(String, nullable=True)
     # Sparse column order, seeded 1000, 2000, ... like ff_rank_entries.
     sort_key = Column(Float, nullable=False)
     created_at = Column(DateTime, default=utc_now, nullable=False)

@@ -40,6 +40,12 @@
             href: "/casino/",
             matches: ["/casino/", "/poker/", "/craps/", "/craps-strategy/", "/blackjack/", "/high-card-flush/"],
             icon: "spade"
+        },
+        {
+            label: "Gifts",
+            hint: "Ideas & wishlists",
+            href: "/gifts/",
+            icon: "gift"
         }
     ];
 
@@ -72,7 +78,8 @@
         "log-in": '<path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><path d="M10 17l5-5-5-5"/><path d="M15 12H3"/>',
         "log-out": '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/>',
         "circle-user": '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="10" r="3"/><path d="M6.2 18.4c1.2-2.2 3.1-3.4 5.8-3.4s4.6 1.2 5.8 3.4"/>',
-        menu: '<path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h16"/>'
+        menu: '<path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h16"/>',
+        gift: '<rect x="3" y="8" width="18" height="4" rx="1"/><path d="M12 8v13"/><path d="M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7"/><path d="M7.5 8a2.5 2.5 0 0 1 0-5C9.5 3 12 5.5 12 8c0-2.5 2.5-5 4.5-5a2.5 2.5 0 0 1 0 5"/>'
     };
 
     function iconSvg(name) {

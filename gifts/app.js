@@ -1,11 +1,17 @@
 // Gift board (spec 21). One column per person, the caller's own wishlist
-// first. Every byte of board data comes from /api/gifts/*; the page itself is
-// an empty shell that anonymous visitors see as a teaser.
+// first, with a graph view of the same data (graph.js) and a Wishlists tab for
+// browsing what other members want. Every byte of data comes from
+// /api/gifts/*; the page itself is an empty shell that anonymous visitors see
+// as a teaser.
+//
+// Routes live in the hash: "" is your board, #wishlists the member list, and
+// #wishlist/<username> one member's wishlist, so members can share links.
 (function () {
     "use strict";
 
     const API_BASE = window.API_ORIGIN || "";
     const HIDE_DONE_KEY = "gifts.hideDone";
+    const VIEW_KEY = "gifts.view";
     const ME = "me";
 
     const STATUS_LABELS = {
@@ -26,6 +32,21 @@
         boardView: byId("boardView"),
         boardActions: byId("boardActions"),
         board: byId("board"),
+        graph: byId("graph"),
+        graphLegend: byId("graphLegend"),
+        tabs: byId("tabs"),
+        boardTab: byId("boardTab"),
+        wishlistsTab: byId("wishlistsTab"),
+        boardViewButton: byId("boardViewButton"),
+        graphViewButton: byId("graphViewButton"),
+        wishlistsView: byId("wishlistsView"),
+        memberGrid: byId("memberGrid"),
+        wishlistsEmpty: byId("wishlistsEmpty"),
+        wishlistView: byId("wishlistView"),
+        wishlistTitle: byId("wishlistTitle"),
+        wishlistActions: byId("wishlistActions"),
+        wishList: byId("wishList"),
+        wishlistEmpty: byId("wishlistEmpty"),
         errorBanner: byId("errorBanner"),
         liveRegion: byId("liveRegion"),
         hideDoneToggle: byId("hideDoneToggle"),
@@ -44,9 +65,21 @@
     };
 
     const state = {
+        me: null,
+        loaded: false,
         people: [],
         items: [],
-        hideDone: readHideDone(),
+        hideDone: readPref(HIDE_DONE_KEY) === "1",
+        view: readPref(VIEW_KEY) === "graph" ? "graph" : "board",
+        // The wishlist on screen, so a "Save as idea" can redraw it.
+        wishlist: null,
+        // Guards against a slow wishlist response landing after the viewer
+        // has already navigated somewhere else.
+        wishlistSeq: 0,
+        // Linked-wishlist sections the viewer has collapsed, by person id.
+        collapsed: new Set(),
+        // A graph node to focus once the graph redraws after an edit.
+        focusNode: null,
         editingItemId: null,
         editingPersonId: null,
         dragItemId: null,
@@ -100,17 +133,17 @@
 
     // ── helpers ─────────────────────────────────────────────────────────────
 
-    function readHideDone() {
+    function readPref(key) {
         try {
-            return window.localStorage.getItem(HIDE_DONE_KEY) === "1";
+            return window.localStorage.getItem(key);
         } catch (_error) {
-            return false;
+            return null;
         }
     }
 
-    function writeHideDone(value) {
+    function writePref(key, value) {
         try {
-            window.localStorage.setItem(HIDE_DONE_KEY, value ? "1" : "0");
+            window.localStorage.setItem(key, value);
         } catch (_error) {
             // A blocked store only costs the preference, not the board.
         }
@@ -204,6 +237,23 @@
         return `Birthday ${label}`;
     }
 
+    function initials(name) {
+        const parts = name.trim().split(/\s+/).filter(Boolean);
+        const letters = parts.length > 1 ? parts[0][0] + parts[parts.length - 1][0] : name.slice(0, 2);
+        return letters.toUpperCase();
+    }
+
+    function titleNode(title, url) {
+        const href = safeHref(url);
+        return href ? el("a", { href, target: "_blank", rel: "noopener noreferrer nofollow", text: title }) : title;
+    }
+
+    // Has this wishlist item already been copied into these ideas?
+    function alreadySaved(ideas, wish) {
+        const title = wish.title.trim().toLowerCase();
+        return ideas.some((idea) => (wish.url && idea.url === wish.url) || idea.title.trim().toLowerCase() === title);
+    }
+
     function columnKey(personId) {
         return personId === null || personId === undefined ? ME : String(personId);
     }
@@ -228,11 +278,22 @@
         els.loadingView.hidden = name !== "loading";
         els.signedOutView.hidden = name !== "signedOut";
         els.boardView.hidden = name !== "board";
+        els.wishlistsView.hidden = name !== "wishlists";
+        els.wishlistView.hidden = name !== "wishlist";
+        els.tabs.hidden = !["board", "wishlists", "wishlist"].includes(name);
         els.boardActions.hidden = name !== "board";
+        const [current, other] = name === "board"
+            ? [els.boardTab, els.wishlistsTab]
+            : [els.wishlistsTab, els.boardTab];
+        current.setAttribute("aria-current", "page");
+        other.removeAttribute("aria-current");
     }
 
     function showSignedOut() {
         closeDialogs();
+        // Keep the hash, so a shared #wishlist/<name> link survives sign-in.
+        const next = `${window.location.pathname}${window.location.hash}`;
+        els.signInLink.href = `/login/?next=${encodeURIComponent(next)}`;
         setView("signedOut");
     }
 
@@ -245,6 +306,16 @@
 
     function render() {
         els.hideDoneToggle.setAttribute("aria-pressed", String(state.hideDone));
+        const graph = state.view === "graph";
+        els.boardViewButton.setAttribute("aria-pressed", String(!graph));
+        els.graphViewButton.setAttribute("aria-pressed", String(graph));
+        els.board.hidden = graph;
+        els.graph.hidden = !graph;
+        els.graphLegend.hidden = !graph;
+        if (graph) {
+            renderGraph();
+            return;
+        }
         const columns = [renderColumn(ME, null)];
         state.people.forEach((person, index) => columns.push(renderColumn(String(person.id), person, index)));
         columns.push(renderAddPerson());
@@ -272,6 +343,62 @@
         }
     }
 
+    function renderGraph() {
+        const items = state.hideDone ? state.items.filter((item) => !DONE_STATUSES.has(item.status)) : state.items;
+        window.GiftGraph.render(els.graph, {
+            people: state.people,
+            items,
+            isDone: (item) => DONE_STATUSES.has(item.status),
+            statusLabel: (status) => STATUS_LABELS[status],
+            onItem: (id) => {
+                state.focusNode = `[data-item="${id}"]`;
+                openItemEditor(id);
+            },
+            onPerson: (id) => {
+                state.focusNode = `[data-person="${id}"]`;
+                openPersonEditor(id);
+            },
+        });
+        if (state.focusNode && !els.itemEditor.open && !els.personEditor.open) {
+            const target = els.graph.querySelector(state.focusNode);
+            state.focusNode = null;
+            if (target) target.focus();
+        }
+    }
+
+    // P4: a person linked to a site account shows that member's public
+    // wishlist under your private ideas, with a one-click copy into them.
+    function renderLinked(person) {
+        const linked = person.linked;
+        const ideas = itemsIn(String(person.id));
+        const details = el("details", {
+            class: "linked",
+            open: !state.collapsed.has(person.id),
+            ontoggle: (event) => {
+                if (event.currentTarget.open) state.collapsed.delete(person.id);
+                else state.collapsed.add(person.id);
+            },
+        }, [
+            el("summary", { text: `From ${linked.displayName}'s wishlist (${linked.items.length})` }),
+            linked.items.length
+                ? el("ul", { class: "linked__list" }, linked.items.map((wish) => el("li", { class: "linked__item" }, [
+                    el("span", { class: "linked__title" }, titleNode(wish.title, wish.url)),
+                    wish.priceCents !== null ? el("span", { class: "linked__price", text: formatPrice(wish.priceCents) }) : null,
+                    alreadySaved(ideas, wish)
+                        ? el("span", { class: "linked__saved", text: "Saved" })
+                        : el("button", {
+                            type: "button",
+                            class: "button button--quiet button--small",
+                            "aria-label": `Save ${wish.title} as an idea for ${person.name}`,
+                            text: "Save as idea",
+                            onclick: () => saveAsIdea(person, wish),
+                        }),
+                ])))
+                : el("p", { class: "linked__empty", text: "Nothing on it right now." }),
+        ]);
+        return details;
+    }
+
     function renderColumn(key, person, index) {
         const all = itemsIn(key);
         const visible = state.hideDone ? all.filter((item) => !DONE_STATUSES.has(item.status)) : all;
@@ -286,6 +413,9 @@
             el("span", { text: `${all.length} ${all.length === 1 ? "gift" : "gifts"}` }),
         ];
         if (person && person.birthday) meta.push(el("span", { text: birthdayLabel(person.birthday) }));
+        if (person && person.linkedUsername && !person.linked) {
+            meta.push(el("span", { text: "Linked account unavailable" }));
+        }
 
         const tools = isMe
             ? null
@@ -346,6 +476,7 @@
             person && person.note ? el("p", { class: "column__note", text: person.note }) : null,
             list,
             empty,
+            person && person.linked ? renderLinked(person) : null,
             el("form", { class: "quick-add", onsubmit: (event) => quickAdd(event, key) }, [
                 el("label", { class: "sr-only", for: `add-${key}`, text: `Add a gift to ${name}` }),
                 el("input", {
@@ -364,9 +495,7 @@
 
     function renderCard(item) {
         const href = safeHref(item.url);
-        const title = href
-            ? el("a", { href, target: "_blank", rel: "noopener noreferrer nofollow", text: item.title })
-            : item.title;
+        const title = titleNode(item.title, item.url);
         const meta = [el("span", { class: `status status--${item.status}`, text: STATUS_LABELS[item.status] })];
         if (item.priceCents !== null) meta.push(el("span", { text: formatPrice(item.priceCents) }));
         if (href) meta.push(el("span", { text: hostOf(href) }));
@@ -698,6 +827,7 @@
         form.name.value = person.name;
         form.birthday.value = person.birthday || "";
         form.note.value = person.note || "";
+        form.linkedUsername.value = person.linkedUsername || "";
         els.personError.hidden = true;
         els.personEditor.showModal();
         form.name.focus();
@@ -715,7 +845,12 @@
         try {
             const updated = await api(`/people/${state.editingPersonId}`, {
                 method: "PATCH",
-                body: { name, birthday: form.birthday.value || null, note: form.note.value.trim() || null },
+                body: {
+                    name,
+                    birthday: form.birthday.value || null,
+                    note: form.note.value.trim() || null,
+                    linked_username: form.linkedUsername.value.trim() || null,
+                },
             });
             state.people = state.people.map((p) => (p.id === updated.id ? updated : p));
         } catch (error) {
@@ -748,9 +883,20 @@
 
     els.hideDoneToggle.addEventListener("click", () => {
         state.hideDone = !state.hideDone;
-        writeHideDone(state.hideDone);
+        writePref(HIDE_DONE_KEY, state.hideDone ? "1" : "0");
         render();
     });
+
+    function setBoardView(view) {
+        if (view === state.view) return;
+        state.view = view;
+        els.graph.replaceChildren();
+        writePref(VIEW_KEY, view);
+        render();
+    }
+
+    els.boardViewButton.addEventListener("click", () => setBoardView("board"));
+    els.graphViewButton.addEventListener("click", () => setBoardView("graph"));
 
     els.itemForm.addEventListener("submit", saveItem);
     els.itemForm.elements.column.addEventListener("change", () => {
@@ -768,11 +914,168 @@
     byId("personCancel").addEventListener("click", () => els.personEditor.close());
     byId("deletePerson").addEventListener("click", deletePerson);
 
+    // ── wishlists (P2) ──────────────────────────────────────────────────────
+
+    async function saveAsIdea(person, wish) {
+        const created = await attempt(() => api("/items", {
+            method: "POST",
+            body: {
+                person_id: person.id,
+                title: wish.title,
+                url: wish.url,
+                price_cents: wish.priceCents,
+                note: wish.note,
+            },
+        }));
+        if (!created) return;
+        state.items.push(created);
+        if (currentRoute().name === "wishlist" && state.wishlist) renderWishlist(state.wishlist);
+        else render();
+        announce(`Saved ${wish.title} as an idea for ${person.name}.`);
+    }
+
+    async function showWishlists() {
+        setView("wishlists");
+        const seq = ++state.wishlistSeq;
+        const data = await attempt(() => api("/wishlists"));
+        if (!data || seq !== state.wishlistSeq) return;
+        els.wishlistsEmpty.hidden = data.members.length > 0;
+        els.memberGrid.replaceChildren(...data.members.map((member) => el("a", {
+            class: "member-card",
+            href: `#wishlist/${encodeURIComponent(member.username)}`,
+        }, [
+            el("span", { class: "member-card__avatar", "aria-hidden": "true", text: initials(member.displayName) }),
+            el("span", { class: "member-card__name", text: member.displayName }),
+            el("span", { class: "member-card__count", text: `${member.count} ${member.count === 1 ? "thing" : "things"}` }),
+        ])));
+    }
+
+    async function showWishlist(member) {
+        setView("wishlist");
+        state.wishlist = null;
+        els.wishlistTitle.textContent = "Loading…";
+        els.wishList.replaceChildren();
+        els.wishlistActions.replaceChildren();
+        els.wishlistEmpty.hidden = true;
+        const seq = ++state.wishlistSeq;
+        let data;
+        try {
+            data = await api(`/wishlists/${encodeURIComponent(member)}`);
+        } catch (error) {
+            if (seq !== state.wishlistSeq) return;
+            if (error instanceof ForbiddenError) return showSignedOut();
+            els.wishlistTitle.textContent = "Wishlist not found";
+            return showError(error.message);
+        }
+        if (seq !== state.wishlistSeq) return;
+        state.wishlist = data;
+        renderWishlist(data);
+    }
+
+    function renderWishlist(data) {
+        const isMe = data.username === state.me;
+        const person = state.people.find((p) => p.linkedUsername === data.username) || null;
+        els.wishlistTitle.textContent = isMe ? "Your wishlist" : `${data.displayName}'s wishlist`;
+
+        let action;
+        if (isMe) {
+            action = el("p", { class: "wishlist-head__note", text: "This is how other members see your wishlist." });
+        } else if (person) {
+            action = el("p", { class: "wishlist-head__note", text: `Linked to ${person.name} on your board.` });
+        } else {
+            action = el("button", {
+                type: "button",
+                class: "button",
+                text: `Add ${data.displayName} to my board`,
+                onclick: () => addLinkedPerson(data),
+            });
+        }
+        els.wishlistActions.replaceChildren(action);
+
+        const ideas = person ? itemsIn(String(person.id)) : [];
+        els.wishList.replaceChildren(...data.items.map((wish) => {
+            const href = safeHref(wish.url);
+            const meta = [];
+            if (wish.priceCents !== null) meta.push(el("span", { text: formatPrice(wish.priceCents) }));
+            if (href) meta.push(el("span", { text: hostOf(href) }));
+            let save = null;
+            if (person) {
+                save = alreadySaved(ideas, wish)
+                    ? el("span", { class: "linked__saved", text: `Saved to ${person.name}` })
+                    : el("button", {
+                        type: "button",
+                        class: "button button--quiet button--small",
+                        text: `Save as idea for ${person.name}`,
+                        onclick: () => saveAsIdea(person, wish),
+                    });
+            }
+            return el("li", { class: "wish" }, [
+                el("div", { class: "wish__main" }, [
+                    el("p", { class: "wish__title" }, titleNode(wish.title, wish.url)),
+                    meta.length ? el("div", { class: "wish__meta" }, meta) : null,
+                    wish.note ? el("p", { class: "wish__note", text: wish.note }) : null,
+                ]),
+                save,
+            ]);
+        }));
+        els.wishlistEmpty.hidden = data.items.length > 0;
+    }
+
+    // One step from someone's wishlist to a column on your board, linked so
+    // their wishlist shows up there.
+    async function addLinkedPerson(data) {
+        const result = await attempt(async () => {
+            const created = await api("/people", { method: "POST", body: { name: data.displayName } });
+            return api(`/people/${created.id}`, { method: "PATCH", body: { linked_username: data.username } });
+        });
+        if (!result) {
+            // The usual failure is a name clash with someone already on the
+            // board; point at the way through rather than leaving a dead end.
+            showError(`${els.errorBanner.textContent} To link someone already on your board, edit them and enter ${data.username} as their site account.`);
+            return;
+        }
+        state.people.push(result);
+        renderWishlist(data);
+        announce(`Added ${data.displayName} to your board.`);
+    }
+
+    // ── routing ─────────────────────────────────────────────────────────────
+
+    function currentRoute() {
+        let hash = window.location.hash.slice(1);
+        try {
+            hash = decodeURIComponent(hash);
+        } catch (_error) {
+            hash = "";
+        }
+        if (hash === "wishlists") return { name: "wishlists" };
+        if (hash.startsWith("wishlist/") && hash.length > 9) return { name: "wishlist", member: hash.slice(9) };
+        return { name: "board" };
+    }
+
+    function route() {
+        if (!state.loaded) return;
+        hideError();
+        closeDialogs();
+        const current = currentRoute();
+        if (current.name === "wishlists") return showWishlists();
+        if (current.name === "wishlist") return showWishlist(current.member);
+        state.wishlistSeq += 1;
+        setView("board");
+        render();
+    }
+
+    window.addEventListener("hashchange", route);
+
     async function load() {
         setView("loading");
         try {
-            adoptBoard(await api("/board"));
-            setView("board");
+            const data = await api("/board");
+            state.me = data.username;
+            state.loaded = true;
+            state.people = data.people;
+            state.items = data.items;
+            route();
         } catch (error) {
             if (error instanceof ForbiddenError) {
                 showSignedOut();

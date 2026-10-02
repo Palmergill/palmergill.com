@@ -44,7 +44,7 @@ are a History board at the foot of the hub, one row a year naming its
 champion, rather than a chip row above the season you came to read. Old URLs
 (`/fantasy/league/*`, and `/fantasy/` for the market board) redirect from
 `vercel.json`.
-- `/gifts/` - gift board (spec 21): a member's private gift ideas, one column per person, plus their own wishlist. Not a member path, for the same reason as `/fantasy/`: anonymous visitors get a teaser and a sign-in prompt, and `/api/gifts/*` is the real boundary. Not linked from the homepage or nav until spec 21 P2.
+- `/gifts/` - gift board (spec 21): a member's private gift ideas, one column per person, plus their own wishlist, as a board or a radial graph (`gifts/graph.js`). The Wishlists tab (`#wishlists`, `#wishlist/<username>`) browses other members' wishlists. A person can be linked to a site account, which shows that member's wishlist in their column — one-way: the linked member is never told and sees nothing new. Not a member path, for the same reason as `/fantasy/`: anonymous visitors get a teaser and a sign-in prompt, and `/api/gifts/*` is the real boundary.
 - `/casino/` - casino landing page linking the browser table games
 - `/poker/` - poker app
 - `/craps/` - craps app
@@ -80,7 +80,7 @@ Important routes:
 - `/api/fantasy/*` (public fantasy reads and account-gated persistent draft rooms; the Ask chat and its `POST /api/fantasy/chat` route were removed in Sep 2026, and league team overviews, weekly recaps and draft recaps are written only by the scheduler, Tuesday mornings — there is no write endpoint or button)
 - `/api/fantasy/league/*` (members-only ESPN league reads and digest-cached team overviews; 403 for anonymous callers). `GET /teams/{id}/moves` suggests waiver pickups and trade ideas, each priced by rebuilding the best legal lineup with the move made (`fantasy_league_moves.py`); the team overview is about the roster and those moves, not a weekly recap. `GET /power-history` serves the season-long rank chart: `metric=resume` reads `ff_league_power_rankings`, which covers every stored season, while `metric=roster` reads `ff_league_roster_power`, which the collector only began writing in Sep 2026 and cannot be backfilled — earlier seasons have no weekly roster snapshots or weekly projections.
 - `/api/fantasy/rankings/*` (personal ranking boards; every `/boards` route is account-owned and returns JSON 403 to anonymous callers, 404 for someone else's board — including to the admin)
-- `/api/gifts/*` (gift board; every route is account-owned and returns JSON 403 to anonymous callers, 404 for someone else's person or idea — including to the admin. An item with no `person_id` is on its owner's wishlist; one with a `person_id` is an idea only its author is ever served)
+- `/api/gifts/*` (gift board; every route is member-only and returns JSON 403 to anonymous callers, 404 for someone else's person or idea — including to the admin. An item with no `person_id` is on its owner's wishlist; one with a `person_id` is an idea only its author is ever served. The only rows that cross accounts — `GET /wishlists`, `GET /wishlists/{member}`, and linked people's wishlists inside `GET /board` — are read through one query, `_public_wishlist_query` in `services/gift_board.py`: no person, status `wanted`)
 - `/api/analytics/*` (public client analytics ingest)
 - `/api/admin/*` (logs, analytics aggregates, retention, and `GET /api/admin/users` — the member account roster)
 - `/health`

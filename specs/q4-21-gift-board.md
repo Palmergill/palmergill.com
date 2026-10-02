@@ -1,7 +1,7 @@
 # Spec 21 — Gift Board
 
 - **Quarter:** Q4 2026 (Oct–Dec)
-- **Status:** in progress — P1 built (Oct 2026)
+- **Status:** implemented — P1–P4 built (Oct 2026); P5 (claiming) is an open question
 - **Depends on:** site member accounts (`backend/app/accounts.py`, `app_users`)
 - **Areas:** `gifts/` (new), `backend/app/routers/gifts.py` (new),
   `backend/app/services/gift_board.py` (new), `backend/app/database.py`,
@@ -182,16 +182,33 @@ wishlist.
   - Pointer users drag cards (HTML5 drag and drop). Touch and keyboard users
     move gifts from the editor (List, Move up, Move down), which works on every
     device, instead of a pointer-events drag implementation.
-  - The page is live but unlinked: no homepage card or nav entry until P2, so
-    the "Visible to members" badge describes the agreed contract slightly
-    ahead of the wishlist browser that makes it true.
-- **P2.** Wishlists panel and read-only member wishlist view. Homepage project
-  card and site-nav entry.
-- **P3.** Graph view (R4), toggled from the board header, remembered per viewer
-  in `localStorage`.
-- **P4.** Link a contact to a member: their public wishlist appears read-only in
-  that person's column, with "save as idea" to copy an item into your private
-  ideas.
+- **P2 (done).** A "Wishlists" tab next to "My board", routed in the hash
+  (`#wishlists`, `#wishlist/<username>`) so members can share a link to a
+  wishlist; the hash survives the sign-in redirect. The member list leaves out
+  the caller, members with nothing wanted, and deactivated accounts. A member
+  wishlist page offers "Add <name> to my board", which creates a person
+  already linked to them (P4). Homepage card (05) and a "Gifts" nav entry.
+  As built:
+  - Wishlist responses carry only `id`, `title`, `url`, `priceCents` and
+    `note`; no timestamps or status.
+  - `GET /board` now also returns the caller's `username`, so the wishlist
+    page can recognise "this is you" and show the member's-eye view.
+- **P3 (done).** Graph view in `gifts/graph.js`, toggled Board / Graph next to
+  the tabs and remembered in `localStorage`. Your wishlist sits on an inner
+  ring in the gaps between the spokes to your people, so no gift node lands
+  on a line; a person's gifts fan out on an arc beyond them, staggered onto
+  two radii when there are more than five. Nodes are focusable buttons
+  (Enter or Space opens the editor) and focus returns to the node after a
+  save. "Hide given" applies. On a narrow screen the graph keeps a readable
+  size and scrolls sideways inside its frame, centred on "Me" when it first
+  appears.
+- **P4 (done).** `gift_people.linked_username` (added by
+  `database_migration.py` on existing deployments), set from the person
+  editor's "Site account" field. A linked person's column shows "From
+  <name>'s wishlist" under your ideas, collapsible, with "Save as idea" on
+  each item, which turns into "Saved" once an idea with the same link or
+  title exists. You can't link to yourself or to an unknown account; a link
+  to an account that is later deactivated quietly stops resolving.
 - **P5 (open).** Claiming. See open questions.
 
 ## Testing
@@ -209,9 +226,10 @@ wishlist.
 - `e2e/gifts.spec.js` (P1, built) — anonymous visitors see the teaser; a member
   adds a person, ideas and a wishlist item, edits price, link and status, moves
   an idea onto the wishlist through the confirm, reloads, and a second member
-  sees an empty board. P2 adds: member B finds A in Wishlists and sees the
-  wishlist item but not the idea. P3 adds: the board ↔ graph toggle keeps the
-  same item count.
+  sees an empty board; member B finds A in Wishlists and sees the wishlist
+  item but not the idea, adds A to their board from there, saves one of A's
+  items as an idea, and sees "Saved" in A's column; the board ↔ graph toggle
+  keeps the same item count and survives a reload.
 
 ## Open questions
 

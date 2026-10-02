@@ -26,6 +26,7 @@
     <style>
         :root {
             --plum: #8a6d8a;
+            --rose: #b5677a;
             --radius: 18px;
             --max: 1060px;
             --sans: "Plus Jakarta Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
@@ -357,6 +358,7 @@
         .card[data-c="btc"] { --ac: var(--clay); }
         .card[data-c="fantasy"] { --ac: var(--plum); }
         .card[data-c="casino"] { --ac: var(--sage); }
+        .card[data-c="gifts"] { --ac: var(--rose); }
 
         /* ---- footer ---- */
         footer {
@@ -557,7 +559,7 @@
             <section class="section" id="work" aria-labelledby="work-title">
                 <div class="sec-head">
                     <h2 id="work-title">Things I've built</h2>
-                    <p>Four projects, live now</p>
+                    <p>Five projects, live now</p>
                 </div>
                 <div class="cards">
                     <article class="card" data-c="stock">
@@ -624,6 +626,19 @@
                             <div class="go" aria-hidden="true"><span>View all games</span><span class="go-arrow">→</span></div>
                         </div>
                     </article>
+
+                    <article class="card" data-c="gifts">
+                        <div class="thumb">
+                            <img src="/assets/project-screenshots/gifts.png" alt="Gift board with a wishlist column and a column of gift ideas for each person" loading="lazy" decoding="async">
+                        </div>
+                        <div class="pad">
+                            <div class="card-topline"><span class="ey">Gift ideas</span><span class="rule" aria-hidden="true"></span><span class="project-no">05</span></div>
+                            <h3><a class="card-link" href="/gifts/">Gift Board</a></h3>
+                            <p>Jot down a gift the moment you think of it, filed under the person it's for, and keep a wishlist of your own that friends can browse. Ideas for other people stay private; switch to a graph to see everyone at once.</p>
+                            <div class="card-meta"><span>Private ideas</span><span>Board + graph</span></div>
+                            <div class="go" aria-hidden="true"><span>Explore project</span><span class="go-arrow">→</span></div>
+                        </div>
+                    </article>
                 </div>
             </section>
         </main>
@@ -647,7 +662,7 @@
         </footer>
     </div>
 
-    <script src="/shared/site-nav.js?v=18"></script>
+    <script src="/shared/site-nav.js?v=19"></script>
     <script src="/shared/analytics.js?v=1"></script>
     <script>
         (() => {

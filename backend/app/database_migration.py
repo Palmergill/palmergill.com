@@ -160,6 +160,13 @@ def migrate_database():
             "waiver_rank",
             "INTEGER",
         )
+        # Spec 21 P4: a gift-board contact can be linked to a site account.
+        _add_column_if_missing(
+            inspector,
+            "gift_people",
+            "linked_username",
+            "VARCHAR",
+        )
 
         refreshed = inspect(engine)
         if (

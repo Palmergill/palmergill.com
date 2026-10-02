@@ -3,8 +3,10 @@ own wishlist.
 
 Every function here takes the caller's normalized username and filters on it.
 That is the privacy boundary for ideas — nothing in this module reads another
-account's people or idea rows. The one query that will cross accounts (the
-wishlist browser, spec 21 P2) reads only ``person_id IS NULL`` rows.
+account's people or idea rows. The only reads that cross accounts — the
+wishlist browser (P2) and a linked contact's wishlist (P4) — go through
+``_public_wishlist_query``, which reads only ``person_id IS NULL`` rows with
+status ``wanted``.
 
 Someone else's person or item is a 404, never a 403, so ids are not
 enumerable.
@@ -18,7 +20,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app import accounts
-from app.database import GIFT_IDEA_STATUSES, GIFT_WISHLIST_STATUSES, GiftItem, GiftPerson
+from app.database import AppUser, GIFT_IDEA_STATUSES, GIFT_WISHLIST_STATUSES, GiftItem, GiftPerson
 
 MAX_PEOPLE = 100
 MAX_ITEMS = 1000
@@ -119,6 +121,91 @@ def _column(db: Session, username: str, person_id: Optional[int]) -> List[GiftIt
     return query.order_by(GiftItem.sort_key, GiftItem.id).all()
 
 
+# ── accounts and public wishlists ───────────────────────────────────────────
+
+
+def _admin_username() -> str:
+    return accounts.normalize_username(accounts.admin_username())
+
+
+def display_names(db: Session, usernames) -> Dict[str, str]:
+    """normalized username → display name, for active accounts only.
+
+    The admin has no app_users row, so it is answered from the env var. An
+    account missing from the result is unknown or deactivated.
+    """
+    wanted = {name for name in usernames if name}
+    names: Dict[str, str] = {}
+    if not wanted:
+        return names
+    admin = _admin_username()
+    if admin in wanted:
+        names[admin] = accounts.admin_username()
+    rows = (
+        db.query(AppUser.username, AppUser.display_name)
+        .filter(AppUser.username.in_(wanted), AppUser.is_active.is_(True))
+        .all()
+    )
+    for username, display_name in rows:
+        names[username] = display_name or username
+    return names
+
+
+def _public_wishlist_query(db: Session):
+    """The only gift rows that may be served to someone other than their owner."""
+    return db.query(GiftItem).filter(GiftItem.person_id.is_(None), GiftItem.status == "wanted")
+
+
+def serialize_public_item(item: GiftItem) -> Dict[str, Any]:
+    return {
+        "id": item.id,
+        "title": item.title,
+        "url": item.url,
+        "priceCents": item.price_cents,
+        "note": item.note,
+    }
+
+
+def _wishlist_items(db: Session, username: str) -> List[GiftItem]:
+    return (
+        _public_wishlist_query(db)
+        .filter(GiftItem.owner_username == username)
+        .order_by(GiftItem.sort_key, GiftItem.id)
+        .all()
+    )
+
+
+def wishlists(db: Session, caller: str) -> Dict[str, Any]:
+    """Members other than the caller with at least one wanted item."""
+    counts = (
+        _public_wishlist_query(db)
+        .filter(GiftItem.owner_username != caller)
+        .with_entities(GiftItem.owner_username, func.count(GiftItem.id))
+        .group_by(GiftItem.owner_username)
+        .all()
+    )
+    names = display_names(db, [owner for owner, _count in counts])
+    members = [
+        {"username": owner, "displayName": names[owner], "count": count}
+        for owner, count in counts
+        if owner in names
+    ]
+    members.sort(key=lambda member: member["displayName"].casefold())
+    return {"members": members}
+
+
+def member_wishlist(db: Session, username: str) -> Dict[str, Any]:
+    normalized = accounts.normalize_username(username)
+    names = display_names(db, [normalized])
+    if normalized not in names:
+        raise HTTPException(status_code=404, detail="No member by that name.")
+    return {
+        "username": normalized,
+        "displayName": names[normalized],
+        "items": [serialize_public_item(item) for item in _wishlist_items(db, normalized)],
+    }
+
+
 # ── ordering ────────────────────────────────────────────────────────────────
 
 
@@ -153,12 +240,36 @@ def _iso(value) -> Optional[str]:
     return value.isoformat() if value else None
 
 
-def serialize_person(person: GiftPerson) -> Dict[str, Any]:
-    return {
+def serialize_person(person: GiftPerson, linked: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    data = {
         "id": person.id,
         "name": person.name,
         "note": person.note,
         "birthday": _iso(person.birthday),
+        "linkedUsername": person.linked_username,
+        "linked": None,
+    }
+    if person.linked_username and linked is not None:
+        data["linked"] = linked.get(person.linked_username)
+    return data
+
+
+def _linked_wishlists(db: Session, people: List[GiftPerson]) -> Dict[str, Dict[str, Any]]:
+    """Public wishlists for every linked account on this board, keyed by username.
+
+    A link to an account that has since been deactivated resolves to nothing,
+    and the person renders as unlinked rather than erroring.
+    """
+    usernames = {person.linked_username for person in people if person.linked_username}
+    names = display_names(db, usernames)
+    return {
+        username: {
+            "username": username,
+            "displayName": names[username],
+            "items": [serialize_public_item(item) for item in _wishlist_items(db, username)],
+        }
+        for username in usernames
+        if username in names
     }
 
 
@@ -185,8 +296,11 @@ def board(db: Session, username: str) -> Dict[str, Any]:
         .order_by(GiftItem.sort_key, GiftItem.id)
         .all()
     )
+    people = _people(db, username)
+    linked = _linked_wishlists(db, people)
     return {
-        "people": [serialize_person(person) for person in _people(db, username)],
+        "username": username,
+        "people": [serialize_person(person, linked) for person in people],
         "items": [serialize_item(item) for item in items],
         "limits": {"people": MAX_PEOPLE, "items": MAX_ITEMS},
     }
@@ -238,9 +352,22 @@ def update_person(db: Session, username: str, person_id: int, changes: Dict[str,
         person.note = clean_text(changes["note"])
     if "birthday" in changes:
         person.birthday = changes["birthday"]
+    if "linked_username" in changes:
+        person.linked_username = _check_link(db, username, changes["linked_username"])
     db.commit()
     db.refresh(person)
-    return serialize_person(person)
+    return serialize_person(person, _linked_wishlists(db, [person]))
+
+
+def _check_link(db: Session, owner: str, value: Optional[str]) -> Optional[str]:
+    target = accounts.normalize_username(value or "")
+    if not target:
+        return None
+    if target == owner:
+        raise HTTPException(status_code=422, detail="That's you. Your own wishlist is already on the board.")
+    if target not in display_names(db, [target]):
+        raise HTTPException(status_code=422, detail="No member by that name.")
+    return target
 
 
 def move_person(db: Session, username: str, person_id: int, index: int) -> Dict[str, Any]:

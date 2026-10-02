@@ -99,30 +99,120 @@ def test_someone_elses_rows_are_404(method, path, body, intruder):
 
 def test_no_read_route_leaks_another_members_ideas():
     alice, bob, admin = _member_client(), _member_client(), _admin_client()
+    admin.username = ADMIN
+    clients = (alice, bob, admin)
     secrets = {}
-    for client in (alice, bob, admin):
+    for client in clients:
         person = client.post("/api/gifts/people", json={"name": f"Person {uuid.uuid4().hex[:6]}"}).json()
         secret = f"idea-{uuid.uuid4().hex}"
         client.post("/api/gifts/items", json={"person_id": person["id"], "title": secret, "note": secret})
-        secrets[id(client)] = (secret, person["name"])
+        # Something on each wishlist too, so the cross-account routes have rows to serve.
+        client.post("/api/gifts/items", json={"title": f"wish-{uuid.uuid4().hex}"})
+        secrets[id(client)] = (secret, person["name"], person["id"])
+    # Every account links its person to every other account (one at a time,
+    # since a person holds one link), so the linked-wishlist path is exercised.
+    for client in clients:
+        for target in clients:
+            if target is not client:
+                client.patch(f"/api/gifts/people/{secrets[id(client)][2]}", json={"linked_username": target.username})
 
     get_paths = [
         route.path
         for route in app.routes
         if getattr(route, "path", "").startswith("/api/gifts") and "GET" in getattr(route, "methods", set())
     ]
-    assert "/api/gifts/board" in get_paths
-    for viewer in (alice, bob, admin):
+    assert {"/api/gifts/board", "/api/gifts/wishlists", "/api/gifts/wishlists/{member}"} <= set(get_paths)
+    for viewer in clients:
+        bodies = []
         for path in get_paths:
-            assert "{" not in path, f"add a parametrized case for {path}"
-            body = viewer.get(path).text
-            for other in (alice, bob, admin):
-                secret, person_name = secrets[id(other)]
-                if other is viewer:
-                    assert secret in body
-                else:
-                    assert secret not in body
-                    assert person_name not in body
+            if path == "/api/gifts/wishlists/{member}":
+                bodies.extend(viewer.get(path.format(member=c.username)).text for c in clients)
+            else:
+                assert "{" not in path, f"add a parametrized case for {path}"
+                bodies.append(viewer.get(path).text)
+        everything = "\n".join(bodies)
+        for other in clients:
+            secret, person_name, _pid = secrets[id(other)]
+            if other is viewer:
+                assert secret in everything
+            else:
+                assert secret not in everything
+                assert person_name not in everything
+
+
+def test_wishlists_list_other_members_wanted_items_only():
+    alice, bob = _member_client(), _member_client()
+    _seed(alice)  # one idea, one wanted item
+    got = alice.post("/api/gifts/items", json={"title": "Already have it"}).json()
+    alice.patch(f"/api/gifts/items/{got['id']}", json={"status": "received"})
+
+    listing = bob.get("/api/gifts/wishlists").json()["members"]
+    entry = next(m for m in listing if m["username"] == alice.username)
+    assert entry["count"] == 1 and entry["displayName"] == alice.username
+    # The caller is not listed as their own entry.
+    assert all(m["username"] != bob.username for m in bob.get("/api/gifts/wishlists").json()["members"])
+
+    wishlist = bob.get(f"/api/gifts/wishlists/{alice.username.upper()}").json()
+    assert wishlist["username"] == alice.username
+    assert [item["title"] for item in wishlist["items"]] == ["Trail shoes"]
+    assert set(wishlist["items"][0]) == {"id", "title", "url", "priceCents", "note"}
+
+
+def test_member_with_nothing_wanted_is_not_listed_but_still_readable():
+    alice, bob = _member_client(), _member_client()
+    alice.post("/api/gifts/people", json={"name": "Mom"})
+    assert all(m["username"] != alice.username for m in bob.get("/api/gifts/wishlists").json()["members"])
+    assert bob.get(f"/api/gifts/wishlists/{alice.username}").json()["items"] == []
+
+
+def test_unknown_or_deactivated_member_wishlist_is_404():
+    alice, bob = _member_client(), _member_client()
+    _seed(alice)
+    assert bob.get("/api/gifts/wishlists/nobody-by-this-name").status_code == 404
+    db = SessionLocal()
+    try:
+        user = accounts.get_user(db, alice.username)
+        user.is_active = False
+        db.commit()
+    finally:
+        db.close()
+    assert bob.get(f"/api/gifts/wishlists/{alice.username}").status_code == 404
+    assert all(m["username"] != alice.username for m in bob.get("/api/gifts/wishlists").json()["members"])
+
+
+def test_wishlists_require_sign_in():
+    for path in ("/api/gifts/wishlists", "/api/gifts/wishlists/palmer"):
+        response = TestClient(app).get(path)
+        assert response.status_code == 403
+
+
+def test_linking_a_person_shows_their_public_wishlist():
+    alice, bob = _member_client(), _member_client()
+    _bp, bob_idea, bob_wish = _seed(bob)
+    person = alice.post("/api/gifts/people", json={"name": "Bob"}).json()
+    linked = alice.patch(f"/api/gifts/people/{person['id']}", json={"linked_username": bob.username}).json()
+    assert linked["linkedUsername"] == bob.username
+    assert [i["title"] for i in linked["linked"]["items"]] == ["Trail shoes"]
+
+    board = alice.get("/api/gifts/board").json()
+    bob_column = next(p for p in board["people"] if p["id"] == person["id"])
+    assert bob_column["linked"]["displayName"] == bob.username
+    assert "Secret pasta maker" not in str(board)
+    # Bob's own board is untouched by being linked.
+    assert "Bob" not in str(bob.get("/api/gifts/board").json()["people"])
+
+    unlinked = alice.patch(f"/api/gifts/people/{person['id']}", json={"linked_username": None}).json()
+    assert unlinked["linkedUsername"] is None and unlinked["linked"] is None
+
+
+def test_link_validation():
+    alice = _member_client()
+    person = alice.post("/api/gifts/people", json={"name": "X"}).json()
+    url = f"/api/gifts/people/{person['id']}"
+    assert alice.patch(url, json={"linked_username": "nobody-by-this-name"}).status_code == 422
+    assert alice.patch(url, json={"linked_username": alice.username}).status_code == 422
+    assert alice.patch(url, json={"linked_username": ADMIN}).json()["linkedUsername"] == ADMIN
+    assert alice.patch(url, json={"linked_username": ""}).json()["linkedUsername"] is None
 
 
 def test_board_shape_and_default_statuses():
@@ -131,7 +221,10 @@ def test_board_shape_and_default_statuses():
     assert idea["status"] == "idea" and idea["personId"] == person["id"]
     assert wish["status"] == "wanted" and wish["personId"] is None
     board = client.get("/api/gifts/board").json()
-    assert board["people"] == [{"id": person["id"], "name": "Mom", "note": None, "birthday": None}]
+    assert board["people"] == [{
+        "id": person["id"], "name": "Mom", "note": None, "birthday": None,
+        "linkedUsername": None, "linked": None,
+    }]
     assert {i["id"] for i in board["items"]} == {idea["id"], wish["id"]}
 
 

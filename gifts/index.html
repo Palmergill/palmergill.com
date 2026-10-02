@@ -13,7 +13,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/shared/site-nav.css?v=15">
-    <link rel="stylesheet" href="style.css?v=1">
+    <link rel="stylesheet" href="style.css?v=4">
 </head>
 <body>
 <noscript>
@@ -29,10 +29,19 @@
                     it's for. Keep a wishlist of things you'd like yourself, too.
                 </p>
             </div>
-            <div class="page-head__actions" id="boardActions" hidden>
+        </header>
+
+        <nav class="tabs" id="tabs" aria-label="Gift board sections" hidden>
+            <a class="tab" href="#" id="boardTab">My board</a>
+            <a class="tab" href="#wishlists" id="wishlistsTab">Wishlists</a>
+            <div class="tabs__actions" id="boardActions">
+                <div class="segmented" role="group" aria-label="View">
+                    <button type="button" class="segmented__option" id="boardViewButton" aria-pressed="true">Board</button>
+                    <button type="button" class="segmented__option" id="graphViewButton" aria-pressed="false">Graph</button>
+                </div>
                 <button type="button" class="chip" id="hideDoneToggle" aria-pressed="false">Hide given</button>
             </div>
-        </header>
+        </nav>
 
         <p id="errorBanner" class="banner banner--error" role="alert" hidden></p>
 
@@ -74,6 +83,37 @@
 
         <section id="boardView" hidden>
             <div class="board" id="board" aria-label="Gift board"></div>
+            <div class="graph" id="graph" hidden></div>
+            <p class="graph__legend" id="graphLegend" hidden>
+                Inner ring: your wishlist. Outer ring: your people, with their gift
+                ideas beyond them. Select any gift or person to edit it.
+            </p>
+        </section>
+
+        <!-- Every member with something on their wishlist. -->
+        <section id="wishlistsView" hidden>
+            <p class="section-intro">
+                What other members have put on their own wishlists. Your ideas for
+                people are never shown here, and nobody can see yours.
+            </p>
+            <div class="member-grid" id="memberGrid"></div>
+            <p class="empty-state" id="wishlistsEmpty" hidden>
+                Nobody else has added anything to their wishlist yet.
+            </p>
+        </section>
+
+        <!-- One member's wishlist, read-only. -->
+        <section id="wishlistView" hidden>
+            <a class="back-link" href="#wishlists">← All wishlists</a>
+            <div class="wishlist-head">
+                <div>
+                    <span class="eyebrow">Wishlist</span>
+                    <h2 id="wishlistTitle">Wishlist</h2>
+                </div>
+                <div class="wishlist-head__actions" id="wishlistActions"></div>
+            </div>
+            <ul class="wish-list" id="wishList"></ul>
+            <p class="empty-state" id="wishlistEmpty" hidden>Nothing on this wishlist right now.</p>
         </section>
 
         <p class="sr-only" id="liveRegion" aria-live="polite" role="status"></p>
@@ -162,6 +202,11 @@
                 <span>Notes</span>
                 <textarea name="note" rows="3" maxlength="2000" placeholder="Sizes, favourite colours, things they already have…"></textarea>
             </label>
+            <label class="field">
+                <span>Site account (optional)</span>
+                <input type="text" name="linkedUsername" maxlength="64" autocomplete="off" placeholder="Their username on this site">
+                <small class="field__hint">Shows their wishlist in this column. They aren't told, and they can't see your ideas.</small>
+            </label>
             <p class="editor__error" id="personError" role="alert" hidden></p>
             <div class="editor__actions">
                 <button type="button" class="button button--danger" id="deletePerson">Delete</button>
@@ -173,8 +218,9 @@
     </dialog>
 
     <script src="/shared/api-base.js?v=1"></script>
-    <script src="/shared/site-nav.js?v=18"></script>
+    <script src="/shared/site-nav.js?v=19"></script>
     <script src="/shared/analytics.js?v=1"></script>
-    <script src="app.js?v=1"></script>
+    <script src="graph.js?v=4"></script>
+    <script src="app.js?v=3"></script>
 </body>
 </html>

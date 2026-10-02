@@ -41,6 +41,8 @@ class UpdatePersonRequest(BaseModel):
     name: Optional[str] = Field(None, min_length=1, max_length=80)
     note: Optional[str] = Field(None, max_length=2000)
     birthday: Optional[date] = None
+    # A site username to link (P4), or null/empty to unlink.
+    linked_username: Optional[str] = Field(None, max_length=64)
 
 
 class MovePersonRequest(BaseModel):
@@ -79,6 +81,20 @@ class MoveItemRequest(BaseModel):
 @router.get("/board")
 def read_board(username: str = Depends(caller), db: Session = Depends(get_db)) -> Dict[str, Any]:
     return gift_board.board(db, username)
+
+
+@router.get("/wishlists")
+def list_wishlists(username: str = Depends(caller), db: Session = Depends(get_db)) -> Dict[str, Any]:
+    return gift_board.wishlists(db, username)
+
+
+@router.get("/wishlists/{member}")
+def read_wishlist(
+    member: str = Path(..., min_length=1, max_length=64),
+    _username: str = Depends(caller),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    return gift_board.member_wishlist(db, member)
 
 
 @router.post("/people", status_code=201)
