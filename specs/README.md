@@ -30,6 +30,9 @@ One spec per roadmap item. Status legend: `draft` → `accepted` →
   but a shipped feature with no spec has nowhere to record *why* it works
   the way it does, which is the expensive part to reconstruct.
 
+- **Spec 21 added Oct 2026:** gift board, a net-new member app using the
+  roadmap's slack. Spec written before any code.
+
 ## Q3 2026 (Jul–Sep) — Finish what's in flight, stabilize
 
 | # | Spec | Status |
@@ -52,6 +55,7 @@ One spec per roadmap item. Status legend: `draft` → `accepted` →
 | 6 | [Craps strategy simulator v2](q4-06-craps-simulator-v2.md) | draft |
 | 7 | [Blackjack strategy tools](q4-07-blackjack-strategy-tools.md) | draft |
 | 8 | [Session stats dashboard](q4-08-session-stats-dashboard.md) | draft |
+| 21 | [Gift board](q4-21-gift-board.md) | draft — private gift ideas per person, public-to-members wishlist, board + graph views |
 
 ## Q1 2027 (Jan–Mar) — Data apps grow up
 
