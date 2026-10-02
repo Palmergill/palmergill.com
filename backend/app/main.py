@@ -31,6 +31,7 @@ from app.routers import (
     fantasy,
     fantasy_league,
     fantasy_rankings,
+    gifts,
 )
 from app.routers.analytics import cleanup_old_analytics, record_analytics_event
 import os
@@ -258,6 +259,11 @@ DEMO_PATH_PREFIXES = (
     "/stock-research",
     "/bitcoin-chat",
     "/fantasy",
+    # Not demo data: every /api/gifts route is account-owned and returns a JSON
+    # 403 from require_member. Listed here so anonymous callers reach that 403
+    # instead of a Basic-auth challenge, and so /gifts/ can render its teaser.
+    "/api/gifts",
+    "/gifts",
 )
 # Members-only pages. These sit UNDERNEATH a demo prefix ("/fantasy"), and
 # is_demo_path matches by prefix, so omitting them from DEMO_PATH_PREFIXES is
@@ -988,6 +994,7 @@ app.include_router(fantasy.router)
 app.include_router(fantasy_league.router)
 app.include_router(fantasy_rankings.router)
 app.include_router(draft_order.router)
+app.include_router(gifts.router)
 
 def _check_database_readiness() -> None:
     with engine.connect() as connection:
@@ -1025,6 +1032,7 @@ if local_site_root_enabled:
         "/high-card-flush": "high-card-flush",
         "/bitcoin-chat": "bitcoin-chat",
         "/fantasy": "fantasy",
+        "/gifts": "gifts",
         "/casino": "casino",
         "/admin": "admin",
         "/login": "login",

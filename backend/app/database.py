@@ -1,5 +1,6 @@
 from sqlalchemy import (
     Boolean,
+    CheckConstraint,
     Column,
     Date,
     DateTime,
@@ -1055,6 +1056,77 @@ class FantasyRankTier(Base):
     scope = Column(String, nullable=False)
     label = Column(String, nullable=False)
     sort_key = Column(Float, nullable=False)
+
+
+# ── Gift board (spec 21) ──────────────────────────────────────────────────────
+#
+# One privacy rule, carried by one column: an item with no person_id is on its
+# owner's own wishlist, which other members may read; an item with a person_id
+# is an idea for one of the owner's people, which nobody but the owner ever
+# sees. There is no per-item visibility flag, because a flag is one more thing
+# that could be wrong.
+
+GIFT_WISHLIST_STATUSES = ("wanted", "received")
+GIFT_IDEA_STATUSES = ("idea", "bought", "given")
+
+
+class GiftPerson(Base):
+    """Someone a member keeps gift ideas for. A private contact, not an account."""
+
+    __tablename__ = "gift_people"
+    __table_args__ = (
+        Index("ix_gift_people_owner_key", "owner_username", "sort_key"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    # Normalized account name, as in ff_rank_boards: a ForeignKey to app_users
+    # would exclude the admin, who authenticates from env vars and has no row.
+    owner_username = Column(String, index=True, nullable=False)
+    name = Column(String, nullable=False)
+    note = Column(Text, nullable=True)
+    birthday = Column(Date, nullable=True)
+    # Sparse column order, seeded 1000, 2000, ... like ff_rank_entries.
+    sort_key = Column(Float, nullable=False)
+    created_at = Column(DateTime, default=utc_now, nullable=False)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now, nullable=False)
+
+
+class GiftItem(Base):
+    """One gift: an idea for one of the owner's people, or on their own wishlist."""
+
+    __tablename__ = "gift_items"
+    __table_args__ = (
+        Index("ix_gift_items_owner_person_status", "owner_username", "person_id", "status"),
+        # Status follows the side of the privacy line the row is on, so a
+        # half-applied move can never leave a "wanted" idea or a "bought"
+        # wishlist item behind.
+        CheckConstraint(
+            "(person_id IS NULL AND status IN ('wanted', 'received'))"
+            " OR (person_id IS NOT NULL AND status IN ('idea', 'bought', 'given'))",
+            name="ck_gift_items_status_side",
+        ),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    owner_username = Column(String, index=True, nullable=False)
+    # NULL means "my own wishlist". See the block comment above.
+    person_id = Column(
+        Integer,
+        ForeignKey("gift_people.id", ondelete="CASCADE"),
+        index=True,
+        nullable=True,
+    )
+    title = Column(String, nullable=False)
+    # Stored and linked, never fetched by the server.
+    url = Column(String, nullable=True)
+    price_cents = Column(Integer, nullable=True)
+    note = Column(Text, nullable=True)
+    status = Column(String, nullable=False)
+    occasion = Column(String, nullable=True)
+    given_on = Column(Date, nullable=True)
+    sort_key = Column(Float, nullable=False)
+    created_at = Column(DateTime, default=utc_now, nullable=False)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now, nullable=False)
 
 
 def get_db():

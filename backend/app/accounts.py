@@ -20,6 +20,7 @@ import secrets
 import unicodedata
 from datetime import datetime, time, timedelta
 
+from fastapi import HTTPException, Request
 from sqlalchemy import func
 from sqlalchemy.dialects.postgresql import insert as postgresql_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
@@ -215,6 +216,23 @@ def verify_password(password: str, encoded: str) -> bool:
         return False
 
     return secrets.compare_digest(derived.hex(), hash_hex)
+
+
+def require_member_identity(request: Request, message: str) -> dict:
+    """The signed-in identity, or a JSON 403 carrying `message`.
+
+    Account-owned routes gate themselves here rather than by path prefix: a
+    transport-level rejection is a 401 with ``WWW-Authenticate: Basic``, which
+    some browsers turn into a native credential modal on a ``fetch()``. A JSON
+    403 lets the page render its own sign-in panel. The admin counts as a
+    member for these routes.
+    """
+    if getattr(request.state, "demo_mode", False):
+        raise HTTPException(status_code=403, detail=message)
+    identity = getattr(request.state, "app_user", None)
+    if not identity:
+        raise HTTPException(status_code=403, detail=message)
+    return identity
 
 
 def get_user(db: Session, username: object) -> AppUser | None:

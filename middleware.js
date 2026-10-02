@@ -23,6 +23,9 @@ const PUBLIC_PREFIXES = [
   '/api/stocks',
   '/api/bitcoin',
   '/api/fantasy',
+  // Account-owned, not public: the origin's require_member answers anonymous
+  // callers with a JSON 403 the page turns into its sign-in panel.
+  '/api/gifts',
 ];
 
 // Members-only pages. These live underneath a public prefix ('/api/fantasy'
@@ -65,6 +68,7 @@ const OPTIONAL_AUTH_API_PREFIXES = [
   '/api/stocks',
   '/api/bitcoin',
   '/api/fantasy',
+  '/api/gifts',
 ];
 
 const REALM = 'Palmer Gill Apps';

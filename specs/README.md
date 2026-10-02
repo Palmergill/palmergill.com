@@ -55,7 +55,7 @@ One spec per roadmap item. Status legend: `draft` → `accepted` →
 | 6 | [Craps strategy simulator v2](q4-06-craps-simulator-v2.md) | draft |
 | 7 | [Blackjack strategy tools](q4-07-blackjack-strategy-tools.md) | draft |
 | 8 | [Session stats dashboard](q4-08-session-stats-dashboard.md) | draft |
-| 21 | [Gift board](q4-21-gift-board.md) | draft — private gift ideas per person, public-to-members wishlist, board + graph views |
+| 21 | [Gift board](q4-21-gift-board.md) | in progress — P1 built (private board at `/gifts/`, unlinked); P2 wishlist browsing next |
 
 ## Q1 2027 (Jan–Mar) — Data apps grow up
 

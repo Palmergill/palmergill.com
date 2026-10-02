@@ -14,6 +14,7 @@ from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request, Res
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
+from app import accounts
 from app.database import get_db
 from app.services import fantasy_rankings_board as boards
 
@@ -26,12 +27,7 @@ SCOPE_PATTERN = "^(OVERALL|QB|RB|WR|TE)$"
 
 def require_member(request: Request) -> Dict[str, Any]:
     """Any signed-in account may keep boards; anonymous callers may not."""
-    if getattr(request.state, "demo_mode", False):
-        raise HTTPException(status_code=403, detail="Sign in to build your own rankings.")
-    identity = getattr(request.state, "app_user", None)
-    if not identity:
-        raise HTTPException(status_code=403, detail="Sign in to build your own rankings.")
-    return identity
+    return accounts.require_member_identity(request, "Sign in to build your own rankings.")
 
 
 class CreateBoardRequest(BaseModel):

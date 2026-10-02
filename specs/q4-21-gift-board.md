@@ -1,7 +1,7 @@
 # Spec 21 — Gift Board
 
 - **Quarter:** Q4 2026 (Oct–Dec)
-- **Status:** draft
+- **Status:** in progress — P1 built (Oct 2026)
 - **Depends on:** site member accounts (`backend/app/accounts.py`, `app_users`)
 - **Areas:** `gifts/` (new), `backend/app/routers/gifts.py` (new),
   `backend/app/services/gift_board.py` (new), `backend/app/database.py`,
@@ -167,11 +167,26 @@ wishlist.
 
 ## Phases
 
-- **P1.** Tables, service and router with the auth boundary. Shared
-  `require_member`. `/gifts/` board: people columns, Me column, inline add/edit,
-  status, reorder. Teaser for anonymous visitors.
+- **P1 (done).** Tables, service and router with the auth boundary. Shared
+  `require_member` (now `accounts.require_member_identity`, used by the
+  rankings and league routers too). `/gifts/` board: people columns, Me
+  column, inline add/edit, status, reorder, "Hide given", birthday countdown.
+  Teaser for anonymous visitors. ARCHITECTURE.md updated, since P1 deploys.
+  As built:
+  - Reordering and cross-column moves send a destination `index` rather than
+    neighbour ids; the server works out the neighbours from the current order.
+    Move routes return the whole board, because an exhausted key gap respreads
+    the destination column.
+  - No revision token, unlike spec 18. A board has one editor, and a
+    last-write-wins race between two of your own tabs costs little.
+  - Pointer users drag cards (HTML5 drag and drop). Touch and keyboard users
+    move gifts from the editor (List, Move up, Move down), which works on every
+    device, instead of a pointer-events drag implementation.
+  - The page is live but unlinked: no homepage card or nav entry until P2, so
+    the "Visible to members" badge describes the agreed contract slightly
+    ahead of the wishlist browser that makes it true.
 - **P2.** Wishlists panel and read-only member wishlist view. Homepage project
-  card and site-nav entry. ARCHITECTURE.md routes and deployment lists updated.
+  card and site-nav entry.
 - **P3.** Graph view (R4), toggled from the board header, remembered per viewer
   in `localStorage`.
 - **P4.** Link a contact to a member: their public wishlist appears read-only in
@@ -181,16 +196,22 @@ wishlist.
 
 ## Testing
 
-- `backend/tests/test_gifts_api.py` — the auth boundary parametrized over every
-  route (anonymous → 403; another member's person or idea → 404, including for
-  the admin), and the privacy invariant: seed two members with ideas and
-  wishlist items, call every read route as each member, and assert that no
-  response ever contains another member's idea rows. Also the status remap on
-  move, the input limits, and URL scheme validation.
-- `e2e/gifts.spec.js` — member A adds an idea for "Mom" and a wishlist item;
-  member B finds A in Wishlists, sees the wishlist item and not the idea; A
-  marks the idea bought, then given; the board ↔ graph toggle keeps the same
-  item count; anonymous visitors see the teaser.
+- `backend/tests/test_gifts_api.py` (P1, built) — the auth boundary
+  parametrized over every route (anonymous → 403 with no `WWW-Authenticate`;
+  another member's person or idea → 404, including for the admin), and the
+  privacy invariant: seed three accounts with uniquely named ideas, call every
+  parameterless GET route under `/api/gifts` as each one, and assert that no
+  response contains another account's idea or person. The test enumerates the
+  routes from the app, so a new GET route is covered automatically, and a new
+  route with a path parameter fails the test until it gets its own case. Also
+  the status remap on move, reordering, key-gap respread, cascade on person
+  delete, the DB check constraint, input limits, and URL scheme validation.
+- `e2e/gifts.spec.js` (P1, built) — anonymous visitors see the teaser; a member
+  adds a person, ideas and a wishlist item, edits price, link and status, moves
+  an idea onto the wishlist through the confirm, reloads, and a second member
+  sees an empty board. P2 adds: member B finds A in Wishlists and sees the
+  wishlist item but not the idea. P3 adds: the board ↔ graph toggle keeps the
+  same item count.
 
 ## Open questions
 

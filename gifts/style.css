@@ -1,0 +1,638 @@
+/* Gift board (spec 21) — warm light theme on the shared tokens from
+   /shared/site-nav.css (--bg, --card, --ink, --sage, --clay, ...). */
+
+/* `hidden` has to beat display rules like .button's inline-flex. */
+[hidden] { display: none !important; }
+
+body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "Plus Jakarta Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+    line-height: 1.55;
+}
+
+.app-shell {
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: clamp(20px, 4vw, 40px) clamp(16px, 4vw, 32px) 80px;
+}
+
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+:focus-visible {
+    outline: none;
+    box-shadow: var(--focus-ring);
+}
+
+/* ── header ──────────────────────────────────────────────────────────────── */
+
+.page-head {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px 24px;
+    justify-content: space-between;
+    align-items: flex-end;
+    margin-bottom: 24px;
+}
+
+.eyebrow {
+    display: block;
+    margin-bottom: 6px;
+    color: var(--clay);
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.page-head h1 {
+    margin: 0 0 8px;
+    font-family: "Newsreader", Georgia, serif;
+    font-size: clamp(2rem, 5vw, 2.8rem);
+    font-weight: 500;
+    line-height: 1.1;
+}
+
+.lede {
+    max-width: 56ch;
+    margin: 0;
+    color: var(--soft);
+}
+
+/* ── buttons ─────────────────────────────────────────────────────────────── */
+
+.button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 9px 18px;
+    border: 1px solid var(--sage);
+    border-radius: 999px;
+    background: var(--sage);
+    color: #fff;
+    font: inherit;
+    font-size: 0.92rem;
+    font-weight: 600;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.button:hover { background: var(--sage-dim); }
+
+.button--quiet {
+    background: transparent;
+    color: var(--sage);
+}
+
+.button--quiet:hover { background: var(--sage-soft); }
+
+.button--danger {
+    border-color: var(--clay);
+    background: transparent;
+    color: var(--clay);
+}
+
+.button--danger:hover { background: #f6e6df; }
+
+.button--small {
+    padding: 5px 12px;
+    font-size: 0.82rem;
+}
+
+.button:disabled {
+    opacity: 0.5;
+    cursor: default;
+}
+
+.chip {
+    padding: 6px 14px;
+    border: 1px solid var(--line-strong);
+    border-radius: 999px;
+    background: var(--card);
+    color: var(--soft);
+    font: inherit;
+    font-size: 0.86rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.chip:hover {
+    border-color: var(--sage);
+    color: var(--sage);
+}
+
+.chip[aria-pressed="true"] {
+    border-color: var(--sage);
+    background: var(--sage);
+    color: #fff;
+}
+
+.icon-button {
+    width: 32px;
+    height: 32px;
+    border: none;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--muted);
+    font-size: 1.4rem;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.icon-button:hover {
+    background: var(--surface);
+    color: var(--ink);
+}
+
+/* ── banners and empty states ────────────────────────────────────────────── */
+
+.banner {
+    margin: 0 0 20px;
+    padding: 12px 16px;
+    border-radius: 10px;
+    background: var(--surface);
+}
+
+.banner--error {
+    border: 1px solid #e8c4b5;
+    background: #fbefe9;
+    color: #8a3f22;
+}
+
+.empty-state {
+    color: var(--muted);
+}
+
+/* ── signed out ──────────────────────────────────────────────────────────── */
+
+.signed-out {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+    gap: 32px;
+    align-items: center;
+    padding: clamp(20px, 4vw, 36px);
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    background: var(--card);
+}
+
+.signed-out h2 {
+    margin: 0 0 10px;
+    font-family: "Newsreader", Georgia, serif;
+    font-size: 1.6rem;
+    font-weight: 500;
+}
+
+.signed-out p {
+    margin: 0 0 20px;
+    color: var(--soft);
+}
+
+.signed-out__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.teaser {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.teaser__col {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px;
+    border-radius: 12px;
+    background: var(--surface);
+}
+
+.teaser__name {
+    font-weight: 700;
+    font-size: 0.9rem;
+}
+
+.teaser__card {
+    padding: 8px 10px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--card);
+    font-size: 0.8rem;
+}
+
+.teaser__card--done {
+    color: var(--muted);
+    text-decoration: line-through;
+}
+
+/* ── board ───────────────────────────────────────────────────────────────── */
+
+/* Columns sit side by side and the board scrolls sideways inside itself, so
+   the page never does. Below 640px they stack instead. */
+.board {
+    display: flex;
+    gap: 16px;
+    align-items: flex-start;
+    overflow-x: auto;
+    padding-bottom: 12px;
+    scroll-snap-type: x proximity;
+}
+
+.column {
+    display: flex;
+    flex: 0 0 280px;
+    flex-direction: column;
+    max-width: 280px;
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    background: var(--surface);
+    scroll-snap-align: start;
+}
+
+.column--me {
+    border-color: #d9c2b4;
+    background: #f7ece4;
+}
+
+.column.is-drop-target {
+    border-color: var(--sage);
+    box-shadow: var(--focus-ring);
+}
+
+.column__head {
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+    justify-content: space-between;
+    padding: 14px 14px 8px;
+}
+
+.column__title {
+    min-width: 0;
+}
+
+.column__name {
+    margin: 0;
+    overflow-wrap: anywhere;
+    font-size: 1.02rem;
+    font-weight: 700;
+}
+
+.column__meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+    margin-top: 4px;
+    color: var(--muted);
+    font-size: 0.76rem;
+}
+
+.badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 1px 8px;
+    border-radius: 999px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+}
+
+.badge--private {
+    background: var(--card);
+    color: var(--soft);
+}
+
+.badge--public {
+    background: var(--clay);
+    color: #fff;
+}
+
+.column__tools {
+    display: flex;
+    flex-shrink: 0;
+}
+
+.column__tools .icon-button {
+    width: 28px;
+    height: 28px;
+    font-size: 0.95rem;
+}
+
+.column__note {
+    margin: 0 14px 6px;
+    color: var(--soft);
+    font-size: 0.8rem;
+    white-space: pre-line;
+}
+
+.cards {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-height: 8px;
+    margin: 0;
+    padding: 4px 10px;
+    list-style: none;
+}
+
+.card {
+    position: relative;
+    padding: 10px 12px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: var(--card);
+    cursor: grab;
+    transition: box-shadow 120ms ease, border-color 120ms ease;
+}
+
+.card:hover {
+    border-color: var(--line-strong);
+    box-shadow: 0 2px 10px rgba(60, 50, 35, 0.08);
+}
+
+.card.is-dragging { opacity: 0.4; }
+
+.card.is-drop-before::before {
+    content: "";
+    position: absolute;
+    top: -6px;
+    left: 4px;
+    right: 4px;
+    height: 3px;
+    border-radius: 2px;
+    background: var(--sage);
+}
+
+.card--done .card__title { color: var(--muted); text-decoration: line-through; }
+
+/* The whole card opens the editor; the title link stays independently
+   clickable above it. */
+.card__open {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    width: 100%;
+    border: none;
+    border-radius: inherit;
+    background: transparent;
+    cursor: pointer;
+}
+
+.card__title {
+    position: relative;
+    z-index: 1;
+    margin: 0;
+    overflow-wrap: anywhere;
+    font-size: 0.92rem;
+    font-weight: 600;
+    pointer-events: none;
+}
+
+.card__title a {
+    color: inherit;
+    text-decoration-color: var(--line-strong);
+    text-underline-offset: 2px;
+    pointer-events: auto;
+}
+
+.card__title a:hover { color: var(--sage); }
+
+.card__meta {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 10px;
+    align-items: center;
+    margin-top: 6px;
+    color: var(--muted);
+    font-size: 0.76rem;
+    pointer-events: none;
+}
+
+.card__note {
+    position: relative;
+    z-index: 1;
+    display: -webkit-box;
+    margin: 6px 0 0;
+    overflow: hidden;
+    color: var(--soft);
+    font-size: 0.8rem;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    pointer-events: none;
+}
+
+.status {
+    padding: 1px 8px;
+    border-radius: 999px;
+    font-size: 0.7rem;
+    font-weight: 600;
+}
+
+.status--idea,
+.status--wanted { background: var(--surface); color: var(--soft); }
+.status--bought { background: #e4ecf3; color: var(--sky); }
+.status--given,
+.status--received { background: var(--sage-soft); color: var(--sage-dim); }
+
+.quick-add {
+    padding: 8px 10px 12px;
+}
+
+.quick-add input,
+.add-person input {
+    box-sizing: border-box;
+    width: 100%;
+    padding: 9px 12px;
+    border: 1px dashed var(--line-strong);
+    border-radius: 10px;
+    background: transparent;
+    color: var(--ink);
+    font: inherit;
+    font-size: 0.88rem;
+}
+
+.quick-add input:focus,
+.add-person input:focus {
+    border-style: solid;
+    border-color: var(--sage);
+    background: var(--card);
+    outline: none;
+}
+
+.column__empty {
+    margin: 2px 14px 4px;
+    color: var(--muted);
+    font-size: 0.8rem;
+}
+
+.add-person {
+    flex: 0 0 240px;
+    padding: 14px;
+    border: 1px dashed var(--line-strong);
+    border-radius: 16px;
+}
+
+.add-person h2 {
+    margin: 0 0 4px;
+    font-size: 0.95rem;
+}
+
+.add-person p {
+    margin: 0 0 10px;
+    color: var(--muted);
+    font-size: 0.8rem;
+}
+
+/* ── editor dialog ───────────────────────────────────────────────────────── */
+
+.editor {
+    box-sizing: border-box;
+    width: min(520px, calc(100vw - 32px));
+    max-height: calc(100vh - 32px);
+    padding: 0;
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    background: var(--card);
+    color: var(--ink);
+    box-shadow: 0 24px 80px rgba(60, 50, 35, 0.25);
+}
+
+.editor--small { width: min(420px, calc(100vw - 32px)); }
+
+.editor::backdrop { background: rgba(60, 50, 35, 0.32); }
+
+.editor form {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    padding: 20px;
+}
+
+.editor__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.editor__head h2 {
+    margin: 0;
+    font-family: "Newsreader", Georgia, serif;
+    font-size: 1.4rem;
+    font-weight: 500;
+}
+
+.field {
+    display: flex;
+    flex: 1 1 0;
+    flex-direction: column;
+    gap: 5px;
+    min-width: 0;
+}
+
+.field > span {
+    color: var(--soft);
+    font-size: 0.78rem;
+    font-weight: 600;
+}
+
+.field input,
+.field select,
+.field textarea {
+    box-sizing: border-box;
+    width: 100%;
+    padding: 9px 11px;
+    border: 1px solid var(--line-strong);
+    border-radius: 10px;
+    background: var(--card);
+    color: var(--ink);
+    font: inherit;
+    font-size: 0.92rem;
+}
+
+.field textarea { resize: vertical; }
+
+.field input:focus,
+.field select:focus,
+.field textarea:focus {
+    border-color: var(--sage);
+    outline: none;
+    box-shadow: var(--focus-ring);
+}
+
+.field-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.order-buttons {
+    display: flex;
+    gap: 6px;
+}
+
+.editor__warning {
+    margin: 0;
+    padding: 10px 12px;
+    border-radius: 10px;
+    background: #f7ece4;
+    color: #7a4a33;
+    font-size: 0.85rem;
+}
+
+.editor__error {
+    margin: 0;
+    color: #8a3f22;
+    font-size: 0.85rem;
+}
+
+.editor__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+}
+
+.editor__spacer { flex: 1; }
+
+/* ── small screens ───────────────────────────────────────────────────────── */
+
+@media (max-width: 760px) {
+    .signed-out { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 640px) {
+    .board {
+        flex-direction: column;
+        align-items: stretch;
+        overflow: visible;
+    }
+
+    .column,
+    .add-person {
+        flex: none;
+        max-width: none;
+    }
+
+    /* Columns stack here, so "earlier" and "later" point up and down. */
+    .icon-button--order { transform: rotate(90deg); }
+
+    .teaser { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+    .teaser__col { padding: 8px; }
+}

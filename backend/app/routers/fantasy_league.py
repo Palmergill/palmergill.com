@@ -18,6 +18,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 
+from app import accounts
 from app.database import get_db
 from app.services import (
     fantasy_ai,
@@ -39,12 +40,7 @@ class LeagueTeamSelectionRequest(BaseModel):
 
 def require_member(request: Request) -> Dict[str, Any]:
     """Any signed-in account may read the league; anonymous callers may not."""
-    if getattr(request.state, "demo_mode", False):
-        raise HTTPException(status_code=403, detail="Sign in to view the league hub.")
-    identity = getattr(request.state, "app_user", None)
-    if not identity:
-        raise HTTPException(status_code=403, detail="Sign in to view the league hub.")
-    return identity
+    return accounts.require_member_identity(request, "Sign in to view the league hub.")
 
 
 def _member_username(identity: Dict[str, Any]) -> str:
