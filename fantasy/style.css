@@ -2086,10 +2086,6 @@ button:focus-visible {
     .my-team-picker select { font-size: 15px; }
     .my-team-picker button { flex: 0 0 auto; white-space: nowrap; padding-inline: 12px; }
 
-    /* Under the name, not under the rank: the logo slot is 26px + 10px. */
-    .ledger__meta,
-    .ledger__chart { padding-left: 36px; }
-
     .chart-range { font-size: 13px; color: var(--soft, #5d574e); margin: 4px 0 8px; }
 
     /* Start/sit: rows on hairlines inside the one card, not cards in it. */
@@ -2141,4 +2137,31 @@ button:focus-visible {
     /* The season context is a fold, not a slab between two boards. */
     .team-context { margin: 18px 0; padding: 6px 0; }
     .back-link { margin-bottom: 10px; }
+}
+
+/* ── the ledger on a phone: two lines a team, not four ────────────────
+   The owner line, the context line and the chart each took a row, so ten
+   teams ran two screens. The owner goes (the power board already drops
+   it), and the context and its chart share the line under the name,
+   starting where the name does rather than under the logo slot. */
+
+@media (max-width: 720px) {
+    .ledger-table tr { align-items: center; padding: 9px 0; }
+    .ledger-table .team-cell__owner { display: none; }
+
+    .ledger-table td.ledger__team {
+        display: grid;
+        /* The chart's track is fixed, not whatever the context line leaves:
+           every row's bar has to share one axis to be read down the column. */
+        grid-template-columns: 26px minmax(0, 1fr) 80px;
+        align-items: center;
+        column-gap: 10px;
+        row-gap: 2px;
+    }
+    .ledger__team .team-cell { grid-column: 1 / -1; }
+    .ledger__team .ledger__meta { grid-column: 2; margin-top: 0; }
+    .ledger__team .ledger__chart { grid-column: 3; margin-top: 0; }
+
+    /* The row's own chart is that meter now; two of them said it twice. */
+    .ledger__cell .ledger__odds .meter { display: none; }
 }
