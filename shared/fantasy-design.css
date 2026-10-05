@@ -44,7 +44,8 @@ button:focus-visible, select:focus-visible, summary:focus-visible, a:focus-visib
  #market-board .season-leader__meta { font-size: .7rem; }
  .season-bar { gap: 8px; }
  .team-context .dossier { display: block; }
- .my-team-picker select { flex: 1 1 180px; }
+ .my-team-picker { flex-wrap: nowrap; gap: 8px; }
+ .my-team-picker select { flex: 1 1 auto; min-width: 0; }
 }
 
 .quote-coverage { margin: 0; padding: 10px 14px; font-size: .8rem; background: #f6eddc; color: #66502c; white-space: normal; }

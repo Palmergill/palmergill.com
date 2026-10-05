@@ -2073,3 +2073,72 @@ button:focus-visible {
     border-radius: 4px;
 }
 .my-team-picker button:disabled { opacity: 0.6; cursor: wait; }
+
+/* ── the phone: the team page and the hub's loose ends ────────────────
+   Boxes inside boxes ate a third of the width on the team page, and a
+   trade of two-for-one ran four name lines and four stat lines tall. */
+
+@media (max-width: 620px) {
+
+    /* One line, not a select and a stranded button under it (the wrap
+       itself is set in shared/fantasy-design.css, which loads after this). */
+    .my-team-picker label { flex: 0 0 auto; font-size: 13px; font-weight: 600; color: var(--soft, #5d574e); }
+    .my-team-picker select { font-size: 15px; }
+    .my-team-picker button { flex: 0 0 auto; white-space: nowrap; padding-inline: 12px; }
+
+    /* Under the name, not under the rank: the logo slot is 26px + 10px. */
+    .ledger__meta,
+    .ledger__chart { padding-left: 36px; }
+
+    .chart-range { font-size: 13px; color: var(--soft, #5d574e); margin: 4px 0 8px; }
+
+    /* Start/sit: rows on hairlines inside the one card, not cards in it. */
+    .lineup__changes { gap: 0; margin-top: 10px; }
+    .lineup__change {
+        padding: 9px 0;
+        border: 0;
+        border-bottom: 1px solid var(--line, #ece4d8);
+        border-radius: 0;
+        background: none;
+    }
+    .lineup__change:last-child { border-bottom: 0; }
+    .lineup__slot { min-width: 38px; }
+    .lineup__totals { width: 100%; justify-content: space-between; }
+
+    /* Moves: the gain is the headline, so it takes the top-right corner and
+       its explanation runs full width under both sides. */
+    .move {
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 8px 12px;
+        padding: 12px;
+    }
+    .move__side { grid-column: 1; }
+    .move__gain { display: contents; }
+    .move__gain-value {
+        grid-column: 2;
+        grid-row: 1;
+        align-self: start;
+        font-size: 17px;
+        font-weight: 700;
+        color: #3f6d4a;
+    }
+    .move__gain small {
+        grid-column: 1 / -1;
+        padding-top: 6px;
+        border-top: 1px dashed var(--line-strong, #d8cdba);
+    }
+    .move__player {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: baseline;
+        gap: 0 8px;
+        padding: 1px 0;
+    }
+    .move__player .lineup__name { flex: 0 1 auto; min-width: 0; }
+    .move__player .lineup__points { flex: 0 0 auto; font-size: 11px; color: var(--muted, #928a7d); }
+    .move__side + .move__side { padding-top: 6px; }
+
+    /* The season context is a fold, not a slab between two boards. */
+    .team-context { margin: 18px 0; padding: 6px 0; }
+    .back-link { margin-bottom: 10px; }
+}

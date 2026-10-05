@@ -1196,16 +1196,21 @@
         side.appendChild(el("span", "lineup__label", label));
         if (!list.length) side.appendChild(el("span", "lineup__name", fallback || "—"));
         list.forEach((player) => {
-            side.appendChild(el("span", "lineup__name", player.name || "—"));
+            // One wrapper a player, so a phone can set the name and its line
+            // side by side instead of stacking a package four rows deep.
+            const row = el("div", "move__player");
+            row.appendChild(el("span", "lineup__name", player.name || "—"));
             const meta = [player.position, player.pro_team].filter(Boolean).join(" · ");
             const ppg = player.ppg == null ? "" : `${F.formatPoints(player.ppg)} a game`;
-            side.appendChild(el("span", "lineup__points", [meta, ppg].filter(Boolean).join(" · ")));
+            row.appendChild(el("span", "lineup__points", [meta, ppg].filter(Boolean).join(" · ")));
+            side.appendChild(row);
         });
         return side;
     }
 
     function moveGain(value, note) {
-        const gain = el("div", "move__gain", `+${F.formatPoints(value)}`);
+        const gain = el("div", "move__gain");
+        gain.appendChild(el("span", "move__gain-value", `+${F.formatPoints(value)}`));
         if (note) gain.appendChild(el("small", null, note));
         return gain;
     }
