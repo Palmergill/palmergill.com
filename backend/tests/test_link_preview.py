@@ -227,10 +227,10 @@ def test_preview_endpoint_requires_sign_in():
     assert response.status_code == 403
 
 
-def test_preview_endpoint_returns_the_image(monkeypatch):
-    monkeypatch.setattr(link_preview, "find_image", lambda url: "https://cdn.test/a.jpg")
+def test_preview_endpoint_returns_picture_and_title(monkeypatch):
+    monkeypatch.setattr(link_preview, "find_preview", lambda url: {"imageUrl": "https://cdn.test/a.jpg", "title": "Kettle"})
     response = _member().post("/api/gifts/link-preview", json={"url": "https://shop.example/p"})
-    assert response.json() == {"imageUrl": "https://cdn.test/a.jpg", "status": "found"}
+    assert response.json() == {"imageUrl": "https://cdn.test/a.jpg", "title": "Kettle", "status": "found"}
 
 
 def test_preview_endpoint_validates_the_link():
@@ -239,13 +239,13 @@ def test_preview_endpoint_validates_the_link():
 
 def test_preview_endpoint_can_be_disabled(monkeypatch):
     monkeypatch.setenv("GIFT_LINK_PREVIEWS_DISABLED", "true")
-    monkeypatch.setattr(link_preview, "find_image", lambda url: pytest.fail("must not fetch"))
+    monkeypatch.setattr(link_preview, "find_preview", lambda url: pytest.fail("must not fetch"))
     response = _member().post("/api/gifts/link-preview", json={"url": "https://shop.example/p"})
     assert response.json()["status"] == "disabled"
 
 
 def test_preview_endpoint_is_rate_limited(monkeypatch):
-    monkeypatch.setattr(link_preview, "find_image", lambda url: None)
+    monkeypatch.setattr(link_preview, "find_preview", lambda url: {"imageUrl": None, "title": None})
     monkeypatch.setattr(link_preview, "RATE_LIMIT", 2)
     client = _member()
     statuses = [client.post("/api/gifts/link-preview", json={"url": "https://shop.example/p"}).status_code for _ in range(3)]
@@ -293,3 +293,115 @@ def test_og_image_beats_the_fallbacks():
         <script type="application/ld+json">{"@type": "Product", "image": "https://cdn.test/ld.jpg"}</script>
         <meta property="og:image" content="https://cdn.test/og.jpg">"""
     assert link_preview.image_from_html(html, "https://shop.test/") == "https://cdn.test/og.jpg"
+
+
+# ── titles ──────────────────────────────────────────────────────────────────
+
+
+def test_title_prefers_the_product_heading_and_strips_the_shop():
+    html = """<title>Amazon.com: Echo Dot : Electronics</title>
+        <span id="productTitle">
+            Echo Dot (3rd Gen) &amp; Clock
+        </span>"""
+    preview = link_preview.preview_from_html(html, "https://www.amazon.com/dp/X")
+    assert preview["title"] == "Echo Dot (3rd Gen) & Clock"
+
+
+def test_title_falls_back_through_og_and_html_title():
+    html = '<title>Tree Runners | Allbirds</title><meta property="og:site_name" content="Allbirds">'
+    assert link_preview.preview_from_html(html, "https://www.allbirds.com/p")["title"] == "Tree Runners"
+    html = '<meta property="og:title" content="Wingspan"><title>Shop - Stonemaier</title>'
+    assert link_preview.preview_from_html(html, "https://stonemaiergames.com/w")["title"] == "Wingspan"
+
+
+@pytest.mark.parametrize("title,url,site,expected", [
+    ("Amazon.com: Echo Dot : Devices", "https://www.amazon.com/x", None, "Echo Dot : Devices"),
+    ("Men's Tree Runners | Allbirds", "https://www.allbirds.com/x", "Allbirds", "Men's Tree Runners"),
+    ("Wingspan – Stonemaier Games", "https://stonemaiergames.com/x", "Stonemaier Games", "Wingspan"),
+    ("Allbirds", "https://allbirds.com/", None, None),
+    ("Ratio: The Simple Codes", "https://books.example/x", None, "Ratio: The Simple Codes"),
+])
+def test_clean_title(title, url, site, expected):
+    assert link_preview.clean_title(title, url, site) == expected
+
+
+def test_a_huge_title_is_capped():
+    html = "<title>" + "x" * 5000 + "</title>"
+    title = link_preview.preview_from_html(html, "https://shop.test/")["title"]
+    assert len(title) <= link_preview.MAX_TITLE
+
+
+# ── storing a preview on a gift ─────────────────────────────────────────────
+
+
+def _fake_preview(monkeypatch, image="https://cdn.test/found.jpg", title="Found Title"):
+    calls = []
+
+    def find(url):
+        calls.append(url)
+        return {"imageUrl": image, "title": title}
+
+    monkeypatch.setattr(link_preview, "find_preview", find)
+    return calls
+
+
+def test_refresh_stores_the_preview_on_the_gift(monkeypatch):
+    calls = _fake_preview(monkeypatch)
+    client = _member()
+    item = client.post("/api/gifts/items", json={"title": "Kettle", "url": "https://shop.example/k"}).json()
+    assert item["previewChecked"] is False
+    refreshed = client.post(f"/api/gifts/items/{item['id']}/preview", json={}).json()
+    assert calls == ["https://shop.example/k"]
+    assert refreshed["imageUrl"] == "https://cdn.test/found.jpg"
+    assert refreshed["previewTitle"] == "Found Title"
+    assert refreshed["title"] == "Kettle"
+    assert refreshed["previewChecked"] is True
+
+
+def test_refresh_keeps_a_pasted_picture_unless_asked(monkeypatch):
+    _fake_preview(monkeypatch)
+    client = _member()
+    item = client.post("/api/gifts/items", json={
+        "title": "Kettle", "url": "https://shop.example/k", "image_url": "https://cdn.test/mine.jpg",
+    }).json()
+    kept = client.post(f"/api/gifts/items/{item['id']}/preview", json={}).json()
+    assert kept["imageUrl"] == "https://cdn.test/mine.jpg"
+    replaced = client.post(f"/api/gifts/items/{item['id']}/preview", json={"replace_image": True}).json()
+    assert replaced["imageUrl"] == "https://cdn.test/found.jpg"
+
+
+def test_a_pasted_link_can_take_the_page_title(monkeypatch):
+    _fake_preview(monkeypatch, title="Echo Dot (3rd Gen)")
+    client = _member()
+    item = client.post("/api/gifts/items", json={"title": "amazon.com", "url": "https://www.amazon.com/dp/X"}).json()
+    renamed = client.post(f"/api/gifts/items/{item['id']}/preview", json={"title_from_page": True}).json()
+    assert renamed["title"] == "Echo Dot (3rd Gen)"
+
+
+def test_refresh_needs_a_link_and_an_owner(monkeypatch):
+    _fake_preview(monkeypatch)
+    owner, other = _member(), _member()
+    bare = owner.post("/api/gifts/items", json={"title": "No link"}).json()
+    assert owner.post(f"/api/gifts/items/{bare['id']}/preview", json={}).status_code == 422
+    linked = owner.post("/api/gifts/items", json={"title": "x", "url": "https://shop.example/x"}).json()
+    assert other.post(f"/api/gifts/items/{linked['id']}/preview", json={}).status_code == 404
+    assert TestClient(app).post(f"/api/gifts/items/{linked['id']}/preview", json={}).status_code == 403
+
+
+def test_changing_the_link_clears_the_old_preview(monkeypatch):
+    _fake_preview(monkeypatch)
+    client = _member()
+    item = client.post("/api/gifts/items", json={"title": "x", "url": "https://shop.example/a"}).json()
+    client.post(f"/api/gifts/items/{item['id']}/preview", json={})
+    moved = client.patch(f"/api/gifts/items/{item['id']}", json={"url": "https://shop.example/b"}).json()
+    assert moved["previewTitle"] is None and moved["previewChecked"] is False
+    same = client.patch(f"/api/gifts/items/{item['id']}", json={"url": "https://shop.example/b", "preview_title": "B"}).json()
+    assert same["previewTitle"] == "B" and same["previewChecked"] is True
+
+
+def test_refresh_is_a_no_op_when_disabled(monkeypatch):
+    monkeypatch.setenv("GIFT_LINK_PREVIEWS_DISABLED", "true")
+    monkeypatch.setattr(link_preview, "find_preview", lambda url: pytest.fail("must not fetch"))
+    client = _member()
+    item = client.post("/api/gifts/items", json={"title": "x", "url": "https://shop.example/a"}).json()
+    assert client.post(f"/api/gifts/items/{item['id']}/preview", json={}).json()["previewChecked"] is False

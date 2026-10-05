@@ -58,7 +58,8 @@
         publicWarning: byId("publicWarning"),
         givenFields: byId("givenFields"),
         moveUp: byId("moveUp"),
-        imagePreview: byId("imagePreview"),
+        editorPreview: byId("editorPreview"),
+        imageOverride: byId("imageOverride"),
         imageHint: byId("imageHint"),
         findImage: byId("findImage"),
         moveDown: byId("moveDown"),
@@ -87,6 +88,16 @@
         // never overwritten by an automatic lookup.
         previewSeq: 0,
         imageTouched: false,
+        // What the editor's own lookup found for the link in the form: the
+        // page title, and whether a lookup has finished for this link.
+        editorTitle: null,
+        editorLookedUp: false,
+        editorLoading: false,
+        // Gifts whose link is being looked up right now (shown as a loading
+        // card), and ones already tried this visit, so a shop that never
+        // answers isn't asked again on every render.
+        pendingPreviews: new Set(),
+        triedPreviews: new Set(),
         editingItemId: null,
         editingPersonId: null,
         dragItemId: null,
@@ -234,13 +245,56 @@
             loading: "lazy",
             decoding: "async",
             referrerpolicy: "no-referrer",
-            onerror: (event) => {
-                const img = event.currentTarget;
-                const host = img.closest(".has-thumb");
-                if (host) host.classList.remove("has-thumb");
-                img.remove();
-            },
+            onerror: (event) => event.currentTarget.remove(),
         });
+    }
+
+    // A link card like a messages app's: the page's picture, its title, and
+    // the site. The whole card opens the link. `loading` shows a placeholder
+    // while the lookup runs.
+    function linkCard({ url, imageUrl, title, loading }) {
+        const href = safeHref(url);
+        if (!href) return null;
+        const site = hostOf(href);
+        const image = loading ? null : safeImage(imageUrl);
+        const card = el("a", {
+            class: `lp${image ? "" : " lp--no-image"}${loading ? " lp--loading" : ""}`,
+            href,
+            target: "_blank",
+            rel: "noopener noreferrer nofollow",
+            draggable: "false",
+            "aria-label": `Open ${title || site} on ${site} (new tab)`,
+        }, [
+            loading ? el("span", { class: "lp__skeleton", "aria-hidden": "true" }) : null,
+            image ? el("img", {
+                class: "lp__img",
+                src: image,
+                alt: "",
+                loading: "lazy",
+                decoding: "async",
+                draggable: "false",
+                referrerpolicy: "no-referrer",
+                onerror: (event) => {
+                    event.currentTarget.closest(".lp")?.classList.add("lp--no-image");
+                    event.currentTarget.remove();
+                },
+            }) : null,
+            el("span", { class: "lp__body" }, [
+                loading
+                    ? el("span", { class: "lp__title", text: "Loading preview…" })
+                    : title ? el("span", { class: "lp__title", text: title }) : null,
+                el("span", { class: "lp__site", text: site }),
+            ]),
+        ]);
+        return card;
+    }
+
+    function sameText(a, b) {
+        return Boolean(a && b) && a.trim().toLowerCase() === b.trim().toLowerCase();
+    }
+
+    function looksLikeLink(text) {
+        return !/\s/.test(text) && Boolean(safeHref(text)) && /^https?:\/\//i.test(text);
     }
 
     function hostOf(url) {
@@ -531,16 +585,20 @@
     }
 
     function renderCard(item) {
-        const href = safeHref(item.url);
-        const title = titleNode(item.title, item.url);
         const meta = [el("span", { class: `status status--${item.status}`, text: STATUS_LABELS[item.status] })];
         if (item.priceCents !== null) meta.push(el("span", { text: formatPrice(item.priceCents) }));
-        if (href) meta.push(el("span", { text: hostOf(href) }));
         if (item.occasion) meta.push(el("span", { text: item.occasion }));
+        // The link lives on the preview card, so the title is plain text.
+        const preview = linkCard({
+            url: item.url,
+            imageUrl: item.imageUrl,
+            // Named after its page already? Then the card needn't repeat it.
+            title: sameText(item.previewTitle, item.title) ? null : item.previewTitle,
+            loading: state.pendingPreviews.has(item.id),
+        });
 
-        const thumb = thumbNode(item.imageUrl, "card__thumb");
         const card = el("li", {
-            class: `card${DONE_STATUSES.has(item.status) ? " card--done" : ""}${thumb ? " has-thumb" : ""}`,
+            class: `card${DONE_STATUSES.has(item.status) ? " card--done" : ""}`,
             draggable: "true",
             "data-item": String(item.id),
         }, [
@@ -550,10 +608,10 @@
                 "aria-label": `Edit ${item.title}`,
                 onclick: () => openItemEditor(item.id),
             }),
-            thumb,
-            el("p", { class: "card__title" }, title),
+            el("p", { class: "card__title", text: item.title }),
             el("div", { class: "card__meta" }, meta),
             item.note ? el("p", { class: "card__note", text: item.note }) : null,
+            preview,
         ]);
         card.addEventListener("dragstart", (event) => {
             state.dragItemId = item.id;
@@ -688,10 +746,13 @@
         // Clear now rather than disabling the field for the round trip: a
         // disabled input drops whatever the next gift's first keystrokes were.
         input.value = "";
-        const created = await attempt(() => api("/items", {
-            method: "POST",
-            body: { person_id: personIdFromKey(key), title },
-        }));
+        // A pasted link becomes a gift named after its page, the way a
+        // messages app turns a link into a preview.
+        const isLink = looksLikeLink(title);
+        const body = isLink
+            ? { person_id: personIdFromKey(key), title: hostOf(title), url: title }
+            : { person_id: personIdFromKey(key), title };
+        const created = await attempt(() => api("/items", { method: "POST", body }));
         if (!created) {
             const live = els.board.querySelector(`#add-${key}`);
             if (live && !live.value) live.value = title;
@@ -700,8 +761,42 @@
         }
         state.items.push(created);
         state.refocus = `#add-${key}`;
+        if (isLink) state.pendingPreviews.add(created.id);
         render();
         announce(`Added ${created.title} to ${columnName(key)}.`);
+        if (isLink) refreshPreview(created.id, { replaceImage: true, titleFromPage: true });
+    }
+
+    // Look up a saved gift's link on the server and redraw with its preview.
+    async function refreshPreview(itemId, { replaceImage = false, titleFromPage = false } = {}) {
+        state.triedPreviews.add(itemId);
+        state.pendingPreviews.add(itemId);
+        render();
+        let updated = null;
+        try {
+            updated = await api(`/items/${itemId}/preview`, {
+                method: "POST",
+                body: { replace_image: replaceImage, title_from_page: titleFromPage },
+            });
+        } catch (error) {
+            // A failed lookup leaves a plain site card; it isn't worth a banner.
+            if (error instanceof ForbiddenError) showSignedOut();
+        }
+        state.pendingPreviews.delete(itemId);
+        if (updated) state.items = state.items.map((row) => (row.id === updated.id ? updated : row));
+        if (currentRoute().name === "board") render();
+        if (updated && titleFromPage) announce(`Found ${updated.title}.`);
+    }
+
+    // Gifts saved with a link before previews existed (or whose lookup was
+    // interrupted) get theirs once, a few at a time, in the background.
+    async function backfillPreviews() {
+        const missing = state.items
+            .filter((item) => item.url && !item.previewChecked && !state.triedPreviews.has(item.id))
+            .slice(0, 8);
+        for (const item of missing) {
+            await refreshPreview(item.id);
+        }
     }
 
     async function addPerson(event) {
@@ -739,9 +834,13 @@
         form.imageUrl.value = item.imageUrl || "";
         state.imageTouched = false;
         state.previewSeq += 1;
+        state.editorTitle = item.previewTitle;
+        state.editorLookedUp = false;
+        state.editorLoading = false;
         els.imageHint.textContent = "";
         els.findImage.disabled = false;
-        showImagePreview();
+        els.imageOverride.open = false;
+        renderEditorPreview();
         form.price.value = item.priceCents === null ? "" : (item.priceCents / 100).toFixed(2);
         form.note.value = item.note || "";
         form.occasion.value = item.occasion || "";
@@ -824,6 +923,7 @@
                     title,
                     url: url || null,
                     image_url: imageUrl ? safeImage(imageUrl) : null,
+                    ...(state.editorLookedUp ? { preview_title: state.editorTitle } : {}),
                     price_cents: priceCents,
                     note: form.note.value.trim() || null,
                     status: form.status.value,
@@ -840,6 +940,10 @@
         els.itemEditor.close();
         render();
         announce(`Saved ${title}.`);
+        // A new link saved before the editor's lookup came back: finish it
+        // on the server.
+        const saved = state.items.find((row) => row.id === item.id);
+        if (saved && saved.url && !saved.previewChecked) refreshPreview(saved.id);
     }
 
     async function nudgeItem(delta) {
@@ -865,69 +969,68 @@
         announce(`Deleted ${item.title}.`);
     }
 
-    // ── product images ──────────────────────────────────────────────────────
+    // ── link preview in the editor ──────────────────────────────────────────
 
-    function showImagePreview() {
-        const src = safeImage(els.itemForm.elements.imageUrl.value.trim());
-        els.imagePreview.hidden = !src;
-        if (src && els.imagePreview.getAttribute("src") !== src) els.imagePreview.src = src;
+    function renderEditorPreview() {
+        const form = els.itemForm.elements;
+        const url = form.url.value.trim();
+        const card = linkCard({
+            url,
+            imageUrl: form.imageUrl.value.trim(),
+            title: state.editorTitle,
+            loading: state.editorLoading,
+        });
+        els.editorPreview.replaceChildren(
+            card || el("p", { class: "editor-preview__empty", text: "Paste a link to see its preview." })
+        );
     }
 
-    // Ask the server for the product page's picture. `automatic` lookups run
-    // when the link changes and never replace an image the owner typed.
-    async function lookupImage(automatic) {
+    // Ask the server for the page's picture and title. `automatic` lookups
+    // run when the link changes and never replace a picture the owner pasted.
+    async function lookupLink(automatic) {
         const form = els.itemForm.elements;
         const url = form.url.value.trim();
         if (!safeHref(url)) {
             if (!automatic) els.imageHint.textContent = "Add a link first.";
             return;
         }
-        if (automatic && state.imageTouched && form.imageUrl.value.trim()) return;
+        const keepImage = automatic && state.imageTouched && form.imageUrl.value.trim();
         const itemId = state.editingItemId;
         const seq = ++state.previewSeq;
-        els.imageHint.textContent = "Looking for a picture on that page…";
+        state.editorLoading = true;
+        els.imageHint.textContent = "";
         els.findImage.disabled = true;
+        renderEditorPreview();
         let result;
         try {
             result = await api("/link-preview", { method: "POST", body: { url } });
         } catch (error) {
             if (seq !== state.previewSeq) return;
+            state.editorLoading = false;
             els.findImage.disabled = false;
+            renderEditorPreview();
             if (error instanceof ForbiddenError) return showSignedOut();
             els.imageHint.textContent = error.message;
             return;
         }
-        if (seq !== state.previewSeq) return;
+        // Ignore an answer for a link the form no longer holds, or for an
+        // editor that has since closed or moved to another gift.
+        if (seq !== state.previewSeq || state.editingItemId !== itemId || form.url.value.trim() !== url) return;
+        state.editorLoading = false;
+        state.editorLookedUp = true;
+        state.editorTitle = result.title;
         els.findImage.disabled = false;
-
-        const stillEditing = els.itemEditor.open && state.editingItemId === itemId && form.url.value.trim() === url;
-        if (stillEditing) {
-            if (result.imageUrl && !(automatic && state.imageTouched && form.imageUrl.value.trim())) {
-                form.imageUrl.value = result.imageUrl;
-                state.imageTouched = false;
-                showImagePreview();
-                els.imageHint.textContent = "";
-            } else if (!result.imageUrl) {
-                els.imageHint.textContent = result.status === "disabled"
-                    ? "Picture lookup is turned off here."
-                    : "Couldn't find a picture on that page. Some shops block lookups; you can paste an image address instead.";
-            }
-            return;
+        if (result.imageUrl && !keepImage) {
+            form.imageUrl.value = result.imageUrl;
+            state.imageTouched = false;
         }
-        // The editor was saved and closed before the answer came back: attach
-        // the picture to the saved gift, if it still has this link and no
-        // picture of its own.
-        const item = state.items.find((row) => row.id === itemId);
-        if (result.imageUrl && item && item.url === url && !item.imageUrl) {
-            const updated = await attempt(() => api(`/items/${item.id}`, {
-                method: "PATCH",
-                body: { image_url: result.imageUrl },
-            }));
-            if (updated) {
-                state.items = state.items.map((row) => (row.id === updated.id ? updated : row));
-                render();
-            }
+        if (result.status === "disabled") {
+            els.imageHint.textContent = "Link previews are turned off here.";
+        } else if (!result.imageUrl && !keepImage) {
+            els.imageHint.textContent = "That shop didn't share a picture. You can paste one below.";
+            els.imageOverride.open = true;
         }
+        renderEditorPreview();
     }
 
     // ── person editor ───────────────────────────────────────────────────────
@@ -1020,20 +1123,21 @@
     byId("editorCancel").addEventListener("click", () => els.itemEditor.close());
     byId("deleteItem").addEventListener("click", deleteItem);
     els.moveUp.addEventListener("click", () => nudgeItem(-1));
-    els.findImage.addEventListener("click", () => lookupImage(false));
-    els.itemForm.elements.url.addEventListener("change", () => lookupImage(true));
+    els.findImage.addEventListener("click", () => lookupLink(false));
+    els.itemForm.elements.url.addEventListener("change", () => {
+        // A different page: the old title and (unless pasted by hand) the old
+        // picture described something else.
+        state.editorTitle = null;
+        state.editorLookedUp = false;
+        if (!state.imageTouched) els.itemForm.elements.imageUrl.value = "";
+        renderEditorPreview();
+        lookupLink(true);
+    });
     els.itemForm.elements.imageUrl.addEventListener("input", () => {
         state.imageTouched = true;
         els.imageHint.textContent = "";
-        showImagePreview();
+        renderEditorPreview();
     });
-    els.imagePreview.addEventListener("error", () => {
-        els.imagePreview.hidden = true;
-        if (els.itemForm.elements.imageUrl.value.trim()) {
-            els.imageHint.textContent = "That image didn't load. Check the address, or try another.";
-        }
-    });
-    els.moveDown.addEventListener("click", () => nudgeItem(1));
 
     els.personForm.addEventListener("submit", savePerson);
     byId("personClose").addEventListener("click", () => els.personEditor.close());
@@ -1050,6 +1154,7 @@
                 title: wish.title,
                 url: wish.url,
                 image_url: wish.imageUrl,
+                preview_title: wish.previewTitle,
                 price_cents: wish.priceCents,
                 note: wish.note,
             },
@@ -1121,10 +1226,8 @@
 
         const ideas = person ? itemsIn(String(person.id)) : [];
         els.wishList.replaceChildren(...data.items.map((wish) => {
-            const href = safeHref(wish.url);
             const meta = [];
             if (wish.priceCents !== null) meta.push(el("span", { text: formatPrice(wish.priceCents) }));
-            if (href) meta.push(el("span", { text: hostOf(href) }));
             let save = null;
             if (person) {
                 save = alreadySaved(ideas, wish)
@@ -1136,13 +1239,16 @@
                         onclick: () => saveAsIdea(person, wish),
                     });
             }
-            const thumb = thumbNode(wish.imageUrl, "wish__thumb");
-            return el("li", { class: `wish${thumb ? " has-thumb" : ""}` }, [
-                thumb,
+            return el("li", { class: "wish" }, [
                 el("div", { class: "wish__main" }, [
-                    el("p", { class: "wish__title" }, titleNode(wish.title, wish.url)),
+                    el("p", { class: "wish__title", text: wish.title }),
                     meta.length ? el("div", { class: "wish__meta" }, meta) : null,
                     wish.note ? el("p", { class: "wish__note", text: wish.note }) : null,
+                    linkCard({
+                        url: wish.url,
+                        imageUrl: wish.imageUrl,
+                        title: sameText(wish.previewTitle, wish.title) ? null : wish.previewTitle,
+                    }),
                 ]),
                 save,
             ]);
@@ -1205,6 +1311,7 @@
             state.people = data.people;
             state.items = data.items;
             route();
+            backfillPreviews();
         } catch (error) {
             if (error instanceof ForbiddenError) {
                 showSignedOut();

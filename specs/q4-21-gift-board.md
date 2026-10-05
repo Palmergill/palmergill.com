@@ -215,17 +215,37 @@ wishlist.
 
 ## Link previews (added Oct 2026)
 
-A gift with a link shows the product's picture on its card, on the wishlist
-page, and in a linked contact's wishlist.
+A gift with a link shows a link card, the way a messages app unfurls a pasted
+link: the page's picture, its title, and the site, with the whole card
+opening the shop. It appears on board cards, on the wishlist page, and as a
+small thumbnail in a linked contact's wishlist. Pasting a bare link into an
+"+ Add" field makes a gift named after the page. (A first version showed only
+a small thumbnail beside the gift's name; the link card replaced it after
+feedback that the point was the message-app style preview.)
 
-- **Finding it.** `POST /api/gifts/link-preview {url}` returns
-  `{imageUrl, status}` (`found`, `not_found`, or `disabled`) and saves
-  nothing. The editor calls it when the Link field changes, and from a
-  "Find image" button. `services/link_preview.py` reads, in order:
-  `og:image:secure_url`, `og:image`, `twitter:image`, a schema.org Product's
-  `image` in JSON-LD, a store's main product `<img>` by well-known id
-  (Amazon's `landingImage`, which publishes neither og:image nor JSON-LD),
-  `itemprop=image`, and `link rel=image_src`.
+- **Finding it.** `services/link_preview.py` reads the picture from, in
+  order: `og:image:secure_url`, `og:image`, `twitter:image`, a schema.org
+  Product's `image` in JSON-LD, a store's main product `<img>` by well-known
+  id (Amazon's `landingImage`, since Amazon publishes neither og:image nor
+  JSON-LD), `itemprop=image`, and `link rel=image_src`. The title comes from
+  a store's product heading by id (Amazon's `#productTitle`), then
+  `og:title`, `twitter:title`, then `<title>`, with the shop's name stripped
+  ("Amazon.com: …" prefixes, "… | Allbirds" suffixes).
+- **Three ways in.** `POST /api/gifts/link-preview {url}` is stateless, for the
+  editor's live card while a link is typed but unsaved; the editor sends what
+  it found as `preview_title` and `image_url` on save.
+  `POST /api/gifts/items/{id}/preview {replace_image, title_from_page}` looks
+  up a saved gift and stores the result: quick-add uses it with both flags
+  for a pasted link, and the page uses it with neither to fill in gifts that
+  have a link but have never been looked up (`preview_checked_at` is null),
+  at most eight per visit and once per gift per visit. A background refresh
+  never replaces a picture the owner pasted. Changing a gift's link clears
+  its preview title and check time.
+- **Editor.** The Preview field shows the live card; "Use a different
+  picture" holds the manual picture address and "Look up again". The editor's
+  buttons are pinned in a footer with the fields scrolling above it: the card
+  growing as a lookup starts (on blur, on the way to clicking Save) otherwise
+  moved Save out from under the pointer and the click was lost.
 - **SSRF defences, on every hop.** http/https on default ports only; no
   credentials in the URL; every address the host resolves to must be public
   unicast (`is_global`, IPv4-mapped IPv6 unwrapped), so loopback, RFC 1918,
@@ -235,17 +255,22 @@ page, and in a linked contact's wishlist.
   by hand, at most three, each re-checked; 4 s connect / 5 s read timeouts;
   HTML responses only, read up to 512 KB. Per-account budget of 20 lookups
   per 10 minutes, per API instance.
-- **Showing it.** `gift_items.image_url` holds the URL (http upgraded to
-  https). Browsers load the picture straight from the retailer's CDN with
-  `referrerpolicy="no-referrer"`; a picture that fails to load is removed
-  rather than shown broken. The server never downloads, stores or proxies
-  image bytes. The trade-off: a viewer's browser contacts the retailer's
-  image host, as it would for any embedded image.
+- **Showing it.** `gift_items` gains `image_url` (http upgraded to
+  https), `preview_title` and `preview_checked_at`; wishlist responses carry
+  `imageUrl` and `previewTitle`. Browsers load the picture straight from the
+  retailer's CDN with `referrerpolicy="no-referrer"`; a picture that fails to
+  load is removed and the card falls back to title and site. A card whose
+  page title matches the gift's name doesn't repeat it. The server never
+  downloads, stores or proxies image bytes. The trade-off: a viewer's browser
+  contacts the retailer's image host, as it would for any embedded image.
 - **When the shop says no.** Many stores block automated requests (REI, Etsy
   and Best Buy did when tested; Patagonia serves a bot-check page). No attempt
   is made to get around that. The editor says it couldn't find a picture,
   and the owner can paste an image address into the Image field instead.
-  Amazon, Shopify stores (via og:image) and GitHub worked.
+  Amazon, Shopify stores (via og:image) and GitHub worked. This is the one
+  real gap with a phone's messages app, which fetches previews from the
+  person's own connection; this server fetches from a data centre, which
+  shops treat as a bot. A blocked link still gets a card with the site name.
 - **Tests.** `backend/tests/test_link_preview.py`: the address checks
   (private, metadata, mapped and mixed answers), URL rules, the parser and
   its fallbacks, and real fetches against a loopback server with name

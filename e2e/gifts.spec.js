@@ -49,7 +49,9 @@ test('a member keeps private ideas and a wishlist, and nobody else sees them', a
     const pasta = mom.locator('.card', { hasText: 'Pasta maker' });
     await expect(pasta).toContainText('Bought');
     await expect(pasta).toContainText('$89.50');
-    await expect(pasta.getByRole('link', { name: 'Pasta maker' })).toHaveAttribute('rel', 'noopener noreferrer nofollow');
+    // The link lives on the preview card, not the gift's name.
+    await expect(pasta.locator('a.lp')).toHaveAttribute('href', 'https://example.com/pasta');
+    await expect(pasta.locator('a.lp')).toHaveAttribute('rel', 'noopener noreferrer nofollow');
 
     // Moving an idea onto the wishlist asks first, then becomes "Wanted".
     page.once('dialog', (dialog) => dialog.accept());
@@ -137,12 +139,12 @@ test.describe('wishlist links', () => {
     });
 });
 
-test.describe('product pictures', () => {
-    // The last step loads an image that 404s on purpose.
+test.describe('link previews', () => {
+    // The last step loads a picture that 404s on purpose.
     test.use({ allowErrors: [/status of 404/] });
 
-    test('a gift shows its product picture, and a pasted image address works when lookup cannot', async ({ page }) => {
-        // Serve the "retailer" image locally; the test never reaches the internet.
+    test('links become preview cards, and a pasted picture works when the shop shares none', async ({ page }) => {
+        // Serve the "retailer" picture locally; the test never reaches the internet.
         const png = Buffer.from(
             'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
             'base64'
@@ -152,34 +154,50 @@ test.describe('product pictures', () => {
         await signUp(page);
         await page.goto('/gifts/');
         const wishlist = column(page, 'My wishlist');
-        await wishlist.getByPlaceholder("+ Add something you'd like").fill('Pour-over kettle');
-        await wishlist.getByPlaceholder("+ Add something you'd like").press('Enter');
 
-        await page.getByRole('button', { name: 'Edit Pour-over kettle' }).click();
+        // Pasting a bare link makes a gift with a preview card. Lookups are off
+        // in the test server, so it is named after the site and shows no picture.
+        const add = wishlist.getByPlaceholder("+ Add something you'd like");
+        await add.fill('https://shop.example.test/kettle');
+        await add.press('Enter');
+        const card = wishlist.locator('.card', { hasText: 'shop.example.test' });
+        await expect(card.locator('.card__title')).toHaveText('shop.example.test');
+        const preview = card.locator('a.lp');
+        await expect(preview).toHaveAttribute('href', 'https://shop.example.test/kettle');
+        await expect(preview).toHaveAttribute('rel', 'noopener noreferrer nofollow');
+        await expect(preview.locator('.lp__site')).toHaveText('shop.example.test');
+        await expect(preview.locator('img')).toHaveCount(0);
+
+        // In the editor: rename it, and paste a picture by hand.
+        await page.getByRole('button', { name: 'Edit shop.example.test' }).click();
         const editor = page.locator('#itemEditor');
-        await editor.getByLabel('Link').fill('https://shop.example.test/kettle');
-        await editor.getByRole('button', { name: 'Find image' }).click();
-        // Lookups are switched off in the test server, and the editor says so.
-        await expect(page.locator('#imageHint')).toHaveText('Picture lookup is turned off here.');
+        await editor.getByLabel('Gift').fill('Pour-over kettle');
+        await editor.getByText('Use a different picture').click();
+        await editor.getByRole('button', { name: 'Look up again' }).click();
+        await expect(page.locator('#imageHint')).toHaveText('Link previews are turned off here.');
 
-        await editor.getByLabel('Image').fill('https://images.example.test/kettle.png');
-        await expect(page.locator('#imagePreview')).toBeVisible();
-        await editor.getByLabel('Image').fill('javascript:alert(1)');
+        await editor.getByLabel('Picture address').fill('javascript:alert(1)');
         await editor.getByRole('button', { name: 'Save' }).click();
         await expect(page.locator('#editorError')).toHaveText('Image addresses must start with https://.');
 
-        await editor.getByLabel('Image').fill('https://images.example.test/kettle.png');
+        await editor.getByLabel('Picture address').fill('https://images.example.test/kettle.png');
+        await expect(page.locator('#editorPreview img.lp__img')).toBeVisible();
         await editor.getByRole('button', { name: 'Save' }).click();
-        const thumb = wishlist.locator('.card', { hasText: 'Pour-over kettle' }).locator('img.card__thumb');
-        await expect(thumb).toHaveAttribute('src', 'https://images.example.test/kettle.png');
-        await expect(thumb).toHaveAttribute('referrerpolicy', 'no-referrer');
-        await expect(thumb).toBeVisible();
+        const saved = wishlist.locator('.card', { hasText: 'Pour-over kettle' });
+        const picture = saved.locator('img.lp__img');
+        await expect(picture).toHaveAttribute('src', 'https://images.example.test/kettle.png');
+        await expect(picture).toHaveAttribute('referrerpolicy', 'no-referrer');
+        await expect(picture).toBeVisible();
 
-        // An image that fails to load is removed, not shown broken.
+        // A picture that fails to load is removed, leaving a plain site card.
         await page.route('https://images.example.test/**', (route) => route.fulfill({ status: 404, body: '' }));
-        await page.getByRole('button', { name: 'Edit Pour-over kettle' }).click();
-        await editor.getByLabel('Image').fill('https://images.example.test/gone.png');
+        // With a picture, the preview fills most of the card and opens the
+        // shop; the gift's name is where you tap to edit.
+        await page.getByRole('button', { name: 'Edit Pour-over kettle' }).click({ position: { x: 24, y: 14 } });
+        await editor.getByText('Use a different picture').click();
+        await editor.getByLabel('Picture address').fill('https://images.example.test/gone.png');
         await editor.getByRole('button', { name: 'Save' }).click();
-        await expect(wishlist.locator('img.card__thumb')).toHaveCount(0);
+        await expect(saved.locator('img.lp__img')).toHaveCount(0);
+        await expect(saved.locator('a.lp .lp__site')).toHaveText('shop.example.test');
     });
 });

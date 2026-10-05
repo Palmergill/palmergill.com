@@ -174,6 +174,13 @@ def migrate_database():
             "image_url",
             "VARCHAR",
         )
+        _add_column_if_missing(inspector, "gift_items", "preview_title", "VARCHAR")
+        _add_column_if_missing(
+            inspector,
+            "gift_items",
+            "preview_checked_at",
+            "TIMESTAMP" if is_postgres else "DATETIME",
+        )
 
         refreshed = inspect(engine)
         if (

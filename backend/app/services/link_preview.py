@@ -1,4 +1,5 @@
-"""Find a product page's preview image (its og:image) for the gift board.
+"""Build a link preview for the gift board: a product page's picture and title,
+the way a messages app unfurls a pasted link.
 
 This fetches a URL a member typed, from inside our network, which is the
 textbook SSRF setup. The defences, all of which apply to every hop:
@@ -20,6 +21,7 @@ stores third-party bytes.
 import ipaddress
 import json
 import logging
+import re
 import os
 import socket
 import time
@@ -61,6 +63,13 @@ IMAGE_KEYS = (
     "image_src",
 )
 MAIN_IMAGE_IDS = {"landingImage", "imgBlkFront", "main-image"}
+# Title sources, best first. "product-title" is the text of a store's product
+# heading by well-known id (Amazon's #productTitle), which is the clean
+# product name where <title> is "Amazon.com: <name> : <department>".
+TITLE_KEYS = ("product-title", "og:title", "twitter:title", "html-title")
+PRODUCT_TITLE_IDS = {"productTitle", "title"}
+MAX_TITLE = 200
+MAX_TITLE_TEXT = 2000
 MAX_JSON_LD = 200_000
 
 
@@ -244,17 +253,29 @@ def _amazon_dynamic_image(value: str) -> Optional[str]:
     return next(iter(options), None) if isinstance(options, dict) else None
 
 
-class _ImageMetaParser(HTMLParser):
+class _PreviewParser(HTMLParser):
     def __init__(self):
         super().__init__(convert_charrefs=True)
         self.found: Dict[str, str] = {}
+        self.titles: Dict[str, str] = {}
+        self.site_name: Optional[str] = None
         self._json_ld: Optional[List[str]] = None
+        # Text being collected for a title: (key, closing tag, chunks).
+        self._text: Optional[tuple] = None
 
     def handle_data(self, data):
         if self._json_ld is not None and sum(map(len, self._json_ld)) < MAX_JSON_LD:
             self._json_ld.append(data)
+        if self._text is not None and sum(map(len, self._text[2])) < MAX_TITLE_TEXT:
+            self._text[2].append(data)
 
     def handle_endtag(self, tag):
+        if self._text is not None and tag == self._text[1]:
+            key, _tag, chunks = self._text
+            self._text = None
+            text = " ".join("".join(chunks).split())
+            if text:
+                self.titles.setdefault(key, text)
         if tag == "script" and self._json_ld is not None:
             text, self._json_ld = "".join(self._json_ld), None
             if "ld+json" in self.found:
@@ -268,6 +289,15 @@ class _ImageMetaParser(HTMLParser):
 
     def handle_starttag(self, tag, attrs):
         values = {name.lower(): (value or "") for name, value in attrs}
+        if tag == "title" and "html-title" not in self.titles and self._text is None:
+            self._text = ("html-title", "title", [])
+        elif (
+            values.get("id") in PRODUCT_TITLE_IDS
+            and tag in ("span", "h1")
+            and "product-title" not in self.titles
+            and self._text is None
+        ):
+            self._text = ("product-title", tag, [])
         if tag == "script" and values.get("type", "").lower() == "application/ld+json":
             self._json_ld = []
         elif tag == "img" and values.get("id") in MAIN_IMAGE_IDS and "main-img" not in self.found:
@@ -285,6 +315,10 @@ class _ImageMetaParser(HTMLParser):
             content = values.get("content", "").strip()
             if key in IMAGE_KEYS and content:
                 self.found.setdefault(key, content)
+            elif key in ("og:title", "twitter:title") and content:
+                self.titles.setdefault(key, " ".join(content.split()))
+            elif key == "og:site_name" and content and not self.site_name:
+                self.site_name = content.strip()
         elif tag == "link":
             rels = values.get("rel", "").lower().split()
             href = values.get("href", "").strip()
@@ -292,20 +326,64 @@ class _ImageMetaParser(HTMLParser):
                 self.found.setdefault("image_src", href)
 
 
-def image_from_html(html: str, page_url: str) -> Optional[str]:
-    parser = _ImageMetaParser()
+def clean_title(title: str, page_url: str, site_name: Optional[str] = None) -> Optional[str]:
+    """Strip the shop's name off a page title, as a messages app's preview does.
+
+    "Amazon.com: Echo Dot : Electronics" → "Echo Dot : Electronics" (the
+    domain prefix), and "Tree Runners | Allbirds" → "Tree Runners" (a suffix
+    naming the site). A title that is nothing but the site name is dropped.
+    """
+    title = " ".join(title.split())
+    host = (urlsplit(page_url).hostname or "").lower()
+    if host.startswith("www."):
+        host = host[4:]
+    brand = host.split(".")[-2] if host.count(".") >= 1 else host
+    names = {name for name in (host, brand, (site_name or "").lower().strip()) if name}
+
+    def is_site(text: str) -> bool:
+        squashed = re.sub(r"[^a-z0-9]", "", text.lower())
+        return bool(squashed) and any(squashed == re.sub(r"[^a-z0-9]", "", name) for name in names)
+
+    prefix = re.match(r"^([^:|]{2,40}?)\s*:\s+(.+)$", title)
+    if prefix and (is_site(prefix.group(1)) or "." in prefix.group(1)):
+        title = prefix.group(2)
+    for separator in (" | ", " - ", " – ", " — ", " · "):
+        if separator in title:
+            head, tail = title.rsplit(separator, 1)
+            if is_site(tail):
+                title = head
+                break
+    if not title or is_site(title):
+        return None
+    return title[:MAX_TITLE].strip() or None
+
+
+def preview_from_html(html: str, page_url: str) -> Dict[str, Optional[str]]:
+    parser = _PreviewParser()
     try:
         parser.feed(html)
     except Exception:  # A malformed page is a page with no preview, not a 500.
         logger.debug("Could not parse %s", page_url, exc_info=True)
+    image = None
     for key in IMAGE_KEYS:
         if key in parser.found:
-            image = clean_image_url(urljoin(page_url, parser.found[key]))
+            candidate = clean_image_url(urljoin(page_url, parser.found[key]))
             # A junk value ("//", "#") resolves back to the page itself,
             # which is not an image.
-            if image and image != clean_image_url(page_url):
-                return image
-    return None
+            if candidate and candidate != clean_image_url(page_url):
+                image = candidate
+                break
+    title = None
+    for key in TITLE_KEYS:
+        if key in parser.titles:
+            title = clean_title(parser.titles[key], page_url, parser.site_name)
+            if title:
+                break
+    return {"imageUrl": image, "title": title}
+
+
+def image_from_html(html: str, page_url: str) -> Optional[str]:
+    return preview_from_html(html, page_url)["imageUrl"]
 
 
 def clean_image_url(value: Optional[str]) -> Optional[str]:
@@ -327,17 +405,26 @@ def clean_image_url(value: Optional[str]) -> Optional[str]:
     return value
 
 
-def find_image(url: str) -> Optional[str]:
-    """The preview image URL for a product page, or None. Never raises."""
+def find_preview(url: str) -> Dict[str, Optional[str]]:
+    """{"imageUrl", "title"} for a product page; both None when it can't be read.
+
+    Never raises: a blocked, failed or unreadable page is a link with no
+    preview, which the page shows as a plain site card.
+    """
+    empty = {"imageUrl": None, "title": None}
     try:
         fetched = fetch_html(url)
     except PreviewBlocked as exc:
         logger.info("Link preview blocked: %s", exc)
-        return None
+        return empty
     except (HTTPError, OSError, ValueError) as exc:
         logger.info("Link preview failed for %s: %s", urlsplit(url).hostname, exc)
-        return None
+        return empty
     if not fetched:
-        return None
+        return empty
     final_url, html = fetched
-    return image_from_html(html, final_url)
+    return preview_from_html(html, final_url)
+
+
+def find_image(url: str) -> Optional[str]:
+    return find_preview(url)["imageUrl"]

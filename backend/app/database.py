@@ -1127,6 +1127,12 @@ class GiftItem(Base):
     # The product's picture, loaded by viewers' browsers straight from the
     # retailer. Found from the page's og:image, or pasted by the owner.
     image_url = Column(String, nullable=True)
+    # The linked page's own title, shown on the link preview card.
+    preview_title = Column(String, nullable=True)
+    # When the server last looked the link up, found anything or not, so a
+    # gift's preview is filled in once rather than re-fetched on every visit.
+    # Cleared when the link changes.
+    preview_checked_at = Column(DateTime, nullable=True)
     price_cents = Column(Integer, nullable=True)
     note = Column(Text, nullable=True)
     status = Column(String, nullable=False)

@@ -20,7 +20,9 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app import accounts
+from app.services import link_preview
 from app.services.link_preview import clean_image_url
+from app.database import utc_now
 from app.database import AppUser, GIFT_IDEA_STATUSES, GIFT_WISHLIST_STATUSES, GiftItem, GiftPerson
 
 MAX_PEOPLE = 100
@@ -66,6 +68,37 @@ def _clean_image(value: Optional[str]) -> Optional[str]:
     if image is None:
         raise HTTPException(status_code=422, detail="Image links must start with https://.")
     return image
+
+
+def _clean_preview_title(value: Optional[str]) -> Optional[str]:
+    value = clean_text(value)
+    return value[:200] if value else None
+
+
+def refresh_preview(
+    db: Session, username: str, item_id: int, replace_image: bool, title_from_page: bool
+) -> Dict[str, Any]:
+    """Look up an item's link and store its preview.
+
+    The image is only replaced when asked, or when the gift has none, so a
+    picture the owner pasted by hand survives a background refresh.
+    `title_from_page` renames the gift after the page — used when a member
+    pasted a bare link as the gift's name.
+    """
+    item = owned_item(db, username, item_id)
+    if not item.url:
+        raise HTTPException(status_code=422, detail="This gift has no link to preview.")
+    preview = link_preview.find_preview(item.url)
+    if preview["title"]:
+        item.preview_title = preview["title"]
+        if title_from_page:
+            item.title = preview["title"]
+    if preview["imageUrl"] and (replace_image or not item.image_url):
+        item.image_url = preview["imageUrl"]
+    item.preview_checked_at = utc_now()
+    db.commit()
+    db.refresh(item)
+    return serialize_item(item)
 
 
 def side_statuses(person_id: Optional[int]):
@@ -173,6 +206,7 @@ def serialize_public_item(item: GiftItem) -> Dict[str, Any]:
         "title": item.title,
         "url": item.url,
         "imageUrl": item.image_url,
+        "previewTitle": item.preview_title,
         "priceCents": item.price_cents,
         "note": item.note,
     }
@@ -292,6 +326,8 @@ def serialize_item(item: GiftItem) -> Dict[str, Any]:
         "title": item.title,
         "url": item.url,
         "imageUrl": item.image_url,
+        "previewTitle": item.preview_title,
+        "previewChecked": item.preview_checked_at is not None,
         "priceCents": item.price_cents,
         "note": item.note,
         "status": item.status,
@@ -433,6 +469,7 @@ def create_item(db: Session, username: str, fields: Dict[str, Any]) -> Dict[str,
         title=title,
         url=clean_url(fields.get("url")),
         image_url=_clean_image(fields.get("image_url")),
+        preview_title=_clean_preview_title(fields.get("preview_title")),
         price_cents=fields.get("price_cents"),
         note=clean_text(fields.get("note")),
         status=_check_status(status, person_id),
@@ -456,9 +493,20 @@ def update_item(db: Session, username: str, item_id: int, changes: Dict[str, Any
             raise HTTPException(status_code=422, detail="Give the gift a name.")
         item.title = title
     if "url" in changes:
-        item.url = clean_url(changes["url"])
+        url = clean_url(changes["url"])
+        if url != item.url:
+            # A new link needs a new preview; the old one described a
+            # different page.
+            item.preview_checked_at = None
+            item.preview_title = None
+        item.url = url
     if "image_url" in changes:
         item.image_url = _clean_image(changes["image_url"])
+    if "preview_title" in changes:
+        item.preview_title = _clean_preview_title(changes["preview_title"])
+        # The editor sends what its own lookup found, so the gift counts as
+        # looked up.
+        item.preview_checked_at = utc_now()
     if "price_cents" in changes:
         item.price_cents = changes["price_cents"]
     if "note" in changes:

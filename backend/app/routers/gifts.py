@@ -55,6 +55,7 @@ class CreateItemRequest(BaseModel):
     title: str = Field(..., min_length=1, max_length=200)
     url: Optional[str] = Field(None, max_length=2000)
     image_url: Optional[str] = Field(None, max_length=2000)
+    preview_title: Optional[str] = Field(None, max_length=400)
     price_cents: Optional[int] = Field(None, ge=0, le=MAX_PRICE_CENTS)
     note: Optional[str] = Field(None, max_length=2000)
     status: Optional[str] = Field(None, pattern=STATUS_PATTERN)
@@ -66,6 +67,7 @@ class UpdateItemRequest(BaseModel):
     title: Optional[str] = Field(None, min_length=1, max_length=200)
     url: Optional[str] = Field(None, max_length=2000)
     image_url: Optional[str] = Field(None, max_length=2000)
+    preview_title: Optional[str] = Field(None, max_length=400)
     price_cents: Optional[int] = Field(None, ge=0, le=MAX_PRICE_CENTS)
     note: Optional[str] = Field(None, max_length=2000)
     status: Optional[str] = Field(None, pattern=STATUS_PATTERN)
@@ -84,20 +86,45 @@ class LinkPreviewRequest(BaseModel):
     url: str = Field(..., min_length=1, max_length=2000)
 
 
-@router.post("/link-preview")
-def link_preview_image(body: LinkPreviewRequest, username: str = Depends(caller)) -> Dict[str, Any]:
-    """The preview image for a product link, without saving anything.
+class RefreshPreviewRequest(BaseModel):
+    replace_image: bool = False
+    title_from_page: bool = False
 
-    Stateless on purpose: the editor asks for a link the member has typed but
+
+def _spend_lookup(username: str) -> None:
+    if not link_preview.allow(username):
+        raise HTTPException(status_code=429, detail="Too many link lookups. Try again in a few minutes.")
+
+
+@router.post("/link-preview")
+def link_preview_card(body: LinkPreviewRequest, username: str = Depends(caller)) -> Dict[str, Any]:
+    """The preview (picture and title) for a link, without saving anything.
+
+    Stateless on purpose: the editor asks about a link the member has typed but
     not saved yet, and decides whether to keep the answer.
     """
     url = gift_board.clean_url(body.url)
     if link_preview.previews_disabled():
-        return {"imageUrl": None, "status": "disabled"}
-    if not link_preview.allow(username):
-        raise HTTPException(status_code=429, detail="Too many image lookups. Try again in a few minutes.")
-    image = link_preview.find_image(url)
-    return {"imageUrl": image, "status": "found" if image else "not_found"}
+        return {"imageUrl": None, "title": None, "status": "disabled"}
+    _spend_lookup(username)
+    preview = link_preview.find_preview(url)
+    found = preview["imageUrl"] or preview["title"]
+    return {**preview, "status": "found" if found else "not_found"}
+
+
+@router.post("/items/{item_id}/preview")
+def refresh_item_preview(
+    body: RefreshPreviewRequest,
+    item_id: int = Path(..., ge=1),
+    username: str = Depends(caller),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """Look up a saved gift's link and store its preview on the gift."""
+    item = gift_board.owned_item(db, username, item_id)
+    if link_preview.previews_disabled():
+        return gift_board.serialize_item(item)
+    _spend_lookup(username)
+    return gift_board.refresh_preview(db, username, item_id, body.replace_image, body.title_from_page)
 
 
 @router.get("/board")
