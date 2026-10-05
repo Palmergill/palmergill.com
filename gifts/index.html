@@ -13,7 +13,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/shared/site-nav.css?v=15">
-    <link rel="stylesheet" href="style.css?v=4">
+    <link rel="stylesheet" href="style.css?v=5">
 </head>
 <body>
 <noscript>
@@ -134,6 +134,15 @@
                 <span>Link</span>
                 <input type="url" name="url" maxlength="2000" placeholder="https://">
             </label>
+            <div class="field">
+                <span id="imageLabel">Image</span>
+                <div class="image-field">
+                    <img class="image-field__preview" id="imagePreview" alt="" referrerpolicy="no-referrer" hidden>
+                    <input type="url" name="imageUrl" maxlength="2000" aria-labelledby="imageLabel" placeholder="Found from the link, or paste an image address">
+                    <button type="button" class="button button--quiet button--small" id="findImage">Find image</button>
+                </div>
+                <small class="field__hint" id="imageHint" aria-live="polite"></small>
+            </div>
             <div class="field-row">
                 <label class="field">
                     <span>Price</span>
@@ -221,6 +230,6 @@
     <script src="/shared/site-nav.js?v=19"></script>
     <script src="/shared/analytics.js?v=1"></script>
     <script src="graph.js?v=4"></script>
-    <script src="app.js?v=3"></script>
+    <script src="app.js?v=4"></script>
 </body>
 </html>

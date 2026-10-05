@@ -136,3 +136,50 @@ test.describe('wishlist links', () => {
         await expect(page.locator('#signInLink')).toHaveAttribute('href', `/login/?next=${encodeURIComponent('/gifts/#wishlist/someone')}`);
     });
 });
+
+test.describe('product pictures', () => {
+    // The last step loads an image that 404s on purpose.
+    test.use({ allowErrors: [/status of 404/] });
+
+    test('a gift shows its product picture, and a pasted image address works when lookup cannot', async ({ page }) => {
+        // Serve the "retailer" image locally; the test never reaches the internet.
+        const png = Buffer.from(
+            'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+            'base64'
+        );
+        await page.route('https://images.example.test/**', (route) => route.fulfill({ contentType: 'image/png', body: png }));
+
+        await signUp(page);
+        await page.goto('/gifts/');
+        const wishlist = column(page, 'My wishlist');
+        await wishlist.getByPlaceholder("+ Add something you'd like").fill('Pour-over kettle');
+        await wishlist.getByPlaceholder("+ Add something you'd like").press('Enter');
+
+        await page.getByRole('button', { name: 'Edit Pour-over kettle' }).click();
+        const editor = page.locator('#itemEditor');
+        await editor.getByLabel('Link').fill('https://shop.example.test/kettle');
+        await editor.getByRole('button', { name: 'Find image' }).click();
+        // Lookups are switched off in the test server, and the editor says so.
+        await expect(page.locator('#imageHint')).toHaveText('Picture lookup is turned off here.');
+
+        await editor.getByLabel('Image').fill('https://images.example.test/kettle.png');
+        await expect(page.locator('#imagePreview')).toBeVisible();
+        await editor.getByLabel('Image').fill('javascript:alert(1)');
+        await editor.getByRole('button', { name: 'Save' }).click();
+        await expect(page.locator('#editorError')).toHaveText('Image addresses must start with https://.');
+
+        await editor.getByLabel('Image').fill('https://images.example.test/kettle.png');
+        await editor.getByRole('button', { name: 'Save' }).click();
+        const thumb = wishlist.locator('.card', { hasText: 'Pour-over kettle' }).locator('img.card__thumb');
+        await expect(thumb).toHaveAttribute('src', 'https://images.example.test/kettle.png');
+        await expect(thumb).toHaveAttribute('referrerpolicy', 'no-referrer');
+        await expect(thumb).toBeVisible();
+
+        // An image that fails to load is removed, not shown broken.
+        await page.route('https://images.example.test/**', (route) => route.fulfill({ status: 404, body: '' }));
+        await page.getByRole('button', { name: 'Edit Pour-over kettle' }).click();
+        await editor.getByLabel('Image').fill('https://images.example.test/gone.png');
+        await editor.getByRole('button', { name: 'Save' }).click();
+        await expect(wishlist.locator('img.card__thumb')).toHaveCount(0);
+    });
+});

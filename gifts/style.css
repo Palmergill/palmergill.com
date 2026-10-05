@@ -987,6 +987,75 @@ body {
     white-space: pre-line;
 }
 
+/* ── product images ──────────────────────────────────────────────────────── */
+
+/* Product shots are usually a cut-out on white, so they sit on white and are
+   contained rather than cropped. */
+.card.has-thumb {
+    display: grid;
+    grid-template-columns: 56px minmax(0, 1fr);
+    column-gap: 12px;
+    align-items: start;
+}
+
+.card.has-thumb > :not(.card__open):not(.card__thumb) { grid-column: 2; }
+
+.card__thumb {
+    position: relative;
+    z-index: 1;
+    grid-row: 1 / span 3;
+    grid-column: 1;
+    width: 56px;
+    height: 56px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: #fff;
+    object-fit: contain;
+    pointer-events: none;
+}
+
+.card--done .card__thumb { opacity: 0.5; }
+
+.linked__thumb {
+    flex: none;
+    width: 32px;
+    height: 32px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: #fff;
+    object-fit: contain;
+}
+
+.wish.has-thumb { flex-wrap: nowrap; }
+
+.wish__thumb {
+    flex: none;
+    width: 76px;
+    height: 76px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: #fff;
+    object-fit: contain;
+}
+
+.image-field {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.image-field input { flex: 1; min-width: 0; }
+
+.image-field__preview {
+    flex: none;
+    width: 44px;
+    height: 44px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: #fff;
+    object-fit: contain;
+}
+
 /* ── small screens ───────────────────────────────────────────────────────── */
 
 @media (max-width: 760px) {
@@ -1000,6 +1069,8 @@ body {
     }
 
     .graph { padding: 6px; }
+    .wish.has-thumb { flex-wrap: wrap; }
+    .wish__thumb { width: 60px; height: 60px; }
     .graph__svg { max-height: none; }
 
     .board {

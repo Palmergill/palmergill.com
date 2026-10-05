@@ -44,9 +44,11 @@ the warm site theme.
 
 ## Non-goals
 
-- **No link scraping.** The server never fetches a pasted URL to pull a title or
-  image. Fetching user-supplied URLs server-side is an SSRF surface, and typing a
-  title is fine. (Could be revisited client-side or with an allowlist later.)
+- **No link scraping beyond the preview image.** Originally a flat non-goal,
+  because fetching user-supplied URLs server-side is an SSRF surface. Revised
+  Oct 2026 for product pictures (see "Link previews" below): the server reads
+  a page only to find its image URL, behind explicit SSRF defences, and never
+  fetches or proxies the image itself.
 - **No purchasing, price tracking or affiliate links.**
 - **No admin access to private ideas.** Same rule as personal rankings: these are
   personal notes, not moderated content.
@@ -210,6 +212,48 @@ wishlist.
   title exists. You can't link to yourself or to an unknown account; a link
   to an account that is later deactivated quietly stops resolving.
 - **P5 (open).** Claiming. See open questions.
+
+## Link previews (added Oct 2026)
+
+A gift with a link shows the product's picture on its card, on the wishlist
+page, and in a linked contact's wishlist.
+
+- **Finding it.** `POST /api/gifts/link-preview {url}` returns
+  `{imageUrl, status}` (`found`, `not_found`, or `disabled`) and saves
+  nothing. The editor calls it when the Link field changes, and from a
+  "Find image" button. `services/link_preview.py` reads, in order:
+  `og:image:secure_url`, `og:image`, `twitter:image`, a schema.org Product's
+  `image` in JSON-LD, a store's main product `<img>` by well-known id
+  (Amazon's `landingImage`, which publishes neither og:image nor JSON-LD),
+  `itemprop=image`, and `link rel=image_src`.
+- **SSRF defences, on every hop.** http/https on default ports only; no
+  credentials in the URL; every address the host resolves to must be public
+  unicast (`is_global`, IPv4-mapped IPv6 unwrapped), so loopback, RFC 1918,
+  CGNAT, link-local (cloud metadata) and multicast are refused; the connection
+  is made to the checked IP with the hostname only as Host header and TLS SNI,
+  so DNS rebinding between check and connect does nothing; redirects followed
+  by hand, at most three, each re-checked; 4 s connect / 5 s read timeouts;
+  HTML responses only, read up to 512 KB. Per-account budget of 20 lookups
+  per 10 minutes, per API instance.
+- **Showing it.** `gift_items.image_url` holds the URL (http upgraded to
+  https). Browsers load the picture straight from the retailer's CDN with
+  `referrerpolicy="no-referrer"`; a picture that fails to load is removed
+  rather than shown broken. The server never downloads, stores or proxies
+  image bytes. The trade-off: a viewer's browser contacts the retailer's
+  image host, as it would for any embedded image.
+- **When the shop says no.** Many stores block automated requests (REI, Etsy
+  and Best Buy did when tested; Patagonia serves a bot-check page). No attempt
+  is made to get around that. The editor says it couldn't find a picture,
+  and the owner can paste an image address into the Image field instead.
+  Amazon, Shopify stores (via og:image) and GitHub worked.
+- **Tests.** `backend/tests/test_link_preview.py`: the address checks
+  (private, metadata, mapped and mixed answers), URL rules, the parser and
+  its fallbacks, and real fetches against a loopback server with name
+  resolution stubbed: redirect to the metadata address refused by the guard,
+  redirect loops capped, non-HTML ignored, the size cap enforced. The e2e
+  suite runs with `GIFT_LINK_PREVIEWS_DISABLED=true`, so it never reaches the
+  internet. `e2e/gifts.spec.js` covers the disabled hint, a pasted image,
+  rejection of a non-https address, and removal of an image that 404s.
 
 ## Testing
 

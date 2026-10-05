@@ -20,6 +20,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app import accounts
+from app.services.link_preview import clean_image_url
 from app.database import AppUser, GIFT_IDEA_STATUSES, GIFT_WISHLIST_STATUSES, GiftItem, GiftPerson
 
 MAX_PEOPLE = 100
@@ -55,6 +56,16 @@ def clean_url(value: Optional[str]) -> Optional[str]:
     if parts.scheme.lower() not in ("http", "https") or not parts.netloc:
         raise HTTPException(status_code=422, detail="Links must start with http:// or https://.")
     return value
+
+
+def _clean_image(value: Optional[str]) -> Optional[str]:
+    value = clean_text(value)
+    if value is None:
+        return None
+    image = clean_image_url(value)
+    if image is None:
+        raise HTTPException(status_code=422, detail="Image links must start with https://.")
+    return image
 
 
 def side_statuses(person_id: Optional[int]):
@@ -161,6 +172,7 @@ def serialize_public_item(item: GiftItem) -> Dict[str, Any]:
         "id": item.id,
         "title": item.title,
         "url": item.url,
+        "imageUrl": item.image_url,
         "priceCents": item.price_cents,
         "note": item.note,
     }
@@ -279,6 +291,7 @@ def serialize_item(item: GiftItem) -> Dict[str, Any]:
         "personId": item.person_id,
         "title": item.title,
         "url": item.url,
+        "imageUrl": item.image_url,
         "priceCents": item.price_cents,
         "note": item.note,
         "status": item.status,
@@ -419,6 +432,7 @@ def create_item(db: Session, username: str, fields: Dict[str, Any]) -> Dict[str,
         person_id=person_id,
         title=title,
         url=clean_url(fields.get("url")),
+        image_url=_clean_image(fields.get("image_url")),
         price_cents=fields.get("price_cents"),
         note=clean_text(fields.get("note")),
         status=_check_status(status, person_id),
@@ -443,6 +457,8 @@ def update_item(db: Session, username: str, item_id: int, changes: Dict[str, Any
         item.title = title
     if "url" in changes:
         item.url = clean_url(changes["url"])
+    if "image_url" in changes:
+        item.image_url = _clean_image(changes["image_url"])
     if "price_cents" in changes:
         item.price_cents = changes["price_cents"]
     if "note" in changes:

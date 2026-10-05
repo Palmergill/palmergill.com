@@ -8,13 +8,13 @@ privacy rule (ideas are only ever served to their author) lives in
 from datetime import date
 from typing import Any, Dict, Optional
 
-from fastapi import APIRouter, Depends, Path, Request, Response
+from fastapi import APIRouter, Depends, HTTPException, Path, Request, Response
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app import accounts
 from app.database import get_db
-from app.services import gift_board
+from app.services import gift_board, link_preview
 
 router = APIRouter(prefix="/api/gifts", tags=["gifts"])
 
@@ -54,6 +54,7 @@ class CreateItemRequest(BaseModel):
     person_id: Optional[int] = Field(None, ge=1)
     title: str = Field(..., min_length=1, max_length=200)
     url: Optional[str] = Field(None, max_length=2000)
+    image_url: Optional[str] = Field(None, max_length=2000)
     price_cents: Optional[int] = Field(None, ge=0, le=MAX_PRICE_CENTS)
     note: Optional[str] = Field(None, max_length=2000)
     status: Optional[str] = Field(None, pattern=STATUS_PATTERN)
@@ -64,6 +65,7 @@ class CreateItemRequest(BaseModel):
 class UpdateItemRequest(BaseModel):
     title: Optional[str] = Field(None, min_length=1, max_length=200)
     url: Optional[str] = Field(None, max_length=2000)
+    image_url: Optional[str] = Field(None, max_length=2000)
     price_cents: Optional[int] = Field(None, ge=0, le=MAX_PRICE_CENTS)
     note: Optional[str] = Field(None, max_length=2000)
     status: Optional[str] = Field(None, pattern=STATUS_PATTERN)
@@ -76,6 +78,26 @@ class MoveItemRequest(BaseModel):
     # omitted field that happens to mean the same thing.
     person_id: Optional[int] = Field(..., ge=1)
     index: int = Field(..., ge=0, le=gift_board.MAX_ITEMS)
+
+
+class LinkPreviewRequest(BaseModel):
+    url: str = Field(..., min_length=1, max_length=2000)
+
+
+@router.post("/link-preview")
+def link_preview_image(body: LinkPreviewRequest, username: str = Depends(caller)) -> Dict[str, Any]:
+    """The preview image for a product link, without saving anything.
+
+    Stateless on purpose: the editor asks for a link the member has typed but
+    not saved yet, and decides whether to keep the answer.
+    """
+    url = gift_board.clean_url(body.url)
+    if link_preview.previews_disabled():
+        return {"imageUrl": None, "status": "disabled"}
+    if not link_preview.allow(username):
+        raise HTTPException(status_code=429, detail="Too many image lookups. Try again in a few minutes.")
+    image = link_preview.find_image(url)
+    return {"imageUrl": image, "status": "found" if image else "not_found"}
 
 
 @router.get("/board")

@@ -167,6 +167,13 @@ def migrate_database():
             "linked_username",
             "VARCHAR",
         )
+        # Product preview images on gift cards.
+        _add_column_if_missing(
+            inspector,
+            "gift_items",
+            "image_url",
+            "VARCHAR",
+        )
 
         refreshed = inspect(engine)
         if (

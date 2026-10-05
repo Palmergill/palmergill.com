@@ -30,6 +30,8 @@ module.exports = defineConfig({
             DATABASE_URL: `sqlite:///${DB_PATH}`,
             LOCAL_SITE_ROOT: 'true',
             FANTASY_COLLECTION_DISABLED: 'true',
+            // Gift links are never fetched in tests; the lookup reports "disabled".
+            GIFT_LINK_PREVIEWS_DISABLED: 'true',
             APP_AUTH_PASSWORD: 'e2e-admin-password',
             // Rate limits are per-IP, and every test signs in from loopback.
             APP_AUTH_RATE_LIMIT_MAX_ATTEMPTS: '1000',

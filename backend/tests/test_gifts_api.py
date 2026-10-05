@@ -155,7 +155,7 @@ def test_wishlists_list_other_members_wanted_items_only():
     wishlist = bob.get(f"/api/gifts/wishlists/{alice.username.upper()}").json()
     assert wishlist["username"] == alice.username
     assert [item["title"] for item in wishlist["items"]] == ["Trail shoes"]
-    assert set(wishlist["items"][0]) == {"id", "title", "url", "priceCents", "note"}
+    assert set(wishlist["items"][0]) == {"id", "title", "url", "imageUrl", "priceCents", "note"}
 
 
 def test_member_with_nothing_wanted_is_not_listed_but_still_readable():

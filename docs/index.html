@@ -618,7 +618,7 @@
                     </article>
                     <article>
                         <h3><code>/api/gifts/*</code></h3>
-                        <p>The gift board. A gift with no person attached is on its owner's wishlist, which any signed-in member can read through <code>/wishlists</code>; a gift filed under a person is an idea that no route serves to anyone but its author. Another member's person or idea is a 404, and anonymous callers get a JSON 403.</p>
+                        <p>The gift board. A gift with no person attached is on its owner's wishlist, which any signed-in member can read through <code>/wishlists</code>; a gift filed under a person is an idea that no route serves to anyone but its author. Another member's person or idea is a 404, and anonymous callers get a JSON 403. <code>POST /link-preview</code> finds a product link's picture; it only fetches public addresses, pins the connection to the address it checked, and re-checks every redirect.</p>
                     </article>
                     <article>
                         <h3><code>/api/draft-order/*</code></h3>

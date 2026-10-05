@@ -58,6 +58,9 @@
         publicWarning: byId("publicWarning"),
         givenFields: byId("givenFields"),
         moveUp: byId("moveUp"),
+        imagePreview: byId("imagePreview"),
+        imageHint: byId("imageHint"),
+        findImage: byId("findImage"),
         moveDown: byId("moveDown"),
         personEditor: byId("personEditor"),
         personForm: byId("personForm"),
@@ -80,6 +83,10 @@
         collapsed: new Set(),
         // A graph node to focus once the graph redraws after an edit.
         focusNode: null,
+        // Image lookups: the latest one wins, and an image the owner typed is
+        // never overwritten by an automatic lookup.
+        previewSeq: 0,
+        imageTouched: false,
         editingItemId: null,
         editingPersonId: null,
         dragItemId: null,
@@ -205,6 +212,35 @@
         } catch (_error) {
             return null;
         }
+    }
+
+    // Image addresses come from other sites, so only http(s), upgraded to
+    // https to match the page (browsers would block or upgrade it anyway).
+    function safeImage(url) {
+        const href = safeHref(url);
+        return href ? href.replace(/^http:/, "https:") : null;
+    }
+
+    // Product pictures load straight from the retailer, with no referrer so
+    // the shop never learns which page showed it. One that fails to load is
+    // removed rather than left as a broken-image icon.
+    function thumbNode(url, className) {
+        const src = safeImage(url);
+        if (!src) return null;
+        return el("img", {
+            class: className,
+            src,
+            alt: "",
+            loading: "lazy",
+            decoding: "async",
+            referrerpolicy: "no-referrer",
+            onerror: (event) => {
+                const img = event.currentTarget;
+                const host = img.closest(".has-thumb");
+                if (host) host.classList.remove("has-thumb");
+                img.remove();
+            },
+        });
     }
 
     function hostOf(url) {
@@ -382,6 +418,7 @@
             el("summary", { text: `From ${linked.displayName}'s wishlist (${linked.items.length})` }),
             linked.items.length
                 ? el("ul", { class: "linked__list" }, linked.items.map((wish) => el("li", { class: "linked__item" }, [
+                    thumbNode(wish.imageUrl, "linked__thumb"),
                     el("span", { class: "linked__title" }, titleNode(wish.title, wish.url)),
                     wish.priceCents !== null ? el("span", { class: "linked__price", text: formatPrice(wish.priceCents) }) : null,
                     alreadySaved(ideas, wish)
@@ -501,8 +538,9 @@
         if (href) meta.push(el("span", { text: hostOf(href) }));
         if (item.occasion) meta.push(el("span", { text: item.occasion }));
 
+        const thumb = thumbNode(item.imageUrl, "card__thumb");
         const card = el("li", {
-            class: `card${DONE_STATUSES.has(item.status) ? " card--done" : ""}`,
+            class: `card${DONE_STATUSES.has(item.status) ? " card--done" : ""}${thumb ? " has-thumb" : ""}`,
             draggable: "true",
             "data-item": String(item.id),
         }, [
@@ -512,6 +550,7 @@
                 "aria-label": `Edit ${item.title}`,
                 onclick: () => openItemEditor(item.id),
             }),
+            thumb,
             el("p", { class: "card__title" }, title),
             el("div", { class: "card__meta" }, meta),
             item.note ? el("p", { class: "card__note", text: item.note }) : null,
@@ -697,6 +736,12 @@
         els.editorHeading.textContent = item.personId === null ? "On your wishlist" : `Idea for ${columnName(columnKey(item.personId))}`;
         form.title.value = item.title;
         form.url.value = item.url || "";
+        form.imageUrl.value = item.imageUrl || "";
+        state.imageTouched = false;
+        state.previewSeq += 1;
+        els.imageHint.textContent = "";
+        els.findImage.disabled = false;
+        showImagePreview();
         form.price.value = item.priceCents === null ? "" : (item.priceCents / 100).toFixed(2);
         form.note.value = item.note || "";
         form.occasion.value = item.occasion || "";
@@ -751,6 +796,8 @@
         if (!title) return editorError("Give the gift a name.");
         const url = form.url.value.trim();
         if (url && !safeHref(url)) return editorError("Links must start with http:// or https://.");
+        const imageUrl = form.imageUrl.value.trim();
+        if (imageUrl && !safeImage(imageUrl)) return editorError("Image addresses must start with https://.");
         const priceCents = parsePrice(form.price.value);
         if (Number.isNaN(priceCents)) return editorError("Enter a price like 25 or 24.99.");
 
@@ -776,6 +823,7 @@
                 body: {
                     title,
                     url: url || null,
+                    image_url: imageUrl ? safeImage(imageUrl) : null,
                     price_cents: priceCents,
                     note: form.note.value.trim() || null,
                     status: form.status.value,
@@ -815,6 +863,71 @@
         els.itemEditor.close();
         render();
         announce(`Deleted ${item.title}.`);
+    }
+
+    // ── product images ──────────────────────────────────────────────────────
+
+    function showImagePreview() {
+        const src = safeImage(els.itemForm.elements.imageUrl.value.trim());
+        els.imagePreview.hidden = !src;
+        if (src && els.imagePreview.getAttribute("src") !== src) els.imagePreview.src = src;
+    }
+
+    // Ask the server for the product page's picture. `automatic` lookups run
+    // when the link changes and never replace an image the owner typed.
+    async function lookupImage(automatic) {
+        const form = els.itemForm.elements;
+        const url = form.url.value.trim();
+        if (!safeHref(url)) {
+            if (!automatic) els.imageHint.textContent = "Add a link first.";
+            return;
+        }
+        if (automatic && state.imageTouched && form.imageUrl.value.trim()) return;
+        const itemId = state.editingItemId;
+        const seq = ++state.previewSeq;
+        els.imageHint.textContent = "Looking for a picture on that page…";
+        els.findImage.disabled = true;
+        let result;
+        try {
+            result = await api("/link-preview", { method: "POST", body: { url } });
+        } catch (error) {
+            if (seq !== state.previewSeq) return;
+            els.findImage.disabled = false;
+            if (error instanceof ForbiddenError) return showSignedOut();
+            els.imageHint.textContent = error.message;
+            return;
+        }
+        if (seq !== state.previewSeq) return;
+        els.findImage.disabled = false;
+
+        const stillEditing = els.itemEditor.open && state.editingItemId === itemId && form.url.value.trim() === url;
+        if (stillEditing) {
+            if (result.imageUrl && !(automatic && state.imageTouched && form.imageUrl.value.trim())) {
+                form.imageUrl.value = result.imageUrl;
+                state.imageTouched = false;
+                showImagePreview();
+                els.imageHint.textContent = "";
+            } else if (!result.imageUrl) {
+                els.imageHint.textContent = result.status === "disabled"
+                    ? "Picture lookup is turned off here."
+                    : "Couldn't find a picture on that page. Some shops block lookups; you can paste an image address instead.";
+            }
+            return;
+        }
+        // The editor was saved and closed before the answer came back: attach
+        // the picture to the saved gift, if it still has this link and no
+        // picture of its own.
+        const item = state.items.find((row) => row.id === itemId);
+        if (result.imageUrl && item && item.url === url && !item.imageUrl) {
+            const updated = await attempt(() => api(`/items/${item.id}`, {
+                method: "PATCH",
+                body: { image_url: result.imageUrl },
+            }));
+            if (updated) {
+                state.items = state.items.map((row) => (row.id === updated.id ? updated : row));
+                render();
+            }
+        }
     }
 
     // ── person editor ───────────────────────────────────────────────────────
@@ -907,6 +1020,19 @@
     byId("editorCancel").addEventListener("click", () => els.itemEditor.close());
     byId("deleteItem").addEventListener("click", deleteItem);
     els.moveUp.addEventListener("click", () => nudgeItem(-1));
+    els.findImage.addEventListener("click", () => lookupImage(false));
+    els.itemForm.elements.url.addEventListener("change", () => lookupImage(true));
+    els.itemForm.elements.imageUrl.addEventListener("input", () => {
+        state.imageTouched = true;
+        els.imageHint.textContent = "";
+        showImagePreview();
+    });
+    els.imagePreview.addEventListener("error", () => {
+        els.imagePreview.hidden = true;
+        if (els.itemForm.elements.imageUrl.value.trim()) {
+            els.imageHint.textContent = "That image didn't load. Check the address, or try another.";
+        }
+    });
     els.moveDown.addEventListener("click", () => nudgeItem(1));
 
     els.personForm.addEventListener("submit", savePerson);
@@ -923,6 +1049,7 @@
                 person_id: person.id,
                 title: wish.title,
                 url: wish.url,
+                image_url: wish.imageUrl,
                 price_cents: wish.priceCents,
                 note: wish.note,
             },
@@ -1009,7 +1136,9 @@
                         onclick: () => saveAsIdea(person, wish),
                     });
             }
-            return el("li", { class: "wish" }, [
+            const thumb = thumbNode(wish.imageUrl, "wish__thumb");
+            return el("li", { class: `wish${thumb ? " has-thumb" : ""}` }, [
+                thumb,
                 el("div", { class: "wish__main" }, [
                     el("p", { class: "wish__title" }, titleNode(wish.title, wish.url)),
                     meta.length ? el("div", { class: "wish__meta" }, meta) : null,

@@ -1121,8 +1121,12 @@ class GiftItem(Base):
         nullable=True,
     )
     title = Column(String, nullable=False)
-    # Stored and linked, never fetched by the server.
+    # Linked from the card. The server fetches it only to find its preview
+    # image (services/link_preview.py), behind the SSRF checks there.
     url = Column(String, nullable=True)
+    # The product's picture, loaded by viewers' browsers straight from the
+    # retailer. Found from the page's og:image, or pasted by the owner.
+    image_url = Column(String, nullable=True)
     price_cents = Column(Integer, nullable=True)
     note = Column(Text, nullable=True)
     status = Column(String, nullable=False)
