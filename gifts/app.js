@@ -417,6 +417,7 @@
             .map((input) => [input.id, input.value]);
         const focusedId = els.board.contains(document.activeElement) ? document.activeElement.id : null;
         els.board.replaceChildren(...columns);
+        packBoard();
         for (const [id, value] of drafts) {
             const input = byId(id);
             if (input) input.value = value;
@@ -432,6 +433,37 @@
             if (target) target.focus();
         }
     }
+
+    // The board is a grid of thin rows (see .board in style.css); each list
+    // spans as many as its height needs, so the grid's own placement tucks a
+    // short list under a short neighbour instead of starting a new row below
+    // the tallest one. DOM order — and so tab and screen-reader order — stays
+    // the board's order. Preview pictures have a fixed aspect ratio, so a
+    // list's height doesn't change when they finish loading.
+    const BOARD_ROW = 4;
+    const BOARD_GAP = 16;
+
+    function packBoard() {
+        // Hidden boards measure every list as zero tall; the next visible
+        // render packs them.
+        if (els.board.offsetParent === null) return;
+        for (const child of els.board.children) {
+            const height = child.getBoundingClientRect().height;
+            child.style.gridRowEnd = `span ${Math.ceil((height + BOARD_GAP) / BOARD_ROW)}`;
+        }
+    }
+
+    let packFrame = null;
+    function schedulePack() {
+        if (packFrame) return;
+        packFrame = window.requestAnimationFrame(() => {
+            packFrame = null;
+            packBoard();
+        });
+    }
+
+    // Text rewraps when the window changes width, so lists change height.
+    window.addEventListener("resize", schedulePack);
 
     function renderGraph() {
         const items = state.hideDone ? state.items.filter((item) => !DONE_STATUSES.has(item.status)) : state.items;
@@ -467,6 +499,7 @@
             ontoggle: (event) => {
                 if (event.currentTarget.open) state.collapsed.delete(person.id);
                 else state.collapsed.add(person.id);
+                schedulePack();
             },
         }, [
             el("summary", { text: `From ${linked.displayName}'s wishlist (${linked.items.length})` }),

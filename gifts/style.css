@@ -240,26 +240,29 @@ body {
 
 /* ── board ───────────────────────────────────────────────────────────────── */
 
-/* Columns sit side by side and the board scrolls sideways inside itself, so
-   the page never does. Below 640px they stack instead. */
+/* Lists wrap onto as many rows as they need, in reading order, so every
+   list is reachable by scrolling down. (They used to sit in one sideways-
+   scrolling row, whose scrollbar was at the bottom of the tallest column —
+   off-screen on a long board.) Below 640px they stack one per row. */
 .board {
-    display: flex;
-    gap: 16px;
-    align-items: flex-start;
-    overflow-x: auto;
-    padding-bottom: 12px;
-    scroll-snap-type: x proximity;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    /* Thin rows that packBoard() in app.js spans each list across, so lists
+       pack under each other rather than leaving gaps below short ones. The
+       vertical gap is folded into each list's span. */
+    grid-auto-rows: 4px;
+    column-gap: 16px;
+    row-gap: 0;
+    align-items: start;
 }
 
 .column {
     display: flex;
-    flex: 0 0 280px;
     flex-direction: column;
-    max-width: 280px;
+    min-width: 0;
     border: 1px solid var(--line);
     border-radius: 16px;
     background: var(--surface);
-    scroll-snap-align: start;
 }
 
 .column--me {
@@ -483,7 +486,6 @@ body {
 }
 
 .add-person {
-    flex: 0 0 240px;
     padding: 14px;
     border: 1px dashed var(--line-strong);
     border-radius: 16px;
@@ -1160,17 +1162,7 @@ body {
     .graph { padding: 6px; }
     .graph__svg { max-height: none; }
 
-    .board {
-        flex-direction: column;
-        align-items: stretch;
-        overflow: visible;
-    }
-
-    .column,
-    .add-person {
-        flex: none;
-        max-width: none;
-    }
+    .board { grid-template-columns: minmax(0, 1fr); }
 
     /* Columns stack here, so "earlier" and "later" point up and down. */
     .icon-button--order { transform: rotate(90deg); }

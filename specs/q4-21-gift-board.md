@@ -74,6 +74,12 @@ the warm site theme.
   its items as cards with title, price, link and status. Add an item inline at the
   bottom of a column. Columns can be reordered; items within a column can be
   reordered (sparse float `sort_key`, as in spec 18 R2).
+  *Layout, revised Oct 2026:* the lists first sat in one sideways-scrolling
+  row, whose scrollbar was at the bottom of the tallest list and so usually
+  off-screen. They now wrap into as many columns as fit (one on a phone), and
+  pack like a masonry board: the grid has 4px rows and each list spans as many
+  as its height needs, so a short list slots under a short neighbour. DOM
+  order, and so keyboard and screen-reader order, stays the board's order.
 - **R4. Graph view.** Same data, drawn as inline SVG with a deterministic radial
   layout: Me at the centre, people evenly spaced on a ring, each person's items
   fanned out on a short arc beyond them. Deterministic, not force-directed, so the
