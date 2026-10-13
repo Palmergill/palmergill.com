@@ -550,6 +550,7 @@
 
     const LEDGER_HEADERS = [
         ["record", "W-L"],
+        ["median_record", "Median"],
         ["points_for", "PF"],
         ["all_play", "All-play"],
         ["expected", "xW"],
@@ -655,6 +656,7 @@
             row.appendChild(nameCell);
 
             row.appendChild(valueCell("record", F.ledgerText(team, "record")));
+            row.appendChild(valueCell("median_record", F.ledgerText(team, "median_record")));
             row.appendChild(valueCell("points_for", F.ledgerText(team, "points_for")));
             row.appendChild(valueCell("all_play", F.ledgerText(team, "all_play")));
             row.appendChild(

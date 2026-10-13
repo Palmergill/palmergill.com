@@ -304,6 +304,7 @@
     // inside the row, which is what lets a ten-column table survive 390px.
     const LEDGER_COLUMNS = [
         { key: "record", label: "Record", header: "W-L", chart: "none" },
+        { key: "median_record", label: "Median record", header: "Median", chart: "none" },
         { key: "points_for", label: "Points", header: "PF", chart: "none" },
         { key: "all_play", label: "All-play", header: "Record vs all", chart: "meter" },
         { key: "luck", label: "Luck", header: "W − xW", chart: "diverging" },
@@ -325,6 +326,10 @@
         switch (key) {
             case "record":
                 return winPct(row.wins, row.losses, row.ties);
+            case "median_record":
+                return row.median_record && row.median_record.games
+                    ? row.median_record.win_pct
+                    : null;
             case "points_for":
                 return row.points_for === null || row.points_for === undefined
                     ? null
@@ -362,6 +367,9 @@
         seed: "Position in this table, by whichever column it is sorted on.",
         team: "The manager's team. Open one for its roster, results and start/sit.",
         record: "Wins and losses as the schedule actually fell, ties included where there are any.",
+        median_record:
+            "The scheduled result plus one result each week for scoring above or below "
+            + "the league median. Each week can finish 2-0, 1-1 or 0-2.",
         points_for: "Total points scored so far this season.",
         all_play:
             "Record against every team that played that week, every week — what the "
@@ -567,6 +575,14 @@
         switch (key) {
             case "record":
                 return recordLabel(row.wins, row.losses, row.ties);
+            case "median_record":
+                return row.median_record && row.median_record.games
+                    ? recordLabel(
+                          row.median_record.wins,
+                          row.median_record.losses,
+                          row.median_record.ties
+                      )
+                    : "—";
             case "points_for":
                 return formatPoints(row.points_for);
             case "all_play":
@@ -605,6 +621,8 @@
         if (!row) return "";
         const record = recordLabel(row.wins, row.losses, row.ties);
         switch (key) {
+            case "median_record":
+                return `${record} scheduled · ${formatPoints(row.points_for)} PF`;
             case "all_play":
                 return row.expected_wins === null || row.expected_wins === undefined
                     ? record

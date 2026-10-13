@@ -2201,6 +2201,7 @@ def get_league_ledger(
         rows.append(
             {
                 **team,
+                "median_record": extra.get("median_record"),
                 "all_play": extra.get("all_play"),
                 "expected_wins": extra.get("expected_wins"),
                 "luck": extra.get("luck"),

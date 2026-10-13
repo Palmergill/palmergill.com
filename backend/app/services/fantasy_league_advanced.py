@@ -12,6 +12,9 @@ pass.
 
 Three ideas carry the ledger:
 
+  * **Median record** adds one result per week against the league's median
+    score to the scheduled head-to-head result. It preserves the familiar
+    record while rewarding teams that consistently finish in the top half.
   * **All-play** is a team's record against every other team, every week. It
     answers "how would you be doing if the schedule were fair", which is the
     only honest way to separate a good team from a lucky one in a ten-team
@@ -98,6 +101,45 @@ def all_play_records(metrics: Dict[int, TeamMetrics]) -> Dict[int, Dict[str, Any
                     record["losses"] += 1
                 else:
                     record["ties"] += 1
+
+    for record in records.values():
+        games = record["games"]
+        record["win_pct"] = (
+            (record["wins"] + 0.5 * record["ties"]) / games if games else 0.0
+        )
+    return records
+
+
+def median_records(metrics: Dict[int, TeamMetrics]) -> Dict[int, Dict[str, Any]]:
+    """Head-to-head records with one extra result against each week's median.
+
+    Finishing above the median adds a win and finishing below it adds a loss,
+    so a normal week ends 2-0, 1-1, or 0-2. An exact median score is recorded
+    as a tie rather than being assigned arbitrarily to the top or bottom half.
+    """
+    records: Dict[int, Dict[str, Any]] = {
+        team_id: {
+            "wins": metric.wins,
+            "losses": metric.losses,
+            "ties": metric.ties,
+            "games": metric.games_played,
+        }
+        for team_id, metric in metrics.items()
+    }
+
+    for scores in _weekly_scores(metrics).values():
+        if len(scores) < 2:
+            continue
+        median_score = statistics.median(scores.values())
+        for team_id, score in scores.items():
+            record = records[team_id]
+            record["games"] += 1
+            if score > median_score:
+                record["wins"] += 1
+            elif score < median_score:
+                record["losses"] += 1
+            else:
+                record["ties"] += 1
 
     for record in records.values():
         games = record["games"]
@@ -409,6 +451,7 @@ def ledger_rows(
     once per column.
     """
     all_play = all_play_records(metrics)
+    median_record = median_records(metrics)
     expected = expected_wins(metrics, all_play)
     luck = luck_index(metrics, expected)
     scoring = scoring_summary(metrics)
@@ -418,6 +461,7 @@ def ledger_rows(
 
     return {
         team_id: {
+            "median_record": median_record[team_id],
             "all_play": all_play[team_id],
             "expected_wins": expected[team_id],
             "luck": luck[team_id],
