@@ -80,8 +80,10 @@
         }
         btn.hidden = false;
         const saved = isSaved(t);
+        const label = saved ? `Remove ${t} from watchlist` : `Save ${t} to watchlist`;
         btn.setAttribute('aria-pressed', saved ? 'true' : 'false');
-        btn.textContent = saved ? '★ Saved' : '★ Save';
+        btn.setAttribute('aria-label', label);
+        btn.title = label;
     }
 
     function fmtPrice(p) {
@@ -91,8 +93,7 @@
 
     function fmtChange(c) {
         if (c == null || !Number.isFinite(c)) return '';
-        const sign = c >= 0 ? '+' : '';
-        return `${sign}${c.toFixed(2)}%`;
+        return `${c >= 0 ? '+' : '\u2212'}${Math.abs(c).toFixed(2)}%`;
     }
 
     function render() {
@@ -108,46 +109,39 @@
         section.hidden = false;
         const frag = document.createDocumentFragment();
         list.forEach((entry) => {
-            const btn = document.createElement('button');
-            btn.className = 'trending-stock';
-            btn.type = 'button';
-            btn.dataset.ticker = entry.ticker;
+            // Clicks are handled by app.js's delegated [data-ticker] listener.
+            const row = document.createElement('button');
+            row.className = 'watch-row';
+            row.type = 'button';
+            row.dataset.ticker = entry.ticker;
 
+            const id = document.createElement('span');
+            id.className = 'watch-row-id';
             const ticker = document.createElement('span');
-            ticker.className = 'trending-ticker';
+            ticker.className = 'watch-row-symbol';
             ticker.textContent = entry.ticker;
-
             const name = document.createElement('span');
-            name.className = 'trending-name';
-            name.textContent = entry.name || (entry.price != null ? fmtPrice(entry.price) : 'Saved ticker');
+            name.className = 'watch-row-name';
+            name.textContent = entry.name || 'Saved ticker';
+            id.append(ticker, name);
+            row.appendChild(id);
 
-            btn.appendChild(ticker);
-            btn.appendChild(name);
-
+            const price = fmtPrice(entry.price);
             const delta = fmtChange(entry.changePercent);
-            if (delta) {
-                const d = document.createElement('span');
-                d.className = 'watchlist-item-delta ' + (entry.changePercent >= 0 ? 'is-positive' : 'is-negative');
-                d.textContent = (entry.price != null ? fmtPrice(entry.price) + ' · ' : '') + delta;
-                btn.appendChild(d);
+            if (price || delta) {
+                const quote = document.createElement('span');
+                quote.className = 'watch-row-quote';
+                if (price) quote.append(document.createTextNode(price));
+                if (delta) {
+                    const pill = document.createElement('span');
+                    pill.className = 'change-pill ' + (entry.changePercent >= 0 ? 'positive' : 'negative');
+                    pill.textContent = delta;
+                    quote.appendChild(pill);
+                }
+                row.appendChild(quote);
             }
 
-            btn.addEventListener('click', () => {
-                const ti = document.getElementById('tickerInput');
-                if (ti) ti.value = entry.ticker;
-                if (typeof window.loadStock === 'function') {
-                    window.loadStock(entry.ticker);
-                } else {
-                    // app.js exposes loadStock inside an IIFE; fall back to dispatching a synthetic
-                    // search form submit so the existing handler picks it up.
-                    if (ti) {
-                        ti.value = entry.ticker;
-                        document.getElementById('searchForm')?.requestSubmit();
-                    }
-                }
-            });
-
-            frag.appendChild(btn);
+            frag.appendChild(row);
         });
         grid.replaceChildren(frag);
     }
@@ -163,7 +157,7 @@
                 else add(t, {
                     name: document.getElementById('headerStockName')?.textContent || '',
                     price: parseFloat((document.getElementById('headerStockPrice')?.textContent || '').replace(/[^0-9.\-]/g, '')) || null,
-                    changePercent: parseFloat((document.getElementById('headerStockChange')?.textContent || '').replace(/[^0-9.\-]/g, '')) || null
+                    changePercent: parseFloat((document.getElementById('headerStockChange')?.textContent || '').replace('\u2212', '-').replace(/[^0-9.\-]/g, '')) || null
                 });
                 syncToggleButton();
             });
@@ -177,9 +171,6 @@
                 syncToggleButton();
             });
         }
-        // Watchlist tiles use the same `.trending-stock[data-ticker]` shape as the
-        // existing Trending grid, so the main app's delegated click handler
-        // already routes them through `loadStock`.
         render();
         syncToggleButton();
     }

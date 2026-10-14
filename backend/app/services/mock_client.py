@@ -5,12 +5,45 @@ Returns realistic synthetic data without hitting external APIs.
 Useful for development, testing, and avoiding rate limits.
 """
 
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from typing import Dict, List, Optional
 import random
 import logging
+import zlib
 
 logger = logging.getLogger(__name__)
+
+
+def _seeded_rng(*parts) -> random.Random:
+    """Deterministic RNG for a ticker (and optional salt).
+
+    Python's built-in hash() is salted per process, so seeding with it gave
+    every server restart (and every worker) different demo numbers. crc32 is
+    stable, so the same ticker shows the same values on every load.
+    """
+    key = "|".join(str(part) for part in parts)
+    return random.Random(zlib.crc32(key.encode("utf-8")))
+
+
+def _recent_quarter_ends(count: int, today: Optional[date] = None) -> List[date]:
+    """Most recent completed calendar quarter-ends, newest first."""
+    today = today or date.today()
+    year = today.year
+    # Last day of the previous completed quarter
+    quarter = (today.month - 1) // 3  # 0..3 completed quarters this year
+    if quarter == 0:
+        year -= 1
+        quarter = 4
+    ends = []
+    for _ in range(count):
+        month = quarter * 3
+        next_month_first = date(year + (month == 12), (month % 12) + 1, 1)
+        ends.append(next_month_first - timedelta(days=1))
+        quarter -= 1
+        if quarter == 0:
+            quarter = 4
+            year -= 1
+    return ends
 
 
 class MockDataClient:
@@ -304,49 +337,53 @@ class MockDataClient:
         }
     
     def get_price_history(self, ticker: str, days: int = 365) -> List[Dict]:
-        """Generate mock price history."""
+        """Generate mock price history that ends at the quoted current price.
+
+        The walk is generated backwards from today's price so the chart, the
+        header quote, and the day change all agree.
+        """
         ticker = ticker.upper().strip()
-        
-        # Get base price
+
         if ticker in self.MOCK_COMPANIES:
-            base_price = self.MOCK_COMPANIES[ticker]["current_price"]
+            end_price = self.MOCK_COMPANIES[ticker]["current_price"]
         else:
-            base_price = random.uniform(50, 500)
-        
-        # Generate daily prices with realistic volatility
-        prices = []
-        current_price = base_price
-        
-        # Seed for consistent results
-        rng = random.Random(hash(ticker) % 10000)
-        
+            end_price = self._generate_random_company(ticker)["current_price"]
+
+        # Seed on ticker only so every range (1M..2Y) is a slice of one series.
+        rng = _seeded_rng("prices", ticker)
         end_date = datetime.now()
-        
-        for i in range(days):
-            date = end_date - timedelta(days=days - i - 1)
-            
-            # Skip weekends
-            if date.weekday() >= 5:
-                continue
-            
-            # Random daily change (-3% to +3%)
-            change = rng.uniform(-0.03, 0.03)
-            current_price = current_price * (1 + change)
-            
-            # Ensure price stays positive
-            current_price = max(current_price, 1.0)
-            
-            prices.append({
-                "date": date.strftime("%Y-%m-%d"),
-                "open": round(current_price * rng.uniform(0.99, 1.01), 2),
-                "high": round(current_price * rng.uniform(1.0, 1.02), 2),
-                "low": round(current_price * rng.uniform(0.98, 1.0), 2),
-                "close": round(current_price, 2),
+        total_days = max(days, 730)
+
+        dates = []
+        for i in range(total_days):
+            day = end_date - timedelta(days=i)
+            if day.weekday() < 5:
+                dates.append(day)
+
+        closes = []
+        price = end_price
+        for _ in dates:
+            closes.append(price)
+            price = max(price / (1 + rng.uniform(-0.025, 0.026)), 1.0)
+
+        prices = []
+        cutoff = end_date - timedelta(days=days)
+        for day, close in zip(reversed(dates), reversed(closes)):
+            # Draw every day's values, then filter, so a 1M request is an
+            # exact slice of the 2Y series.
+            row = {
+                "date": day.strftime("%Y-%m-%d"),
+                "open": round(close * rng.uniform(0.99, 1.01), 2),
+                "high": round(close * rng.uniform(1.0, 1.02), 2),
+                "low": round(close * rng.uniform(0.98, 1.0), 2),
+                "close": round(close, 2),
                 "volume": int(rng.uniform(10000000, 100000000)),
-            })
-        
+            }
+            if day > cutoff:
+                prices.append(row)
+
         return prices
-    
+
     def search_stocks(self, query: str, limit: int = 10) -> List[Dict]:
         """Search for stocks - returns mock results."""
         query = query.upper().strip()
@@ -368,7 +405,7 @@ class MockDataClient:
                     "ticker": query,
                     "name": f"{query} Corporation",
                     "sector": "Technology",
-                    "market_cap": random.randint(1000000000, 500000000000),
+                    "market_cap": _seeded_rng("search", query).randint(1000000000, 500000000000),
                 }
             ]
         
@@ -376,101 +413,94 @@ class MockDataClient:
     
     def _generate_random_company(self, ticker: str) -> Dict:
         """Generate realistic random data for unknown tickers."""
-        base_price = random.uniform(20, 800)
-        market_cap = base_price * random.uniform(1000000, 10000000000)
+        rng = _seeded_rng("company", ticker)
+        base_price = rng.uniform(20, 800)
+        market_cap = base_price * rng.uniform(1000000, 10000000000)
         
         sectors = ["Technology", "Healthcare", "Financials", "Consumer Cyclical", "Industrials", "Energy", "Utilities"]
-        sector = random.choice(sectors)
+        sector = rng.choice(sectors)
         
         return {
             "name": f"{ticker} Corporation",
             "sector": sector,
             "industry": f"{sector} Services",
             "description": f"{ticker} Corporation operates as a leading provider of {sector.lower()} solutions worldwide. The company delivers innovative products and services to customers across multiple markets.",
-            "employees": random.randint(1000, 500000),
-            "founded": str(random.randint(1950, 2015)),
+            "employees": rng.randint(1000, 500000),
+            "founded": str(rng.randint(1950, 2015)),
             "hq": "United States",
             "website": f"https://www.{ticker.lower()}.com",
             "market_cap": market_cap,
             "current_price": base_price,
-            "pe_ratio": random.uniform(10, 100),
-            "revenue_growth": random.uniform(-20, 50),
-            "free_cash_flow": random.uniform(1000000, 50000000000),
-            "profit_margin": random.uniform(5, 40),
-            "operating_margin": random.uniform(8, 45),
-            "gross_margin": random.uniform(20, 80),
-            "roe": random.uniform(5, 50),
-            "roa": random.uniform(3, 25),
-            "roic": random.uniform(5, 30),
-            "debt_to_equity": random.uniform(0.1, 2.0),
-            "current_ratio": random.uniform(0.8, 3.5),
-            "quick_ratio": random.uniform(0.7, 3.0),
-            "ps_ratio": random.uniform(1, 30),
-            "pb_ratio": random.uniform(1, 50),
-            "ev_ebitda": random.uniform(8, 60),
-            "enterprise_value": market_cap * random.uniform(0.9, 1.2),
+            "pe_ratio": rng.uniform(10, 100),
+            "revenue_growth": rng.uniform(-20, 50),
+            "free_cash_flow": rng.uniform(1000000, 50000000000),
+            "profit_margin": rng.uniform(5, 40),
+            "operating_margin": rng.uniform(8, 45),
+            "gross_margin": rng.uniform(20, 80),
+            "roe": rng.uniform(5, 50),
+            "roa": rng.uniform(3, 25),
+            "roic": rng.uniform(5, 30),
+            "debt_to_equity": rng.uniform(0.1, 2.0),
+            "current_ratio": rng.uniform(0.8, 3.5),
+            "quick_ratio": rng.uniform(0.7, 3.0),
+            "ps_ratio": rng.uniform(1, 30),
+            "pb_ratio": rng.uniform(1, 50),
+            "ev_ebitda": rng.uniform(8, 60),
+            "enterprise_value": market_cap * rng.uniform(0.9, 1.2),
             "shares_outstanding": market_cap / base_price,
-            "working_capital": random.uniform(-10000000000, 50000000000),
-            "cash": random.uniform(1000000000, 100000000000),
-            "beta": random.uniform(0.5, 2.5),
-            "avg_volume": random.randint(5000000, 200000000),
-            "price_52w_high": base_price * random.uniform(1.1, 2.0),
-            "price_52w_low": base_price * random.uniform(0.4, 0.9),
+            "working_capital": rng.uniform(-10000000000, 50000000000),
+            "cash": rng.uniform(1000000000, 100000000000),
+            "beta": rng.uniform(0.5, 2.5),
+            "avg_volume": rng.randint(5000000, 200000000),
+            "price_52w_high": base_price * rng.uniform(1.1, 2.0),
+            "price_52w_low": base_price * rng.uniform(0.4, 0.9),
         }
     
     def _generate_earnings(self, ticker: str, company_data: Dict) -> List[Dict]:
-        """Generate realistic earnings history."""
-        rng = random.Random(hash(ticker) % 10000)
-        
-        # Base EPS derived from PE ratio
-        pe = company_data.get("pe_ratio", 25)
+        """Generate eight quarters of earnings, newest first.
+
+        Quarterly EPS is scaled so the trailing four quarters roughly match
+        price / P/E, keeping the P/E chart and the headline P/E consistent.
+        """
+        rng = _seeded_rng("earnings", ticker)
+
+        pe = company_data.get("pe_ratio") or 25
         price = company_data["current_price"]
-        base_eps = price / pe if pe else 2.0
-        
+        ttm_eps = price / pe if pe else 2.0
+        shares = company_data.get("shares_outstanding") or 1e9
+        # Revenue per dollar of earnings, fixed per company (margin proxy)
+        revenue_multiple = rng.uniform(3.5, 8.0)
+
+        quarter_ends = _recent_quarter_ends(8)
+        # Build oldest -> newest with gentle growth toward today's TTM level
+        eps_values = []
+        level = ttm_eps / 4 * rng.uniform(0.7, 0.9)
+        for _ in quarter_ends:
+            level = max(level * (1 + rng.uniform(-0.08, 0.12)), 0.01)
+            eps_values.append(level)
+        recent_sum = sum(eps_values[-4:])
+        scale = ttm_eps / recent_sum if recent_sum else 1
+        eps_values = [value * scale for value in eps_values]
+
         earnings = []
-        current_eps = base_eps
-        
-        # Generate 8 quarters
-        for i in range(8):
-            quarter_date = datetime.now() - timedelta(days=i * 91)  # ~91 days per quarter
-            
-            # Add some randomness to EPS
-            eps_change = rng.uniform(-0.2, 0.25)
-            current_eps = current_eps * (1 + eps_change)
-            current_eps = max(current_eps, 0.1)  # Keep positive
-            
-            # Generate estimated EPS (slightly off actual)
-            estimated_eps = current_eps * rng.uniform(0.85, 1.15)
-            
-            # Calculate surprise
-            surprise_pct = ((current_eps - estimated_eps) / estimated_eps) * 100
-            
-            # Generate revenue
-            revenue = current_eps * random.uniform(8e9, 20e9)  # Scale to company size
-            
-            # Determine quarter
-            month = quarter_date.month
-            if month <= 3:
-                period = "Q1"
-            elif month <= 6:
-                period = "Q2"
-            elif month <= 9:
-                period = "Q3"
-            else:
-                period = "Q4"
-            
+        for quarter_end, eps in zip(reversed(quarter_ends), eps_values):
+            estimated_eps = eps * rng.uniform(0.92, 1.06)
+            surprise_pct = ((eps - estimated_eps) / estimated_eps) * 100
+            net_income = eps * shares
+            revenue = net_income * revenue_multiple * rng.uniform(0.95, 1.05)
             earnings.append({
-                "fiscal_date": quarter_date.strftime("%Y-%m-%d"),
-                "period": period,
-                "reported_eps": round(current_eps, 2),
+                "fiscal_date": quarter_end.strftime("%Y-%m-%d"),
+                "period": f"Q{(quarter_end.month - 1) // 3 + 1}",
+                "reported_eps": round(eps, 2),
                 "estimated_eps": round(estimated_eps, 2),
                 "surprise_pct": round(surprise_pct, 2),
                 "revenue": round(revenue, 0),
-                "free_cash_flow": round(revenue * rng.uniform(0.05, 0.25), 0),
-                "pe_ratio": company_data.get("pe_ratio"),
-                "price": company_data["current_price"],
+                "free_cash_flow": round(net_income * rng.uniform(0.6, 1.2), 0),
+                "pe_ratio": None,
+                "price": None,
             })
-        
+
+        earnings.reverse()
         return earnings
 
 

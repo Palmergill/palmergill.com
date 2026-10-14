@@ -32,17 +32,28 @@
 
     function fmtPct(v) {
         if (v == null || !Number.isFinite(v)) return '—';
-        const sign = v >= 0 ? '+' : '';
-        return `${sign}${Number(v).toFixed(2)}%`;
+        return `${v >= 0 ? '+' : '\u2212'}${Math.abs(v).toFixed(2)}%`;
+    }
+
+    function ttmEps(earnings) {
+        if (!Array.isArray(earnings)) return null;
+        const recent = [...earnings]
+            .filter((e) => e && e.fiscal_date)
+            .sort((a, b) => (a.fiscal_date < b.fiscal_date ? 1 : -1))
+            .slice(0, 4)
+            .map((e) => e.reported_eps);
+        if (recent.length < 4 || !recent.every((v) => Number.isFinite(v))) return null;
+        return recent.reduce((sum, v) => sum + v, 0);
     }
 
     function fmtMcap(v) {
         if (v == null || !Number.isFinite(v)) return '—';
         const abs = Math.abs(v);
-        if (abs >= 1e12) return '$' + (v / 1e12).toFixed(2) + 'T';
-        if (abs >= 1e9) return '$' + (v / 1e9).toFixed(2) + 'B';
-        if (abs >= 1e6) return '$' + (v / 1e6).toFixed(2) + 'M';
-        return '$' + Math.round(v).toLocaleString();
+        const sign = v < 0 ? '\u2212' : '';
+        if (abs >= 1e12) return sign + '$' + (abs / 1e12).toFixed(2) + 'T';
+        if (abs >= 1e9) return sign + '$' + (abs / 1e9).toFixed(2) + 'B';
+        if (abs >= 1e6) return sign + '$' + (abs / 1e6).toFixed(2) + 'M';
+        return sign + '$' + Math.round(abs).toLocaleString();
     }
 
     function fmtNum(v, digits = 2) {
@@ -84,7 +95,7 @@
                 changePercent: changePct,
                 marketCap: summary.market_cap ?? null,
                 peRatio: summary.pe_ratio ?? null,
-                eps: summary.eps ?? null,
+                eps: summary.eps ?? ttmEps(data.earnings),
                 dividendYield: summary.dividend_yield ?? null,
                 demo: Boolean(data._demo || priceData?._demo),
                 warning: data._warning || priceData?._warning || null
@@ -110,6 +121,7 @@
             const x = document.createElement('button');
             x.type = 'button';
             x.title = `Remove ${t}`;
+            x.setAttribute('aria-label', `Remove ${t} from comparison`);
             x.textContent = '×';
             x.addEventListener('click', () => {
                 writeTickers(list.filter((entry) => entry !== t));
@@ -156,7 +168,10 @@
         const headRow = document.createElement('tr');
         const blank = document.createElement('th');
         blank.scope = 'col';
-        blank.textContent = 'Metric';
+        const blankLabel = document.createElement('span');
+        blankLabel.className = 'visually-hidden';
+        blankLabel.textContent = 'Metric';
+        blank.appendChild(blankLabel);
         headRow.appendChild(blank);
         rows.forEach((row) => {
             const th = document.createElement('th');
@@ -172,8 +187,8 @@
             ['Price', (r) => fmtMoney(r.price)],
             ['Day %', (r) => fmtPct(r.changePercent), (r) => r.changePercent],
             ['Market cap', (r) => fmtMcap(r.marketCap)],
-            ['P/E ratio', (r) => fmtNum(r.peRatio)],
-            ['EPS', (r) => fmtMoney(r.eps)],
+            ['P/E ratio', (r) => fmtNum(r.peRatio, 1)],
+            ['EPS (TTM)', (r) => fmtMoney(r.eps)],
             ['Dividend yield', (r) => r.dividendYield != null ? fmtPct(r.dividendYield) : '—']
         ];
         metrics.forEach(([label, format, signGetter]) => {

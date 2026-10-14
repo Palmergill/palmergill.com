@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Stock Research</title>
     <meta name="description" content="Polished stock research app — fundamentals, charts, and news for any ticker. By Palmer Gill.">
     <link rel="canonical" href="https://palmergill.com/stock-research/">
@@ -21,468 +21,335 @@
     <link rel="icon" type="image/png" href="/assets/palmer-gill-logo-small.png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/shared/site-nav.css?v=15">
-    <link rel="stylesheet" href="style.css?v=7">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/shared/site-nav.css?v=16">
+    <link rel="stylesheet" href="style.css?v=8">
 </head>
 <body>
 <noscript>
     <p class="site-noscript">This page builds its content with JavaScript, so it needs scripts enabled. <a href="/">Browse the other projects</a> in the meantime.</p>
 </noscript>
-    <div class="container">
-        <header>
-            <div class="header-content" id="headerLogo">
-                <h1>Stock Research</h1>
-            </div>
-            <div class="header-stock-content hidden" id="headerStockContent">
-                <div class="header-row-1">
-                    <div class="header-stock-left">
-                        <span id="headerStockTicker" class="header-ticker-large">TSLA</span>
-                        <span id="headerStockName" class="header-name-large">Tesla, Inc.</span>
-                    </div>
-                    <div class="header-stock-right">
-                        <span id="headerStockPrice" class="header-price-large">$417.44</span>
-                        <span id="headerStockChange" class="header-change-badge positive">+5.2%</span>
-                        <button id="watchlistBtn" class="watchlist-btn" type="button" aria-pressed="false" title="Add to watchlist">★ Save</button>
-                        <button id="searchIconBtnInline" class="search-icon-btn-inline" title="Search">Search</button>
-                    </div>
-                </div>
-                <div class="header-row-2">
-                    <button class="header-tab-btn active" data-tab="overview">Overview</button>
-                    <button class="header-tab-btn" data-tab="fundamentals">Fundamentals</button>
-                    <button class="header-tab-btn" data-tab="about">About</button>
-                </div>
-            </div>
-            <button id="searchIconBtnMain" class="search-icon-btn" title="Search">Search</button>
-        </header>
-        <div id="demoBanner" class="demo-banner hidden" role="status">
-            Public demo mode uses generated sample stock data. Live market provider calls stay protected.
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+    <symbol id="icon-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2"/><path d="m20 20-4-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+    <symbol id="icon-star" viewBox="0 0 24 24"><path d="m12 3.5 2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8-4.3-4.1 5.9-.9Z" fill="var(--star-fill, none)" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
+    <symbol id="icon-back" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="icon-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+</svg>
+
+<div class="page">
+    <!-- Sticky page header: title on the landing view, quote + tabs once a ticker loads -->
+    <header class="stock-header" id="stockHeader">
+        <div class="header-landing" id="headerLogo">
+            <h1>Stock Research</h1>
         </div>
-        
-        <!-- Search Modal -->
-        <div id="searchModal" class="search-modal hidden" role="dialog" aria-modal="true" aria-label="Search stocks">
-            <div class="search-modal-backdrop" aria-hidden="true"></div>
-            <div class="search-modal-content">
-                <form id="searchForm" class="search-modal-form" role="search">
-                    <div class="search-modal-input-wrapper">
-                        <input 
-                            type="text" 
-                            id="tickerInput" 
-                            placeholder="Search ticker or company name..." 
-                            aria-label="Ticker or company name"
-                            autocomplete="off"
-                            autofocus
-                        >
-                        <button type="submit" id="searchBtn">Search</button>
-                    </div>
-                    <div id="searchSuggestions" class="suggestions hidden"></div>
+
+        <div class="header-quote hidden" id="headerStockContent">
+            <div class="quote-row">
+                <button type="button" id="backBtn" class="icon-btn back-btn" aria-label="Back to all stocks">
+                    <svg aria-hidden="true"><use href="#icon-back"/></svg>
+                </button>
+                <div class="quote-id">
+                    <span id="headerStockTicker" class="quote-ticker"></span>
+                    <span id="headerStockName" class="quote-name"></span>
+                </div>
+                <div class="quote-price">
+                    <span id="headerStockPrice" class="quote-last"></span>
+                    <span class="quote-change-row">
+                        <span id="headerStockChange" class="change-pill"></span>
+                        <span class="quote-change-label">today</span>
+                    </span>
+                </div>
+                <div class="quote-actions">
+                    <button id="watchlistBtn" class="icon-btn watch-btn" type="button" aria-pressed="false" aria-label="Save to watchlist" title="Save to watchlist" hidden>
+                        <svg aria-hidden="true"><use href="#icon-star"/></svg>
+                    </button>
+                    <button id="searchIconBtnInline" class="icon-btn" type="button" aria-label="Search stocks" title="Search">
+                        <svg aria-hidden="true"><use href="#icon-search"/></svg>
+                    </button>
+                </div>
+            </div>
+            <div class="tabs" role="tablist" aria-label="Stock sections">
+                <button class="tab" role="tab" type="button" id="tab-overview" data-tab="overview" aria-controls="overview" aria-selected="true">Overview</button>
+                <button class="tab" role="tab" type="button" id="tab-fundamentals" data-tab="fundamentals" aria-controls="fundamentals" aria-selected="false" tabindex="-1">Fundamentals</button>
+                <button class="tab" role="tab" type="button" id="tab-about" data-tab="about" aria-controls="about" aria-selected="false" tabindex="-1">About</button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Search sheet -->
+    <div id="searchModal" class="search-modal hidden" role="dialog" aria-modal="true" aria-label="Search stocks">
+        <div class="search-modal-backdrop" aria-hidden="true"></div>
+        <div class="search-sheet">
+            <form id="searchForm" class="search-form" role="search" autocomplete="off">
+                <label class="search-field">
+                    <svg class="search-field-icon" aria-hidden="true"><use href="#icon-search"/></svg>
+                    <input
+                        type="search"
+                        id="tickerInput"
+                        placeholder="Ticker or company name"
+                        aria-label="Ticker or company name"
+                        aria-autocomplete="list"
+                        aria-controls="searchSuggestions"
+                        autocapitalize="characters"
+                        autocorrect="off"
+                        spellcheck="false"
+                        enterkeyhint="search"
+                    >
+                </label>
+                <button type="submit" id="searchBtn" class="btn btn-primary search-submit">Search</button>
+                <button id="closeSearchModal" class="search-cancel" type="button">Cancel</button>
+            </form>
+            <div id="searchSuggestions" class="suggestions hidden" role="listbox" aria-label="Suggestions"></div>
+        </div>
+    </div>
+
+    <main id="main" class="main">
+        <div id="demoBanner" class="demo-note hidden" role="status"></div>
+
+        <!-- Loading skeleton -->
+        <div id="loading" class="loading hidden" aria-busy="true" aria-label="Loading stock">
+            <div class="card skeleton-card">
+                <div class="sk sk-line" style="width: 40%"></div>
+                <div class="sk sk-chart"></div>
+            </div>
+            <div class="card skeleton-card">
+                <div class="sk-grid">
+                    <div class="sk sk-tile"></div><div class="sk sk-tile"></div>
+                    <div class="sk sk-tile"></div><div class="sk sk-tile"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Error -->
+        <div id="error" class="error-card hidden" role="alert">
+            <p id="errorMessage" class="error-message"></p>
+            <p id="retryCountdown" class="retry-countdown hidden">Retrying in <span class="countdown-seconds">3</span>s…</p>
+            <div class="error-actions">
+                <button id="retryBtn" class="btn btn-primary" type="button">Try again</button>
+                <button id="errorBackBtn" class="btn btn-quiet" type="button">Back to all stocks</button>
+            </div>
+        </div>
+
+        <!-- Landing -->
+        <div id="empty" class="landing">
+            <section class="hero">
+                <h2 class="hero-title">Research any ticker</h2>
+                <p class="hero-copy">Price history, fundamentals, and earnings for US stocks.</p>
+                <button type="button" id="searchIconBtnMain" class="hero-search">
+                    <svg aria-hidden="true"><use href="#icon-search"/></svg>
+                    <span>Search ticker or company</span>
+                </button>
+                <p class="hero-note">The public demo uses generated sample values. <a href="/login/?next=/stock-research/">Sign in</a> for live market data.</p>
+            </section>
+
+            <section id="watchlistSection" class="landing-section" aria-labelledby="watchlistHeading" hidden>
+                <div class="section-head">
+                    <h2 id="watchlistHeading" class="section-title">Your watchlist</h2>
+                    <button type="button" id="clearWatchlistBtn" class="link-button">Clear</button>
+                </div>
+                <div id="watchlistGrid" class="ticker-list"></div>
+            </section>
+
+            <section class="landing-section" aria-labelledby="popularHeading">
+                <div class="section-head">
+                    <h2 id="popularHeading" class="section-title">Popular</h2>
+                </div>
+                <div class="ticker-grid">
+                    <button type="button" class="ticker-tile" data-ticker="AAPL"><span class="ticker-tile-symbol">AAPL</span><span class="ticker-tile-name">Apple</span></button>
+                    <button type="button" class="ticker-tile" data-ticker="NVDA"><span class="ticker-tile-symbol">NVDA</span><span class="ticker-tile-name">NVIDIA</span></button>
+                    <button type="button" class="ticker-tile" data-ticker="MSFT"><span class="ticker-tile-symbol">MSFT</span><span class="ticker-tile-name">Microsoft</span></button>
+                    <button type="button" class="ticker-tile" data-ticker="AMZN"><span class="ticker-tile-symbol">AMZN</span><span class="ticker-tile-name">Amazon</span></button>
+                    <button type="button" class="ticker-tile" data-ticker="GOOGL"><span class="ticker-tile-symbol">GOOGL</span><span class="ticker-tile-name">Alphabet</span></button>
+                    <button type="button" class="ticker-tile" data-ticker="TSLA"><span class="ticker-tile-symbol">TSLA</span><span class="ticker-tile-name">Tesla</span></button>
+                </div>
+            </section>
+
+            <section id="compareSection" class="landing-section card compare-card" aria-labelledby="compareHeading">
+                <div class="section-head">
+                    <h2 id="compareHeading" class="section-title">Compare</h2>
+                    <span class="section-hint">Up to 4 tickers</span>
+                </div>
+                <form id="compareForm" class="compare-form" autocomplete="off">
+                    <label for="compareInput" class="visually-hidden">Ticker to compare</label>
+                    <input id="compareInput" type="text" maxlength="8" placeholder="Add a ticker, e.g. NVDA" autocapitalize="characters" autocorrect="off" spellcheck="false" enterkeyhint="done">
+                    <button type="submit" class="btn btn-secondary">Add</button>
                 </form>
-                <button id="closeSearchModal" class="close-search-modal" type="button" aria-label="Close search">&times;</button>
-            </div>
+                <div id="compareChips" class="compare-chips"></div>
+                <div id="compareTable" class="compare-table" hidden></div>
+            </section>
+
+            <p class="data-source">Live data for signed-in users comes from Polygon.io and Finnhub.</p>
         </div>
 
-        <main id="main">
-            <div id="loading" class="loading hidden">
-                <!-- Progress Bar -->
-                <div class="progress-container">
-                    <div class="progress-bar" id="loadingProgress">
-                        <div class="progress-fill"></div>
-                    </div>
-                    <div class="progress-steps">
-                        <span class="progress-step active" data-step="1">Fetching stock data...</span>
-                        <span class="progress-step" data-step="2">Loading price history...</span>
-                        <span class="progress-step" data-step="3">Rendering charts...</span>
-                    </div>
-                </div>
-                
-                <!-- Rotating Stock Tips -->
-                <div class="stock-tips-container">
-                    <div class="stock-tip" id="stockTip">
-                        <span class="tip-icon">💡</span>
-                        <span class="tip-text">Did you know? The P/E ratio helps compare valuations across companies.</span>
-                    </div>
-                </div>
-                
-                <!-- Skeleton Header -->
-                <div class="card company-header skeleton">
-                    <div class="company-header-content">
+        <!-- Ticker results -->
+        <div id="results" class="results hidden">
+            <!-- Overview -->
+            <section id="overview" class="tab-panel" role="tabpanel" aria-labelledby="tab-overview">
+                <div class="card chart-card">
+                    <div class="chart-head">
                         <div>
-                            <div class="skeleton-text skeleton-title"></div>
-                            <div class="skeleton-text skeleton-subtitle"></div>
+                            <h3 class="card-title">Price</h3>
+                            <p class="chart-sub"><span id="rangeChange" class="range-change"></span> <span id="rangeLabel" class="range-label"></span></p>
                         </div>
-                        <div class="skeleton-button"></div>
-                    </div>
-                </div>
-                
-                <!-- Skeleton Tabs -->
-                <div class="skeleton-tabs">
-                    <div class="skeleton-tab"></div>
-                    <div class="skeleton-tab"></div>
-                    <div class="skeleton-tab"></div>
-                </div>
-                
-                <!-- Skeleton Cards -->
-                <div class="card skeleton">
-                    <div class="skeleton-text skeleton-heading"></div>
-                    <div class="skeleton-grid">
-                        <div class="skeleton-metric">
-                            <div class="skeleton-text skeleton-label"></div>
-                            <div class="skeleton-text skeleton-value"></div>
-                        </div>
-                        <div class="skeleton-metric">
-                            <div class="skeleton-text skeleton-label"></div>
-                            <div class="skeleton-text skeleton-value"></div>
-                        </div>
-                        <div class="skeleton-metric">
-                            <div class="skeleton-text skeleton-label"></div>
-                            <div class="skeleton-text skeleton-value"></div>
-                        </div>
-                        <div class="skeleton-metric">
-                            <div class="skeleton-text skeleton-label"></div>
-                            <div class="skeleton-text skeleton-value"></div>
+                        <div class="segmented" id="rangeControl" role="group" aria-label="Chart range">
+                            <button type="button" data-range="1M" aria-pressed="false">1M</button>
+                            <button type="button" data-range="3M" aria-pressed="false">3M</button>
+                            <button type="button" data-range="6M" aria-pressed="false">6M</button>
+                            <button type="button" data-range="1Y" aria-pressed="true">1Y</button>
+                            <button type="button" data-range="2Y" aria-pressed="false">2Y</button>
                         </div>
                     </div>
-                </div>
-                
-                <div class="card skeleton">
-                    <div class="skeleton-text skeleton-heading"></div>
-                    <div class="skeleton-chart"></div>
-                </div>
-                
-                <div class="card skeleton">
-                    <div class="skeleton-text skeleton-heading"></div>
-                    <div class="skeleton-grid">
-                        <div class="skeleton-metric">
-                            <div class="skeleton-text skeleton-label"></div>
-                            <div class="skeleton-text skeleton-value"></div>
+                    <div class="chart-box chart-box-price">
+                        <canvas id="priceChart" role="img" aria-label="Price history chart"></canvas>
+                    </div>
+                    <div class="range-bar" id="rangeBar" hidden>
+                        <div class="range-bar-labels">
+                            <span>52-week low <strong id="low52"></strong></span>
+                            <span>52-week high <strong id="high52"></strong></span>
                         </div>
-                        <div class="skeleton-metric">
-                            <div class="skeleton-text skeleton-label"></div>
-                            <div class="skeleton-text skeleton-value"></div>
-                        </div>
-                        <div class="skeleton-metric">
-                            <div class="skeleton-text skeleton-label"></div>
-                            <div class="skeleton-text skeleton-value"></div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div id="error" class="error hidden">
-                <div class="error-icon">⚠️</div>
-                <p id="errorMessage"></p>
-                <div id="retryCountdown" class="retry-countdown hidden">
-                    Retrying in <span class="countdown-seconds">3</span>s...
-                </div>
-                <button id="retryBtn" class="retry-btn">Try Again</button>
-            </div>
-
-            <div id="empty" class="empty">
-                <div class="empty-illustration">
-                    <svg viewBox="0 0 120 120" class="chart-doodle">
-                        <path class="doodle-line" d="M10,100 L30,80 L50,90 L70,60 L90,70 L110,30" />
-                        <circle class="doodle-dot" cx="30" cy="80" r="4" />
-                        <circle class="doodle-dot" cx="50" cy="90" r="4" />
-                        <circle class="doodle-dot" cx="70" cy="60" r="4" />
-                        <circle class="doodle-dot" cx="90" cy="70" r="4" />
-                        <circle class="doodle-dot" cx="110" cy="30" r="4" />
-                    </svg>
-                </div>
-                <h3 class="empty-title">Research any ticker</h3>
-                <p class="empty-description">Explore price history, fundamentals, and earnings for US stocks. Sign in for live market data; the public demo uses generated sample values.</p>
-                
-                <div id="compareSection" class="trending-stocks compare-section">
-                    <div class="trending-label-row">
-                        <span class="trending-label">Compare</span>
-                        <span class="compare-hint">Add up to 4 tickers</span>
-                    </div>
-                    <form id="compareForm" class="compare-form">
-                        <input id="compareInput" type="text" maxlength="8" placeholder="Add ticker (e.g. NVDA)" autocomplete="off">
-                        <button type="submit" class="compare-add-btn">Add</button>
-                    </form>
-                    <div id="compareChips" class="compare-chips"></div>
-                    <div id="compareTable" class="compare-table" hidden></div>
-                </div>
-
-                <div id="watchlistSection" class="trending-stocks watchlist-section" hidden>
-                    <div class="trending-label-row">
-                        <span class="trending-label">Your Watchlist</span>
-                        <button type="button" id="clearWatchlistBtn" class="link-button">Clear</button>
-                    </div>
-                    <div id="watchlistGrid" class="trending-grid"></div>
-                </div>
-
-                <div class="trending-stocks">
-                    <span class="trending-label">Trending Now</span>
-                    <div class="trending-grid">
-                        <button class="trending-stock" data-ticker="TSLA">
-                            <span class="trending-ticker">TSLA</span>
-                            <span class="trending-name">Tesla</span>
-                        </button>
-                        <button class="trending-stock" data-ticker="AAPL">
-                            <span class="trending-ticker">AAPL</span>
-                            <span class="trending-name">Apple</span>
-                        </button>
-                        <button class="trending-stock" data-ticker="NVDA">
-                            <span class="trending-ticker">NVDA</span>
-                            <span class="trending-name">NVIDIA</span>
-                        </button>
-                        <button class="trending-stock" data-ticker="MSFT">
-                            <span class="trending-ticker">MSFT</span>
-                            <span class="trending-name">Microsoft</span>
-                        </button>
-                        <button class="trending-stock" data-ticker="AMZN">
-                            <span class="trending-ticker">AMZN</span>
-                            <span class="trending-name">Amazon</span>
-                        </button>
-                        <button class="trending-stock" data-ticker="GOOGL">
-                            <span class="trending-ticker">GOOGL</span>
-                            <span class="trending-name">Alphabet</span>
-                        </button>
-                    </div>
-                </div>
-                
-                <!-- Feature Callouts -->
-                <div class="feature-callouts">
-                    <div class="feature-item">
-                        <span class="feature-icon">📊</span>
-                        <span class="feature-text">Price History Charts</span>
-                    </div>
-                    <div class="feature-item">
-                        <span class="feature-icon">💰</span>
-                        <span class="feature-text">Financial Metrics</span>
-                    </div>
-                    <div class="feature-item">
-                        <span class="feature-icon">📈</span>
-                        <span class="feature-text">Earnings Data</span>
-                    </div>
-                    <div class="feature-item">
-                        <span class="feature-icon">⚡</span>
-                        <span class="feature-text">Price Comparisons</span>
-                    </div>
-                </div>
-                
-                <p class="data-source">Live data for signed-in users is provided by Polygon.io and Finnhub.</p>
-            </div>
-
-            <div id="results" class="hidden">
-                <!-- Tab Contents Container -->
-                <div class="tab-content-container">
-                <!-- Tab Content: Overview -->
-                <div id="overview" class="tab-content active">
-                    <!-- Price Chart -->
-                    <div class="card chart-container">
-                        <h3>Stock Price History</h3>
-                        <div class="chart-wrapper">
-                            <canvas id="priceChart"></canvas>
-                        </div>
-                    </div>
-
-                    <!-- Key Metrics Grid - Option B Style -->
-                    <div class="card metrics-key-simple">
-                        <div class="key-metrics-grid">
-                            <div class="key-metric">
-                                <div class="key-metric-left">
-                                    <span class="key-metric-label">P/E Ratio</span>
-                                    <span id="peRatio" class="key-metric-value"></span>
-                                </div>
-                                <span class="key-metric-change" style="opacity:0;">—</span>
-                            </div>
-                            <div class="key-metric">
-                                <div class="key-metric-left">
-                                    <span class="key-metric-label">Earnings</span>
-                                    <span id="ttmEarnings" class="key-metric-value"></span>
-                                </div>
-                                <span id="ttmEarningsChange" class="key-metric-change"></span>
-                            </div>
-                            <div class="key-metric">
-                                <div class="key-metric-left">
-                                    <span class="key-metric-label">Revenue</span>
-                                    <span id="ttmRevenue" class="key-metric-value"></span>
-                                </div>
-                                <span id="ttmRevenueChange" class="key-metric-change"></span>
-                            </div>
-                            <div class="key-metric">
-                                <div class="key-metric-left">
-                                    <span class="key-metric-label">Free Cash Flow</span>
-                                    <span id="ttmFCF" class="key-metric-value"></span>
-                                </div>
-                                <span id="ttmFCFChange" class="key-metric-change"></span>
-                            </div>
-                        </div>
+                        <div class="range-bar-track"><span class="range-bar-marker" id="rangeMarker"></span></div>
                     </div>
                 </div>
 
-                <!-- Tab Content: Fundamentals -->
-                <div id="fundamentals" class="tab-content">
-                    <!-- Charts Section -->
-                    <div class="card">
-                        <h3>Earnings & Free Cash Flow</h3>
-                        <canvas id="epsChart" width="800" height="350"></canvas>
-                    </div>
-                    
-                    <div class="card">
-                        <h3>Revenue by Quarter</h3>
-                        <canvas id="revenueChart" width="800" height="300"></canvas>
-                    </div>
-                    
-                    <div class="card">
-                        <h3>Free Cash Flow</h3>
-                        <canvas id="fcfChart" width="800" height="300"></canvas>
-                    </div>
-                    
-                    <div class="card">
-                        <h3>P/E Ratio Over Time</h3>
-                        <canvas id="peChart" width="800" height="350"></canvas>
-                    </div>
-                    
-                    <!-- Profitability Metrics -->
-                    <div class="card metrics-overview metrics-profitability">
-                        <h3>Profitability</h3>
-                        <div class="metrics-grid-compact">
-                            <div class="metric" title="Gross profit margin. Percentage of revenue left after cost of goods sold. Shows pricing power and production efficiency.">
-                                <span class="metric-label">Gross Margin</span>
-                                <span id="grossMargin" class="metric-value">-</span>
-                            </div>
-                            <div class="metric" title="EBITDA margin. Earnings before interest, taxes, depreciation. Shows operating profitability.">
-                                <span class="metric-label">EBITDA Margin</span>
-                                <span id="ebitdaMargin" class="metric-value">-</span>
-                            </div>
-                            <div class="metric" title="Return on Assets. How efficiently the company uses its assets to generate profit.">
-                                <span class="metric-label">Return on Assets</span>
-                                <span id="roa" class="metric-value">-</span>
-                            </div>
-                            <div class="metric" title="Return on Invested Capital. Measures return to all investors (debt + equity). ROIC > WACC creates value.">
-                                <span class="metric-label">ROIC</span>
-                                <span id="roic" class="metric-value">-</span>
-                            </div>
+                <div class="card">
+                    <h3 class="card-title">Key stats</h3>
+                    <dl class="stat-grid">
+                        <div class="stat">
+                            <dt>Market cap</dt>
+                            <dd id="marketCap" class="stat-value">—</dd>
                         </div>
-                    </div>
-                    
-                    <!-- Financial Health -->
-                    <div class="card metrics-overview metrics-health">
-                        <h3>Financial Health</h3>
-                        <div class="metrics-grid-compact">
-                            <div class="metric" title="Current Ratio. Current assets divided by current liabilities. > 1.5 suggests good short-term liquidity.">
-                                <span class="metric-label">Current Ratio</span>
-                                <span id="currentRatio" class="metric-value">-</span>
-                            </div>
-                            <div class="metric" title="Quick Ratio. Current assets minus inventory, divided by liabilities. More conservative liquidity measure.">
-                                <span class="metric-label">Quick Ratio</span>
-                                <span id="quickRatio" class="metric-value">-</span>
-                            </div>
-                            <div class="metric" title="Interest Coverage. EBIT divided by interest expense. > 3 indicates comfortable debt service ability.">
-                                <span class="metric-label">Interest Coverage</span>
-                                <span id="interestCoverage" class="metric-value">-</span>
-                            </div>
-                            <div class="metric" title="Total cash and equivalents on the balance sheet.">
-                                <span class="metric-label">Cash & Equivalents</span>
-                                <span id="cash" class="metric-value">-</span>
-                            </div>
-                            <div class="metric" title="Working capital. Current assets minus current liabilities. Positive means short-term obligations can be met.">
-                                <span class="metric-label">Working Capital</span>
-                                <span id="workingCapital" class="metric-value">-</span>
-                            </div>
+                        <div class="stat">
+                            <dt>P/E ratio</dt>
+                            <dd id="peRatio" class="stat-value">—</dd>
+                            <dd class="stat-sub">S&amp;P 500 ≈ 22</dd>
                         </div>
-                    </div>
-                    
-                    <!-- Valuation Metrics -->
-                    <div class="card metrics-overview metrics-valuation">
-                        <h3>Valuation Metrics</h3>
-                        <div class="metrics-grid-compact">
-                            <div class="metric" title="Price-to-Sales ratio. Useful for valuing growth companies that may not be profitable yet. Lower is generally better.">
-                                <span class="metric-label">P/S Ratio</span>
-                                <span id="psRatio" class="metric-value">-</span>
-                            </div>
-                            <div class="metric" title="Price-to-Book ratio. Compares market value to book value. < 1 may indicate undervaluation, > 3 often overvalued.">
-                                <span class="metric-label">P/B Ratio</span>
-                                <span id="pbRatio" class="metric-value">-</span>
-                            </div>
-                            <div class="metric" title="Enterprise Value to EBITDA. Comprehensive valuation metric that accounts for debt. Useful for comparing across capital structures.">
-                                <span class="metric-label">EV/EBITDA</span>
-                                <span id="evebitda" class="metric-value">-</span>
-                            </div>
-                            <div class="metric" title="Market capitalization. Total value of all outstanding shares.">
-                                <span class="metric-label">Market Cap</span>
-                                <span id="marketCap2" class="metric-value">-</span>
-                            </div>
-                            <div class="metric" title="Enterprise Value. Market cap plus debt minus cash. Theoretical takeover price.">
-                                <span class="metric-label">Enterprise Value</span>
-                                <span id="enterpriseValue" class="metric-value">-</span>
-                            </div>
-                            <div class="metric" title="Shares outstanding. Number of shares held by all shareholders.">
-                                <span class="metric-label">Shares Outstanding</span>
-                                <span id="sharesOutstanding" class="metric-value">-</span>
-                            </div>
+                        <div class="stat">
+                            <dt>Revenue <span class="dt-note">TTM</span></dt>
+                            <dd id="ttmRevenue" class="stat-value">—</dd>
+                            <dd class="stat-sub"><span id="ttmRevenueChange" class="change-pill"></span><span class="sub-label">vs. last yr</span></dd>
                         </div>
-                    </div>
+                        <div class="stat">
+                            <dt>Earnings <span class="dt-note">TTM</span></dt>
+                            <dd id="ttmEarnings" class="stat-value">—</dd>
+                            <dd class="stat-sub"><span id="ttmEarningsChange" class="change-pill"></span><span class="sub-label">vs. last yr</span></dd>
+                        </div>
+                        <div class="stat">
+                            <dt>Free cash flow <span class="dt-note">TTM</span></dt>
+                            <dd id="ttmFCF" class="stat-value">—</dd>
+                            <dd class="stat-sub"><span id="ttmFCFChange" class="change-pill"></span><span class="sub-label">vs. last yr</span></dd>
+                        </div>
+                        <div class="stat">
+                            <dt>EPS <span class="dt-note">TTM</span></dt>
+                            <dd id="ttmEPS" class="stat-value">—</dd>
+                            <dd class="stat-sub"><span id="ttmEPSChange" class="change-pill"></span><span class="sub-label">vs. last yr</span></dd>
+                        </div>
+                    </dl>
+                    <p class="footnote">TTM = trailing twelve months, compared with the twelve months before.</p>
+                </div>
+            </section>
+
+            <!-- Fundamentals -->
+            <section id="fundamentals" class="tab-panel" role="tabpanel" aria-labelledby="tab-fundamentals" hidden>
+                <div class="card chart-card">
+                    <h3 class="card-title">Earnings per share</h3>
+                    <p class="chart-sub" id="beatSummary"></p>
+                    <ul class="legend">
+                        <li><span class="swatch swatch-up"></span>Beat estimate</li>
+                        <li><span class="swatch swatch-down"></span>Missed estimate</li>
+                        <li><span class="swatch swatch-line"></span>Estimate</li>
+                    </ul>
+                    <div class="chart-box"><canvas id="epsChart" role="img" aria-label="Quarterly earnings per share against estimates"></canvas></div>
                 </div>
 
-                <!-- Tab Content: About -->
-                <div id="about" class="tab-content">
-                    <div class="card about-card">
-                        <h3>Company Overview</h3>
-                        <p id="companyDescription" class="company-description">Loading company information...</p>
-                        
-                        <div class="company-details-grid">
-                            <div class="company-detail">
-                                <span class="detail-label">Industry</span>
-                                <span id="companyIndustry" class="detail-value">-</span>
-                            </div>
-                            <div class="company-detail">
-                                <span class="detail-label">Sector</span>
-                                <span id="companySector" class="detail-value">-</span>
-                            </div>
-                            <div class="company-detail">
-                                <span class="detail-label">Employees</span>
-                                <span id="companyEmployees" class="detail-value">-</span>
-                            </div>
-                            <div class="company-detail">
-                                <span class="detail-label">Founded</span>
-                                <span id="companyFounded" class="detail-value">-</span>
-                            </div>
-                            <div class="company-detail">
-                                <span class="detail-label">Headquarters</span>
-                                <span id="companyHQ" class="detail-value">-</span>
-                            </div>
-                            <div class="company-detail">
-                                <span class="detail-label">Website</span>
-                                <a id="companyWebsite" class="detail-value link" href="#" target="_blank" rel="noopener noreferrer">-</a>
-                            </div>
-                        </div>
-                    </div>
+                <div class="card chart-card">
+                    <h3 class="card-title">Revenue by quarter</h3>
+                    <div class="chart-box"><canvas id="revenueChart" role="img" aria-label="Quarterly revenue"></canvas></div>
                 </div>
-                </div><!-- End tab-content-container -->
-            </div>
-        </main>
-    </div>
 
-    <!-- Chart Tooltip -->
-    <div id="chartTooltip" class="chart-tooltip hidden">
-        <div class="tooltip-date"></div>
-        <div class="tooltip-value"></div>
-    </div>
+                <div class="card chart-card">
+                    <h3 class="card-title">Free cash flow by quarter</h3>
+                    <div class="chart-box"><canvas id="fcfChart" role="img" aria-label="Quarterly free cash flow"></canvas></div>
+                </div>
 
-    <!-- Metric Tooltip -->
-    <div id="metricTooltip" class="metric-tooltip hidden">
-        <div class="tooltip-title"></div>
-        <div class="tooltip-description"></div>
-    </div>
+                <div class="card chart-card">
+                    <h3 class="card-title">P/E ratio over time</h3>
+                    <ul class="legend">
+                        <li><span class="swatch swatch-pe"></span>Trailing P/E</li>
+                        <li><span class="swatch swatch-ref"></span>S&amp;P 500 average (~22)</li>
+                    </ul>
+                    <div class="chart-box"><canvas id="peChart" role="img" aria-label="Trailing price to earnings ratio by quarter"></canvas></div>
+                </div>
 
-    <!-- Shelby Easter Egg -->
-    <div id="shelbyOverlay" class="shelby-overlay hidden">
-        <canvas id="shelbyCanvas" class="shelby-canvas"></canvas>
-        <div id="shelbyMessage" class="shelby-message">I love you Shelby!</div>
-        <div class="shelby-hearts" id="shelbyHearts"></div>
-        <div class="shelby-hint">Tap anywhere to continue</div>
-    </div>
+                <div class="card metric-group" data-group="profitability">
+                    <h3 class="card-title">Profitability</h3>
+                    <div class="metric-grid">
+                        <button type="button" class="metric" data-desc="Share of revenue left after the direct cost of making the product. Higher means more pricing power."><span class="metric-label">Gross margin</span><span id="grossMargin" class="metric-value">—</span></button>
+                        <button type="button" class="metric" data-desc="Earnings before interest, taxes, depreciation and amortization, as a share of revenue. A read on operating profitability."><span class="metric-label">EBITDA margin</span><span id="ebitdaMargin" class="metric-value">—</span></button>
+                        <button type="button" class="metric" data-desc="Return on assets: profit relative to everything the company owns. Shows how efficiently assets earn."><span class="metric-label">Return on assets</span><span id="roa" class="metric-value">—</span></button>
+                        <button type="button" class="metric" data-desc="Return on invested capital: profit relative to all the debt and equity put into the business. Above the cost of capital creates value."><span class="metric-label">ROIC</span><span id="roic" class="metric-value">—</span></button>
+                    </div>
+                    <p class="metric-explain" aria-live="polite">Select a metric to see what it means.</p>
+                </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" integrity="sha384-9nhczxUqK87bcKHh20fSQcTGD4qq5GhayNYSYWqwBkINBhOfQLg/P5HG5lF1urn4" crossorigin="anonymous"></script>
-    <script src="/shared/site-nav.js?v=19"></script>
-    <script src="/shared/analytics.js?v=1"></script>
-    <script src="/shared/api-base.js?v=1"></script>
-    <script src="app.js?v=11"></script>
-    <script src="watchlist.js?v=1"></script>
-    <script src="compare.js?v=3"></script>
+                <div class="card metric-group" data-group="health">
+                    <h3 class="card-title">Financial health</h3>
+                    <div class="metric-grid">
+                        <button type="button" class="metric" data-desc="Current assets divided by current liabilities. Above 1.5 usually means comfortable short-term liquidity."><span class="metric-label">Current ratio</span><span id="currentRatio" class="metric-value">—</span></button>
+                        <button type="button" class="metric" data-desc="Like the current ratio, but leaves out inventory. A stricter test of paying near-term bills."><span class="metric-label">Quick ratio</span><span id="quickRatio" class="metric-value">—</span></button>
+                        <button type="button" class="metric" data-desc="Operating profit divided by interest expense. Above 3 suggests debt payments are well covered."><span class="metric-label">Interest coverage</span><span id="interestCoverage" class="metric-value">—</span></button>
+                        <button type="button" class="metric" data-desc="Cash and short-term investments on the balance sheet."><span class="metric-label">Cash</span><span id="cash" class="metric-value">—</span></button>
+                        <button type="button" class="metric" data-desc="Current assets minus current liabilities. Negative is common for companies that collect cash before paying suppliers."><span class="metric-label">Working capital</span><span id="workingCapital" class="metric-value">—</span></button>
+                    </div>
+                    <p class="metric-explain" aria-live="polite">Select a metric to see what it means.</p>
+                </div>
+
+                <div class="card metric-group" data-group="valuation">
+                    <h3 class="card-title">Valuation</h3>
+                    <div class="metric-grid">
+                        <button type="button" class="metric" data-desc="Market value divided by yearly revenue. Useful for companies without steady profits. Lower is cheaper."><span class="metric-label">Price / sales</span><span id="psRatio" class="metric-value">—</span></button>
+                        <button type="button" class="metric" data-desc="Market value divided by book value (assets minus liabilities). Asset-light companies often run high."><span class="metric-label">Price / book</span><span id="pbRatio" class="metric-value">—</span></button>
+                        <button type="button" class="metric" data-desc="Enterprise value divided by EBITDA. Compares companies regardless of how much debt they carry."><span class="metric-label">EV / EBITDA</span><span id="evebitda" class="metric-value">—</span></button>
+                        <button type="button" class="metric" data-desc="Market cap plus debt minus cash: roughly what it would cost to buy the whole business."><span class="metric-label">Enterprise value</span><span id="enterpriseValue" class="metric-value">—</span></button>
+                        <button type="button" class="metric" data-desc="Total number of shares held by all shareholders."><span class="metric-label">Shares outstanding</span><span id="sharesOutstanding" class="metric-value">—</span></button>
+                    </div>
+                    <p class="metric-explain" aria-live="polite">Select a metric to see what it means.</p>
+                </div>
+            </section>
+
+            <!-- About -->
+            <section id="about" class="tab-panel" role="tabpanel" aria-labelledby="tab-about" hidden>
+                <div class="card">
+                    <h3 class="card-title">Company overview</h3>
+                    <p id="companyDescription" class="company-description"></p>
+                    <dl class="detail-grid">
+                        <div><dt>Industry</dt><dd id="companyIndustry">—</dd></div>
+                        <div><dt>Sector</dt><dd id="companySector">—</dd></div>
+                        <div><dt>Employees</dt><dd id="companyEmployees">—</dd></div>
+                        <div><dt>Founded</dt><dd id="companyFounded">—</dd></div>
+                        <div><dt>Headquarters</dt><dd id="companyHQ">—</dd></div>
+                        <div><dt>Website</dt><dd><a id="companyWebsite" href="#" target="_blank" rel="noopener noreferrer">—</a></dd></div>
+                    </dl>
+                </div>
+            </section>
+        </div>
+    </main>
+</div>
+
+<!-- Shelby Easter Egg -->
+<div id="shelbyOverlay" class="shelby-overlay hidden">
+    <canvas id="shelbyCanvas" class="shelby-canvas"></canvas>
+    <div id="shelbyMessage" class="shelby-message">I love you Shelby!</div>
+    <div class="shelby-hearts" id="shelbyHearts"></div>
+    <div class="shelby-hint">Tap anywhere to continue</div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" integrity="sha384-9nhczxUqK87bcKHh20fSQcTGD4qq5GhayNYSYWqwBkINBhOfQLg/P5HG5lF1urn4" crossorigin="anonymous"></script>
+<script src="/shared/site-nav.js?v=19"></script>
+<script src="/shared/analytics.js?v=1"></script>
+<script src="/shared/api-base.js?v=1"></script>
+<script src="app.js?v=12"></script>
+<script src="watchlist.js?v=2"></script>
+<script src="compare.js?v=4"></script>
 </body>
 </html>
