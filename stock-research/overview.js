@@ -45,14 +45,15 @@
         return value == null || Number.isNaN(value) ? '—' : `${value.toFixed(1)}${suffix}`;
     }
 
-    // Round axis ticks (1, 2, 2.5, 5 × 10^k) spanning [lo, hi] with ~3 lines.
-    function niceTicks(lo, hi) {
+    // Round axis ticks (1, 2, 2.5, 5 × 10^k) spanning [lo, hi] with ~intervals + 1 lines.
+    function niceTicks(lo, hi, intervals = 2) {
         const span = hi - lo || Math.abs(hi) || 1;
-        const raw = span / 2;
+        const raw = span / intervals;
         const mag = 10 ** Math.floor(Math.log10(raw));
         const step = [1, 2, 2.5, 5, 10].map((m) => m * mag).find((s) => s >= raw);
-        const start = Math.floor((lo - span * 0.08) / step) * step;
-        const end = Math.ceil((hi + span * 0.08) / step) * step;
+        // Zero stays the floor/ceiling when the data touches it (bars grow from 0).
+        const start = Math.floor((lo === 0 ? 0 : lo - span * 0.08) / step) * step;
+        const end = Math.ceil((hi === 0 ? 0 : hi + span * 0.08) / step) * step;
         const ticks = [];
         for (let v = start; v <= end + step / 2; v += step) ticks.push(Math.round(v * 100) / 100);
         return ticks;
@@ -529,6 +530,131 @@
         return draw;
     }
 
+    // ---------- earnings vs. free cash flow (Fundamentals tab) ----------
+    function axisMoney(value) {
+        if (value === 0) return '$0';
+        const abs = Math.abs(value);
+        const sign = value < 0 ? '−' : '';
+        const [div, unit] = abs >= 1e12 ? [1e12, 'T'] : abs >= 1e9 ? [1e9, 'B'] : [1e6, 'M'];
+        const n = abs / div;
+        return `${sign}$${Number.isInteger(n) ? n : n.toFixed(1)}${unit}`;
+    }
+
+    function renderEarningsCash(root, series) {
+        root.replaceChildren();
+        const rows = series.filter((q) => q.earnings != null || q.fcf != null);
+        if (rows.length < 2) {
+            root.append(el('p', 'ov-empty', 'Quarterly earnings data unavailable.'));
+            return null;
+        }
+
+        const head = el('div', 'ov-card-head');
+        head.append(
+            el('h3', 'ov-card-title', 'Earnings & free cash flow'),
+            el('p', 'ov-card-sub', 'Profit on paper vs. the cash the business actually brought in, by quarter')
+        );
+
+        const earn = ttm(rows, 'earnings').current;
+        const fcf = ttm(rows, 'fcf').current;
+        const stats = el('div', 'ec-stats');
+        const stat = (cls, label, value) => {
+            const box = el('div', 'ec-stat');
+            const k = el('span', 'ec-stat-label');
+            k.append(el('span', `ec-key ${cls}`), document.createTextNode(label));
+            box.append(k, el('span', 'ec-stat-value', compactMoney(value)), el('span', 'ec-stat-note', 'Last 12 months'));
+            return box;
+        };
+        stats.append(stat('is-earn', 'Earnings', earn), stat('is-fcf', 'Free cash flow', fcf));
+        if (earn > 0 && fcf != null) {
+            const conv = (fcf / earn) * 100;
+            const box = el('div', 'ec-stat ec-stat-wide');
+            box.append(
+                el('span', 'ec-stat-label', 'Cash conversion'),
+                el('span', 'ec-stat-value', `${conv.toFixed(0)}%`),
+                el('span', 'ec-stat-note', conv >= 90
+                    ? 'Profits are backed by real cash'
+                    : conv >= 50 ? 'Some profit is tied up in spending' : 'Much less cash than reported profit')
+            );
+            stats.append(box);
+        }
+
+        const box = el('div', 'ec-chart');
+        const readout = el('div', 'ec-readout');
+        root.append(head, stats, box, readout);
+
+        return () => {
+            box.replaceChildren();
+            const W = Math.max(box.clientWidth, 280);
+            const H = 200;
+            const pad = { top: 8, right: 4, bottom: 36, left: 46 };
+            const vals = rows.flatMap((q) => [q.earnings, q.fcf]).filter((v) => v != null);
+            const ticks = niceTicks(Math.min(0, ...vals), Math.max(0, ...vals), 3);
+            const lo = ticks[0];
+            const hi = ticks[ticks.length - 1];
+            const y = (v) => pad.top + (1 - (v - lo) / (hi - lo)) * (H - pad.top - pad.bottom);
+            const slot = (W - pad.left - pad.right) / rows.length;
+            const barW = Math.min(14, (slot - 10) / 2);
+            const gap = 2;
+
+            const svgRoot = svg('svg', { viewBox: `0 0 ${W} ${H}`, width: W, height: H, class: 'ec-svg' });
+            svgRoot.setAttribute('role', 'img');
+            svgRoot.setAttribute('aria-label', `Quarterly earnings and free cash flow. Last 12 months: earnings ${compactMoney(earn)}, free cash flow ${compactMoney(fcf)}.`);
+
+            ticks.forEach((v) => {
+                const gy = y(v);
+                svgRoot.append(svg('line', { x1: pad.left, x2: W - pad.right, y1: gy, y2: gy, class: v === 0 ? 'ec-zero' : 'ov-grid' }));
+                const t = svg('text', { x: pad.left - 8, y: gy + 4, 'text-anchor': 'end', class: 'ov-axis' });
+                t.textContent = axisMoney(v);
+                svgRoot.append(t);
+            });
+
+            // Column with a 4px rounded data end, square at the zero baseline.
+            const column = (x, v, cls) => {
+                const y0 = y(0);
+                const h = Math.max(1.5, Math.abs(y(v) - y0));
+                const r = Math.min(4, barW / 2, h);
+                const top = v >= 0 ? y0 - h : y0 + h;
+                const d = v >= 0
+                    ? `M${x},${y0}V${top + r}Q${x},${top} ${x + r},${top}H${x + barW - r}Q${x + barW},${top} ${x + barW},${top + r}V${y0}Z`
+                    : `M${x},${y0}V${top - r}Q${x},${top} ${x + r},${top}H${x + barW - r}Q${x + barW},${top} ${x + barW},${top - r}V${y0}Z`;
+                return svg('path', { d, class: `ec-bar ${cls}` });
+            };
+
+            const groups = rows.map((q, i) => {
+                const cx = pad.left + slot * i + slot / 2;
+                const g = svg('g', { class: 'ec-q' });
+                g.append(svg('rect', { x: cx - slot / 2, y: 0, width: slot, height: H - pad.bottom + 30, rx: 8, class: 'ov-hit' }));
+                if (q.earnings != null) g.append(column(cx - gap / 2 - barW, q.earnings, 'is-earn'));
+                if (q.fcf != null) g.append(column(cx + gap / 2, q.fcf, 'is-fcf'));
+                const ql = svg('text', { x: cx, y: H - pad.bottom + 18, 'text-anchor': 'middle', class: 'ov-axis ov-axis-strong' });
+                ql.textContent = q.q;
+                const yl = svg('text', { x: cx, y: H - pad.bottom + 32, 'text-anchor': 'middle', class: 'ov-axis' });
+                yl.textContent = q.y;
+                g.append(ql, yl);
+                const select = () => {
+                    groups.forEach((other) => other.classList.toggle('is-active', other === g));
+                    const item = (cls, label, v) => {
+                        const span = el('span', 'ec-readout-item');
+                        span.append(el('span', `ec-key ${cls}`), document.createTextNode(`${label} `), el('strong', null, compactMoney(v)));
+                        return span;
+                    };
+                    readout.replaceChildren(
+                        el('span', 'ov-eps-readout-q', `${q.q} ${q.y}`),
+                        item('is-earn', 'Earnings', q.earnings),
+                        item('is-fcf', 'Free cash flow', q.fcf)
+                    );
+                };
+                g.addEventListener('pointerenter', select);
+                g.addEventListener('pointerdown', select);
+                g._select = select;
+                svgRoot.append(g);
+                return g;
+            });
+            groups[groups.length - 1]._select();
+            box.append(svgRoot);
+        };
+    }
+
     // ---------- profitability ----------
     function renderMargins(root) {
         const { summary = {} } = state.data;
@@ -608,7 +734,10 @@
         renderMargins(pair);
         renderSnapshot(pair);
 
-        redrawers = [drawPrice, drawEps].filter(Boolean);
+        const ecRoot = document.getElementById('earningsCashViz');
+        const drawEc = ecRoot ? renderEarningsCash(ecRoot, series) : null;
+
+        redrawers = [drawPrice, drawEps, drawEc].filter(Boolean);
         redrawers.forEach((fn) => fn());
         lastWidth = root.clientWidth;
     }
