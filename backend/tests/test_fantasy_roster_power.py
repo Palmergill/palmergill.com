@@ -34,3 +34,30 @@ def test_lineups_use_only_the_roster_and_leave_unfillable_seats_empty():
     assert team["need"]["empty"] is True
     assert team["need"]["seat"] == "DST"
     assert all(not p.get("replacement") for p in team["players"])
+
+
+from app.services.fantasy_league_data import _absence, _player_value
+
+
+def test_injured_reserve_counts_for_nothing_whatever_the_preseason_number():
+    # 245 preseason points is 14.4 a game; IR with no weekly projection.
+    value = _player_value(245.0, None, False, False, absence=_absence("NORMAL", "IR"), week_covered=True)
+    assert value["ppg"] == 0.0
+    assert value["absence"] == "long"
+    # A manager's IR slot means the same, whatever the feeds say.
+    assert _player_value(245.0, 16.0, False, True)["ppg"] == 0.0
+
+
+def test_missing_from_a_projected_week_counts_as_out_not_as_full_value():
+    value = _player_value(245.0, None, False, False, week_covered=True)
+    assert value["out"] is True
+    assert round(value["ppg"], 2) == round(0.5 * 245.0 / 17, 2)
+    # On a bye, a missing week is expected and costs nothing.
+    assert _player_value(245.0, None, True, False, week_covered=True)["out"] is False
+
+
+def test_absence_reads_every_feed_and_ignores_espn_normal():
+    assert _absence("NORMAL", None) is None
+    assert _absence("NORMAL", "Out") == "out"
+    assert _absence("INJURY_RESERVE") == "long"
+    assert _absence("Questionable") is None

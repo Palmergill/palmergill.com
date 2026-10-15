@@ -1318,24 +1318,69 @@ def get_free_agents(
 SEASON_GAMES = 17
 
 
+# Injury designations that take a player away for weeks or the season: injured
+# reserve, the PUP and NFI lists, suspension. Sleeper and ESPN spell them
+# differently, so both spellings are here, compared upper-cased.
+LONG_ABSENCE_STATUSES = frozenset(
+    {"IR", "INJURY_RESERVE", "PUP", "NFI", "SUS", "SUSPENSION", "DNR"}
+)
+# Out for this game only.
+SHORT_ABSENCE_STATUSES = frozenset({"OUT"})
+
+
+def _absence(*statuses: Optional[str]) -> Optional[str]:
+    """"long", "out" or None, the most serious across every feed's status.
+
+    ESPN reports "NORMAL" for a healthy player, which must not mask a real
+    designation from Sleeper, so every status is read rather than the first.
+    """
+    found = {str(status).strip().upper() for status in statuses if status}
+    if found & LONG_ABSENCE_STATUSES:
+        return "long"
+    if found & SHORT_ABSENCE_STATUSES:
+        return "out"
+    return None
+
+
 def _player_value(
     season_points: Optional[float],
     week_points: Optional[float],
     on_bye: bool,
     on_ir: bool,
+    absence: Optional[str] = None,
+    week_covered: bool = False,
 ) -> Dict[str, Any]:
     """Projected points per game for the rest of the season.
 
     The season-long projection is the steady signal and this week's is the
     fresh one, so they are averaged. A bye says nothing about the player, so
-    that week is ignored. A zero this week means the projection has him out;
-    the feed cannot say for how long, so he counts at a discount instead of
-    at nothing or at full value.
+    that week is ignored.
+
+    Injuries come first. A player on injured reserve (the designation, or a
+    manager's IR slot), the PUP list or suspended counts for nothing: the
+    season-long number was set before he got hurt and cannot know. A player
+    out this week, projected at zero, or simply left out of a week the
+    providers did project while his team plays, counts at a discount — the
+    feeds cannot say for how long.
     """
     season_ppg = season_points / SEASON_GAMES if season_points is not None else None
-    out = on_ir or (week_points is not None and week_points <= 0 and not on_bye)
+    if on_ir or absence == "long":
+        return {
+            "ppg": 0.0,
+            "season_ppg": season_ppg,
+            "week": None,
+            "out": True,
+            "absence": "long",
+            "projected": season_ppg is not None or week_points is not None,
+        }
+    unprojected = week_covered and week_points is None and not on_bye
+    out = (
+        absence == "out"
+        or (week_points is not None and week_points <= 0 and not on_bye)
+        or (unprojected and season_ppg is not None)
+    )
     if season_ppg is None and (week_points is None or on_bye):
-        return {"ppg": 0.0, "season_ppg": None, "week": None, "out": out, "projected": False}
+        return {"ppg": 0.0, "season_ppg": None, "week": None, "out": out, "absence": "out" if out else None, "projected": False}
     if out:
         base = season_ppg if season_ppg is not None else 0.0
         ppg = roster_power.OUT_DISCOUNT * base
@@ -1350,6 +1395,7 @@ def _player_value(
         "season_ppg": season_ppg,
         "week": None if on_bye else week_points,
         "out": out,
+        "absence": "out" if out else None,
         "projected": True,
     }
 
@@ -1639,11 +1685,18 @@ def get_roster_power(
 
     matchups = fantasy_data._week_matchups(db, season, week)
 
-    def value_for(player_id, pro_team, on_ir):
+    def value_for(player_id, pro_team, on_ir, *statuses):
         season_points = (season_map.get(player_id) or {}).get(scoring_field)
         week_points = (week_map.get(player_id) or {}).get(scoring_field)
         on_bye = bool(matchups) and bool(pro_team) and pro_team not in matchups
-        return _player_value(season_points, week_points, on_bye, on_ir)
+        return _player_value(
+            season_points,
+            week_points,
+            on_bye,
+            on_ir,
+            absence=_absence(*statuses),
+            week_covered=bool(week_map),
+        )
 
     roster_rows = (
         db.query(FantasyLeagueRosterEntry)
@@ -1666,10 +1719,11 @@ def get_roster_power(
         if row.player_id is None:
             unmatched += 1
         pro_team = row.pro_team or (player.team if player else None)
+        statuses = (row.injury_status, player.injury_status if player else None)
         value = (
-            value_for(row.player_id, pro_team, row.lineup_slot == "IR")
+            value_for(row.player_id, pro_team, row.lineup_slot == "IR", *statuses)
             if row.player_id
-            else _player_value(None, None, False, row.lineup_slot == "IR")
+            else _player_value(None, None, False, row.lineup_slot == "IR", absence=_absence(*statuses))
         )
         rosters.setdefault(row.espn_team_id, []).append(
             {
@@ -1680,7 +1734,10 @@ def get_roster_power(
                     row.position or (player.position if player else None)
                 ),
                 "pro_team": pro_team,
-                "injury_status": row.injury_status or (player.injury_status if player else None),
+                "injury_status": next(
+                    (status for status in statuses if status and str(status).upper() not in ("NORMAL", "ACTIVE")),
+                    None,
+                ),
                 **value,
             }
         )
@@ -1697,7 +1754,7 @@ def get_roster_power(
                 "name": player.full_name,
                 "position": roster_power.normalize_position(player.position),
                 "pro_team": player.team,
-                **value_for(player_id, player.team, False),
+                **value_for(player_id, player.team, False, player.injury_status),
             }
         )
     replacements = roster_power.replacement_level(waiver_pool, rostered_ids)
@@ -1728,6 +1785,8 @@ def get_roster_power(
             "season_ppg": round(player["season_ppg"], 1) if player.get("season_ppg") is not None else None,
             "week_points": round(player["week"], 1) if player.get("week") is not None else None,
             "out": player.get("out", False),
+            "absence": player.get("absence"),
+            "injury_status": player.get("injury_status"),
             "projected": player.get("projected", True),
             "marginal": round(player["marginal"], 1) if "marginal" in player else None,
             "over_replacement": round(player["over_replacement"], 1)
