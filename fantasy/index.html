@@ -14,7 +14,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/shared/site-nav.css?v=17">
     <link rel="stylesheet" href="/shared/fantasy-header.css?v=3">
-    <link rel="stylesheet" href="style.css?v=38">
+    <link rel="stylesheet" href="style.css?v=39">
     <link rel="stylesheet" href="/shared/fantasy-design.css?v=2">
 </head>
 <body>
@@ -98,12 +98,21 @@
         </section>
 
         <div id="leagueView" hidden>
+            <form id="myTeamForm" class="my-team-picker" hidden>
+                <label for="myTeamSelect">My team</label>
+                <select id="myTeamSelect" required></select>
+                <button id="myTeamSave" type="submit" class="button button--quiet">Save team</button>
+                <span id="myTeamStatus" role="status"></span>
+            </form>
             <!-- Team detail replaces the league sections; it is a routed view
                  on this page (?team=N) rather than a second HTML file. The
                  team's own name rides in the masthead above, so this view
                  opens on the paragraph the hub already writes about it. -->
             <section id="teamView" class="team-view" hidden aria-labelledby="leagueName">
-                <button type="button" class="back-link" id="teamBack">← Back to the league</button>
+                <div class="team-view__bar">
+                    <button type="button" class="back-link" id="teamBack">← Back to the league</button>
+                    <button type="button" class="button button--quiet" id="myTeamChange" hidden>Change my team</button>
+                </div>
 
                 <section class="lineup" id="lineupCard" aria-labelledby="lineupTitle" hidden>
                     <div class="lineup__head">
@@ -161,20 +170,9 @@
                  each board names its view in data-view, and only the current
                  view's boards are shown. ?view= keeps it in the URL. -->
             <div id="leagueSections" data-view="home">
-                <!-- League: where you stand, and the order. -->
-                <div class="hub-team" data-view="home">
-                <div id="myTeamSummary" class="my-team-summary" hidden><span id="myTeamName"></span> <button id="myTeamChange" type="button" class="button button--quiet">Change team</button></div>
-                <form id="myTeamForm" class="my-team-picker" hidden>
-                    <label for="myTeamSelect">My team</label>
-                    <select id="myTeamSelect" required></select>
-                    <button id="myTeamSave" type="submit" class="button button--quiet">Save team</button>
-                    <span id="myTeamStatus" role="status"></span>
-                </form>
-                </div>
-
-                <!-- Power rankings read the rosters, not the results: what each
-                     team can be expected to score a week from here, given
-                     who it has and which of them it can actually start. -->
+                <!-- League: the power rankings. They read the rosters, not the
+                     results: what each team can be expected to score a week
+                     from here. Tap a team to see how its number adds up. -->
                 <section class="board" id="power" data-board="power" data-view="home" aria-labelledby="powerTitle">
                     <div class="board__head">
                         <div>
@@ -312,6 +310,6 @@
     <script src="/shared/analytics.js?v=1"></script>
     <script src="/shared/api-base.js?v=1"></script>
     <script src="format.js?v=16"></script>
-    <script src="app.js?v=40"></script>
+    <script src="app.js?v=41"></script>
 </body>
 </html>

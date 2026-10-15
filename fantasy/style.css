@@ -2220,54 +2220,6 @@ td.standings__num:nth-child(3) { font-weight: 700; color: var(--ink, #23201c); }
     .standings__odds-head { width: 58px; }
 }
 
-/* My team, at a glance. Beats shared/fantasy-design.css's summary rule. */
-.my-team-summary.my-team-card {
-    display: grid;
-    grid-template-columns: 48px minmax(0, 1fr);
-    align-items: center;
-    gap: 12px 14px;
-    padding: 14px;
-    margin: 16px 0 22px;
-    border: 1px solid var(--line, #ece4d8);
-    border-radius: 14px;
-    background: var(--card, #fff);
-}
-.my-team-card__logo { width: 48px; height: 48px; border-radius: 12px; object-fit: cover; }
-.my-team-card__logo.team-mono { border-radius: 50%; font-size: 15px; }
-.my-team-card__body { display: flex; flex-direction: column; min-width: 0; }
-.my-team-card__eyebrow {
-    font-size: 11px;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--clay, #b96a4b);
-}
-.my-team-card__name {
-    font-family: "Newsreader", Georgia, serif;
-    font-size: 22px;
-    font-weight: 600;
-    line-height: 1.15;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-.my-team-card__facts { display: flex; gap: 18px; margin: 6px 0 0; }
-.my-team-card__facts div { display: flex; flex-direction: column; }
-.my-team-card__facts dt { font-size: 11px; font-weight: 600; color: var(--muted, #928a7d); }
-.my-team-card__facts dd { margin: 0; font-size: 16px; font-weight: 800; font-variant-numeric: tabular-nums; }
-.my-team-card__actions {
-    grid-column: 1 / -1;
-    display: flex;
-    gap: 8px;
-}
-.my-team-card__actions .button { flex: 1 1 0; min-height: 40px; justify-content: center; }
-@media (min-width: 721px) {
-    .my-team-summary.my-team-card { grid-template-columns: 56px minmax(0, 1fr) auto; }
-    .my-team-card__logo { width: 56px; height: 56px; }
-    .my-team-card__actions { grid-column: auto; }
-    .my-team-card__actions .button { flex: 0 0 auto; }
-}
-
 /* Power rankings: one column; a dot on the league's own points range and
    a ring for playoff odds. */
 .power-list,
@@ -2276,12 +2228,13 @@ td.standings__num:nth-child(3) { font-weight: 700; color: var(--ink, #23201c); }
     grid-template-rows: none;
 }
 .power-head,
-.power-row {
+.power-row__toggle {
     display: grid;
     grid-template-columns: 22px minmax(0, 1.25fr) minmax(96px, 1fr) 42px;
     align-items: center;
     column-gap: 12px;
 }
+.power-row { display: block; }
 .power-head {
     padding: 0 0 8px;
     border-bottom: 1px solid var(--line-strong, #d8cdba);
@@ -2294,8 +2247,104 @@ td.standings__num:nth-child(3) { font-weight: 700; color: var(--ink, #23201c); }
 .power-head__scale { display: flex; justify-content: space-between; font-weight: 600; font-variant-numeric: tabular-nums; }
 .power-head__odds { text-align: center; }
 .power-head .col-hint__bubble { left: auto; right: 0; }
-.power-row { padding: 10px 0; }
+.power-row { padding: 0; }
 .power-row--mine { margin: 0 -10px; padding-left: 10px; padding-right: 10px; }
+
+/* The row is one button: tap a team to see how its number adds up. */
+.power-row__toggle {
+    width: 100%;
+    padding: 10px 0;
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+.power-row__toggle:focus-visible { outline: 2px solid var(--sage, #5b7152); outline-offset: 2px; border-radius: 8px; }
+.power-row__team { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.power-row__name {
+    min-width: 0;
+    font-weight: 600;
+    line-height: 1.25;
+    color: var(--ink, #23201c);
+}
+.power-row__chevron {
+    flex: 0 0 auto;
+    color: var(--muted, #928a7d);
+    font-size: 11px;
+    transition: transform 160ms ease;
+}
+.power-row.is-open .power-row__chevron { transform: rotate(180deg); }
+.power-row__toggle:hover .power-row__name { color: var(--sage, #5b7152); }
+
+/* The breakdown: lineup by slot, the arithmetic, then the bench. */
+.power-bd {
+    margin: 0 0 14px 34px;
+    padding: 12px 14px 14px;
+    border-radius: 12px;
+    background: var(--surface, #f3eee4);
+    font-size: 13px;
+}
+.power-bd__lede { margin: 0 0 10px; color: var(--soft, #5d574e); line-height: 1.45; }
+.power-bd__title {
+    margin: 12px 0 4px;
+    color: var(--clay, #b96a4b);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+.power-bd__list { margin: 0; padding: 0; list-style: none; }
+.power-bd__player {
+    display: grid;
+    grid-template-columns: 38px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 0;
+    border-bottom: 1px solid var(--line, #ece4d8);
+}
+.power-bd__player:last-child { border-bottom: 0; }
+.power-bd__slot { color: var(--muted, #928a7d); font-size: 11px; font-weight: 700; }
+.power-bd__who { display: flex; flex-direction: column; min-width: 0; }
+.power-bd__name { font-weight: 600; color: var(--ink, #23201c); }
+.power-bd__meta { color: var(--muted, #928a7d); font-size: 11.5px; }
+.power-bd__tag {
+    margin-left: 6px;
+    padding: 1px 6px;
+    border-radius: 999px;
+    background: var(--card, #fff);
+    color: var(--sky, #5a7794);
+    font-size: 10px;
+    font-weight: 700;
+    vertical-align: 1px;
+}
+.power-bd__tag--out { color: var(--clay, #b96a4b); }
+.power-bd__pts { font-weight: 700; font-variant-numeric: tabular-nums; }
+.power-bd__list--bench .power-bd__name,
+.power-bd__list--bench .power-bd__pts { font-weight: 500; color: var(--soft, #5d574e); }
+.power-bd__math { margin: 6px 0 0; border-top: 1px solid var(--line-strong, #d8cdba); }
+.power-bd__line {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 12px;
+    padding: 6px 0;
+}
+.power-bd__line dt { display: flex; flex-direction: column; font-weight: 600; }
+.power-bd__line dt small { margin-top: 2px; color: var(--muted, #928a7d); font-size: 11.5px; font-weight: 400; line-height: 1.35; }
+.power-bd__line dd { margin: 0; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.power-bd__line--minus dd { color: var(--clay, #b96a4b); }
+.power-bd__line--total { border-top: 1px solid var(--line-strong, #d8cdba); }
+.power-bd__line--total dt,
+.power-bd__line--total dd { font-size: 15px; font-weight: 800; color: var(--ink, #23201c); }
+.power-bd__open { display: inline-block; margin-top: 10px; padding: 0; border: 0; background: none; font: inherit; font-weight: 600; cursor: pointer; }
+@media (max-width: 620px) {
+    .power-bd { margin-left: 0; }
+}
+
+/* Change my team, beside the way back, on your own team page. */
+.team-view__bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
 .power-strip { display: grid; grid-template-columns: minmax(0, 1fr) 40px; align-items: center; gap: 8px; }
 .power-strip__track {
     position: relative;
@@ -2331,9 +2380,9 @@ td.standings__num:nth-child(3) { font-weight: 700; color: var(--ink, #23201c); }
 }
 @media (max-width: 720px) {
     .power-head,
-    .power-row { grid-template-columns: 18px minmax(0, 1fr) 92px 40px; column-gap: 10px; }
+    .power-row__toggle { grid-template-columns: 18px minmax(0, 1fr) 92px 40px; column-gap: 10px; }
     .power-row .team-cell { gap: 8px; }
-    .power-row .team-cell__name {
+    .power-row .power-row__name {
         display: -webkit-box;
         -webkit-line-clamp: 2;
         -webkit-box-orient: vertical;
@@ -2345,8 +2394,6 @@ td.standings__num:nth-child(3) { font-weight: 700; color: var(--ink, #23201c); }
     .power-strip__value { text-align: left; font-size: 14px; order: -1; }
     .power-head__pts { padding-right: 0; }
 }
-
-/* Scoreboard: logos, a W, the point split as one bar, and the margin. */
 
 /* Teams list: give the initials badge the logo's slot. */
 .team-card__logo.team-mono { font-size: 11px; }

@@ -38,6 +38,8 @@
         pendingMyTeam: false,
         leagueId: null,
         rosterPower: null,
+        // Power rows a reader has opened, kept across the board's redraws.
+        powerOpen: new Set(),
         // Which series the season chart is showing, and its own request
         // generation — switching metric fires a fetch that can land after
         // the next one.
@@ -69,8 +71,6 @@
         modeBanner: byId("modeBanner"),
         routeBanner: byId("routeBanner"),
         myTeamForm: byId("myTeamForm"),
-        myTeamSummary: byId("myTeamSummary"),
-        myTeamName: byId("myTeamName"),
         myTeamChange: byId("myTeamChange"),
         chartFullSeason: byId("chartFullSeason"),
         chartSelection: byId("chartSelection"),
@@ -1665,8 +1665,6 @@
         const teams = me.teams || [];
         const selected = teams.find(team => team.espn_team_id === me.selected_team_id);
         els.myTeamForm.hidden = !teams.length || Boolean(selected);
-        els.myTeamSummary.hidden = !selected;
-        els.myTeamName.textContent = selected ? `My team: ${selected.name || selected.abbrev}` : "";
         els.myTeamSelect.replaceChildren(new Option("Choose your team", ""));
         teams.forEach((team) => {
             els.myTeamSelect.appendChild(new Option(team.name || team.abbrev, team.espn_team_id));
@@ -1911,6 +1909,100 @@
         return strip;
     }
 
+    // ── how a team's number adds up ─────────────────────────────────────
+    //
+    // Pts / wk is three steps, and the breakdown shows each: every player's
+    // value, the best legal lineup those values make, and what that lineup
+    // loses to byes and injuries.
+
+    const SLOT_LABELS = { DST: "D/ST", FLEX: "Flex" };
+
+    function lineupBySlot(team, slots) {
+        const starters = [...(team.players || []).filter((p) => p.slot), ...(team.waiver_starters || [])];
+        const pools = new Map();
+        starters.forEach((player) => {
+            if (!pools.has(player.slot)) pools.set(player.slot, []);
+            pools.get(player.slot).push(player);
+        });
+        pools.forEach((list) => list.sort((a, b) => b.ppg - a.ppg));
+        const lineup = [];
+        (slots || []).forEach((slot) => {
+            const list = pools.get(slot);
+            if (list && list.length) lineup.push({ slot, player: list.shift() });
+        });
+        // Anything the slot list did not name still counts toward the total.
+        pools.forEach((list, slot) => list.forEach((player) => lineup.push({ slot, player })));
+        return lineup;
+    }
+
+    function playerSource(player) {
+        if (player.out) return "out · counted at half";
+        const parts = [];
+        if (player.season_ppg !== null && player.season_ppg !== undefined) parts.push(`season ${F.formatPoints(player.season_ppg)}`);
+        if (player.week_points !== null && player.week_points !== undefined) parts.push(`this wk ${F.formatPoints(player.week_points)}`);
+        return parts.join(" · ");
+    }
+
+    function breakdownPlayer(slot, player, waiver) {
+        const row = el("li", "power-bd__player");
+        row.appendChild(el("span", "power-bd__slot", slot ? SLOT_LABELS[slot] || slot : player.position));
+        const who = el("span", "power-bd__who");
+        const name = el("span", "power-bd__name", player.name || "—");
+        if (waiver) name.appendChild(el("span", "power-bd__tag", "Waivers"));
+        if (player.out) name.appendChild(el("span", "power-bd__tag power-bd__tag--out", "Out"));
+        who.appendChild(name);
+        const meta = [player.position, player.pro_team].filter(Boolean).join(" · ");
+        who.appendChild(el("span", "power-bd__meta", [meta, playerSource(player)].filter(Boolean).join(" — ")));
+        row.appendChild(who);
+        row.appendChild(el("span", "power-bd__pts", F.formatPoints(player.ppg)));
+        return row;
+    }
+
+    function powerBreakdown(team, payload) {
+        const box = el("div", "power-bd");
+        const absence = Math.round((payload.absence_rate || 0) * 100);
+
+        box.appendChild(el("p", "power-bd__lede",
+            "Each player counts for the average of his season projection per game and this week's projection. " +
+            "Pts / wk is the best legal lineup, less what it loses to missed games."));
+
+        box.appendChild(el("h4", "power-bd__title", "Starting lineup"));
+        const starters = el("ol", "power-bd__list");
+        lineupBySlot(team, payload.slots).forEach(({ slot, player }) => {
+            starters.appendChild(breakdownPlayer(slot, player, (team.waiver_starters || []).includes(player)));
+        });
+        box.appendChild(starters);
+
+        const math = el("dl", "power-bd__math");
+        const line = (label, value, cls, hint) => {
+            const wrap = el("div", cls ? `power-bd__line ${cls}` : "power-bd__line");
+            const dt = el("dt", null, label);
+            if (hint) dt.appendChild(el("small", null, hint));
+            wrap.appendChild(dt);
+            wrap.appendChild(el("dd", null, value));
+            math.appendChild(wrap);
+        };
+        line("Lineup total", F.formatPoints(team.lineup_points));
+        line("Missed games", `−${F.formatPoints(team.absence_cost)}`, "power-bd__line--minus",
+            `Starters sit about ${absence}% of weeks for byes and injuries; this is what the next man up gives back.`);
+        line("Pts / wk", F.formatPoints(team.expected), "power-bd__line--total");
+        box.appendChild(math);
+
+        const bench = (team.players || []).filter((p) => !p.slot).sort((a, b) => b.ppg - a.ppg);
+        if (bench.length) {
+            box.appendChild(el("h4", "power-bd__title", "Bench"));
+            const list = el("ol", "power-bd__list power-bd__list--bench");
+            bench.forEach((player) => list.appendChild(breakdownPlayer(null, player, false)));
+            box.appendChild(list);
+        }
+
+        const link = el("button", "league-link power-bd__open", "Open team page →");
+        link.type = "button";
+        link.addEventListener("click", () => selectTeam(team.espn_team_id));
+        box.appendChild(link);
+        return box;
+    }
+
     function renderRosterPower(payload) {
         els.powerList.replaceChildren();
         if (!payload.available) {
@@ -1918,7 +2010,6 @@
             els.powerList.appendChild(
                 el("li", "empty-note", UNAVAILABLE_POWER[payload.unavailable_reason] || "Power rankings are unavailable.")
             );
-            renderMyTeamCard();
             return;
         }
 
@@ -1950,57 +2041,41 @@
         teams.forEach((team) => {
             const item = el("li", "power-row");
             if (team.espn_team_id === state.myTeamId) item.classList.add("power-row--mine");
-            item.appendChild(el("span", "power-row__rank", String(team.rank)));
-            const who = el("div", "power-row__team");
-            who.appendChild(teamCell(team));
-            item.appendChild(who);
-            item.appendChild(pointsStrip(team.expected, lo, hi));
-            item.appendChild(oddsRing(playoffOdds(team.espn_team_id)));
+            const open = state.powerOpen.has(team.espn_team_id);
+            item.classList.toggle("is-open", open);
+
+            // The whole row is the control: tapping a team shows how its
+            // number adds up, rather than leaving the page.
+            const toggle = el("button", "power-row__toggle");
+            toggle.type = "button";
+            toggle.setAttribute("aria-expanded", String(open));
+            const detailId = `power-detail-${team.espn_team_id}`;
+            toggle.setAttribute("aria-controls", detailId);
+            toggle.appendChild(el("span", "power-row__rank", String(team.rank)));
+            const who = el("span", "power-row__team team-cell");
+            who.appendChild(teamBadge(team, "team-cell__logo"));
+            who.appendChild(el("span", "power-row__name", team.name || "—"));
+            who.appendChild(el("span", "power-row__chevron", "▾")).setAttribute("aria-hidden", "true");
+            toggle.appendChild(who);
+            toggle.appendChild(pointsStrip(team.expected, lo, hi));
+            toggle.appendChild(oddsRing(playoffOdds(team.espn_team_id)));
+            item.appendChild(toggle);
+
+            const detail = powerBreakdown(team, payload);
+            detail.id = detailId;
+            detail.hidden = !open;
+            item.appendChild(detail);
+
+            toggle.addEventListener("click", () => {
+                const now = !state.powerOpen.has(team.espn_team_id);
+                if (now) state.powerOpen.add(team.espn_team_id);
+                else state.powerOpen.delete(team.espn_team_id);
+                item.classList.toggle("is-open", now);
+                toggle.setAttribute("aria-expanded", String(now));
+                detail.hidden = !now;
+            });
             els.powerList.appendChild(item);
         });
-        renderMyTeamCard();
-    }
-
-    // ── my team, at a glance ────────────────────────────────────────────
-    //
-    // Once a manager has picked a team, the top of the hub says where it
-    // stands: power rank, record and playoff odds, with the way into it.
-
-    function renderMyTeamCard() {
-        const card = els.myTeamSummary;
-        if (!card || !state.myTeamId) return;
-        const power = rosterPowerTeam(state.myTeamId);
-        const standing = (state.standingsTeams || []).find((t) => t.espn_team_id === state.myTeamId) || power;
-        if (!standing) return;
-
-        card.replaceChildren();
-        card.classList.add("my-team-card");
-        card.appendChild(teamBadge(standing, "my-team-card__logo"));
-
-        const body = el("div", "my-team-card__body");
-        body.appendChild(el("span", "my-team-card__eyebrow", "Your team"));
-        body.appendChild(el("strong", "my-team-card__name", standing.name || standing.abbrev || "—"));
-        const facts = el("dl", "my-team-card__facts");
-        const fact = (label, value) => {
-            const box = el("div");
-            box.appendChild(el("dt", null, label));
-            box.appendChild(el("dd", null, value));
-            facts.appendChild(box);
-        };
-        if (power) fact("Power", `#${power.rank}`);
-        if (standing.wins !== undefined) fact("Record", F.recordLabel(standing.wins, standing.losses, standing.ties));
-        const odds = playoffOdds(state.myTeamId);
-        if (odds !== null) fact("Playoffs", `${Math.round(odds * 100)}%`);
-        body.appendChild(facts);
-        card.appendChild(body);
-
-        const actions = el("div", "my-team-card__actions");
-        const open = el("button", "button my-team-card__open", "Open my team");
-        open.type = "button";
-        open.addEventListener("click", () => selectTeam(state.myTeamId));
-        actions.appendChild(open);
-        actions.appendChild(els.myTeamChange);
-        card.appendChild(actions);
     }
 
     // ── power over time ─────────────────────────────────────────────────
@@ -2475,6 +2550,8 @@
 
     function applyRoute() {
         const showingTeam = Boolean(state.teamId);
+        // Your own team page is where you change which team is yours.
+        els.myTeamChange.hidden = !showingTeam || state.teamId !== state.myTeamId;
         els.teamView.hidden = !showingTeam;
         els.leagueSections.hidden = showingTeam;
         // Swap the masthead before the fetch, not after it: the league's
@@ -2495,7 +2572,6 @@
         state.myTeamId = null;
         els.routeBanner.hidden = true;
         els.myTeamForm.hidden = true;
-        els.myTeamSummary.hidden = true;
         clearError();
         try {
             const params = state.season ? `?season=${state.season}` : "";
@@ -2577,8 +2653,8 @@
         els.myTeamForm.addEventListener("submit", saveMyTeam);
         els.myTeamChange.addEventListener("click", () => {
             els.myTeamForm.hidden = false;
-            els.myTeamSummary.hidden = true;
-            els.myTeamSelect.focus();
+            window.scrollTo({ top: 0, behavior: "smooth" });
+            els.myTeamSelect.focus({ preventScroll: true });
         });
         els.chartFullSeason.addEventListener("change", () => renderPowerChart(state.chartPayload));
         els.teamBack.addEventListener("click", clearTeam);
