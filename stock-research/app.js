@@ -22,7 +22,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const button = event.currentTarget instanceof HTMLButtonElement
             ? event.currentTarget
             : event.target.closest('button');
-        if (!button) return;
+        // The shared site nav isn't this page's chrome; leave its buttons alone.
+        if (!button || button.closest('.site-nav')) return;
         const circle = document.createElement('span');
         const diameter = Math.max(button.clientWidth, button.clientHeight);
         const radius = diameter / 2;

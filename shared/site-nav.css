@@ -274,6 +274,20 @@ button.site-nav__link:disabled,
     border-color: var(--site-nav-active-line);
 }
 
+/* Logout is a <button> among <a> links: buttons centre their text and
+   pick up page button styles, so it matches the links explicitly. */
+.site-nav .site-nav__logout {
+    -webkit-appearance: none;
+    appearance: none;
+    margin: 0;
+    font-family: inherit;
+    text-align: left;
+    text-transform: none;
+    letter-spacing: normal;
+    transform: none;
+    cursor: pointer;
+}
+
 .site-nav__utility .site-nav__link {
     border-color: var(--site-nav-line);
     color: var(--site-nav-green);
@@ -307,16 +321,42 @@ button.site-nav__link:disabled,
         -webkit-backdrop-filter: none;
     }
 
+    /* One flex row: menu | brand | account. The pieces used to be absolutely
+       positioned against guessed widths, so a long username or a page's own
+       button padding pushed them out of line. */
+    .site-nav {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 0 max(10px, env(safe-area-inset-right)) 0 max(10px, env(safe-area-inset-left));
+    }
+
+    /* Page stylesheets style bare `button` and `a` (padding, transforms,
+       uppercase, shadows). The nav's own controls reset what matters at a
+       specificity a type selector can't beat. */
+    .site-nav .site-nav__toggle,
+    .site-nav .site-nav__top-login {
+        -webkit-appearance: none;
+        appearance: none;
+        position: relative;
+        flex: 0 0 auto;
+        min-width: 0;
+        min-height: 0;
+        margin: 0;
+        box-shadow: none;
+        transform: none;
+        font-family: var(--site-nav-mono);
+        letter-spacing: normal;
+        text-transform: none;
+        overflow: hidden;
+    }
+
     .site-nav__toggle {
-        position: absolute;
-        top: 0;
-        bottom: 0;
-        left: max(10px, env(safe-area-inset-left));
         z-index: calc(var(--site-nav-z) + 2);
         display: grid;
         width: 38px;
         height: 38px;
-        margin: auto 0;
+        padding: 0;
         place-items: center;
         border: 1px solid var(--site-nav-line);
         border-radius: 7px;
@@ -326,21 +366,24 @@ button.site-nav__link:disabled,
     }
 
     .site-nav__toggle svg {
+        display: block;
         width: 20px;
         height: 20px;
         stroke: currentColor;
     }
 
+    .site-nav__mobile-brand > span {
+        min-width: 0;
+        overflow: hidden;
+    }
+
     .site-nav__mobile-brand {
-        position: absolute;
-        top: 0;
-        bottom: 0;
-        left: calc(max(10px, env(safe-area-inset-left)) + 50px);
-        right: calc(max(12px, env(safe-area-inset-right)) + 88px);
+        position: relative;
         z-index: calc(var(--site-nav-z) + 2);
         display: flex;
+        flex: 1 1 auto;
+        min-width: 0;
         height: 38px;
-        margin: auto 0;
         align-items: center;
         gap: 9px;
         overflow: hidden;
@@ -355,14 +398,9 @@ button.site-nav__link:disabled,
     }
 
     .site-nav__top-login {
-        position: absolute;
-        top: 0;
-        right: max(10px, env(safe-area-inset-right));
-        bottom: 0;
         z-index: calc(var(--site-nav-z) + 2);
         display: inline-flex;
         height: 38px;
-        margin: auto 0;
         align-items: center;
         gap: 7px;
         padding: 0 10px;
@@ -377,10 +415,6 @@ button.site-nav__link:disabled,
         white-space: nowrap;
         cursor: pointer;
         font-family: inherit;
-    }
-
-    .site-nav.is-authenticated .site-nav__mobile-brand {
-        right: calc(max(12px, env(safe-area-inset-right)) + min(52vw, 190px));
     }
 
     .site-nav__top-logout {
@@ -413,13 +447,14 @@ button.site-nav__link:disabled,
         visibility: hidden;
     }
 
+    /* The laptop sits small in the middle of a square image; scale it up
+       inside its slot so it reads at the title's size. */
     .site-nav__mobile-logo {
-        flex: 0 0 28px;
-        width: 28px;
-        height: 28px;
-        border-radius: 6px;
-        object-fit: cover;
-        object-position: center;
+        flex: 0 0 30px;
+        width: 30px;
+        height: 30px;
+        object-fit: contain;
+        transform: scale(1.3);
         box-shadow: var(--site-nav-logo-shadow);
     }
 
@@ -427,9 +462,10 @@ button.site-nav__link:disabled,
         display: block;
         overflow: hidden;
         color: var(--site-nav-brand-color);
-        font-size: 0.9rem;
+        font-size: 0.95rem;
         font-weight: 700;
-        line-height: 1;
+        /* 1 clipped the descender of the "g" under overflow: hidden. */
+        line-height: 1.3;
         text-overflow: ellipsis;
         white-space: nowrap;
     }
@@ -566,10 +602,6 @@ button.site-nav__link:disabled,
 }
 
 @media (max-width: 420px) {
-    .site-nav.is-authenticated .site-nav__mobile-brand {
-        right: calc(max(12px, env(safe-area-inset-right)) + 112px);
-    }
-
     .site-nav__top-logout { max-width: 104px; }
     .site-nav__top-username,
     .site-nav__top-separator { display: none; }
