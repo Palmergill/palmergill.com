@@ -105,41 +105,6 @@ function updateMetricTrend(elementId, trend) {
     }
 }
 
-// Count-up animation helper
-function animateCountUp(element, start, end, duration = 500, prefix = '', suffix = '', decimals = 2) {
-    if (!element) return;
-    
-    if (start === end || isNaN(start) || isNaN(end)) {
-        element.textContent = `${prefix}${end.toFixed(decimals)}${suffix}`;
-        return;
-    }
-    
-    const range = end - start;
-    const minTimer = 50;
-    let stepTime = Math.abs(Math.floor(duration / range));
-    stepTime = Math.max(stepTime, minTimer);
-    
-    let startTime = new Date().getTime();
-    let endTime = startTime + duration;
-    let timer;
-    
-    function run() {
-        let now = new Date().getTime();
-        let remaining = Math.max((endTime - now) / duration, 0);
-        let value = Math.round(end - (remaining * range));
-        let displayValue = decimals > 0 ? (start + (end - start) * (1 - remaining)).toFixed(decimals) : value;
-        element.textContent = `${prefix}${displayValue}${suffix}`;
-        
-        if (value == end) {
-            clearInterval(timer);
-            element.textContent = `${prefix}${end.toFixed(decimals)}${suffix}`;
-        }
-    }
-    
-    timer = setInterval(run, stepTime);
-    run();
-}
-
 // Wait for DOM to be ready
 document.addEventListener('DOMContentLoaded', () => {
     
@@ -527,10 +492,8 @@ document.addEventListener('DOMContentLoaded', () => {
             setTimeout(() => {
                 const chartData = lastChartData;
                 if (tabId === 'overview') {
-                    drawPriceChart(lastPriceHistory || chartData);
-                    drawEPSChart(chartData);
+                    window.StockOverview?.redraw();
                 } else if (tabId === 'fundamentals') {
-                    drawPriceChart(lastPriceHistory || chartData);
                     drawEPSChart(chartData);
                     drawRevenueChart(chartData);
                     drawFCFChart(chartData);
@@ -1105,70 +1068,8 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
         
-        // Animate key metrics with count-up effect
-        if (summary.pe_ratio != null) {
-            animateCountUp(document.getElementById('peRatio'), 0, summary.pe_ratio, 500, '', '', 2);
-        } else {
-            document.getElementById('peRatio').textContent = 'N/A';
-        }
-        
-        // Calculate TTM Earnings and Revenue from last 4 quarters
-        const earnings = data.earnings || [];
-        const last4Quarters = earnings.slice(0, 4);
-        const prev4Quarters = earnings.slice(4, 8);
-        const ttmEPS = last4Quarters.reduce((sum, e) => sum + (e.reported_eps || 0), 0);
-        const ttmRevenue = last4Quarters.reduce((sum, e) => sum + (e.revenue || 0), 0);
-        
-        // Convert to total earnings using shares outstanding
-        const ttmTotalEarnings = summary.shares_outstanding ? (ttmEPS * summary.shares_outstanding) / 1e9 : 0;
-        
-        const ttmEarningsEl = document.getElementById('ttmEarnings');
-        if (ttmEarningsEl) {
-            ttmEarningsEl.textContent = '$' + ttmTotalEarnings.toFixed(2) + 'B';
-        }
-        
-        const ttmRevenueEl = document.getElementById('ttmRevenue');
-        if (ttmRevenueEl) {
-            ttmRevenueEl.textContent = formatMarketCap(ttmRevenue);
-        }
-        
-        // Calculate YoY changes
-        const prevTTMEPS = prev4Quarters.reduce((sum, e) => sum + (e.reported_eps || 0), 0);
-        const prevTTMRevenue = prev4Quarters.reduce((sum, e) => sum + (e.revenue || 0), 0);
-        const prevTTMTotalEarnings = summary.shares_outstanding ? (prevTTMEPS * summary.shares_outstanding) / 1e9 : 0;
-        
-        const earningsChangeEl = document.getElementById('ttmEarningsChange');
-        if (earningsChangeEl && prevTTMTotalEarnings > 0) {
-            const earningsChange = ((ttmTotalEarnings - prevTTMTotalEarnings) / prevTTMTotalEarnings) * 100;
-            const changeSymbol = earningsChange >= 0 ? '+' : '';
-            earningsChangeEl.textContent = `${changeSymbol}${earningsChange.toFixed(1)}%`;
-            earningsChangeEl.className = 'metric-change ' + (earningsChange >= 0 ? 'positive' : 'negative');
-        }
-        
-        const revenueChangeEl = document.getElementById('ttmRevenueChange');
-        if (revenueChangeEl && prevTTMRevenue > 0) {
-            const revenueChange = ((ttmRevenue - prevTTMRevenue) / prevTTMRevenue) * 100;
-            const changeSymbol = revenueChange >= 0 ? '+' : '';
-            revenueChangeEl.textContent = `${changeSymbol}${revenueChange.toFixed(1)}%`;
-            revenueChangeEl.className = 'metric-change ' + (revenueChange >= 0 ? 'positive' : 'negative');
-        }
-        
-        // Calculate TTM FCF and YoY change
-        const ttmFCF = last4Quarters.reduce((sum, e) => sum + (e.free_cash_flow || 0), 0);
-        const prevTTMFCF = prev4Quarters.reduce((sum, e) => sum + (e.free_cash_flow || 0), 0);
-        
-        const ttmFCFEl = document.getElementById('ttmFCF');
-        if (ttmFCFEl) {
-            ttmFCFEl.textContent = formatMarketCap(ttmFCF);
-        }
-        
-        const fcfChangeEl = document.getElementById('ttmFCFChange');
-        if (fcfChangeEl && prevTTMFCF > 0) {
-            const fcfChange = ((ttmFCF - prevTTMFCF) / prevTTMFCF) * 100;
-            const changeSymbol = fcfChange >= 0 ? '+' : '';
-            fcfChangeEl.textContent = `${changeSymbol}${fcfChange.toFixed(1)}%`;
-            fcfChangeEl.className = 'metric-change ' + (fcfChange >= 0 ? 'positive' : 'negative');
-        }
+        // Overview metrics visualization (see overview.js)
+        window.StockOverview?.render(data, lastPriceHistory);
         
         // Calculate and display trends based on earnings data
         calculateAndDisplayTrends(data.earnings || []);
@@ -1206,8 +1107,6 @@ document.addEventListener('DOMContentLoaded', () => {
         
         console.log(`Drawing charts for active tab: ${activeTab}`);
         
-        // Always draw charts for Overview on load
-        drawPriceChart(lastPriceHistory || chartData);
         drawEPSChart(chartData);
         
         // Draw other charts if their tab is active
@@ -1258,8 +1157,6 @@ document.addEventListener('DOMContentLoaded', () => {
             if (data.prices && data.prices.length > 0) {
                 console.log(`Received ${data.prices.length} price points`);
                 lastPriceHistory = data.prices;
-                // Redraw price chart with real historical data
-                drawPriceChart(data.prices);
                 // Also redraw P/E chart if we have earnings data
                 if (lastChartData) {
                     const chartData = lastChartData;
@@ -1898,211 +1795,6 @@ function formatQuarterLabel(entry) {
     const quarter = Math.floor(date.getUTCMonth() / 3) + 1;
     const year = String(date.getUTCFullYear()).slice(-2);
     return `Q${quarter} '${year}`;
-}
-
-// Global Chart.js instances
-let priceChartInstance = null;
-
-function drawPriceChart(data) {
-    // Check if Chart.js is loaded
-    if (typeof Chart === 'undefined') {
-        console.warn('Chart.js not loaded, skipping chart render');
-        return;
-    }
-    
-    const canvas = document.getElementById('priceChart');
-    if (!canvas) return;
-    
-    // Destroy existing chart if any
-    if (priceChartInstance) {
-        priceChartInstance.destroy();
-    }
-    
-    const ctx = canvas.getContext('2d');
-    
-    // Prepare data
-    const priceRows = data
-        .map(d => ({
-            price: d.close || d.price,
-            date: d.date || d.fiscal_date || ''
-        }))
-        .filter(d => d.price != null);
-    const prices = priceRows.map(d => d.price);
-    if (prices.length === 0) return;
-    
-    // Calculate percent change for the period
-    const startPrice = prices[0];
-    const endPrice = prices[prices.length - 1];
-    const percentChange = ((endPrice - startPrice) / startPrice) * 100;
-    const isPositive = percentChange >= 0;
-    const changeColor = isPositive ? '#10b981' : '#ef4444';
-    const changeSymbol = isPositive ? '+' : '';
-    
-    const labels = priceRows.map(d => d.date);
-    const highIndex = prices.reduce((bestIndex, price, index) => (
-        price > prices[bestIndex] ? index : bestIndex
-    ), 0);
-    const highPrice = prices[highIndex];
-    const highMarkerData = prices.map((price, index) => index === highIndex ? price : null);
-
-    const highPointLabelPlugin = {
-        id: 'highPointLabel',
-        afterDatasetsDraw(chart) {
-            const meta = chart.getDatasetMeta(1);
-            const point = meta?.data?.[highIndex];
-            if (!point) return;
-
-            const { ctx, chartArea } = chart;
-            const label = `$${highPrice.toFixed(2)}`;
-            const alignRight = point.x > chartArea.left + chartArea.width * 0.65;
-            const labelX = alignRight ? point.x - 12 : point.x + 12;
-            const labelY = Math.max(chartArea.top + 14, point.y - 12);
-
-            ctx.save();
-            ctx.font = 'bold 12px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
-            ctx.textAlign = alignRight ? 'right' : 'left';
-            ctx.textBaseline = 'middle';
-            const width = ctx.measureText(label).width + 14;
-            const boxX = alignRight ? labelX - width : labelX;
-            ctx.fillStyle = 'rgba(15, 23, 42, 0.92)';
-            ctx.strokeStyle = 'rgba(244, 201, 106, 0.75)';
-            ctx.lineWidth = 1;
-            ctx.beginPath();
-            ctx.roundRect(boxX, labelY - 11, width, 22, 6);
-            ctx.fill();
-            ctx.stroke();
-            ctx.fillStyle = '#f4c96a';
-            ctx.fillText(label, alignRight ? labelX - 7 : labelX + 7, labelY);
-            ctx.restore();
-        }
-    };
-    
-    // Create gradient
-    const gradient = ctx.createLinearGradient(0, 0, 0, 300);
-    gradient.addColorStop(0, isPositive ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.3)');
-    gradient.addColorStop(1, isPositive ? 'rgba(16, 185, 129, 0.02)' : 'rgba(239, 68, 68, 0.02)');
-    const isCoarsePointer = window.matchMedia?.('(pointer: coarse)').matches;
-    const chartEvents = isCoarsePointer
-        ? ['click']
-        : ['mousemove', 'mouseout', 'click', 'touchstart', 'touchmove'];
-    
-    // Create Chart.js chart
-    priceChartInstance = new Chart(ctx, {
-        type: 'line',
-        data: {
-            labels: labels,
-            datasets: [{
-                label: 'Price',
-                data: prices,
-                borderColor: changeColor,
-                backgroundColor: gradient,
-                borderWidth: 2.5,
-                fill: true,
-                tension: 0.4,
-                pointRadius: 0,
-                pointHoverRadius: 6,
-                pointHoverBackgroundColor: changeColor,
-                pointHoverBorderColor: '#fff',
-                pointHoverBorderWidth: 2
-            }, {
-                label: 'Range high',
-                data: highMarkerData,
-                borderColor: '#f4c96a',
-                backgroundColor: '#f4c96a',
-                pointRadius: 5,
-                pointHoverRadius: 7,
-                pointBorderColor: '#0f172a',
-                pointBorderWidth: 2,
-                showLine: false
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            events: chartEvents,
-            interaction: {
-                intersect: false,
-                mode: 'index'
-            },
-            plugins: {
-                legend: {
-                    display: false
-                },
-                title: {
-                    display: true,
-                    text: `${changeSymbol}${percentChange.toFixed(2)}%`,
-                    color: changeColor,
-                    font: {
-                        size: 18,
-                        weight: 'bold'
-                    },
-                    padding: {
-                        top: 10,
-                        bottom: 10
-                    }
-                },
-                tooltip: {
-                    backgroundColor: 'rgba(15, 23, 42, 0.95)',
-                    titleColor: '#cbd5e1',
-                    bodyColor: '#f8fafc',
-                    borderColor: 'rgba(59, 130, 246, 0.3)',
-                    borderWidth: 1,
-                    padding: 12,
-                    displayColors: false,
-                    callbacks: {
-                        title: function(context) {
-                            const idx = context[0].dataIndex;
-                            return labels[idx] || '';
-                        },
-                        label: function(context) {
-                            const prefix = context.datasetIndex === 1 ? 'Range high: ' : '';
-                            return prefix + '$' + context.parsed.y.toFixed(2);
-                        }
-                    }
-                }
-            },
-            scales: {
-                x: {
-                    grid: {
-                        display: false,
-                        drawBorder: false
-                    },
-                    ticks: {
-                        color: '#6e6555',
-                        autoSkip: true,
-                        maxTicksLimit: 12,
-                        callback: function(value) {
-                            const label = this.getLabelForValue(value);
-                            return label ? label.slice(0, 7) : '';
-                        },
-                        font: {
-                            size: 10
-                        }
-                    }
-                },
-                y: {
-                    grid: {
-                        color: 'rgba(60, 50, 35, 0.12)',
-                        drawBorder: false
-                    },
-                    ticks: {
-                        color: '#6e6555',
-                        callback: function(value) {
-                            return '$' + value.toFixed(0);
-                        },
-                        font: {
-                            size: 11
-                        }
-                    }
-                }
-            },
-            animation: {
-                duration: 1000,
-                easing: 'easeOutQuart'
-            }
-        },
-        plugins: [highPointLabelPlugin]
-    });
 }
 
     // Pull-to-refresh for mobile

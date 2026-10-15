@@ -23,7 +23,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/shared/site-nav.css?v=15">
-    <link rel="stylesheet" href="style.css?v=7">
+    <link rel="stylesheet" href="style.css?v=8">
 </head>
 <body>
 <noscript>
@@ -44,7 +44,7 @@
                         <span id="headerStockPrice" class="header-price-large">$417.44</span>
                         <span id="headerStockChange" class="header-change-badge positive">+5.2%</span>
                         <button id="watchlistBtn" class="watchlist-btn" type="button" aria-pressed="false" title="Add to watchlist">★ Save</button>
-                        <button id="searchIconBtnInline" class="search-icon-btn-inline" title="Search">Search</button>
+                        <button id="searchIconBtnInline" class="search-icon-btn-inline" title="Search" aria-label="Search stocks"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2"/><path d="M20 20l-4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><span class="search-btn-text">Search</span></button>
                     </div>
                 </div>
                 <div class="header-row-2">
@@ -270,47 +270,7 @@
                 <div class="tab-content-container">
                 <!-- Tab Content: Overview -->
                 <div id="overview" class="tab-content active">
-                    <!-- Price Chart -->
-                    <div class="card chart-container">
-                        <h3>Stock Price History</h3>
-                        <div class="chart-wrapper">
-                            <canvas id="priceChart"></canvas>
-                        </div>
-                    </div>
-
-                    <!-- Key Metrics Grid - Option B Style -->
-                    <div class="card metrics-key-simple">
-                        <div class="key-metrics-grid">
-                            <div class="key-metric">
-                                <div class="key-metric-left">
-                                    <span class="key-metric-label">P/E Ratio</span>
-                                    <span id="peRatio" class="key-metric-value"></span>
-                                </div>
-                                <span class="key-metric-change" style="opacity:0;">—</span>
-                            </div>
-                            <div class="key-metric">
-                                <div class="key-metric-left">
-                                    <span class="key-metric-label">Earnings</span>
-                                    <span id="ttmEarnings" class="key-metric-value"></span>
-                                </div>
-                                <span id="ttmEarningsChange" class="key-metric-change"></span>
-                            </div>
-                            <div class="key-metric">
-                                <div class="key-metric-left">
-                                    <span class="key-metric-label">Revenue</span>
-                                    <span id="ttmRevenue" class="key-metric-value"></span>
-                                </div>
-                                <span id="ttmRevenueChange" class="key-metric-change"></span>
-                            </div>
-                            <div class="key-metric">
-                                <div class="key-metric-left">
-                                    <span class="key-metric-label">Free Cash Flow</span>
-                                    <span id="ttmFCF" class="key-metric-value"></span>
-                                </div>
-                                <span id="ttmFCFChange" class="key-metric-change"></span>
-                            </div>
-                        </div>
-                    </div>
+                    <div id="overviewViz" class="overview-viz"></div>
                 </div>
 
                 <!-- Tab Content: Fundamentals -->
@@ -477,11 +437,11 @@
         <div class="shelby-hint">Tap anywhere to continue</div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" integrity="sha384-9nhczxUqK87bcKHh20fSQcTGD4qq5GhayNYSYWqwBkINBhOfQLg/P5HG5lF1urn4" crossorigin="anonymous"></script>
     <script src="/shared/site-nav.js?v=19"></script>
     <script src="/shared/analytics.js?v=1"></script>
     <script src="/shared/api-base.js?v=1"></script>
-    <script src="app.js?v=11"></script>
+    <script src="overview.js?v=1"></script>
+    <script src="app.js?v=12"></script>
     <script src="watchlist.js?v=1"></script>
     <script src="compare.js?v=3"></script>
 </body>
