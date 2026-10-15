@@ -457,13 +457,19 @@ button.site-nav__link:disabled,
         padding: max(64px, calc(var(--site-nav-height) + env(safe-area-inset-top) + 10px)) 14px 18px;
         background: var(--site-nav-panel-bg);
         border-right: 1px solid var(--site-nav-line);
-        box-shadow: var(--site-nav-panel-shadow);
+        /* Closed: no shadow and hidden, so the offscreen panel's blur
+           doesn't bleed a gray band onto the left edge of the page. */
+        box-shadow: none;
+        visibility: hidden;
         transform: translateX(-104%);
-        transition: transform 180ms ease;
+        transition: transform 180ms ease, box-shadow 180ms ease, visibility 0s linear 180ms;
     }
 
     .site-nav.is-open .site-nav__panel {
+        box-shadow: var(--site-nav-panel-shadow);
+        visibility: visible;
         transform: translateX(0);
+        transition: transform 180ms ease, box-shadow 180ms ease, visibility 0s;
     }
 
     .site-nav__brand {

@@ -12,7 +12,7 @@ const STATIC_ASSETS = [
     '/craps-strategy/manifest.json',
     '/craps/crapsRules.js?v=2',
     '/shared/casino-theme.css?v=3',
-    '/shared/site-nav.css?v=15',
+    '/shared/site-nav.css?v=16',
     '/shared/site-nav.js?v=18',
     '/shared/api-base.js?v=1'
 ];
