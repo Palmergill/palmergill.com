@@ -23,7 +23,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/shared/site-nav.css?v=16">
-    <link rel="stylesheet" href="style.css?v=9">
+    <link rel="stylesheet" href="style.css?v=10">
 </head>
 <body>
 <noscript>
@@ -277,102 +277,9 @@
                 <div id="fundamentals" class="tab-content">
                     <!-- Charts Section -->
                     <section id="earningsCashViz" class="ov-card ec-card"></section>
-                    
-                    <div class="card">
-                        <h3>Revenue by Quarter</h3>
-                        <canvas id="revenueChart" width="800" height="300"></canvas>
-                    </div>
-                    
-                    <div class="card">
-                        <h3>Free Cash Flow</h3>
-                        <canvas id="fcfChart" width="800" height="300"></canvas>
-                    </div>
-                    
-                    <div class="card">
-                        <h3>P/E Ratio Over Time</h3>
-                        <canvas id="peChart" width="800" height="350"></canvas>
-                    </div>
-                    
-                    <!-- Profitability Metrics -->
-                    <div class="card metrics-overview metrics-profitability">
-                        <h3>Profitability</h3>
-                        <div class="metrics-grid-compact">
-                            <div class="metric" title="Gross profit margin. Percentage of revenue left after cost of goods sold. Shows pricing power and production efficiency.">
-                                <span class="metric-label">Gross Margin</span>
-                                <span id="grossMargin" class="metric-value">-</span>
-                            </div>
-                            <div class="metric" title="EBITDA margin. Earnings before interest, taxes, depreciation. Shows operating profitability.">
-                                <span class="metric-label">EBITDA Margin</span>
-                                <span id="ebitdaMargin" class="metric-value">-</span>
-                            </div>
-                            <div class="metric" title="Return on Assets. How efficiently the company uses its assets to generate profit.">
-                                <span class="metric-label">Return on Assets</span>
-                                <span id="roa" class="metric-value">-</span>
-                            </div>
-                            <div class="metric" title="Return on Invested Capital. Measures return to all investors (debt + equity). ROIC > WACC creates value.">
-                                <span class="metric-label">ROIC</span>
-                                <span id="roic" class="metric-value">-</span>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Financial Health -->
-                    <div class="card metrics-overview metrics-health">
-                        <h3>Financial Health</h3>
-                        <div class="metrics-grid-compact">
-                            <div class="metric" title="Current Ratio. Current assets divided by current liabilities. > 1.5 suggests good short-term liquidity.">
-                                <span class="metric-label">Current Ratio</span>
-                                <span id="currentRatio" class="metric-value">-</span>
-                            </div>
-                            <div class="metric" title="Quick Ratio. Current assets minus inventory, divided by liabilities. More conservative liquidity measure.">
-                                <span class="metric-label">Quick Ratio</span>
-                                <span id="quickRatio" class="metric-value">-</span>
-                            </div>
-                            <div class="metric" title="Interest Coverage. EBIT divided by interest expense. > 3 indicates comfortable debt service ability.">
-                                <span class="metric-label">Interest Coverage</span>
-                                <span id="interestCoverage" class="metric-value">-</span>
-                            </div>
-                            <div class="metric" title="Total cash and equivalents on the balance sheet.">
-                                <span class="metric-label">Cash & Equivalents</span>
-                                <span id="cash" class="metric-value">-</span>
-                            </div>
-                            <div class="metric" title="Working capital. Current assets minus current liabilities. Positive means short-term obligations can be met.">
-                                <span class="metric-label">Working Capital</span>
-                                <span id="workingCapital" class="metric-value">-</span>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Valuation Metrics -->
-                    <div class="card metrics-overview metrics-valuation">
-                        <h3>Valuation Metrics</h3>
-                        <div class="metrics-grid-compact">
-                            <div class="metric" title="Price-to-Sales ratio. Useful for valuing growth companies that may not be profitable yet. Lower is generally better.">
-                                <span class="metric-label">P/S Ratio</span>
-                                <span id="psRatio" class="metric-value">-</span>
-                            </div>
-                            <div class="metric" title="Price-to-Book ratio. Compares market value to book value. < 1 may indicate undervaluation, > 3 often overvalued.">
-                                <span class="metric-label">P/B Ratio</span>
-                                <span id="pbRatio" class="metric-value">-</span>
-                            </div>
-                            <div class="metric" title="Enterprise Value to EBITDA. Comprehensive valuation metric that accounts for debt. Useful for comparing across capital structures.">
-                                <span class="metric-label">EV/EBITDA</span>
-                                <span id="evebitda" class="metric-value">-</span>
-                            </div>
-                            <div class="metric" title="Market capitalization. Total value of all outstanding shares.">
-                                <span class="metric-label">Market Cap</span>
-                                <span id="marketCap2" class="metric-value">-</span>
-                            </div>
-                            <div class="metric" title="Enterprise Value. Market cap plus debt minus cash. Theoretical takeover price.">
-                                <span class="metric-label">Enterprise Value</span>
-                                <span id="enterpriseValue" class="metric-value">-</span>
-                            </div>
-                            <div class="metric" title="Shares outstanding. Number of shares held by all shareholders.">
-                                <span class="metric-label">Shares Outstanding</span>
-                                <span id="sharesOutstanding" class="metric-value">-</span>
-                            </div>
-                        </div>
-                    </div>
+                    <section id="revenueViz" class="ov-card ec-card"></section>
+                    <section id="peViz" class="ov-card ec-card"></section>
+                    <div id="metricGroupsViz" class="fm-groups"></div>
                 </div>
 
                 <!-- Tab Content: About -->
@@ -414,18 +321,6 @@
         </main>
     </div>
 
-    <!-- Chart Tooltip -->
-    <div id="chartTooltip" class="chart-tooltip hidden">
-        <div class="tooltip-date"></div>
-        <div class="tooltip-value"></div>
-    </div>
-
-    <!-- Metric Tooltip -->
-    <div id="metricTooltip" class="metric-tooltip hidden">
-        <div class="tooltip-title"></div>
-        <div class="tooltip-description"></div>
-    </div>
-
     <!-- Shelby Easter Egg -->
     <div id="shelbyOverlay" class="shelby-overlay hidden">
         <canvas id="shelbyCanvas" class="shelby-canvas"></canvas>
@@ -437,8 +332,8 @@
     <script src="/shared/site-nav.js?v=19"></script>
     <script src="/shared/analytics.js?v=1"></script>
     <script src="/shared/api-base.js?v=1"></script>
-    <script src="overview.js?v=2"></script>
-    <script src="app.js?v=13"></script>
+    <script src="overview.js?v=3"></script>
+    <script src="app.js?v=14"></script>
     <script src="watchlist.js?v=1"></script>
     <script src="compare.js?v=3"></script>
 </body>

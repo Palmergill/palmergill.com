@@ -530,6 +530,277 @@
         return draw;
     }
 
+    // Column with a 4px rounded data end, square at the baseline (y0). Grows
+    // up or down depending on which side of the baseline yv sits.
+    function columnPath(x, w, y0, yv) {
+        const h = Math.max(1.5, Math.abs(yv - y0));
+        const r = Math.min(4, w / 2, h);
+        const dir = yv <= y0 ? -1 : 1;
+        const end = y0 + dir * h;
+        return `M${x},${y0}V${end - dir * r}Q${x},${end} ${x + r},${end}H${x + w - r}Q${x + w},${end} ${x + w},${end - dir * r}V${y0}Z`;
+    }
+
+    // Shared card scaffolding for the Fundamentals charts.
+    function chartCard(root, title, subtitle) {
+        root.replaceChildren();
+        const head = el('div', 'ov-card-head');
+        head.append(el('h3', 'ov-card-title', title));
+        if (subtitle) head.append(el('p', 'ov-card-sub', subtitle));
+        root.append(head);
+    }
+
+    function statBlock(label, value, note, noteClass) {
+        const box = el('div', 'ec-stat');
+        box.append(el('span', 'ec-stat-label', label), el('span', 'ec-stat-value', value));
+        if (note) box.append(el('span', `ec-stat-note${noteClass ? ` ${noteClass}` : ''}`, note));
+        return box;
+    }
+
+    // ---------- revenue by quarter (Fundamentals tab) ----------
+    function renderRevenue(root, series) {
+        const rows = series.filter((q) => q.revenue != null);
+        chartCard(root, 'Revenue by quarter', 'Total sales each quarter, before any costs');
+        if (rows.length < 2) {
+            root.append(el('p', 'ov-empty', 'Quarterly revenue unavailable.'));
+            return null;
+        }
+
+        const total = ttm(series, 'revenue');
+        const stats = el('div', 'ec-stats');
+        stats.append(statBlock(
+            'Last 12 months',
+            compactMoney(total.current),
+            total.change != null ? `${signedPct(total.change)} vs. prior year` : null,
+            total.change != null ? (total.change >= 0 ? 'is-up' : 'is-down') : null
+        ));
+        const box = el('div', 'ec-chart');
+        const readout = el('div', 'ec-readout');
+        root.append(stats, box, readout);
+
+        return () => {
+            box.replaceChildren();
+            const W = Math.max(box.clientWidth, 280);
+            const H = 190;
+            const pad = { top: 8, right: 4, bottom: 36, left: 46 };
+            const vals = rows.map((q) => q.revenue);
+            const ticks = niceTicks(Math.min(0, ...vals), Math.max(0, ...vals), 3);
+            const lo = ticks[0];
+            const hi = ticks[ticks.length - 1];
+            const y = (v) => pad.top + (1 - (v - lo) / (hi - lo)) * (H - pad.top - pad.bottom);
+            const slot = (W - pad.left - pad.right) / rows.length;
+            const barW = Math.min(24, slot - 12);
+
+            const svgRoot = svg('svg', { viewBox: `0 0 ${W} ${H}`, width: W, height: H, class: 'ec-svg' });
+            svgRoot.setAttribute('role', 'img');
+            svgRoot.setAttribute('aria-label', `Quarterly revenue. Last 12 months: ${compactMoney(total.current)}.`);
+            ticks.forEach((v) => {
+                const gy = y(v);
+                svgRoot.append(svg('line', { x1: pad.left, x2: W - pad.right, y1: gy, y2: gy, class: v === 0 ? 'ec-zero' : 'ov-grid' }));
+                const t = svg('text', { x: pad.left - 8, y: gy + 4, 'text-anchor': 'end', class: 'ov-axis' });
+                t.textContent = axisMoney(v);
+                svgRoot.append(t);
+            });
+
+            const groups = rows.map((q, i) => {
+                const cx = pad.left + slot * i + slot / 2;
+                const g = svg('g', { class: `ec-q${i === rows.length - 1 ? ' is-latest' : ''}` });
+                g.append(svg('rect', { x: cx - slot / 2, y: 0, width: slot, height: H - pad.bottom + 30, rx: 8, class: 'ov-hit' }));
+                g.append(svg('path', { d: columnPath(cx - barW / 2, barW, y(0), y(q.revenue)), class: 'ec-bar is-rev' }));
+                const ql = svg('text', { x: cx, y: H - pad.bottom + 18, 'text-anchor': 'middle', class: 'ov-axis ov-axis-strong' });
+                ql.textContent = q.q;
+                const yl = svg('text', { x: cx, y: H - pad.bottom + 32, 'text-anchor': 'middle', class: 'ov-axis' });
+                yl.textContent = q.y;
+                g.append(ql, yl);
+                // Same quarter a year earlier, for seasonality-free growth.
+                const yearAgo = rows[i - 4];
+                const select = () => {
+                    groups.forEach((other) => other.classList.toggle('is-active', other === g));
+                    const parts = [el('span', 'ov-eps-readout-q', `${q.q} ${q.y}`), el('strong', 'ec-readout-strong', compactMoney(q.revenue))];
+                    if (yearAgo && yearAgo.revenue > 0) {
+                        const yoy = ((q.revenue - yearAgo.revenue) / yearAgo.revenue) * 100;
+                        parts.push(el('span', `ec-readout-delta ${yoy >= 0 ? 'is-up' : 'is-down'}`, `${yoy >= 0 ? '▲' : '▼'} ${signedPct(yoy)} vs. ${yearAgo.q} ${yearAgo.y}`));
+                    }
+                    readout.replaceChildren(...parts);
+                };
+                g.addEventListener('pointerenter', select);
+                g.addEventListener('pointerdown', select);
+                g._select = select;
+                svgRoot.append(g);
+                return g;
+            });
+            groups[groups.length - 1]._select();
+            box.append(svgRoot);
+        };
+    }
+
+    // ---------- P/E over time (Fundamentals tab) ----------
+    // Daily P/E for the price window: each day's close divided by the sum of
+    // the four quarters of EPS reported on or before that day.
+    function peHistory(earnings, prices) {
+        const quarters = [...earnings]
+            .filter((e) => e && e.fiscal_date && e.reported_eps != null)
+            .map((e) => ({ date: parseDate(e.fiscal_date), eps: e.reported_eps }))
+            .filter((e) => e.date)
+            .sort((a, b) => a.date - b.date);
+        const points = [];
+        let idx = -1;
+        prices.forEach((p) => {
+            const day = parseDate(p.date);
+            while (idx + 1 < quarters.length && quarters[idx + 1].date <= day) idx++;
+            if (idx < 3) return;
+            const ttmEps = quarters.slice(idx - 3, idx + 1).reduce((sum, q) => sum + q.eps, 0);
+            if (ttmEps > 0) points.push({ date: p.date, pe: p.close / ttmEps });
+        });
+        return points;
+    }
+
+    function renderPE(root) {
+        const points = peHistory(state.data.earnings || [], state.prices);
+        chartCard(root, 'P/E ratio over time', 'Share price ÷ the last 12 months of earnings per share. Lower means cheaper for each dollar of profit.');
+        if (points.length < 2) {
+            root.append(el('p', 'ov-empty', 'Not enough profitable quarters to chart P/E.'));
+            return null;
+        }
+
+        const first = points[0].pe;
+        const last = points[points.length - 1].pe;
+        const pes = points.map((p) => p.pe);
+        const stats = el('div', 'ec-stats');
+        stats.append(
+            statBlock('Now', `${last.toFixed(1)}×`, last < 15 ? 'Value territory' : last <= 25 ? 'Near market average' : 'Priced for growth'),
+            statBlock('Past-year range', `${Math.min(...pes).toFixed(0)}–${Math.max(...pes).toFixed(0)}×`, `${last >= first ? 'Up' : 'Down'} from ${first.toFixed(1)}× a year ago`)
+        );
+        const box = el('div', 'ec-chart');
+        const readout = el('div', 'ec-readout');
+        root.append(stats, box, readout);
+
+        const legendNote = el('p', 'pe-note');
+        legendNote.append(el('span', 'pe-band-key'), document.createTextNode('Shaded band: 15–25×, where the broad market usually trades'));
+        root.append(legendNote);
+
+        return () => {
+            box.replaceChildren();
+            const W = Math.max(box.clientWidth, 280);
+            const H = 190;
+            const pad = { top: 12, right: 8, bottom: 22, left: 34 };
+            const ticks = niceTicks(Math.min(...pes, 15), Math.max(...pes, 25), 3);
+            const lo = ticks[0];
+            const hi = ticks[ticks.length - 1];
+            const x = (i) => pad.left + (i / (points.length - 1)) * (W - pad.left - pad.right);
+            const y = (v) => pad.top + (1 - (v - lo) / (hi - lo)) * (H - pad.top - pad.bottom);
+
+            const svgRoot = svg('svg', { viewBox: `0 0 ${W} ${H}`, width: W, height: H, class: 'ec-svg pe-svg' });
+            svgRoot.setAttribute('role', 'img');
+            svgRoot.setAttribute('aria-label', `P/E ratio over the past year, from ${first.toFixed(1)} to ${last.toFixed(1)}.`);
+
+            svgRoot.append(svg('rect', { x: pad.left, y: y(25), width: W - pad.left - pad.right, height: y(15) - y(25), class: 'pe-band' }));
+            ticks.forEach((v) => {
+                const gy = y(v);
+                svgRoot.append(svg('line', { x1: pad.left, x2: W - pad.right, y1: gy, y2: gy, class: 'ov-grid' }));
+                const t = svg('text', { x: pad.left - 8, y: gy + 4, 'text-anchor': 'end', class: 'ov-axis' });
+                t.textContent = `${v}×`;
+                svgRoot.append(t);
+            });
+
+            const d = `M${points.map((p, i) => `${x(i).toFixed(1)},${y(p.pe).toFixed(1)}`).join('L')}`;
+            svgRoot.append(svg('path', { d, class: 'pe-line' }));
+            const ex = x(points.length - 1);
+            svgRoot.append(svg('circle', { cx: ex, cy: y(last), r: 4, class: 'pe-end' }));
+
+            [0, points.length - 1].forEach((i) => {
+                const t = svg('text', { x: x(i), y: H - 4, 'text-anchor': i === 0 ? 'start' : 'end', class: 'ov-axis' });
+                t.textContent = shortDate(points[i].date);
+                svgRoot.append(t);
+            });
+
+            const cross = svg('line', { y1: pad.top, y2: H - pad.bottom, class: 'ov-crosshair' });
+            const crossDot = svg('circle', { r: 5, class: 'pe-end' });
+            const crossGroup = svg('g', { visibility: 'hidden' });
+            crossGroup.append(cross, crossDot);
+            svgRoot.append(crossGroup);
+
+            const show = (i) => {
+                readout.replaceChildren(
+                    el('span', 'ov-eps-readout-q', i === points.length - 1 ? 'Latest' : longDate(points[i].date)),
+                    el('strong', 'ec-readout-strong', `${points[i].pe.toFixed(1)}× earnings`)
+                );
+            };
+            const scrubTo = (clientX) => {
+                const rect = svgRoot.getBoundingClientRect();
+                const rel = ((clientX - rect.left) / rect.width) * W;
+                const i = Math.max(0, Math.min(points.length - 1, Math.round(((rel - pad.left) / (W - pad.left - pad.right)) * (points.length - 1))));
+                cross.setAttribute('x1', x(i));
+                cross.setAttribute('x2', x(i));
+                crossDot.setAttribute('cx', x(i));
+                crossDot.setAttribute('cy', y(points[i].pe));
+                crossGroup.setAttribute('visibility', 'visible');
+                show(i);
+            };
+            const endScrub = () => {
+                crossGroup.setAttribute('visibility', 'hidden');
+                show(points.length - 1);
+            };
+            svgRoot.addEventListener('pointerdown', (e) => scrubTo(e.clientX));
+            svgRoot.addEventListener('pointermove', (e) => {
+                if (e.pointerType === 'mouse' || e.buttons || e.pressure > 0) scrubTo(e.clientX);
+            });
+            svgRoot.addEventListener('pointerleave', endScrub);
+            svgRoot.addEventListener('pointerup', (e) => { if (e.pointerType !== 'mouse') endScrub(); });
+            svgRoot.addEventListener('pointercancel', endScrub);
+            show(points.length - 1);
+            box.append(svgRoot);
+        };
+    }
+
+    // ---------- metric groups (Fundamentals tab) ----------
+    function renderMetricGroups(root) {
+        const s = state.data.summary || {};
+        const pct = (v) => (v == null ? null : `${v.toFixed(1)}%`);
+        const x = (v, digits = 2) => (v == null ? null : `${v.toFixed(digits)}×`);
+        const groups = [
+            ['Profitability', 'How efficiently sales turn into profit', [
+                ['Gross margin', pct(s.gross_margin), 'Revenue left after the cost of making the product'],
+                ['Operating margin', pct(s.operating_margin), 'Left after day-to-day running costs'],
+                ['Net margin', pct(s.profit_margin), 'Left as profit after everything, including taxes'],
+                ['Return on assets', pct(s.roa), 'Profit generated per dollar of assets'],
+                ['Return on equity', pct(s.roe), 'Profit generated per dollar shareholders own'],
+                ['Return on invested capital', pct(s.roic), 'Return on all money invested, debt and equity']
+            ]],
+            ['Financial health', 'Can the company comfortably pay its bills?', [
+                ['Current ratio', x(s.current_ratio), 'Short-term assets ÷ bills due within a year; above 1.5 is comfortable'],
+                ['Quick ratio', x(s.quick_ratio), 'Same, minus inventory; above 1 is comfortable'],
+                ['Interest coverage', x(s.interest_coverage), 'Operating profit ÷ interest owed; above 3 is safe'],
+                ['Debt to equity', x(s.debt_to_equity), 'Debt per dollar of shareholder equity'],
+                ['Cash', s.cash != null ? compactMoney(s.cash) : null, 'Cash and equivalents on hand'],
+                ['Working capital', s.working_capital != null ? compactMoney(s.working_capital) : null, 'Short-term assets minus short-term bills']
+            ]],
+            ['Valuation', 'What the market is paying for the business', [
+                ['P/E ratio', x(s.pe_ratio, 1), 'Price per dollar of yearly profit'],
+                ['Price / sales', x(s.ps_ratio, 1), 'Price per dollar of yearly revenue'],
+                ['Price / book', x(s.pb_ratio, 1), 'Price vs. the accounting value of its assets'],
+                ['EV / EBITDA', x(s.ev_ebitda, 1), 'Takeover price vs. operating cash profit'],
+                ['Market cap', s.market_cap != null ? compactMoney(s.market_cap) : null, 'Value of all shares combined'],
+                ['Enterprise value', s.enterprise_value != null ? compactMoney(s.enterprise_value) : null, 'Market cap plus debt, minus cash'],
+                ['Shares outstanding', s.shares_outstanding != null ? `${(s.shares_outstanding / 1e9).toFixed(2)}B` : null, 'Total shares held by investors']
+            ]]
+        ];
+
+        root.replaceChildren();
+        groups.forEach(([title, subtitle, items]) => {
+            const shown = items.filter(([, v]) => v != null);
+            if (!shown.length) return;
+            const section = card(title, subtitle);
+            const dl = el('dl', 'ov-glance fm-glance');
+            shown.forEach(([k, v, hint]) => {
+                const item = el('div', 'ov-glance-item');
+                item.append(el('dt', null, k), el('dd', null, v), el('p', 'fm-hint', hint));
+                dl.append(item);
+            });
+            section.append(dl);
+            root.append(section);
+        });
+    }
+
     // ---------- earnings vs. free cash flow (Fundamentals tab) ----------
     function axisMoney(value) {
         if (value === 0) return '$0';
@@ -608,17 +879,7 @@
                 svgRoot.append(t);
             });
 
-            // Column with a 4px rounded data end, square at the zero baseline.
-            const column = (x, v, cls) => {
-                const y0 = y(0);
-                const h = Math.max(1.5, Math.abs(y(v) - y0));
-                const r = Math.min(4, barW / 2, h);
-                const top = v >= 0 ? y0 - h : y0 + h;
-                const d = v >= 0
-                    ? `M${x},${y0}V${top + r}Q${x},${top} ${x + r},${top}H${x + barW - r}Q${x + barW},${top} ${x + barW},${top + r}V${y0}Z`
-                    : `M${x},${y0}V${top - r}Q${x},${top} ${x + r},${top}H${x + barW - r}Q${x + barW},${top} ${x + barW},${top - r}V${y0}Z`;
-                return svg('path', { d, class: `ec-bar ${cls}` });
-            };
+            const column = (x, v, cls) => svg('path', { d: columnPath(x, barW, y(0), y(v)), class: `ec-bar ${cls}` });
 
             const groups = rows.map((q, i) => {
                 const cx = pad.left + slot * i + slot / 2;
@@ -734,10 +995,16 @@
         renderMargins(pair);
         renderSnapshot(pair);
 
-        const ecRoot = document.getElementById('earningsCashViz');
-        const drawEc = ecRoot ? renderEarningsCash(ecRoot, series) : null;
+        const fundamental = (id, fn) => {
+            const target = document.getElementById(id);
+            return target ? fn(target) : null;
+        };
+        const drawEc = fundamental('earningsCashViz', (t) => renderEarningsCash(t, series));
+        const drawRev = fundamental('revenueViz', (t) => renderRevenue(t, series));
+        const drawPe = fundamental('peViz', (t) => renderPE(t));
+        fundamental('metricGroupsViz', (t) => renderMetricGroups(t));
 
-        redrawers = [drawPrice, drawEps, drawEc].filter(Boolean);
+        redrawers = [drawPrice, drawEps, drawEc, drawRev, drawPe].filter(Boolean);
         redrawers.forEach((fn) => fn());
         lastWidth = root.clientWidth;
     }
