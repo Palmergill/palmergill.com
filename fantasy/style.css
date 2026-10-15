@@ -2320,6 +2320,7 @@ td.standings__num:nth-child(3) { font-weight: 700; color: var(--ink, #23201c); }
     vertical-align: 1px;
 }
 .power-bd__tag--out { color: var(--clay, #b96a4b); }
+.power-bd__player--empty .power-bd__who { color: var(--clay, #b96a4b); font-style: italic; }
 .power-bd__pts { font-weight: 700; font-variant-numeric: tabular-nums; }
 .power-bd__list--bench .power-bd__name,
 .power-bd__list--bench .power-bd__pts { font-weight: 500; color: var(--soft, #5d574e); }

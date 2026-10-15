@@ -1748,10 +1748,7 @@ def get_roster_power(
                 "lineup_points": round(team["lineup_points"], 1),
                 "absence_cost": round(team["absence_cost"], 1),
                 "players": [player_out(player) for player in team["players"]],
-                "waiver_starters": [
-                    {**player_out(player), "slot": player["slot"]}
-                    for player in team["waiver_starters"]
-                ],
+                "empty_slots": team["empty_slots"],
                 "surplus": [player_out(player) for player in team["surplus"]],
                 "need": (
                     {

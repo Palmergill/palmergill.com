@@ -11,10 +11,14 @@ Three ideas carry it, and each is small enough to explain on the page:
 * A team is worth the best legal lineup it can field under this league's own
   slots — so a fifth quarterback in a league that starts at most two adds
   nothing, however good he is.
-* Starters miss games. When one does, the next-best eligible player takes his
-  seat: from the bench, or from waivers when the bench has no one better.
-  That is the only thing depth is worth, which is where diminishing returns
-  come from without anyone having to write a rule for them.
+* Starters miss games. When one does, the next-best eligible player on the
+  roster takes his seat, or it sits empty if there is nobody. That is the
+  only thing depth is worth, which is where diminishing returns come from
+  without anyone having to write a rule for them.
+
+Only the players on a team count. Free agents never fill a lineup here; what
+waivers offer shows up only as the bar a player is measured against
+(``over_replacement``) and in the pickup suggestions.
 
 A player's value *to a team* is then how much the team's expected points drop
 without him. A good player a team cannot use scores near zero — that gap
@@ -156,24 +160,20 @@ def best_lineup(
 def expected_points(
     slots: Sequence[str],
     roster: Sequence[Dict[str, Any]],
-    replacements: Sequence[Dict[str, Any]],
     eligibility: Dict[str, frozenset],
     absence_rate: float = ABSENCE_RATE,
 ) -> Dict[str, Any]:
     """Expected weekly points once starters' absences are covered.
 
-    Each rostered starter is out ``absence_rate`` of the time, one at a time;
-    what that costs is the drop to the best lineup without him. Waiver
-    replacements sit in the pool throughout, so a thin roster is judged
-    against what anyone could pick up rather than against an empty seat.
+    Each starter is out ``absence_rate`` of the time, one at a time; what that
+    costs is the drop to the best lineup the rest of the roster can field. A
+    seat nobody on the roster can fill scores nothing.
     """
-    pool = list(roster) + list(replacements)
+    pool = list(roster)
     full, lineup = best_lineup(slots, pool, eligibility)
     exposure = 0.0
     losses: Dict[Any, float] = {}
     for _slot, starter in lineup:
-        if starter.get("replacement"):
-            continue
         without = [player for player in pool if player is not starter]
         points, _ = best_lineup(slots, without, eligibility)
         losses[starter["key"]] = full - points
@@ -214,15 +214,14 @@ def rank_rosters(
     Players arrive as {"key", "position", "ppg", ...}; whatever else they
     carry (name, team, injury) rides along untouched.
     """
-    waiver = list(replacements.values())
     teams = []
     for team_id, roster in rosters.items():
-        base = expected_points(slots, roster, waiver, eligibility, absence_rate)
+        base = expected_points(slots, roster, eligibility, absence_rate)
         starter_slot = {player["key"]: slot for slot, player in base["lineup"]}
         players = []
         for player in roster:
             without = [other for other in roster if other is not player]
-            reduced = expected_points(slots, without, waiver, eligibility, absence_rate)
+            reduced = expected_points(slots, without, eligibility, absence_rate)
             floor = replacements.get(player["position"])
             players.append(
                 {
@@ -243,11 +242,7 @@ def rank_rosters(
                 "expected": base["expected"],
                 "lineup_points": base["lineup_points"],
                 "absence_cost": base["absence_cost"],
-                "waiver_starters": [
-                    {"slot": slot, **player}
-                    for slot, player in base["lineup"]
-                    if player.get("replacement")
-                ],
+                "empty_slots": _empty_slots(slots, base["lineup"]),
                 "players": players,
                 "surplus": [player for player in players if player["key"] in spare],
             }
@@ -274,24 +269,33 @@ def surplus(
     both would not be. So the most expendable goes first, and the next is
     judged on the roster without him.
     """
-    waiver = list(replacements.values())
     remaining = list(roster)
     chosen: List[Dict[str, Any]] = []
     while True:
-        base = expected_points(slots, remaining, waiver, eligibility, absence_rate)["expected"]
+        base = expected_points(slots, remaining, eligibility, absence_rate)["expected"]
         best = None
         for player in remaining:
             floor = replacements.get(player["position"])
             if player["ppg"] - (floor["ppg"] if floor else 0.0) < SURPLUS_OVER_REPLACEMENT:
                 continue
             without = [other for other in remaining if other is not player]
-            cost = base - expected_points(slots, without, waiver, eligibility, absence_rate)["expected"]
+            cost = base - expected_points(slots, without, eligibility, absence_rate)["expected"]
             if cost < SURPLUS_MARGINAL and (best is None or cost < best[0]):
                 best = (cost, player)
         if best is None:
             return chosen
         chosen.append(best[1])
         remaining = [other for other in remaining if other is not best[1]]
+
+
+def _empty_slots(
+    slots: Sequence[str], lineup: Sequence[Tuple[str, Dict[str, Any]]]
+) -> List[str]:
+    """Seats the roster has nobody for, in the league's slot order."""
+    open_seats = list(slots)
+    for slot, _player in lineup:
+        open_seats.remove(slot)
+    return open_seats
 
 
 def _annotate_needs(teams: List[Dict[str, Any]]) -> None:
@@ -304,7 +308,8 @@ def _annotate_needs(teams: List[Dict[str, Any]]) -> None:
     seats_for: Dict[Any, List[Tuple[Tuple[str, int], Dict[str, Any]]]] = {}
     for team in teams:
         starters = [p for p in team["players"] if p["slot"]] + [
-            {**p, "name": p.get("name")} for p in team["waiver_starters"]
+            {"slot": slot, "name": None, "position": slot, "ppg": 0.0, "empty": True}
+            for slot in team["empty_slots"]
         ]
         order: Dict[str, int] = {}
         seats = []
@@ -338,6 +343,6 @@ def _annotate_needs(teams: List[Dict[str, Any]]) -> None:
                     "ppg": player["ppg"],
                     "league_average": average,
                     "gap": gap,
-                    "from_waivers": bool(player.get("replacement")),
+                    "empty": bool(player.get("empty")),
                 }
         team["need"] = worst if worst and worst["gap"] < 0 else None

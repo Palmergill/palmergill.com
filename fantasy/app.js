@@ -1273,8 +1273,8 @@
         const need = payload.need;
         if (!need) {
             els.movesLede.textContent = "No starting seat is below the league average. Ideas, not orders.";
-        } else if (need.from_waivers) {
-            els.movesLede.textContent = `Weakest seat: ${need.seat}, which the roster has nobody for; waivers offer ${F.formatPoints(need.ppg)} a game against a league average of ${F.formatPoints(need.league_average)}. Ideas, not orders.`;
+        } else if (need.empty) {
+            els.movesLede.textContent = `Weakest seat: ${need.seat}, which the roster has nobody for, against a league average of ${F.formatPoints(need.league_average)} a game. Ideas, not orders.`;
         } else {
             els.movesLede.textContent = `Weakest seat: ${need.seat}, ${need.name || "its starter"} at ${F.formatPoints(need.ppg)} a game against a league average of ${F.formatPoints(need.league_average)}. Ideas, not orders.`;
         }
@@ -1918,7 +1918,7 @@
     const SLOT_LABELS = { DST: "D/ST", FLEX: "Flex" };
 
     function lineupBySlot(team, slots) {
-        const starters = [...(team.players || []).filter((p) => p.slot), ...(team.waiver_starters || [])];
+        const starters = (team.players || []).filter((p) => p.slot);
         const pools = new Map();
         starters.forEach((player) => {
             if (!pools.has(player.slot)) pools.set(player.slot, []);
@@ -1932,6 +1932,8 @@
         });
         // Anything the slot list did not name still counts toward the total.
         pools.forEach((list, slot) => list.forEach((player) => lineup.push({ slot, player })));
+        // Seats nobody on the roster can fill, in slot order, scoring nothing.
+        (team.empty_slots || []).forEach((slot) => lineup.push({ slot, player: null }));
         return lineup;
     }
 
@@ -1943,12 +1945,18 @@
         return parts.join(" · ");
     }
 
-    function breakdownPlayer(slot, player, waiver) {
+    function breakdownPlayer(slot, player) {
         const row = el("li", "power-bd__player");
+        if (!player) {
+            row.classList.add("power-bd__player--empty");
+            row.appendChild(el("span", "power-bd__slot", SLOT_LABELS[slot] || slot));
+            row.appendChild(el("span", "power-bd__who", "Empty — nobody on the roster can play here"));
+            row.appendChild(el("span", "power-bd__pts", F.formatPoints(0)));
+            return row;
+        }
         row.appendChild(el("span", "power-bd__slot", slot ? SLOT_LABELS[slot] || slot : player.position));
         const who = el("span", "power-bd__who");
         const name = el("span", "power-bd__name", player.name || "—");
-        if (waiver) name.appendChild(el("span", "power-bd__tag", "Waivers"));
         if (player.out) name.appendChild(el("span", "power-bd__tag power-bd__tag--out", "Out"));
         who.appendChild(name);
         const meta = [player.position, player.pro_team].filter(Boolean).join(" · ");
@@ -1963,13 +1971,13 @@
         const absence = Math.round((payload.absence_rate || 0) * 100);
 
         box.appendChild(el("p", "power-bd__lede",
-            "Each player counts for the average of his season projection per game and this week's projection. " +
-            "Pts / wk is the best legal lineup, less what it loses to missed games."));
+            "Only players on this roster count. Each is worth the average of his season projection per game " +
+            "and this week's projection; pts / wk is the best legal lineup, less what it loses to missed games."));
 
         box.appendChild(el("h4", "power-bd__title", "Starting lineup"));
         const starters = el("ol", "power-bd__list");
         lineupBySlot(team, payload.slots).forEach(({ slot, player }) => {
-            starters.appendChild(breakdownPlayer(slot, player, (team.waiver_starters || []).includes(player)));
+            starters.appendChild(breakdownPlayer(slot, player));
         });
         box.appendChild(starters);
 
@@ -1984,7 +1992,7 @@
         };
         line("Lineup total", F.formatPoints(team.lineup_points));
         line("Missed games", `−${F.formatPoints(team.absence_cost)}`, "power-bd__line--minus",
-            `Starters sit about ${absence}% of weeks for byes and injuries; this is what the next man up gives back.`);
+            `Starters sit about ${absence}% of weeks for byes and injuries; this is what the next man on the roster gives back.`);
         line("Pts / wk", F.formatPoints(team.expected), "power-bd__line--total");
         box.appendChild(math);
 
@@ -1992,7 +2000,7 @@
         if (bench.length) {
             box.appendChild(el("h4", "power-bd__title", "Bench"));
             const list = el("ol", "power-bd__list power-bd__list--bench");
-            bench.forEach((player) => list.appendChild(breakdownPlayer(null, player, false)));
+            bench.forEach((player) => list.appendChild(breakdownPlayer(null, player)));
             box.appendChild(list);
         }
 
