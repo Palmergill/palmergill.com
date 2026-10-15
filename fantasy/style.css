@@ -332,8 +332,7 @@ button:focus-visible {
 .team-cell__text { display: flex; flex-direction: column; }
 
 .team-cell__name,
-.ledger__team-name,
-.matchup__name {
+.ledger__team-name {
     padding: 0;
     border: 0;
     background: none;
@@ -345,8 +344,7 @@ button:focus-visible {
 }
 
 .team-cell__name:hover,
-.ledger__team-name:hover,
-.matchup__name:hover { color: var(--sage, #5b7152); }
+.ledger__team-name:hover { color: var(--sage, #5b7152); }
 
 .team-cell__owner {
     font-size: 12px;
@@ -362,54 +360,10 @@ button:focus-visible {
     stroke-linecap: round;
 }
 
-/* ── scoreboard ───────────────────────────────────────────────────── */
 
-.scoreboard {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-    gap: 12px;
-}
 
-.matchup {
-    padding: 14px;
-    border: 1px solid var(--line, #ece4d8);
-    border-radius: 14px;
-    background: var(--surface, #f3eee4);
-}
 
-.matchup__tier {
-    display: block;
-    font-size: 10px;
-    font-weight: 600;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--clay, #b96a4b);
-    margin-bottom: 6px;
-}
 
-.matchup__side {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 10px;
-    padding: 4px 0;
-}
-
-.matchup__side--win .matchup__name,
-.matchup__side--win .matchup__score { color: var(--sage, #5b7152); }
-
-.matchup__score {
-    font-variant-numeric: tabular-nums;
-    font-weight: 600;
-}
-
-.matchup__pending,
-.matchup__bye {
-    display: block;
-    margin: 4px 0 0;
-    font-size: 12px;
-    color: var(--muted, #928a7d);
-}
 
 /* ── teams grid ───────────────────────────────────────────────────── */
 
@@ -650,9 +604,6 @@ button:focus-visible {
 
 .roster__ppg.dim { font-weight: 500; color: var(--muted, #928a7d); }
 
-
-@media (max-width: 620px) {
-}
 
 /* Free agents. A ranked list, but the point is the subtraction: these are the
    players nobody in this league has. */
@@ -1456,7 +1407,6 @@ button:focus-visible {
 #power,
 #standings,
 #power-chart,
-#scoreboard,
 #free-agents,
 #teams,
 #history { scroll-margin-top: calc(var(--site-nav-height, 52px) + 16px); }
@@ -1586,22 +1536,8 @@ button:focus-visible {
 
 @media (max-width: 720px) {
 
-    .scoreboard {
-        grid-template-columns: minmax(0, 1fr);
-        gap: 0;
-    }
 
-    .matchup {
-        padding: 10px 0;
-        border: 0;
-        border-bottom: 1px solid var(--line, #ece4d8);
-        border-radius: 0;
-        background: none;
-    }
 
-    .matchup:last-child { border-bottom: none; }
-    .matchup__side { padding: 2px 0; }
-    .matchup__name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
     .teams-grid {
         grid-template-columns: minmax(0, 1fr);
@@ -2165,7 +2101,7 @@ button:focus-visible {
     .ledger__cell .ledger__odds .meter { display: none; }
 }
 
-/* ══ Mobile-first hub (tabs, my-team card, power strip, matchups) ════════ */
+/* ══ Mobile-first hub (views, my-team card, power strip) ════════ */
 
 /* Team initials: the stand-in for a missing or unloadable logo. */
 .team-mono {
@@ -2411,38 +2347,6 @@ td.standings__num:nth-child(3) { font-weight: 700; color: var(--ink, #23201c); }
 }
 
 /* Scoreboard: logos, a W, the point split as one bar, and the margin. */
-.matchup__side { display: grid; grid-template-columns: 24px minmax(0, 1fr) auto 18px; align-items: center; gap: 10px; }
-.matchup__logo { width: 24px; height: 24px; border-radius: 6px; object-fit: cover; }
-.matchup__logo.team-mono { border-radius: 50%; font-size: 9px; }
-.matchup__name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.matchup__side:not(.matchup__side--win) .matchup__name,
-.matchup__side:not(.matchup__side--win) .matchup__score { color: var(--soft, #5d574e); font-weight: 500; }
-.matchup__side--win .matchup__name,
-.matchup__side--win .matchup__score { color: var(--ink, #23201c); font-weight: 800; }
-.matchup__side--mine .matchup__name { text-decoration: underline; text-decoration-color: var(--clay, #b96a4b); text-underline-offset: 3px; }
-.matchup__win {
-    display: grid;
-    place-items: center;
-    width: 18px;
-    height: 18px;
-    border-radius: 5px;
-    background: var(--sage, #5b7152);
-    color: #fff;
-    font-size: 10px;
-    font-weight: 800;
-}
-.matchup__split {
-    display: flex;
-    gap: 2px;
-    height: 4px;
-    margin: 8px 0 4px;
-}
-.matchup__split span { border-radius: 999px; background: var(--line-strong, #d8cdba); }
-.matchup__split-home { flex: 0 0 50%; }
-.matchup__split-away { flex: 1 1 auto; }
-.matchup__split--home .matchup__split-home,
-.matchup__split--away .matchup__split-away { background: var(--sage, #5b7152); }
-.matchup__margin { display: block; font-size: 12px; color: var(--muted, #928a7d); }
 
 /* Teams list: give the initials badge the logo's slot. */
 .team-card__logo.team-mono { font-size: 11px; }

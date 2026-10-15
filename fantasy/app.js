@@ -14,8 +14,6 @@
         season: null,
         mode: null,
         week: null,
-        scoreWeek: null,
-        scoreboardRequest: 0,
         // Résumé is always ranked on every factor at once. The server offers
         // single-factor methods too, but a menu of them confused more than it
         // answered, so the page no longer asks.
@@ -109,8 +107,6 @@
         playoffBubble: byId("playoffBubble"),
         charts: byId("charts"),
         chartsNote: byId("chartsNote"),
-        scoreboardWeek: byId("scoreboardWeek"),
-        scoreboard: byId("scoreboardGrid"),
         teamsGrid: byId("teamsGrid"),
         freeAgents: byId("freeAgents"),
         freeAgentsNote: byId("freeAgentsNote"),
@@ -1036,82 +1032,6 @@
         els.chartsNote.textContent = `${scored.length} teams with completed games`;
     }
 
-    function fillWeekSelect(select, weeks, selected) {
-        select.replaceChildren();
-        weeks.forEach((week) => {
-            const option = el("option", null, `Week ${week}`);
-            option.value = week;
-            if (week === selected) option.selected = true;
-            select.appendChild(option);
-        });
-        select.disabled = weeks.length === 0;
-    }
-
-    function renderScoreboard(payload) {
-        els.scoreboard.replaceChildren();
-        if (!payload.matchups.length) {
-            els.scoreboard.appendChild(el("p", "empty-note", "No matchups for this week."));
-            return;
-        }
-
-        payload.matchups.forEach((matchup) => {
-            const card = el("article", "matchup");
-            if (matchup.playoff_tier && matchup.playoff_tier !== "NONE") {
-                card.appendChild(
-                    el("span", "matchup__tier", matchup.playoff_tier.replace(/_/g, " ").toLowerCase())
-                );
-            }
-
-            if (matchup.is_bye) {
-                card.classList.add("matchup--bye");
-                card.appendChild(el("p", "matchup__bye", `${matchup.home.name || "—"} — bye`));
-                els.scoreboard.appendChild(card);
-                return;
-            }
-
-            const sides = [matchup.home, matchup.away].filter(Boolean);
-            sides.forEach((side, index) => {
-                const isWinner =
-                    matchup.is_complete &&
-                    ((index === 0 && matchup.winner === "HOME") ||
-                        (index === 1 && matchup.winner === "AWAY"));
-                const line = el("div", `matchup__side${isWinner ? " matchup__side--win" : ""}`);
-                if (side.espn_team_id === state.myTeamId) line.classList.add("matchup__side--mine");
-                line.appendChild(teamBadge(side, "matchup__logo"));
-                const nameButton = el("button", "matchup__name", side.name || "—");
-                nameButton.type = "button";
-                nameButton.addEventListener("click", () => selectTeam(side.espn_team_id));
-                line.appendChild(nameButton);
-                line.appendChild(el("span", "matchup__score", F.formatPoints(side.points)));
-                if (isWinner) line.appendChild(el("span", "matchup__win", "W"));
-                card.appendChild(line);
-            });
-
-            // How the points split, as one bar: the margin is the story.
-            if (sides.length === 2 && (sides[0].points || sides[1].points)) {
-                const total = (sides[0].points || 0) + (sides[1].points || 0);
-                const bar = el("div", "matchup__split");
-                bar.setAttribute("aria-hidden", "true");
-                const home = el("span", "matchup__split-home");
-                home.style.flexBasis = `${((sides[0].points || 0) / total) * 100}%`;
-                bar.appendChild(home);
-                bar.appendChild(el("span", "matchup__split-away"));
-                if (matchup.is_complete) bar.classList.add(matchup.winner === "AWAY" ? "matchup__split--away" : "matchup__split--home");
-                card.appendChild(bar);
-            }
-
-            if (!matchup.is_complete) {
-                card.appendChild(el("span", "matchup__pending", "Not played"));
-            } else if (sides.length === 2) {
-                const margin = Math.abs((sides[0].points || 0) - (sides[1].points || 0));
-                const winner = matchup.winner === "AWAY" ? sides[1] : sides[0];
-                card.appendChild(el("span", "matchup__margin",
-                    matchup.winner === "TIE" ? "Tied" : `${winner.name || "—"} by ${F.formatPoints(margin)}`));
-            }
-            els.scoreboard.appendChild(card);
-        });
-    }
-
     function renderTeamsGrid(payload) {
         state.standingsTeams = payload.teams || [];
         // Once games are played the standings rows are the way into a team.
@@ -1689,23 +1609,6 @@
         if (state.ledger) {
             renderLedger(state.ledger);
             renderCharts(state.ledger);
-        }
-    }
-
-    async function loadScoreboard() {
-        const generation = state.generation;
-        const request = ++state.scoreboardRequest;
-        const params = new URLSearchParams();
-        if (state.season) params.set("season", state.season);
-        if (state.scoreWeek) params.set("week", state.scoreWeek);
-        try {
-            const payload = await fetchJson(`${API_BASE}/scoreboard?${params}`);
-            if (stale(generation) || request !== state.scoreboardRequest) return;
-            state.scoreWeek = payload.week;
-            fillWeekSelect(els.scoreboardWeek, payload.available_weeks, payload.week);
-            renderScoreboard(payload);
-        } catch (error) {
-            if (!stale(generation) && request === state.scoreboardRequest) handleFailure(error);
         }
     }
 
@@ -2627,7 +2530,6 @@
             await Promise.all([
                 loadRosterPower(),
                 loadLedger(),
-                loadScoreboard(),
                 loadFreeAgents(),
                 loadPowerChart(),
             ]);
@@ -2648,7 +2550,6 @@
         if (season === state.season) return;
         state.season = season;
         state.week = null;
-        state.scoreWeek = null;
         state.teamId = null;
         state.pendingMyTeam = false;
         writeUrlState(false);
@@ -2681,10 +2582,6 @@
         });
         els.chartFullSeason.addEventListener("change", () => renderPowerChart(state.chartPayload));
         els.teamBack.addEventListener("click", clearTeam);
-        els.scoreboardWeek.addEventListener("change", (event) => {
-            state.scoreWeek = parseInt(event.target.value, 10);
-            loadScoreboard();
-        });
 
         els.freeAgentsToggle.addEventListener("click", () => {
             if (!state.freeAgentsPayload) return;

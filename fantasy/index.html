@@ -14,7 +14,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/shared/site-nav.css?v=17">
     <link rel="stylesheet" href="/shared/fantasy-header.css?v=3">
-    <link rel="stylesheet" href="style.css?v=37">
+    <link rel="stylesheet" href="style.css?v=38">
     <link rel="stylesheet" href="/shared/fantasy-design.css?v=2">
 </head>
 <body>
@@ -161,7 +161,7 @@
                  each board names its view in data-view, and only the current
                  view's boards are shown. ?view= keeps it in the URL. -->
             <div id="leagueSections" data-view="home">
-                <!-- League: where you stand, this week, and the order. -->
+                <!-- League: where you stand, and the order. -->
                 <div class="hub-team" data-view="home">
                 <div id="myTeamSummary" class="my-team-summary" hidden><span id="myTeamName"></span> <button id="myTeamChange" type="button" class="button button--quiet">Change team</button></div>
                 <form id="myTeamForm" class="my-team-picker" hidden>
@@ -171,18 +171,6 @@
                     <span id="myTeamStatus" role="status"></span>
                 </form>
                 </div>
-
-                <section class="board" id="scoreboard" data-board="scoreboard" data-view="home" aria-labelledby="scoreboardTitle">
-                    <div class="board__head">
-                        <h2 id="scoreboardTitle">This week</h2>
-                        <label class="select-field">
-                            <span class="sr-only">Scoreboard week</span>
-                            <select id="scoreboardWeek"></select>
-                        </label>
-                    </div>
-                    <div id="scoreboardGrid" class="scoreboard"></div>
-                    <a class="league-link board__more" href="/fantasy/week/">Read the weekly recap →</a>
-                </section>
 
                 <!-- Power rankings read the rosters, not the results: what each
                      team can be expected to score a week from here, given
@@ -305,7 +293,7 @@
                             <h2 id="historyTitle">History</h2>
                             <p class="board__lede">
                                 Every season the league has kept. Open one to read its
-                                table, scoreboard and rosters as they finished.
+                                table and rosters as they finished.
                             </p>
                         </div>
                         <span class="board__note" id="historyNote"></span>
@@ -324,6 +312,6 @@
     <script src="/shared/analytics.js?v=1"></script>
     <script src="/shared/api-base.js?v=1"></script>
     <script src="format.js?v=16"></script>
-    <script src="app.js?v=39"></script>
+    <script src="app.js?v=40"></script>
 </body>
 </html>
