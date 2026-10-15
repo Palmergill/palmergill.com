@@ -350,9 +350,9 @@ document.addEventListener('DOMContentLoaded', () => {
         // Close modal and clear input
         closeSearchModalFn();
         
-        // Shelby Easter Egg
+        // Shelby easter egg (shelby.js)
         if (ticker === 'SHELBY') {
-            showShelbyEasterEgg();
+            window.ShelbyEgg?.show();
             return;
         }
         window.pgAnalytics?.track?.('stock_ticker_searched', { ticker });
@@ -377,171 +377,6 @@ document.addEventListener('DOMContentLoaded', () => {
     
     searchForm.addEventListener('submit', handleSearch);
     
-    // ============================================
-    // SHELBY EASTER EGG
-    // ============================================
-    function showShelbyEasterEgg() {
-        const overlay = document.getElementById('shelbyOverlay');
-        const canvas = document.getElementById('shelbyCanvas');
-        const message = document.getElementById('shelbyMessage');
-        const heartsContainer = document.getElementById('shelbyHearts');
-        const hint = document.querySelector('.shelby-hint');
-        
-        if (!overlay || !canvas) return;
-
-        let heartInterval = null;
-
-        // Show overlay
-        overlay.classList.remove('hidden');
-        setTimeout(() => overlay.classList.add('visible'), 10);
-        
-        // Setup canvas
-        const ctx = canvas.getContext('2d');
-        canvas.width = window.innerWidth;
-        canvas.height = window.innerHeight;
-        
-        // Heart drawing animation - positioned below the text
-        const centerX = canvas.width / 2;
-        const centerY = canvas.height / 2 + 80; // Moved down to make room for text
-        const size = Math.min(canvas.width, canvas.height) * 0.22; // Slightly smaller
-        
-        let progress = 0;
-        const duration = 3000; // 3 seconds to draw
-        const startTime = performance.now();
-        let heartsStarted = false;
-        
-        function drawHeart(p) {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            
-            // Draw heart path with sparkle
-            ctx.beginPath();
-            ctx.strokeStyle = '#ff1744';
-            ctx.lineWidth = 4;
-            ctx.lineCap = 'round';
-            ctx.lineJoin = 'round';
-            ctx.shadowBlur = 20;
-            ctx.shadowColor = '#ff1744';
-            
-            // Heart shape using parametric equations
-            const points = [];
-            const totalPoints = 200;
-            const drawPoints = Math.floor(totalPoints * p);
-            
-            for (let i = 0; i <= drawPoints; i++) {
-                const t = (i / totalPoints) * Math.PI * 2;
-                const x = centerX + size * (16 * Math.pow(Math.sin(t), 3)) / 16;
-                const y = centerY - size * (13 * Math.cos(t) - 5 * Math.cos(2*t) - 2 * Math.cos(3*t) - Math.cos(4*t)) / 16;
-                points.push({x, y});
-            }
-            
-            if (points.length > 1) {
-                ctx.moveTo(points[0].x, points[0].y);
-                for (let i = 1; i < points.length; i++) {
-                    ctx.lineTo(points[i].x, points[i].y);
-                }
-                ctx.stroke();
-                
-                // Add sparkle at the end
-                if (points.length > 5) {
-                    const last = points[points.length - 1];
-                    ctx.shadowBlur = 30;
-                    ctx.fillStyle = '#3b82f6';
-                    ctx.beginPath();
-                    ctx.arc(last.x, last.y, 6, 0, Math.PI * 2);
-                    ctx.fill();
-                }
-            }
-            
-            // Add glow effect
-            if (p > 0.8) {
-                ctx.globalAlpha = (p - 0.8) * 5;
-                ctx.fillStyle = '#ff1744';
-                ctx.beginPath();
-                for (let i = 0; i < points.length; i++) {
-                    const t = (i / totalPoints) * Math.PI * 2;
-                    const x = centerX + size * 0.9 * (16 * Math.pow(Math.sin(t), 3)) / 16;
-                    const y = centerY - size * 0.9 * (13 * Math.cos(t) - 5 * Math.cos(2*t) - 2 * Math.cos(3*t) - Math.cos(4*t)) / 16;
-                    if (i === 0) ctx.moveTo(x, y);
-                    else ctx.lineTo(x, y);
-                }
-                ctx.fill();
-                ctx.globalAlpha = 1;
-            }
-        }
-        
-        function animate(currentTime) {
-            const elapsed = currentTime - startTime;
-            progress = Math.min(elapsed / duration, 1);
-            
-            drawHeart(progress);
-            
-            // Start hearts early (at 30% progress)
-            if (progress > 0.3 && !heartsStarted) {
-                heartsStarted = true;
-                startFloatingHearts();
-            }
-            
-            if (progress < 1) {
-                requestAnimationFrame(animate);
-            } else {
-                // Show message when heart is complete
-                message.classList.add('visible');
-                // Show hint
-                setTimeout(() => hint.classList.add('visible'), 2000);
-            }
-        }
-        
-        requestAnimationFrame(animate);
-        
-        // Floating hearts
-        function startFloatingHearts() {
-            const heartEmojis = ['❤️', '💕', '💗', '💖', '💝'];
-            
-            function createHeart() {
-                const heart = document.createElement('div');
-                heart.className = 'shelby-heart';
-                heart.textContent = heartEmojis[Math.floor(Math.random() * heartEmojis.length)];
-                heart.style.left = Math.random() * 100 + '%';
-                heart.style.fontSize = (16 + Math.random() * 24) + 'px';
-                heart.style.animationDuration = (3 + Math.random() * 3) + 's';
-                heart.style.animationDelay = Math.random() * 2 + 's';
-                heartsContainer.appendChild(heart);
-                
-                // Remove after animation
-                setTimeout(() => heart.remove(), 7000);
-            }
-            
-            // Create hearts continuously. Keep the id in the closure so the
-            // close handler can clear it reliably — storing it on dataset
-            // round-trips through a string and parseInt(NaN) silently leaks
-            // the interval if the value is lost or replaced.
-            heartInterval = setInterval(createHeart, 300);
-        }
-        
-        // Click to close
-        function closeOverlay() {
-            overlay.classList.remove('visible');
-            setTimeout(() => {
-                overlay.classList.add('hidden');
-                message.classList.remove('visible');
-                hint.classList.remove('visible');
-                heartsContainer.innerHTML = '';
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
-                if (heartInterval !== null) {
-                    clearInterval(heartInterval);
-                    heartInterval = null;
-                }
-            }, 1000);
-            overlay.removeEventListener('click', closeOverlay);
-            overlay.removeEventListener('touchstart', closeOverlay);
-        }
-        
-        setTimeout(() => {
-            overlay.addEventListener('click', closeOverlay);
-            overlay.addEventListener('touchstart', closeOverlay);
-        }, 4000); // Allow close after animation
-    }
-
     // Retry handler
     retryBtn.addEventListener('click', () => {
         // Clear any running countdown
@@ -632,6 +467,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function loadStock(ticker, forceRefresh = false, attempt = 1) {
+        // Every entry point (Enter on a suggestion, ?ticker=) reaches here.
+        if (ticker === 'SHELBY') {
+            window.ShelbyEgg?.show();
+            return;
+        }
         currentTicker = ticker;
         if (attempt === 1) {
             lastChartData = null;

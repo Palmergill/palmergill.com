@@ -1912,122 +1912,6 @@ button,
 }
 
 /* ============================================
-   SHELBY EASTER EGG
-   ============================================ */
-
-.shelby-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: #000;
-    z-index: 9999;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    opacity: 0;
-    transition: opacity 1s ease;
-}
-
-.shelby-overlay.visible {
-    opacity: 1;
-}
-
-.shelby-canvas {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-}
-
-.shelby-message {
-    position: absolute;
-    top: 15%;
-    left: 50%;
-    transform: translateX(-50%) scale(0.8);
-    z-index: 10;
-    font-family: 'Georgia', 'Times New Roman', serif;
-    font-size: 48px;
-    font-weight: 700;
-    color: #ff1744;
-    text-shadow: 0 0 30px rgba(255, 23, 68, 0.5), 0 0 60px rgba(255, 23, 68, 0.3);
-    opacity: 0;
-    transition: all 1s ease;
-    text-align: center;
-    padding: 20px;
-    white-space: nowrap;
-}
-
-.shelby-message.visible {
-    opacity: 1;
-    transform: translateX(-50%) scale(1);
-}
-
-.shelby-hearts {
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    pointer-events: none;
-    overflow: hidden;
-}
-
-.shelby-heart {
-    position: absolute;
-    font-size: 24px;
-    animation: shelby-float 4s ease-in infinite;
-    opacity: 0;
-}
-
-@keyframes shelby-float {
-    0% {
-        transform: translateY(100vh) rotate(0deg);
-        opacity: 0;
-    }
-    10% {
-        opacity: 1;
-    }
-    90% {
-        opacity: 1;
-    }
-    100% {
-        transform: translateY(-100px) rotate(360deg);
-        opacity: 0;
-    }
-}
-
-.shelby-hint {
-    position: absolute;
-    bottom: 40px;
-    left: 50%;
-    transform: translateX(-50%);
-    color: var(--line-strong);
-    font-size: 14px;
-    opacity: 0;
-    transition: opacity 1s ease;
-    animation: shelby-pulse 2s ease-in-out infinite;
-}
-
-.shelby-hint.visible {
-    opacity: 1;
-}
-
-@keyframes shelby-pulse {
-    0%, 100% { opacity: 0.3; }
-    50% { opacity: 0.8; }
-}
-
-@media (max-width: 768px) {
-    .shelby-message {
-        font-size: 32px;
-    }
-}
-
-/* ============================================
    KEY METRICS - OPTION B STYLE (Compact)
    ============================================ */
 
@@ -2797,3 +2681,171 @@ button,
     .fm-glance { grid-template-columns: repeat(3, minmax(0, 1fr)); }
     .fm-glance .ov-glance-item:nth-child(3) { border-top: 0; padding-top: 0; }
 }
+
+/* ============================================
+   SHELBY EASTER EGG (shelby.js)
+   A rallying price line that traces a heart.
+   ============================================ */
+html.shelby-lock, html.shelby-lock body { overflow: hidden; }
+
+.shelby-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 10050; /* above the shared site nav */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: max(24px, env(safe-area-inset-top)) 16px max(24px, env(safe-area-inset-bottom));
+    background:
+        radial-gradient(120% 70% at 50% 42%, #fde9e6 0%, rgba(253, 233, 230, 0) 60%),
+        var(--bg);
+    opacity: 0;
+    transition: opacity 450ms ease;
+    cursor: default;
+    overflow: hidden;
+}
+.shelby-overlay.is-open { opacity: 1; }
+.shelby-overlay.is-closing { opacity: 0; }
+.shelby-overlay.can-close { cursor: pointer; }
+
+.shelby-floats { position: absolute; inset: 0; pointer-events: none; }
+.shelby-float {
+    position: absolute;
+    bottom: -32px;
+    animation: shelby-rise linear forwards;
+}
+@keyframes shelby-rise {
+    0% { transform: translate(0, 0) rotate(0); opacity: 0; }
+    12% { opacity: 1; }
+    100% { transform: translate(var(--drift), -110vh) rotate(var(--spin)); opacity: 0; }
+}
+
+.shelby-stage {
+    position: relative;
+    width: min(100%, 460px);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+}
+
+.shelby-ticker {
+    align-self: stretch;
+    text-align: left;
+    opacity: 0;
+    transform: translateY(8px);
+    transition: opacity 600ms ease 200ms, transform 600ms cubic-bezier(0.2, 0.8, 0.2, 1) 200ms;
+}
+.shelby-overlay.is-open .shelby-ticker { opacity: 1; transform: none; }
+.shelby-ticker-top { display: flex; align-items: baseline; gap: 8px; }
+.shelby-symbol {
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    color: var(--ink);
+    padding: 2px 8px;
+    border-radius: 6px;
+    background: #fbe0dd;
+}
+.shelby-name { font-size: 13px; font-weight: 600; color: var(--muted); }
+.shelby-price {
+    margin-top: 6px;
+    font-size: 44px;
+    line-height: 1.05;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: var(--ink);
+}
+.shelby-delta {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    margin-top: 4px;
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--accent-green);
+}
+.shelby-arrow { font-size: 11px; }
+.shelby-delta-label { color: var(--muted); font-weight: 500; }
+
+.shelby-chart { width: 100%; height: auto; margin-top: 8px; overflow: visible; }
+.shelby-ref { stroke: var(--line-strong); stroke-width: 1; opacity: 0; transition: opacity 400ms ease 500ms; }
+.shelby-overlay.is-open .shelby-ref { opacity: 1; }
+.shelby-line {
+    fill: none;
+    stroke: #c4485e;
+    stroke-width: 3;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-dasharray: 1;
+    stroke-dashoffset: 1;
+}
+.shelby-overlay.is-open .shelby-line {
+    animation: shelby-draw 2.6s cubic-bezier(0.55, 0.1, 0.35, 1) 600ms forwards;
+}
+@keyframes shelby-draw { to { stroke-dashoffset: 0; } }
+
+.shelby-heart-fill {
+    opacity: 0;
+    transform-box: fill-box;
+    transform-origin: 50% 60%;
+}
+.shelby-overlay.is-open .shelby-heart-fill {
+    animation:
+        shelby-fill 700ms ease 3.1s forwards,
+        shelby-beat 1.6s ease-in-out 3.9s infinite;
+}
+@keyframes shelby-fill { from { opacity: 0; transform: scale(0.92); } to { opacity: 1; transform: scale(1); } }
+@keyframes shelby-beat {
+    0%, 100% { transform: scale(1); }
+    14% { transform: scale(1.07); }
+    28% { transform: scale(1); }
+    42% { transform: scale(1.05); }
+    70% { transform: scale(1); }
+}
+
+.shelby-message {
+    margin-top: 12px;
+    font-size: 34px;
+    line-height: 1.15;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: var(--ink);
+    opacity: 0;
+    transform: translateY(10px);
+}
+.shelby-name-accent { color: #c4485e; }
+.shelby-overlay.is-open .shelby-message {
+    animation: shelby-message 800ms cubic-bezier(0.2, 0.8, 0.2, 1) 3.4s forwards;
+}
+@keyframes shelby-message { to { opacity: 1; transform: none; } }
+
+.shelby-hint {
+    position: absolute;
+    left: 50%;
+    bottom: max(24px, env(safe-area-inset-bottom));
+    transform: translateX(-50%);
+    padding: 6px 14px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.7);
+    border: 1px solid var(--line);
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--muted);
+    white-space: nowrap;
+    opacity: 0;
+    transition: opacity 600ms ease;
+}
+.shelby-overlay.can-close .shelby-hint { opacity: 1; transition-delay: 3s; }
+
+@media (min-width: 720px) {
+    .shelby-price { font-size: 56px; }
+    .shelby-message { font-size: 44px; }
+}
+
+.shelby-overlay.is-static .shelby-ticker,
+.shelby-overlay.is-static .shelby-ref,
+.shelby-overlay.is-static .shelby-message,
+.shelby-overlay.is-static .shelby-heart-fill { opacity: 1; transform: none; transition: none; animation: none; }
+.shelby-overlay.is-static .shelby-line { stroke-dashoffset: 0; animation: none; }
+.shelby-overlay.is-static .shelby-hint { transition-delay: 0s; }
