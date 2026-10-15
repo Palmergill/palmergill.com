@@ -1,7 +1,7 @@
 // Shared fantasy section nav: the one menu for everything under /fantasy/.
 //
-// Four slots and a More. League, Standings and Stats are views of the hub
-// at /fantasy/; My team is your own team page. The quieter league pages
+// Five slots and a More. League, Standings, Stats and Rosters are views of
+// the hub at /fantasy/; My team is your own team page. The quieter league pages
 // (free agents, recaps, history) and the tools that are the same for every
 // league sit behind More, so the row fits a phone without scrolling.
 //
@@ -27,6 +27,7 @@
         { key: "home", label: "League", href: "/fantasy/" },
         { key: "standings", label: "Standings", href: "/fantasy/?view=standings" },
         { key: "stats", label: "Stats", href: "/fantasy/?view=stats" },
+        { key: "rosters", label: "Rosters", href: "/fantasy/?view=rosters" },
         // `team=me` rather than a team id: the header has no idea which team
         // is yours and should not have to fetch to find out. The hub already
         // reads /league/me for the ledger highlight, so it resolves this.
@@ -39,7 +40,6 @@
         {
             heading: "League",
             items: [
-                { key: "rosters", label: "Rosters", href: "/fantasy/?view=rosters", note: "Every team's roster shape" },
                 { key: "free-agents", label: "Free agents", href: "/fantasy/?view=free-agents", note: "Who is still claimable" },
                 { key: "week", label: "Weekly recap", href: "/fantasy/week/", note: "The week, written up" },
                 { key: "draft-recap", label: "Draft recap", href: "/fantasy/draft-recap/", note: "How every team drafted" },

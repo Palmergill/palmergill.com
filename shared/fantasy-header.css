@@ -164,7 +164,7 @@ span.fantasy-header__link.is-current {
    hang open. */
 [hidden] { display: none !important; }
 
-/* A phone gets one row of five even slots and no brand label: the page's
+/* A phone gets one row of six even slots and no brand label: the page's
    own masthead already says where you are. */
 @media (max-width: 620px) {
     .fantasy-header__inner {
@@ -179,7 +179,7 @@ span.fantasy-header__link.is-current {
         position: relative;
         flex-wrap: nowrap;
         justify-content: space-between;
-        gap: 2px;
+        gap: 0;
         width: 100%;
         margin-left: 0;
     }
@@ -187,8 +187,9 @@ span.fantasy-header__link.is-current {
     .fantasy-header__link {
         justify-content: center;
         min-height: 36px;
-        padding: 6px 9px;
-        font-size: 0.8rem;
+        padding: 6px clamp(3px, 1.1vw, 9px);
+        font-size: clamp(0.68rem, 3.15vw, 0.8rem);
+        letter-spacing: -0.01em;
     }
 
     /* The menu spans the row rather than hanging off the More button. */

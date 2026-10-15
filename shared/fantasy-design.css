@@ -57,9 +57,6 @@ button:focus-visible, select:focus-visible, summary:focus-visible, a:focus-visib
 }
 .page-head h1 { font-family: "Newsreader", Georgia, serif; font-size: clamp(2rem, 4vw, 3.4rem); line-height: 1.1; }
 @media (max-width: 620px) {
- .fantasy-header__inner { flex-wrap: nowrap; gap: 4px; }
- .fantasy-header__links { width: auto; margin-left: auto; }
- .fantasy-header__menu { width: min(320px, calc(100vw - 32px)); left: auto; right: 0; }
  .editorial-hero { padding-top: 0; padding-bottom: 10px; margin-top: 6px; margin-bottom: 12px; }
  .editorial-hero__title > .eyebrow { display: none; }
  .hero-snapshot { margin-top: 6px; border: 0; background: transparent; }
