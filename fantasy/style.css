@@ -2267,6 +2267,15 @@ td.standings__num:nth-child(3) { font-weight: 700; color: var(--ink, #23201c); }
 }
 .standings__odds .meter { margin-top: 4px; }
 .standings__row--mine td { background: #f7f4ec; }
+.standings__division {
+    margin: 0 0 2px;
+    color: var(--clay, #b96a4b);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+.standings-table + .standings__division { margin-top: 26px; }
 .standings__row--mine .team-cell__name { font-weight: 700; }
 @media (max-width: 620px) {
     .standings-table { font-size: 13.5px; }

@@ -568,6 +568,25 @@
         els.standingsNote.textContent = els.ledgerNote.textContent;
         const showOdds = teams.some((team) => team.playoff && team.playoff.odds !== null && team.playoff.odds !== undefined);
 
+        // The league plays in divisions, so the table does too: one per
+        // division, in ESPN's order, each ranked on its own. A season with
+        // no divisions gets a single table.
+        const divisions = new Map();
+        teams.forEach((team) => {
+            const key = team.division_name ? team.division_id ?? team.division_name : null;
+            if (!divisions.has(key)) divisions.set(key, { name: team.division_name || null, id: team.division_id ?? 0, teams: [] });
+            divisions.get(key).teams.push(team);
+        });
+        const groups = [...divisions.values()].sort((x, y) => x.id - y.id);
+        groups.forEach((group) => {
+            if (groups.length > 1 && group.name) {
+                els.standingsTable.appendChild(el("h3", "standings__division", group.name));
+            }
+            els.standingsTable.appendChild(standingsTable(group.teams, showOdds));
+        });
+    }
+
+    function standingsTable(teams, showOdds) {
         const table = el("table", "standings-table");
         const head = el("tr");
         head.appendChild(el("th", "standings__seed", "#"));
@@ -603,7 +622,7 @@
             body.appendChild(row);
         });
         table.appendChild(body);
-        els.standingsTable.appendChild(table);
+        return table;
     }
 
     function renderColumnChips() {
