@@ -129,6 +129,8 @@
         lineupTotals: byId("lineupTotals"),
         lineupChanges: byId("lineupChanges"),
         lineupNote: byId("lineupNote"),
+        rosterShapeBoard: byId("roster-shape"),
+        rosterShape: byId("rosterShape"),
     };
 
     class ForbiddenError extends Error {}
@@ -2011,6 +2013,118 @@
         return box;
     }
 
+    // ── roster shape ────────────────────────────────────────────────────
+    //
+    // A compass of the four rooms that decide a lineup. Each room is the
+    // projected points a week of the players who would start there (two
+    // quarterbacks for QB and OP, three backs and three receivers with the
+    // flex seats, one tight end), scaled across the league from weakest at
+    // the centre to strongest at the edge.
+
+    const SHAPE_AXES = [
+        { position: "QB", label: "QB", depth: 2 },
+        { position: "WR", label: "WR", depth: 3 },
+        { position: "TE", label: "TE", depth: 1 },
+        { position: "RB", label: "RB", depth: 3 },
+    ];
+    const SHAPE_FLOOR = 0.12;
+
+    function roomValue(team, axis) {
+        return (team.players || [])
+            .filter((p) => p.position === axis.position)
+            .map((p) => p.ppg || 0)
+            .sort((a, b) => b - a)
+            .slice(0, axis.depth)
+            .reduce((sum, v) => sum + v, 0);
+    }
+
+    function rosterShapeData(teamId) {
+        const teams = (state.rosterPower && state.rosterPower.available && state.rosterPower.teams) || [];
+        const team = teams.find((t) => t.espn_team_id === teamId);
+        if (!team || teams.length < 2) return null;
+        return SHAPE_AXES.map((axis) => {
+            const values = teams.map((t) => roomValue(t, axis));
+            const lo = Math.min(...values);
+            const hi = Math.max(...values);
+            const scale = (v) => (hi > lo ? SHAPE_FLOOR + (1 - SHAPE_FLOOR) * ((v - lo) / (hi - lo)) : 0.5);
+            const value = roomValue(team, axis);
+            const average = values.reduce((sum, v) => sum + v, 0) / values.length;
+            return {
+                ...axis,
+                value,
+                average,
+                r: scale(value),
+                avgR: scale(average),
+                rank: values.filter((v) => v > value).length + 1,
+                teams: teams.length,
+            };
+        });
+    }
+
+    function renderRosterShape() {
+        const board = els.rosterShapeBoard;
+        const data = state.teamId ? rosterShapeData(state.teamId) : null;
+        board.hidden = !data;
+        els.rosterShape.replaceChildren();
+        if (!data) return;
+
+        const size = 320;
+        const c = size / 2;
+        const R = 104;
+        // QB north, WR east, TE south, RB west.
+        const point = (index, r) => {
+            const angle = -Math.PI / 2 + (index * 2 * Math.PI) / data.length;
+            return [c + Math.cos(angle) * R * r, c + Math.sin(angle) * R * r];
+        };
+        const path = (key) => data.map((d, i) => point(i, d[key]).map((n) => n.toFixed(1)).join(",")).join(" ");
+
+        const chart = svg("svg", { viewBox: `0 0 ${size} ${size}`, class: "shape__svg", role: "img" });
+        chart.setAttribute("aria-label", "Roster shape: " + data.map((d) =>
+            `${d.label} ${F.formatPoints(d.value)} points, ${F.ordinal(d.rank)} of ${d.teams}`).join("; "));
+
+        [0.25, 0.5, 0.75, 1].forEach((r) => {
+            chart.appendChild(svg("circle", {
+                cx: c, cy: c, r: R * r,
+                class: r === 1 ? "shape__ring shape__ring--edge" : "shape__ring",
+            }));
+        });
+        data.forEach((_d, i) => {
+            const [x, y] = point(i, 1);
+            chart.appendChild(svg("line", { x1: c, y1: c, x2: x, y2: y, class: "shape__spoke" }));
+        });
+        chart.appendChild(svg("polygon", { points: path("avgR"), class: "shape__avg" }));
+        chart.appendChild(svg("polygon", { points: path("r"), class: "shape__team" }));
+        data.forEach((d, i) => {
+            const [x, y] = point(i, d.r);
+            chart.appendChild(svg("circle", { cx: x, cy: y, r: 4.5, class: "shape__dot" }));
+        });
+
+        // Labels sit just past the edge, anchored away from the centre.
+        data.forEach((d, i) => {
+            const [x, y] = point(i, 1.2);
+            const anchor = Math.abs(x - c) < 1 ? "middle" : x > c ? "start" : "end";
+            const dy = y < c - 1 ? -14 : y > c + 1 ? 6 : -4;
+            const label = svg("text", { x: anchor === "start" ? x - 10 : anchor === "end" ? x + 10 : x, y: y + dy, "text-anchor": anchor, class: "shape__label" });
+            label.appendChild(svg("tspan", { class: "shape__pos" })).textContent = d.label;
+            const sub = svg("tspan", { x: label.getAttribute("x"), dy: 15, class: "shape__sub" });
+            sub.textContent = `${F.formatPoints(d.value)} · ${F.ordinal(d.rank)}`;
+            label.appendChild(sub);
+            chart.appendChild(label);
+        });
+        els.rosterShape.appendChild(chart);
+
+        const legend = el("ul", "shape__legend");
+        const key = (cls, text) => {
+            const item = el("li");
+            item.appendChild(el("span", `shape__key ${cls}`));
+            item.appendChild(document.createTextNode(text));
+            legend.appendChild(item);
+        };
+        key("shape__key--team", "This roster");
+        key("shape__key--avg", "League average");
+        els.rosterShape.appendChild(legend);
+    }
+
     function renderRosterPower(payload) {
         els.powerList.replaceChildren();
         if (!payload.available) {
@@ -2022,6 +2136,7 @@
         }
 
         const teams = payload.teams;
+        if (state.teamId) renderRosterShape();
         els.powerNote.textContent = payload.week
             ? `Projections through week ${payload.week} · ${payload.scoring === "half" ? "Half PPR" : payload.scoring}`
             : "";
@@ -2503,6 +2618,7 @@
         els.rosterNote.textContent = "";
         els.roomsLede.textContent = "";
         els.lineupCard.hidden = true;
+        renderRosterShape();
         try {
             const lineupParams = new URLSearchParams(params);
             // The roster list below prints Half PPR projections, so the lineup that

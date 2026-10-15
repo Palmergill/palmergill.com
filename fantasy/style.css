@@ -2398,3 +2398,34 @@ td.standings__num:nth-child(3) { font-weight: 700; color: var(--ink, #23201c); }
 
 /* Teams list: give the initials badge the logo's slot. */
 .team-card__logo.team-mono { font-size: 11px; }
+
+/* Roster shape: a four-point compass of the position rooms. */
+.shape { display: flex; flex-direction: column; align-items: center; }
+.shape__svg { width: 100%; max-width: 360px; height: auto; overflow: visible; }
+.shape__ring { fill: none; stroke: var(--line, #ece4d8); stroke-width: 1; }
+.shape__ring--edge { stroke: var(--line-strong, #d8cdba); }
+.shape__spoke { stroke: var(--line, #ece4d8); stroke-width: 1; }
+.shape__avg { fill: none; stroke: var(--muted, #928a7d); stroke-width: 1.5; stroke-dasharray: 4 4; }
+.shape__team {
+    fill: color-mix(in srgb, var(--sage, #5b7152) 24%, transparent);
+    stroke: var(--sage, #5b7152);
+    stroke-width: 2;
+    stroke-linejoin: round;
+}
+.shape__dot { fill: var(--sage, #5b7152); stroke: var(--bg, #faf6f0); stroke-width: 2; }
+.shape__label { font-family: inherit; }
+.shape__pos { fill: var(--ink, #23201c); font-size: 13px; font-weight: 800; letter-spacing: 0.04em; }
+.shape__sub { fill: var(--muted, #928a7d); font-size: 11.5px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.shape__legend {
+    display: flex;
+    gap: 18px;
+    margin: 4px 0 0;
+    padding: 0;
+    list-style: none;
+    color: var(--soft, #5d574e);
+    font-size: 12px;
+}
+.shape__legend li { display: flex; align-items: center; gap: 6px; }
+.shape__key { display: inline-block; width: 18px; height: 0; border-top: 2px solid var(--sage, #5b7152); }
+.shape__key--team { height: 10px; border: 2px solid var(--sage, #5b7152); border-radius: 3px; background: color-mix(in srgb, var(--sage, #5b7152) 24%, transparent); }
+.shape__key--avg { border-top: 2px dashed var(--muted, #928a7d); }
