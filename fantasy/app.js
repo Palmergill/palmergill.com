@@ -153,13 +153,6 @@
         return node;
     }
 
-    // ESPN logo URLs rot (a manager's uploaded image, a dead CDN path). A
-    // broken-image glyph reads as the page being broken, so hide it — but keep
-    // its box, or that team's name sits out of line with the others.
-    function hideIfBroken(img) {
-        img.addEventListener("error", () => { img.style.visibility = "hidden"; }, { once: true });
-    }
-
     function appendInline(parent, text) {
         String(text).split(/(\*\*[^*]+\*\*)/g).forEach((part) => {
             if (/^\*\*[^*]+\*\*$/.test(part)) {
@@ -409,16 +402,38 @@
         }
     }
 
+    // Initials in a tinted circle: the stand-in for a team with no logo, or
+    // one whose ESPN image will not load (uploaded logos often refuse to
+    // load off espn.com). The tint is fixed per team id so a team keeps its
+    // colour across every board.
+    const MONOGRAM_TINTS = ["#5b7152", "#5a7794", "#b96a4b", "#8a6d8a", "#b97e35", "#4c7a74"];
+
+    function teamInitials(name) {
+        const words = String(name || "?").replace(/[^\p{L}\p{N}\s]/gu, " ").trim().split(/\s+/).filter(Boolean);
+        if (!words.length) return "?";
+        return (words.length === 1 ? words[0].slice(0, 2) : words[0][0] + words[1][0]).toUpperCase();
+    }
+
+    function teamMonogram(team, className) {
+        const mono = el("span", `${className} team-mono`, teamInitials(team.name));
+        mono.style.setProperty("--mono", MONOGRAM_TINTS[Math.abs(Number(team.espn_team_id) || 0) % MONOGRAM_TINTS.length]);
+        mono.setAttribute("aria-hidden", "true");
+        return mono;
+    }
+
+    function teamBadge(team, className) {
+        if (!team.logo_url) return teamMonogram(team, className);
+        const logo = el("img", className);
+        logo.src = team.logo_url;
+        logo.alt = "";
+        logo.loading = "lazy";
+        logo.addEventListener("error", () => logo.replaceWith(teamMonogram(team, className)), { once: true });
+        return logo;
+    }
+
     function teamCell(team) {
         const wrap = el("div", "team-cell");
-        if (team.logo_url) {
-            const logo = el("img", "team-cell__logo");
-            logo.src = team.logo_url;
-            logo.alt = "";
-            logo.loading = "lazy";
-            hideIfBroken(logo);
-            wrap.appendChild(logo);
-        }
+        wrap.appendChild(teamBadge(team, "team-cell__logo"));
         const text = el("div", "team-cell__text");
         const link = el("button", "team-cell__name", team.name || "—");
         link.type = "button";
@@ -1001,42 +1016,57 @@
                 return;
             }
 
-            [matchup.home, matchup.away].forEach((side, index) => {
-                if (!side) return;
+            const sides = [matchup.home, matchup.away].filter(Boolean);
+            sides.forEach((side, index) => {
                 const isWinner =
                     matchup.is_complete &&
                     ((index === 0 && matchup.winner === "HOME") ||
                         (index === 1 && matchup.winner === "AWAY"));
                 const line = el("div", `matchup__side${isWinner ? " matchup__side--win" : ""}`);
+                if (side.espn_team_id === state.myTeamId) line.classList.add("matchup__side--mine");
+                line.appendChild(teamBadge(side, "matchup__logo"));
                 const nameButton = el("button", "matchup__name", side.name || "—");
                 nameButton.type = "button";
                 nameButton.addEventListener("click", () => selectTeam(side.espn_team_id));
                 line.appendChild(nameButton);
                 line.appendChild(el("span", "matchup__score", F.formatPoints(side.points)));
+                if (isWinner) line.appendChild(el("span", "matchup__win", "W"));
                 card.appendChild(line);
             });
 
+            // How the points split, as one bar: the margin is the story.
+            if (sides.length === 2 && (sides[0].points || sides[1].points)) {
+                const total = (sides[0].points || 0) + (sides[1].points || 0);
+                const bar = el("div", "matchup__split");
+                bar.setAttribute("aria-hidden", "true");
+                const home = el("span", "matchup__split-home");
+                home.style.flexBasis = `${((sides[0].points || 0) / total) * 100}%`;
+                bar.appendChild(home);
+                bar.appendChild(el("span", "matchup__split-away"));
+                if (matchup.is_complete) bar.classList.add(matchup.winner === "AWAY" ? "matchup__split--away" : "matchup__split--home");
+                card.appendChild(bar);
+            }
+
             if (!matchup.is_complete) {
                 card.appendChild(el("span", "matchup__pending", "Not played"));
+            } else if (sides.length === 2) {
+                const margin = Math.abs((sides[0].points || 0) - (sides[1].points || 0));
+                const winner = matchup.winner === "AWAY" ? sides[1] : sides[0];
+                card.appendChild(el("span", "matchup__margin",
+                    matchup.winner === "TIE" ? "Tied" : `${winner.name || "—"} by ${F.formatPoints(margin)}`));
             }
             els.scoreboard.appendChild(card);
         });
     }
 
     function renderTeamsGrid(payload) {
+        state.standingsTeams = payload.teams || [];
         els.teamsGrid.replaceChildren();
         payload.teams.forEach((team) => {
             const card = el("button", "team-card");
             card.type = "button";
             card.addEventListener("click", () => selectTeam(team.espn_team_id));
-            if (team.logo_url) {
-                const logo = el("img", "team-card__logo");
-                logo.src = team.logo_url;
-                logo.alt = "";
-                logo.loading = "lazy";
-                hideIfBroken(logo);
-                card.appendChild(logo);
-            }
+            card.appendChild(teamBadge(team, "team-card__logo"));
             card.appendChild(el("span", "team-card__name", team.name || "—"));
             if (team.owner_name) card.appendChild(el("span", "team-card__owner", team.owner_name));
             card.appendChild(
@@ -1743,7 +1773,106 @@
             return;
         }
         const target = document.getElementById(id);
-        if (target) target.scrollIntoView({ block: "start" });
+        if (!target) return;
+        // On a phone the board may sit behind another tab; open that one first.
+        const board = target.closest("[data-panel]");
+        if (board && board !== els.leagueSections && els.leagueSections.contains(board)) {
+            setHubPanel(board.dataset.panel, { scroll: false, updateHash: false });
+        }
+        target.scrollIntoView({ block: "start" });
+    }
+
+    // ── section tabs ────────────────────────────────────────────────────
+    //
+    // Nine boards stacked run eight phone screens deep. Below 720px the hub
+    // shows one tab's boards at a time; above it every board stays on the
+    // page and a tab is a jump to its first board. A tab whose boards are all
+    // hidden (no playoff picture yet, no free agents) hides with them.
+
+    function hubBoards(panel) {
+        return [...els.leagueSections.querySelectorAll(":scope > [data-panel]")]
+            .filter((board) => !panel || board.dataset.panel === panel);
+    }
+
+    function hubTabs() {
+        return [...document.querySelectorAll("#hubTabs .hub-tab")];
+    }
+
+    function stickyOffset() {
+        const nav = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--site-nav-height")) || 52;
+        return nav;
+    }
+
+    function setHubPanel(panel, { scroll = true, updateHash = true } = {}) {
+        const tab = hubTabs().find((t) => t.dataset.panel === panel);
+        if (!tab || tab.hidden) return;
+        state.hubPanel = panel;
+        els.leagueSections.dataset.panel = panel;
+        hubBoards().forEach((board) => board.classList.toggle("is-current", board.dataset.panel === panel));
+        hubTabs().forEach((t) => t.setAttribute("aria-selected", String(t === tab)));
+        const track = tab.parentElement;
+        track.scrollLeft = tab.offsetLeft - (track.clientWidth - tab.offsetWidth) / 2;
+
+        const first = hubBoards(panel).find((board) => !board.hidden);
+        if (updateHash && first && first.id) {
+            history.replaceState(history.state, "", `${window.location.pathname}${window.location.search}#${first.id}`);
+        }
+        if (!scroll) return;
+        const tabs = byId("hubTabs");
+        if (isNarrow()) {
+            // Start the new tab at its top, under the stuck tab bar, but never
+            // jump down the page when the tabs have not reached the top yet.
+            const sectionsTop = els.leagueSections.getBoundingClientRect().top + window.scrollY;
+            const target = sectionsTop - stickyOffset();
+            if (window.scrollY > target) window.scrollTo({ top: target });
+        } else if (first) {
+            const top = first.getBoundingClientRect().top + window.scrollY - stickyOffset() - tabs.offsetHeight - 8;
+            window.scrollTo({ top, behavior: "smooth" });
+        }
+    }
+
+    function syncHubTabs() {
+        hubTabs().forEach((tab) => {
+            tab.hidden = hubBoards(tab.dataset.panel).every((board) => board.hidden);
+        });
+        const current = hubTabs().find((t) => t.dataset.panel === state.hubPanel);
+        if (!current || current.hidden) {
+            const first = hubTabs().find((t) => !t.hidden);
+            if (first) setHubPanel(first.dataset.panel, { scroll: false, updateHash: false });
+        } else {
+            hubBoards().forEach((board) => board.classList.toggle("is-current", board.dataset.panel === state.hubPanel));
+        }
+    }
+
+    // Wide screens: the tab for whichever board is under the tab bar lights up.
+    function spyHubTabs() {
+        if (isNarrow() || els.leagueSections.hidden) return;
+        const line = stickyOffset() + byId("hubTabs").offsetHeight + 24;
+        let active = null;
+        hubBoards().forEach((board) => {
+            if (!board.hidden && board.getBoundingClientRect().top <= line) active = board.dataset.panel;
+        });
+        active = active || "power";
+        if (active !== state.hubPanel) {
+            state.hubPanel = active;
+            hubTabs().forEach((t) => t.setAttribute("aria-selected", String(t.dataset.panel === active)));
+        }
+    }
+
+    function initHubTabs() {
+        state.hubPanel = "power";
+        hubTabs().forEach((tab) => {
+            tab.addEventListener("click", () => setHubPanel(tab.dataset.panel));
+        });
+        const observer = new MutationObserver(syncHubTabs);
+        hubBoards().forEach((board) => observer.observe(board, { attributes: true, attributeFilter: ["hidden"] }));
+        syncHubTabs();
+        let ticking = false;
+        window.addEventListener("scroll", () => {
+            if (ticking) return;
+            ticking = true;
+            requestAnimationFrame(() => { ticking = false; spyHubTabs(); });
+        }, { passive: true });
     }
 
     // ── power rankings: the rosters ─────────────────────────────────────
@@ -1797,11 +1926,38 @@
         return odds === null || odds === undefined ? null : odds;
     }
 
-    function powerStat(key, value, label) {
-        const stat = el("div", `power-row__stat power-row__stat--${key}`);
-        stat.appendChild(el("strong", null, value));
-        stat.appendChild(hintLabel("small", `power-hint-${key}`, label, F.powerHint(key)));
-        return stat;
+    // Playoff odds as a small ring gauge; the number sits in the middle.
+    function oddsRing(odds) {
+        const wrap = el("div", "power-ring");
+        const r = 15;
+        const circ = 2 * Math.PI * r;
+        const ring = svg("svg", { viewBox: "0 0 36 36", class: "power-ring__svg", "aria-hidden": "true" });
+        ring.appendChild(svg("circle", { cx: 18, cy: 18, r, class: "power-ring__track" }));
+        if (odds !== null) {
+            const arc = svg("circle", {
+                cx: 18, cy: 18, r, class: "power-ring__arc",
+                "stroke-dasharray": `${(odds * circ).toFixed(2)} ${circ.toFixed(2)}`,
+            });
+            ring.appendChild(arc);
+        }
+        wrap.appendChild(ring);
+        wrap.appendChild(el("span", "power-ring__value", odds === null ? "—" : `${Math.round(odds * 100)}%`));
+        return wrap;
+    }
+
+    // Projected points as a dot on one axis shared by every row. The values
+    // sit within a few points of each other, so a bar from zero would make
+    // ten identical bars; a dot on the league's own range shows the gaps.
+    function pointsStrip(value, lo, hi) {
+        const strip = el("div", "power-strip");
+        const track = el("div", "power-strip__track");
+        const dot = el("span", "power-strip__dot");
+        const pos = hi > lo ? (value - lo) / (hi - lo) : 0.5;
+        dot.style.left = `${(Math.max(0, Math.min(1, pos)) * 100).toFixed(1)}%`;
+        track.appendChild(dot);
+        strip.appendChild(track);
+        strip.appendChild(el("strong", "power-strip__value", F.formatPoints(value)));
+        return strip;
     }
 
     function renderRosterPower(payload) {
@@ -1811,6 +1967,7 @@
             els.powerList.appendChild(
                 el("li", "empty-note", UNAVAILABLE_POWER[payload.unavailable_reason] || "Power rankings are unavailable.")
             );
+            renderMyTeamCard();
             return;
         }
 
@@ -1819,32 +1976,80 @@
             ? `Projections through week ${payload.week} · ${payload.scoring === "half" ? "Half PPR" : payload.scoring}`
             : "";
 
-        // Two columns, filled down: the list needs to know how tall a column is.
-        const rows = Math.ceil(teams.length / 2);
-        els.powerList.style.setProperty("--power-rows", String(rows));
+        const values = teams.map((team) => team.expected).filter((v) => v !== null && v !== undefined);
+        const lo = Math.floor(Math.min(...values));
+        const hi = Math.ceil(Math.max(...values));
 
-        teams.forEach((team, index) => {
+        // Column labels once, above the list, rather than under every number.
+        const head = el("li", "power-head");
+        head.setAttribute("aria-hidden", "false");
+        head.appendChild(el("span", "power-head__team", "Team"));
+        const ptsHead = el("span", "power-head__pts");
+        ptsHead.appendChild(hintLabel("span", "power-hint-expected", "Pts / wk", F.powerHint("expected")));
+        const scale = el("span", "power-head__scale");
+        scale.appendChild(el("span", null, String(lo)));
+        scale.appendChild(el("span", null, String(hi)));
+        ptsHead.appendChild(scale);
+        head.appendChild(ptsHead);
+        head.appendChild(el("span", "power-head__odds")).appendChild(
+            hintLabel("span", "power-hint-odds", "Playoffs", F.powerHint("odds"))
+        );
+        els.powerList.appendChild(head);
+
+        teams.forEach((team) => {
             const item = el("li", "power-row");
             if (team.espn_team_id === state.myTeamId) item.classList.add("power-row--mine");
-            // Last two rows of either column open their hover bubble upward.
-            const inColumn = index % rows;
-            if (inColumn >= rows - 2) item.classList.add("power-row--low");
-
             item.appendChild(el("span", "power-row__rank", String(team.rank)));
-
             const who = el("div", "power-row__team");
             who.appendChild(teamCell(team));
             item.appendChild(who);
-
-            item.appendChild(powerStat("expected", F.formatPoints(team.expected), "pts/wk"));
-
-            const odds = playoffOdds(team.espn_team_id);
-            item.appendChild(
-                powerStat("odds", odds === null ? "—" : `${Math.round(odds * 100)}%`, "playoffs")
-            );
-
+            item.appendChild(pointsStrip(team.expected, lo, hi));
+            item.appendChild(oddsRing(playoffOdds(team.espn_team_id)));
             els.powerList.appendChild(item);
         });
+        renderMyTeamCard();
+    }
+
+    // ── my team, at a glance ────────────────────────────────────────────
+    //
+    // Once a manager has picked a team, the top of the hub says where it
+    // stands: power rank, record and playoff odds, with the way into it.
+
+    function renderMyTeamCard() {
+        const card = els.myTeamSummary;
+        if (!card || !state.myTeamId) return;
+        const power = rosterPowerTeam(state.myTeamId);
+        const standing = (state.standingsTeams || []).find((t) => t.espn_team_id === state.myTeamId) || power;
+        if (!standing) return;
+
+        card.replaceChildren();
+        card.classList.add("my-team-card");
+        card.appendChild(teamBadge(standing, "my-team-card__logo"));
+
+        const body = el("div", "my-team-card__body");
+        body.appendChild(el("span", "my-team-card__eyebrow", "Your team"));
+        body.appendChild(el("strong", "my-team-card__name", standing.name || standing.abbrev || "—"));
+        const facts = el("dl", "my-team-card__facts");
+        const fact = (label, value) => {
+            const box = el("div");
+            box.appendChild(el("dt", null, label));
+            box.appendChild(el("dd", null, value));
+            facts.appendChild(box);
+        };
+        if (power) fact("Power", `#${power.rank}`);
+        if (standing.wins !== undefined) fact("Record", F.recordLabel(standing.wins, standing.losses, standing.ties));
+        const odds = playoffOdds(state.myTeamId);
+        if (odds !== null) fact("Playoffs", `${Math.round(odds * 100)}%`);
+        body.appendChild(facts);
+        card.appendChild(body);
+
+        const actions = el("div", "my-team-card__actions");
+        const open = el("button", "button my-team-card__open", "Open my team");
+        open.type = "button";
+        open.addEventListener("click", () => selectTeam(state.myTeamId));
+        actions.appendChild(open);
+        actions.appendChild(els.myTeamChange);
+        card.appendChild(actions);
     }
 
     // ── power over time ─────────────────────────────────────────────────
@@ -2468,6 +2673,7 @@
         readUrlState();
         syncNav();
         bindEvents();
+        initHubTabs();
         loadSeason();
     }
 

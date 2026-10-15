@@ -14,7 +14,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/shared/site-nav.css?v=16">
     <link rel="stylesheet" href="/shared/fantasy-header.css?v=2">
-    <link rel="stylesheet" href="style.css?v=34">
+    <link rel="stylesheet" href="style.css?v=35">
     <link rel="stylesheet" href="/shared/fantasy-design.css?v=2">
 </head>
 <body>
@@ -168,13 +168,26 @@
                 </section>
             </section>
 
-            <div id="leagueSections">
+            <div id="leagueSections" data-panel="power">
+                <!-- On a phone the hub is one section at a time behind these
+                     tabs; on a wider screen every board stays stacked and the
+                     tabs jump to them. Each board names its tab in data-panel. -->
+                <nav class="hub-tabs" id="hubTabs" aria-label="League sections">
+                    <div class="hub-tabs__track" role="tablist">
+                        <button type="button" class="hub-tab" role="tab" data-panel="power" aria-selected="true">Power</button>
+                        <button type="button" class="hub-tab" role="tab" data-panel="standings" aria-selected="false">Standings</button>
+                        <button type="button" class="hub-tab" role="tab" data-panel="playoffs" aria-selected="false">Playoffs</button>
+                        <button type="button" class="hub-tab" role="tab" data-panel="scores" aria-selected="false">Scores</button>
+                        <button type="button" class="hub-tab" role="tab" data-panel="free-agents" aria-selected="false">Free agents</button>
+                        <button type="button" class="hub-tab" role="tab" data-panel="history" aria-selected="false">History</button>
+                    </div>
+                </nav>
                 <!-- Power rankings read the rosters, not the results: what each
                      team can be expected to score a week from here, given
                      who it has and which of them it can actually start. It
                      leads because it is the one ranking the scoreboard
                      cannot tell you. -->
-                <section class="board" id="power" data-board="power" aria-labelledby="powerTitle">
+                <section class="board" id="power" data-board="power" data-panel="power" aria-labelledby="powerTitle">
                     <div class="board__head">
                         <div>
                             <h2 id="powerTitle">Power Rankings</h2>
@@ -195,7 +208,7 @@
                      reaches back over every stored season; the power line
                      only as far as Sep 2026, when the hub started writing
                      it down. -->
-                <section class="board" id="power-chart" data-board="power-chart"
+                <section class="board" id="power-chart" data-board="power-chart" data-panel="power"
                          aria-labelledby="powerChartTitle">
                     <div class="board__head">
                         <div>
@@ -219,7 +232,7 @@
                      lists of the same ten teams. One table now, with a column
                      that changes — which is also what lets it survive a phone,
                      where the chosen column brings its chart into the row. -->
-                <section class="board" id="standings" data-board="ledger" aria-labelledby="ledgerTitle">
+                <section class="board" id="standings" data-board="ledger" data-panel="standings" aria-labelledby="ledgerTitle">
                     <div class="board__head">
                         <div>
                             <h2 id="ledgerTitle">Team stats</h2>
@@ -241,7 +254,7 @@
                      the top seeds and the byes, the next best records fill
                      out the rest. Seeded from the same simulation as the
                      odds column, so the two never disagree about the rule. -->
-                <section class="board" id="playoffs" data-board="playoffs" aria-labelledby="playoffsTitle" hidden>
+                <section class="board" id="playoffs" data-board="playoffs" data-panel="playoffs" aria-labelledby="playoffsTitle" hidden>
                     <div class="board__head">
                         <div>
                             <h2 id="playoffsTitle">Playoff picture</h2>
@@ -256,7 +269,7 @@
                     <div class="bracket__bubble" id="playoffBubble"></div>
                 </section>
 
-                <section class="board" data-board="charts" aria-labelledby="chartsTitle" hidden>
+                <section class="board" data-board="charts" aria-labelledby="chartsTitle" data-panel="standings" hidden>
                     <div class="board__head">
                         <h2 id="chartsTitle">Reading the season</h2>
                         <span class="board__note" id="chartsNote"></span>
@@ -264,7 +277,7 @@
                     <div id="charts" class="charts"></div>
                 </section>
 
-                <section class="board" id="scoreboard" data-board="scoreboard" aria-labelledby="scoreboardTitle">
+                <section class="board" id="scoreboard" data-board="scoreboard" data-panel="scores" aria-labelledby="scoreboardTitle">
                     <div class="board__head">
                         <h2 id="scoreboardTitle">Scoreboard</h2>
                         <label class="select-field">
@@ -277,7 +290,7 @@
 
                 <!-- Who is actually claimable here, which is a fact about
                      these rosters rather than about the player pool. -->
-                <section class="board" id="free-agents" data-board="free-agents" aria-labelledby="freeAgentsTitle">
+                <section class="board" id="free-agents" data-board="free-agents" data-panel="free-agents" aria-labelledby="freeAgentsTitle">
                     <div class="board__head">
                         <h2 id="freeAgentsTitle">Free agents</h2>
                         <span class="board__note" id="freeAgentsNote"></span>
@@ -288,7 +301,7 @@
 
                 <!-- Kept for the preseason, when the ledger's derived columns
                      are all empty and this grid is the only way into a team. -->
-                <section class="board" id="teams" data-board="teams" aria-labelledby="teamsTitle">
+                <section class="board" id="teams" data-board="teams" data-panel="standings" aria-labelledby="teamsTitle">
                     <div class="board__head">
                         <h2 id="teamsTitle">Teams</h2>
                     </div>
@@ -299,7 +312,7 @@
                      because of who won it, which is what the chips at the top
                      of the page could never say. Switching to one is a link
                      in the row rather than a separate control. -->
-                <section class="board" id="history" data-board="history" aria-labelledby="historyTitle">
+                <section class="board" id="history" data-board="history" data-panel="history" aria-labelledby="historyTitle">
                     <div class="board__head">
                         <div>
                             <h2 id="historyTitle">History</h2>
@@ -322,6 +335,6 @@
     <script src="/shared/analytics.js?v=1"></script>
     <script src="/shared/api-base.js?v=1"></script>
     <script src="format.js?v=16"></script>
-    <script src="app.js?v=36"></script>
+    <script src="app.js?v=37"></script>
 </body>
 </html>
