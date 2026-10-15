@@ -14,7 +14,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/shared/site-nav.css?v=17">
     <link rel="stylesheet" href="/shared/fantasy-header.css?v=3">
-    <link rel="stylesheet" href="style.css?v=41">
+    <link rel="stylesheet" href="style.css?v=43">
     <link rel="stylesheet" href="/shared/fantasy-design.css?v=2">
 </head>
 <body>
@@ -197,7 +197,10 @@
                         <span class="board__note" id="powerNote"></span>
                     </div>
                     <ol class="power-list" id="powerList"></ol>
-                    <a class="league-link board__more" href="/fantasy/?view=stats" data-view-link="stats">Rankings over time →</a>
+                    <div class="board__links">
+                        <a class="league-link board__more" href="/fantasy/?view=rosters">Every roster's shape →</a>
+                        <a class="league-link board__more" href="/fantasy/?view=stats">Rankings over time →</a>
+                    </div>
                 </section>
 
                 <!-- Standings: the table, plainly. Record, points and playoff
@@ -289,6 +292,24 @@
                     <div id="charts" class="charts"></div>
                 </section>
 
+                <!-- Rosters: every team's shape, in power-ranking order. -->
+                <section class="board" id="rosters" data-board="rosters" data-view="rosters" aria-labelledby="rostersTitle">
+                    <div class="board__head">
+                        <div>
+                            <h2 id="rostersTitle">Roster shapes</h2>
+                            <p class="board__lede">
+                                Each point is a position room, from the league's weakest (centre) to its
+                                strongest (edge), on current projections and actual scoring. Tap a team to open it.
+                            </p>
+                        </div>
+                    </div>
+                    <ul class="shape__legend shape__legend--top">
+                        <li><span class="shape__key shape__key--team"></span>Roster</li>
+                        <li><span class="shape__key shape__key--avg"></span>League average</li>
+                    </ul>
+                    <div class="shape-grid" id="rosterShapes"></div>
+                </section>
+
                 <!-- Who is actually claimable here, which is a fact about
                      these rosters rather than about the player pool. -->
                 <section class="board" id="free-agents" data-board="free-agents" data-view="free-agents" aria-labelledby="freeAgentsTitle">
@@ -321,11 +342,11 @@
     </main>
 
     <script src="/shared/site-nav.js?v=19"></script>
-    <script src="/shared/fantasy-header.js?v=6"></script>
+    <script src="/shared/fantasy-header.js?v=7"></script>
     <script>window.FantasyHeader.mount({ page: "home" });</script>
     <script src="/shared/analytics.js?v=1"></script>
     <script src="/shared/api-base.js?v=1"></script>
     <script src="format.js?v=17"></script>
-    <script src="app.js?v=46"></script>
+    <script src="app.js?v=47"></script>
 </body>
 </html>

@@ -39,6 +39,7 @@
         {
             heading: "League",
             items: [
+                { key: "rosters", label: "Rosters", href: "/fantasy/?view=rosters", note: "Every team's roster shape" },
                 { key: "free-agents", label: "Free agents", href: "/fantasy/?view=free-agents", note: "Who is still claimable" },
                 { key: "week", label: "Weekly recap", href: "/fantasy/week/", note: "The week, written up" },
                 { key: "draft-recap", label: "Draft recap", href: "/fantasy/draft-recap/", note: "How every team drafted" },

@@ -2429,3 +2429,73 @@ td.standings__num:nth-child(3) { font-weight: 700; color: var(--ink, #23201c); }
 .shape__key { display: inline-block; width: 18px; height: 0; border-top: 2px solid var(--sage, #5b7152); }
 .shape__key--team { height: 10px; border: 2px solid var(--sage, #5b7152); border-radius: 3px; background: color-mix(in srgb, var(--sage, #5b7152) 24%, transparent); }
 .shape__key--avg { border-top: 2px dashed var(--muted, #928a7d); }
+
+/* Rosters view: every team's compass in a grid. */
+.board__links { display: flex; flex-wrap: wrap; gap: 4px 20px; }
+.shape__legend--top { justify-content: flex-start; margin: 0 0 14px; }
+.shape-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 12px;
+}
+.shape-card {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 4px;
+    padding: 12px 12px 10px;
+    border: 1px solid var(--line, #ece4d8);
+    border-radius: 14px;
+    background: var(--card, #fff);
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition: border-color 140ms ease, box-shadow 140ms ease;
+}
+.shape-card:hover { border-color: var(--sage, #5b7152); box-shadow: 0 6px 18px rgba(47, 38, 28, 0.08); }
+.shape-card:focus-visible { outline: 2px solid var(--sage, #5b7152); outline-offset: 2px; }
+.shape-card--mine { border-color: var(--clay, #b96a4b); background: #fdf8f2; }
+.shape-card__head { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.shape-card__rank {
+    min-width: 1.2em;
+    font-family: "Newsreader", Georgia, serif;
+    font-size: 18px;
+    color: var(--sage-dim, #4c6044);
+}
+.shape-card__name {
+    display: -webkit-box;
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    font-weight: 700;
+    line-height: 1.2;
+}
+.shape-card__head { align-items: flex-start; min-height: 2.4em; }
+.shape-card__pts { font-weight: 800; font-variant-numeric: tabular-nums; }
+.shape__svg--compact { display: block; width: 100%; max-width: 220px; margin: 0 auto; }
+.shape__svg--compact .shape__pos { font-size: 11px; }
+.shape-card__ranks {
+    display: flex;
+    justify-content: space-between;
+    gap: 6px;
+    padding-top: 6px;
+    border-top: 1px solid var(--line, #ece4d8);
+    color: var(--muted, #928a7d);
+    font-size: 11.5px;
+    font-variant-numeric: tabular-nums;
+}
+.shape-card__ranks b { color: var(--soft, #5d574e); font-weight: 700; }
+.shape-card__ranks .is-top { color: var(--sage, #5b7152); font-weight: 700; }
+.shape-card__ranks .is-low { color: var(--clay, #b96a4b); }
+@media (max-width: 620px) {
+    .shape-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+    .shape-card { padding: 10px 8px 8px; }
+    .shape-card__head { gap: 6px; }
+    .shape-card__head .team-cell__logo { display: none; }
+    .shape-card__name { font-size: 13px; }
+    .shape-card__pts { font-size: 13px; }
+    .shape-card__ranks { font-size: 10.5px; gap: 2px; }
+}

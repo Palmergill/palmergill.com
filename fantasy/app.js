@@ -131,6 +131,7 @@
         lineupNote: byId("lineupNote"),
         rosterShapeBoard: byId("roster-shape"),
         rosterShape: byId("rosterShape"),
+        rosterShapes: byId("rosterShapes"),
     };
 
     class ForbiddenError extends Error {}
@@ -1752,7 +1753,7 @@
     // menus. The league is five views now, picked from the section nav,
     // and each shows only its own boards at every width.
 
-    const HUB_VIEWS = ["home", "standings", "stats", "free-agents", "history"];
+    const HUB_VIEWS = ["home", "standings", "stats", "rosters", "free-agents", "history"];
 
     function hubBoards(view) {
         return [...els.leagueSections.querySelectorAll(":scope > [data-view]")]
@@ -2072,16 +2073,12 @@
         });
     }
 
-    function renderRosterShape() {
-        const board = els.rosterShapeBoard;
-        const data = state.teamId ? rosterShapeData(state.teamId) : null;
-        board.hidden = !data;
-        els.rosterShape.replaceChildren();
-        if (!data) return;
-
-        const size = 320;
+    // One compass. Compact drops the numbers under each point and shrinks
+    // the frame, for the Rosters view's grid of every team.
+    function shapeSvg(data, { compact = false } = {}) {
+        const size = compact ? 200 : 320;
         const c = size / 2;
-        const R = 104;
+        const R = compact ? 70 : 104;
         // QB north, WR east, TE south, RB west.
         const point = (index, r) => {
             const angle = -Math.PI / 2 + (index * 2 * Math.PI) / data.length;
@@ -2089,7 +2086,11 @@
         };
         const path = (key) => data.map((d, i) => point(i, d[key]).map((n) => n.toFixed(1)).join(",")).join(" ");
 
-        const chart = svg("svg", { viewBox: `0 0 ${size} ${size}`, class: "shape__svg", role: "img" });
+        const chart = svg("svg", {
+            viewBox: `0 0 ${size} ${size}`,
+            class: compact ? "shape__svg shape__svg--compact" : "shape__svg",
+            role: "img",
+        });
         chart.setAttribute("aria-label", "Roster shape: " + data.map((d) =>
             `${d.label} ${F.formatPoints(d.value)} points, ${F.ordinal(d.rank)} of ${d.teams}`).join("; "));
 
@@ -2107,23 +2108,33 @@
         chart.appendChild(svg("polygon", { points: path("r"), class: "shape__team" }));
         data.forEach((d, i) => {
             const [x, y] = point(i, d.r);
-            chart.appendChild(svg("circle", { cx: x, cy: y, r: 4.5, class: "shape__dot" }));
+            chart.appendChild(svg("circle", { cx: x, cy: y, r: compact ? 3.5 : 4.5, class: "shape__dot" }));
         });
 
         // Labels sit just past the edge, anchored away from the centre.
         data.forEach((d, i) => {
-            const [x, y] = point(i, 1.2);
+            const [x, y] = point(i, compact ? 1.16 : 1.2);
             const anchor = Math.abs(x - c) < 1 ? "middle" : x > c ? "start" : "end";
-            const dy = y < c - 1 ? -14 : y > c + 1 ? 6 : -4;
-            const label = svg("text", { x: anchor === "start" ? x - 10 : anchor === "end" ? x + 10 : x, y: y + dy, "text-anchor": anchor, class: "shape__label" });
+            const nudge = compact ? 6 : 10;
+            const dy = compact ? (y < c - 1 ? -2 : y > c + 1 ? 12 : 4) : (y < c - 1 ? -14 : y > c + 1 ? 6 : -4);
+            const label = svg("text", {
+                x: anchor === "start" ? x - nudge : anchor === "end" ? x + nudge : x,
+                y: y + dy,
+                "text-anchor": anchor,
+                class: "shape__label",
+            });
             label.appendChild(svg("tspan", { class: "shape__pos" })).textContent = d.label;
-            const sub = svg("tspan", { x: label.getAttribute("x"), dy: 15, class: "shape__sub" });
-            sub.textContent = `${F.formatPoints(d.value)} · ${F.ordinal(d.rank)}`;
-            label.appendChild(sub);
+            if (!compact) {
+                const sub = svg("tspan", { x: label.getAttribute("x"), dy: 15, class: "shape__sub" });
+                sub.textContent = `${F.formatPoints(d.value)} · ${F.ordinal(d.rank)}`;
+                label.appendChild(sub);
+            }
             chart.appendChild(label);
         });
-        els.rosterShape.appendChild(chart);
+        return chart;
+    }
 
+    function shapeLegend(teamLabel) {
         const legend = el("ul", "shape__legend");
         const key = (cls, text) => {
             const item = el("li");
@@ -2131,9 +2142,61 @@
             item.appendChild(document.createTextNode(text));
             legend.appendChild(item);
         };
-        key("shape__key--team", "This roster");
+        key("shape__key--team", teamLabel);
         key("shape__key--avg", "League average");
-        els.rosterShape.appendChild(legend);
+        return legend;
+    }
+
+    function renderRosterShape() {
+        const board = els.rosterShapeBoard;
+        const data = state.teamId ? rosterShapeData(state.teamId) : null;
+        board.hidden = !data;
+        els.rosterShape.replaceChildren();
+        if (!data) return;
+        els.rosterShape.appendChild(shapeSvg(data));
+        els.rosterShape.appendChild(shapeLegend("This roster"));
+    }
+
+    // ── rosters: every team's shape ─────────────────────────────────────
+    //
+    // The same compass for the whole league, in power-ranking order, so the
+    // shapes can be read against each other: who is all backs, who is thin
+    // at quarterback, who is round.
+
+    function renderRosterShapes() {
+        const grid = els.rosterShapes;
+        grid.replaceChildren();
+        const payload = state.rosterPower;
+        if (!payload || !payload.available || !(payload.teams || []).length) {
+            grid.appendChild(el("p", "empty-note", "Roster shapes need this season's rosters and projections."));
+            return;
+        }
+        payload.teams.forEach((team) => {
+            const data = rosterShapeData(team.espn_team_id);
+            if (!data) return;
+            const card = el("button", "shape-card");
+            card.type = "button";
+            if (team.espn_team_id === state.myTeamId) card.classList.add("shape-card--mine");
+            card.addEventListener("click", () => selectTeam(team.espn_team_id));
+
+            const head = el("span", "shape-card__head");
+            head.appendChild(el("span", "shape-card__rank", String(team.rank)));
+            head.appendChild(teamBadge(team, "team-cell__logo"));
+            head.appendChild(el("span", "shape-card__name", team.name || "—"));
+            head.appendChild(el("span", "shape-card__pts", F.formatPoints(team.expected)));
+            card.appendChild(head);
+            card.appendChild(shapeSvg(data, { compact: true }));
+
+            const ranks = el("span", "shape-card__ranks");
+            data.forEach((d) => {
+                const item = el("span", d.rank <= 3 ? "is-top" : d.rank > d.teams - 3 ? "is-low" : null);
+                item.appendChild(el("b", null, d.label));
+                item.appendChild(document.createTextNode(` ${F.ordinal(d.rank)}`));
+                ranks.appendChild(item);
+            });
+            card.appendChild(ranks);
+            grid.appendChild(card);
+        });
     }
 
     function renderRosterPower(payload) {
@@ -2148,6 +2211,7 @@
 
         const teams = payload.teams;
         if (state.teamId) renderRosterShape();
+        renderRosterShapes();
         els.powerNote.textContent = payload.week
             ? `Projections through week ${payload.week} · ${payload.scoring === "half" ? "Half PPR" : payload.scoring}`
             : "";
