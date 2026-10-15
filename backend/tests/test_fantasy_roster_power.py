@@ -39,21 +39,29 @@ def test_lineups_use_only_the_roster_and_leave_unfillable_seats_empty():
 from app.services.fantasy_league_data import _absence, _player_value
 
 
-def test_injured_reserve_counts_for_nothing_whatever_the_preseason_number():
-    # 245 preseason points is 14.4 a game; IR with no weekly projection.
-    value = _player_value(245.0, None, False, False, absence=_absence("NORMAL", "IR"), week_covered=True)
+def test_injured_reserve_counts_for_nothing_whatever_he_has_scored():
+    value = _player_value(16.0, 6, 86.4, 6, absence=_absence("NORMAL", "IR"))
     assert value["ppg"] == 0.0
     assert value["absence"] == "long"
     # A manager's IR slot means the same, whatever the feeds say.
-    assert _player_value(245.0, 16.0, False, True)["ppg"] == 0.0
+    assert _player_value(16.0, 6, 86.4, 6, on_ir=True)["ppg"] == 0.0
 
 
-def test_missing_from_a_projected_week_counts_as_out_not_as_full_value():
-    value = _player_value(245.0, None, False, False, week_covered=True)
+def test_actual_scoring_gains_weight_as_games_accumulate():
+    # Projected 10 a week, actually scoring 20 a game.
+    early = _player_value(10.0, 3, 40.0, 2)
+    late = _player_value(10.0, 13, 240.0, 12)
+    assert round(early["ppg"], 2) == round(10 + (20 - 10) * 2 / 6, 2)
+    assert round(late["ppg"], 2) == round(10 + (20 - 10) * 12 / 16, 2)
+    assert late["ppg"] > early["ppg"]
+    # No games yet: the current projection alone.
+    assert _player_value(10.0, 1, None, 0)["ppg"] == 10.0
+
+
+def test_out_this_week_counts_at_half_of_his_current_level():
+    value = _player_value(12.0, 5, 72.0, 6, out_this_week=True)
     assert value["out"] is True
-    assert round(value["ppg"], 2) == round(0.5 * 245.0 / 17, 2)
-    # On a bye, a missing week is expected and costs nothing.
-    assert _player_value(245.0, None, True, False, week_covered=True)["out"] is False
+    assert round(value["ppg"], 2) == round(0.5 * (0.6 * 12.0 + 0.4 * 12.0), 2)
 
 
 def test_absence_reads_every_feed_and_ignores_espn_normal():

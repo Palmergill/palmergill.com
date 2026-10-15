@@ -1939,15 +1939,20 @@
         return lineup;
     }
 
-    // Where a player's value comes from. "Preseason" because the season-long
-    // projection is taken before week 1 and does not move after it.
+    // Where a player's value comes from: his latest weekly projection and
+    // what he has actually scored per game, weighted by games played.
     function playerSource(player) {
         const status = player.injury_status ? ` (${player.injury_status})` : "";
         if (player.absence === "long") return `injured reserve or suspended${status} · counts 0`;
-        if (player.out) return `out${status} · counted at half`;
         const parts = [];
-        if (player.season_ppg !== null && player.season_ppg !== undefined) parts.push(`preseason ${F.formatPoints(player.season_ppg)}/g`);
-        if (player.week_points !== null && player.week_points !== undefined) parts.push(`this wk ${F.formatPoints(player.week_points)}`);
+        if (player.projection !== null && player.projection !== undefined) {
+            const when = player.projection_week === 0 ? "preseason" : `wk ${player.projection_week}`;
+            parts.push(`proj ${F.formatPoints(player.projection)} (${when})`);
+        }
+        if (player.actual_ppg !== null && player.actual_ppg !== undefined && player.games) {
+            parts.push(`actual ${F.formatPoints(player.actual_ppg)}/g over ${player.games} g`);
+        }
+        if (player.out) parts.push(`out${status} · counted at half`);
         return parts.join(" · ");
     }
 
@@ -1977,9 +1982,10 @@
         const absence = Math.round((payload.absence_rate || 0) * 100);
 
         box.appendChild(el("p", "power-bd__lede",
-            "Only players on this roster count. Each is worth the average of his preseason projection per game " +
-            "and this week's projection (Sleeper and ESPN, blended). Injured reserve counts 0, out this week counts half. " +
-            "Pts / wk is the best legal lineup, less what it loses to missed games."));
+            "Only players on this roster count. Each blends his latest weekly projection (Sleeper and ESPN) " +
+            "with what he has actually scored per game, the actual counting for more as games pile up. " +
+            "Injured reserve counts 0, out this week counts half. Pts / wk is the best legal lineup, " +
+            "less what it loses to missed games."));
 
         box.appendChild(el("h4", "power-bd__title", "Starting lineup"));
         const starters = el("ol", "power-bd__list");

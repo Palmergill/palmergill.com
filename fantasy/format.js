@@ -404,8 +404,9 @@
     // hangs off their labels the same way the table's columns do.
     const POWER_HINTS = {
         expected:
-            "The team's best legal lineup in projected points a week, after the bench "
-            + "covers byes and injuries. Depth only counts when it could start.",
+            "The team's best legal lineup in points a week, each player valued on his "
+            + "latest projection and his actual scoring this season, after the bench "
+            + "covers byes and injuries. Tap a team to see the math.",
         odds:
             "How often this team makes the playoffs across ten thousand simulated "
             + "seasons. Early on a team's scoring average is weighted against the "
