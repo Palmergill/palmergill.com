@@ -5,8 +5,24 @@
    (--fantasy-* on the market dashboard, --line/--card/--ink on the others),
    so every colour here carries its own fallback and the nav looks the same
    wherever it mounts. */
+/* The section's only menu, so it stays in reach: it sticks under the site
+   nav, frosted so it sits on any page's background while content slides
+   under it. */
 .fantasy-header {
+    position: sticky;
+    top: var(--site-nav-height, 52px);
+    z-index: 30;
     margin-bottom: 18px;
+    background: color-mix(in srgb, var(--bg, #faf6f0) 80%, transparent);
+    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(12px);
+}
+
+/* The site nav sizes in-app shells to exactly one screen, which these pages
+   overflow; a sticky nav can only stick inside a parent as tall as the page. */
+body.has-site-nav .app-shell:has(> .fantasy-header) {
+    height: auto;
+    min-height: calc(100dvh - var(--site-nav-height, 52px));
 }
 
 .fantasy-header__inner {
@@ -96,6 +112,22 @@ span.fantasy-header__link.is-current {
     margin: 0;
 }
 
+.fantasy-header__menu-heading {
+    margin: 0;
+    padding: 8px 10px 2px;
+    color: var(--fantasy-clay, #b86f52);
+    font-size: 0.66rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.fantasy-header__menu-item + .fantasy-header__menu-heading {
+    margin-top: 4px;
+    border-top: 1px solid var(--line, #ece4d8);
+    padding-top: 10px;
+}
+
 .fantasy-header__menu-link {
     display: block;
     padding: 8px 10px;
@@ -132,33 +164,41 @@ span.fantasy-header__link.is-current {
    hang open. */
 [hidden] { display: none !important; }
 
+/* A phone gets one row of five even slots and no brand label: the page's
+   own masthead already says where you are. */
 @media (max-width: 620px) {
     .fantasy-header__inner {
-        gap: 8px;
-        padding-bottom: 10px;
+        flex-wrap: nowrap;
+        gap: 0;
+        padding: 6px 0;
     }
 
+    .fantasy-header__brand { display: none; }
+
     .fantasy-header__links {
+        position: relative;
+        flex-wrap: nowrap;
+        justify-content: space-between;
+        gap: 2px;
         width: 100%;
         margin-left: 0;
     }
 
     .fantasy-header__link {
-        padding: 5px 9px;
-        font-size: 0.74rem;
+        justify-content: center;
+        min-height: 36px;
+        padding: 6px 9px;
+        font-size: 0.8rem;
     }
 
-    /* On a phone the nav wraps onto its own full-width row and the Tools
-       button sits near the left of it, so a popup anchored to the button
-       runs off one edge or the other whichever way it opens. Hand the
-       containing block to the row instead and let the menu span it. */
+    /* The menu spans the row rather than hanging off the More button. */
     .fantasy-header__tools { position: static; }
-
-    .fantasy-header__links { position: relative; }
 
     .fantasy-header__menu {
         right: 0;
         left: 0;
         min-width: 0;
+        max-height: calc(100vh - var(--site-nav-height, 52px) - 64px);
+        overflow-y: auto;
     }
 }

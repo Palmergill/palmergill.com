@@ -23,9 +23,9 @@
         // Which measure the ledger's switchable column is showing. On a
         // phone this is the only column, so it is worth keeping in the URL.
         column: "record",
-        // Which seeding the playoff board shows: where the season is headed,
-        // or where it stands. Projected is the question the board exists for.
-        playoffBasis: "projected",
+        // Which view of the league is showing: home (League), standings,
+        // stats, free-agents or history. ?view= keeps it in the URL.
+        view: "home",
         teamId: null,
         overview: null,
         ledger: null,
@@ -97,11 +97,14 @@
         ledgerColumns: byId("ledgerColumns"),
         ledgerNote: byId("ledgerNote"),
         ledgerFootnote: byId("ledgerFootnote"),
+        standingsTable: byId("standingsTable"),
+        standingsNote: byId("standingsNote"),
+        teamsBoard: byId("teams"),
+        viewEmpty: byId("viewEmpty"),
         chartsBoard: document.querySelector('[data-board="charts"]'),
         playoffsBoard: byId("playoffs"),
         playoffsLede: byId("playoffsLede"),
         playoffsNote: byId("playoffsNote"),
-        playoffsBasis: byId("playoffsBasis"),
         playoffBracket: byId("playoffBracket"),
         playoffBubble: byId("playoffBubble"),
         charts: byId("charts"),
@@ -235,6 +238,8 @@
         if (Number.isFinite(week)) state.week = week;
         if (Number.isFinite(team)) state.teamId = team;
         else if (rawTeam === "me") state.pendingMyTeam = true;
+        const view = params.get("view");
+        if (HUB_VIEWS.includes(view)) state.view = view;
         const column = params.get("col");
         if (column && F.LEDGER_COLUMNS.some((entry) => entry.key === column)) {
             state.column = column;
@@ -249,8 +254,9 @@
         } else if (state.pendingMyTeam) {
             params.set("team", "me");
         } else {
+            if (state.view !== "home") params.set("view", state.view);
             if (state.week) params.set("week", state.week);
-            if (state.column && state.column !== "record") {
+            if (state.view === "stats" && state.column && state.column !== "record") {
                 params.set("col", state.column);
             }
         }
@@ -266,12 +272,12 @@
     }
 
     // The nav is mounted as "home" before this script runs, but the hub is
-    // also the team page. Home is current on the league view, My Team on
-    // your own team, and neither on anyone else's, so both stay clickable.
+    // every league view and the team page too. The view is current on the
+    // league, My team on your own team, and nothing on anyone else's.
     function syncNav() {
         const header = window.FantasyHeader;
         if (!header || !header.setPage) return;
-        let page = "home";
+        let page = state.view;
         if (state.pendingMyTeam) page = "my-team";
         else if (state.teamId) page = state.teamId === state.myTeamId ? "my-team" : null;
         header.setPage(page);
@@ -546,6 +552,60 @@
         return null;
     }
 
+    // ── standings ───────────────────────────────────────────────────────
+    //
+    // The table most people come for, with nothing to configure: record,
+    // points for and playoff odds. The other measures are on Stats.
+
+    function renderStandings(payload) {
+        const teams = payload.teams || [];
+        els.standingsTable.replaceChildren();
+        if (!teams.length) {
+            els.standingsTable.appendChild(el("p", "empty-note", "No teams collected for this season."));
+            els.standingsNote.textContent = "";
+            return;
+        }
+        els.standingsNote.textContent = els.ledgerNote.textContent;
+        const showOdds = teams.some((team) => team.playoff && team.playoff.odds !== null && team.playoff.odds !== undefined);
+
+        const table = el("table", "standings-table");
+        const head = el("tr");
+        head.appendChild(el("th", "standings__seed", "#"));
+        head.appendChild(el("th", "standings__team", "Team"));
+        head.appendChild(el("th", "standings__num", "W-L"));
+        head.appendChild(el("th", "standings__num", "PF"));
+        if (showOdds) head.appendChild(el("th", "standings__odds-head", "Playoffs"));
+        const thead = el("thead");
+        thead.appendChild(head);
+        table.appendChild(thead);
+
+        const body = el("tbody");
+        F.sortLedger(teams, "record").forEach((team, index) => {
+            const row = el("tr");
+            if (state.myTeamId && team.espn_team_id === state.myTeamId) row.classList.add("standings__row--mine");
+            row.appendChild(el("td", "standings__seed", String(index + 1)));
+            const name = el("td", "standings__team");
+            name.appendChild(teamCell(team));
+            row.appendChild(name);
+            row.appendChild(el("td", "standings__num", F.ledgerText(team, "record")));
+            row.appendChild(el("td", "standings__num", F.ledgerText(team, "points_for")));
+            if (showOdds) {
+                const cell = el("td", "standings__odds");
+                const odds = team.playoff && team.playoff.odds;
+                if (odds === null || odds === undefined) {
+                    cell.textContent = "—";
+                } else {
+                    cell.appendChild(el("span", "standings__odds-value", `${Math.round(odds * 100)}%`));
+                    cell.appendChild(meterEl(odds * 100));
+                }
+                row.appendChild(cell);
+            }
+            body.appendChild(row);
+        });
+        table.appendChild(body);
+        els.standingsTable.appendChild(table);
+    }
+
     function renderColumnChips() {
         els.ledgerColumns.replaceChildren();
         // A phone hides the ranking-method picker unless it is the column in
@@ -756,11 +816,6 @@
 
     // ── the playoff picture ─────────────────────────────────────────────
 
-    const PLAYOFF_BASES = [
-        { key: "projected", label: "Projected" },
-        { key: "current", label: "If it ended today" },
-    ];
-
     function formatOdds(value) {
         if (value === null || value === undefined) return "—";
         const percent = value * 100;
@@ -798,39 +853,18 @@
         return row;
     }
 
-    function renderPlayoffBasis(picture) {
-        els.playoffsBasis.replaceChildren();
-        // Once the regular season is over there is nothing left to project.
-        if (!picture.projected) return;
-        PLAYOFF_BASES.forEach((basis) => {
-            const chip = el("button", "chip", basis.label);
-            chip.type = "button";
-            if (basis.key === state.playoffBasis) {
-                chip.classList.add("chip--active");
-                chip.setAttribute("aria-pressed", "true");
-            } else {
-                chip.setAttribute("aria-pressed", "false");
-            }
-            chip.addEventListener("click", () => {
-                if (state.playoffBasis === basis.key) return;
-                state.playoffBasis = basis.key;
-                if (state.ledger) renderPlayoffs(state.ledger);
-            });
-            els.playoffsBasis.appendChild(chip);
-        });
-    }
-
     function renderPlayoffs(payload) {
         const picture = payload.playoff_picture;
         els.playoffsBoard.hidden = !picture;
         if (!picture) return;
 
-        const basis = picture.projected && state.playoffBasis === "projected" ? "projected" : "current";
+        // Where the season is headed while there is any of it left to project;
+        // the final seeding once there is not.
+        const basis = picture.projected ? "projected" : "current";
         const field = picture[basis];
         const teams = new Map((payload.teams || []).map((team) => [team.espn_team_id, team]));
         const seedTeam = new Map(field.seeds.map((entry) => [entry.seed, teams.get(entry.espn_team_id)]));
 
-        renderPlayoffBasis(picture);
         const wildcards = field.seeds.length - field.byes;
         els.playoffsLede.textContent = field.byes
             ? `Each division winner takes a top seed and a first-round bye; the next ${wildcards} best records fill out the field.`
@@ -1061,6 +1095,9 @@
 
     function renderTeamsGrid(payload) {
         state.standingsTeams = payload.teams || [];
+        // Once games are played the standings rows are the way into a team.
+        const played = state.standingsTeams.some((team) => (team.wins || 0) + (team.losses || 0) + (team.ties || 0) > 0);
+        els.teamsBoard.hidden = played;
         els.teamsGrid.replaceChildren();
         payload.teams.forEach((team) => {
             const card = el("button", "team-card");
@@ -1592,6 +1629,7 @@
             state.ledger = payload;
             renderColumnChips();
             renderLedger(payload);
+            renderStandings(payload);
             renderCharts(payload);
             renderPlayoffs(payload);
             // The power rankings borrow playoff odds from this payload, and
@@ -1612,6 +1650,8 @@
             }
             state.ledger = null;
             els.ledger.replaceChildren(el("p", "empty-note", "The table is unavailable right now."));
+            els.standingsTable.replaceChildren(el("p", "empty-note", "The table is unavailable right now."));
+            els.standingsNote.textContent = "";
             els.ledgerNote.textContent = "";
             els.ledgerFootnote.textContent = "";
             els.chartsBoard.hidden = true;
@@ -1764,6 +1804,8 @@
     }
 
 
+    // Old links point at a board by id (#free-agents, #playoffs). Open the
+    // view that board lives in, then scroll to it.
     function scrollToRequestedBoard(hash = window.location.hash) {
         if (!hash || hash.length < 2) return;
         let id;
@@ -1774,105 +1816,92 @@
         }
         const target = document.getElementById(id);
         if (!target) return;
-        // On a phone the board may sit behind another tab; open that one first.
-        const board = target.closest("[data-panel]");
+        const board = target.closest("[data-view]");
         if (board && board !== els.leagueSections && els.leagueSections.contains(board)) {
-            setHubPanel(board.dataset.panel, { scroll: false, updateHash: false });
+            showHubView(board.dataset.view);
+            writeUrlState(true, hash);
         }
         target.scrollIntoView({ block: "start" });
     }
 
-    // ── section tabs ────────────────────────────────────────────────────
+    // ── views ───────────────────────────────────────────────────────────
     //
-    // Nine boards stacked run eight phone screens deep. Below 720px the hub
-    // shows one tab's boards at a time; above it every board stays on the
-    // page and a tab is a jump to its first board. A tab whose boards are all
-    // hidden (no playoff picture yet, no free agents) hides with them.
+    // Nine boards stacked ran eight phone screens deep behind two rows of
+    // menus. The league is five views now, picked from the section nav,
+    // and each shows only its own boards at every width.
 
-    function hubBoards(panel) {
-        return [...els.leagueSections.querySelectorAll(":scope > [data-panel]")]
-            .filter((board) => !panel || board.dataset.panel === panel);
+    const HUB_VIEWS = ["home", "standings", "stats", "free-agents", "history"];
+
+    function hubBoards(view) {
+        return [...els.leagueSections.querySelectorAll(":scope > [data-view]")]
+            .filter((board) => !view || board.dataset.view === view);
     }
 
-    function hubTabs() {
-        return [...document.querySelectorAll("#hubTabs .hub-tab")];
+    function showHubView(view) {
+        if (!HUB_VIEWS.includes(view)) view = "home";
+        state.view = view;
+        els.leagueSections.dataset.view = view;
+        hubBoards().forEach((board) => board.classList.toggle("is-current", board.dataset.view === view));
+        syncViewEmpty();
+        syncNav();
     }
 
-    function stickyOffset() {
-        const nav = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--site-nav-height")) || 52;
-        return nav;
+    // A view whose boards all hid themselves (no free agents to claim, no
+    // playoff picture yet) says so rather than showing an empty page.
+    function syncViewEmpty() {
+        if (!state.overview) return;
+        els.viewEmpty.hidden = hubBoards(state.view).some((board) => !board.hidden);
     }
 
-    function setHubPanel(panel, { scroll = true, updateHash = true } = {}) {
-        const tab = hubTabs().find((t) => t.dataset.panel === panel);
-        if (!tab || tab.hidden) return;
-        state.hubPanel = panel;
-        els.leagueSections.dataset.panel = panel;
-        hubBoards().forEach((board) => board.classList.toggle("is-current", board.dataset.panel === panel));
-        hubTabs().forEach((t) => t.setAttribute("aria-selected", String(t === tab)));
-        const track = tab.parentElement;
-        track.scrollLeft = tab.offsetLeft - (track.clientWidth - tab.offsetWidth) / 2;
-
-        const first = hubBoards(panel).find((board) => !board.hidden);
-        if (updateHash && first && first.id) {
-            history.replaceState(history.state, "", `${window.location.pathname}${window.location.search}#${first.id}`);
+    // Moving between league views, from the nav or a link on a board. A
+    // team page closes first, since the views live behind it.
+    function goToView(view) {
+        const leavingTeam = Boolean(state.teamId || state.pendingMyTeam);
+        if (!leavingTeam && view === state.view) {
+            window.scrollTo({ top: 0 });
+            return;
         }
-        if (!scroll) return;
-        const tabs = byId("hubTabs");
-        if (isNarrow()) {
-            // Start the new tab at its top, under the stuck tab bar, but never
-            // jump down the page when the tabs have not reached the top yet.
-            const sectionsTop = els.leagueSections.getBoundingClientRect().top + window.scrollY;
-            const target = sectionsTop - stickyOffset();
-            if (window.scrollY > target) window.scrollTo({ top: target });
-        } else if (first) {
-            const top = first.getBoundingClientRect().top + window.scrollY - stickyOffset() - tabs.offsetHeight - 8;
-            window.scrollTo({ top, behavior: "smooth" });
+        state.teamId = null;
+        state.pendingMyTeam = false;
+        showHubView(view);
+        writeUrlState(false);
+        if (leavingTeam) {
+            state.generation += 1;
+            applyRoute();
         }
+        window.scrollTo({ top: 0 });
     }
 
-    function syncHubTabs() {
-        hubTabs().forEach((tab) => {
-            tab.hidden = hubBoards(tab.dataset.panel).every((board) => board.hidden);
-        });
-        const current = hubTabs().find((t) => t.dataset.panel === state.hubPanel);
-        if (!current || current.hidden) {
-            const first = hubTabs().find((t) => !t.hidden);
-            if (first) setHubPanel(first.dataset.panel, { scroll: false, updateHash: false });
-        } else {
-            hubBoards().forEach((board) => board.classList.toggle("is-current", board.dataset.panel === state.hubPanel));
+    // Links into the hub (the section nav, "More team stats →") switch view
+    // in place instead of reloading the page they are already on.
+    function interceptHubLinks(event) {
+        if (event.defaultPrevented || event.button !== 0) return;
+        if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+        const link = event.target.closest("a[href]");
+        if (!link) return;
+        const url = new URL(link.href, window.location.href);
+        if (url.origin !== window.location.origin || url.pathname !== "/fantasy/") return;
+        if (url.searchParams.has("season")) return;
+        const team = url.searchParams.get("team");
+        event.preventDefault();
+        if (team === "me") {
+            if (state.myTeamId) {
+                selectTeam(state.myTeamId);
+            } else {
+                state.pendingMyTeam = true;
+                writeUrlState(false);
+                loadSeason();
+            }
+            return;
         }
+        goToView(url.searchParams.get("view") || "home");
     }
 
-    // Wide screens: the tab for whichever board is under the tab bar lights up.
-    function spyHubTabs() {
-        if (isNarrow() || els.leagueSections.hidden) return;
-        const line = stickyOffset() + byId("hubTabs").offsetHeight + 24;
-        let active = null;
-        hubBoards().forEach((board) => {
-            if (!board.hidden && board.getBoundingClientRect().top <= line) active = board.dataset.panel;
-        });
-        active = active || "power";
-        if (active !== state.hubPanel) {
-            state.hubPanel = active;
-            hubTabs().forEach((t) => t.setAttribute("aria-selected", String(t.dataset.panel === active)));
-        }
-    }
-
-    function initHubTabs() {
-        state.hubPanel = "power";
-        hubTabs().forEach((tab) => {
-            tab.addEventListener("click", () => setHubPanel(tab.dataset.panel));
-        });
-        const observer = new MutationObserver(syncHubTabs);
+    function initHubViews() {
+        showHubView(state.view);
+        document.addEventListener("click", interceptHubLinks);
+        const observer = new MutationObserver(syncViewEmpty);
         hubBoards().forEach((board) => observer.observe(board, { attributes: true, attributeFilter: ["hidden"] }));
-        syncHubTabs();
-        let ticking = false;
-        window.addEventListener("scroll", () => {
-            if (ticking) return;
-            ticking = true;
-            requestAnimationFrame(() => { ticking = false; spyHubTabs(); });
-        }, { passive: true });
     }
 
     // ── power rankings: the rosters ─────────────────────────────────────
@@ -2585,6 +2614,7 @@
             ]);
             if (stale(generation)) return;
             applyRoute();
+            syncViewEmpty();
             // A cross-link from the dashboard's Waiver Pulse lands on the
             // free-agent board, which anchors immediately but fills in late.
             scrollToRequestedBoard(requestedHash);
@@ -2663,8 +2693,9 @@
             state.teamId = null;
             state.pendingMyTeam = false;
             state.column = "record";
+            state.view = "home";
             readUrlState();
-            syncNav();
+            showHubView(state.view);
             loadSeason();
         });
     }
@@ -2673,7 +2704,7 @@
         readUrlState();
         syncNav();
         bindEvents();
-        initHubTabs();
+        initHubViews();
         loadSeason();
     }
 

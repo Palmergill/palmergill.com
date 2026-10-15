@@ -13,8 +13,8 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/shared/site-nav.css?v=17">
-    <link rel="stylesheet" href="/shared/fantasy-header.css?v=2">
-    <link rel="stylesheet" href="style.css?v=35">
+    <link rel="stylesheet" href="/shared/fantasy-header.css?v=3">
+    <link rel="stylesheet" href="style.css?v=36">
     <link rel="stylesheet" href="/shared/fantasy-design.css?v=2">
 </head>
 <body>
@@ -33,16 +33,11 @@
                 <!-- The manager's name, on a team route only. -->
                 <p class="masthead__sub" id="leagueSub" hidden></p>
             </div>
-            <!-- The league's side of the masthead: how fresh the data is and
-                 the two recaps. The season, week and scoring figures that
-                 used to sit here said nothing the page below does not. -->
+            <!-- The league's side of the masthead: how fresh the data is. The
+                 recaps live in the section nav's More menu. -->
             <div class="masthead__aside" id="modeBadge" aria-live="polite">
                 <p class="masthead__freshness" id="freshnessValue"></p>
                 <p class="season-bar__viewing" id="seasonViewing" hidden></p>
-                <div class="masthead__links">
-                    <a class="league-link" href="/fantasy/week/">Weekly recap →</a>
-                    <a class="league-link" href="/fantasy/draft-recap/">Draft recap →</a>
-                </div>
             </div>
             <!-- The team route swaps this in for the league's facts rather
                  than stacking a second masthead under the first. -->
@@ -103,19 +98,12 @@
         </section>
 
         <div id="leagueView" hidden>
-            <div id="myTeamSummary" class="my-team-summary" hidden><span id="myTeamName"></span> <button id="myTeamChange" type="button" class="button button--quiet">Change team</button></div>
-            <form id="myTeamForm" class="my-team-picker" hidden>
-                <label for="myTeamSelect">My team</label>
-                <select id="myTeamSelect" required></select>
-                <button id="myTeamSave" type="submit" class="button button--quiet">Save team</button>
-                <span id="myTeamStatus" role="status"></span>
-            </form>
             <!-- Team detail replaces the league sections; it is a routed view
                  on this page (?team=N) rather than a second HTML file. The
                  team's own name rides in the masthead above, so this view
                  opens on the paragraph the hub already writes about it. -->
             <section id="teamView" class="team-view" hidden aria-labelledby="leagueName">
-                <button type="button" class="back-link" id="teamBack">← All teams</button>
+                <button type="button" class="back-link" id="teamBack">← Back to the league</button>
 
                 <section class="lineup" id="lineupCard" aria-labelledby="lineupTitle" hidden>
                     <div class="lineup__head">
@@ -168,47 +156,89 @@
                 </section>
             </section>
 
-            <div id="leagueSections" data-panel="power">
-                <!-- On a phone the hub is one section at a time behind these
-                     tabs; on a wider screen every board stays stacked and the
-                     tabs jump to them. Each board names its tab in data-panel. -->
-                <nav class="hub-tabs" id="hubTabs" aria-label="League sections">
-                    <div class="hub-tabs__track" role="tablist">
-                        <button type="button" class="hub-tab" role="tab" data-panel="power" aria-selected="true">Power</button>
-                        <button type="button" class="hub-tab" role="tab" data-panel="standings" aria-selected="false">Standings</button>
-                        <button type="button" class="hub-tab" role="tab" data-panel="playoffs" aria-selected="false">Playoffs</button>
-                        <button type="button" class="hub-tab" role="tab" data-panel="scores" aria-selected="false">Scores</button>
-                        <button type="button" class="hub-tab" role="tab" data-panel="free-agents" aria-selected="false">Free agents</button>
-                        <button type="button" class="hub-tab" role="tab" data-panel="history" aria-selected="false">History</button>
+            <!-- The league, as views of one page. The section nav at the top
+                 (League · Standings · Stats · My team · More) picks the view;
+                 each board names its view in data-view, and only the current
+                 view's boards are shown. ?view= keeps it in the URL. -->
+            <div id="leagueSections" data-view="home">
+                <!-- League: where you stand, this week, and the order. -->
+                <div class="hub-team" data-view="home">
+                <div id="myTeamSummary" class="my-team-summary" hidden><span id="myTeamName"></span> <button id="myTeamChange" type="button" class="button button--quiet">Change team</button></div>
+                <form id="myTeamForm" class="my-team-picker" hidden>
+                    <label for="myTeamSelect">My team</label>
+                    <select id="myTeamSelect" required></select>
+                    <button id="myTeamSave" type="submit" class="button button--quiet">Save team</button>
+                    <span id="myTeamStatus" role="status"></span>
+                </form>
+                </div>
+
+                <section class="board" id="scoreboard" data-board="scoreboard" data-view="home" aria-labelledby="scoreboardTitle">
+                    <div class="board__head">
+                        <h2 id="scoreboardTitle">This week</h2>
+                        <label class="select-field">
+                            <span class="sr-only">Scoreboard week</span>
+                            <select id="scoreboardWeek"></select>
+                        </label>
                     </div>
-                </nav>
+                    <div id="scoreboardGrid" class="scoreboard"></div>
+                    <a class="league-link board__more" href="/fantasy/week/">Read the weekly recap →</a>
+                </section>
+
                 <!-- Power rankings read the rosters, not the results: what each
                      team can be expected to score a week from here, given
-                     who it has and which of them it can actually start. It
-                     leads because it is the one ranking the scoreboard
-                     cannot tell you. -->
-                <section class="board" id="power" data-board="power" data-panel="power" aria-labelledby="powerTitle">
+                     who it has and which of them it can actually start. -->
+                <section class="board" id="power" data-board="power" data-view="home" aria-labelledby="powerTitle">
                     <div class="board__head">
                         <div>
                             <h2 id="powerTitle">Power Rankings</h2>
                         </div>
                         <span class="board__note" id="powerNote"></span>
                     </div>
-                    <!-- Two numbers a row. The lede, the footnote and the
-                         per-row reasons that used to sit here said more than
-                         anybody reads on a board whose job is an order; the
-                         method is a hover on each stat's label now. -->
                     <ol class="power-list" id="powerList"></ol>
+                    <a class="league-link board__more" href="/fantasy/?view=stats" data-view-link="stats">Rankings over time →</a>
                 </section>
 
-                <!-- The same ranking as a season, directly under the board
-                     it charts. Two series behind one toggle: the Power
-                     rankings board above, week by week,
-                     and the résumé rank from results. The résumé line
-                     reaches back over every stored season; the power line
-                     only as far as Sep 2026, when the hub started writing
-                     it down. -->
-                <section class="board" id="power-chart" data-board="power-chart" data-panel="power"
+                <!-- Standings: the table, plainly. Record, points and playoff
+                     odds are fixed columns; every other measure lives on Stats,
+                     so this view has nothing to configure. -->
+                <section class="board" id="standings" data-board="standings" data-view="standings" aria-labelledby="standingsTitle">
+                    <div class="board__head">
+                        <div>
+                            <h2 id="standingsTitle">Standings</h2>
+                        </div>
+                        <span class="board__note" id="standingsNote"></span>
+                    </div>
+                    <div id="standingsTable" class="standings"></div>
+                    <a class="league-link board__more" href="/fantasy/?view=stats" data-view-link="stats">More team stats →</a>
+                </section>
+
+                <!-- The field as it stands to finish: division winners take
+                     the top seeds and the byes, the next best records fill
+                     out the rest. Seeded from the same simulation as the
+                     odds column, so the two never disagree about the rule. -->
+                <section class="board" id="playoffs" data-board="playoffs" data-view="standings" aria-labelledby="playoffsTitle" hidden>
+                    <div class="board__head">
+                        <div>
+                            <h2 id="playoffsTitle">Playoff picture</h2>
+                            <p class="board__lede" id="playoffsLede"></p>
+                        </div>
+                        <span class="board__note" id="playoffsNote"></span>
+                    </div>
+                    <div class="bracket" id="playoffBracket"></div>
+                    <div class="bracket__bubble" id="playoffBubble"></div>
+                </section>
+
+                <!-- Kept for the preseason, when there is no table yet and this
+                     grid is the only way into a team. -->
+                <section class="board" id="teams" data-board="teams" data-view="standings" aria-labelledby="teamsTitle" hidden>
+                    <div class="board__head">
+                        <h2 id="teamsTitle">Teams</h2>
+                    </div>
+                    <div id="teamsGrid" class="teams-grid"></div>
+                </section>
+
+                <!-- Stats: the deeper reading, for whoever wants it. -->
+                <section class="board" id="power-chart" data-board="power-chart" data-view="stats"
                          aria-labelledby="powerChartTitle">
                     <div class="board__head">
                         <div>
@@ -228,18 +258,16 @@
                     <details class="chart-data"><summary>View weekly ranks as a table</summary><div id="chartTable" class="table-wrap"></div></details>
                 </section>
 
-                <!-- Standings, power rankings and rosters used to be three
-                     lists of the same ten teams. One table now, with a column
-                     that changes — which is also what lets it survive a phone,
+                <!-- Every measure the hub keeps, one column at a time on a phone,
                      where the chosen column brings its chart into the row. -->
-                <section class="board" id="standings" data-board="ledger" data-panel="standings" aria-labelledby="ledgerTitle">
+                <section class="board" id="team-stats" data-board="ledger" data-view="stats" aria-labelledby="ledgerTitle">
                     <div class="board__head">
                         <div>
                             <h2 id="ledgerTitle">Team stats</h2>
                             <p class="board__lede">
-                                Record and points, plus one column you choose. Median record
-                                adds a result each week for finishing above or below the league
-                                median; luck is wins minus expected wins.
+                                Pick a measure to sort by. Median record adds a result each
+                                week for finishing above or below the league median; luck is
+                                wins minus expected wins.
                             </p>
                         </div>
                         <span class="board__note" id="ledgerNote"></span>
@@ -250,26 +278,8 @@
                     <div id="ledger" class="ledger"></div>
                     <p class="ledger__note" id="ledgerFootnote"></p>
                 </section>
-                <!-- The field as it stands to finish: division winners take
-                     the top seeds and the byes, the next best records fill
-                     out the rest. Seeded from the same simulation as the
-                     odds column, so the two never disagree about the rule. -->
-                <section class="board" id="playoffs" data-board="playoffs" data-panel="playoffs" aria-labelledby="playoffsTitle" hidden>
-                    <div class="board__head">
-                        <div>
-                            <h2 id="playoffsTitle">Playoff picture</h2>
-                            <p class="board__lede" id="playoffsLede"></p>
-                        </div>
-                        <span class="board__note" id="playoffsNote"></span>
-                    </div>
-                    <div class="controls">
-                        <div class="chip-row" id="playoffsBasis" role="group" aria-label="Seeding basis"></div>
-                    </div>
-                    <div class="bracket" id="playoffBracket"></div>
-                    <div class="bracket__bubble" id="playoffBubble"></div>
-                </section>
 
-                <section class="board" data-board="charts" aria-labelledby="chartsTitle" data-panel="standings" hidden>
+                <section class="board" data-board="charts" aria-labelledby="chartsTitle" data-view="stats" hidden>
                     <div class="board__head">
                         <h2 id="chartsTitle">Reading the season</h2>
                         <span class="board__note" id="chartsNote"></span>
@@ -277,20 +287,9 @@
                     <div id="charts" class="charts"></div>
                 </section>
 
-                <section class="board" id="scoreboard" data-board="scoreboard" data-panel="scores" aria-labelledby="scoreboardTitle">
-                    <div class="board__head">
-                        <h2 id="scoreboardTitle">Scoreboard</h2>
-                        <label class="select-field">
-                            <span class="sr-only">Scoreboard week</span>
-                            <select id="scoreboardWeek"></select>
-                        </label>
-                    </div>
-                    <div id="scoreboardGrid" class="scoreboard"></div>
-                </section>
-
                 <!-- Who is actually claimable here, which is a fact about
                      these rosters rather than about the player pool. -->
-                <section class="board" id="free-agents" data-board="free-agents" data-panel="free-agents" aria-labelledby="freeAgentsTitle">
+                <section class="board" id="free-agents" data-board="free-agents" data-view="free-agents" aria-labelledby="freeAgentsTitle">
                     <div class="board__head">
                         <h2 id="freeAgentsTitle">Free agents</h2>
                         <span class="board__note" id="freeAgentsNote"></span>
@@ -299,20 +298,8 @@
                     <button type="button" class="league-more" id="freeAgentsToggle" aria-expanded="false" hidden>Show all</button>
                 </section>
 
-                <!-- Kept for the preseason, when the ledger's derived columns
-                     are all empty and this grid is the only way into a team. -->
-                <section class="board" id="teams" data-board="teams" data-panel="standings" aria-labelledby="teamsTitle">
-                    <div class="board__head">
-                        <h2 id="teamsTitle">Teams</h2>
-                    </div>
-                    <div id="teamsGrid" class="teams-grid"></div>
-                </section>
-
-                <!-- Every season before this one. A past year is worth a row
-                     because of who won it, which is what the chips at the top
-                     of the page could never say. Switching to one is a link
-                     in the row rather than a separate control. -->
-                <section class="board" id="history" data-board="history" data-panel="history" aria-labelledby="historyTitle">
+                <!-- Every season before this one, by who won it. -->
+                <section class="board" id="history" data-board="history" data-view="history" aria-labelledby="historyTitle">
                     <div class="board__head">
                         <div>
                             <h2 id="historyTitle">History</h2>
@@ -325,16 +312,18 @@
                     </div>
                     <ol class="history" id="historyList"></ol>
                 </section>
+
+                <p class="empty-note hub-view-empty" id="viewEmpty" hidden>Nothing to show here for this season yet.</p>
             </div>
         </div>
     </main>
 
     <script src="/shared/site-nav.js?v=19"></script>
-    <script src="/shared/fantasy-header.js?v=5"></script>
+    <script src="/shared/fantasy-header.js?v=6"></script>
     <script>window.FantasyHeader.mount({ page: "home" });</script>
     <script src="/shared/analytics.js?v=1"></script>
     <script src="/shared/api-base.js?v=1"></script>
     <script src="format.js?v=16"></script>
-    <script src="app.js?v=37"></script>
+    <script src="app.js?v=38"></script>
 </body>
 </html>
