@@ -598,7 +598,11 @@ def search_rankable_players(
     rows = (
         db.query(_Player)
         .filter(
-            _Player.search_name.like(f"%{term}%"),
+            # Escape LIKE's wildcards so "%" or "_" in a query is literal.
+            _Player.search_name.like(
+                "%" + term.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%",
+                escape="\\",
+            ),
             _Player.position.in_(RANKABLE_POSITIONS),
         )
         .limit(200)

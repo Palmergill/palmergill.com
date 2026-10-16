@@ -456,7 +456,10 @@ function decodeBasicAuth(value) {
   }
 
   try {
-    const decoded = atob(value.slice('Basic '.length));
+    // atob yields one char per byte; decode those bytes as UTF-8 so a
+    // non-ASCII password compares equal to the configured one.
+    const binary = atob(value.slice('Basic '.length));
+    const decoded = new TextDecoder().decode(Uint8Array.from(binary, (char) => char.charCodeAt(0)));
     const separator = decoded.indexOf(':');
     if (separator === -1) {
       return null;
@@ -494,8 +497,10 @@ export default async function middleware(request) {
     identity = await sessionIdentityFromApi(request);
   }
 
+  // A session cookie never clears this IP's auth failures: anyone can sign
+  // up for one, so clearing on it let an account holder reset the counter
+  // between password guesses. Only correct Basic credentials (below) do.
   if (identity && isAdminPath(url.pathname)) {
-    clearAuthFailures(request);
     if (identity.role !== ROLE_ADMIN) {
       return forbidden(request);
     }
@@ -503,7 +508,6 @@ export default async function middleware(request) {
   }
 
   if (isOptionalAuthApiPath(url.pathname) && identity) {
-    clearAuthFailures(request);
     return withOriginAuth(request, identity, username, password);
   }
 
@@ -516,7 +520,6 @@ export default async function middleware(request) {
   }
 
   if (identity) {
-    clearAuthFailures(request);
     return withOriginAuth(request, identity, username, password);
   }
 

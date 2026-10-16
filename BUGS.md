@@ -21,6 +21,16 @@ Closed items are trimmed quarterly.
 
 ## Closed
 
+- The 2026-10-15 whole-codebase review closed ten findings, each pinned in `backend/tests/test_review_regressions.py`.
+  (1) `GET /api/stocks/{ticker}` echoed the provider exception, whose request URL carries `apiKey=`, so any signed-up member could read the Polygon key; details are now generic and provider errors are redacted. Rotate the key — it was exposed.
+  (2) Any signed-in request cleared its IP's auth-failure count, at the origin and the edge, so a free account reset the login rate limit between guesses; only a correct password clears it now.
+  (3) `secrets.compare_digest` on non-ASCII `str` raised, so a member named like "straße" could never log in and any non-ASCII Basic header, session signature or poker token was a 500; comparisons are on UTF-8 bytes.
+  (4) `POST /api/poker/games/{id}/next-hand` accepted the multiplayer lobby, letting a guest start the game around the host-only `/start`.
+  (5) The stocks routes, craps `/translate` and `POST /api/analytics/events` ran blocking I/O inside coroutines on the single uvicorn worker; they are plain `def` now.
+  (6) The session cookie's `Secure` flag read `request.url.scheme`, which is `http` behind the Railway proxy; `X-Forwarded-Proto` counts too.
+  (7) All five casino workers precached `site-nav.js?v=18` while pages loaded `v=19` (three also missed `analytics.js`) — the fourth time; a pytest guard now checks every page asset is precached.
+  (8) The rankings player search did not escape LIKE wildcards. (9) `get_block` passed unvalidated input into the provider URL path. — closed 2026-10-15
+
 - (fantasy CSS) `hidden` did not hide two elements, because a class setting `display` outranks the UA `[hidden]` rule: `#shareLink` on the rankings board (`.button` is `inline-flex`, so "View shared board" showed on unpublished boards) and the week board's stepper (`.week-step`). Every DOM test asserting `el.hidden === true` passed the whole time; only opening a browser showed it. `fantasy/draft-order/style.css` had carried `[hidden] { display: none !important; }` for the same reason since it was written — the other three fantasy stylesheets now do too, with `fantasy/tests/hidden-guard.test.js` keeping the next one honest (that test was removed with the unit suites on 2026-09-24; nothing guards this now). — closed 2026-09-06
 
 - (fantasy API) `POST /api/fantasy/chat` carried a demo-mode branch that no UI could reach: the panel moved to the members-only league hub in the dashboard redesign, and demo mode means anonymous. Deleting the branch alone would have been worse than leaving it — `answer_demo_chat` was the only thing keeping an anonymous caller out of the model — so the route is now member-gated (JSON 403, mirroring `fantasy_league.require_member`) and the demo path is gone. `_answer_with_local_router` stays: it is also the no-key fallback. — closed 2026-09-05

@@ -11,6 +11,8 @@ from typing import Optional, List
 import logging
 import os
 
+from app.log_handler import _redact_sensitive_query_values
+
 logger = logging.getLogger(__name__)
 
 # Cache TTLs optimized for data type
@@ -134,7 +136,9 @@ class StockDataClient:
             
             return self._save_polygon_data(ticker, data, db)
         except Exception as e:
-            error_msg = str(e)
+            # Provider errors carry the request URL, and Polygon's URLs carry
+            # the API key as a query parameter.
+            error_msg = _redact_sensitive_query_values(str(e))
             logger.error(f"[{ticker}] Polygon API error: {error_msg}")
             
             # Try to serve stale cache

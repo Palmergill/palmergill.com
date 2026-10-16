@@ -463,7 +463,11 @@ def create_player_token(game_id: str, player_id: str) -> str:
 
 def require_player_token(game_id: str, player_id: str, player_token: Optional[str]) -> None:
     expected = player_tokens.get(game_id, {}).get(player_id)
-    if not expected or not player_token or not secrets.compare_digest(expected, player_token):
+    # Compare bytes: compare_digest on str raises TypeError (a 500) when a
+    # client sends a non-ASCII token.
+    if not expected or not player_token or not secrets.compare_digest(
+        expected.encode("utf-8"), player_token.encode("utf-8")
+    ):
         raise HTTPException(status_code=403, detail="Invalid player token")
 
 
@@ -813,6 +817,12 @@ async def next_hand(game_id: str, http_request: Request, request: PlayerAuthRequ
 
         if game.phase not in ('showdown', 'waiting'):
             raise HTTPException(status_code=400, detail="Hand still in progress")
+
+        # A multiplayer lobby is also 'waiting', and start_hand() would deal
+        # it — letting any joined guest start the game around the host-only
+        # /start check (and its two-player minimum).
+        if getattr(game, 'game_type', 'single') == 'multiplayer' and game.hand_number == 0:
+            raise HTTPException(status_code=400, detail="Waiting for the host to start the game")
 
         game.dealer_index = (game.dealer_index + 1) % len(game.players)
         game.start_hand()

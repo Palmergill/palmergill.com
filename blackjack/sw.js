@@ -13,7 +13,8 @@ const STATIC_ASSETS = [
     '/shared/casino-profile.js?v=3',
     '/shared/casino-header.js?v=2',
     '/shared/site-nav.css?v=17',
-    '/shared/site-nav.js?v=18',
+    '/shared/site-nav.js?v=19',
+    '/shared/analytics.js?v=1',
     '/casino/blackjack%20rules%20and%20strategy.txt'
 ];
 

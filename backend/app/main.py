@@ -420,6 +420,17 @@ def is_demo_path(path: str):
     return any(path == prefix or path.startswith(f"{prefix}/") for prefix in DEMO_PATH_PREFIXES)
 
 
+def constant_time_equal(left: str, right: str) -> bool:
+    """`secrets.compare_digest` for any text.
+
+    Comparing two `str` values raises TypeError as soon as either holds a
+    non-ASCII character, which turned a login attempt as "straße" (or any
+    Basic header carrying "é") into a 500. Comparing UTF-8 bytes has no such
+    restriction.
+    """
+    return secrets.compare_digest(left.encode("utf-8"), right.encode("utf-8"))
+
+
 def valid_app_credentials(authorization: str | None):
     config = app_auth_config()
     credentials = basic_auth_credentials(authorization)
@@ -428,8 +439,8 @@ def valid_app_credentials(authorization: str | None):
 
     username, password = credentials
     return (
-        secrets.compare_digest(username, config["username"])
-        and secrets.compare_digest(password, config["password"])
+        constant_time_equal(username, config["username"])
+        and constant_time_equal(password, config["password"])
     )
 
 
@@ -484,7 +495,7 @@ def session_identity(request: Request) -> dict | None:
         return None
 
     expected_signature = _session_signature(session_signing_secret(config["password"]), payload)
-    if not secrets.compare_digest(signature, expected_signature):
+    if not constant_time_equal(signature, expected_signature):
         return None
 
     try:
@@ -503,7 +514,7 @@ def session_identity(request: Request) -> dict | None:
     if role is None:
         # Legacy token with no role claim: only the admin could have been
         # issued one, so anything else is not trusted with a role at all.
-        if not secrets.compare_digest(username, config["username"]):
+        if not constant_time_equal(username, config["username"]):
             return None
         return {"username": config["username"], "role": ROLE_ADMIN}
 
@@ -511,7 +522,7 @@ def session_identity(request: Request) -> dict | None:
         # An admin claim is only honored for the configured admin username,
         # so a member account named in a forged-but-unsigned way is moot and
         # a renamed admin cannot leave a stale admin token behind.
-        if not secrets.compare_digest(username, config["username"]):
+        if not constant_time_equal(username, config["username"]):
             return None
         return {"username": config["username"], "role": ROLE_ADMIN}
 
@@ -778,13 +789,16 @@ async def require_app_auth(request: Request, call_next):
     identity = None
     if valid_app_credentials(authorization):
         identity = {"username": app_auth_config()["username"], "role": ROLE_ADMIN}
+        # Only a correct password clears this IP's failures. A session cookie
+        # must not: anyone can sign up for one, and clearing on every signed-in
+        # request let an account holder reset the counter between guesses.
+        clear_auth_failures(request)
     else:
         identity = session_identity(request) or local_dev_identity(request)
 
     if identity:
         request.state.app_auth_authenticated = True
         request.state.app_user = identity
-        clear_auth_failures(request)
         if identity["role"] != ROLE_ADMIN and is_admin_path(request.url.path):
             return admin_required(request)
         return await call_next(request)
@@ -822,6 +836,18 @@ async def login_session_status(request: Request):
     return JSONResponse(body, headers={"Cache-Control": "no-store"})
 
 
+def request_is_https(request: Request) -> bool:
+    """Whether the browser reached us over https.
+
+    Behind Vercel and Railway the TLS hop ends before uvicorn, which sees
+    plain http unless it trusts the proxy headers, so `request.url.scheme`
+    alone left the session cookie without `Secure` in production. Trusting a
+    spoofed X-Forwarded-Proto here can only add `Secure`, never remove it.
+    """
+    forwarded_proto = request.headers.get("x-forwarded-proto", "").split(",")[0].strip().lower()
+    return request.url.scheme == "https" or forwarded_proto == "https"
+
+
 def _set_session_cookie(response: JSONResponse, request: Request, username: str, role: str):
     config = app_auth_config()
     response.set_cookie(
@@ -829,7 +855,7 @@ def _set_session_cookie(response: JSONResponse, request: Request, username: str,
         create_app_session_token(username, config["password"], role=role),
         max_age=SESSION_TTL_SECONDS,
         httponly=True,
-        secure=request.url.scheme == "https",
+        secure=request_is_https(request),
         samesite="lax",
         path="/",
     )
@@ -856,8 +882,8 @@ async def login_session(request: Request):
     redirect = safe_next_path(body.get("next"))
 
     is_admin = (
-        secrets.compare_digest(username, config["username"])
-        and secrets.compare_digest(password, config["password"])
+        constant_time_equal(username, config["username"])
+        and constant_time_equal(password, config["password"])
     )
 
     if is_admin:
@@ -955,7 +981,7 @@ async def login_logout(request: Request):
     response = JSONResponse({"ok": True})
     response.delete_cookie(
         SESSION_COOKIE_NAME,
-        secure=request.url.scheme == "https",
+        secure=request_is_https(request),
         samesite="lax",
         path="/",
     )

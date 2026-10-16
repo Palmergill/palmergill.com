@@ -221,8 +221,10 @@ def cleanup_old_analytics(db: Session, days: int = RETENTION_DAYS) -> int:
     return deleted
 
 
+# Plain `def` so the synchronous commit runs in the threadpool, not on the
+# event loop (the request middleware queues its writes for the same reason).
 @router.post("/events")
-async def create_event(
+def create_event(
     payload: AnalyticsEventIn,
     request: Request,
     db: Session = Depends(get_db),

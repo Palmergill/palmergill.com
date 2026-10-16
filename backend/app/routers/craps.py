@@ -126,8 +126,11 @@ def sweep_rate_limit_store(now: float | None = None) -> int:
     return len(stale_keys)
 
 
+# Plain `def`: translate_strategy blocks on the model call for seconds, and a
+# coroutine would hold the event loop (every other request) for all of it.
+# FastAPI runs sync routes in its threadpool.
 @router.post("/translate", response_model=StrategyIntent, response_model_exclude_none=True)
-async def translate(payload: TranslateRequest, request: Request) -> StrategyIntent:
+def translate(payload: TranslateRequest, request: Request) -> StrategyIntent:
     if _rate_limited(request):
         raise HTTPException(status_code=429, detail="Too many requests. Try again shortly.")
 

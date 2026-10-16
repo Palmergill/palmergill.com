@@ -268,6 +268,14 @@ def get_latest_block() -> Dict[str, Any]:
 
 
 def get_block(height_or_hash: str) -> Dict[str, Any]:
+    # Validated like transaction ids: the value is interpolated into a
+    # provider URL path. isascii() keeps "١٢٣" (which isdigit() accepts) out.
+    height_or_hash = height_or_hash.strip()
+    is_height = height_or_hash.isascii() and height_or_hash.isdigit()
+    is_hash = len(height_or_hash) == 64 and all(char in "0123456789abcdefABCDEF" for char in height_or_hash)
+    if not (is_height or is_hash):
+        raise ValueError("That does not look like a block height or hash.")
+
     if _provider_not_configured():
         return get_demo_block(height_or_hash)
 

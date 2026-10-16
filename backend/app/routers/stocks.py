@@ -4,6 +4,9 @@ from app.database import get_db
 from app.services.stock_data_client import stock_data_client
 from app.services.stock_data import search_stocks
 
+# Every route here is a plain `def`: the Polygon/Finnhub clients and the cache
+# are synchronous, and inside a coroutine they would stall the event loop for
+# the whole process. FastAPI runs sync routes in its threadpool.
 router = APIRouter(prefix="/api/stocks", tags=["stocks"])
 DEMO_STOCK_WARNING = (
     "Public demo mode uses generated sample stock data and does not call live market data providers."
@@ -29,7 +32,7 @@ def stock_error_status(error: Exception) -> int:
 
 
 @router.get("/search")
-async def search_stocks_endpoint(
+def search_stocks_endpoint(
     request: Request,
     q: str = Query(..., min_length=1),
     limit: int = Query(10, ge=1, le=25),
@@ -62,7 +65,7 @@ async def search_stocks_endpoint(
 
 
 @router.get("/{ticker}/earnings")
-async def get_earnings(request: Request, ticker: str, db: Session = Depends(get_db)):
+def get_earnings(request: Request, ticker: str, db: Session = Depends(get_db)):
     """Get earnings data for a ticker"""
     try:
         data = (
@@ -84,7 +87,7 @@ async def get_earnings(request: Request, ticker: str, db: Session = Depends(get_
 
 
 @router.get("/{ticker}/prices")
-async def get_price_history(
+def get_price_history(
     request: Request,
     ticker: str,
     days: int = Query(365, ge=1, le=1000),
@@ -117,7 +120,7 @@ async def get_price_history(
 
 
 @router.get("/{ticker}")
-async def get_stock(request: Request, ticker: str, refresh: bool = False, db: Session = Depends(get_db)):
+def get_stock(request: Request, ticker: str, refresh: bool = False, db: Session = Depends(get_db)):
     """Get stock data including earnings and summary"""
     try:
         data = (
@@ -129,7 +132,12 @@ async def get_stock(request: Request, ticker: str, refresh: bool = False, db: Se
             mark_demo(data)
         return data
     except Exception as e:
-        raise HTTPException(
-            status_code=stock_error_status(e),
-            detail=f"Could not fetch data for {ticker}: {str(e)}",
+        status = stock_error_status(e)
+        # Never echo the exception: provider errors include the request URL,
+        # and that URL includes the Polygon API key.
+        detail = (
+            "Stock data temporarily unavailable"
+            if status == 503
+            else f"Could not fetch data for '{ticker}'"
         )
+        raise HTTPException(status_code=status, detail=detail)
