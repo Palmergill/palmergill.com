@@ -367,39 +367,10 @@ button:focus-visible {
 
 /* ── teams grid ───────────────────────────────────────────────────── */
 
-.teams-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-    gap: 12px;
-}
 
-.team-card {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 4px;
-    padding: 14px;
-    border: 1px solid var(--line, #ece4d8);
-    border-radius: 14px;
-    background: var(--surface, #f3eee4);
-    font: inherit;
-    text-align: left;
-    cursor: pointer;
-}
 
-.team-card:hover { border-color: var(--sage, #5b7152); }
 
-.team-card__logo {
-    width: 34px;
-    height: 34px;
-    border-radius: 8px;
-    object-fit: cover;
-    margin-bottom: 4px;
-}
 
-.team-card__name { font-weight: 600; }
-.team-card__owner { font-size: 12px; color: var(--muted, #928a7d); }
-.team-card__record { font-size: 13px; color: var(--soft, #5d574e); }
 
 /* ── team detail ──────────────────────────────────────────────────── */
 
@@ -1405,10 +1376,10 @@ button:focus-visible {
 
 /* Anchored boards clear the sticky site nav when linked to directly. */
 #power,
-#standings,
 #power-chart,
+#playoffs,
+#rosters,
 #free-agents,
-#teams,
 #history { scroll-margin-top: calc(var(--site-nav-height, 52px) + 16px); }
 
 /* ── sections: rules instead of boxes ─────────────────────────────── */
@@ -1534,51 +1505,6 @@ button:focus-visible {
    scoreboard and the teams grid kept theirs, and a two-up grid of cards
    turned ten teams into a screen and a half of scrolling. */
 
-@media (max-width: 720px) {
-
-
-
-
-    .teams-grid {
-        grid-template-columns: minmax(0, 1fr);
-        gap: 0;
-    }
-
-    .team-card {
-        display: grid;
-        grid-template-columns: 34px minmax(0, 1fr) auto;
-        column-gap: 12px;
-        align-items: center;
-        width: 100%;
-        padding: 10px 0;
-        border: 0;
-        border-bottom: 1px solid var(--line, #ece4d8);
-        border-radius: 0;
-        background: none;
-        color: inherit;
-    }
-
-    .team-card:last-child { border-bottom: none; }
-
-    .team-card__logo {
-        grid-column: 1;
-        grid-row: 1 / span 2;
-        width: 30px;
-        height: 30px;
-        margin: 0;
-    }
-
-    .team-card__name { grid-column: 2; grid-row: 1; }
-    .team-card__owner { grid-column: 2; grid-row: 2; }
-
-    .team-card__record {
-        grid-column: 3;
-        grid-row: 1 / span 2;
-        font-weight: 700;
-        font-variant-numeric: tabular-nums;
-        color: var(--ink, #23201c);
-    }
-}
 
 /* ── power rankings: the rosters ───────────────────────────────────────
    One row per team, in the same hairline language as the table. The
@@ -2137,88 +2063,6 @@ button:focus-visible {
     font-size: 13.5px;
 }
 
-/* Standings: four columns that fit a phone without scrolling. */
-.standings-table {
-    width: 100%;
-    table-layout: fixed;
-    border-collapse: collapse;
-    font-size: 14px;
-    font-variant-numeric: tabular-nums;
-}
-.standings-table th {
-    padding: 8px 6px;
-    border-bottom: 1px solid var(--line-strong, #d8cdba);
-    color: var(--muted, #928a7d);
-    font-size: 11px;
-    font-weight: 600;
-    letter-spacing: 0.06em;
-    text-align: left;
-    text-transform: uppercase;
-    white-space: nowrap;
-}
-.standings-table td {
-    padding: 10px 6px;
-    border-bottom: 1px solid var(--line, #ece4d8);
-    vertical-align: middle;
-}
-.standings-table tbody tr:last-child td { border-bottom: none; }
-.standings-table th:first-child,
-.standings-table td:first-child { padding-left: 0; }
-.standings-table th:last-child,
-.standings-table td:last-child { padding-right: 0; }
-.standings__seed {
-    width: 26px;
-    color: var(--sage, #5b7152);
-    font-weight: 700;
-}
-.standings-table th.standings__seed { color: var(--muted, #928a7d); }
-.standings__team { min-width: 0; }
-.standings__team .team-cell { min-width: 0; }
-.standings__team .team-cell__text { min-width: 0; }
-.standings__team .team-cell__name {
-    display: -webkit-box;
-    max-width: 100%;
-    overflow: hidden;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 2;
-    line-height: 1.25;
-    text-align: left;
-    white-space: normal;
-}
-.standings__num {
-    width: 56px;
-    text-align: right !important;
-    white-space: nowrap;
-}
-td.standings__num:nth-child(3) { font-weight: 700; color: var(--ink, #23201c); }
-.standings__odds-head { width: 72px; text-align: right !important; }
-.standings__odds {
-    text-align: right;
-    white-space: nowrap;
-}
-.standings__odds-value {
-    display: block;
-    font-size: 13px;
-    font-weight: 700;
-}
-.standings__odds .meter { margin-top: 4px; }
-.standings__row--mine td { background: #f7f4ec; }
-.standings__division {
-    margin: 0 0 2px;
-    color: var(--clay, #b96a4b);
-    font-size: 12px;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-}
-.standings-table + .standings__division { margin-top: 26px; }
-.standings__row--mine .team-cell__name { font-weight: 700; }
-@media (max-width: 620px) {
-    .standings-table { font-size: 13.5px; }
-    .standings__team .team-cell__owner { display: none; }
-    .standings__num { width: 46px; }
-    .standings__odds-head { width: 58px; }
-}
 
 /* Power rankings: one column; a dot on the league's own points range and
    a ring for playoff odds. */
@@ -2395,9 +2239,6 @@ td.standings__num:nth-child(3) { font-weight: 700; color: var(--ink, #23201c); }
     .power-strip__value { text-align: left; font-size: 14px; order: -1; }
     .power-head__pts { padding-right: 0; }
 }
-
-/* Teams list: give the initials badge the logo's slot. */
-.team-card__logo.team-mono { font-size: 11px; }
 
 /* Roster shape: a four-point compass of the position rooms. */
 .shape { display: flex; flex-direction: column; align-items: center; }

@@ -21,8 +21,8 @@
         // Which measure the ledger's switchable column is showing. On a
         // phone this is the only column, so it is worth keeping in the URL.
         column: "record",
-        // Which view of the league is showing: home (League), standings,
-        // stats, free-agents or history. ?view= keeps it in the URL.
+        // Which view of the league is showing: home (League), stats,
+        // rosters, free-agents or history. ?view= keeps it in the URL.
         view: "home",
         teamId: null,
         overview: null,
@@ -95,9 +95,6 @@
         ledgerColumns: byId("ledgerColumns"),
         ledgerNote: byId("ledgerNote"),
         ledgerFootnote: byId("ledgerFootnote"),
-        standingsTable: byId("standingsTable"),
-        standingsNote: byId("standingsNote"),
-        teamsBoard: byId("teams"),
         viewEmpty: byId("viewEmpty"),
         chartsBoard: document.querySelector('[data-board="charts"]'),
         playoffsBoard: byId("playoffs"),
@@ -107,7 +104,6 @@
         playoffBubble: byId("playoffBubble"),
         charts: byId("charts"),
         chartsNote: byId("chartsNote"),
-        teamsGrid: byId("teamsGrid"),
         freeAgents: byId("freeAgents"),
         freeAgentsNote: byId("freeAgentsNote"),
         freeAgentsToggle: byId("freeAgentsToggle"),
@@ -551,79 +547,6 @@
         return null;
     }
 
-    // ── standings ───────────────────────────────────────────────────────
-    //
-    // The table most people come for, with nothing to configure: record,
-    // points for and playoff odds. The other measures are on Stats.
-
-    function renderStandings(payload) {
-        const teams = payload.teams || [];
-        els.standingsTable.replaceChildren();
-        if (!teams.length) {
-            els.standingsTable.appendChild(el("p", "empty-note", "No teams collected for this season."));
-            els.standingsNote.textContent = "";
-            return;
-        }
-        els.standingsNote.textContent = els.ledgerNote.textContent;
-        const showOdds = teams.some((team) => team.playoff && team.playoff.odds !== null && team.playoff.odds !== undefined);
-
-        // The league plays in divisions, so the table does too: one per
-        // division, in ESPN's order, each ranked on its own. A season with
-        // no divisions gets a single table.
-        const divisions = new Map();
-        teams.forEach((team) => {
-            const key = team.division_name ? team.division_id ?? team.division_name : null;
-            if (!divisions.has(key)) divisions.set(key, { name: team.division_name || null, id: team.division_id ?? 0, teams: [] });
-            divisions.get(key).teams.push(team);
-        });
-        const groups = [...divisions.values()].sort((x, y) => x.id - y.id);
-        groups.forEach((group) => {
-            if (groups.length > 1 && group.name) {
-                els.standingsTable.appendChild(el("h3", "standings__division", group.name));
-            }
-            els.standingsTable.appendChild(standingsTable(group.teams, showOdds));
-        });
-    }
-
-    function standingsTable(teams, showOdds) {
-        const table = el("table", "standings-table");
-        const head = el("tr");
-        head.appendChild(el("th", "standings__seed", "#"));
-        head.appendChild(el("th", "standings__team", "Team"));
-        head.appendChild(el("th", "standings__num", "W-L"));
-        head.appendChild(el("th", "standings__num", "PF"));
-        if (showOdds) head.appendChild(el("th", "standings__odds-head", "Playoffs"));
-        const thead = el("thead");
-        thead.appendChild(head);
-        table.appendChild(thead);
-
-        const body = el("tbody");
-        F.sortLedger(teams, "record").forEach((team, index) => {
-            const row = el("tr");
-            if (state.myTeamId && team.espn_team_id === state.myTeamId) row.classList.add("standings__row--mine");
-            row.appendChild(el("td", "standings__seed", String(index + 1)));
-            const name = el("td", "standings__team");
-            name.appendChild(teamCell(team));
-            row.appendChild(name);
-            row.appendChild(el("td", "standings__num", F.ledgerText(team, "record")));
-            row.appendChild(el("td", "standings__num", F.ledgerText(team, "points_for")));
-            if (showOdds) {
-                const cell = el("td", "standings__odds");
-                const odds = team.playoff && team.playoff.odds;
-                if (odds === null || odds === undefined) {
-                    cell.textContent = "—";
-                } else {
-                    cell.appendChild(el("span", "standings__odds-value", `${Math.round(odds * 100)}%`));
-                    cell.appendChild(meterEl(odds * 100));
-                }
-                row.appendChild(cell);
-            }
-            body.appendChild(row);
-        });
-        table.appendChild(body);
-        return table;
-    }
-
     function renderColumnChips() {
         els.ledgerColumns.replaceChildren();
         // A phone hides the ranking-method picker unless it is the column in
@@ -1033,26 +956,6 @@
         );
 
         els.chartsNote.textContent = `${scored.length} teams with completed games`;
-    }
-
-    function renderTeamsGrid(payload) {
-        state.standingsTeams = payload.teams || [];
-        // Once games are played the standings rows are the way into a team.
-        const played = state.standingsTeams.some((team) => (team.wins || 0) + (team.losses || 0) + (team.ties || 0) > 0);
-        els.teamsBoard.hidden = played;
-        els.teamsGrid.replaceChildren();
-        payload.teams.forEach((team) => {
-            const card = el("button", "team-card");
-            card.type = "button";
-            card.addEventListener("click", () => selectTeam(team.espn_team_id));
-            card.appendChild(teamBadge(team, "team-card__logo"));
-            card.appendChild(el("span", "team-card__name", team.name || "—"));
-            if (team.owner_name) card.appendChild(el("span", "team-card__owner", team.owner_name));
-            card.appendChild(
-                el("span", "team-card__record", F.recordLabel(team.wins, team.losses, team.ties))
-            );
-            els.teamsGrid.appendChild(card);
-        });
     }
 
     // ── the team as a document ──────────────────────────────────────────
@@ -1571,7 +1474,6 @@
             state.ledger = payload;
             renderColumnChips();
             renderLedger(payload);
-            renderStandings(payload);
             renderCharts(payload);
             renderPlayoffs(payload);
             // The power rankings borrow playoff odds from this payload, and
@@ -1592,8 +1494,6 @@
             }
             state.ledger = null;
             els.ledger.replaceChildren(el("p", "empty-note", "The table is unavailable right now."));
-            els.standingsTable.replaceChildren(el("p", "empty-note", "The table is unavailable right now."));
-            els.standingsNote.textContent = "";
             els.ledgerNote.textContent = "";
             els.ledgerFootnote.textContent = "";
             els.chartsBoard.hidden = true;
@@ -1753,7 +1653,7 @@
     // menus. The league is five views now, picked from the section nav,
     // and each shows only its own boards at every width.
 
-    const HUB_VIEWS = ["home", "standings", "stats", "rosters", "free-agents", "history"];
+    const HUB_VIEWS = ["home", "stats", "rosters", "free-agents", "history"];
 
     function hubBoards(view) {
         return [...els.leagueSections.querySelectorAll(":scope > [data-view]")]
@@ -2791,10 +2691,6 @@
             renderSeasonViewing(overview);
             renderHistory(overview.seasons);
             writeUrlState(true, requestedHash);
-
-            const standings = await fetchJson(`${API_BASE}/standings?season=${state.season}`);
-            if (stale(generation)) return;
-            renderTeamsGrid(standings);
 
             // The ledger is the page; it loads before the boards under it so
             // the table is readable while the rest fills in.

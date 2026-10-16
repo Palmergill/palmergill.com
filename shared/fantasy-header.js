@@ -1,7 +1,7 @@
 // Shared fantasy section nav: the one menu for everything under /fantasy/.
 //
-// Five slots and a More. League, Standings, Stats and Rosters are views of
-// the hub at /fantasy/; My team is your own team page. The quieter league pages
+// Four slots and a More. League, Stats and Rosters are views of the hub at
+// /fantasy/; My team is your own team page. Standings are left to ESPN. The quieter league pages
 // (free agents, recaps, history) and the tools that are the same for every
 // league sit behind More, so the row fits a phone without scrolling.
 //
@@ -25,7 +25,6 @@
     // page in the section they are ordinary links back to it.
     const PRIMARY = [
         { key: "home", label: "League", href: "/fantasy/" },
-        { key: "standings", label: "Standings", href: "/fantasy/?view=standings" },
         { key: "stats", label: "Stats", href: "/fantasy/?view=stats" },
         { key: "rosters", label: "Rosters", href: "/fantasy/?view=rosters" },
         // `team=me` rather than a team id: the header has no idea which team

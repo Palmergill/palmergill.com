@@ -14,7 +14,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/shared/site-nav.css?v=17">
     <link rel="stylesheet" href="/shared/fantasy-header.css?v=4">
-    <link rel="stylesheet" href="style.css?v=43">
+    <link rel="stylesheet" href="style.css?v=44">
     <link rel="stylesheet" href="/shared/fantasy-design.css?v=3">
 </head>
 <body>
@@ -60,8 +60,8 @@
                 <span class="eyebrow">Sign in to read it</span>
                 <h2>A league that reads itself</h2>
                 <p class="teaser__lede" id="teaserLede">
-                    This hub keeps one private ESPN league's season: standings and
-                    power rankings from the rosters rather than the results, a start/sit
+                    This hub keeps one private ESPN league's season: power rankings
+                    from the rosters rather than the results, a start/sit
                     call on each lineup, who is genuinely claimable, and a weekly
                     recap worth reading. Sign in to open it.
                 </p>
@@ -203,45 +203,6 @@
                     </div>
                 </section>
 
-                <!-- Standings: the table, plainly. Record, points and playoff
-                     odds are fixed columns; every other measure lives on Stats,
-                     so this view has nothing to configure. -->
-                <section class="board" id="standings" data-board="standings" data-view="standings" aria-labelledby="standingsTitle">
-                    <div class="board__head">
-                        <div>
-                            <h2 id="standingsTitle">Standings</h2>
-                        </div>
-                        <span class="board__note" id="standingsNote"></span>
-                    </div>
-                    <div id="standingsTable" class="standings"></div>
-                    <a class="league-link board__more" href="/fantasy/?view=stats" data-view-link="stats">More team stats →</a>
-                </section>
-
-                <!-- The field as it stands to finish: division winners take
-                     the top seeds and the byes, the next best records fill
-                     out the rest. Seeded from the same simulation as the
-                     odds column, so the two never disagree about the rule. -->
-                <section class="board" id="playoffs" data-board="playoffs" data-view="standings" aria-labelledby="playoffsTitle" hidden>
-                    <div class="board__head">
-                        <div>
-                            <h2 id="playoffsTitle">Playoff picture</h2>
-                            <p class="board__lede" id="playoffsLede"></p>
-                        </div>
-                        <span class="board__note" id="playoffsNote"></span>
-                    </div>
-                    <div class="bracket" id="playoffBracket"></div>
-                    <div class="bracket__bubble" id="playoffBubble"></div>
-                </section>
-
-                <!-- Kept for the preseason, when there is no table yet and this
-                     grid is the only way into a team. -->
-                <section class="board" id="teams" data-board="teams" data-view="standings" aria-labelledby="teamsTitle" hidden>
-                    <div class="board__head">
-                        <h2 id="teamsTitle">Teams</h2>
-                    </div>
-                    <div id="teamsGrid" class="teams-grid"></div>
-                </section>
-
                 <!-- Stats: the deeper reading, for whoever wants it. -->
                 <section class="board" id="power-chart" data-board="power-chart" data-view="stats"
                          aria-labelledby="powerChartTitle">
@@ -282,6 +243,22 @@
                     </div>
                     <div id="ledger" class="ledger"></div>
                     <p class="ledger__note" id="ledgerFootnote"></p>
+                </section>
+
+                <!-- The field as it stands to finish: division winners take
+                     the top seeds and the byes, the next best records fill
+                     out the rest. Seeded from the same simulation as the
+                     odds column, so the two never disagree about the rule. -->
+                <section class="board" id="playoffs" data-board="playoffs" data-view="stats" aria-labelledby="playoffsTitle" hidden>
+                    <div class="board__head">
+                        <div>
+                            <h2 id="playoffsTitle">Playoff picture</h2>
+                            <p class="board__lede" id="playoffsLede"></p>
+                        </div>
+                        <span class="board__note" id="playoffsNote"></span>
+                    </div>
+                    <div class="bracket" id="playoffBracket"></div>
+                    <div class="bracket__bubble" id="playoffBubble"></div>
                 </section>
 
                 <section class="board" data-board="charts" aria-labelledby="chartsTitle" data-view="stats" hidden>
@@ -342,11 +319,11 @@
     </main>
 
     <script src="/shared/site-nav.js?v=19"></script>
-    <script src="/shared/fantasy-header.js?v=8"></script>
+    <script src="/shared/fantasy-header.js?v=9"></script>
     <script>window.FantasyHeader.mount({ page: "home" });</script>
     <script src="/shared/analytics.js?v=1"></script>
     <script src="/shared/api-base.js?v=1"></script>
     <script src="format.js?v=17"></script>
-    <script src="app.js?v=47"></script>
+    <script src="app.js?v=48"></script>
 </body>
 </html>
