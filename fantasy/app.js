@@ -97,11 +97,6 @@
         ledgerFootnote: byId("ledgerFootnote"),
         viewEmpty: byId("viewEmpty"),
         chartsBoard: document.querySelector('[data-board="charts"]'),
-        playoffsBoard: byId("playoffs"),
-        playoffsLede: byId("playoffsLede"),
-        playoffsNote: byId("playoffsNote"),
-        playoffBracket: byId("playoffBracket"),
-        playoffBubble: byId("playoffBubble"),
         charts: byId("charts"),
         chartsNote: byId("chartsNote"),
         freeAgents: byId("freeAgents"),
@@ -755,109 +750,6 @@
             "No week has a full set of starter results yet, so lineup efficiency cannot be scored.",
     };
 
-    // ── the playoff picture ─────────────────────────────────────────────
-
-    function formatOdds(value) {
-        if (value === null || value === undefined) return "—";
-        const percent = value * 100;
-        if (percent > 0 && percent < 1) return "<1%";
-        if (percent < 100 && percent > 99) return ">99%";
-        return `${Math.round(percent)}%`;
-    }
-
-    function playoffRecord(team, basis) {
-        const playoff = team.playoff || {};
-        if (basis === "projected" && playoff.projected_wins !== null && playoff.projected_wins !== undefined) {
-            return `${playoff.projected_wins.toFixed(1)}–${playoff.projected_losses.toFixed(1)}`;
-        }
-        return F.ledgerText(team, "record");
-    }
-
-    // One team in the bracket: seed, who, the record it got there on, and
-    // how often the simulation agrees. A bye seed's odds are its odds of
-    // the bye, since making the field is not the question for it.
-    function bracketTeam(team, seed, bye, basis) {
-        const row = el("div", "bracket-team");
-        if (team.espn_team_id === state.myTeamId) row.classList.add("bracket-team--mine");
-        row.appendChild(el("span", "bracket-team__seed", seed === null ? "" : String(seed)));
-        const who = el("div", "bracket-team__who");
-        who.appendChild(teamCell(team));
-        const meta = [playoffRecord(team, basis)];
-        if (bye && team.division_name) meta.push(`${team.division_name} winner`);
-        who.appendChild(el("span", "bracket-team__meta", meta.join(" · ")));
-        row.appendChild(who);
-        const playoff = team.playoff || {};
-        const odds = el("div", "bracket-team__odds");
-        odds.appendChild(el("strong", null, formatOdds(bye ? playoff.bye_odds : playoff.odds)));
-        odds.appendChild(el("small", null, bye ? "bye" : "playoffs"));
-        row.appendChild(odds);
-        return row;
-    }
-
-    function renderPlayoffs(payload) {
-        const picture = payload.playoff_picture;
-        els.playoffsBoard.hidden = !picture;
-        if (!picture) return;
-
-        // Where the season is headed while there is any of it left to project;
-        // the final seeding once there is not.
-        const basis = picture.projected ? "projected" : "current";
-        const field = picture[basis];
-        const teams = new Map((payload.teams || []).map((team) => [team.espn_team_id, team]));
-        const seedTeam = new Map(field.seeds.map((entry) => [entry.seed, teams.get(entry.espn_team_id)]));
-
-        const wildcards = field.seeds.length - field.byes;
-        els.playoffsLede.textContent = field.byes
-            ? `Each division winner takes a top seed and a first-round bye; the next ${wildcards} best records fill out the field.`
-            : `The ${field.seeds.length} best records make the field.`;
-        els.playoffsNote.textContent = !picture.projected
-            ? "Final regular-season seeding"
-            : basis === "projected"
-              ? "Seeded on average final wins across 10,000 simulated seasons"
-              : "Seeded on current records";
-
-        els.playoffBracket.replaceChildren();
-        if (field.byes) {
-            const byes = el("div", "bracket__col");
-            byes.appendChild(el("h3", "bracket__title", "First-round byes"));
-            field.seeds.slice(0, field.byes).forEach((entry) => {
-                const card = el("div", "bracket__card bracket__card--bye");
-                card.appendChild(bracketTeam(teams.get(entry.espn_team_id), entry.seed, true, basis));
-                byes.appendChild(card);
-            });
-            els.playoffBracket.appendChild(byes);
-        }
-
-        const round = el("div", "bracket__col");
-        round.appendChild(el("h3", "bracket__title", field.byes ? "Wild-card round" : "First round"));
-        field.first_round.forEach((game) => {
-            const card = el("div", "bracket__card");
-            game.seeds.forEach((seed) => {
-                const team = seedTeam.get(seed);
-                if (team) card.appendChild(bracketTeam(team, seed, false, basis));
-            });
-            if (game.winner_meets) {
-                const opponent = seedTeam.get(game.winner_meets);
-                card.appendChild(
-                    el(
-                        "p",
-                        "bracket__next",
-                        `Winner plays the ${game.winner_meets} seed${opponent ? `, ${opponent.name}` : ""}`
-                    )
-                );
-            }
-            round.appendChild(card);
-        });
-        els.playoffBracket.appendChild(round);
-
-        els.playoffBubble.replaceChildren();
-        const bubble = (field.bubble || []).map((id) => teams.get(id)).filter(Boolean);
-        if (bubble.length) {
-            els.playoffBubble.appendChild(el("h3", "bracket__title", "First out"));
-            bubble.forEach((team) => els.playoffBubble.appendChild(bracketTeam(team, null, false, basis)));
-        }
-    }
-
     // ── the season charts ───────────────────────────────────────────────
 
     function chartRow(team, valueText, chart, highlight) {
@@ -1475,7 +1367,6 @@
             renderColumnChips();
             renderLedger(payload);
             renderCharts(payload);
-            renderPlayoffs(payload);
             // The power rankings borrow playoff odds from this payload, and
             // the two requests race. If power drew first, its odds column is
             // still dashes.
@@ -1497,7 +1388,6 @@
             els.ledgerNote.textContent = "";
             els.ledgerFootnote.textContent = "";
             els.chartsBoard.hidden = true;
-            els.playoffsBoard.hidden = true;
         }
     }
 
@@ -1627,7 +1517,7 @@
     }
 
 
-    // Old links point at a board by id (#free-agents, #playoffs). Open the
+    // Old links point at a board by id (#free-agents, #history). Open the
     // view that board lives in, then scroll to it.
     function scrollToRequestedBoard(hash = window.location.hash) {
         if (!hash || hash.length < 2) return;
@@ -1670,7 +1560,7 @@
     }
 
     // A view whose boards all hid themselves (no free agents to claim, no
-    // playoff picture yet) says so rather than showing an empty page.
+    // season charts yet) says so rather than showing an empty page.
     function syncViewEmpty() {
         if (!state.overview) return;
         els.viewEmpty.hidden = hubBoards(state.view).some((board) => !board.hidden);
