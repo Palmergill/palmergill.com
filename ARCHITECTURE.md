@@ -51,7 +51,7 @@ champion, rather than a chip row above the season you came to read. Old URLs
 - `/craps-strategy/` - craps strategy simulator
 - `/blackjack/` - blackjack app
 - `/high-card-flush/` - single-player High Card Flush app
-- `/castle-defense/` - tower defense game. Fully client-side: `castleDefenseGame.js` is a DOM-free engine (state + `step(dt)`) that node can drive, and `app.js` only draws it on a canvas and forwards input. The best wave reached lives in `localStorage`.
+- `/castle-defense/` - daily tower defense puzzle. Fully client-side: `castleDefenseGame.js` is a DOM-free engine (state + `step(dt)`) that node can drive, and `app.js` only draws it on a canvas and forwards input. The local date seeds the 8×8 map and the horde, so everyone gets the same puzzle that day (`?date=YYYY-MM-DD` replays another day). The day's best score and tower layout live in `localStorage`.
 - `/admin/` - protected backend log dashboard
 
 Shared site chrome defaults to the warm light palette defined in

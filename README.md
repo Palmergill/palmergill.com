@@ -26,7 +26,7 @@ navigation chrome.
 - `/craps-strategy/` - craps strategy simulator
 - `/blackjack/` - blackjack app
 - `/high-card-flush/` - single-player High Card Flush table
-- `/castle-defense/` - tower defense game against waves of zombies
+- `/castle-defense/` - daily tower defense puzzle: a new map each day, three towers, one score
 - `/admin/` - protected backend log dashboard
 
 ## Active Backend Paths
@@ -124,7 +124,7 @@ craps/            Active craps frontend
 craps-strategy/   Active craps strategy simulator
 blackjack/        Active blackjack frontend
 high-card-flush/  High Card Flush frontend and PWA shell
-castle-defense/   Castle Defense tower defense game
+castle-defense/   Castle Defense daily tower defense puzzle
 e2e/              Playwright end-to-end suite (config in playwright.config.js)
 ```
 

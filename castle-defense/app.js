@@ -2,10 +2,9 @@
 // clicks and keys to it. All rules live in castleDefenseGame.js.
 (function () {
     const G = window.CastleDefenseGame;
-    const BEST_KEY = "castle-defense-best";
     const STEP = 1 / 60;
-    const TOWER_ORDER = ["archer", "cannon", "frost", "mage"];
-    const UPGRADE_ORDER = ["repair", "walls", "oil", "bounty"];
+    const TYPES = ["archer", "cannon", "frost", "mage"];
+    const SHARE_ICON = { archer: "🏹", cannon: "💣", frost: "❄️", mage: "🔮" };
 
     const $ = (id) => document.getElementById(id);
     const canvas = $("board");
@@ -13,38 +12,48 @@
     const wrap = $("canvasWrap");
     const overlay = $("overlay");
 
-    let state = G.createGame();
+    // ?date=YYYY-MM-DD replays another day's map; otherwise it's today's.
+    const requested = new URLSearchParams(location.search).get("date");
+    const today = G.localDateString();
+    const date = /^\d{4}-\d{2}-\d{2}$/.test(requested || "") && !Number.isNaN(Date.parse(requested)) ? requested : today;
+    const map = G.dailyMap(date);
+    const storeKey = `castle-defense:v2:${date}`;
+
+    let record = readRecord();
+    let state = G.createGame(map);
     let speed = 1;
-    let paused = false;
-    let started = false;
-    let buildType = "archer";
-    let selectedId = null;
+    let selectedType = null;
     let hover = null;
-    let scale = 40;
+    let scale = 60;
     let dpr = 1;
     let background = null;
     let lastFrame = 0;
     let acc = 0;
     let toastTimer = 0;
-    let best = readBest();
 
     // ---------- storage ----------
-    function readBest() {
+    function readRecord() {
         try {
-            return Number(localStorage.getItem(BEST_KEY)) || 0;
+            return { best: null, runs: 0, layout: null, ...JSON.parse(localStorage.getItem(storeKey) || "{}") };
         } catch {
-            return 0;
+            return { best: null, runs: 0, layout: null };
         }
     }
 
-    function saveBest(wave) {
-        if (wave <= best) return;
-        best = wave;
+    function writeRecord() {
         try {
-            localStorage.setItem(BEST_KEY, String(wave));
+            localStorage.setItem(storeKey, JSON.stringify(record));
         } catch {
-            /* private mode: the best score just doesn't persist */
+            /* private mode: today's best just doesn't persist */
         }
+    }
+
+    function layoutOf(s) {
+        return s.towers.map((t) => ({ type: t.type, x: t.x, y: t.y }));
+    }
+
+    function applyLayout(s, layout) {
+        (layout || []).forEach((t) => G.placeTower(s, t.type, t.x, t.y));
     }
 
     // ---------- sizing ----------
@@ -53,14 +62,14 @@
         if (!width) return;
         dpr = Math.min(window.devicePixelRatio || 1, 2);
         canvas.width = Math.round(width * dpr);
-        canvas.height = Math.round(width * dpr * (G.ROWS / G.COLS));
-        scale = canvas.width / G.COLS;
+        canvas.height = canvas.width;
+        scale = canvas.width / G.SIZE;
         background = paintBackground();
     }
 
     // ---------- drawing helpers ----------
     function noise(x, y) {
-        const v = Math.sin(x * 127.1 + y * 311.7) * 43758.5453;
+        const v = Math.sin(x * 127.1 + y * 311.7 + (map.seed % 1000)) * 43758.5453;
         return v - Math.floor(v);
     }
 
@@ -73,7 +82,7 @@
         }
         if (stroke) {
             c.strokeStyle = stroke;
-            c.lineWidth = lw || 0.04;
+            c.lineWidth = lw || 0.03;
             c.stroke();
         }
     }
@@ -88,19 +97,17 @@
         c.closePath();
     }
 
-    function text(str, x, y, size, color, weight = 800) {
+    function text(str, x, y, size, color) {
         ctx.save();
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-        const px = (x * scale) / dpr;
-        const py = (y * scale) / dpr;
-        ctx.font = `${weight} ${Math.max(10, (size * scale) / dpr)}px "Plus Jakarta Sans", system-ui, sans-serif`;
+        ctx.font = `800 ${Math.max(11, (size * scale) / dpr)}px "Plus Jakarta Sans", system-ui, sans-serif`;
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
         ctx.lineWidth = 3;
-        ctx.strokeStyle = "rgba(30, 26, 20, 0.55)";
-        ctx.strokeText(str, px, py);
+        ctx.strokeStyle = "rgba(30, 26, 20, 0.6)";
+        ctx.strokeText(str, (x * scale) / dpr, (y * scale) / dpr);
         ctx.fillStyle = color;
-        ctx.fillText(str, px, py);
+        ctx.fillText(str, (x * scale) / dpr, (y * scale) / dpr);
         ctx.restore();
     }
 
@@ -112,55 +119,92 @@
         const c = off.getContext("2d");
         c.setTransform(scale, 0, 0, scale, 0, 0);
 
-        for (let x = 0; x < G.COLS; x++) {
-            for (let y = 0; y < G.ROWS; y++) {
+        for (let x = 0; x < G.SIZE; x++) {
+            for (let y = 0; y < G.SIZE; y++) {
                 const n = noise(x, y);
-                c.fillStyle = n > 0.5 ? "#7aa557" : "#75a052";
+                c.fillStyle = (x + y) % 2 ? "#79a456" : "#74a051";
                 c.fillRect(x, y, 1.01, 1.01);
-                for (let i = 0; i < 3; i++) {
+                for (let i = 0; i < 5; i++) {
                     const tx = x + noise(x + i, y * 3) * 0.9 + 0.05;
                     const ty = y + noise(x * 2, y + i) * 0.9 + 0.05;
-                    c.strokeStyle = "rgba(60, 100, 40, 0.45)";
-                    c.lineWidth = 0.035;
+                    c.strokeStyle = "rgba(60, 100, 40, 0.4)";
+                    c.lineWidth = 0.02;
                     c.beginPath();
                     c.moveTo(tx, ty);
-                    c.lineTo(tx - 0.04, ty - 0.12);
-                    c.moveTo(tx + 0.05, ty);
-                    c.lineTo(tx + 0.08, ty - 0.1);
+                    c.lineTo(tx - 0.03, ty - 0.08);
+                    c.moveTo(tx + 0.035, ty);
+                    c.lineTo(tx + 0.055, ty - 0.07);
                     c.stroke();
                 }
-                if (n > 0.93) circle(c, x + 0.3, y + 0.7, 0.05, "#e9d56b");
-                if (n < 0.04) circle(c, x + 0.7, y + 0.3, 0.05, "#f0f0ea");
+                if (n > 0.9) circle(c, x + 0.3, y + 0.7, 0.035, "#e9d56b");
+                if (n < 0.06) circle(c, x + 0.7, y + 0.3, 0.035, "#f0f0ea");
             }
         }
 
-        const pts = G.WAYPOINTS.map(([x, y]) => [x + 0.5, y + 0.5]);
+        const pts = map.waypoints;
         c.lineJoin = "round";
         c.lineCap = "butt";
         const road = (width, color) => {
             c.strokeStyle = color;
             c.lineWidth = width;
             c.beginPath();
-            pts.forEach(([x, y], i) => (i ? c.lineTo(x, y) : c.moveTo(x, y)));
+            pts.forEach((p, i) => (i ? c.lineTo(p.x, p.y) : c.moveTo(p.x, p.y)));
             c.stroke();
         };
-        road(0.98, "#8e6f45");
-        road(0.84, "#b8925f");
-        road(0.5, "#c4a06b");
-        for (let d = 0.3; d < G.PATH_LENGTH; d += 0.55) {
-            const p = G.pointAt(d);
-            const off2 = (noise(d, 3) - 0.5) * 0.6;
-            circle(c, p.x + p.dy * off2, p.y - p.dx * off2, 0.035 + noise(d, 7) * 0.03, "rgba(110, 82, 50, 0.55)");
+        road(0.86, "#8e6f45");
+        road(0.74, "#b8925f");
+        road(0.42, "#c4a06b");
+        for (let d = 0.3; d < map.length - 0.5; d += 0.4) {
+            const p = G.pointAt(map, d);
+            const o = (noise(d, 3) - 0.5) * 0.5;
+            circle(c, p.x + p.dy * o, p.y - p.dx * o, 0.025 + noise(d, 7) * 0.02, "rgba(110, 82, 50, 0.55)");
         }
 
-        G.TREES.forEach(([x, y]) => {
-            const cx = x + 0.5;
-            const cy = y + 0.5;
-            circle(c, cx + 0.06, cy + 0.12, 0.4, "rgba(30, 50, 20, 0.25)");
-            circle(c, cx, cy, 0.38, "#3f6b32");
-            circle(c, cx - 0.12, cy - 0.1, 0.24, "#4f8040");
-            circle(c, cx + 0.1, cy + 0.06, 0.2, "#467538");
-            circle(c, cx - 0.16, cy - 0.16, 0.08, "rgba(255,255,255,0.12)");
+        // Footprints where the horde walks on, so the entrance reads at a glance.
+        const e = map.waypoints[1];
+        const f = map.waypoints[2];
+        c.fillStyle = "rgba(70, 50, 30, 0.5)";
+        for (let i = 0; i < 4; i++) {
+            const t = -0.4 + i * 0.22;
+            const side = i % 2 ? 0.09 : -0.09;
+            const px = e.x + (f.x - e.x) * t + side * (f.y - e.y);
+            const py = e.y + (f.y - e.y) * t - side * (f.x - e.x);
+            c.beginPath();
+            c.ellipse(px, py, 0.05, 0.032, Math.atan2(f.y - e.y, f.x - e.x), 0, Math.PI * 2);
+            c.fill();
+        }
+
+        map.obstacles.forEach((o) => {
+            const cx = o.x + 0.5;
+            const cy = o.y + 0.5;
+            if (o.kind === "rock") {
+                circle(c, cx + 0.05, cy + 0.08, 0.3, "rgba(30, 40, 20, 0.25)");
+                c.fillStyle = "#9a9488";
+                c.strokeStyle = "#6f6a60";
+                c.lineWidth = 0.03;
+                c.beginPath();
+                c.moveTo(cx - 0.3, cy + 0.15);
+                c.lineTo(cx - 0.18, cy - 0.2);
+                c.lineTo(cx + 0.08, cy - 0.28);
+                c.lineTo(cx + 0.3, cy - 0.05);
+                c.lineTo(cx + 0.24, cy + 0.2);
+                c.closePath();
+                c.fill();
+                c.stroke();
+                c.fillStyle = "rgba(255,255,255,0.18)";
+                c.beginPath();
+                c.moveTo(cx - 0.16, cy - 0.15);
+                c.lineTo(cx + 0.06, cy - 0.22);
+                c.lineTo(cx - 0.02, cy - 0.05);
+                c.closePath();
+                c.fill();
+            } else {
+                circle(c, cx + 0.05, cy + 0.1, 0.36, "rgba(30, 50, 20, 0.25)");
+                circle(c, cx, cy, 0.34, "#3f6b32");
+                circle(c, cx - 0.1, cy - 0.09, 0.22, "#4f8040");
+                circle(c, cx + 0.1, cy + 0.06, 0.18, "#467538");
+                circle(c, cx - 0.14, cy - 0.14, 0.07, "rgba(255,255,255,0.12)");
+            }
         });
 
         return off;
@@ -168,126 +212,94 @@
 
     // ---------- castle ----------
     function drawCastle() {
-        const { x, y, w, h } = G.CASTLE;
+        const { x, y } = map.castle;
+        const cx = x + 0.5;
+        const cy = y + 0.5;
+        const prev = map.path[map.path.length - 2];
+        const facing = Math.atan2(prev[1] - y, prev[0] - x);
         const hpRatio = state.hp / state.maxHp;
-        const stone = "#b3ab9c";
         const dark = "#7d7466";
+        const clock = performance.now() / 1000;
 
-        ctx.fillStyle = "rgba(30, 40, 20, 0.25)";
-        ctx.fillRect(x + 0.18, y + 0.22, w, h);
-        roundRect(ctx, x + 0.1, y + 0.1, w - 0.2, h - 0.2, 0.12);
-        ctx.fillStyle = stone;
+        circle(ctx, cx + 0.06, cy + 0.08, 0.5, "rgba(30, 40, 20, 0.25)");
+        roundRect(ctx, cx - 0.4, cy - 0.4, 0.8, 0.8, 0.06);
+        ctx.fillStyle = "#b8b0a1";
         ctx.fill();
-        ctx.lineWidth = 0.06;
         ctx.strokeStyle = dark;
+        ctx.lineWidth = 0.035;
         ctx.stroke();
-
-        // brick courses
-        ctx.strokeStyle = "rgba(90, 80, 68, 0.35)";
-        ctx.lineWidth = 0.025;
-        for (let row = 0; row < (h - 0.2) / 0.3; row++) {
-            const yy = y + 0.1 + row * 0.3;
+        ctx.strokeStyle = "rgba(90, 80, 68, 0.3)";
+        ctx.lineWidth = 0.015;
+        for (let row = 1; row < 4; row++) {
             ctx.beginPath();
-            ctx.moveTo(x + 0.1, yy);
-            ctx.lineTo(x + w - 0.1, yy);
+            ctx.moveTo(cx - 0.4, cy - 0.4 + row * 0.2);
+            ctx.lineTo(cx + 0.4, cy - 0.4 + row * 0.2);
             ctx.stroke();
-            for (let col = 0; col < w / 0.5; col++) {
-                const xx = x + 0.1 + col * 0.5 + (row % 2 ? 0.25 : 0);
-                if (xx > x + w - 0.1) continue;
-                ctx.beginPath();
-                ctx.moveTo(xx, yy);
-                ctx.lineTo(xx, yy + 0.3);
-                ctx.stroke();
-            }
         }
 
-        // keep
-        roundRect(ctx, x + 0.75, y + 1.2, 1.7, 2.4, 0.1);
-        ctx.fillStyle = "#c6bfb1";
+        roundRect(ctx, cx - 0.2, cy - 0.2, 0.4, 0.4, 0.04);
+        ctx.fillStyle = "#cbc4b6";
         ctx.fill();
         ctx.strokeStyle = dark;
-        ctx.lineWidth = 0.05;
+        ctx.lineWidth = 0.03;
         ctx.stroke();
-        for (let i = 0; i < 5; i++) {
-            ctx.fillStyle = "#9c9385";
-            ctx.fillRect(x + 0.8 + i * 0.34, y + 1.08, 0.2, 0.16);
-        }
 
-        // corner towers
-        [[x + 0.35, y + 0.35], [x + w - 0.35, y + 0.35], [x + 0.35, y + h - 0.35], [x + w - 0.35, y + h - 0.35]].forEach(([tx, ty]) => {
-            circle(ctx, tx, ty, 0.36, "#a69e8f", dark, 0.05);
-            circle(ctx, tx, ty, 0.2, "#8e8576");
+        [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(([sx, sy]) => {
+            circle(ctx, cx + sx * 0.38, cy + sy * 0.38, 0.15, "#a9a192", dark, 0.03);
+            circle(ctx, cx + sx * 0.38, cy + sy * 0.38, 0.08, "#8e8576");
         });
 
-        // flag
-        const fx = x + 1.6;
-        const fy = y + 1.6;
+        // gate, facing the road
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.rotate(facing);
+        ctx.fillStyle = "#4a3a2a";
+        roundRect(ctx, 0.3, -0.13, 0.12, 0.26, 0.04);
+        ctx.fill();
+        ctx.restore();
+
         ctx.strokeStyle = "#4b4237";
-        ctx.lineWidth = 0.05;
+        ctx.lineWidth = 0.025;
         ctx.beginPath();
-        ctx.moveTo(fx, fy + 0.6);
-        ctx.lineTo(fx, fy - 0.4);
+        ctx.moveTo(cx, cy + 0.1);
+        ctx.lineTo(cx, cy - 0.38);
         ctx.stroke();
-        const wave = Math.sin(state.time * 4) * 0.06;
+        const flutter = Math.sin(clock * 4) * 0.03;
         ctx.fillStyle = "#b5523f";
         ctx.beginPath();
-        ctx.moveTo(fx, fy - 0.4);
-        ctx.quadraticCurveTo(fx + 0.3, fy - 0.36 + wave, fx + 0.6, fy - 0.26);
-        ctx.lineTo(fx, fy - 0.08);
+        ctx.moveTo(cx, cy - 0.38);
+        ctx.quadraticCurveTo(cx + 0.14, cy - 0.36 + flutter, cx + 0.28, cy - 0.31);
+        ctx.lineTo(cx, cy - 0.22);
         ctx.fill();
-
-        // gate on the road side
-        const gy = 8.5;
-        ctx.fillStyle = "#4a3a2a";
-        ctx.beginPath();
-        ctx.moveTo(x + 0.1, gy + 0.38);
-        ctx.lineTo(x + 0.1, gy - 0.18);
-        ctx.quadraticCurveTo(x + 0.1, gy - 0.4, x + 0.42, gy - 0.4);
-        ctx.lineTo(x + 0.55, gy - 0.4);
-        ctx.lineTo(x + 0.55, gy + 0.38);
-        ctx.fill();
-        ctx.strokeStyle = "#2e241a";
-        ctx.lineWidth = 0.03;
-        for (let i = 1; i < 4; i++) {
-            ctx.beginPath();
-            ctx.moveTo(x + 0.1, gy - 0.4 + i * 0.2);
-            ctx.lineTo(x + 0.55, gy - 0.4 + i * 0.2);
-            ctx.stroke();
-        }
-
-        if (state.castle.oil > 0) {
-            circle(ctx, x + 0.4, gy - 0.7, 0.18, "#3c3530", "#211c18", 0.04);
-            circle(ctx, x + 0.4, gy - 0.7, 0.1, "#d9932f");
-        }
 
         if (hpRatio < 0.6) {
-            ctx.strokeStyle = "rgba(50, 40, 30, 0.7)";
-            ctx.lineWidth = 0.04;
+            ctx.strokeStyle = "rgba(50, 40, 30, 0.75)";
+            ctx.lineWidth = 0.025;
             ctx.beginPath();
-            ctx.moveTo(x + 2.4, y + 0.3);
-            ctx.lineTo(x + 2.2, y + 0.8);
-            ctx.lineTo(x + 2.45, y + 1.1);
-            ctx.moveTo(x + 0.5, y + 3.8);
-            ctx.lineTo(x + 0.8, y + 4.2);
-            ctx.lineTo(x + 0.7, y + 4.6);
+            ctx.moveTo(cx + 0.25, cy - 0.38);
+            ctx.lineTo(cx + 0.16, cy - 0.24);
+            ctx.lineTo(cx + 0.24, cy - 0.12);
+            ctx.moveTo(cx - 0.3, cy + 0.1);
+            ctx.lineTo(cx - 0.2, cy + 0.22);
             ctx.stroke();
         }
-        if (hpRatio < 0.3) {
+        if (hpRatio < 0.35) {
             for (let i = 0; i < 3; i++) {
-                const t = (state.time * 0.6 + i / 3) % 1;
-                circle(ctx, x + 2.2 + Math.sin(t * 6 + i) * 0.1, y + 0.6 - t * 1.2, 0.12 + t * 0.2, `rgba(70, 64, 58, ${0.45 * (1 - t)})`);
+                const t = (clock / 1.6 + i / 3) % 1;
+                circle(ctx, cx + 0.1 + Math.sin(t * 6 + i) * 0.06, cy - 0.2 - t * 0.6, 0.08 + t * 0.14, `rgba(70, 64, 58, ${0.5 * (1 - t)})`);
             }
         }
     }
 
     // ---------- towers ----------
+    // level 0 draws a bare tower (icons, placement ghost); 1–5 draws that many pips.
     function drawTower(c, type, level, cx, cy, angle, time, alpha = 1) {
         c.save();
         c.globalAlpha = alpha;
         roundRect(c, cx - 0.4, cy - 0.4, 0.8, 0.8, 0.12);
-        c.fillStyle = "#bdb5a6";
+        c.fillStyle = level >= G.MAX_LEVEL ? "#d6c79c" : "#bdb5a6";
         c.fill();
-        c.strokeStyle = "#857c6d";
+        c.strokeStyle = level >= G.MAX_LEVEL ? "#a8893c" : "#857c6d";
         c.lineWidth = 0.05;
         c.stroke();
 
@@ -349,8 +361,9 @@
             circle(c, cx + 0.2, cy - 0.2, pulse, "#d8c2ff", "#8e6cd1", 0.03);
         }
 
-        for (let i = 0; i <= level; i++) {
-            circle(c, cx - 0.2 + i * 0.2, cy + 0.33, 0.055, "#e2b746", "#8d6a1c", 0.025);
+        if (level > 0) {
+            const start = cx - ((level - 1) * 0.14) / 2;
+            for (let i = 0; i < level; i++) circle(c, start + i * 0.14, cy + 0.33, 0.045, "#e2b746", "#8d6a1c", 0.02);
         }
         c.restore();
     }
@@ -372,9 +385,8 @@
         const x = z.x + px * sway;
         const y = z.y + py * sway;
 
-        circle(ctx, x + 0.04, y + 0.06, r, "rgba(20, 30, 10, 0.25)");
+        circle(ctx, x + 0.03, y + 0.05, r, "rgba(20, 30, 10, 0.25)");
 
-        // arms reaching forward
         ctx.strokeStyle = look.skin;
         ctx.lineWidth = r * 0.32;
         ctx.lineCap = "round";
@@ -385,10 +397,10 @@
         ctx.lineTo(x - px * r * 0.6 + z.dx * r * 1.35, y - py * r * 0.6 + z.dy * r * 1.35);
         ctx.stroke();
 
-        circle(ctx, x, y, r, look.cloth, "rgba(30, 24, 18, 0.6)", 0.035);
+        circle(ctx, x, y, r, look.cloth, "rgba(30, 24, 18, 0.6)", 0.025);
         const hx = x + z.dx * r * 0.35;
         const hy = y + z.dy * r * 0.35;
-        circle(ctx, hx, hy, r * 0.58, look.skin, "rgba(40, 60, 25, 0.7)", 0.03);
+        circle(ctx, hx, hy, r * 0.58, look.skin, "rgba(40, 60, 25, 0.7)", 0.02);
         const ex = z.dx * r * 0.32;
         const ey = z.dy * r * 0.32;
         circle(ctx, hx + ex + px * r * 0.2, hy + ey + py * r * 0.2, r * 0.1, "#e8402f");
@@ -397,9 +409,9 @@
         if (z.type === "king") {
             ctx.fillStyle = "#e2b746";
             ctx.strokeStyle = "#8d6a1c";
-            ctx.lineWidth = 0.025;
-            ctx.beginPath();
+            ctx.lineWidth = 0.02;
             const cw = r * 0.55;
+            ctx.beginPath();
             ctx.moveTo(hx - cw, hy - r * 0.05);
             ctx.lineTo(hx - cw, hy - r * 0.55);
             ctx.lineTo(hx - cw * 0.5, hy - r * 0.3);
@@ -412,18 +424,18 @@
             ctx.stroke();
         }
 
-        if (z.slowUntil > state.time) circle(ctx, x, y, r + 0.06, null, "rgba(150, 215, 255, 0.9)", 0.05);
+        if (z.slowUntil > state.time) circle(ctx, x, y, r + 0.04, null, "rgba(150, 215, 255, 0.9)", 0.035);
         if (z.hitFlash > 0) circle(ctx, x, y, r, `rgba(255,255,255,${z.hitFlash * 4})`);
 
         if (z.hp < z.maxHp) {
-            const bw = Math.max(0.5, r * 2);
+            const bw = Math.max(0.36, r * 2);
             const bx = z.x - bw / 2;
-            const by = z.y - r - 0.2;
+            const by = z.y - r - 0.14;
             ctx.fillStyle = "rgba(20, 20, 20, 0.6)";
-            ctx.fillRect(bx, by, bw, 0.08);
+            ctx.fillRect(bx, by, bw, 0.06);
             const ratio = Math.max(0, z.hp / z.maxHp);
             ctx.fillStyle = ratio > 0.5 ? "#8fd16a" : ratio > 0.25 ? "#e6c14a" : "#e3573e";
-            ctx.fillRect(bx, by, bw * ratio, 0.08);
+            ctx.fillRect(bx, by, bw * ratio, 0.06);
         }
     }
 
@@ -432,24 +444,24 @@
         const ang = Math.atan2(p.ty - p.y, p.tx - p.x);
         if (p.kind === "arrow") {
             ctx.strokeStyle = "#4a3320";
-            ctx.lineWidth = 0.04;
+            ctx.lineWidth = 0.035;
             ctx.beginPath();
-            ctx.moveTo(p.x - Math.cos(ang) * 0.24, p.y - Math.sin(ang) * 0.24);
+            ctx.moveTo(p.x - Math.cos(ang) * 0.2, p.y - Math.sin(ang) * 0.2);
             ctx.lineTo(p.x, p.y);
             ctx.stroke();
-            circle(ctx, p.x, p.y, 0.03, "#d9d2c0");
+            circle(ctx, p.x, p.y, 0.025, "#d9d2c0");
         } else if (p.kind === "shell") {
-            circle(ctx, p.x, p.y, 0.1, "#262321", "#000", 0.02);
+            circle(ctx, p.x, p.y, 0.08, "#262321", "#000", 0.02);
         } else if (p.kind === "shard") {
             ctx.save();
             ctx.translate(p.x, p.y);
             ctx.rotate(ang);
             ctx.fillStyle = "#c6ecff";
             ctx.beginPath();
-            ctx.moveTo(0.14, 0);
-            ctx.lineTo(0, 0.06);
-            ctx.lineTo(-0.14, 0);
-            ctx.lineTo(0, -0.06);
+            ctx.moveTo(0.12, 0);
+            ctx.lineTo(0, 0.05);
+            ctx.lineTo(-0.12, 0);
+            ctx.lineTo(0, -0.05);
             ctx.closePath();
             ctx.fill();
             ctx.restore();
@@ -458,23 +470,24 @@
 
     function drawEffect(e) {
         const t = 1 - e.ttl / e.life;
-        if (e.kind === "coin") {
-            text(e.text, e.x, e.y - 0.3 - t * 0.6, 0.34, "#ffd866");
+        if (e.kind === "points") {
+            text(e.text, e.x, e.y - 0.2 - t * 0.4, 0.22, "#ffd866");
         } else if (e.kind === "breach") {
-            text(e.text, e.x, e.y - 0.4 - t * 0.6, 0.42, "#ff7a62");
+            text(e.text, e.x, e.y - t * 0.4, 0.3, "#ff7a62");
+        } else if (e.kind === "levelup") {
+            circle(ctx, e.x, e.y, 0.45 + t * 0.3, null, `rgba(255, 216, 102, ${1 - t})`, 0.05);
+            text(e.text, e.x, e.y - 0.55 - t * 0.25, 0.24, "#ffe08a");
         } else if (e.kind === "splat") {
             circle(ctx, e.x, e.y, e.r * (1 + t * 0.4), `rgba(70, 90, 40, ${0.55 * (1 - t)})`);
         } else if (e.kind === "boom") {
             circle(ctx, e.x, e.y, e.r * (0.4 + t * 0.6), `rgba(255, 170, 70, ${0.55 * (1 - t)})`);
             circle(ctx, e.x, e.y, e.r * 0.35 * (1 - t), `rgba(255, 240, 180, ${0.8 * (1 - t)})`);
         } else if (e.kind === "frost") {
-            circle(ctx, e.x, e.y, e.r * (0.4 + t * 0.6), `rgba(190, 235, 255, ${0.35 * (1 - t)})`, `rgba(220, 245, 255, ${0.9 * (1 - t)})`, 0.04);
-        } else if (e.kind === "oil") {
-            circle(ctx, e.x, e.y, e.r * (0.5 + t * 0.4), `rgba(200, 130, 40, ${0.5 * (1 - t)})`);
+            circle(ctx, e.x, e.y, e.r * (0.4 + t * 0.6), `rgba(190, 235, 255, ${0.35 * (1 - t)})`, `rgba(220, 245, 255, ${0.9 * (1 - t)})`, 0.03);
         } else if (e.kind === "bolt") {
             ctx.save();
             ctx.lineJoin = "round";
-            [[0.14, "rgba(190, 160, 255, 0.5)"], [0.05, "#f4eeff"]].forEach(([lw, color]) => {
+            [[0.1, "rgba(190, 160, 255, 0.5)"], [0.035, "#f4eeff"]].forEach(([lw, color]) => {
                 ctx.strokeStyle = color;
                 ctx.lineWidth = lw;
                 ctx.beginPath();
@@ -484,9 +497,7 @@
                         return;
                     }
                     const prev = e.points[i - 1];
-                    const mx = (prev.x + p.x) / 2 + (noise(i, e.ttl * 100) - 0.5) * 0.3;
-                    const my = (prev.y + p.y) / 2 + (noise(e.ttl * 100, i) - 0.5) * 0.3;
-                    ctx.lineTo(mx, my);
+                    ctx.lineTo((prev.x + p.x) / 2 + (noise(i, e.ttl * 100) - 0.5) * 0.25, (prev.y + p.y) / 2 + (noise(e.ttl * 100, i) - 0.5) * 0.25);
                     ctx.lineTo(p.x, p.y);
                 });
                 ctx.stroke();
@@ -495,12 +506,12 @@
         }
     }
 
-    function drawRange(cx, cy, range, ok = true) {
+    function drawRange(cx, cy, range, strong, ok = true) {
         circle(
             ctx, cx, cy, range,
-            ok ? "rgba(255, 255, 255, 0.14)" : "rgba(230, 80, 60, 0.14)",
-            ok ? "rgba(255, 255, 255, 0.7)" : "rgba(230, 80, 60, 0.7)",
-            0.035
+            ok ? `rgba(255, 255, 255, ${strong ? 0.16 : 0.07})` : "rgba(230, 80, 60, 0.14)",
+            ok ? `rgba(255, 255, 255, ${strong ? 0.8 : 0.35})` : "rgba(230, 80, 60, 0.7)",
+            0.025
         );
     }
 
@@ -509,64 +520,60 @@
         ctx.setTransform(1, 0, 0, 1, 0, 0);
         if (background) ctx.drawImage(background, 0, 0);
         ctx.setTransform(scale, 0, 0, scale, 0, 0);
+        const setup = state.phase === "setup";
+        const clock = performance.now() / 1000;
 
-        if (buildType && hover) {
-            for (let x = 0; x < G.COLS; x++) {
-                for (let y = 0; y < G.ROWS; y++) {
-                    if (G.canBuild(state, x, y)) {
-                        ctx.strokeStyle = "rgba(255, 255, 255, 0.12)";
-                        ctx.lineWidth = 0.025;
-                        ctx.strokeRect(x + 0.06, y + 0.06, 0.88, 0.88);
-                    }
+        if (setup && selectedType) {
+            for (let x = 0; x < G.SIZE; x++) {
+                for (let y = 0; y < G.SIZE; y++) {
+                    if (!G.canPlace(state, x, y)) continue;
+                    ctx.strokeStyle = "rgba(255, 255, 255, 0.18)";
+                    ctx.lineWidth = 0.02;
+                    roundRect(ctx, x + 0.05, y + 0.05, 0.9, 0.9, 0.1);
+                    ctx.stroke();
                 }
             }
         }
 
-        drawCastle();
-
-        const selected = selectedId != null ? G.findTower(state, selectedId) : null;
-        if (selected) drawRange(selected.x + 0.5, selected.y + 0.5, G.towerStats(selected).range);
-
-        state.effects.forEach((e) => {
-            if (e.kind === "splat" || e.kind === "oil") drawEffect(e);
-        });
-        state.towers.forEach((t) => drawTower(ctx, t.type, t.level, t.x + 0.5, t.y + 0.5, t.angle, state.time));
-        state.zombies.forEach((z) => {
-            if (z.dist > -0.3) drawZombie(z);
-        });
-        state.projectiles.forEach(drawProjectile);
-        state.effects.forEach((e) => {
-            if (e.kind !== "splat" && e.kind !== "oil") drawEffect(e);
-        });
-
-        if (hover && !G.towerAt(state, hover.x, hover.y)) {
-            if (buildType) {
-                const ok = G.canBuild(state, hover.x, hover.y) && state.gold >= G.TOWERS[buildType].cost;
-                drawRange(hover.x + 0.5, hover.y + 0.5, G.TOWERS[buildType].levels[0].range, ok);
-                drawTower(ctx, buildType, 0, hover.x + 0.5, hover.y + 0.5, -Math.PI / 2, state.time, ok ? 0.75 : 0.4);
-            }
-        } else if (hover) {
-            ctx.strokeStyle = "rgba(255, 255, 255, 0.85)";
-            ctx.lineWidth = 0.05;
-            roundRect(ctx, hover.x + 0.06, hover.y + 0.06, 0.88, 0.88, 0.14);
-            ctx.stroke();
+        // While planning, every placed tower shows its reach.
+        if (setup) {
+            state.towers.forEach((t) => {
+                const strong = hover && hover.x === t.x && hover.y === t.y;
+                drawRange(t.x + 0.5, t.y + 0.5, G.towerStats(t.type, 1).range, strong);
+            });
         }
 
-        if (paused && started && state.phase !== "over") {
-            ctx.setTransform(1, 0, 0, 1, 0, 0);
-            ctx.fillStyle = "rgba(20, 24, 16, 0.35)";
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-            ctx.setTransform(scale, 0, 0, scale, 0, 0);
-            text("Paused", G.COLS / 2, G.ROWS / 2, 0.9, "#ffffff");
+        drawCastle();
+        state.effects.forEach((e) => {
+            if (e.kind === "splat") drawEffect(e);
+        });
+        state.towers.forEach((t) => drawTower(ctx, t.type, t.level, t.x + 0.5, t.y + 0.5, t.angle, setup ? clock : state.time));
+        state.zombies.forEach(drawZombie);
+        state.projectiles.forEach(drawProjectile);
+        state.effects.forEach((e) => {
+            if (e.kind !== "splat") drawEffect(e);
+        });
+
+        if (setup && hover) {
+            if (G.towerAt(state, hover.x, hover.y)) {
+                ctx.strokeStyle = "rgba(255, 255, 255, 0.9)";
+                ctx.lineWidth = 0.04;
+                roundRect(ctx, hover.x + 0.06, hover.y + 0.06, 0.88, 0.88, 0.14);
+                ctx.stroke();
+            } else if (selectedType) {
+                const ok = G.canPlace(state, hover.x, hover.y);
+                drawRange(hover.x + 0.5, hover.y + 0.5, G.towerStats(selectedType, 1).range, true, ok);
+                drawTower(ctx, selectedType, 0, hover.x + 0.5, hover.y + 0.5, -Math.PI / 2, clock, ok ? 0.75 : 0.35);
+            }
         }
     }
 
-    function frame(now) {
-        const real = Math.min(0.25, (now - (lastFrame || now)) / 1000);
-        lastFrame = now;
-        if (started && !paused && state.phase !== "over") {
+    function frame(t) {
+        const real = Math.min(0.25, (t - (lastFrame || t)) / 1000);
+        lastFrame = t;
+        if (state.phase === "running") {
             acc += real * speed;
-            while (acc >= STEP) {
+            while (acc >= STEP && state.phase === "running") {
                 G.step(state, STEP);
                 acc -= STEP;
             }
@@ -577,7 +584,7 @@
         requestAnimationFrame(frame);
     }
 
-    // ---------- events & toast ----------
+    // ---------- toast & events ----------
     function toast(message, bad = false) {
         const el = $("toast");
         el.textContent = message;
@@ -587,237 +594,289 @@
         toastTimer = setTimeout(() => el.classList.remove("is-on"), 1800);
     }
 
-    function pulse(el, cls) {
-        el.classList.remove(cls);
-        void el.offsetWidth;
-        el.classList.add(cls);
-    }
-
     function handleEvents() {
         for (const e of G.drainEvents(state)) {
-            if (e.type === "wave-start") {
-                toast(e.wave % 10 === 0 ? `Wave ${e.wave} — the Zombie King walks` : `Wave ${e.wave} — here they come`);
-            } else if (e.type === "wave-clear") {
-                toast(`Wave ${e.wave} cleared · +${e.bonus} gold`);
-                saveBest(e.wave);
+            if (e.type === "wave") {
+                toast(e.wave === G.WAVES ? "Final wave — the Zombie King walks" : `Wave ${e.wave}`);
+            } else if (e.type === "level-up") {
+                const tower = G.findTower(state, e.towerId);
+                if (tower) toast(`${G.TOWERS[tower.type].name} reached level ${e.level}`);
             } else if (e.type === "king-down") {
-                toast(`The Zombie King falls · +${e.gold} gold`);
+                toast("The Zombie King falls");
             } else if (e.type === "breach") {
-                pulse(document.querySelector(".cd-stat--hp"), "is-hit");
-            } else if (e.type === "game-over") {
-                // A wave the castle fell during doesn't count as survived.
-                saveBest(e.wave - 1);
-                showOverlay({
-                    eyebrow: `Wave ${e.wave}`,
-                    title: "The castle has fallen",
-                    body: `You held out through ${e.wave - 1} ${e.wave - 1 === 1 ? "wave" : "waves"} and put down ${state.kills} zombies. Best: ${best} ${best === 1 ? "wave" : "waves"}.`,
-                    howto: false,
-                    button: "Defend again"
-                });
+                const el = document.querySelector(".cd-stat--hp");
+                el.classList.remove("is-hit");
+                void el.offsetWidth;
+                el.classList.add("is-hit");
+            } else if (e.type === "end") {
+                finishRun(e);
             }
         }
     }
 
-    function showOverlay({ eyebrow, title, body, howto, button }) {
+    // ---------- overlay ----------
+    function showOverlay({ eyebrow, title, body, actions }) {
         $("overlayEyebrow").textContent = eyebrow;
         $("overlayTitle").textContent = title;
-        $("overlayBody").textContent = body;
-        $("overlayHowto").hidden = !howto;
-        $("overlayButton").textContent = button;
+        $("overlayBody").innerHTML = body;
+        const box = $("overlayActions");
+        box.innerHTML = "";
+        actions.forEach(({ label, primary, onClick }) => {
+            const btn = document.createElement("button");
+            btn.type = "button";
+            btn.className = `cd-btn${primary ? " cd-btn--primary" : ""}`;
+            btn.textContent = label;
+            btn.addEventListener("click", onClick);
+            box.append(btn);
+        });
         overlay.hidden = false;
-        $("overlayButton").focus({ preventScroll: true });
+        box.querySelector(".cd-btn--primary")?.focus({ preventScroll: true });
     }
 
-    // ---------- side panels ----------
-    const shopButtons = {};
-    const upgradeButtons = {};
+    function hideOverlay() {
+        overlay.hidden = true;
+    }
 
-    function buildShop() {
-        const shop = $("shop");
-        TOWER_ORDER.forEach((type, i) => {
+    overlay.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") hideOverlay();
+    });
+
+    function prettyDate(str) {
+        const [y, m, d] = str.split("-").map(Number);
+        return new Date(y, m - 1, d).toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" });
+    }
+
+    function showIntro() {
+        showOverlay({
+            eyebrow: `Day ${map.day} · ${prettyDate(date)}`,
+            title: "Hold the castle",
+            body: `
+                <p>Zombies follow the road to your castle. Every one that reaches it knocks down part of the wall; lose all ${G.START_HP} walls and it falls.</p>
+                <ol class="cd-howto">
+                    <li>Pick three of the four towers and place them on the grass.</li>
+                    <li>Press play. From then on it runs itself.</li>
+                    <li>Towers level up from their kills and assists. Every zombie scores points, with a bonus if the castle survives all ${G.WAVES} waves.</li>
+                </ol>`,
+            actions: [{ label: "Place towers", primary: true, onClick: hideOverlay }]
+        });
+    }
+
+    function untilTomorrow() {
+        const now = new Date();
+        const next = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+        const mins = Math.max(1, Math.round((next - now) / 60000));
+        const h = Math.floor(mins / 60);
+        const m = mins % 60;
+        return h ? `${h}h ${m}m` : `${m}m`;
+    }
+
+    function shareText(won, score) {
+        const icons = state.towers.map((t) => `${SHARE_ICON[t.type]} Lv${t.level}`).join(" · ");
+        const outcome = won ? `🏰 Held all ${G.WAVES} waves · ${state.hp}/${state.maxHp} walls` : `💀 Fell on wave ${state.wave} of ${G.WAVES}`;
+        return `Castle Defense #${map.day} — ${score.toLocaleString()} pts\n${outcome}\n${icons}\nhttps://palmergill.com/castle-defense/`;
+    }
+
+    async function share(textToShare) {
+        try {
+            await navigator.clipboard.writeText(textToShare);
+            toast("Result copied — paste it anywhere");
+            return;
+        } catch {
+            /* fall through to the share sheet */
+        }
+        if (navigator.share) {
+            try {
+                await navigator.share({ text: textToShare });
+                return;
+            } catch {
+                /* dismissed */
+            }
+        }
+        toast("Couldn't copy the result", true);
+    }
+
+    function iconCanvas(type, level, size) {
+        const c = document.createElement("canvas");
+        c.width = size * 2;
+        c.height = size * 2;
+        const ic = c.getContext("2d");
+        ic.setTransform(size * 2, 0, 0, size * 2, 0, 0);
+        drawTower(ic, type, level, 0.5, 0.5, -Math.PI / 4, 0);
+        return c;
+    }
+
+    function finishRun({ won, score }) {
+        const isBest = record.best == null || score > record.best;
+        record.runs += 1;
+        if (isBest) record.best = score;
+        writeRecord();
+
+        const badge = isBest
+            ? `<span class="cd-final__best">${record.runs > 1 ? "New best today" : "Today's score"}</span>`
+            : `<span class="cd-final__best">Best ${record.best.toLocaleString()}</span>`;
+        const bonusRows = won
+            ? `<dt>Castle held</dt><dd>+${G.WIN_BONUS}</dd><dt>${state.hp} walls standing × ${G.HP_BONUS}</dt><dd>+${G.HP_BONUS * state.hp}</dd>`
+            : `<dt>Fell on wave ${state.wave} of ${G.WAVES}</dt><dd>—</dd>`;
+        showOverlay({
+            eyebrow: `Day ${map.day}`,
+            title: won ? "The castle held" : "The castle has fallen",
+            body: `
+                <div class="cd-final">
+                    <span class="cd-final__score">${score.toLocaleString()}</span>
+                    <span class="cd-final__label">points</span>
+                    ${badge}
+                </div>
+                <dl class="cd-breakdown">
+                    <dt>${state.kills} zombies put down</dt><dd>${state.score.toLocaleString()}</dd>
+                    ${bonusRows}
+                </dl>
+                <div class="cd-result-towers" id="resultTowers"></div>
+                <p class="cd-next">${date === today ? `New map in ${untilTomorrow()}` : `Replaying ${prettyDate(date)}`}</p>`,
+            actions: [
+                { label: "Share result", primary: true, onClick: () => share(shareText(won, score)) },
+                { label: "Try again", onClick: resetRun }
+            ]
+        });
+        const list = $("resultTowers");
+        state.towers.forEach((t) => {
+            const row = document.createElement("div");
+            row.className = "cd-result-tower";
+            row.append(iconCanvas(t.type, t.level, 30));
+            row.insertAdjacentHTML("beforeend", `<span><b>${G.TOWERS[t.type].name}</b> · level ${t.level}</span><span>${t.kills} kills · ${t.assists} assists</span>`);
+            list.append(row);
+        });
+    }
+
+    // Same map, same towers in the same spots, fresh levels.
+    function resetRun() {
+        const layout = layoutOf(state);
+        state = G.createGame(map);
+        applyLayout(state, layout);
+        selectedType = null;
+        acc = 0;
+        hideOverlay();
+        refreshCards();
+    }
+
+    // ---------- tower cards ----------
+    const cards = {};
+
+    function buildTowerCards() {
+        const box = $("towers");
+        TYPES.forEach((type) => {
             const def = G.TOWERS[type];
             const btn = document.createElement("button");
             btn.type = "button";
-            btn.className = "cd-card";
-            btn.dataset.type = type;
+            btn.className = "cd-tower";
             btn.setAttribute("aria-pressed", "false");
-            btn.setAttribute("aria-label", `${def.name} tower, ${def.cost} gold. ${def.blurb}`);
-            const icon = document.createElement("canvas");
-            icon.width = 68;
-            icon.height = 68;
-            const ic = icon.getContext("2d");
-            ic.setTransform(68, 0, 0, 68, 0, 0);
-            drawTower(ic, type, 0, 0.5, 0.5, -Math.PI / 4, 0);
-            btn.append(icon);
+            btn.append(iconCanvas(type, 0, 40));
             btn.insertAdjacentHTML(
                 "beforeend",
-                `<span class="cd-card__name">${def.name}</span><span class="cd-card__cost">${def.cost} gold</span><span class="cd-card__key">${i + 1}</span>`
+                `<span class="cd-tower__name">${def.name}</span><span class="cd-tower__blurb">${def.blurb}</span><span class="cd-tower__state"></span>`
             );
-            btn.addEventListener("click", () => chooseBuild(buildType === type ? null : type));
-            shop.append(btn);
-            shopButtons[type] = btn;
-        });
-        const note = document.createElement("p");
-        note.className = "cd-shop-note";
-        note.id = "shopNote";
-        shop.append(note);
-    }
-
-    function buildCastlePanel() {
-        const box = $("castleUpgrades");
-        UPGRADE_ORDER.forEach((kind) => {
-            const def = G.CASTLE_UPGRADES[kind];
-            const btn = document.createElement("button");
-            btn.type = "button";
-            btn.className = "cd-upgrade";
-            btn.innerHTML = `<span class="cd-upgrade__name">${def.name}<span class="cd-pips"></span></span><span class="cd-upgrade__blurb">${def.blurb}</span><span class="cd-upgrade__cost"></span>`;
-            btn.addEventListener("click", () => {
-                const res = G.buyCastleUpgrade(state, kind);
-                if (!res.ok) toast(res.reason, true);
-            });
+            btn.addEventListener("click", () => chooseType(type));
             box.append(btn);
-            upgradeButtons[kind] = btn;
+            cards[type] = btn;
         });
     }
 
-    function chooseBuild(type) {
-        buildType = type;
-        if (type) selectedId = null;
-        Object.entries(shopButtons).forEach(([t, btn]) => btn.setAttribute("aria-pressed", String(t === type)));
-        $("shopNote").textContent = type ? `${G.TOWERS[type].blurb} Click the grass to build.` : "Pick a tower to build.";
+    let lastCards = "";
+    function refreshCards() {
+        lastCards = "";
+        updateCards();
     }
 
-    function selectTower(id) {
-        selectedId = id;
-        if (id != null) chooseBuild(null);
-        lastSelectedSig = "";
+    function updateCards() {
+        const setup = state.phase === "setup";
+        const used = G.typesUsed(state);
+        const sig = setup
+            ? `s|${selectedType}|${state.towers.map((t) => `${t.type}@${t.x},${t.y}`).join(",")}`
+            : `r|${state.towers.map((t) => `${t.level}:${t.xp}:${t.kills}:${t.assists}`).join(",")}`;
+        if (sig === lastCards) return;
+        lastCards = sig;
+        TYPES.forEach((type) => {
+            const btn = cards[type];
+            const tower = state.towers.find((t) => t.type === type);
+            const label = btn.querySelector(".cd-tower__state");
+            btn.classList.toggle("is-placed", Boolean(tower));
+            btn.classList.toggle("is-out", !tower && (!setup || used.length >= G.TOWER_LIMIT));
+            btn.setAttribute("aria-pressed", String(setup && selectedType === type));
+            btn.disabled = !setup;
+            if (setup) {
+                label.textContent = tower ? "Placed" : used.length >= G.TOWER_LIMIT ? "Sitting out" : "";
+            } else if (tower) {
+                const need = G.xpForNext(tower);
+                const floor = tower.level > 1 ? G.LEVEL_XP[tower.level - 2] : 0;
+                const pct = need == null ? 100 : Math.min(100, ((tower.xp - floor) / (need - floor)) * 100);
+                label.innerHTML = `<span class="cd-tower__level">Lv ${tower.level}${need == null ? " · max" : ""}</span><span class="cd-xp"><span style="width:${pct}%"></span></span>${tower.kills} K · ${tower.assists} A`;
+            } else {
+                label.textContent = "Sat out";
+            }
+        });
+        $("towerCount").textContent = setup ? `${used.length}/${G.TOWER_LIMIT} placed` : "Leveling up";
+        $("towersTitle").textContent = setup ? `Pick ${G.TOWER_LIMIT} of 4` : "Your towers";
+        let note;
+        if (!setup) note = "Levels come from kills (2 XP) and assists (1 XP).";
+        else if (selectedType) note = `Click the grass to ${used.includes(selectedType) ? "move" : "place"} the ${G.TOWERS[selectedType].name}. Click a placed tower to pick it up.`;
+        else if (used.length >= G.TOWER_LIMIT) note = "Ready. Click a tower on the map to pick it up and move it.";
+        else note = "Pick a tower to place.";
+        $("towerNote").textContent = note;
     }
 
-    function fmt(n) {
-        return Number.isInteger(n) ? String(n) : n.toFixed(1);
-    }
-
-    let lastSelectedSig = "";
-    function renderSelected() {
-        const panel = $("selectedPanel");
-        const tower = selectedId != null ? G.findTower(state, selectedId) : null;
-        if (!tower) {
-            if (!panel.hidden) panel.hidden = true;
-            selectedId = null;
-            lastSelectedSig = "";
+    function chooseType(type) {
+        if (state.phase !== "setup") return;
+        const placed = state.towers.some((t) => t.type === type);
+        if (!placed && state.towers.length >= G.TOWER_LIMIT) {
+            toast("Three towers max — click one on the map to pick it up first", true);
             return;
         }
-        const cost = G.upgradeCost(tower);
-        const sig = `${tower.id}|${tower.level}|${tower.kills}|${state.gold >= (cost ?? Infinity)}|${state.phase}`;
-        if (sig === lastSelectedSig) return;
-        lastSelectedSig = sig;
-        panel.hidden = false;
-        const def = G.TOWERS[tower.type];
-        const now = G.towerStats(tower);
-        const next = def.levels[tower.level + 1];
-        const row = (label, a, b, suffix = "") =>
-            `<div><dt>${label}</dt><dd>${fmt(a)}${suffix}${b != null && b !== a ? ` <span class="up">→ ${fmt(b)}${suffix}</span>` : ""}</dd></div>`;
-        let special = "";
-        if (now.splash && tower.type === "cannon") special = row("Blast", now.splash, next?.splash);
-        if (now.slow) special = row("Slow", Math.round(now.slow * 100), next ? Math.round(next.slow * 100) : null, "%");
-        if (now.chains) special = row("Chains", now.chains, next?.chains);
-        $("selectedTitle").textContent = `${def.name} · level ${tower.level + 1}`;
-        $("selectedBody").innerHTML = `
-            <p class="cd-tower-meta">${def.blurb} ${tower.kills} ${tower.kills === 1 ? "kill" : "kills"}.</p>
-            <dl class="cd-tower-stats">
-                ${row("Damage", now.damage, next?.damage)}
-                ${row("Range", now.range, next?.range)}
-                ${row("Shots/sec", now.rate, next?.rate)}
-                ${special}
-            </dl>
-            <div class="cd-tower-actions">
-                <button class="cd-btn cd-btn--primary" type="button" data-act="upgrade" ${cost == null || state.gold < cost ? "disabled" : ""}>
-                    ${cost == null ? "Fully upgraded" : `Upgrade · ${cost} gold`}
-                </button>
-                <button class="cd-btn cd-btn--danger" type="button" data-act="sell">Sell · ${G.sellValue(tower)}</button>
-            </div>`;
+        selectedType = selectedType === type ? null : type;
+        refreshCards();
     }
 
-    $("selectedBody").addEventListener("click", (e) => {
-        const act = e.target.closest("[data-act]")?.dataset.act;
-        if (act === "upgrade") doUpgrade();
-        if (act === "sell") doSell();
-    });
-
-    function doUpgrade() {
-        if (selectedId == null) return;
-        const res = G.upgradeTower(state, selectedId);
-        if (!res.ok) toast(res.reason, true);
+    function nextUnplaced() {
+        if (state.towers.length >= G.TOWER_LIMIT) return null;
+        return TYPES.find((t) => !state.towers.some((tw) => tw.type === t)) || null;
     }
 
-    function doSell() {
-        if (selectedId == null) return;
-        const res = G.sellTower(state, selectedId);
-        if (res.ok) {
-            toast(`Sold for ${res.refund} gold`);
-            selectTower(null);
-        }
-    }
-
+    // ---------- HUD ----------
     let lastHud = "";
-    let lastGold = state.gold;
     function updateUi() {
-        const remaining = G.zombiesRemaining(state);
-        const hud = `${state.hp}|${state.maxHp}|${state.gold}|${state.wave}|${remaining}|${state.phase}|${best}|${JSON.stringify(state.castle)}`;
-        renderSelected();
+        updateCards();
+        const hud = `${state.hp}|${state.wave}|${state.score}|${state.phase}|${state.towers.length}|${record.best}`;
         if (hud === lastHud) return;
         lastHud = hud;
-
         $("hpValue").textContent = state.hp;
         $("hpMax").textContent = state.maxHp;
-        const bar = $("hpBar");
-        bar.style.width = `${(state.hp / state.maxHp) * 100}%`;
-        bar.classList.toggle("is-low", state.hp / state.maxHp < 0.35);
-        $("goldValue").textContent = state.gold;
-        if (state.gold > lastGold) pulse(document.querySelector(".cd-stat--gold"), "is-bump");
-        lastGold = state.gold;
+        $("hpBar").style.width = `${(state.hp / state.maxHp) * 100}%`;
+        $("hpBar").classList.toggle("is-low", state.hp / state.maxHp < 0.35);
         $("waveValue").textContent = state.wave;
-        $("zombieValue").textContent = state.phase === "wave" ? remaining : "—";
-        $("bestValue").textContent = best || "—";
+        $("scoreValue").textContent = state.score.toLocaleString();
+        $("bestValue").textContent = record.best == null ? "—" : record.best.toLocaleString();
 
-        Object.entries(shopButtons).forEach(([type, btn]) => btn.classList.toggle("is-poor", state.gold < G.TOWERS[type].cost));
-
-        UPGRADE_ORDER.forEach((kind) => {
-            const btn = upgradeButtons[kind];
-            const cost = G.castleUpgradeCost(state, kind);
-            const level = G.castleUpgradeLevel(state, kind);
-            const def = G.CASTLE_UPGRADES[kind];
-            const full = kind === "repair" && state.hp >= state.maxHp;
-            btn.disabled = cost == null || full || state.gold < cost || state.phase === "over";
-            btn.querySelector(".cd-upgrade__cost").textContent = cost == null ? "Max" : `${cost}`;
-            btn.querySelector(".cd-pips").innerHTML = level == null ? "" : def.costs.map((_, i) => `<i class="${i < level ? "on" : ""}"></i>`).join("");
-        });
-
-        const waveBtn = $("waveButton");
-        if (state.phase === "build") {
-            const next = state.wave + 1;
-            const summary = G.waveSummary(next);
-            const total = Object.values(summary).reduce((a, b) => a + b, 0);
-            $("waveButtonLabel").textContent = `Start wave ${next}`;
-            $("waveHint").textContent = summary.king ? `${total} zombies + King` : `${total} zombies`;
-            waveBtn.disabled = false;
-        } else if (state.phase === "wave") {
-            $("waveButtonLabel").textContent = `Wave ${state.wave} underway`;
-            $("waveHint").textContent = "";
-            waveBtn.disabled = true;
+        const play = $("playButton");
+        if (state.phase === "setup") {
+            const missing = G.TOWER_LIMIT - state.towers.length;
+            play.disabled = missing > 0;
+            $("playLabel").textContent = "Play";
+            $("playHint").textContent = missing > 0 ? `Place ${missing} more` : "";
+        } else if (state.phase === "running") {
+            play.disabled = true;
+            $("playLabel").textContent = "Defending…";
+            $("playHint").textContent = `wave ${state.wave} of ${G.WAVES}`;
         } else {
-            $("waveButtonLabel").textContent = "Castle fallen";
-            $("waveHint").textContent = "";
-            waveBtn.disabled = true;
+            play.disabled = false;
+            $("playLabel").textContent = "Try again";
+            $("playHint").textContent = "";
         }
     }
 
     // ---------- input ----------
     function tileFromEvent(e) {
         const rect = canvas.getBoundingClientRect();
-        const x = Math.floor(((e.clientX - rect.left) / rect.width) * G.COLS);
-        const y = Math.floor(((e.clientY - rect.top) / rect.height) * G.ROWS);
-        if (x < 0 || y < 0 || x >= G.COLS || y >= G.ROWS) return null;
+        const x = Math.floor(((e.clientX - rect.left) / rect.width) * G.SIZE);
+        const y = Math.floor(((e.clientY - rect.top) / rect.height) * G.SIZE);
+        if (x < 0 || y < 0 || x >= G.SIZE || y >= G.SIZE) return null;
         return { x, y };
     }
 
@@ -826,98 +885,97 @@
     });
     canvas.addEventListener("pointerleave", () => { hover = null; });
     canvas.addEventListener("click", (e) => {
+        if (state.phase !== "setup") return;
         const tile = tileFromEvent(e);
         if (!tile) return;
         const tower = G.towerAt(state, tile.x, tile.y);
         if (tower) {
-            selectTower(tower.id);
+            G.removeTower(state, tower.id);
+            selectedType = tower.type;
+            toast(`Picked up the ${G.TOWERS[tower.type].name}`);
+            saveLayout();
+            refreshCards();
             return;
         }
-        if (buildType) {
-            if (!G.canBuild(state, tile.x, tile.y)) {
-                toast(G.isPathTile(tile.x, tile.y) ? "Keep the road clear — build on the grass." : "You can't build there.", true);
-                return;
-            }
-            const res = G.buildTower(state, buildType, tile.x, tile.y);
-            if (!res.ok) toast(res.reason, true);
+        if (!selectedType) {
+            toast("Pick a tower first", true);
             return;
         }
-        selectTower(null);
+        const res = G.placeTower(state, selectedType, tile.x, tile.y);
+        if (!res.ok) {
+            toast(res.reason, true);
+            return;
+        }
+        selectedType = res.moved ? null : nextUnplaced();
+        saveLayout();
+        refreshCards();
     });
 
-    $("waveButton").addEventListener("click", () => {
-        const res = G.startWave(state);
-        if (!res.ok) toast(res.reason, true);
-    });
+    // Keep the layout across reloads while you're still planning.
+    function saveLayout() {
+        record.layout = layoutOf(state);
+        writeRecord();
+    }
+
+    $("playButton").addEventListener("click", startOrRetry);
+
+    function startOrRetry() {
+        if (state.phase === "won" || state.phase === "lost") {
+            resetRun();
+            return;
+        }
+        const res = G.startRun(state);
+        if (!res.ok) {
+            toast(res.reason, true);
+            return;
+        }
+        selectedType = null;
+        hover = null;
+        saveLayout();
+        refreshCards();
+    }
 
     document.querySelectorAll("[data-speed]").forEach((btn) => {
-        btn.addEventListener("click", () => setSpeed(Number(btn.dataset.speed)));
-    });
-
-    function setSpeed(value) {
-        speed = value;
-        document.querySelectorAll("[data-speed]").forEach((b) => b.setAttribute("aria-pressed", String(Number(b.dataset.speed) === value)));
-    }
-
-    function togglePause() {
-        paused = !paused;
-        $("pauseButton").setAttribute("aria-pressed", String(paused));
-        $("pauseButton").textContent = paused ? "Resume" : "Pause";
-    }
-
-    $("pauseButton").addEventListener("click", togglePause);
-    $("autoStart").addEventListener("change", (e) => {
-        state.autoStart = e.target.checked;
-    });
-    $("deselectButton").addEventListener("click", () => selectTower(null));
-
-    $("overlayButton").addEventListener("click", () => {
-        if (state.phase === "over") {
-            state = G.createGame();
-            state.autoStart = $("autoStart").checked;
-            selectTower(null);
-            chooseBuild("archer");
-            lastHud = "";
-            lastGold = state.gold;
-        }
-        started = true;
-        if (paused) togglePause();
-        overlay.hidden = true;
+        btn.addEventListener("click", () => {
+            speed = Number(btn.dataset.speed);
+            document.querySelectorAll("[data-speed]").forEach((b) => b.setAttribute("aria-pressed", String(b === btn)));
+        });
     });
 
     document.addEventListener("keydown", (e) => {
-        if (e.metaKey || e.ctrlKey || e.altKey) return;
-        const tag = e.target.tagName;
-        if (tag === "INPUT" || tag === "TEXTAREA") return;
-        if (!overlay.hidden) return;
+        if (e.metaKey || e.ctrlKey || e.altKey || !overlay.hidden) return;
         const key = e.key.toLowerCase();
         if (["1", "2", "3", "4"].includes(key)) {
-            const type = TOWER_ORDER[Number(key) - 1];
-            chooseBuild(buildType === type ? null : type);
-        } else if (key === " " && tag !== "BUTTON") {
-            e.preventDefault();
-            G.startWave(state);
-        } else if (key === "u") {
-            doUpgrade();
-        } else if (key === "s") {
-            doSell();
-        } else if (key === "p") {
-            togglePause();
+            chooseType(TYPES[Number(key) - 1]);
+        } else if (key === "enter" && e.target.tagName !== "BUTTON") {
+            startOrRetry();
         } else if (key === "escape") {
-            selectTower(null);
-            chooseBuild(null);
+            selectedType = null;
+            refreshCards();
         }
     });
 
-    document.addEventListener("visibilitychange", () => {
-        if (document.hidden && started && !paused && state.phase === "wave") togglePause();
-    });
-
     // ---------- boot ----------
-    buildShop();
-    buildCastlePanel();
-    chooseBuild("archer");
-    if (best) $("overlayBody").textContent += ` Your best so far: ${best} ${best === 1 ? "wave" : "waves"}.`;
+    function describeHorde() {
+        const c = { walker: 0, runner: 0, brute: 0, king: 0 };
+        map.waves.forEach((w) => w.forEach((s) => { c[s.type] += 1; }));
+        const lean = { walker: "Walkers", runner: "Runners", brute: "Brutes" }[map.lean];
+        const total = c.walker + c.runner + c.brute + c.king;
+        $("horde").innerHTML = `Heavy on <b>${lean}</b> today. ${total} zombies over ${G.WAVES} waves: ${c.walker} walkers, ${c.runner} runners, ${c.brute} brutes, and the <b>Zombie King</b> at the end.`;
+    }
+
+    $("dayLabel").textContent = `Daily puzzle · Day ${map.day}${date !== today ? ` · ${date}` : ""}`;
+    $("waveMax").textContent = G.WAVES;
+    $("hpMax").textContent = G.START_HP;
+    $("winBonus").textContent = G.WIN_BONUS;
+    $("hpBonus").textContent = G.HP_BONUS;
+    $("xpRule").textContent = G.LEVEL_XP.join(" / ");
+    describeHorde();
+    buildTowerCards();
+    applyLayout(state, record.layout);
+    selectedType = nextUnplaced();
+    refreshCards();
+    if (!record.runs) showIntro();
     new ResizeObserver(resize).observe(wrap);
     resize();
     requestAnimationFrame(frame);
