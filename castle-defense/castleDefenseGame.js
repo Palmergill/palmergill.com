@@ -30,26 +30,26 @@
     const TOWERS = {
         archer: {
             name: "Archer",
-            blurb: "Quick arrows at the zombie nearest the castle.",
-            base: { damage: 10, range: 1.9, rate: 1.7 },
-            projectile: { kind: "arrow", speed: 11 }
+            blurb: "Long reach, one target at a time. Best against Brutes and the King.",
+            base: { damage: 22, range: 2.3, rate: 2.0 },
+            projectile: { kind: "arrow", speed: 11, homing: true }
         },
         cannon: {
             name: "Cannon",
-            blurb: "Slow shells that burst across a crowd.",
-            base: { damage: 26, range: 1.7, rate: 0.55, splash: 0.75 },
-            projectile: { kind: "shell", speed: 6 }
+            blurb: "Shells burst across a crowd, but fast zombies can outrun them.",
+            base: { damage: 18, range: 1.7, rate: 0.5, splash: 0.75 },
+            projectile: { kind: "shell", speed: 6, homing: false }
         },
         frost: {
             name: "Frost",
-            blurb: "Chills everything it hits, slowing the pack.",
-            base: { damage: 5, range: 1.7, rate: 1.0, splash: 0.7, slow: 0.35, slowFor: 1.6 },
-            projectile: { kind: "shard", speed: 9 }
+            blurb: "Barely hurts, but slows the pack so the others get more shots.",
+            base: { damage: 4, range: 1.7, rate: 1.0, splash: 0.7, slow: 0.28, slowGrowth: 0.04, slowCap: 0.45, slowFor: 1.6 },
+            projectile: { kind: "shard", speed: 9, homing: true }
         },
         mage: {
             name: "Mage",
-            blurb: "Lightning that jumps from zombie to zombie.",
-            base: { damage: 18, range: 2.0, rate: 0.75, chains: 2 },
+            blurb: "Lightning jumps between zombies. Strong when they bunch up.",
+            base: { damage: 23, range: 2.0, rate: 0.75, chains: 2, chainRange: 1.6 },
             projectile: null
         }
     };
@@ -169,8 +169,10 @@
     function dailyMap(dateStr) {
         const seed = hashString(`castle-defense:${dateStr}`);
         const rng = mulberry32(seed);
+        // Reroll roads that towers can barely reach — ones hugging the edge
+        // leave half of every tower's range off the board.
         let road = null;
-        while (!road) road = carveRoad(rng);
+        while (!road || roadCoverage(road) < MIN_COVERAGE) road = carveRoad(rng);
 
         const pathSet = new Set(road.path.map(([x, y]) => `${x},${y}`));
         const castle = road.path[road.path.length - 1];
@@ -178,11 +180,20 @@
         for (let x = 0; x < SIZE; x++) {
             for (let y = 0; y < SIZE; y++) if (!pathSet.has(`${x},${y}`)) free.push([x, y]);
         }
-        const obstacles = shuffle(rng, free).slice(0, 3 + Math.floor(rng() * 3)).map(([x, y], i) => ({
-            x,
-            y,
-            kind: i % 3 === 2 ? "rock" : "tree"
-        }));
+        // Trees and rocks are mostly scenery: at most one may sit beside the
+        // road. Several there can wall off the only good tower spots and make
+        // a day unwinnable.
+        const besideRoad = ([x, y]) => {
+            for (let dx = -1; dx <= 1; dx++) {
+                for (let dy = -1; dy <= 1; dy++) if (pathSet.has(`${x + dx},${y + dy}`)) return true;
+            }
+            return false;
+        };
+        const want = 3 + Math.floor(rng() * 3);
+        const spots = shuffle(rng, free);
+        const near = spots.filter(besideRoad).slice(0, 1);
+        const far = spots.filter((t) => !besideRoad(t)).slice(0, want - near.length);
+        const obstacles = [...near, ...far].map(([x, y], i) => ({ x, y, kind: i % 3 === 2 ? "rock" : "tree" }));
 
         // Each day leans on one kind of zombie, so the best three towers change.
         const leans = ["walker", "runner", "brute"];
@@ -207,6 +218,31 @@
         map.pathSet = pathSet;
         for (let w = 1; w <= WAVES; w++) map.waves.push(waveSpawns(rng, w, lean));
         return map;
+    }
+
+    // How much road (in tiles) the three best grass tiles can reach between
+    // them. Below MIN_COVERAGE, a day was often unwinnable in simulation.
+    const MIN_COVERAGE = 16.5;
+    const COVERAGE_RANGE = 2.0;
+
+    function roadCoverage(road) {
+        const onRoad = new Set(road.path.map(([x, y]) => `${x},${y}`));
+        const fake = { segments: buildSegments([road.entry, ...road.path].map(([x, y]) => ({ x: x + 0.5, y: y + 0.5 }))) };
+        fake.length = fake.segments[fake.segments.length - 1].end;
+        const samples = [];
+        for (let d = 0; d < fake.length; d += 0.1) {
+            const p = pointAt(fake, d);
+            if (p.x >= 0 && p.y >= 0 && p.x <= SIZE && p.y <= SIZE) samples.push(p);
+        }
+        const reach = [];
+        for (let x = 0; x < SIZE; x++) {
+            for (let y = 0; y < SIZE; y++) {
+                if (onRoad.has(`${x},${y}`)) continue;
+                reach.push(samples.filter((p) => Math.hypot(p.x - x - 0.5, p.y - y - 0.5) < COVERAGE_RANGE).length * 0.1);
+            }
+        }
+        reach.sort((a, b) => b - a);
+        return reach[0] + reach[1] + reach[2];
     }
 
     function buildSegments(points) {
@@ -238,6 +274,13 @@
         return Math.pow(1.28, wave - 1);
     }
 
+    function spawnOdds(wave, lean) {
+        return {
+            runner: wave >= 2 ? (lean === "runner" ? 0.4 : 0.2) : 0,
+            brute: wave >= 4 ? (lean === "brute" ? 0.25 : 0.12) : 0
+        };
+    }
+
     function waveSpawns(rng, wave, lean) {
         const list = [];
         const count = 5 + wave * 2;
@@ -246,14 +289,21 @@
         for (let i = 0; i < count; i++) {
             let type = "walker";
             const r = rng();
-            const runnerOdds = wave >= 2 ? (lean === "runner" ? 0.4 : 0.2) : 0;
-            const bruteOdds = wave >= 4 ? (lean === "brute" ? 0.25 : 0.12) : 0;
-            if (r < bruteOdds) type = "brute";
-            else if (r < bruteOdds + runnerOdds) type = "runner";
+            const odds = spawnOdds(wave, lean);
+            if (r < odds.brute) type = "brute";
+            else if (r < odds.brute + odds.runner) type = "runner";
             list.push({ type, at: t, wave });
             t += type === "runner" ? gap * 0.55 : type === "brute" ? gap * 1.6 : gap;
         }
-        if (wave === WAVES) list.push({ type: "king", at: t + 1.5, wave });
+        // Every day's wave carries the same total HP as a walker-day wave of
+        // the same size, so a Brute day means fewer, tougher zombies — not a
+        // harder day. Clamped so a type still feels like itself.
+        const neutral = spawnOdds(wave, "walker");
+        const perZombie = ZOMBIES.brute.hp * neutral.brute + ZOMBIES.runner.hp * neutral.runner + ZOMBIES.walker.hp * (1 - neutral.brute - neutral.runner);
+        const actual = list.reduce((sum, s) => sum + ZOMBIES[s.type].hp, 0);
+        const hpMul = Math.min(1.3, Math.max(0.7, (perZombie * count) / actual));
+        list.forEach((s) => { s.hpMul = hpMul; });
+        if (wave === WAVES) list.push({ type: "king", at: t + 1.5, wave, hpMul: 1 });
         return list;
     }
 
@@ -289,10 +339,13 @@
         };
         if (b.splash) s.splash = +(b.splash + 0.08 * up).toFixed(2);
         if (b.slow) {
-            s.slow = Math.min(0.6, +(b.slow + 0.06 * up).toFixed(2));
+            s.slow = Math.min(b.slowCap, +(b.slow + b.slowGrowth * up).toFixed(2));
             s.slowFor = +(b.slowFor + 0.15 * up).toFixed(2);
         }
-        if (b.chains) s.chains = b.chains + Math.floor(level / 2);
+        if (b.chains) {
+            s.chains = b.chains + Math.floor(level / 2);
+            s.chainRange = b.chainRange;
+        }
         return s;
     }
 
@@ -368,7 +421,7 @@
     // ---------- combat ----------
     function spawnZombie(state, spawn) {
         const def = ZOMBIES[spawn.type];
-        const hp = Math.round(def.hp * hpScale(spawn.wave));
+        const hp = Math.round(def.hp * hpScale(spawn.wave) * spawn.hpMul);
         const id = state.nextId++;
         const z = {
             id,
@@ -480,7 +533,7 @@
                 for (const z of live(state)) {
                     if (hit.includes(z)) continue;
                     const d = Math.hypot(z.x - last.x, z.y - last.y);
-                    if (d < 1.4 && d < nextD) {
+                    if (d < stats.chainRange && d < nextD) {
                         next = z;
                         nextD = d;
                     }
@@ -499,6 +552,7 @@
         state.projectiles.push({
             kind: proj.kind,
             speed: proj.speed,
+            homing: proj.homing,
             x: cx,
             y: cy,
             tx: target.x,
@@ -575,7 +629,9 @@
         }
 
         for (const p of state.projectiles) {
-            const target = state.zombies.find((z) => z.id === p.targetId && !z.gone);
+            // Shells fly to where the target stood when fired, so fast
+            // zombies can outrun the blast; arrows and shards home in.
+            const target = p.homing && state.zombies.find((z) => z.id === p.targetId && !z.gone);
             if (target) {
                 p.tx = target.x;
                 p.ty = target.y;
