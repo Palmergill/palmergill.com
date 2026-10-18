@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Castle Defense — Palmer Gill</title>
+    <meta name="description" content="A browser tower defense game: hold the castle against waves of zombies, earn gold for every kill, and spend it upgrading your towers and walls.">
+    <link rel="canonical" href="https://palmergill.com/castle-defense/">
+    <meta name="theme-color" content="#faf6f0">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://palmergill.com/castle-defense/">
+    <meta property="og:title" content="Castle Defense — Palmer Gill">
+    <meta property="og:description" content="Hold the castle against waves of zombies. Every kill pays; spend it on towers and walls.">
+    <meta property="og:image" content="https://palmergill.com/assets/palmer-gill-logo.png">
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="Castle Defense — Palmer Gill">
+    <meta name="twitter:description" content="Hold the castle against waves of zombies. Every kill pays; spend it on towers and walls.">
+    <meta name="twitter:image" content="https://palmergill.com/assets/palmer-gill-logo.png">
+    <link rel="icon" type="image/png" href="/assets/palmer-gill-logo-small.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/shared/site-nav.css?v=17">
+    <link rel="stylesheet" href="./style.css?v=2">
+</head>
+<body>
+<noscript>
+    <p class="site-noscript">This game runs on JavaScript, so it needs scripts enabled. <a href="/">Browse the other projects</a> in the meantime.</p>
+</noscript>
+    <main class="cd-shell" id="main">
+        <header class="cd-head">
+            <div>
+                <p class="cd-eyebrow">Tower defense</p>
+                <h1>Castle Defense</h1>
+            </div>
+            <p class="cd-lede">The dead are walking the road to your gate. Build towers beside it, earn gold for every zombie you drop, and spend it on bigger guns and thicker walls.</p>
+        </header>
+
+        <section class="cd-hud" aria-label="Game status">
+            <div class="cd-stat cd-stat--hp">
+                <span class="cd-stat__label">Castle</span>
+                <span class="cd-stat__value"><span id="hpValue">20</span><span class="cd-stat__of">/<span id="hpMax">20</span></span></span>
+                <span class="cd-hpbar" aria-hidden="true"><span id="hpBar"></span></span>
+            </div>
+            <div class="cd-stat cd-stat--gold">
+                <span class="cd-stat__label">Gold</span>
+                <span class="cd-stat__value" id="goldValue">160</span>
+            </div>
+            <div class="cd-stat">
+                <span class="cd-stat__label">Wave</span>
+                <span class="cd-stat__value" id="waveValue">0</span>
+            </div>
+            <div class="cd-stat">
+                <span class="cd-stat__label">Zombies</span>
+                <span class="cd-stat__value" id="zombieValue">—</span>
+            </div>
+            <div class="cd-stat">
+                <span class="cd-stat__label">Best</span>
+                <span class="cd-stat__value" id="bestValue">—</span>
+            </div>
+        </section>
+
+        <div class="cd-layout">
+            <section class="cd-stage" aria-label="Battlefield">
+                <div class="cd-canvas-wrap" id="canvasWrap">
+                    <canvas id="board" aria-label="Battlefield. Click an empty grass tile to build the selected tower, or click a tower to upgrade it."></canvas>
+                    <div class="cd-toast" id="toast" role="status" aria-live="polite"></div>
+                    <div class="cd-overlay" id="overlay">
+                        <div class="cd-overlay__card">
+                            <p class="cd-eyebrow" id="overlayEyebrow">Night falls</p>
+                            <h2 id="overlayTitle">Hold the castle</h2>
+                            <p id="overlayBody">Zombies follow the dirt road to your gate. Each one that gets through knocks down part of the wall — lose all of it and the castle falls.</p>
+                            <ol class="cd-howto" id="overlayHowto">
+                                <li>Pick a tower, then click the grass beside the road to build it.</li>
+                                <li>Click a tower to upgrade or sell it.</li>
+                                <li>Start the wave when you're ready. Every kill pays gold.</li>
+                            </ol>
+                            <button class="cd-btn cd-btn--primary" type="button" id="overlayButton">Build your defenses</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="cd-controls">
+                    <button class="cd-btn cd-btn--primary cd-wave-btn" type="button" id="waveButton">
+                        <span id="waveButtonLabel">Start wave 1</span>
+                        <span class="cd-wave-btn__hint" id="waveHint"></span>
+                    </button>
+                    <div class="cd-control-group" role="group" aria-label="Game speed">
+                        <button class="cd-chip" type="button" data-speed="1" aria-pressed="true">1×</button>
+                        <button class="cd-chip" type="button" data-speed="2" aria-pressed="false">2×</button>
+                        <button class="cd-chip" type="button" data-speed="3" aria-pressed="false">3×</button>
+                    </div>
+                    <button class="cd-chip" type="button" id="pauseButton" aria-pressed="false">Pause</button>
+                    <label class="cd-check">
+                        <input type="checkbox" id="autoStart">
+                        <span>Auto-start waves</span>
+                    </label>
+                </div>
+            </section>
+
+            <aside class="cd-side" aria-label="Defenses">
+                <section class="cd-panel">
+                    <h2 class="cd-panel__title">Build</h2>
+                    <div class="cd-shop" id="shop"></div>
+                </section>
+
+                <section class="cd-panel" id="selectedPanel" hidden>
+                    <div class="cd-panel__row">
+                        <h2 class="cd-panel__title" id="selectedTitle">Tower</h2>
+                        <button class="cd-link" type="button" id="deselectButton">Close</button>
+                    </div>
+                    <div id="selectedBody"></div>
+                </section>
+
+                <section class="cd-panel">
+                    <h2 class="cd-panel__title">Castle</h2>
+                    <div class="cd-upgrades" id="castleUpgrades"></div>
+                </section>
+
+                <p class="cd-keys">Keys: <kbd>1</kbd>–<kbd>4</kbd> pick a tower · <kbd>Space</kbd> start wave · <kbd>U</kbd> upgrade · <kbd>S</kbd> sell · <kbd>P</kbd> pause · <kbd>Esc</kbd> cancel</p>
+            </aside>
+        </div>
+    </main>
+
+    <script src="/shared/site-nav.js?v=20"></script>
+    <script src="/shared/analytics.js?v=1"></script>
+    <script src="./castleDefenseGame.js?v=1"></script>
+    <script src="./app.js?v=1"></script>
+</body>
+</html>

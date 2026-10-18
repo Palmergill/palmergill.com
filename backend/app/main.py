@@ -1056,6 +1056,7 @@ if local_site_root_enabled:
         "/craps-strategy": "craps-strategy",
         "/blackjack": "blackjack",
         "/high-card-flush": "high-card-flush",
+        "/castle-defense": "castle-defense",
         "/bitcoin-chat": "bitcoin-chat",
         "/fantasy": "fantasy",
         "/gifts": "gifts",
