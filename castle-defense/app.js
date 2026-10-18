@@ -803,14 +803,14 @@
             btn.setAttribute("aria-pressed", String(setup && selectedType === type));
             btn.disabled = !setup;
             if (setup) {
-                label.textContent = tower ? "Placed" : used.length >= G.TOWER_LIMIT ? "Sitting out" : "";
+                label.textContent = tower ? "Placed" : used.length >= G.TOWER_LIMIT ? "Not picked" : "";
             } else if (tower) {
                 const need = G.xpForNext(tower);
                 const floor = tower.level > 1 ? G.LEVEL_XP[tower.level - 2] : 0;
                 const pct = need == null ? 100 : Math.min(100, ((tower.xp - floor) / (need - floor)) * 100);
                 label.innerHTML = `<span class="cd-tower__level">Lv ${tower.level}${need == null ? " · max" : ""}</span><span class="cd-xp"><span style="width:${pct}%"></span></span>${tower.kills} K · ${tower.assists} A`;
             } else {
-                label.textContent = "Sat out";
+                label.textContent = "Not picked";
             }
         });
         $("towerCount").textContent = setup ? `${used.length}/${G.TOWER_LIMIT} placed` : "Leveling up";
@@ -818,7 +818,7 @@
         let note;
         if (!setup) note = "Levels come from kills (2 XP) and assists (1 XP).";
         else if (selectedType) note = `Click the grass to ${used.includes(selectedType) ? "move" : "place"} the ${G.TOWERS[selectedType].name}. Click a placed tower to pick it up.`;
-        else if (used.length >= G.TOWER_LIMIT) note = "Ready. Click a tower on the map to pick it up and move it.";
+        else if (used.length >= G.TOWER_LIMIT) note = `Ready. Want the ${G.TOWERS[TYPES.find((t) => !used.includes(t))].name} instead? Click a tower on the map to pick it up, then swap.`;
         else note = "Pick a tower to place.";
         $("towerNote").textContent = note;
     }

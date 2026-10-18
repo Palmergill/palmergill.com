@@ -30,10 +30,20 @@ test('place three towers and start the run', async ({ page }) => {
     // A fourth type has to wait until one is picked up.
     await page.getByRole('button', { name: /Frost/ }).click();
     await expect(page.locator('#toast')).toHaveText(/Three towers max/);
+    await expect(page.locator('#towerNote')).toHaveText(/Want the Frost instead/);
+
+    // Swap Frost in for the Mage: pick the Mage up, then Frost is placeable.
+    await clickTile(page, 4, 4);
+    await expect(page.locator('#towerCount')).toHaveText('2/3 placed');
+    await page.getByRole('button', { name: /Frost/ }).click();
+    await clickTile(page, 4, 4);
+    await expect(page.locator('#towerCount')).toHaveText('3/3 placed');
+    await expect(page.getByRole('button', { name: /Frost/ })).toContainText('Placed');
+    await expect(page.getByRole('button', { name: /Mage/ })).toContainText('Not picked');
 
     await expect(play).toBeEnabled();
     await play.click();
     await expect(page.locator('#playLabel')).toHaveText('Defending…');
     await expect(page.locator('#waveValue')).toHaveText('1');
-    await expect(page.getByRole('button', { name: /Frost/ })).toBeDisabled();
+    await expect(page.getByRole('button', { name: /Mage/ })).toBeDisabled();
 });

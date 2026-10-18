@@ -261,7 +261,8 @@ button { font: inherit; color: inherit; }
 .cd-tower:hover { border-color: var(--line-strong); }
 .cd-tower[aria-pressed="true"] { border-color: var(--sage); background: var(--sage-soft); }
 .cd-tower.is-placed .cd-tower__state { color: var(--sage); }
-.cd-tower.is-out { opacity: 0.5; }
+.cd-tower.is-out { opacity: 0.7; }
+.cd-tower.is-out:disabled { opacity: 0.5; }
 .cd-tower:disabled { cursor: default; }
 .cd-tower:disabled:hover { border-color: var(--line); }
 .cd-tower canvas { grid-row: span 2; width: 40px; height: 40px; }
