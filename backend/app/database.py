@@ -1143,6 +1143,39 @@ class GiftItem(Base):
     updated_at = Column(DateTime, default=utc_now, onupdate=utc_now, nullable=False)
 
 
+
+class CastleDefenseScore(Base):
+    """A member's best Castle Defense run on one day's map.
+
+    One row per (day, username): a better run replaces the score, a worse one
+    only bumps `runs`. `kills` is always the server's own replay of `layout`,
+    never a number the browser reported.
+    """
+
+    __tablename__ = "castle_defense_scores"
+    __table_args__ = (
+        UniqueConstraint("day", "username", name="uq_castle_defense_day_user"),
+        Index("ix_castle_defense_day_kills", "day", "kills"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    # The player's local date, as the page uses it to seed the map.
+    day = Column(String(10), nullable=False)
+    # Normalized account name, as in gift_people: no ForeignKey, because the
+    # admin authenticates from env vars and has no app_users row.
+    username = Column(String, nullable=False)
+    display_name = Column(String, nullable=False)
+    kills = Column(Integer, nullable=False)
+    wave = Column(Integer, nullable=False)
+    # JSON list of {type, x, y}: the layout that earned `kills`.
+    layout = Column(Text, nullable=False)
+    runs = Column(Integer, nullable=False, default=1)
+    created_at = Column(DateTime, default=utc_now, nullable=False)
+    # When `kills` was last set. Ties on the board go to whoever got there first.
+    achieved_at = Column(DateTime, default=utc_now, nullable=False)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now, nullable=False)
+
+
 def get_db():
     db = SessionLocal()
     try:

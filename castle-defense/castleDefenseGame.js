@@ -19,6 +19,11 @@
     const START_HP = 10;
     const WAVE_BREAK = 4;
     const KING_EVERY = 10;
+    // The page and the server's replay both advance in this fixed step, so
+    // a layout plays out identically in either place.
+    const STEP = 1 / 60;
+    // A run that somehow never ends stops here (90 minutes of game time).
+    const MAX_STEPS = 60 * 60 * 90;
     // Day #1 of the daily map.
     const EPOCH = "2026-10-18";
 
@@ -446,6 +451,11 @@
     function startRun(state) {
         if (state.phase !== "setup") return { ok: false, reason: "Already running." };
         if (!state.defenses.length) return { ok: false, reason: "Build something first." };
+        // Renumber in board order. Ids feed into each zombie's lane, so the
+        // same layout must play the same however it was built or rearranged.
+        state.defenses.sort((a, b) => a.y - b.y || a.x - b.x);
+        state.defenses.forEach((d, i) => { d.id = i + 1; });
+        state.nextId = state.defenses.length + 1;
         state.phase = "running";
         state.time = 0;
         state.nextWaveAt = 0;
@@ -723,6 +733,25 @@
         }
     }
 
+    // The official result of a layout on a date. The server replays this to
+    // rank a run, so a posted score can't claim more than the layout earns.
+    function replay(dateStr, layout) {
+        const state = createGame(dailyMap(dateStr));
+        if (!Array.isArray(layout) || !layout.length) return { ok: false, reason: "Build something first." };
+        for (const d of layout) {
+            const res = place(state, d && d.type, d && d.x, d && d.y);
+            if (!res.ok) return { ok: false, reason: res.reason };
+        }
+        const started = startRun(state);
+        if (!started.ok) return started;
+        let steps = 0;
+        while (state.phase === "running" && steps < MAX_STEPS) {
+            step(state, STEP);
+            steps += 1;
+        }
+        return { ok: true, kills: state.kills, wave: state.wave, spent: BUDGET - state.gold };
+    }
+
     function drainEvents(state) {
         const out = state.events;
         state.events = [];
@@ -734,6 +763,7 @@
         BUDGET,
         START_HP,
         KING_EVERY,
+        STEP,
         MAX_LEVEL,
         LEVEL_XP,
         KILL_XP,
@@ -756,6 +786,7 @@
         placementProblem,
         pointAt,
         remove,
+        replay,
         startRun,
         stats,
         step,

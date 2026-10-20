@@ -2,7 +2,7 @@
 // clicks and keys to it. All rules live in castleDefenseGame.js.
 (function () {
     const G = window.CastleDefenseGame;
-    const STEP = 1 / 60;
+    const STEP = G.STEP;
     const TYPES = [...G.TOWER_TYPES, ...G.TRAP_TYPES];
     const SHARE_ICON = { archer: "🏹", cannon: "💣", frost: "❄️", mage: "🔮", spikes: "🔱", tar: "🛢️", mine: "💥" };
 
@@ -34,9 +34,9 @@
     // ---------- storage ----------
     function readRecord() {
         try {
-            return { best: null, runs: 0, layout: null, ...JSON.parse(localStorage.getItem(storeKey) || "{}") };
+            return { best: null, runs: 0, layout: null, pending: null, ...JSON.parse(localStorage.getItem(storeKey) || "{}") };
         } catch {
-            return { best: null, runs: 0, layout: null };
+            return { best: null, runs: 0, layout: null, pending: null };
         }
     }
 
@@ -60,6 +60,104 @@
     function saveLayout() {
         record.layout = layoutOf(state);
         writeRecord();
+    }
+
+    // ---------- leaderboard ----------
+    // Only today's map is ranked; ?date= replays are for practice.
+    const ranked = date === today;
+    const API = `${window.API_ORIGIN || ""}/api/castle-defense`;
+    // The latest post of this run: { kills, best, players } or { signedOut }.
+    let placement = null;
+    let posting = null;
+
+    async function api(path, options = {}) {
+        const response = await fetch(`${API}${path}`, {
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            ...options,
+            body: options.body === undefined ? undefined : JSON.stringify(options.body)
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+            const err = new Error(typeof data.detail === "string" ? data.detail : "The leaderboard didn't answer.");
+            err.status = response.status;
+            throw err;
+        }
+        return data;
+    }
+
+    function ordinal(n) {
+        const tens = n % 100;
+        if (tens >= 11 && tens <= 13) return `${n}th`;
+        return `${n}${{ 1: "st", 2: "nd", 3: "rd" }[n % 10] || "th"}`;
+    }
+
+    function placeText(best, players) {
+        return `${ordinal(best.rank)} of ${players} today`;
+    }
+
+    function escapeHtml(str) {
+        return String(str).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+    }
+
+    async function loadBoard() {
+        const note = $("boardNote");
+        if (!ranked) {
+            $("boardTitle").textContent = "Leaderboard";
+            $("board-list").innerHTML = "";
+            note.innerHTML = `You're replaying ${escapeHtml(prettyDate(date))}. Only today's map is ranked — <a href="/castle-defense/">play today's</a>.`;
+            return;
+        }
+        try {
+            renderBoard(await api(`/leaderboard?day=${date}`));
+        } catch {
+            note.textContent = "The leaderboard couldn't be loaded right now.";
+        }
+    }
+
+    function renderBoard(board) {
+        const list = $("board-list");
+        const shown = board.entries.slice(0, 10);
+        const row = (e) => `<li class="${e.you ? "is-you" : ""}"><span class="cd-board__rank">${e.rank}</span><span class="cd-board__name">${escapeHtml(e.name)}${e.you ? " (you)" : ""}</span><span class="cd-board__kills">${e.kills.toLocaleString()} <small>w${e.wave}</small></span></li>`;
+        let html = shown.map(row).join("");
+        if (board.you && !shown.some((e) => e.you)) html += `<li class="is-gap">…</li>${row(board.you)}`;
+        list.innerHTML = html;
+        $("boardCount").textContent = board.players ? `${board.players} ${board.players === 1 ? "player" : "players"}` : "";
+        const note = $("boardNote");
+        if (!board.players) note.textContent = "No scores yet today. Be the first.";
+        else if (board.you) note.textContent = `You're ${placeText(board.you, board.players)}. Your best run counts.`;
+        else note.innerHTML = `<a href="${signInHref()}">Sign in</a> to put your runs on the board.`;
+    }
+
+    function signInHref() {
+        return `/login/?next=${encodeURIComponent("/castle-defense/")}`;
+    }
+
+    // Post a finished run. The server replays the layout and keeps the
+    // account's best; anything signed out is kept to post after sign-in.
+    function postRun(layout) {
+        if (!ranked) return Promise.resolve(null);
+        posting = api("/runs", { method: "POST", body: { day: date, layout } })
+            .then((res) => {
+                placement = res;
+                if (record.pending) {
+                    record.pending = null;
+                    writeRecord();
+                }
+                loadBoard();
+                return res;
+            })
+            .catch((err) => {
+                if (err.status === 403) {
+                    record.pending = layout;
+                    writeRecord();
+                    placement = { signedOut: true };
+                } else {
+                    placement = { error: err.message };
+                }
+                return placement;
+            });
+        return posting;
     }
 
     // ---------- sizing ----------
@@ -764,7 +862,14 @@
     }
 
     function shareText(kills, wave) {
-        return `Castle Defense #${map.day} — ${kills.toLocaleString()} zombies\n🏰 Fell on wave ${wave}\n${buildSummary()}\nhttps://palmergill.com/castle-defense/`;
+        const lines = [`Castle Defense #${map.day} — ${kills.toLocaleString()} zombies`];
+        if (placement && placement.best) {
+            const medal = { 1: " 🥇", 2: " 🥈", 3: " 🥉" }[placement.best.rank] || "";
+            const which = placement.improved ? "" : " (my best today)";
+            lines.push(`🏆 ${placeText(placement.best, placement.players)}${medal}${which}`);
+        }
+        lines.push(`🏰 Fell on wave ${wave}`, buildSummary(), "https://palmergill.com/castle-defense/");
+        return lines.join("\n");
     }
 
     async function copyText(str) {
@@ -856,10 +961,19 @@
                     <span class="cd-final__label">zombies killed</span>
                     ${badge}
                 </div>
+                <p class="cd-place is-muted" id="placeLine"${ranked ? "" : " hidden"}>Posting to today's leaderboard…</p>
                 <div class="cd-result-towers" id="resultTowers"></div>
                 <p class="cd-next">${date === today ? `New map in ${untilTomorrow()}` : `Replaying ${prettyDate(date)}`}</p>`,
             actions: [
-                { label: "Share result", primary: true, onClick: (btn) => share(shareText(kills, wave), btn) },
+                {
+                    label: "Share result",
+                    primary: true,
+                    onClick: async (btn) => {
+                        // The place belongs in the message, so let the post land first.
+                        if (posting) await posting;
+                        share(shareText(kills, wave), btn);
+                    }
+                },
                 { label: "Try again", onClick: resetRun }
             ]
         });
@@ -871,6 +985,24 @@
             row.insertAdjacentHTML("beforeend", `<span><b>${G.DEFENSES[d.type].name}</b> · level ${d.level}</span><span>${d.kills} kills · ${d.assists} assists</span>`);
             list.append(row);
         });
+        placement = null;
+        postRun(layoutOf(state)).then(showPlacement);
+    }
+
+    function showPlacement(res) {
+        const line = $("placeLine");
+        if (!line || !res) return;
+        line.classList.toggle("is-muted", !res.best);
+        if (res.best) {
+            const best = res.improved
+                ? `You're <b>${placeText(res.best, res.players)}</b>.`
+                : `Your best today (${res.best.kills.toLocaleString()}) still stands — <b>${placeText(res.best, res.players)}</b>.`;
+            line.innerHTML = best;
+        } else if (res.signedOut) {
+            line.innerHTML = `<a href="${signInHref()}">Sign in</a> to put this run on today's leaderboard — it'll post when you're back.`;
+        } else {
+            line.textContent = `Couldn't post this run: ${res.error}`;
+        }
     }
 
     // Same map, same layout, fresh levels and a full purse.
@@ -1104,6 +1236,25 @@
     applyLayout(state, record.layout);
     refreshPanel();
     if (!record.runs) showIntro();
+    loadBoard();
+    // A run finished while signed out posts itself once you're signed in.
+    // The nav publishes window.SiteSession on DOMContentLoaded, which is
+    // after this script runs, so wait for it.
+    const siteSession = () => new Promise((resolve) => {
+        if (document.readyState === "loading") {
+            document.addEventListener("DOMContentLoaded", () => resolve(window.SiteSession), { once: true });
+        } else {
+            resolve(window.SiteSession);
+        }
+    });
+    if (ranked && record.pending) {
+        siteSession().then((session) => {
+            if (!session || !session.authenticated) return;
+            postRun(record.pending).then((res) => {
+                if (res && res.best) toast(`Posted your run — ${placeText(res.best, res.players)}`);
+            });
+        });
+    }
     new ResizeObserver(resize).observe(wrap);
     resize();
     requestAnimationFrame(frame);

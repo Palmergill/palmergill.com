@@ -583,6 +583,7 @@
                             <li><code>POST /api/fantasy/chat</code>, members only — it spends model budget per request</li>
                             <li><code>/api/fantasy/rankings/boards/*</code>, owned by the account that created the board</li>
                             <li><code>/api/gifts/*</code>, members only; gift ideas are only ever served to the account that wrote them</li>
+                            <li><code>POST /api/castle-defense/runs</code>, members only; the leaderboard itself is public</li>
                             <li><code>/api/*</code> except public demo, poker, craps, and analytics routes</li>
                         </ul>
                     </div>
@@ -624,6 +625,10 @@
                     <article>
                         <h3><code>/api/gifts/*</code></h3>
                         <p>The gift board. A gift with no person attached is on its owner's wishlist, which any signed-in member can read through <code>/wishlists</code>; a gift filed under a person is an idea that no route serves to anyone but its author. Another member's person or idea is a 404, and anonymous callers get a JSON 403. <code>POST /link-preview</code> finds a product link's picture; it only fetches public addresses, pins the connection to the address it checked, and re-checks every redirect.</p>
+                    </article>
+                    <article>
+                        <h3><code>/api/castle-defense/*</code></h3>
+                        <p>The Castle Defense daily leaderboard. <code>GET /leaderboard?day=</code> is public. <code>POST /runs</code> takes a day and a layout — never a score — and the server replays the layout in the game's own engine to decide the kills, keeping each account's best run that day.</p>
                     </article>
                     <article>
                         <h3><code>/api/draft-order/*</code></h3>

@@ -21,7 +21,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/shared/site-nav.css?v=17">
-    <link rel="stylesheet" href="./style.css?v=7">
+    <link rel="stylesheet" href="./style.css?v=8">
 </head>
 <body>
 <noscript>
@@ -33,7 +33,7 @@
                 <p class="cd-eyebrow" id="dayLabel">Daily puzzle</p>
                 <h1>Castle Defense</h1>
             </div>
-            <p class="cd-lede">A new map every day and 1,000 gold to defend it. Buy towers for the grass and traps for the road, press play, and watch. The horde never stops — your score is how many zombies fall before the castle does.</p>
+            <p class="cd-lede">A new map every day and 1,000 gold to defend it. Buy towers for the grass and traps for the road, press play, and watch. The horde never stops — your score is how many zombies fall before the castle does, ranked against everyone else today.</p>
         </header>
 
         <section class="cd-hud" aria-label="Game status">
@@ -91,6 +91,15 @@
                     <p class="cd-note" id="shopNote"></p>
                 </section>
 
+                <section class="cd-panel" aria-labelledby="boardTitle">
+                    <div class="cd-panel__row">
+                        <h2 class="cd-panel__title" id="boardTitle">Today's leaderboard</h2>
+                        <span class="cd-panel__count" id="boardCount"></span>
+                    </div>
+                    <ol class="cd-board" id="board-list" aria-live="polite"></ol>
+                    <p class="cd-note" id="boardNote">Loading…</p>
+                </section>
+
                 <section class="cd-panel">
                     <h2 class="cd-panel__title">Today's horde</h2>
                     <p class="cd-horde" id="horde"></p>
@@ -120,7 +129,8 @@
 
     <script src="/shared/site-nav.js?v=20"></script>
     <script src="/shared/analytics.js?v=1"></script>
-    <script src="./castleDefenseGame.js?v=4"></script>
-    <script src="./app.js?v=5"></script>
+    <script src="/shared/api-base.js?v=1"></script>
+    <script src="./castleDefenseGame.js?v=5"></script>
+    <script src="./app.js?v=7"></script>
 </body>
 </html>

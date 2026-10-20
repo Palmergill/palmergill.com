@@ -425,3 +425,41 @@ button { font: inherit; color: inherit; }
     font: 600 0.84rem/1.45 var(--sans);
     resize: none;
 }
+
+/* ---- leaderboard ---- */
+.cd-board {
+    display: grid;
+    gap: 2px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+.cd-board:empty { display: none; }
+.cd-board li {
+    display: grid;
+    grid-template-columns: 2.2em minmax(0, 1fr) auto;
+    gap: 10px;
+    align-items: baseline;
+    padding: 6px 8px;
+    border-radius: 8px;
+    font-size: 0.88rem;
+}
+.cd-board li:nth-child(odd) { background: var(--surface); }
+.cd-board li.is-you { background: var(--sage-soft); box-shadow: inset 0 0 0 1px var(--sage); }
+.cd-board li.is-gap { background: none; color: var(--muted); padding: 0 8px; text-align: center; display: block; }
+.cd-board__rank { color: var(--muted); font-weight: 800; font-variant-numeric: tabular-nums; }
+.cd-board__name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.cd-board__kills { font-weight: 800; font-variant-numeric: tabular-nums; }
+.cd-board__kills small { color: var(--muted); font-weight: 600; }
+
+/* result card: where this run landed */
+.cd-place {
+    margin: 0 0 12px !important;
+    padding: 10px 12px;
+    border-radius: 10px;
+    background: var(--sage-soft);
+    color: var(--ink) !important;
+    font-weight: 700;
+}
+.cd-place a { color: var(--sage-dim); }
+.cd-place.is-muted { background: var(--surface); color: var(--soft) !important; font-weight: 600; }

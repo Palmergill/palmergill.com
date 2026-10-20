@@ -75,7 +75,7 @@ Health check:
 
 The backend owns the auth model: it authenticates sign-ins, creates member accounts, mints the `pg_session` cookie, and enforces the same path rules for locally served app folders. Poker, craps, craps-strategy, blackjack, High Card Flush, login, signup, `/api/poker/*`, `/api/craps/*`, and `/api/analytics/*` remain public in the backend. Stock research, Bitcoin chat, the fantasy dashboard, `/api/stocks/*`, `/api/bitcoin/*`, and `/api/fantasy/*` allow unauthenticated demo-mode responses and use live providers for any signed-in account. Admin, `/api/admin/*`, `/api/fantasy/admin/*`, and FastAPI docs/OpenAPI JSON require the admin role and return `403` for members. Protected routes return `503` if `APP_AUTH_PASSWORD` is missing, so set the same `APP_AUTH_USERNAME` and `APP_AUTH_PASSWORD` values in Railway to keep direct backend access usable and protected.
 
-The root Railway deployment uses the root `Dockerfile`, which copies only `backend/`.
+The root Railway deployment uses the root `Dockerfile`, which copies `backend/` plus one frontend file: `castle-defense/castleDefenseGame.js`, the game engine the Castle Defense leaderboard replays posted runs in (through `mini-racer`, an embedded V8 — no Node install needed). The `castle_defense_scores` table is created on startup like every other table.
 
 Stock Research uses Polygon in production. Configure:
 

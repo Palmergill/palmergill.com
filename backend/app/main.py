@@ -32,6 +32,7 @@ from app.routers import (
     fantasy_league,
     fantasy_rankings,
     gifts,
+    castle_defense,
 )
 from app.routers.analytics import cleanup_old_analytics, record_analytics_event
 import os
@@ -264,6 +265,9 @@ DEMO_PATH_PREFIXES = (
     # instead of a Basic-auth challenge, and so /gifts/ can render its teaser.
     "/api/gifts",
     "/gifts",
+    # The Castle Defense leaderboard is public to read; posting a run is
+    # member-only and gated in its router with a JSON 403, as for gifts.
+    "/api/castle-defense",
 )
 # Members-only pages. These sit UNDERNEATH a demo prefix ("/fantasy"), and
 # is_demo_path matches by prefix, so omitting them from DEMO_PATH_PREFIXES is
@@ -1021,6 +1025,7 @@ app.include_router(fantasy_league.router)
 app.include_router(fantasy_rankings.router)
 app.include_router(draft_order.router)
 app.include_router(gifts.router)
+app.include_router(castle_defense.router)
 
 def _check_database_readiness() -> None:
     with engine.connect() as connection:

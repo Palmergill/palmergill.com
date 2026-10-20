@@ -7,3 +7,5 @@ psycopg2-binary==2.9.10
 requests==2.33.0
 urllib3==2.8.0
 certifi==2026.7.22
+# Embedded V8: replays Castle Defense runs in the page's own JS engine.
+mini-racer==0.14.1
