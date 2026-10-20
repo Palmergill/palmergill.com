@@ -387,3 +387,41 @@ button { font: inherit; color: inherit; }
     .cd-overlay__card { padding: 20px; }
     .cd-final__score { font-size: 2.2rem; }
 }
+
+/* ---- shop ---- */
+.cd-gold {
+    color: var(--gold);
+    font-size: 0.95rem;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+}
+.cd-gold.is-out { color: var(--muted); }
+.cd-group {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    margin: 4px 0 8px;
+    font-size: 0.82rem;
+    font-weight: 800;
+}
+.cd-group span { color: var(--muted); font-size: 0.74rem; font-weight: 600; }
+#shopTowers { margin-bottom: 12px; }
+.cd-tower.is-poor { opacity: 0.5; }
+.cd-tower__cost { color: var(--gold); }
+.cd-tower__count { color: var(--sage); }
+#roster { max-height: 420px; overflow: auto; }
+#roster[hidden], #shop[hidden] { display: none; }
+
+/* Shown only when the browser won't let us copy for you. */
+.cd-share-fallback {
+    width: 100%;
+    min-height: 96px;
+    margin: 12px 0 0;
+    padding: 10px;
+    border: 1px solid var(--line-strong);
+    border-radius: 10px;
+    background: var(--surface);
+    color: var(--ink);
+    font: 600 0.84rem/1.45 var(--sans);
+    resize: none;
+}

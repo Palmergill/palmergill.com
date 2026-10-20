@@ -3,8 +3,8 @@
 (function () {
     const G = window.CastleDefenseGame;
     const STEP = 1 / 60;
-    const TYPES = ["archer", "cannon", "frost", "mage"];
-    const SHARE_ICON = { archer: "🏹", cannon: "💣", frost: "❄️", mage: "🔮" };
+    const TYPES = [...G.TOWER_TYPES, ...G.TRAP_TYPES];
+    const SHARE_ICON = { archer: "🏹", cannon: "💣", frost: "❄️", mage: "🔮", spikes: "🔱", tar: "🛢️", mine: "💥" };
 
     const $ = (id) => document.getElementById(id);
     const canvas = $("board");
@@ -17,7 +17,7 @@
     const today = G.localDateString();
     const date = /^\d{4}-\d{2}-\d{2}$/.test(requested || "") && !Number.isNaN(Date.parse(requested)) ? requested : today;
     const map = G.dailyMap(date);
-    const storeKey = `castle-defense:v2:${date}`;
+    const storeKey = `castle-defense:v3:${date}`;
 
     let record = readRecord();
     let state = G.createGame(map);
@@ -49,11 +49,17 @@
     }
 
     function layoutOf(s) {
-        return s.towers.map((t) => ({ type: t.type, x: t.x, y: t.y }));
+        return s.defenses.map((d) => ({ type: d.type, x: d.x, y: d.y }));
     }
 
     function applyLayout(s, layout) {
-        (layout || []).forEach((t) => G.placeTower(s, t.type, t.x, t.y));
+        (layout || []).forEach((d) => G.place(s, d.type, d.x, d.y));
+    }
+
+    // Keep the layout across reloads while you're still planning.
+    function saveLayout() {
+        record.layout = layoutOf(state);
+        writeRecord();
     }
 
     // ---------- sizing ----------
@@ -97,15 +103,17 @@
         c.closePath();
     }
 
-    function text(str, x, y, size, color) {
+    function text(str, x, y, size, color, outline = true) {
         ctx.save();
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-        ctx.font = `800 ${Math.max(11, (size * scale) / dpr)}px "Plus Jakarta Sans", system-ui, sans-serif`;
+        ctx.font = `800 ${Math.max(10, (size * scale) / dpr)}px "Plus Jakarta Sans", system-ui, sans-serif`;
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
-        ctx.lineWidth = 3;
-        ctx.strokeStyle = "rgba(30, 26, 20, 0.6)";
-        ctx.strokeText(str, (x * scale) / dpr, (y * scale) / dpr);
+        if (outline) {
+            ctx.lineWidth = 3;
+            ctx.strokeStyle = "rgba(30, 26, 20, 0.6)";
+            ctx.strokeText(str, (x * scale) / dpr, (y * scale) / dpr);
+        }
         ctx.fillStyle = color;
         ctx.fillText(str, (x * scale) / dpr, (y * scale) / dpr);
         ctx.restore();
@@ -291,15 +299,14 @@
         }
     }
 
-    // ---------- towers ----------
-    // level 0 draws a bare tower (icons, placement ghost); 1–5 draws that many pips.
-    function drawTower(c, type, level, cx, cy, angle, time, alpha = 1) {
+    // ---------- defenses ----------
+    function drawTower(c, type, cx, cy, angle, time, alpha = 1) {
         c.save();
         c.globalAlpha = alpha;
         roundRect(c, cx - 0.4, cy - 0.4, 0.8, 0.8, 0.12);
-        c.fillStyle = level >= G.MAX_LEVEL ? "#d6c79c" : "#bdb5a6";
+        c.fillStyle = "#bdb5a6";
         c.fill();
-        c.strokeStyle = level >= G.MAX_LEVEL ? "#a8893c" : "#857c6d";
+        c.strokeStyle = "#857c6d";
         c.lineWidth = 0.05;
         c.stroke();
 
@@ -360,12 +367,81 @@
             circle(c, cx + 0.2, cy - 0.2, pulse + 0.06, "rgba(200, 170, 255, 0.35)");
             circle(c, cx + 0.2, cy - 0.2, pulse, "#d8c2ff", "#8e6cd1", 0.03);
         }
+        c.restore();
+    }
 
-        if (level > 0) {
-            const start = cx - ((level - 1) * 0.14) / 2;
-            for (let i = 0; i < level; i++) circle(c, start + i * 0.14, cy + 0.33, 0.045, "#e2b746", "#8d6a1c", 0.02);
+    // `armed` is 0–1 for a mine re-arming; `active` means something is on the trap.
+    function drawTrap(c, type, cx, cy, time, { alpha = 1, armed = 1, active = false } = {}) {
+        c.save();
+        c.globalAlpha = alpha;
+        if (type === "spikes") {
+            roundRect(c, cx - 0.32, cy - 0.32, 0.64, 0.64, 0.06);
+            c.fillStyle = "#77736c";
+            c.fill();
+            c.strokeStyle = "#4f4c47";
+            c.lineWidth = 0.03;
+            c.stroke();
+            const lift = active ? 0.04 : 0;
+            for (let i = 0; i < 3; i++) {
+                for (let j = 0; j < 3; j++) {
+                    const sx = cx - 0.2 + i * 0.2;
+                    const sy = cy - 0.2 + j * 0.2;
+                    c.fillStyle = "#d9d6cf";
+                    c.beginPath();
+                    c.moveTo(sx, sy - 0.08 - lift);
+                    c.lineTo(sx + 0.06, sy + 0.05);
+                    c.lineTo(sx - 0.06, sy + 0.05);
+                    c.closePath();
+                    c.fill();
+                }
+            }
+        } else if (type === "tar") {
+            c.fillStyle = "#2b2420";
+            c.beginPath();
+            c.ellipse(cx, cy, 0.36, 0.3, 0.3, 0, Math.PI * 2);
+            c.fill();
+            c.fillStyle = "rgba(255, 255, 255, 0.12)";
+            c.beginPath();
+            c.ellipse(cx - 0.12, cy - 0.1, 0.12, 0.05, 0.3, 0, Math.PI * 2);
+            c.fill();
+            for (let i = 0; i < 3; i++) {
+                const t = (time * 0.7 + i / 3) % 1;
+                circle(c, cx + Math.sin(i * 2.1) * 0.18, cy + Math.cos(i * 1.7) * 0.12, 0.03 + t * 0.04, null, `rgba(120, 100, 85, ${1 - t})`, 0.02);
+            }
+        } else if (type === "mine") {
+            circle(c, cx, cy, 0.24, "#4d4a45", "#2a2825", 0.035);
+            circle(c, cx, cy, 0.15, "#6a665f");
+            const ready = armed >= 1;
+            const blink = ready ? 0.5 + 0.5 * Math.sin(time * 6) : 0.2;
+            circle(c, cx, cy, 0.06, ready ? `rgba(230, 70, 50, ${0.5 + blink * 0.5})` : "#5a3a30");
+            if (!ready) {
+                c.strokeStyle = "rgba(255, 255, 255, 0.7)";
+                c.lineWidth = 0.035;
+                c.beginPath();
+                c.arc(cx, cy, 0.3, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * armed);
+                c.stroke();
+            }
         }
         c.restore();
+    }
+
+    function drawDefense(c, d, time, alpha = 1) {
+        if (G.DEFENSES[d.type].kind === "trap") {
+            const s = G.stats(d.type, d.level || 1);
+            const armed = d.type === "mine" && d.cooldown > 0 ? 1 - d.cooldown / s.rearm : 1;
+            drawTrap(c, d.type, d.x + 0.5, d.y + 0.5, time, { alpha, armed, active: d.active });
+        } else {
+            drawTower(c, d.type, d.x + 0.5, d.y + 0.5, d.angle ?? -Math.PI / 2, time, alpha);
+        }
+    }
+
+    // A small numbered badge in the corner once something has levelled.
+    function drawLevel(d) {
+        if (d.level < 2) return;
+        const bx = d.x + 0.82;
+        const by = d.y + 0.82;
+        circle(ctx, bx, by, 0.15, d.level >= G.MAX_LEVEL ? "#e2b746" : "#fff7e0", "#8d6a1c", 0.025);
+        text(String(d.level), bx, by + 0.005, 0.17, "#5a4310", false);
     }
 
     // ---------- zombies ----------
@@ -471,7 +547,7 @@
     function drawEffect(e) {
         const t = 1 - e.ttl / e.life;
         if (e.kind === "points") {
-            text(e.text, e.x, e.y - 0.2 - t * 0.4, 0.22, "#ffd866");
+            text(e.text, e.x, e.y - 0.2 - t * 0.4, 0.2, "#ffd866");
         } else if (e.kind === "breach") {
             text(e.text, e.x, e.y - t * 0.4, 0.3, "#ff7a62");
         } else if (e.kind === "levelup") {
@@ -522,12 +598,15 @@
         ctx.setTransform(scale, 0, 0, scale, 0, 0);
         const setup = state.phase === "setup";
         const clock = performance.now() / 1000;
+        const time = setup ? clock : state.time;
 
+        // While choosing, outline every tile the selected item could go on.
         if (setup && selectedType) {
             for (let x = 0; x < G.SIZE; x++) {
                 for (let y = 0; y < G.SIZE; y++) {
-                    if (!G.canPlace(state, x, y)) continue;
-                    ctx.strokeStyle = "rgba(255, 255, 255, 0.18)";
+                    const problem = G.placementProblem(state, selectedType, x, y);
+                    if (problem && !/gold/.test(problem)) continue;
+                    ctx.strokeStyle = "rgba(255, 255, 255, 0.2)";
                     ctx.lineWidth = 0.02;
                     roundRect(ctx, x + 0.05, y + 0.05, 0.9, 0.9, 0.1);
                     ctx.stroke();
@@ -535,35 +614,43 @@
             }
         }
 
-        // While planning, every placed tower shows its reach.
+        // While planning, every tower shows its reach.
         if (setup) {
-            state.towers.forEach((t) => {
-                const strong = hover && hover.x === t.x && hover.y === t.y;
-                drawRange(t.x + 0.5, t.y + 0.5, G.towerStats(t.type, 1).range, strong);
+            state.defenses.forEach((d) => {
+                if (d.kind !== "tower") return;
+                const strong = hover && hover.x === d.x && hover.y === d.y;
+                drawRange(d.x + 0.5, d.y + 0.5, G.stats(d.type, 1).range, strong);
             });
         }
 
+        state.defenses.forEach((d) => {
+            if (d.kind === "trap") drawDefense(ctx, d, time);
+        });
         drawCastle();
         state.effects.forEach((e) => {
             if (e.kind === "splat") drawEffect(e);
         });
-        state.towers.forEach((t) => drawTower(ctx, t.type, t.level, t.x + 0.5, t.y + 0.5, t.angle, setup ? clock : state.time));
+        state.defenses.forEach((d) => {
+            if (d.kind === "tower") drawDefense(ctx, d, time);
+        });
         state.zombies.forEach(drawZombie);
         state.projectiles.forEach(drawProjectile);
+        state.defenses.forEach(drawLevel);
         state.effects.forEach((e) => {
             if (e.kind !== "splat") drawEffect(e);
         });
 
         if (setup && hover) {
-            if (G.towerAt(state, hover.x, hover.y)) {
+            if (G.defenseAt(state, hover.x, hover.y)) {
                 ctx.strokeStyle = "rgba(255, 255, 255, 0.9)";
                 ctx.lineWidth = 0.04;
                 roundRect(ctx, hover.x + 0.06, hover.y + 0.06, 0.88, 0.88, 0.14);
                 ctx.stroke();
             } else if (selectedType) {
-                const ok = G.canPlace(state, hover.x, hover.y);
-                drawRange(hover.x + 0.5, hover.y + 0.5, G.towerStats(selectedType, 1).range, true, ok);
-                drawTower(ctx, selectedType, 0, hover.x + 0.5, hover.y + 0.5, -Math.PI / 2, clock, ok ? 0.75 : 0.35);
+                const ok = G.canPlace(state, selectedType, hover.x, hover.y);
+                const ghost = { type: selectedType, x: hover.x, y: hover.y, level: 1, angle: -Math.PI / 2 };
+                if (G.DEFENSES[selectedType].kind === "tower") drawRange(hover.x + 0.5, hover.y + 0.5, G.stats(selectedType, 1).range, true, ok);
+                drawDefense(ctx, ghost, clock, ok ? 0.75 : 0.35);
             }
         }
     }
@@ -597,10 +684,10 @@
     function handleEvents() {
         for (const e of G.drainEvents(state)) {
             if (e.type === "wave") {
-                toast(e.wave === G.WAVES ? "Final wave — the Zombie King walks" : `Wave ${e.wave}`);
+                toast(e.wave % G.KING_EVERY === 0 ? `Wave ${e.wave} — the Zombie King walks` : `Wave ${e.wave}`);
             } else if (e.type === "level-up") {
-                const tower = G.findTower(state, e.towerId);
-                if (tower) toast(`${G.TOWERS[tower.type].name} reached level ${e.level}`);
+                const d = G.findDefense(state, e.id);
+                if (d && e.level % 2 === 0) toast(`${G.DEFENSES[d.type].name} reached level ${e.level}`);
             } else if (e.type === "king-down") {
                 toast("The Zombie King falls");
             } else if (e.type === "breach") {
@@ -626,7 +713,7 @@
             btn.type = "button";
             btn.className = `cd-btn${primary ? " cd-btn--primary" : ""}`;
             btn.textContent = label;
-            btn.addEventListener("click", onClick);
+            btn.addEventListener("click", () => onClick(btn));
             box.append(btn);
         });
         overlay.hidden = false;
@@ -651,13 +738,13 @@
             eyebrow: `Day ${map.day} · ${prettyDate(date)}`,
             title: "Hold the castle",
             body: `
-                <p>Zombies follow the road to your castle. Every one that reaches it knocks down part of the wall; lose all ${G.START_HP} walls and it falls.</p>
+                <p>Zombies follow the road to your castle, and they never stop coming. Each one that gets in knocks down part of the wall; lose all ${G.START_HP} walls and it falls.</p>
                 <ol class="cd-howto">
-                    <li>Pick three of the four towers and place them on the grass.</li>
-                    <li>Press play. From then on it runs itself.</li>
-                    <li>Towers level up from their kills and assists. Every zombie scores points, with a bonus if the castle survives all ${G.WAVES} waves.</li>
+                    <li>Spend ${G.BUDGET.toLocaleString()} gold: towers go on the grass, traps go on the road.</li>
+                    <li>Press play. From then on it runs itself, and everything levels up from its kills.</li>
+                    <li>Your score is how many zombies you kill before the castle falls.</li>
                 </ol>`,
-            actions: [{ label: "Place towers", primary: true, onClick: hideOverlay }]
+            actions: [{ label: "Start building", primary: true, onClick: hideOverlay }]
         });
     }
 
@@ -670,84 +757,123 @@
         return h ? `${h}h ${m}m` : `${m}m`;
     }
 
-    function shareText(won, score) {
-        const icons = state.towers.map((t) => `${SHARE_ICON[t.type]} Lv${t.level}`).join(" · ");
-        const outcome = won ? `🏰 Held all ${G.WAVES} waves · ${state.hp}/${state.maxHp} walls` : `💀 Fell on wave ${state.wave} of ${G.WAVES}`;
-        return `Castle Defense #${map.day} — ${score.toLocaleString()} pts\n${outcome}\n${icons}\nhttps://palmergill.com/castle-defense/`;
+    function buildSummary() {
+        const counts = {};
+        state.defenses.forEach((d) => { counts[d.type] = (counts[d.type] || 0) + 1; });
+        return TYPES.filter((t) => counts[t]).map((t) => `${SHARE_ICON[t]}${counts[t] > 1 ? `×${counts[t]}` : ""}`).join(" ");
     }
 
-    async function share(textToShare) {
+    function shareText(kills, wave) {
+        return `Castle Defense #${map.day} — ${kills.toLocaleString()} zombies\n🏰 Fell on wave ${wave}\n${buildSummary()}\nhttps://palmergill.com/castle-defense/`;
+    }
+
+    async function copyText(str) {
         try {
-            await navigator.clipboard.writeText(textToShare);
-            toast("Result copied — paste it anywhere");
-            return;
+            await navigator.clipboard.writeText(str);
+            return true;
         } catch {
-            /* fall through to the share sheet */
-        }
-        if (navigator.share) {
+            // Older browsers, or a page without clipboard permission.
+            const area = document.createElement("textarea");
+            area.value = str;
+            area.setAttribute("readonly", "");
+            area.style.position = "fixed";
+            area.style.opacity = "0";
+            document.body.append(area);
+            area.select();
+            let ok = false;
             try {
-                await navigator.share({ text: textToShare });
-                return;
+                ok = document.execCommand("copy");
             } catch {
-                /* dismissed */
+                ok = false;
+            }
+            area.remove();
+            return ok;
+        }
+    }
+
+    // Phones get the share sheet; everywhere else copies, and the button
+    // itself says so — a toast would sit underneath this card.
+    async function share(str, btn) {
+        if (navigator.share && matchMedia("(pointer: coarse)").matches) {
+            try {
+                await navigator.share({ text: str });
+                return;
+            } catch (err) {
+                if (err && err.name === "AbortError") return;
             }
         }
-        toast("Couldn't copy the result", true);
+        if (await copyText(str)) {
+            btn.textContent = "Copied!";
+            setTimeout(() => { btn.textContent = "Share result"; }, 2000);
+            return;
+        }
+        if (!$("shareFallback")) {
+            const area = document.createElement("textarea");
+            area.id = "shareFallback";
+            area.className = "cd-share-fallback";
+            area.readOnly = true;
+            area.value = str;
+            area.setAttribute("aria-label", "Your result — copy it from here");
+            $("overlayBody").append(area);
+        }
+        $("shareFallback").select();
+        btn.textContent = "Copy the text above";
     }
 
-    function iconCanvas(type, level, size) {
+    function iconCanvas(type, size) {
         const c = document.createElement("canvas");
         c.width = size * 2;
         c.height = size * 2;
         const ic = c.getContext("2d");
         ic.setTransform(size * 2, 0, 0, size * 2, 0, 0);
-        drawTower(ic, type, level, 0.5, 0.5, -Math.PI / 4, 0);
+        if (G.DEFENSES[type].kind === "trap") {
+            roundRect(ic, 0.06, 0.06, 0.88, 0.88, 0.14);
+            ic.fillStyle = "#c4a06b";
+            ic.fill();
+            drawTrap(ic, type, 0.5, 0.5, 0);
+        } else {
+            drawTower(ic, type, 0.5, 0.5, -Math.PI / 4, 0);
+        }
         return c;
     }
 
-    function finishRun({ won, score }) {
-        const isBest = record.best == null || score > record.best;
+    function finishRun({ kills, wave }) {
+        const isBest = record.best == null || kills > record.best;
         record.runs += 1;
-        if (isBest) record.best = score;
+        if (isBest) record.best = kills;
         writeRecord();
 
         const badge = isBest
             ? `<span class="cd-final__best">${record.runs > 1 ? "New best today" : "Today's score"}</span>`
             : `<span class="cd-final__best">Best ${record.best.toLocaleString()}</span>`;
-        const bonusRows = won
-            ? `<dt>Castle held</dt><dd>+${G.WIN_BONUS}</dd><dt>${state.hp} walls standing × ${G.HP_BONUS}</dt><dd>+${G.HP_BONUS * state.hp}</dd>`
-            : `<dt>Fell on wave ${state.wave} of ${G.WAVES}</dt><dd>—</dd>`;
+        const top = state.defenses.slice().sort((a, b) => b.kills - a.kills).slice(0, 4);
         showOverlay({
             eyebrow: `Day ${map.day}`,
-            title: won ? "The castle held" : "The castle has fallen",
+            title: `The castle fell on wave ${wave}`,
             body: `
                 <div class="cd-final">
-                    <span class="cd-final__score">${score.toLocaleString()}</span>
-                    <span class="cd-final__label">points</span>
+                    <span class="cd-final__score">${kills.toLocaleString()}</span>
+                    <span class="cd-final__label">zombies killed</span>
                     ${badge}
                 </div>
-                <dl class="cd-breakdown">
-                    <dt>${state.kills} zombies put down</dt><dd>${state.score.toLocaleString()}</dd>
-                    ${bonusRows}
-                </dl>
                 <div class="cd-result-towers" id="resultTowers"></div>
                 <p class="cd-next">${date === today ? `New map in ${untilTomorrow()}` : `Replaying ${prettyDate(date)}`}</p>`,
             actions: [
-                { label: "Share result", primary: true, onClick: () => share(shareText(won, score)) },
+                { label: "Share result", primary: true, onClick: (btn) => share(shareText(kills, wave), btn) },
                 { label: "Try again", onClick: resetRun }
             ]
         });
         const list = $("resultTowers");
-        state.towers.forEach((t) => {
+        top.forEach((d) => {
             const row = document.createElement("div");
             row.className = "cd-result-tower";
-            row.append(iconCanvas(t.type, t.level, 30));
-            row.insertAdjacentHTML("beforeend", `<span><b>${G.TOWERS[t.type].name}</b> · level ${t.level}</span><span>${t.kills} kills · ${t.assists} assists</span>`);
+            row.append(iconCanvas(d.type, 30));
+            row.insertAdjacentHTML("beforeend", `<span><b>${G.DEFENSES[d.type].name}</b> · level ${d.level}</span><span>${d.kills} kills · ${d.assists} assists</span>`);
             list.append(row);
         });
     }
 
-    // Same map, same towers in the same spots, fresh levels.
+    // Same map, same layout, fresh levels and a full purse.
     function resetRun() {
         const layout = layoutOf(state);
         state = G.createGame(map);
@@ -755,95 +881,109 @@
         selectedType = null;
         acc = 0;
         hideOverlay();
-        refreshCards();
+        refreshPanel();
     }
 
-    // ---------- tower cards ----------
+    // ---------- shop & roster ----------
     const cards = {};
 
-    function buildTowerCards() {
-        const box = $("towers");
-        TYPES.forEach((type) => {
-            const def = G.TOWERS[type];
+    function buildShop() {
+        TYPES.forEach((type, i) => {
+            const def = G.DEFENSES[type];
             const btn = document.createElement("button");
             btn.type = "button";
             btn.className = "cd-tower";
             btn.setAttribute("aria-pressed", "false");
-            btn.append(iconCanvas(type, 0, 40));
+            btn.setAttribute("aria-keyshortcuts", String(i + 1));
+            btn.append(iconCanvas(type, 40));
             btn.insertAdjacentHTML(
                 "beforeend",
-                `<span class="cd-tower__name">${def.name}</span><span class="cd-tower__blurb">${def.blurb}</span><span class="cd-tower__state"></span>`
+                `<span class="cd-tower__name">${def.name}</span><span class="cd-tower__blurb">${def.blurb}</span><span class="cd-tower__state"><span class="cd-tower__cost">${def.cost}g</span><br><span class="cd-tower__count"></span></span>`
             );
             btn.addEventListener("click", () => chooseType(type));
-            box.append(btn);
+            $(def.kind === "tower" ? "shopTowers" : "shopTraps").append(btn);
             cards[type] = btn;
         });
     }
 
-    let lastCards = "";
-    function refreshCards() {
-        lastCards = "";
-        updateCards();
+    let lastPanel = "";
+    function refreshPanel() {
+        lastPanel = "";
+        updatePanel();
     }
 
-    function updateCards() {
+    function updatePanel() {
         const setup = state.phase === "setup";
-        const used = G.typesUsed(state);
         const sig = setup
-            ? `s|${selectedType}|${state.towers.map((t) => `${t.type}@${t.x},${t.y}`).join(",")}`
-            : `r|${state.towers.map((t) => `${t.level}:${t.xp}:${t.kills}:${t.assists}`).join(",")}`;
-        if (sig === lastCards) return;
-        lastCards = sig;
-        TYPES.forEach((type) => {
-            const btn = cards[type];
-            const tower = state.towers.find((t) => t.type === type);
-            const label = btn.querySelector(".cd-tower__state");
-            btn.classList.toggle("is-placed", Boolean(tower));
-            btn.classList.toggle("is-out", !tower && (!setup || used.length >= G.TOWER_LIMIT));
-            btn.setAttribute("aria-pressed", String(setup && selectedType === type));
-            btn.disabled = !setup;
-            if (setup) {
-                label.textContent = tower ? "Placed" : used.length >= G.TOWER_LIMIT ? "Not picked" : "";
-            } else if (tower) {
-                const need = G.xpForNext(tower);
-                const floor = tower.level > 1 ? G.LEVEL_XP[tower.level - 2] : 0;
-                const pct = need == null ? 100 : Math.min(100, ((tower.xp - floor) / (need - floor)) * 100);
-                label.innerHTML = `<span class="cd-tower__level">Lv ${tower.level}${need == null ? " · max" : ""}</span><span class="cd-xp"><span style="width:${pct}%"></span></span>${tower.kills} K · ${tower.assists} A`;
+            ? `s|${selectedType}|${state.gold}|${layoutOf(state).map((d) => `${d.type}@${d.x},${d.y}`).join(",")}`
+            : `r|${state.defenses.map((d) => `${d.level}:${d.xp}:${d.kills}:${d.assists}`).join(",")}`;
+        if (sig === lastPanel) return;
+        lastPanel = sig;
+
+        $("shop").hidden = !setup;
+        $("roster").hidden = setup;
+        $("shopTitle").textContent = setup ? "Spend your gold" : "Your defenses";
+        const gold = $("goldValue");
+        gold.textContent = setup ? `${state.gold.toLocaleString()} gold` : `${state.defenses.length} built`;
+        gold.classList.toggle("is-out", setup && state.gold < Math.min(...TYPES.map((t) => G.DEFENSES[t].cost)));
+
+        if (setup) {
+            TYPES.forEach((type) => {
+                const btn = cards[type];
+                const count = state.defenses.filter((d) => d.type === type).length;
+                btn.setAttribute("aria-pressed", String(selectedType === type));
+                btn.classList.toggle("is-poor", state.gold < G.DEFENSES[type].cost);
+                btn.querySelector(".cd-tower__count").textContent = count ? `×${count} placed` : "";
+            });
+            let note;
+            if (selectedType) {
+                const def = G.DEFENSES[selectedType];
+                note = `Click ${def.kind === "tower" ? "the grass" : "the road"} to place ${/^[AEIOU]/.test(def.name) ? "an" : "a"} ${def.name} (${def.cost} gold). Click anything you placed to sell it back.`;
+            } else if (!state.defenses.length) {
+                note = "Pick a tower or trap to start building.";
             } else {
-                label.textContent = "Not picked";
+                note = `${state.gold.toLocaleString()} gold left. Click anything you placed to sell it back, or press play.`;
             }
-        });
-        $("towerCount").textContent = setup ? `${used.length}/${G.TOWER_LIMIT} placed` : "Leveling up";
-        $("towersTitle").textContent = setup ? `Pick ${G.TOWER_LIMIT} of 4` : "Your towers";
-        let note;
-        if (!setup) note = "Levels come from kills (2 XP) and assists (1 XP).";
-        else if (selectedType) note = `Click the grass to ${used.includes(selectedType) ? "move" : "place"} the ${G.TOWERS[selectedType].name}. Click a placed tower to pick it up.`;
-        else if (used.length >= G.TOWER_LIMIT) note = `Ready. Want the ${G.TOWERS[TYPES.find((t) => !used.includes(t))].name} instead? Click a tower on the map to pick it up, then swap.`;
-        else note = "Pick a tower to place.";
-        $("towerNote").textContent = note;
+            $("shopNote").textContent = note;
+        } else {
+            renderRoster();
+            $("shopNote").textContent = "Levels come from kills (2 XP) and assists (1 XP).";
+        }
+    }
+
+    function renderRoster() {
+        const box = $("roster");
+        box.innerHTML = "";
+        state.defenses
+            .slice()
+            .sort((a, b) => b.kills + b.assists - (a.kills + a.assists))
+            .forEach((d) => {
+                const def = G.DEFENSES[d.type];
+                const need = G.xpForNext(d);
+                const floor = d.level > 1 ? G.LEVEL_XP[d.level - 2] : 0;
+                const pct = need == null ? 100 : Math.min(100, ((d.xp - floor) / (need - floor)) * 100);
+                const row = document.createElement("div");
+                row.className = "cd-tower is-placed";
+                row.append(iconCanvas(d.type, 40));
+                row.insertAdjacentHTML(
+                    "beforeend",
+                    `<span class="cd-tower__name">${def.name}</span><span class="cd-tower__blurb">${def.kind === "tower" ? "Tower" : "Trap"} at ${"ABCDEFGH"[d.x]}${d.y + 1}</span><span class="cd-tower__state"><span class="cd-tower__level">Lv ${d.level}${need == null ? " · max" : ""}</span><span class="cd-xp"><span style="width:${pct}%"></span></span>${d.kills} K · ${d.assists} A</span>`
+                );
+                box.append(row);
+            });
     }
 
     function chooseType(type) {
         if (state.phase !== "setup") return;
-        const placed = state.towers.some((t) => t.type === type);
-        if (!placed && state.towers.length >= G.TOWER_LIMIT) {
-            toast("Three towers max — click one on the map to pick it up first", true);
-            return;
-        }
         selectedType = selectedType === type ? null : type;
-        refreshCards();
-    }
-
-    function nextUnplaced() {
-        if (state.towers.length >= G.TOWER_LIMIT) return null;
-        return TYPES.find((t) => !state.towers.some((tw) => tw.type === t)) || null;
+        refreshPanel();
     }
 
     // ---------- HUD ----------
     let lastHud = "";
     function updateUi() {
-        updateCards();
-        const hud = `${state.hp}|${state.wave}|${state.score}|${state.phase}|${state.towers.length}|${record.best}`;
+        updatePanel();
+        const hud = `${state.hp}|${state.wave}|${state.kills}|${state.phase}|${state.defenses.length}|${record.best}`;
         if (hud === lastHud) return;
         lastHud = hud;
         $("hpValue").textContent = state.hp;
@@ -851,19 +991,18 @@
         $("hpBar").style.width = `${(state.hp / state.maxHp) * 100}%`;
         $("hpBar").classList.toggle("is-low", state.hp / state.maxHp < 0.35);
         $("waveValue").textContent = state.wave;
-        $("scoreValue").textContent = state.score.toLocaleString();
+        $("scoreValue").textContent = state.kills.toLocaleString();
         $("bestValue").textContent = record.best == null ? "—" : record.best.toLocaleString();
 
         const play = $("playButton");
         if (state.phase === "setup") {
-            const missing = G.TOWER_LIMIT - state.towers.length;
-            play.disabled = missing > 0;
+            play.disabled = !state.defenses.length;
             $("playLabel").textContent = "Play";
-            $("playHint").textContent = missing > 0 ? `Place ${missing} more` : "";
+            $("playHint").textContent = state.defenses.length ? "" : "Build something first";
         } else if (state.phase === "running") {
             play.disabled = true;
             $("playLabel").textContent = "Defending…";
-            $("playHint").textContent = `wave ${state.wave} of ${G.WAVES}`;
+            $("playHint").textContent = `wave ${state.wave}`;
         } else {
             play.disabled = false;
             $("playLabel").textContent = "Try again";
@@ -888,39 +1027,33 @@
         if (state.phase !== "setup") return;
         const tile = tileFromEvent(e);
         if (!tile) return;
-        const tower = G.towerAt(state, tile.x, tile.y);
-        if (tower) {
-            G.removeTower(state, tower.id);
-            selectedType = tower.type;
-            toast(`Picked up the ${G.TOWERS[tower.type].name}`);
+        const existing = G.defenseAt(state, tile.x, tile.y);
+        if (existing) {
+            const res = G.remove(state, existing.id);
+            selectedType = existing.type;
+            toast(`Sold the ${G.DEFENSES[existing.type].name} — +${res.refund} gold`);
             saveLayout();
-            refreshCards();
+            refreshPanel();
             return;
         }
         if (!selectedType) {
-            toast("Pick a tower first", true);
+            toast("Pick a tower or trap first", true);
             return;
         }
-        const res = G.placeTower(state, selectedType, tile.x, tile.y);
+        const res = G.place(state, selectedType, tile.x, tile.y);
         if (!res.ok) {
             toast(res.reason, true);
             return;
         }
-        selectedType = res.moved ? null : nextUnplaced();
+        if (state.gold < G.DEFENSES[selectedType].cost) selectedType = null;
         saveLayout();
-        refreshCards();
+        refreshPanel();
     });
-
-    // Keep the layout across reloads while you're still planning.
-    function saveLayout() {
-        record.layout = layoutOf(state);
-        writeRecord();
-    }
 
     $("playButton").addEventListener("click", startOrRetry);
 
     function startOrRetry() {
-        if (state.phase === "won" || state.phase === "lost") {
+        if (state.phase === "over") {
             resetRun();
             return;
         }
@@ -932,7 +1065,7 @@
         selectedType = null;
         hover = null;
         saveLayout();
-        refreshCards();
+        refreshPanel();
     }
 
     document.querySelectorAll("[data-speed]").forEach((btn) => {
@@ -945,36 +1078,31 @@
     document.addEventListener("keydown", (e) => {
         if (e.metaKey || e.ctrlKey || e.altKey || !overlay.hidden) return;
         const key = e.key.toLowerCase();
-        if (["1", "2", "3", "4"].includes(key)) {
-            chooseType(TYPES[Number(key) - 1]);
+        const n = Number(key);
+        if (n >= 1 && n <= TYPES.length) {
+            chooseType(TYPES[n - 1]);
         } else if (key === "enter" && e.target.tagName !== "BUTTON") {
             startOrRetry();
         } else if (key === "escape") {
             selectedType = null;
-            refreshCards();
+            refreshPanel();
         }
     });
 
     // ---------- boot ----------
     function describeHorde() {
-        const c = { walker: 0, runner: 0, brute: 0, king: 0 };
-        map.waves.forEach((w) => w.forEach((s) => { c[s.type] += 1; }));
         const lean = { walker: "Walkers", runner: "Runners", brute: "Brutes" }[map.lean];
-        const total = c.walker + c.runner + c.brute + c.king;
-        $("horde").innerHTML = `Heavy on <b>${lean}</b> today. ${total} zombies over ${G.WAVES} waves: ${c.walker} walkers, ${c.runner} runners, ${c.brute} brutes, and the <b>Zombie King</b> at the end.`;
+        const first = G.waveSpawns(map, 1).length;
+        $("horde").innerHTML = `Heavy on <b>${lean}</b> today. Wave 1 is ${first} zombies; every wave after is bigger and tougher, and the <b>Zombie King</b> joins every ${G.KING_EVERY}th. It doesn't stop until the castle falls.`;
     }
 
     $("dayLabel").textContent = `Daily puzzle · Day ${map.day}${date !== today ? ` · ${date}` : ""}`;
-    $("waveMax").textContent = G.WAVES;
     $("hpMax").textContent = G.START_HP;
-    $("winBonus").textContent = G.WIN_BONUS;
-    $("hpBonus").textContent = G.HP_BONUS;
-    $("xpRule").textContent = G.LEVEL_XP.join(" / ");
+    $("maxLevel").textContent = G.MAX_LEVEL;
     describeHorde();
-    buildTowerCards();
+    buildShop();
     applyLayout(state, record.layout);
-    selectedType = nextUnplaced();
-    refreshCards();
+    refreshPanel();
     if (!record.runs) showIntro();
     new ResizeObserver(resize).observe(wrap);
     resize();

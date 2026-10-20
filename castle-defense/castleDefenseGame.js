@@ -1,7 +1,8 @@
 // Castle Defense engine: a daily puzzle. Each date seeds one 8×8 map and one
-// horde. The player places three towers of three different types, presses
-// play, and the run goes untouched until the castle falls or the horde is
-// dead. Towers level themselves up from kills and assists.
+// endless horde. The player spends a fixed budget on towers (beside the road)
+// and traps (on it), presses play, and the run goes untouched until the
+// castle falls. The score is how many zombies died first. Every defense
+// levels itself up from kills and assists.
 //
 // Pure state + step(): no DOM, so the page (app.js) only draws and forwards
 // input, and node can drive it for balance runs. Positions are in tile units;
@@ -14,55 +15,85 @@
     }
 })(typeof self !== "undefined" ? self : this, function () {
     const SIZE = 8;
-    const TOWER_LIMIT = 3;
-    const WAVES = 10;
+    const BUDGET = 1000;
     const START_HP = 10;
     const WAVE_BREAK = 4;
+    const KING_EVERY = 10;
     // Day #1 of the daily map.
     const EPOCH = "2026-10-18";
 
-    // XP needed to reach level 2, 3, 4, 5. A kill is worth 2, an assist 1.
-    const LEVEL_XP = [10, 26, 50, 84];
+    // Total XP needed to reach level 2, 3, … 10. A kill is worth 2, an assist 1.
+    const LEVEL_XP = [10, 26, 50, 84, 130, 190, 265, 355, 460];
     const MAX_LEVEL = LEVEL_XP.length + 1;
     const KILL_XP = 2;
     const ASSIST_XP = 1;
 
-    const TOWERS = {
+    // Towers stand on grass and shoot; traps sit on a road tile and act on
+    // whatever walks over them.
+    const DEFENSES = {
         archer: {
+            kind: "tower",
             name: "Archer",
+            cost: 250,
             blurb: "Long reach, one target at a time. Best against Brutes and the King.",
             base: { damage: 22, range: 2.3, rate: 2.0 },
             projectile: { kind: "arrow", speed: 11, homing: true }
         },
         cannon: {
+            kind: "tower",
             name: "Cannon",
+            cost: 250,
             blurb: "Shells burst across a crowd, but fast zombies can outrun them.",
-            base: { damage: 18, range: 1.7, rate: 0.5, splash: 0.75 },
+            base: { damage: 20, range: 1.7, rate: 0.5, splash: 0.75 },
             projectile: { kind: "shell", speed: 6, homing: false }
         },
         frost: {
+            kind: "tower",
             name: "Frost",
+            cost: 200,
             blurb: "Barely hurts, but slows the pack so the others get more shots.",
             base: { damage: 4, range: 1.7, rate: 1.0, splash: 0.7, slow: 0.28, slowGrowth: 0.04, slowCap: 0.45, slowFor: 1.6 },
             projectile: { kind: "shard", speed: 9, homing: true }
         },
         mage: {
+            kind: "tower",
             name: "Mage",
+            cost: 325,
             blurb: "Lightning jumps between zombies. Strong when they bunch up.",
             base: { damage: 23, range: 2.0, rate: 0.75, chains: 2, chainRange: 1.6 },
             projectile: null
+        },
+        spikes: {
+            kind: "trap",
+            name: "Spikes",
+            cost: 75,
+            blurb: "Cuts every zombie that walks across its tile.",
+            base: { dps: 16 }
+        },
+        tar: {
+            kind: "trap",
+            name: "Tar pit",
+            cost: 75,
+            blurb: "Bogs down everything crossing it, and the slow lingers.",
+            base: { dps: 4, slow: 0.5, slowGrowth: 0.02, slowCap: 0.6, slowFor: 1.3 }
+        },
+        mine: {
+            kind: "trap",
+            name: "Mine",
+            cost: 200,
+            blurb: "A big blast when stepped on, then a few seconds to re-arm.",
+            base: { damage: 55, splash: 0.9, rearm: 5 }
         }
     };
+    const TOWER_TYPES = Object.keys(DEFENSES).filter((t) => DEFENSES[t].kind === "tower");
+    const TRAP_TYPES = Object.keys(DEFENSES).filter((t) => DEFENSES[t].kind === "trap");
 
     const ZOMBIES = {
-        walker: { name: "Walker", hp: 34, speed: 0.85, points: 10, damage: 1, radius: 0.2 },
-        runner: { name: "Runner", hp: 20, speed: 1.6, points: 15, damage: 1, radius: 0.16 },
-        brute: { name: "Brute", hp: 140, speed: 0.5, points: 40, damage: 2, radius: 0.27 },
-        king: { name: "Zombie King", hp: 1200, speed: 0.38, points: 300, damage: 5, radius: 0.34 }
+        walker: { name: "Walker", hp: 34, speed: 0.85, damage: 1, radius: 0.2 },
+        runner: { name: "Runner", hp: 20, speed: 1.6, damage: 1, radius: 0.16 },
+        brute: { name: "Brute", hp: 140, speed: 0.5, damage: 2, radius: 0.27 },
+        king: { name: "Zombie King", hp: 1200, speed: 0.38, damage: 5, radius: 0.34 }
     };
-
-    const WIN_BONUS = 250;
-    const HP_BONUS = 50;
 
     // ---------- seeded randomness ----------
     function hashString(str) {
@@ -166,62 +197,8 @@
         return extend() ? { path, entry } : null;
     }
 
-    function dailyMap(dateStr) {
-        const seed = hashString(`castle-defense:${dateStr}`);
-        const rng = mulberry32(seed);
-        // Reroll roads that towers can barely reach — ones hugging the edge
-        // leave half of every tower's range off the board.
-        let road = null;
-        while (!road || roadCoverage(road) < MIN_COVERAGE) road = carveRoad(rng);
-
-        const pathSet = new Set(road.path.map(([x, y]) => `${x},${y}`));
-        const castle = road.path[road.path.length - 1];
-        const free = [];
-        for (let x = 0; x < SIZE; x++) {
-            for (let y = 0; y < SIZE; y++) if (!pathSet.has(`${x},${y}`)) free.push([x, y]);
-        }
-        // Trees and rocks are mostly scenery: at most one may sit beside the
-        // road. Several there can wall off the only good tower spots and make
-        // a day unwinnable.
-        const besideRoad = ([x, y]) => {
-            for (let dx = -1; dx <= 1; dx++) {
-                for (let dy = -1; dy <= 1; dy++) if (pathSet.has(`${x + dx},${y + dy}`)) return true;
-            }
-            return false;
-        };
-        const want = 3 + Math.floor(rng() * 3);
-        const spots = shuffle(rng, free);
-        const near = spots.filter(besideRoad).slice(0, 1);
-        const far = spots.filter((t) => !besideRoad(t)).slice(0, want - near.length);
-        const obstacles = [...near, ...far].map(([x, y], i) => ({ x, y, kind: i % 3 === 2 ? "rock" : "tree" }));
-
-        // Each day leans on one kind of zombie, so the best three towers change.
-        const leans = ["walker", "runner", "brute"];
-        const lean = leans[Math.floor(rng() * leans.length)];
-
-        const map = {
-            date: dateStr,
-            day: dayNumber(dateStr),
-            seed,
-            path: road.path,
-            entry: road.entry,
-            castle: { x: castle[0], y: castle[1] },
-            obstacles,
-            lean,
-            waves: []
-        };
-        map.waypoints = [road.entry, ...road.path].map(([x, y]) => ({ x: x + 0.5, y: y + 0.5 }));
-        map.segments = buildSegments(map.waypoints);
-        map.length = map.segments[map.segments.length - 1].end;
-        // The castle tile is the end of the road, so it's in pathSet already.
-        map.blocked = new Set([...pathSet, ...obstacles.map((o) => `${o.x},${o.y}`)]);
-        map.pathSet = pathSet;
-        for (let w = 1; w <= WAVES; w++) map.waves.push(waveSpawns(rng, w, lean));
-        return map;
-    }
-
     // How much road (in tiles) the three best grass tiles can reach between
-    // them. Below MIN_COVERAGE, a day was often unwinnable in simulation.
+    // them. Below MIN_COVERAGE, a day played far harder in simulation.
     const MIN_COVERAGE = 16.5;
     const COVERAGE_RANGE = 2.0;
 
@@ -243,6 +220,56 @@
         }
         reach.sort((a, b) => b - a);
         return reach[0] + reach[1] + reach[2];
+    }
+
+    function dailyMap(dateStr) {
+        const seed = hashString(`castle-defense:${dateStr}`);
+        const rng = mulberry32(seed);
+        // Reroll roads that towers can barely reach — ones hugging the edge
+        // leave half of every tower's range off the board.
+        let road = null;
+        while (!road || roadCoverage(road) < MIN_COVERAGE) road = carveRoad(rng);
+
+        const pathSet = new Set(road.path.map(([x, y]) => `${x},${y}`));
+        const castle = road.path[road.path.length - 1];
+        const free = [];
+        for (let x = 0; x < SIZE; x++) {
+            for (let y = 0; y < SIZE; y++) if (!pathSet.has(`${x},${y}`)) free.push([x, y]);
+        }
+        // Trees and rocks are mostly scenery: at most one may sit beside the
+        // road. Several there can wall off the only good tower spots.
+        const besideRoad = ([x, y]) => {
+            for (let dx = -1; dx <= 1; dx++) {
+                for (let dy = -1; dy <= 1; dy++) if (pathSet.has(`${x + dx},${y + dy}`)) return true;
+            }
+            return false;
+        };
+        const want = 3 + Math.floor(rng() * 3);
+        const spots = shuffle(rng, free);
+        const near = spots.filter(besideRoad).slice(0, 1);
+        const far = spots.filter((t) => !besideRoad(t)).slice(0, want - near.length);
+        const obstacles = [...near, ...far].map(([x, y], i) => ({ x, y, kind: i % 3 === 2 ? "rock" : "tree" }));
+
+        // Each day leans on one kind of zombie, so the best mix of defenses changes.
+        const leans = ["walker", "runner", "brute"];
+        const lean = leans[Math.floor(rng() * leans.length)];
+
+        const map = {
+            date: dateStr,
+            day: dayNumber(dateStr),
+            seed,
+            path: road.path,
+            entry: road.entry,
+            castle: { x: castle[0], y: castle[1] },
+            obstacles,
+            lean
+        };
+        map.waypoints = [road.entry, ...road.path].map(([x, y]) => ({ x: x + 0.5, y: y + 0.5 }));
+        map.segments = buildSegments(map.waypoints);
+        map.length = map.segments[map.segments.length - 1].end;
+        map.pathSet = pathSet;
+        map.obstacleSet = new Set(obstacles.map((o) => `${o.x},${o.y}`));
+        return map;
     }
 
     function buildSegments(points) {
@@ -270,6 +297,7 @@
         return { x: last.bx, y: last.by, dx: (last.bx - last.ax) / last.len, dy: (last.by - last.ay) / last.len };
     }
 
+    // ---------- the horde ----------
     function hpScale(wave) {
         return Math.pow(1.28, wave - 1);
     }
@@ -281,7 +309,10 @@
         };
     }
 
-    function waveSpawns(rng, wave, lean) {
+    // Waves never run out; each is generated from the day's seed and its
+    // number, so wave 23 is the same for everyone that day.
+    function waveSpawns(map, wave) {
+        const rng = mulberry32(hashString(`${map.seed}:wave:${wave}`));
         const list = [];
         const count = 5 + wave * 2;
         const gap = Math.max(0.45, 1.05 - wave * 0.05);
@@ -289,7 +320,7 @@
         for (let i = 0; i < count; i++) {
             let type = "walker";
             const r = rng();
-            const odds = spawnOdds(wave, lean);
+            const odds = spawnOdds(wave, map.lean);
             if (r < odds.brute) type = "brute";
             else if (r < odds.brute + odds.runner) type = "runner";
             list.push({ type, at: t, wave });
@@ -303,7 +334,7 @@
         const actual = list.reduce((sum, s) => sum + ZOMBIES[s.type].hp, 0);
         const hpMul = Math.min(1.3, Math.max(0.7, (perZombie * count) / actual));
         list.forEach((s) => { s.hpMul = hpMul; });
-        if (wave === WAVES) list.push({ type: "king", at: t + 1.5, wave, hpMul: 1 });
+        if (wave % KING_EVERY === 0) list.push({ type: "king", at: t + 1.5, wave, hpMul: 1 });
         return list;
     }
 
@@ -313,109 +344,112 @@
             map,
             phase: "setup",
             time: 0,
+            gold: BUDGET,
             hp: START_HP,
             maxHp: START_HP,
             wave: 0,
             kills: 0,
             leaked: 0,
-            score: 0,
-            towers: [],
+            defenses: [],
             zombies: [],
             projectiles: [],
             effects: [],
             events: [],
-            timeline: [],
+            queue: [],
+            nextWaveAt: 0,
             nextId: 1
         };
     }
 
-    function towerStats(type, level) {
-        const b = TOWERS[type].base;
+    function stats(type, level) {
+        const b = DEFENSES[type].base;
         const up = level - 1;
-        const s = {
-            damage: Math.round(b.damage * (1 + 0.45 * up)),
-            range: +(b.range + 0.12 * up).toFixed(2),
-            rate: +(b.rate * (1 + 0.08 * up)).toFixed(2)
-        };
-        if (b.splash) s.splash = +(b.splash + 0.08 * up).toFixed(2);
-        if (b.slow) {
+        const grow = (v) => +(v * (1 + 0.45 * up)).toFixed(2);
+        const s = {};
+        if (b.damage != null) s.damage = Math.round(grow(b.damage));
+        if (b.dps != null) s.dps = grow(b.dps);
+        if (b.range != null) s.range = +(b.range + 0.08 * up).toFixed(2);
+        if (b.rate != null) s.rate = +(b.rate * (1 + 0.06 * up)).toFixed(2);
+        if (b.splash != null) s.splash = +(b.splash + 0.05 * up).toFixed(2);
+        if (b.slow != null) {
             s.slow = Math.min(b.slowCap, +(b.slow + b.slowGrowth * up).toFixed(2));
-            s.slowFor = +(b.slowFor + 0.15 * up).toFixed(2);
+            s.slowFor = +(b.slowFor + 0.1 * up).toFixed(2);
         }
-        if (b.chains) {
+        if (b.chains != null) {
             s.chains = b.chains + Math.floor(level / 2);
             s.chainRange = b.chainRange;
         }
+        if (b.rearm != null) s.rearm = +(b.rearm * Math.pow(0.92, up)).toFixed(2);
         return s;
     }
 
-    function xpForNext(tower) {
-        return tower.level < MAX_LEVEL ? LEVEL_XP[tower.level - 1] : null;
+    function xpForNext(d) {
+        return d.level < MAX_LEVEL ? LEVEL_XP[d.level - 1] : null;
     }
 
-    function towerAt(state, x, y) {
-        return state.towers.find((t) => t.x === x && t.y === y) || null;
+    function defenseAt(state, x, y) {
+        return state.defenses.find((d) => d.x === x && d.y === y) || null;
     }
 
-    function findTower(state, id) {
-        return state.towers.find((t) => t.id === id) || null;
+    function findDefense(state, id) {
+        return state.defenses.find((d) => d.id === id) || null;
     }
 
-    function canPlace(state, x, y) {
-        return Number.isInteger(x) && Number.isInteger(y) && inGrid(x, y) && !state.map.blocked.has(`${x},${y}`) && !towerAt(state, x, y);
+    function isRoad(map, x, y) {
+        return map.pathSet.has(`${x},${y}`) && !(x === map.castle.x && y === map.castle.y);
     }
 
-    function typesUsed(state) {
-        return state.towers.map((t) => t.type);
+    function isGrass(map, x, y) {
+        return inGrid(x, y) && !map.pathSet.has(`${x},${y}`) && !map.obstacleSet.has(`${x},${y}`);
     }
 
-    function placeTower(state, type, x, y) {
-        if (!TOWERS[type]) return { ok: false, reason: "Unknown tower." };
-        if (state.phase !== "setup") return { ok: false, reason: "The run has started." };
-        if (!canPlace(state, x, y)) {
-            return { ok: false, reason: state.map.pathSet.has(`${x},${y}`) ? "Keep the road clear — build on the grass." : "You can't build there." };
+    // Why `type` can't go on (x, y), or null if it can.
+    function placementProblem(state, type, x, y) {
+        const def = DEFENSES[type];
+        if (!def) return "Unknown defense.";
+        if (state.phase !== "setup") return "The run has started.";
+        if (!Number.isInteger(x) || !Number.isInteger(y) || !inGrid(x, y)) return "That's off the map.";
+        if (defenseAt(state, x, y)) return "Something is already there.";
+        if (x === state.map.castle.x && y === state.map.castle.y) return "That's the castle.";
+        if (def.kind === "tower" && !isGrass(state.map, x, y)) {
+            return state.map.pathSet.has(`${x},${y}`) ? "Towers go on the grass — traps go on the road." : "You can't build there.";
         }
-        // One of each type: placing a type you already have moves it.
-        const existing = state.towers.find((t) => t.type === type);
-        if (existing) {
-            existing.x = x;
-            existing.y = y;
-            return { ok: true, tower: existing, moved: true };
-        }
-        if (state.towers.length >= TOWER_LIMIT) return { ok: false, reason: `Only ${TOWER_LIMIT} towers — remove one first.` };
-        const tower = { id: state.nextId++, type, x, y, level: 1, xp: 0, kills: 0, assists: 0, cooldown: 0, angle: -Math.PI / 2 };
-        state.towers.push(tower);
-        return { ok: true, tower };
+        if (def.kind === "trap" && !isRoad(state.map, x, y)) return "Traps go on the road.";
+        if (state.gold < def.cost) return `Not enough gold — ${def.name} costs ${def.cost}.`;
+        return null;
     }
 
-    function removeTower(state, id) {
+    function canPlace(state, type, x, y) {
+        return placementProblem(state, type, x, y) === null;
+    }
+
+    function place(state, type, x, y) {
+        const problem = placementProblem(state, type, x, y);
+        if (problem) return { ok: false, reason: problem };
+        const def = DEFENSES[type];
+        state.gold -= def.cost;
+        const d = { id: state.nextId++, type, kind: def.kind, x, y, level: 1, xp: 0, kills: 0, assists: 0, cooldown: 0, angle: -Math.PI / 2 };
+        state.defenses.push(d);
+        return { ok: true, defense: d };
+    }
+
+    // Before the run, anything can be picked back up for a full refund.
+    function remove(state, id) {
         if (state.phase !== "setup") return { ok: false, reason: "The run has started." };
-        const before = state.towers.length;
-        state.towers = state.towers.filter((t) => t.id !== id);
-        return { ok: state.towers.length < before };
+        const d = findDefense(state, id);
+        if (!d) return { ok: false, reason: "Nothing there." };
+        state.defenses = state.defenses.filter((x) => x !== d);
+        state.gold += DEFENSES[d.type].cost;
+        return { ok: true, refund: DEFENSES[d.type].cost, defense: d };
     }
 
     function startRun(state) {
         if (state.phase !== "setup") return { ok: false, reason: "Already running." };
-        const missing = TOWER_LIMIT - state.towers.length;
-        if (missing > 0) return { ok: false, reason: `Place ${missing} more ${missing === 1 ? "tower" : "towers"}.` };
-        let offset = 0;
-        state.timeline = [];
-        state.map.waves.forEach((spawns) => {
-            spawns.forEach((s) => state.timeline.push({ ...s, at: s.at + offset }));
-            offset += spawns[spawns.length - 1].at + WAVE_BREAK;
-        });
+        if (!state.defenses.length) return { ok: false, reason: "Build something first." };
         state.phase = "running";
         state.time = 0;
+        state.nextWaveAt = 0;
         return { ok: true };
-    }
-
-    function totalZombies(map) {
-        return map.waves.reduce((n, w) => n + w.length, 0);
-    }
-
-    function zombiesRemaining(state) {
-        return state.timeline.length + state.zombies.length;
     }
 
     // ---------- combat ----------
@@ -432,7 +466,6 @@
             speed: def.speed,
             radius: def.radius,
             damage: def.damage,
-            points: def.points,
             dist: 0,
             // Sideways offset from the road's centre line, so a crowd walks
             // abreast instead of stacking into one blob.
@@ -449,10 +482,6 @@
         };
         placeZombie(state.map, z);
         state.zombies.push(z);
-        if (spawn.wave > state.wave) {
-            state.wave = spawn.wave;
-            state.events.push({ type: "wave", wave: spawn.wave });
-        }
     }
 
     function placeZombie(map, z) {
@@ -463,42 +492,50 @@
         z.dy = p.dy;
     }
 
-    function addXp(state, tower, amount) {
-        tower.xp += amount;
-        while (tower.level < MAX_LEVEL && tower.xp >= LEVEL_XP[tower.level - 1]) {
-            tower.level += 1;
-            state.effects.push({ kind: "levelup", x: tower.x + 0.5, y: tower.y + 0.5, text: `Level ${tower.level}`, ttl: 1.2, life: 1.2 });
-            state.events.push({ type: "level-up", towerId: tower.id, level: tower.level });
+    function addXp(state, d, amount) {
+        d.xp += amount;
+        while (d.level < MAX_LEVEL && d.xp >= LEVEL_XP[d.level - 1]) {
+            d.level += 1;
+            state.effects.push({ kind: "levelup", x: d.x + 0.5, y: d.y + 0.5, text: `Level ${d.level}`, ttl: 1.2, life: 1.2 });
+            state.events.push({ type: "level-up", id: d.id, level: d.level });
         }
     }
 
-    // Every tower that damaged a zombie shares the credit: the killing blow
-    // earns KILL_XP, every other tower that hit it earns ASSIST_XP.
-    function damageZombie(state, z, amount, tower) {
+    // Every defense that hurt a zombie shares the credit: the killing blow
+    // earns KILL_XP, every other one that hit it earns ASSIST_XP.
+    function damageZombie(state, z, amount, d) {
         if (z.gone) return;
         z.hp -= amount;
         z.hitFlash = 0.12;
-        z.hitBy.add(tower.id);
+        z.hitBy.add(d.id);
         if (z.hp > 0) return;
         z.gone = true;
         state.kills += 1;
-        state.score += z.points;
-        tower.kills += 1;
-        addXp(state, tower, KILL_XP);
+        d.kills += 1;
+        addXp(state, d, KILL_XP);
         for (const id of z.hitBy) {
-            if (id === tower.id) continue;
-            const helper = findTower(state, id);
+            if (id === d.id) continue;
+            const helper = findDefense(state, id);
             if (!helper) continue;
             helper.assists += 1;
             addXp(state, helper, ASSIST_XP);
         }
-        state.effects.push({ kind: "points", x: z.x, y: z.y, text: `+${z.points}`, ttl: 0.9, life: 0.9 });
+        state.effects.push({ kind: "points", x: z.x, y: z.y, text: "+1", ttl: 0.7, life: 0.7 });
         state.effects.push({ kind: "splat", x: z.x, y: z.y, r: z.radius, ttl: 0.5, life: 0.5 });
         if (z.type === "king") state.events.push({ type: "king-down" });
     }
 
+    function slowZombie(state, z, amount, duration) {
+        if (amount >= z.slowAmt || z.slowUntil < state.time) z.slowAmt = amount;
+        z.slowUntil = Math.max(z.slowUntil, state.time + duration);
+    }
+
     function live(state) {
         return state.zombies.filter((z) => !z.gone);
+    }
+
+    function onTile(z, d) {
+        return Math.floor(z.x) === d.x && Math.floor(z.y) === d.y;
     }
 
     function pickTarget(state, x, y, range) {
@@ -517,25 +554,25 @@
     }
 
     function fireTower(state, tower, target) {
-        const stats = towerStats(tower.type, tower.level);
+        const s = stats(tower.type, tower.level);
         const cx = tower.x + 0.5;
         const cy = tower.y + 0.5;
         tower.angle = Math.atan2(target.y - cy, target.x - cx);
         if (tower.type === "mage") {
             const hit = [target];
             let last = target;
-            let damage = stats.damage;
+            let damage = s.damage;
             const points = [{ x: cx, y: cy - 0.2 }, { x: target.x, y: target.y }];
             damageZombie(state, target, damage, tower);
-            for (let i = 1; i < stats.chains; i++) {
+            for (let i = 1; i < s.chains; i++) {
                 let next = null;
                 let nextD = Infinity;
                 for (const z of live(state)) {
                     if (hit.includes(z)) continue;
-                    const d = Math.hypot(z.x - last.x, z.y - last.y);
-                    if (d < stats.chainRange && d < nextD) {
+                    const dd = Math.hypot(z.x - last.x, z.y - last.y);
+                    if (dd < s.chainRange && dd < nextD) {
                         next = z;
-                        nextD = d;
+                        nextD = dd;
                     }
                 }
                 if (!next) break;
@@ -548,7 +585,7 @@
             state.effects.push({ kind: "bolt", points, ttl: 0.18, life: 0.18 });
             return;
         }
-        const proj = TOWERS[tower.type].projectile;
+        const proj = DEFENSES[tower.type].projectile;
         state.projectiles.push({
             kind: proj.kind,
             speed: proj.speed,
@@ -558,47 +595,69 @@
             tx: target.x,
             ty: target.y,
             targetId: target.id,
-            towerId: tower.id,
-            damage: stats.damage,
-            splash: stats.splash || 0,
-            slow: stats.slow || 0,
-            slowFor: stats.slowFor || 0,
+            ownerId: tower.id,
+            damage: s.damage,
+            splash: s.splash || 0,
+            slow: s.slow || 0,
+            slowFor: s.slowFor || 0,
             done: false
         });
     }
 
     function landProjectile(state, p) {
-        const tower = findTower(state, p.towerId);
-        if (!tower) return;
+        const owner = findDefense(state, p.ownerId);
+        if (!owner) return;
         if (p.kind === "arrow") {
             const target = state.zombies.find((z) => z.id === p.targetId && !z.gone);
-            if (target) damageZombie(state, target, p.damage, tower);
+            if (target) damageZombie(state, target, p.damage, owner);
             return;
         }
         if (p.kind === "shell") {
-            splashAt(state, p.x, p.y, p.splash, (z) => damageZombie(state, z, p.damage, tower));
+            splashAt(state, p.x, p.y, p.splash, (z) => damageZombie(state, z, p.damage, owner));
             state.effects.push({ kind: "boom", x: p.x, y: p.y, r: p.splash, ttl: 0.35, life: 0.35 });
             return;
         }
         splashAt(state, p.x, p.y, p.splash, (z) => {
-            if (p.slow >= z.slowAmt || z.slowUntil < state.time) z.slowAmt = p.slow;
-            z.slowUntil = Math.max(z.slowUntil, state.time + p.slowFor);
-            damageZombie(state, z, p.damage, tower);
+            slowZombie(state, z, p.slow, p.slowFor);
+            damageZombie(state, z, p.damage, owner);
         });
         state.effects.push({ kind: "frost", x: p.x, y: p.y, r: p.splash, ttl: 0.4, life: 0.4 });
     }
 
-    function finalScore(state) {
-        return state.score + (state.phase === "won" ? WIN_BONUS + HP_BONUS * state.hp : 0);
+    function runTrap(state, trap, dt) {
+        const s = stats(trap.type, trap.level);
+        const here = live(state).filter((z) => onTile(z, trap));
+        if (trap.type === "mine") {
+            trap.cooldown -= dt;
+            if (trap.cooldown > 0 || !here.length) return;
+            const cx = trap.x + 0.5;
+            const cy = trap.y + 0.5;
+            splashAt(state, cx, cy, s.splash, (z) => damageZombie(state, z, s.damage, trap));
+            state.effects.push({ kind: "boom", x: cx, y: cy, r: s.splash, ttl: 0.45, life: 0.45 });
+            trap.cooldown = s.rearm;
+            return;
+        }
+        for (const z of here) {
+            if (trap.type === "tar") slowZombie(state, z, s.slow, s.slowFor);
+            damageZombie(state, z, s.dps * dt, trap);
+        }
+        trap.active = here.length > 0;
     }
 
     function step(state, dt) {
         if (state.phase !== "running" || dt <= 0) return;
         state.time += dt;
 
-        while (state.timeline.length && state.timeline[0].at <= state.time) {
-            spawnZombie(state, state.timeline.shift());
+        // The next wave rolls in a short break after the last one finished
+        // arriving, whether or not you've cleared it.
+        if (state.time >= state.nextWaveAt) {
+            state.wave += 1;
+            const spawns = waveSpawns(state.map, state.wave);
+            spawns.forEach((s) => state.queue.push({ ...s, at: s.at + state.time }));
+            state.nextWaveAt = state.time + spawns[spawns.length - 1].at + WAVE_BREAK;
+            state.events.push({ type: "wave", wave: state.wave });
         }
+        while (state.queue.length && state.queue[0].at <= state.time) spawnZombie(state, state.queue.shift());
 
         for (const z of state.zombies) {
             if (z.gone) continue;
@@ -615,17 +674,21 @@
             }
         }
 
-        for (const tower of state.towers) {
-            tower.cooldown -= dt;
-            if (tower.cooldown > 0) continue;
-            const stats = towerStats(tower.type, tower.level);
-            const target = pickTarget(state, tower.x + 0.5, tower.y + 0.5, stats.range);
-            if (!target) {
-                tower.cooldown = 0;
+        for (const d of state.defenses) {
+            if (d.kind === "trap") {
+                runTrap(state, d, dt);
                 continue;
             }
-            fireTower(state, tower, target);
-            tower.cooldown = 1 / stats.rate;
+            d.cooldown -= dt;
+            if (d.cooldown > 0) continue;
+            const s = stats(d.type, d.level);
+            const target = pickTarget(state, d.x + 0.5, d.y + 0.5, s.range);
+            if (!target) {
+                d.cooldown = 0;
+                continue;
+            }
+            fireTower(state, d, target);
+            d.cooldown = 1 / s.rate;
         }
 
         for (const p of state.projectiles) {
@@ -636,16 +699,16 @@
                 p.tx = target.x;
                 p.ty = target.y;
             }
-            const d = Math.hypot(p.tx - p.x, p.ty - p.y);
+            const dist = Math.hypot(p.tx - p.x, p.ty - p.y);
             const move = p.speed * dt;
-            if (d <= move) {
+            if (dist <= move) {
                 p.x = p.tx;
                 p.y = p.ty;
                 p.done = true;
                 landProjectile(state, p);
             } else {
-                p.x += ((p.tx - p.x) / d) * move;
-                p.y += ((p.ty - p.y) / d) * move;
+                p.x += ((p.tx - p.x) / dist) * move;
+                p.y += ((p.ty - p.y) / dist) * move;
             }
         }
 
@@ -655,11 +718,8 @@
         state.effects = state.effects.filter((e) => e.ttl > 0);
 
         if (state.hp <= 0) {
-            state.phase = "lost";
-            state.events.push({ type: "end", won: false, score: finalScore(state) });
-        } else if (!state.timeline.length && !state.zombies.length) {
-            state.phase = "won";
-            state.events.push({ type: "end", won: true, score: finalScore(state) });
+            state.phase = "over";
+            state.events.push({ type: "end", kills: state.kills, wave: state.wave });
         }
     }
 
@@ -671,35 +731,35 @@
 
     return {
         SIZE,
-        TOWER_LIMIT,
-        WAVES,
+        BUDGET,
         START_HP,
+        KING_EVERY,
         MAX_LEVEL,
         LEVEL_XP,
         KILL_XP,
         ASSIST_XP,
-        WIN_BONUS,
-        HP_BONUS,
-        TOWERS,
+        DEFENSES,
+        TOWER_TYPES,
+        TRAP_TYPES,
         ZOMBIES,
         canPlace,
         createGame,
         dailyMap,
         dayNumber,
+        defenseAt,
         drainEvents,
-        finalScore,
-        findTower,
+        findDefense,
+        isGrass,
+        isRoad,
         localDateString,
-        placeTower,
+        place,
+        placementProblem,
         pointAt,
-        removeTower,
+        remove,
         startRun,
+        stats,
         step,
-        totalZombies,
-        towerAt,
-        towerStats,
-        typesUsed,
-        xpForNext,
-        zombiesRemaining
+        waveSpawns,
+        xpForNext
     };
 });

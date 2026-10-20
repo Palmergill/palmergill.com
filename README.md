@@ -26,7 +26,7 @@ navigation chrome.
 - `/craps-strategy/` - craps strategy simulator
 - `/blackjack/` - blackjack app
 - `/high-card-flush/` - single-player High Card Flush table
-- `/castle-defense/` - daily tower defense puzzle: a new map each day, three towers, one score
+- `/castle-defense/` - daily tower defense puzzle: a new map each day, 1,000 gold for towers and traps, scored by zombies killed
 - `/admin/` - protected backend log dashboard
 
 ## Active Backend Paths
