@@ -52,7 +52,7 @@ def _member(display: str = None) -> TestClient:
 
 
 def _tiles(day: str):
-    """Grass tiles (best spots first) and road tiles of `day`'s map, from the engine itself."""
+    """`day`'s allotment, its grass tiles (best spots first) and road tiles, from the engine itself."""
     ctx = MiniRacer()
     try:
         ctx.eval(castle_defense.engine_source())
@@ -64,21 +64,39 @@ def _tiles(day: str):
             "  if (G.isGrass(m, x, y)) grass.push([x, y]); else if (G.isRoad(m, x, y)) road.push([x, y]); }"
             # Best-placed grass first, the way a player would build.
             " grass.sort((a, b) => reach(b[0], b[1]) - reach(a[0], a[1]));"
-            " return JSON.stringify({ grass, road }); })()" % json.dumps(day)
+            " return JSON.stringify({ allotment: m.allotment, grass, road }); })()" % json.dumps(day)
         )
     finally:
         ctx.close()
     return json.loads(raw)
 
 
-def _layout(day: str, *types):
+TRAPS = ("spikes", "tar", "mine")
+
+
+def _place(day: str, types, worst=False):
+    """Put `types` on `day`'s map: towers on the best grass (or the worst)."""
     tiles = _tiles(day)
-    grass, road = iter(tiles["grass"]), iter(tiles["road"])
+    grass = iter(reversed(tiles["grass"]) if worst else tiles["grass"])
+    road = iter(tiles["road"])
     out = []
     for t in types:
-        x, y = next(road) if t in ("spikes", "tar", "mine") else next(grass)
+        x, y = next(road) if t in TRAPS else next(grass)
         out.append({"type": t, "x": x, "y": y})
     return out
+
+
+def _everything(day: str):
+    """Every piece in the day's allotment, well placed."""
+    allotment = _tiles(day)["allotment"]
+    return _place(day, [t for t, n in allotment.items() for _ in range(n)])
+
+
+def _one_piece(day: str):
+    """A single piece, badly placed: a weak run."""
+    allotment = _tiles(day)["allotment"]
+    first = next(t for t, n in allotment.items() if n)
+    return _place(day, [first], worst=True)
 
 
 def test_anyone_can_read_the_board():
@@ -88,14 +106,14 @@ def test_anyone_can_read_the_board():
 
 
 def test_posting_needs_an_account():
-    response = TestClient(app).post("/api/castle-defense/runs", json={"day": TODAY, "layout": _layout(TODAY, "spikes")})
+    response = TestClient(app).post("/api/castle-defense/runs", json={"day": TODAY, "layout": _one_piece(TODAY)})
     assert response.status_code == 403
     assert "Sign in" in response.json()["detail"]
 
 
 def test_the_server_scores_the_run_itself():
     client = _member()
-    layout = _layout(TODAY, "archer", "spikes")
+    layout = _everything(TODAY)
     # Anything the browser might claim is ignored: there's no score field.
     response = client.post("/api/castle-defense/runs", json={"day": TODAY, "layout": layout, "kills": 99999})
     assert response.status_code == 200
@@ -109,7 +127,8 @@ def test_the_server_scores_the_run_itself():
     "layout_fn, message",
     [
         (lambda: [{"type": "archer", "x": _tiles(TODAY)["road"][0][0], "y": _tiles(TODAY)["road"][0][1]}], "grass"),
-        (lambda: _layout(TODAY, "mage", "mage", "mage", "mage"), "gold"),
+        # One more of something than today's allotment gives.
+        (lambda: _everything(TODAY) + _place(TODAY, [next(t for t, n in _tiles(TODAY)["allotment"].items() if n)], worst=True)[:1], "left"),
     ],
 )
 def test_impossible_layouts_are_refused(layout_fn, message):
@@ -120,12 +139,12 @@ def test_impossible_layouts_are_refused(layout_fn, message):
 
 def test_only_todays_map_is_ranked():
     old = (datetime.now(timezone.utc).date() - timedelta(days=5)).isoformat()
-    response = _member().post("/api/castle-defense/runs", json={"day": old, "layout": _layout(old, "spikes")})
+    response = _member().post("/api/castle-defense/runs", json={"day": old, "layout": _one_piece(old)})
     assert response.status_code == 422
 
 
 def test_best_run_counts_and_places_are_shared_on_ties():
-    strong, weak = _layout(TODAY, "archer", "mage", "spikes"), _layout(TODAY, "spikes")
+    strong, weak = _everything(TODAY), _one_piece(TODAY)
     alice, bob, cara = _member("Alice"), _member("Bob"), _member("Cara")
 
     first = alice.post("/api/castle-defense/runs", json={"day": TODAY, "layout": strong}).json()
@@ -141,3 +160,21 @@ def test_best_run_counts_and_places_are_shared_on_ties():
     assert [(e["name"], e["rank"]) for e in board["entries"]] == [("Alice", 1), ("Bob", 2), ("Cara", 2)]
     assert board["you"]["name"] == "Bob" and board["you"]["rank"] == 2
     assert [e["you"] for e in board["entries"]] == [False, True, False]
+
+
+def test_scores_from_older_rules_are_left_off_and_then_replaced():
+    current = castle_defense.current_rules()
+    member = _member("Dana")
+    db = SessionLocal()
+    try:
+        db.add(CastleDefenseScore(day=TODAY, username="dana", display_name="Dana", kills=99999, wave=99, layout="[]", runs=1, rules=current - 1))
+        db.commit()
+    finally:
+        db.close()
+
+    # The old score isn't comparable, so the board doesn't show it...
+    assert member.get(f"/api/castle-defense/leaderboard?day={TODAY}").json()["players"] == 0
+    # ...and Dana's first run under today's rules replaces it, however it scores.
+    body = member.post("/api/castle-defense/runs", json={"day": TODAY, "layout": _one_piece(TODAY)}).json()
+    assert body["improved"] and body["best"]["kills"] == body["kills"] < 99999
+    assert body["players"] == 1 and body["best"]["runs"] == 2

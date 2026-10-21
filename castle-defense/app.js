@@ -17,7 +17,7 @@
     const today = G.localDateString();
     const date = /^\d{4}-\d{2}-\d{2}$/.test(requested || "") && !Number.isNaN(Date.parse(requested)) ? requested : today;
     const map = G.dailyMap(date);
-    const storeKey = `castle-defense:v3:${date}`;
+    const storeKey = `castle-defense:v4:${date}`;
 
     let record = readRecord();
     let state = G.createGame(map);
@@ -100,6 +100,15 @@
         return String(str).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
     }
 
+    // Rows for a board: the top `limit`, plus your own row if you're further down.
+    function boardRows(board, limit) {
+        const shown = board.entries.slice(0, limit);
+        const row = (e) => `<li class="${e.you ? "is-you" : ""}"><span class="cd-board__rank">${e.rank}</span><span class="cd-board__name">${escapeHtml(e.name)}${e.you ? " (you)" : ""}</span><span class="cd-board__kills">${e.kills.toLocaleString()} <small>w${e.wave}</small></span></li>`;
+        let html = shown.map(row).join("");
+        if (board.you && !shown.some((e) => e.you)) html += `<li class="is-gap">…</li>${row(board.you)}`;
+        return html;
+    }
+
     async function loadBoard() {
         const note = $("boardNote");
         if (!ranked) {
@@ -109,19 +118,17 @@
             return;
         }
         try {
-            renderBoard(await api(`/leaderboard?day=${date}`));
+            const board = await api(`/leaderboard?day=${date}`);
+            renderBoard(board);
+            return board;
         } catch {
             note.textContent = "The leaderboard couldn't be loaded right now.";
+            return null;
         }
     }
 
     function renderBoard(board) {
-        const list = $("board-list");
-        const shown = board.entries.slice(0, 10);
-        const row = (e) => `<li class="${e.you ? "is-you" : ""}"><span class="cd-board__rank">${e.rank}</span><span class="cd-board__name">${escapeHtml(e.name)}${e.you ? " (you)" : ""}</span><span class="cd-board__kills">${e.kills.toLocaleString()} <small>w${e.wave}</small></span></li>`;
-        let html = shown.map(row).join("");
-        if (board.you && !shown.some((e) => e.you)) html += `<li class="is-gap">…</li>${row(board.you)}`;
-        list.innerHTML = html;
+        $("board-list").innerHTML = boardRows(board, 10);
         $("boardCount").textContent = board.players ? `${board.players} ${board.players === 1 ? "player" : "players"}` : "";
         const note = $("boardNote");
         if (!board.players) note.textContent = "No scores yet today. Be the first.";
@@ -138,13 +145,13 @@
     function postRun(layout) {
         if (!ranked) return Promise.resolve(null);
         posting = api("/runs", { method: "POST", body: { day: date, layout } })
-            .then((res) => {
+            .then(async (res) => {
                 placement = res;
                 if (record.pending) {
                     record.pending = null;
                     writeRecord();
                 }
-                loadBoard();
+                res.board = await loadBoard();
                 return res;
             })
             .catch((err) => {
@@ -703,7 +710,7 @@
             for (let x = 0; x < G.SIZE; x++) {
                 for (let y = 0; y < G.SIZE; y++) {
                     const problem = G.placementProblem(state, selectedType, x, y);
-                    if (problem && !/gold/.test(problem)) continue;
+                    if (problem && !/left/.test(problem)) continue;
                     ctx.strokeStyle = "rgba(255, 255, 255, 0.2)";
                     ctx.lineWidth = 0.02;
                     roundRect(ctx, x + 0.05, y + 0.05, 0.9, 0.9, 0.1);
@@ -838,7 +845,7 @@
             body: `
                 <p>Zombies follow the road to your castle, and they never stop coming. Each one that gets in knocks down part of the wall; lose all ${G.START_HP} walls and it falls.</p>
                 <ol class="cd-howto">
-                    <li>Spend ${G.BUDGET.toLocaleString()} gold: towers go on the grass, traps go on the road.</li>
+                    <li>Place today's towers and traps — everyone gets the same 0–${G.MAX_EACH} of each. Towers go on the grass, traps on the road.</li>
                     <li>Press play. From then on it runs itself, and everything levels up from its kills.</li>
                     <li>Your score is how many zombies you kill before the castle falls.</li>
                 </ol>`,
@@ -963,6 +970,10 @@
                 </div>
                 <p class="cd-place is-muted" id="placeLine"${ranked ? "" : " hidden"}>Posting to today's leaderboard…</p>
                 <div class="cd-result-towers" id="resultTowers"></div>
+                <section class="cd-result-board" id="resultBoard" hidden>
+                    <h3 class="cd-group">Today's top 10 <span class="cd-result-board__count"></span></h3>
+                    <ol class="cd-board"></ol>
+                </section>
                 <p class="cd-next">${date === today ? `New map in ${untilTomorrow()}` : `Replaying ${prettyDate(date)}`}</p>`,
             actions: [
                 {
@@ -986,7 +997,20 @@
             list.append(row);
         });
         placement = null;
-        postRun(layoutOf(state)).then(showPlacement);
+        postRun(layoutOf(state)).then(async (res) => {
+            showPlacement(res);
+            if (!ranked) return;
+            // Signed out or not, the day's top 10 is public.
+            showResultBoard(res && res.board ? res.board : await loadBoard());
+        });
+    }
+
+    function showResultBoard(board) {
+        const box = $("resultBoard");
+        if (!box || !board || !board.entries.length) return;
+        box.hidden = false;
+        box.querySelector("ol").innerHTML = boardRows(board, 10);
+        box.querySelector(".cd-result-board__count").textContent = `${board.players} ${board.players === 1 ? "player" : "players"}`;
     }
 
     function showPlacement(res) {
@@ -1030,7 +1054,7 @@
             btn.append(iconCanvas(type, 40));
             btn.insertAdjacentHTML(
                 "beforeend",
-                `<span class="cd-tower__name">${def.name}</span><span class="cd-tower__blurb">${def.blurb}</span><span class="cd-tower__state"><span class="cd-tower__cost">${def.cost}g</span><br><span class="cd-tower__count"></span></span>`
+                `<span class="cd-tower__name">${def.name}</span><span class="cd-tower__blurb">${def.blurb}</span><span class="cd-tower__state"><span class="cd-tower__count"></span></span>`
             );
             btn.addEventListener("click", () => chooseType(type));
             $(def.kind === "tower" ? "shopTowers" : "shopTraps").append(btn);
@@ -1047,34 +1071,39 @@
     function updatePanel() {
         const setup = state.phase === "setup";
         const sig = setup
-            ? `s|${selectedType}|${state.gold}|${layoutOf(state).map((d) => `${d.type}@${d.x},${d.y}`).join(",")}`
+            ? `s|${selectedType}|${layoutOf(state).map((d) => `${d.type}@${d.x},${d.y}`).join(",")}`
             : `r|${state.defenses.map((d) => `${d.level}:${d.xp}:${d.kills}:${d.assists}`).join(",")}`;
         if (sig === lastPanel) return;
         lastPanel = sig;
 
         $("shop").hidden = !setup;
         $("roster").hidden = setup;
-        $("shopTitle").textContent = setup ? "Spend your gold" : "Your defenses";
-        const gold = $("goldValue");
-        gold.textContent = setup ? `${state.gold.toLocaleString()} gold` : `${state.defenses.length} built`;
-        gold.classList.toggle("is-out", setup && state.gold < Math.min(...TYPES.map((t) => G.DEFENSES[t].cost)));
+        const left = TYPES.reduce((n, t) => n + state.stock[t], 0);
+        $("shopTitle").textContent = setup ? "Today's defenses" : "Your defenses";
+        const count = $("pieceCount");
+        count.textContent = setup ? `${left} to place` : `${state.defenses.length} built`;
+        count.classList.toggle("is-out", setup && left === 0);
 
         if (setup) {
             TYPES.forEach((type) => {
                 const btn = cards[type];
-                const count = state.defenses.filter((d) => d.type === type).length;
+                const given = map.allotment[type];
+                const remaining = state.stock[type];
                 btn.setAttribute("aria-pressed", String(selectedType === type));
-                btn.classList.toggle("is-poor", state.gold < G.DEFENSES[type].cost);
-                btn.querySelector(".cd-tower__count").textContent = count ? `×${count} placed` : "";
+                btn.classList.toggle("is-poor", remaining === 0);
+                btn.disabled = given === 0;
+                btn.querySelector(".cd-tower__count").textContent = given ? `${remaining} of ${given} left` : "None today";
             });
             let note;
             if (selectedType) {
                 const def = G.DEFENSES[selectedType];
-                note = `Click ${def.kind === "tower" ? "the grass" : "the road"} to place ${/^[AEIOU]/.test(def.name) ? "an" : "a"} ${def.name} (${def.cost} gold). Click anything you placed to sell it back.`;
+                note = `Click ${def.kind === "tower" ? "the grass" : "the road"} to place ${/^[AEIOU]/.test(def.name) ? "an" : "a"} ${def.name}. Click anything you placed to pick it back up.`;
             } else if (!state.defenses.length) {
                 note = "Pick a tower or trap to start building.";
             } else {
-                note = `${state.gold.toLocaleString()} gold left. Click anything you placed to sell it back, or press play.`;
+                note = left
+                    ? `${left} more to place. You don't have to use them all — click anything you placed to pick it up, or press play.`
+                    : "Everything's placed. Click anything to pick it up and move it, or press play.";
             }
             $("shopNote").textContent = note;
         } else {
@@ -1163,7 +1192,7 @@
         if (existing) {
             const res = G.remove(state, existing.id);
             selectedType = existing.type;
-            toast(`Sold the ${G.DEFENSES[existing.type].name} — +${res.refund} gold`);
+            toast(`Picked up the ${G.DEFENSES[existing.type].name}`);
             saveLayout();
             refreshPanel();
             return;
@@ -1177,7 +1206,7 @@
             toast(res.reason, true);
             return;
         }
-        if (state.gold < G.DEFENSES[selectedType].cost) selectedType = null;
+        if (!state.stock[selectedType]) selectedType = null;
         saveLayout();
         refreshPanel();
     });

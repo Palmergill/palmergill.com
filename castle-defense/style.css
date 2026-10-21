@@ -463,3 +463,8 @@ button { font: inherit; color: inherit; }
 }
 .cd-place a { color: var(--sage-dim); }
 .cd-place.is-muted { background: var(--surface); color: var(--soft) !important; font-weight: 600; }
+
+.cd-result-board { margin: 4px 0 10px; }
+.cd-result-board[hidden] { display: none; }
+.cd-result-board .cd-board li { font-size: 0.84rem; padding: 4px 8px; }
+.cd-tower:disabled.is-poor { opacity: 0.4; }

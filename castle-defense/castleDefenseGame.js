@@ -1,8 +1,9 @@
-// Castle Defense engine: a daily puzzle. Each date seeds one 8×8 map and one
-// endless horde. The player spends a fixed budget on towers (beside the road)
-// and traps (on it), presses play, and the run goes untouched until the
-// castle falls. The score is how many zombies died first. Every defense
-// levels itself up from kills and assists.
+// Castle Defense engine: a daily puzzle. Each date seeds one 8×8 map, one
+// endless horde, and one allotment of 0–3 of each tower and trap. The player
+// places what they're given — towers beside the road, traps on it — presses
+// play, and the run goes untouched until the castle falls. The score is how
+// many zombies died first. Every defense levels itself up from kills and
+// assists.
 //
 // Pure state + step(): no DOM, so the page (app.js) only draws and forwards
 // input, and node can drive it for balance runs. Positions are in tile units;
@@ -15,7 +16,14 @@
     }
 })(typeof self !== "undefined" ? self : this, function () {
     const SIZE = 8;
-    const BUDGET = 1000;
+    // Bumped whenever a change makes old scores incomparable; the leaderboard
+    // only ranks runs played under the current rules. 1 was the gold budget.
+    const RULES = 2;
+    const MAX_EACH = 3;
+    // Limits on a day's allotment, checked by simulation (see dailyAllotment).
+    const ALLOT_MIN_TOWERS = 3;
+    const ALLOT_MIN_TOTAL = 7;
+    const ALLOT_MAX_TOTAL = 14;
     const START_HP = 10;
     const WAVE_BREAK = 4;
     const KING_EVERY = 10;
@@ -39,7 +47,7 @@
         archer: {
             kind: "tower",
             name: "Archer",
-            cost: 250,
+            plural: "Archers",
             blurb: "Long reach, one target at a time. Best against Brutes and the King.",
             base: { damage: 22, range: 2.3, rate: 2.0 },
             projectile: { kind: "arrow", speed: 11, homing: true }
@@ -47,7 +55,7 @@
         cannon: {
             kind: "tower",
             name: "Cannon",
-            cost: 250,
+            plural: "Cannons",
             blurb: "Shells burst across a crowd, but fast zombies can outrun them.",
             base: { damage: 20, range: 1.7, rate: 0.5, splash: 0.75 },
             projectile: { kind: "shell", speed: 6, homing: false }
@@ -55,7 +63,7 @@
         frost: {
             kind: "tower",
             name: "Frost",
-            cost: 200,
+            plural: "Frost towers",
             blurb: "Barely hurts, but slows the pack so the others get more shots.",
             base: { damage: 4, range: 1.7, rate: 1.0, splash: 0.7, slow: 0.28, slowGrowth: 0.04, slowCap: 0.45, slowFor: 1.6 },
             projectile: { kind: "shard", speed: 9, homing: true }
@@ -63,7 +71,7 @@
         mage: {
             kind: "tower",
             name: "Mage",
-            cost: 325,
+            plural: "Mages",
             blurb: "Lightning jumps between zombies. Strong when they bunch up.",
             base: { damage: 23, range: 2.0, rate: 0.75, chains: 2, chainRange: 1.6 },
             projectile: null
@@ -71,21 +79,21 @@
         spikes: {
             kind: "trap",
             name: "Spikes",
-            cost: 75,
+            plural: "Spikes",
             blurb: "Cuts every zombie that walks across its tile.",
             base: { dps: 16 }
         },
         tar: {
             kind: "trap",
             name: "Tar pit",
-            cost: 75,
+            plural: "Tar pits",
             blurb: "Bogs down everything crossing it, and the slow lingers.",
             base: { dps: 4, slow: 0.5, slowGrowth: 0.02, slowCap: 0.6, slowFor: 1.3 }
         },
         mine: {
             kind: "trap",
             name: "Mine",
-            cost: 200,
+            plural: "Mines",
             blurb: "A big blast when stepped on, then a few seconds to re-arm.",
             base: { damage: 55, splash: 0.9, rearm: 5 }
         }
@@ -274,7 +282,23 @@
         map.length = map.segments[map.segments.length - 1].end;
         map.pathSet = pathSet;
         map.obstacleSet = new Set(obstacles.map((o) => `${o.x},${o.y}`));
+        map.allotment = dailyAllotment(seed);
         return map;
+    }
+
+    // What everyone gets to place today: 0–3 of each defense, from its own
+    // seeded stream so the map itself is unchanged. Rerolled until it's a
+    // fair day to play — enough towers to fight with, and neither a handful
+    // of pieces nor a bottomless pile.
+    function dailyAllotment(seed) {
+        const rng = mulberry32(hashString(`${seed}:allotment`));
+        for (;;) {
+            const out = {};
+            Object.keys(DEFENSES).forEach((type) => { out[type] = Math.floor(rng() * (MAX_EACH + 1)); });
+            const towers = TOWER_TYPES.reduce((n, t) => n + out[t], 0);
+            const total = Object.values(out).reduce((n, c) => n + c, 0);
+            if (towers >= ALLOT_MIN_TOWERS && total >= ALLOT_MIN_TOTAL && total <= ALLOT_MAX_TOTAL) return out;
+        }
     }
 
     function buildSegments(points) {
@@ -349,7 +373,7 @@
             map,
             phase: "setup",
             time: 0,
-            gold: BUDGET,
+            stock: { ...map.allotment },
             hp: START_HP,
             maxHp: START_HP,
             wave: 0,
@@ -420,7 +444,9 @@
             return state.map.pathSet.has(`${x},${y}`) ? "Towers go on the grass — traps go on the road." : "You can't build there.";
         }
         if (def.kind === "trap" && !isRoad(state.map, x, y)) return "Traps go on the road.";
-        if (state.gold < def.cost) return `Not enough gold — ${def.name} costs ${def.cost}.`;
+        if (!(state.stock[type] > 0)) {
+            return state.map.allotment[type] ? `No ${def.plural} left — that's all of today's.` : `There are no ${def.plural} today.`;
+        }
         return null;
     }
 
@@ -432,20 +458,20 @@
         const problem = placementProblem(state, type, x, y);
         if (problem) return { ok: false, reason: problem };
         const def = DEFENSES[type];
-        state.gold -= def.cost;
+        state.stock[type] -= 1;
         const d = { id: state.nextId++, type, kind: def.kind, x, y, level: 1, xp: 0, kills: 0, assists: 0, cooldown: 0, angle: -Math.PI / 2 };
         state.defenses.push(d);
         return { ok: true, defense: d };
     }
 
-    // Before the run, anything can be picked back up for a full refund.
+    // Before the run, anything can be picked back up and placed again.
     function remove(state, id) {
         if (state.phase !== "setup") return { ok: false, reason: "The run has started." };
         const d = findDefense(state, id);
         if (!d) return { ok: false, reason: "Nothing there." };
         state.defenses = state.defenses.filter((x) => x !== d);
-        state.gold += DEFENSES[d.type].cost;
-        return { ok: true, refund: DEFENSES[d.type].cost, defense: d };
+        state.stock[d.type] += 1;
+        return { ok: true, defense: d };
     }
 
     function startRun(state) {
@@ -749,7 +775,7 @@
             step(state, STEP);
             steps += 1;
         }
-        return { ok: true, kills: state.kills, wave: state.wave, spent: BUDGET - state.gold };
+        return { ok: true, kills: state.kills, wave: state.wave, rules: RULES };
     }
 
     function drainEvents(state) {
@@ -760,7 +786,8 @@
 
     return {
         SIZE,
-        BUDGET,
+        RULES,
+        MAX_EACH,
         START_HP,
         KING_EVERY,
         STEP,

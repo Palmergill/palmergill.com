@@ -182,6 +182,10 @@ def migrate_database():
             "TIMESTAMP" if is_postgres else "DATETIME",
         )
 
+        # Castle Defense scores are tagged with the rules they were played
+        # under; rows from before the tag were the gold-budget rules, 1.
+        _add_column_if_missing(inspector, "castle_defense_scores", "rules", "INTEGER NOT NULL DEFAULT 1")
+
         refreshed = inspect(engine)
         if (
             "ff_draft_sessions" in refreshed.get_table_names()

@@ -42,18 +42,27 @@ def engine_source() -> str:
     raise RuntimeError("castleDefenseGame.js not found; looked in " + ", ".join(str(p) for p in paths))
 
 
-def replay(day: str, layout: List[Dict[str, Any]]) -> Dict[str, Any]:
-    """Run `layout` on `day`'s map to the end and return the engine's result."""
+def _eval(expression: str) -> str:
     from py_mini_racer import MiniRacer
 
     ctx = MiniRacer()
     try:
         ctx.eval(engine_source())
-        raw = ctx.eval(f"JSON.stringify(CastleDefenseGame.replay({json.dumps(day)}, {json.dumps(layout)}))")
+        return ctx.eval(expression)
     finally:
         # Without an explicit close the V8 thread keeps the process alive.
         ctx.close()
-    return json.loads(raw)
+
+
+@lru_cache(maxsize=1)
+def current_rules() -> int:
+    """The engine's own RULES number, so the server can't drift from it."""
+    return int(_eval("CastleDefenseGame.RULES"))
+
+
+def replay(day: str, layout: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """Run `layout` on `day`'s map to the end and return the engine's result."""
+    return json.loads(_eval(f"JSON.stringify(CastleDefenseGame.replay({json.dumps(day)}, {json.dumps(layout)}))"))
 
 
 def postable_days(now: Optional[datetime] = None) -> set:
@@ -70,26 +79,28 @@ def validate_day(day: str) -> str:
         raise HTTPException(status_code=422, detail="That isn't a date.")
 
 
+def _day(db: Session, day: str):
+    """A day's rows that count: the ones played under the current rules."""
+    return db.query(CastleDefenseScore).filter(
+        CastleDefenseScore.day == day, CastleDefenseScore.rules == current_rules()
+    )
+
+
 def _board_query(db: Session, day: str):
     return (
-        db.query(CastleDefenseScore)
-        .filter(CastleDefenseScore.day == day)
+        _day(db, day)
         .order_by(CastleDefenseScore.kills.desc(), CastleDefenseScore.achieved_at.asc(), CastleDefenseScore.id.asc())
     )
 
 
 def rank_of(db: Session, row: CastleDefenseScore) -> int:
     """Standard competition ranking: tied scores share a place (1, 2, 2, 4)."""
-    ahead = (
-        db.query(CastleDefenseScore)
-        .filter(CastleDefenseScore.day == row.day, CastleDefenseScore.kills > row.kills)
-        .count()
-    )
+    ahead = _day(db, row.day).filter(CastleDefenseScore.kills > row.kills).count()
     return ahead + 1
 
 
 def player_count(db: Session, day: str) -> int:
-    return db.query(CastleDefenseScore).filter(CastleDefenseScore.day == day).count()
+    return _day(db, day).count()
 
 
 def entry(row: CastleDefenseScore, rank: int, username: Optional[str] = None) -> Dict[str, Any]:
@@ -113,7 +124,7 @@ def leaderboard(db: Session, day: str, username: Optional[str] = None) -> Dict[s
         previous = row.kills
     you = None
     if username:
-        mine = db.query(CastleDefenseScore).filter_by(day=day, username=username).first()
+        mine = _day(db, day).filter(CastleDefenseScore.username == username).first()
         if mine:
             you = entry(mine, rank_of(db, mine), username)
     return {"day": day, "players": player_count(db, day), "entries": entries, "you": you}
@@ -131,7 +142,7 @@ def submit(db: Session, day: str, layout: List[Dict[str, Any]], username: str, d
     if not result.get("ok"):
         raise HTTPException(status_code=422, detail=result.get("reason") or "That layout isn't valid.")
 
-    kills, wave = int(result["kills"]), int(result["wave"])
+    kills, wave, rules = int(result["kills"]), int(result["wave"]), int(result["rules"])
     improved = False
     if row is None:
         row = CastleDefenseScore(
@@ -142,14 +153,16 @@ def submit(db: Session, day: str, layout: List[Dict[str, Any]], username: str, d
             wave=wave,
             layout=json.dumps(layout),
             runs=1,
+            rules=rules,
         )
         db.add(row)
         improved = True
     else:
         row.runs += 1
         row.display_name = display_name
-        if kills > row.kills:
-            row.kills, row.wave, row.layout = kills, wave, json.dumps(layout)
+        # A score from older rules isn't comparable, so any run replaces it.
+        if row.rules != rules or kills > row.kills:
+            row.kills, row.wave, row.layout, row.rules = kills, wave, json.dumps(layout), rules
             row.achieved_at = utc_now()
             improved = True
     db.commit()

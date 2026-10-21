@@ -1170,6 +1170,9 @@ class CastleDefenseScore(Base):
     # JSON list of {type, x, y}: the layout that earned `kills`.
     layout = Column(Text, nullable=False)
     runs = Column(Integer, nullable=False, default=1)
+    # The engine's RULES the run was played under. The board only ranks the
+    # current rules, so a rules change starts every day's board afresh.
+    rules = Column(Integer, nullable=False, default=1, server_default="1")
     created_at = Column(DateTime, default=utc_now, nullable=False)
     # When `kills` was last set. Ties on the board go to whoever got there first.
     achieved_at = Column(DateTime, default=utc_now, nullable=False)
