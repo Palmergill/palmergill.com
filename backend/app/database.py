@@ -200,6 +200,53 @@ class DailySignupCounter(Base):
     updated_at = Column(DateTime, default=utc_now, onupdate=utc_now, nullable=False)
 
 
+class PasskeyCredential(Base):
+    """A WebAuthn credential that signs one identity in without a password.
+
+    Member rows point at their `app_users` row by id, so a deleted and
+    re-registered username does not inherit the old account's passkeys. Admin
+    rows have no user row to point at; instead `admin_binding` carries an HMAC
+    keyed by the session secret (see app.passkeys), so a row written by
+    anything that lacks that env secret cannot sign anyone in as admin.
+    """
+
+    __tablename__ = "passkey_credentials"
+
+    id = Column(Integer, primary_key=True, index=True)
+    # base64url, as the browser reports it in `credential.id`.
+    credential_id = Column(String, unique=True, index=True, nullable=False)
+    public_key = Column(Text, nullable=False)
+    sign_count = Column(Integer, default=0, nullable=False)
+    role = Column(String, nullable=False)
+    # Normalized username for members; the admin username for the admin.
+    owner = Column(String, index=True, nullable=False)
+    member_id = Column(Integer, ForeignKey("app_users.id", ondelete="CASCADE"), nullable=True)
+    admin_binding = Column(String, nullable=True)
+    name = Column(String, nullable=False)
+    transports = Column(String, nullable=True)
+    created_at = Column(DateTime, default=utc_now, nullable=False)
+    last_used_at = Column(DateTime, nullable=True)
+
+
+class PasskeyChallenge(Base):
+    """A single-use WebAuthn challenge, kept server side until it is answered.
+
+    Stored in the database rather than process memory so an answer can land
+    on any API worker, and deleted on first use so a captured response cannot
+    be replayed.
+    """
+
+    __tablename__ = "passkey_challenges"
+
+    challenge = Column(String, primary_key=True)
+    purpose = Column(String, nullable=False)
+    # Set for registration: whose passkey this ceremony is adding.
+    role = Column(String, nullable=True)
+    owner = Column(String, nullable=True)
+    member_id = Column(Integer, nullable=True)
+    expires_at = Column(DateTime, index=True, nullable=False)
+
+
 class PokerGameState(Base):
     __tablename__ = "poker_game_states"
 

@@ -130,7 +130,7 @@ rule that ideas are never served to anyone but their author. CI runs both.
 ## Deployment
 
 - Static site hosting serves the root static files and project directories.
-- Vercel rewrites `/api/*`, `/login/session`, `/login/signup`, and `/login/logout` to the Railway API.
+- Vercel rewrites `/api/*`, `/login/session`, `/login/signup`, `/login/logout`, and `/login/passkey*` to the Railway API.
 - Railway runs the Dockerized FastAPI backend from `backend/`.
 - `/`, `/docs/`, `/login/`, `/signup/`, `/casino/`, `/poker/`, `/craps/`, `/craps-strategy/`, `/blackjack/`, `/high-card-flush/`, `/api/poker/*`, `/api/craps/*`, `/stock-research/`, `/bitcoin-chat/`, `/api/stocks/*`, `/api/bitcoin/*`, and `/api/analytics/*` are public. Stock and Bitcoin routes serve demo data when unauthenticated; any signed-in account unlocks live provider-backed data. Admin, FastAPI docs/OpenAPI JSON, and other API routes require authentication. Protected backend routes return `503` when `APP_AUTH_PASSWORD` is missing.
 
@@ -140,6 +140,8 @@ Two roles, stored in different places on purpose:
 
 - **admin** — the `APP_AUTH_USERNAME` / `APP_AUTH_PASSWORD` env pair. No database row, so nothing that can write to `app_users` can grant itself the logs.
 - **member** — a row in `app_users`, created through the open `/signup/` flow. Successful registrations are capped at five per UTC day by the `daily_signup_counters` table. Passwords are hashed with stdlib scrypt (`backend/app/accounts.py`). Members get the live tools; `/admin/*`, `/api/admin/*`, `/api/fantasy/admin/*`, and the FastAPI docs return `403`.
+
+Either role can also sign in with a passkey, managed at `/account/` (`backend/app/passkeys.py`, `passkey_credentials`). Adding one needs the current password, not just a session cookie. Member passkeys point at their `app_users` row and must be newer than it, so a re-created username never inherits an old account's passkeys. Admin passkeys keep the "no database row grants admin" rule: each carries an HMAC binding keyed by the session signing secret, so a row written without that env secret is refused, and rotating `APP_SESSION_SECRET` (or the password it falls back to) retires every admin passkey. Challenges are single-use rows in `passkey_challenges`.
 
 Fourth & Fortune persists rooms, players, rounds, and every dealt card in the
 `ff_draft_*` tables. The API owns turn authorization and derives a separate

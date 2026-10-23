@@ -480,7 +480,7 @@ function decodeBasicAuth(value) {
 // Sign-in, sign-up, and sign-out are handled by the API service (see
 // backend/app/main.py) because member accounts live in its database, which
 // the edge runtime can't reach. vercel.json rewrites /login/session,
-// /login/signup, and /login/logout there; this middleware only verifies the
+// /login/signup, /login/logout, and /login/passkey* there; this middleware only verifies the
 // session cookie that service issues.
 export default async function middleware(request) {
   const url = new URL(request.url);

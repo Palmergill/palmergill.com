@@ -39,6 +39,14 @@
       "destination": "https://stock-research-production-f566.up.railway.app/login/logout"
     },
     {
+      "source": "/login/passkey",
+      "destination": "https://stock-research-production-f566.up.railway.app/login/passkey"
+    },
+    {
+      "source": "/login/passkey/(.*)",
+      "destination": "https://stock-research-production-f566.up.railway.app/login/passkey/$1"
+    },
+    {
       "source": "/poker/(.*)",
       "destination": "/poker/$1"
     },

@@ -10,7 +10,7 @@ for (const path of ['/fantasy/week/', '/fantasy/draft-recap/', '/admin/']) {
 async function signIn(page, username, password = PASSWORD) {
     await page.getByLabel('Username').fill(username);
     await page.getByLabel('Password').fill(password);
-    await page.getByRole('button', { name: 'Sign in' }).click();
+    await page.getByRole('button', { name: 'Sign in', exact: true }).click();
 }
 
 test.describe('member session', () => {

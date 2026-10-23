@@ -14,7 +14,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTextResponse, RedirectResponse
-from app import accounts
+from app import accounts, passkeys
 from app.accounts import ROLE_ADMIN, ROLE_MEMBER, AccountError
 from app.database import SessionLocal, engine
 from app.database_migration import init_db_with_migration
@@ -989,6 +989,192 @@ async def login_logout(request: Request):
     return response
 
 
+# Passkeys sign in alongside passwords; app/passkeys.py holds the ceremony
+# logic and the ownership rules. These live under /login so they share its
+# public prefix and the vercel.json rewrite to this service.
+def _passkey_owner(request: Request, db) -> dict | None:
+    identity = getattr(request.state, "app_user", None)
+    config = app_auth_config()
+    if not identity or not config:
+        return None
+    return passkeys.owner_for_identity(db, identity, config["username"])
+
+
+def _signed_out_json():
+    return JSONResponse({"error": "Sign in to manage passkeys."}, status_code=401)
+
+
+@app.post("/login/passkey/register/options")
+async def passkey_registration_options(request: Request):
+    config = app_auth_config()
+    if not config:
+        return JSONResponse({"error": "App authentication is not configured"}, status_code=503)
+    if auth_rate_limited(request):
+        return auth_rate_limit_response()
+
+    try:
+        body = await request.json()
+    except ValueError:
+        return JSONResponse({"error": "Invalid passkey request"}, status_code=400)
+    password = body.get("password") if isinstance(body, dict) else None
+
+    db = SessionLocal()
+    try:
+        owner = _passkey_owner(request, db)
+        if owner is None:
+            return _signed_out_json()
+
+        # A session cookie alone must not be enough to add a passkey: one
+        # stolen cookie would otherwise become permanent access.
+        if owner["role"] == ROLE_ADMIN:
+            confirmed = isinstance(password, str) and constant_time_equal(password, config["password"])
+        else:
+            confirmed = isinstance(password, str) and accounts.verify_password(
+                password, owner["user"].password_hash
+            )
+        if not confirmed:
+            record_auth_failure(request)
+            return JSONResponse({"error": "That password isn't right."}, status_code=401)
+
+        options = passkeys.registration_options(db, request, owner)
+    except AccountError as error:
+        return JSONResponse({"error": error.message}, status_code=error.status_code)
+    finally:
+        db.close()
+
+    return JSONResponse({"publicKey": options}, headers={"Cache-Control": "no-store"})
+
+
+@app.post("/login/passkey/register")
+async def passkey_register(request: Request):
+    config = app_auth_config()
+    if not config:
+        return JSONResponse({"error": "App authentication is not configured"}, status_code=503)
+
+    try:
+        body = await request.json()
+    except ValueError:
+        return JSONResponse({"error": "Invalid passkey request"}, status_code=400)
+    if not isinstance(body, dict):
+        return JSONResponse({"error": "Invalid passkey request"}, status_code=400)
+
+    db = SessionLocal()
+    try:
+        owner = _passkey_owner(request, db)
+        if owner is None:
+            return _signed_out_json()
+        row = passkeys.finish_registration(
+            db,
+            request,
+            owner,
+            body.get("credential"),
+            body.get("name"),
+            session_signing_secret(config["password"]),
+        )
+        logger.info("Added passkey %s for %s %s", row.id, owner["role"], owner["owner"])
+        return JSONResponse({"ok": True, "passkeys": passkeys.list_passkeys(db, owner)}, status_code=201)
+    except AccountError as error:
+        return JSONResponse({"error": error.message}, status_code=error.status_code)
+    finally:
+        db.close()
+
+
+@app.get("/login/passkey/credentials")
+async def passkey_list(request: Request):
+    db = SessionLocal()
+    try:
+        owner = _passkey_owner(request, db)
+        if owner is None:
+            return _signed_out_json()
+        return JSONResponse(
+            {"passkeys": passkeys.list_passkeys(db, owner)},
+            headers={"Cache-Control": "no-store"},
+        )
+    finally:
+        db.close()
+
+
+@app.delete("/login/passkey/credentials/{passkey_id}")
+async def passkey_delete(passkey_id: int, request: Request):
+    db = SessionLocal()
+    try:
+        owner = _passkey_owner(request, db)
+        if owner is None:
+            return _signed_out_json()
+        if not passkeys.delete_passkey(db, owner, passkey_id):
+            return JSONResponse({"error": "Passkey not found."}, status_code=404)
+        logger.info("Removed passkey %s for %s %s", passkey_id, owner["role"], owner["owner"])
+        return JSONResponse({"ok": True, "passkeys": passkeys.list_passkeys(db, owner)})
+    finally:
+        db.close()
+
+
+@app.post("/login/passkey/options")
+async def passkey_authentication_options(request: Request):
+    if not app_auth_config():
+        return JSONResponse({"error": "App authentication is not configured"}, status_code=503)
+    if auth_rate_limited(request):
+        return auth_rate_limit_response()
+
+    db = SessionLocal()
+    try:
+        options = passkeys.authentication_options(db, request)
+    except AccountError as error:
+        return JSONResponse({"error": error.message}, status_code=error.status_code)
+    finally:
+        db.close()
+    return JSONResponse({"publicKey": options}, headers={"Cache-Control": "no-store"})
+
+
+@app.post("/login/passkey")
+async def passkey_sign_in(request: Request):
+    config = app_auth_config()
+    if not config:
+        return JSONResponse({"error": "App authentication is not configured"}, status_code=503)
+    if auth_rate_limited(request):
+        return auth_rate_limit_response()
+
+    try:
+        body = await request.json()
+    except ValueError:
+        record_auth_failure(request)
+        return JSONResponse({"error": "Invalid passkey request"}, status_code=400)
+    if not isinstance(body, dict):
+        record_auth_failure(request)
+        return JSONResponse({"error": "Invalid passkey request"}, status_code=400)
+
+    db = SessionLocal()
+    try:
+        identity = passkeys.finish_authentication(
+            db,
+            request,
+            body.get("credential"),
+            config["username"],
+            session_signing_secret(config["password"]),
+        )
+    finally:
+        db.close()
+
+    if identity is None:
+        record_auth_failure(request)
+        return JSONResponse(
+            {"error": "That passkey isn't set up for this site. Sign in with your password instead."},
+            status_code=401,
+        )
+
+    clear_auth_failures(request)
+    response = JSONResponse(
+        {
+            "ok": True,
+            "redirect": safe_next_path(body.get("next")),
+            "username": identity["username"],
+            "role": identity["role"],
+        },
+        headers={"Cache-Control": "no-store"},
+    )
+    return _set_session_cookie(response, request, identity["username"], identity["role"])
+
+
 # CORS - allow frontend to call backend
 # Allow all origins for development (restrict in production)
 allowed_origins_str = os.getenv("ALLOWED_ORIGINS", "https://palmergill.com")
@@ -1063,6 +1249,7 @@ if local_site_root_enabled:
         "/gifts": "gifts",
         "/casino": "casino",
         "/admin": "admin",
+        "/account": "account",
         "/login": "login",
         "/signup": "signup",
     }.items():

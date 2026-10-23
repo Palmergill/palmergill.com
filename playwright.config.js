@@ -35,6 +35,7 @@ module.exports = defineConfig({
             APP_AUTH_PASSWORD: 'e2e-admin-password',
             // Rate limits are per-IP, and every test signs in from loopback.
             APP_AUTH_RATE_LIMIT_MAX_ATTEMPTS: '1000',
+            ANALYTICS_RATE_LIMIT_MAX_EVENTS: '100000',
             DAILY_SIGNUP_LIMIT: '100000',
         },
     },

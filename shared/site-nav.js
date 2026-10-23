@@ -192,10 +192,10 @@
             const auth = document.createElement("div");
             auth.className = "site-nav__auth";
             auth.innerHTML = [
-                '<span class="site-nav__user">',
+                '<a class="site-nav__user" href="/account/" title="Account and passkeys">',
                 `<span class="site-nav__user-icon">${iconSvg("circle-user")}</span>`,
                 '<span class="site-nav__username"></span>',
-                '</span>',
+                '</a>',
                 '<button class="site-nav__link site-nav__logout" type="button">',
                 `<span class="site-nav__icon">${iconSvg("log-out")}</span>`,
                 '<span><span class="site-nav__label">Logout</span><span class="site-nav__hint">End session</span></span>',

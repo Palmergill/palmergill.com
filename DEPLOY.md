@@ -21,7 +21,7 @@ The active static site lives at the repo root:
 - `fantasy/`
 - `admin/`
 
-Production static hosting should serve those files directly. `vercel.json` rewrites `/api/*` requests to the Railway backend, along with `/login/session`, `/login/signup`, and `/login/logout`.
+Production static hosting should serve those files directly. `vercel.json` rewrites `/api/*` requests to the Railway backend, along with `/login/session`, `/login/signup`, `/login/logout`, and the `/login/passkey*` endpoints.
 
 ### Two roles
 
@@ -49,6 +49,14 @@ APP_AUTH_PASSWORD=<secret password>
 ```
 
 If `APP_AUTH_PASSWORD` is missing in Vercel, protected routes return `503` so the apps do not accidentally publish without auth.
+
+### Passkeys
+
+Any signed-in account can add passkeys at `/account/` (the nav's username links there); the login page then offers "Sign in with a passkey" and lists saved passkeys in the username field's autofill. Passwords keep working alongside them.
+
+Passkeys are scoped to the RP ID `palmergill.com` and accept the `https://palmergill.com` and `https://www.palmergill.com` origins by default. Set `WEBAUTHN_RP_ID` and `WEBAUTHN_ORIGINS` (comma-separated) in Railway only if the site moves domains — passkeys made under one RP ID never work under another. Local previews with `LOCAL_SITE_ROOT=true` use `localhost` automatically.
+
+Admin passkeys are bound to the session signing secret, so rotating `APP_SESSION_SECRET` (or `APP_AUTH_PASSWORD` while it is the fallback) signs every admin passkey out for good; add them again from `/account/` afterwards. Member passkeys are unaffected.
 
 ### Member sign-ups
 

@@ -210,6 +210,16 @@ body.has-site-nav .app-shell {
     white-space: nowrap;
 }
 
+.site-nav__user {
+    border-radius: 6px;
+    text-decoration: none;
+}
+
+.site-nav__user:hover,
+.site-nav__user:focus-visible {
+    color: var(--site-nav-green);
+}
+
 .site-nav__user-icon {
     display: inline-flex;
     width: 17px;

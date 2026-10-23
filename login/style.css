@@ -28,6 +28,11 @@ input {
     font: inherit;
 }
 
+/* The grid and flex blocks below would otherwise override `hidden`. */
+[hidden] {
+    display: none !important;
+}
+
 .login-shell {
     position: relative;
     display: flex;
@@ -164,6 +169,17 @@ h1 {
     text-decoration: none;
 }
 
+.account-note a {
+    border-radius: 4px;
+    color: var(--accent);
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.account-note a:hover {
+    text-decoration: underline;
+}
+
 .login-alt a:hover {
     text-decoration: underline;
 }
@@ -223,6 +239,110 @@ h1 {
     cursor: wait;
     opacity: 0.7;
     transform: none;
+}
+
+.login-button--secondary {
+    width: 100%;
+    border: 1px solid var(--line-strong);
+    background: var(--surface);
+    color: var(--ink);
+}
+
+.login-button--secondary:hover,
+.login-button--secondary:focus-visible {
+    border-color: var(--accent);
+    background: var(--card);
+    color: var(--ink);
+}
+
+.login-button--danger {
+    min-height: 36px;
+    padding: 0 14px;
+    border: 1px solid var(--line-strong);
+    background: transparent;
+    color: var(--danger);
+    font-size: 0.84rem;
+}
+
+.login-button--danger:hover,
+.login-button--danger:focus-visible {
+    border-color: var(--danger);
+    background: transparent;
+    box-shadow: none;
+    transform: none;
+}
+
+.login-passkey {
+    display: grid;
+    gap: 14px;
+    margin-top: -4px;
+}
+
+.login-divider {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    color: var(--soft);
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+.login-divider::before,
+.login-divider::after {
+    content: "";
+    flex: 1;
+    border-top: 1px solid var(--line);
+}
+
+/* Account page: the passkey list. */
+.passkey-list {
+    display: grid;
+    gap: 8px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.passkey-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 14px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--surface);
+}
+
+.passkey-item__name {
+    overflow-wrap: anywhere;
+    color: var(--ink);
+    font-size: 0.92rem;
+    font-weight: 600;
+}
+
+.passkey-item__meta {
+    margin-top: 3px;
+    color: var(--muted);
+    font-size: 0.78rem;
+}
+
+.account-section {
+    display: grid;
+    gap: 14px;
+}
+
+.account-section h2 {
+    margin: 0;
+    color: var(--ink);
+    font-size: 1.05rem;
+}
+
+.account-note {
+    margin: 0;
+    color: var(--muted);
+    font-size: 0.88rem;
+    line-height: 1.5;
 }
 
 .login-back {

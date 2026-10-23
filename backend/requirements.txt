@@ -9,3 +9,5 @@ urllib3==2.8.0
 certifi==2026.7.22
 # Embedded V8: replays Castle Defense runs in the page's own JS engine.
 mini-racer==0.14.1
+# Passkey (WebAuthn) sign-in.
+webauthn==3.0.1

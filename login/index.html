@@ -10,8 +10,8 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/shared/site-nav.css?v=17">
-    <link rel="stylesheet" href="/login/style.css?v=5">
+    <link rel="stylesheet" href="/shared/site-nav.css?v=18">
+    <link rel="stylesheet" href="/login/style.css?v=8">
 </head>
 <body>
 <noscript>
@@ -29,7 +29,7 @@
             <form class="login-form" id="loginForm" novalidate>
                 <div class="field">
                     <label for="username">Username</label>
-                    <input id="username" name="username" type="text" autocomplete="username" required>
+                    <input id="username" name="username" type="text" autocomplete="username webauthn" required>
                 </div>
 
                 <div class="field">
@@ -48,6 +48,19 @@
                 </button>
             </form>
 
+            <div class="login-passkey" id="passkeySection" hidden>
+                <span class="login-divider">or</span>
+                <button class="login-button login-button--secondary" id="passkeyButton" type="button">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <circle cx="8" cy="15" r="4"></circle>
+                        <path d="m10.85 12.15 9.15-9.15"></path>
+                        <path d="m18 5 2 2"></path>
+                        <path d="m15 8 2 2"></path>
+                    </svg>
+                    <span>Sign in with a passkey</span>
+                </button>
+            </div>
+
             <p class="login-alt" id="signupPrompt" hidden>
                 Need an account? <a href="/signup/">Sign up</a>
             </p>
@@ -56,8 +69,9 @@
         <a class="login-back" href="/">&larr; Back to palmergill.com</a>
     </main>
 
-    <script src="/shared/site-nav.js?v=20"></script>
+    <script src="/shared/site-nav.js?v=21"></script>
     <script src="/shared/analytics.js?v=1"></script>
-    <script src="/login/app.js?v=3"></script>
+    <script src="/shared/passkeys.js?v=1"></script>
+    <script src="/login/app.js?v=4"></script>
 </body>
 </html>

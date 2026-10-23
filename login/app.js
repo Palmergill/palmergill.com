@@ -97,6 +97,55 @@
         }
     }
 
+    // Passkeys: a button that opens the browser's passkey dialog, plus the
+    // quieter autofill route — the username field's suggestions list any
+    // passkey saved for this site. Only one request can be pending, so the
+    // button aborts the autofill request before starting its own.
+    const passkeys = window.Passkeys;
+    const passkeySection = document.getElementById("passkeySection");
+    const passkeyButton = document.getElementById("passkeyButton");
+    let autofillRequest = null;
+
+    function passkeySignedIn(data) {
+        window.pgAnalytics?.track?.("login_success", { role: data.role, method: "passkey" });
+        setStatus("Signed in. Opening page.", true);
+        window.location.assign(data.redirect || safeNextPath());
+    }
+
+    async function startPasskeyAutofill() {
+        if (!(await passkeys.conditionalSupported())) return;
+        autofillRequest = new AbortController();
+        try {
+            passkeySignedIn(await passkeys.signIn({
+                next: safeNextPath(),
+                conditional: true,
+                signal: autofillRequest.signal,
+            }));
+        } catch (error) {
+            if (!passkeys.isCancelled(error)) setStatus(error.message);
+        }
+    }
+
+    if (passkeys?.supported()) {
+        passkeySection.hidden = false;
+        passkeyButton.addEventListener("click", async () => {
+            autofillRequest?.abort();
+            passkeyButton.disabled = true;
+            setStatus("");
+            try {
+                passkeySignedIn(await passkeys.signIn({ next: safeNextPath() }));
+            } catch (error) {
+                if (!passkeys.isCancelled(error)) {
+                    window.pgAnalytics?.track?.("login_failed", { status: error.status, method: "passkey" });
+                    setStatus(error.message || "Unable to sign in with a passkey.");
+                }
+            } finally {
+                passkeyButton.disabled = false;
+            }
+        });
+        startPasskeyAutofill();
+    }
+
     username.focus();
     revealSignupPrompt();
 })();
