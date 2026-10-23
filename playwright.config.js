@@ -36,7 +36,6 @@ module.exports = defineConfig({
             // Rate limits are per-IP, and every test signs in from loopback.
             APP_AUTH_RATE_LIMIT_MAX_ATTEMPTS: '1000',
             DAILY_SIGNUP_LIMIT: '100000',
-            OPENAI_API_KEY: '',
         },
     },
 });

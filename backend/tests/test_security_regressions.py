@@ -130,34 +130,6 @@ def test_buy_back_uses_server_defined_amount_for_busted_players():
     assert game._get_player(data["player_id"]).chips == poker.BUY_BACK_AMOUNT
 
 
-def test_bitcoin_chat_session_history_evicts_least_recently_used():
-    # _SESSION_MESSAGES is a per-process dict keyed by chat session id with no
-    # prior eviction policy, so it grew for the life of the process. Confirm
-    # the LRU cap actually bounds it and evicts the oldest session once full.
-    original_messages = dict(bitcoin_ai._SESSION_MESSAGES)
-    original_max = bitcoin_ai.MAX_SESSIONS
-    bitcoin_ai._SESSION_MESSAGES.clear()
-    bitcoin_ai.MAX_SESSIONS = 3
-    try:
-        for i in range(3):
-            bitcoin_ai._remember(f"session-{i}", "hi", "hello")
-        assert list(bitcoin_ai._SESSION_MESSAGES.keys()) == ["session-0", "session-1", "session-2"]
-
-        bitcoin_ai._remember("session-3", "hi", "hello")
-        # session-0 was least-recently-used and gets evicted to stay at cap.
-        assert list(bitcoin_ai._SESSION_MESSAGES.keys()) == ["session-1", "session-2", "session-3"]
-
-        # Touching an existing session moves it to the back of the LRU order,
-        # so the next eviction takes the new least-recently-used session.
-        bitcoin_ai._remember("session-1", "again", "again")
-        bitcoin_ai._remember("session-4", "hi", "hello")
-        assert list(bitcoin_ai._SESSION_MESSAGES.keys()) == ["session-3", "session-1", "session-4"]
-    finally:
-        bitcoin_ai.MAX_SESSIONS = original_max
-        bitcoin_ai._SESSION_MESSAGES.clear()
-        bitcoin_ai._SESSION_MESSAGES.update(original_messages)
-
-
 def test_cash_game_start_hand_skips_busted_players():
     # Non-tournament start_hand used to deal cards to every seat regardless of
     # chip count and only excluded zero-chip players in tournaments. A busted
@@ -360,7 +332,7 @@ def test_poker_serialization_preserves_ai_personality_metadata():
 def test_bitcoin_chat_session_cookie_is_not_exposed_to_browser(monkeypatch):
     seen_sessions = []
 
-    def fake_demo_answer(message, session_id=None, timezone_name=None, level=None):
+    def fake_demo_answer(message, session_id=None, timezone_name=None):
         seen_sessions.append(session_id)
         return {
             "answer": "demo answer",

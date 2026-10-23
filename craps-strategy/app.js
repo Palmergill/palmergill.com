@@ -1,17 +1,16 @@
 // Craps Strategy Simulator — UI controller.
 //
-// Flow: description --(/api/craps/translate)--> StrategyIntent
+// Flow: preset --> StrategyIntent
 //       intent + form --CrapsStrategy.normalize--> StrategySpec
 //       spec --CrapsEngine.runSimulation--> trials + stats --> charts.
 //
-// The LLM only ever yields an intent; all money + the seed are decided here so
+// A preset only ever yields an intent; all money + the seed are decided here so
 // runs are reproducible.
 (function () {
     'use strict';
 
     const Strategy = window.CrapsStrategy;
     const Engine = window.CrapsEngine;
-    const API_BASE = (window.API_ORIGIN || '') + '/api/craps';
     const TRIALS = 1000;
     const MAX_ROLLS = 1000;
 
@@ -24,8 +23,8 @@
 
     const el = (id) => document.getElementById(id);
     const dom = {
-        description: el('description'), buyIn: el('buyIn'), baseUnit: el('baseUnit'),
-        seed: el('seed'), translateBtn: el('translateBtn'), preset: el('preset'),
+        buyIn: el('buyIn'), baseUnit: el('baseUnit'),
+        seed: el('seed'), preset: el('preset'),
         status: el('status'), strategyPanel: el('strategyPanel'),
         strategySummary: el('strategySummary'), betList: el('betList'),
         oddsMult: el('oddsMult'), cashOutMode: el('cashOutMode'),
@@ -143,47 +142,11 @@
         ));
     }
 
-    // ---- Translate / preset -------------------------------------------------
-    async function translate() {
-        const description = dom.description.value.trim();
-        if (!description) { setStatus('Describe a strategy first, or pick a preset.', 'error'); return; }
-
-        dom.translateBtn.disabled = true;
-        setStatus('Translating your strategy…');
-        try {
-            const res = await fetch(API_BASE + '/translate', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    description,
-                    baseUnit: parseInt(dom.baseUnit.value, 10) || 10
-                })
-            });
-            if (res.status === 503) {
-                setStatus('AI translation is unavailable right now — pick a preset below to continue.', 'error');
-                return;
-            }
-            if (!res.ok) {
-                const body = await res.json().catch(() => ({}));
-                setStatus('Could not translate: ' + (body.detail || res.statusText), 'error');
-                return;
-            }
-            currentIntent = await res.json();
-            applyIntentCashOutToControls(currentIntent);
-            const spec = buildSpec(false);
-            if (spec) { renderStrategy(spec); setStatus('Translated. Review the bets, then run.', 'ok'); }
-        } catch (err) {
-            setStatus('Network error: ' + err.message, 'error');
-        } finally {
-            dom.translateBtn.disabled = false;
-        }
-    }
-
+    // ---- Preset -------------------------------------------------------------
     function usePreset(key) {
         if (!key || !Strategy.PRESETS[key]) return;
         currentIntent = JSON.parse(JSON.stringify(Strategy.PRESETS[key]));
         applyIntentCashOutToControls(currentIntent);
-        if (!dom.description.value.trim()) dom.description.value = Strategy.PRESETS[key].summary;
         const spec = buildSpec(false);
         if (spec) { renderStrategy(spec); setStatus('Loaded preset “' + spec.name + '”. Review and run.', 'ok'); }
     }
@@ -409,7 +372,6 @@
         updateCashOutFields();
     }
 
-    dom.translateBtn.addEventListener('click', translate);
     dom.preset.addEventListener('change', (e) => usePreset(e.target.value));
     dom.runBtn.addEventListener('click', run);
     dom.cashOutMode.addEventListener('change', () => {

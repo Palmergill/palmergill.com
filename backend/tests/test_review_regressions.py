@@ -26,7 +26,7 @@ from app.main import (
     app,
     create_app_session_token,
 )
-from app.routers import analytics, craps, poker, stocks
+from app.routers import analytics, poker, stocks
 from app.services import bitcoin_tools, fantasy_rankings_board
 from app.services.polygon_client import polygon_client
 
@@ -194,7 +194,6 @@ def test_guest_cannot_start_multiplayer_lobby_with_next_hand():
         stocks.get_earnings,
         stocks.get_price_history,
         stocks.get_stock,
-        craps.translate,
         analytics.create_event,
     ],
     ids=lambda endpoint: endpoint.__name__,

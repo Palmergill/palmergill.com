@@ -10,7 +10,6 @@ const chatForm = document.getElementById('chatForm');
 const messageInput = document.getElementById('messageInput');
 const nodeStatus = document.getElementById('nodeStatus');
 const demoNotice = document.getElementById('demoNotice');
-const levelSwitch = document.getElementById('levelSwitch');
 const learnPaths = document.getElementById('learnPaths');
 const lookupToggle = document.getElementById('lookupToggle');
 const chatToggle = document.getElementById('chatToggle');
@@ -48,8 +47,6 @@ const explorerEls = {
 // Clean up any session id left in localStorage from before the cookie cutover.
 try { localStorage.removeItem('bitcoinChatSessionId'); } catch { /* ignore */ }
 
-const LEVELS = ['new', 'curious', 'technical'];
-const LEVEL_STORAGE_KEY = 'bitcoinChatLevel';
 const RANGE_STORAGE_KEY = 'bitcoinDashRange';
 const CHAT_HIDDEN_STORAGE_KEY = 'bitcoinDashChatHidden';
 // A simple 1-input, 2-output segwit payment is ~140 vB; used to translate
@@ -68,7 +65,6 @@ const RANGE_LABELS = {
 };
 const MONO_STACK = '"SFMono-Regular", ui-monospace, Menlo, Consolas, monospace';
 
-let explanationLevel = readStoredLevel();
 let activeRange = readStoredRange();
 let priceChartInstance = null;
 let livePriceUsd = null;
@@ -986,34 +982,6 @@ function wireExplorer() {
 
 /* ---------------- Chat panel ---------------- */
 
-function readStoredLevel() {
-    try {
-        const stored = localStorage.getItem(LEVEL_STORAGE_KEY);
-        if (stored && LEVELS.includes(stored)) return stored;
-    } catch { /* ignore */ }
-    return 'new';
-}
-
-function setLevel(level) {
-    if (!LEVELS.includes(level)) return;
-    explanationLevel = level;
-    try { localStorage.setItem(LEVEL_STORAGE_KEY, level); } catch { /* ignore */ }
-    levelSwitch?.querySelectorAll('button[data-level]').forEach((button) => {
-        button.setAttribute('aria-pressed', String(button.dataset.level === level));
-    });
-}
-
-function wireLevelSwitch() {
-    if (!levelSwitch) return;
-    setLevel(explanationLevel);
-    levelSwitch.addEventListener('click', (event) => {
-        const button = event.target.closest('button[data-level]');
-        if (!button) return;
-        setLevel(button.dataset.level);
-        window.pgAnalytics?.track?.('bitcoin_chat_level', { level: button.dataset.level });
-    });
-}
-
 function setChatOpen(open) {
     layoutEl?.classList.toggle('chat-hidden', !open);
     chatToggle?.setAttribute('aria-expanded', String(open));
@@ -1064,7 +1032,6 @@ async function sendMessage(text) {
         const payload = {
             message: text,
             timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-            level: explanationLevel,
         };
         const result = await fetchJson(`${API_BASE}/chat`, {
             method: 'POST',
@@ -1144,7 +1111,6 @@ document.querySelectorAll('.stat-tile[data-prompt]').forEach((button) => {
     });
 });
 
-wireLevelSwitch();
 wireChatToggle();
 wireRangeSwitch();
 wireExplorer();

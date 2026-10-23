@@ -22,7 +22,7 @@ def is_demo_request(request: Request) -> bool:
 
 
 async def run_blocking(func, *args, **kwargs):
-    """Run sync provider/model work off the event loop."""
+    """Run sync provider work off the event loop."""
     return await asyncio.to_thread(func, *args, **kwargs)
 
 
@@ -30,7 +30,6 @@ class BitcoinChatRequest(BaseModel):
     message: str = Field(..., min_length=1, max_length=1000)
     session_id: Optional[str] = None
     timezone: Optional[str] = None
-    level: Optional[str] = Field(None, pattern="^(new|curious|technical)$")
 
 
 class BitcoinChatResponse(BaseModel):
@@ -164,14 +163,13 @@ async def bitcoin_chat(http_request: Request, request: BitcoinChatRequest):
     session_id = http_request.cookies.get(BITCOIN_SESSION_COOKIE) or request.session_id
 
     if is_demo_request(http_request):
-        result = bitcoin_ai.answer_demo_chat(request.message, session_id, request.timezone, request.level)
+        result = bitcoin_ai.answer_demo_chat(request.message, session_id, request.timezone)
     else:
         result = await run_blocking(
             bitcoin_ai.answer_chat,
             request.message,
             session_id,
             request.timezone,
-            request.level,
         )
 
     cookie_session_id = result["session_id"]

@@ -4,13 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Craps Strategy Simulator - Palmer Gill</title>
-    <meta name="description" content="Describe a craps betting strategy in plain English, set your bankroll, and Monte-Carlo simulate it over 1,000 trials — by Palmer Gill.">
+    <meta name="description" content="Pick a craps betting strategy, set your bankroll, and Monte-Carlo simulate it over 1,000 trials — by Palmer Gill.">
     <link rel="canonical" href="https://palmergill.com/craps-strategy/">
     <meta name="theme-color" content="#0a1f12">
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://palmergill.com/craps-strategy/">
     <meta property="og:title" content="Craps Strategy Simulator — Palmer Gill">
-    <meta property="og:description" content="Describe a craps strategy in plain English and watch 1,000 simulated bankrolls play out.">
+    <meta property="og:description" content="Pick a craps strategy and watch 1,000 simulated bankrolls play out.">
     <meta property="og:image" content="https://palmergill.com/assets/palmer-gill-logo.png">
     <meta name="twitter:card" content="summary">
     <link rel="icon" type="image/png" href="/assets/palmer-gill-logo-small.png">
@@ -38,19 +38,13 @@
         <header class="page-head">
             <p class="eyebrow">Monte-Carlo Lab</p>
             <h1>Craps Strategy Simulator</h1>
-            <p class="lede">Describe a betting strategy in plain English. We translate it into a
-                repeatable rule set, then deal <strong>1,000 bankrolls</strong> through up to
+            <p class="lede">Pick a betting strategy and set your bankroll. We deal <strong>1,000 bankrolls</strong> through up to
                 <strong>1,000 rolls</strong> each and chart every one.</p>
         </header>
 
         <section class="panel" aria-labelledby="setup-h">
-            <h2 id="setup-h" class="panel-title">1 &middot; Describe your strategy</h2>
+            <h2 id="setup-h" class="panel-title">1 &middot; Choose your strategy</h2>
 
-            <label class="field">
-                <span class="field-label">Strategy, in plain English</span>
-                <textarea id="description" rows="3"
-                    placeholder="e.g. Pass line with full odds, then place the 6 and 8 and press them after a win."></textarea>
-            </label>
 
             <div class="row">
                 <label class="field">
@@ -90,9 +84,8 @@
             </details>
 
             <div class="row actions">
-                <button id="translateBtn" class="btn btn-primary" type="button">Translate with AI</button>
                 <label class="field grow">
-                    <span class="field-label">Or start from a preset</span>
+                    <span class="field-label">Strategy</span>
                     <select id="preset">
                         <option value="">— choose a preset —</option>
                         <option value="passOdds">Pass Line + Odds</option>
@@ -156,7 +149,7 @@
     <script src="/craps-strategy/strategy.js?v=3"></script>
     <script src="/craps-strategy/engine.js?v=4"></script>
     <script src="/shared/api-base.js?v=1"></script>
-    <script src="/craps-strategy/app.js?v=5"></script>
+    <script src="/craps-strategy/app.js?v=6"></script>
     <script src="/shared/analytics.js?v=1"></script>
     <script src="/shared/site-nav.js?v=20"></script>
 </body>

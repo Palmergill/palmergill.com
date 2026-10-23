@@ -5,7 +5,7 @@ const CACHE_PREFIX = 'craps-strategy-';
 const STATIC_ASSETS = [
     '/craps-strategy/',
     '/craps-strategy/index.html',
-    '/craps-strategy/app.js?v=5',
+    '/craps-strategy/app.js?v=6',
     '/craps-strategy/style.css?v=3',
     '/craps-strategy/strategy.js?v=3',
     '/craps-strategy/engine.js?v=4',
@@ -53,7 +53,7 @@ self.addEventListener('fetch', (event) => {
     if (request.method !== 'GET') return;
     const url = new URL(request.url);
 
-    // Never cache API calls (the translate endpoint must hit the network).
+    // Never cache API calls.
     if (url.pathname.startsWith('/api/')) return;
 
     if (request.mode === 'navigate') {

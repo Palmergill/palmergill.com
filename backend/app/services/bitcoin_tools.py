@@ -14,7 +14,7 @@ from app.services.bitcoin_rpc import BitcoinRPCError, bitcoin_rpc_client
 
 MAX_MINED_STATS_BLOCKS = int(os.getenv("BITCOIN_MAX_MINED_STATS_BLOCKS", "1008"))
 BITCOIN_DATA_PROVIDER = os.getenv("BITCOIN_DATA_PROVIDER", "mempool").strip().lower()
-DEMO_WARNING = "Public demo mode uses estimated sample Bitcoin data and does not call Palmer's live node, mempool.space, or OpenAI."
+DEMO_WARNING = "Public demo mode uses estimated sample Bitcoin data and does not call Palmer's live node or mempool.space."
 BITCOIN_ADDRESS_PATTERN = r"(?:bc1[ac-hj-np-z02-9]{11,71}|[13][a-km-zA-HJ-NP-Z1-9]{25,34})"
 BITCOIN_ADDRESS_RE = re.compile(rf"^{BITCOIN_ADDRESS_PATTERN}$", re.IGNORECASE)
 DEFAULT_ADDRESS_UTXO_LIMIT = 25

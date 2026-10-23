@@ -26,7 +26,6 @@ from app.routers import (
     bitcoin,
     stocks,
     poker,
-    craps,
     draft_order,
     fantasy,
     fantasy_league,
@@ -152,14 +151,13 @@ async def _periodic_rate_limit_sweep(interval: int = 10 * 60) -> None:
     Each store re-filters a key's own timestamps only when that key is
     accessed again, so an IP that hits a public endpoint once and never
     returns (e.g. a botnet scan) leaves a stale entry behind forever. This
-    sweep bounds memory for the unauthenticated poker/craps/analytics APIs
+    sweep bounds memory for the unauthenticated poker/analytics APIs
     and the auth-failure tracker.
     """
 
     def _sweep() -> int:
         return (
             sweep_auth_failure_store()
-            + craps.sweep_rate_limit_store()
             + analytics.sweep_analytics_rate_limit_store()
             + poker.sweep_rate_limit_store()
         )
@@ -246,7 +244,6 @@ _auth_failure_store: dict[str, list[float]] = {}
 PUBLIC_PATH_PREFIXES = (
     "/api/analytics",
     "/api/poker",
-    "/api/craps",
     "/poker",
     "/craps",
     "/craps-strategy",
@@ -1017,7 +1014,6 @@ else:
 app.include_router(stocks.router)
 app.include_router(poker.router)
 app.include_router(bitcoin.router)
-app.include_router(craps.router)
 app.include_router(analytics.router)
 app.include_router(admin.router)
 app.include_router(fantasy.router)

@@ -111,6 +111,10 @@ reproducibly (per-trial RNG seeded from `baseSeed`).
 
 ## Changelog
 
+- **2026-10-22** — Removed the AI translator. The OpenAI key is gone, so
+  `POST /api/craps/translate`, `routers/craps.py`, and `services/craps_ai.py`
+  were deleted along with the plain-English box and "Translate with AI"
+  button. Strategies now come from the presets only.
 - **2026-06-23** — Bumped the run to **1,000 trials** (from 100) for more stable stats.
   The simulation of up to 1M rolls runs in ~0.5s. To keep the line chart fast and
   readable, it plots a representative **250-path sample** (stride-sampled), each thinned

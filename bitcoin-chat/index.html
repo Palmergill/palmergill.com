@@ -23,7 +23,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/shared/site-nav.css?v=17">
-    <link rel="stylesheet" href="style.css?v=9">
+    <link rel="stylesheet" href="style.css?v=10">
 </head>
 <body>
 <noscript>
@@ -40,7 +40,7 @@
                 </button>
                 <button type="button" id="chatToggle" class="term-button" aria-expanded="true" aria-controls="chatPanel">chat</button>
             </header>
-            <p id="demoNotice" class="demo-notice" hidden>Public demo mode uses sample Bitcoin data and local answers. Live node and OpenAI calls stay protected.</p>
+            <p id="demoNotice" class="demo-notice" hidden>Public demo mode uses sample Bitcoin data and local answers. Live node calls stay protected.</p>
 
             <section class="explorer-drawer" id="explorerDrawer" aria-label="Chain lookup" hidden>
                 <form id="explorerSearchForm" class="explorer-search">
@@ -126,11 +126,6 @@
                 <aside class="chat-panel" id="chatPanel" aria-label="Bitcoin chat helper">
                     <div class="chat-header">
                         <span class="chat-title">The explainer</span>
-                        <div class="level-switch" role="group" aria-label="Explanation level" id="levelSwitch">
-                            <button type="button" data-level="new" aria-pressed="true">new to this</button>
-                            <button type="button" data-level="curious" aria-pressed="false">curious</button>
-                            <button type="button" data-level="technical" aria-pressed="false">technical</button>
-                        </div>
                     </div>
                     <div id="messages" class="messages" aria-live="polite">
                         <div class="learn-paths" id="learnPaths" aria-label="Starting points">
@@ -152,6 +147,6 @@
     <script src="/shared/site-nav.js?v=20"></script>
     <script src="/shared/analytics.js?v=1"></script>
     <script src="/shared/api-base.js?v=1"></script>
-    <script src="app.js?v=9"></script>
+    <script src="app.js?v=10"></script>
 </body>
 </html>

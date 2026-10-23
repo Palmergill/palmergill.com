@@ -721,38 +721,6 @@ button {
     font-style: italic;
 }
 
-.level-switch {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    font-size: 11px;
-}
-
-.level-switch button {
-    border: 1px solid var(--line);
-    border-radius: 999px;
-    padding: 3px 9px;
-    background: transparent;
-    color: var(--muted-2);
-    font-size: 10.5px;
-    cursor: pointer;
-    transition: color 160ms ease, border-color 160ms ease, background 160ms ease;
-    white-space: nowrap;
-}
-
-.level-switch button:hover,
-.level-switch button:focus-visible {
-    color: var(--ink);
-    border-color: var(--line-strong);
-    outline: none;
-}
-
-.level-switch button[aria-pressed="true"] {
-    background: var(--ink);
-    border-color: var(--ink);
-    color: var(--paper);
-}
-
 /* Messages */
 .messages {
     flex: 1;
@@ -1345,8 +1313,7 @@ body:has(.status-dot.offline) .blocks-section {
 
 .range-switch button,
 .term-button,
-.learn-chip,
-.level-switch button {
+.learn-chip {
     min-height: 32px;
 }
 

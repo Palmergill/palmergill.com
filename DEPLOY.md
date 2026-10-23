@@ -92,7 +92,6 @@ Bitcoin Dashboard uses mempool.space as the default live provider. Configure:
 BITCOIN_DATA_PROVIDER=mempool
 BITCOIN_MEMPOOL_API_URL=https://mempool.space/api
 BITCOIN_MEMPOOL_TIMEOUT_SECONDS=10
-OPENAI_API_KEY=<OpenAI API key for natural-language chat>
 ```
 
 Set `BITCOIN_DATA_PROVIDER=rpc` plus `BITCOIN_RPC_URL`, `BITCOIN_RPC_USER`, and `BITCOIN_RPC_PASSWORD` only when routing live Bitcoin reads through the private Bitcoin Core node.
