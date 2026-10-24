@@ -64,11 +64,6 @@ body {
     line-height: 1.1;
 }
 
-.lede {
-    max-width: 56ch;
-    margin: 0;
-    color: var(--soft);
-}
 
 /* ── buttons ─────────────────────────────────────────────────────────────── */
 
@@ -885,11 +880,6 @@ body {
 
 /* ── wishlists ───────────────────────────────────────────────────────────── */
 
-.section-intro {
-    max-width: 60ch;
-    margin: 0 0 18px;
-    color: var(--soft);
-}
 
 .member-grid {
     display: grid;

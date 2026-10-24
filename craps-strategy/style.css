@@ -156,7 +156,6 @@ textarea:focus, input:focus, select:focus {
 .bet-row .bet-amount { display: flex; align-items: center; gap: 0.3rem; }
 .bet-row .bet-amount span { color: var(--quiet); }
 .bet-row input { width: 6.5rem; text-align: right; }
-.fineprint { color: var(--quiet); font-size: 0.78rem; margin: 0.9rem 0; }
 
 /* ---- Stats ---- */
 .stat-grid {

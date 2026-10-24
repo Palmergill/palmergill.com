@@ -12,7 +12,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/shared/site-nav.css?v=18">
+    <link rel="stylesheet" href="/shared/site-nav.css?v=19">
     <link rel="stylesheet" href="/shared/fantasy-header.css?v=4">
     <link rel="stylesheet" href="style.css?v=6">
     <link rel="stylesheet" href="/shared/fantasy-design.css?v=3">
@@ -27,10 +27,6 @@
             <div class="page-head__titles">
                 <span class="eyebrow">Your board</span>
                 <h1>My Rankings</h1>
-                <p class="lede">
-                    Your own order, position by position, kept all season. Build a board,
-                    adjust your rankings, and publish it when you want to share.
-                </p>
             </div>
             <button type="button" class="button button--quiet" id="siteConsensusButton">Site consensus</button>
         </header>
@@ -62,10 +58,6 @@
 
             <section class="new-board" aria-labelledby="newBoardHeading">
                 <h2 id="newBoardHeading">Create your first board</h2>
-                <p class="new-board__hint">
-                    Scoring and roster format are separate choices — superflex lifts
-                    quarterbacks up the overall board, so it gets its own list.
-                </p>
                 <div class="new-board__row">
                     <span class="new-board__label" id="scoringLabel">Scoring</span>
                     <div class="chip-row" id="scoringChips" role="group" aria-labelledby="scoringLabel"></div>
@@ -142,7 +134,6 @@
                     <button type="button" class="button button--quiet" id="helperUndoButton" hidden>Undo last pick</button>
                     <button type="button" class="button button--quiet" id="helperRestartButton">Start over</button>
                 </div>
-                <p class="helper__hint">Press 1, 2 or 3 to pick without leaving the keyboard.</p>
             </section>
 
             <p class="keyboard-hint" id="keyboardHint">
@@ -193,7 +184,7 @@
     </main>
 
     <script src="/shared/api-base.js?v=1"></script>
-    <script src="/shared/site-nav.js?v=21"></script>
+    <script src="/shared/site-nav.js?v=22"></script>
     <script src="/shared/analytics.js?v=1"></script>
     <script src="/shared/fantasy-header.js?v=9"></script>
     <script>window.FantasyHeader.mount({ page: "rankings" });</script>

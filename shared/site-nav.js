@@ -2,31 +2,26 @@
     const items = [
         {
             label: "Projects",
-            hint: "Site home",
             href: "/",
             icon: "layout-dashboard"
         },
         {
             label: "About",
-            hint: "Palmer Gill",
             href: "/about/",
             icon: "user-round"
         },
         {
             label: "Stock Research",
-            hint: "Market data",
             href: "/stock-research/",
             icon: "chart-candlestick"
         },
         {
             label: "Bitcoin",
-            hint: "Live dashboard",
             href: "/bitcoin-chat/",
             icon: "bitcoin"
         },
         {
             label: "Fantasy",
-            hint: "NFL rankings",
             href: "/fantasy/",
             // The whole section lives under /fantasy/ — league hub, market
             // board, rankings, draft room — rather than getting its own nav
@@ -36,20 +31,17 @@
         },
         {
             label: "Casino",
-            hint: "Table games & strategy",
             href: "/casino/",
             matches: ["/casino/", "/poker/", "/craps/", "/craps-strategy/", "/blackjack/", "/high-card-flush/"],
             icon: "spade"
         },
         {
             label: "Castle Defense",
-            hint: "Tower defense game",
             href: "/castle-defense/",
             icon: "castle"
         },
         {
             label: "Gifts",
-            hint: "Ideas & wishlists",
             href: "/gifts/",
             icon: "gift"
         }
@@ -58,13 +50,11 @@
     const utilityItems = [
         {
             label: "Docs",
-            hint: "Site reference",
             href: "/docs/",
             icon: "book-open"
         },
         {
             label: "Login",
-            hint: "Protected access",
             href: loginHref,
             icon: "log-in",
             auth: true
@@ -198,7 +188,7 @@
                 '</a>',
                 '<button class="site-nav__link site-nav__logout" type="button">',
                 `<span class="site-nav__icon">${iconSvg("log-out")}</span>`,
-                '<span><span class="site-nav__label">Logout</span><span class="site-nav__hint">End session</span></span>',
+                '<span class="site-nav__label">Logout</span>',
                 '</button>'
             ].join("");
             auth.querySelector(".site-nav__username").textContent = username;
@@ -256,10 +246,7 @@
             return [
                 `<a class="site-nav__link" href="${href}" title="${item.label}"${current}${auth}>`,
                 `<span class="site-nav__icon">${iconSvg(item.icon)}</span>`,
-                '<span>',
                 `<span class="site-nav__label">${item.label}</span>`,
-                `<span class="site-nav__hint">${item.hint}</span>`,
-                '</span>',
                 '</a>'
             ].join("");
         }).join("");
@@ -271,7 +258,7 @@
             '<button class="site-nav__toggle" type="button" aria-label="Open navigation" aria-expanded="false">',
             iconSvg("menu"),
             '</button>',
-            '<a class="site-nav__mobile-brand" href="/" aria-label="palmergill.com home"><img class="site-nav__mobile-logo" src="/assets/palmer-gill-logo-small.png" alt="" aria-hidden="true"><span><span class="site-nav__mobile-title">Palmergill.com</span><span class="site-nav__mobile-subtitle">Projects and tools</span></span></a>',
+            '<a class="site-nav__mobile-brand" href="/" aria-label="palmergill.com home"><img class="site-nav__mobile-logo" src="/assets/palmer-gill-logo-small.png" alt="" aria-hidden="true"><span class="site-nav__mobile-title">Palmergill.com</span></a>',
             `<a class="site-nav__top-login" data-auth-top href="${loginHref()}" title="Login">${iconSvg("log-in")}<span>Login</span></a>`,
             '<div class="site-nav__backdrop" aria-hidden="true"></div>',
             '<div class="site-nav__panel">',

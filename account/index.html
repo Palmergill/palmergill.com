@@ -10,7 +10,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/shared/site-nav.css?v=18">
+    <link rel="stylesheet" href="/shared/site-nav.css?v=19">
     <link rel="stylesheet" href="/login/style.css?v=8">
 </head>
 <body>
@@ -36,7 +36,7 @@
                 <p class="account-note">Signed in as <strong id="accountName"></strong>.</p>
 
                 <h2>Passkeys</h2>
-                <p class="account-note">A passkey signs you in with Face ID, Touch ID, Windows Hello, or a security key instead of your password. Your password keeps working too.</p>
+                <p class="account-note">A passkey signs you in with Face ID, Touch ID, Windows Hello, or a security key instead of your password.</p>
 
                 <ul class="passkey-list" id="passkeyList" aria-live="polite"></ul>
                 <p class="account-note" id="passkeyEmpty" hidden>No passkeys yet.</p>
@@ -47,13 +47,11 @@
                     <div class="field">
                         <label for="passkeyName">Passkey name</label>
                         <input id="passkeyName" name="passkeyName" type="text" maxlength="60" autocomplete="off">
-                        <p class="field-hint">So you can tell your devices apart later.</p>
                     </div>
 
                     <div class="field">
                         <label for="passkeyPassword">Current password</label>
                         <input id="passkeyPassword" name="passkeyPassword" type="password" autocomplete="current-password" required>
-                        <p class="field-hint">Confirm it's you before adding a new way in.</p>
                     </div>
 
                     <p class="status" id="passkeyStatus" role="status" aria-live="polite"></p>
@@ -68,7 +66,7 @@
         <a class="login-back" href="/">&larr; Back to palmergill.com</a>
     </main>
 
-    <script src="/shared/site-nav.js?v=21"></script>
+    <script src="/shared/site-nav.js?v=22"></script>
     <script src="/shared/analytics.js?v=1"></script>
     <script src="/shared/passkeys.js?v=1"></script>
     <script src="/account/app.js?v=3"></script>

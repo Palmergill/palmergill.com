@@ -12,7 +12,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/shared/site-nav.css?v=18">
+    <link rel="stylesheet" href="/shared/site-nav.css?v=19">
     <link rel="stylesheet" href="style.css?v=11">
 </head>
 <body>
@@ -22,12 +22,7 @@
     <main class="app-shell" id="main">
         <header class="page-head">
             <div class="page-head__titles">
-                <span class="eyebrow">Gift board</span>
                 <h1>Gifts</h1>
-                <p class="lede">
-                    Jot down a gift the moment you think of it, filed under the person
-                    it's for. Keep a wishlist of things you'd like yourself, too.
-                </p>
             </div>
         </header>
 
@@ -92,10 +87,6 @@
 
         <!-- Every member with something on their wishlist. -->
         <section id="wishlistsView" hidden>
-            <p class="section-intro">
-                What other members have put on their own wishlists. Your ideas for
-                people are never shown here, and nobody can see yours.
-            </p>
             <div class="member-grid" id="memberGrid"></div>
             <p class="empty-state" id="wishlistsEmpty" hidden>
                 Nobody else has added anything to their wishlist yet.
@@ -232,7 +223,7 @@
     </dialog>
 
     <script src="/shared/api-base.js?v=1"></script>
-    <script src="/shared/site-nav.js?v=21"></script>
+    <script src="/shared/site-nav.js?v=22"></script>
     <script src="/shared/analytics.js?v=1"></script>
     <script src="graph.js?v=4"></script>
     <script src="app.js?v=7"></script>

@@ -61,11 +61,6 @@ body {
     letter-spacing: -0.02em;
 }
 
-.lede {
-    margin: 0;
-    max-width: 56ch;
-    color: var(--soft, #5d574e);
-}
 
 /* ── banners and empty states ────────────────────────────────────────────── */
 
@@ -274,12 +269,6 @@ body {
     font-size: 1.2rem;
 }
 
-.new-board__hint {
-    margin: 0 0 18px;
-    max-width: 56ch;
-    font-size: 0.9rem;
-    color: var(--soft, #5d574e);
-}
 
 .new-board__row {
     display: flex;
@@ -548,11 +537,6 @@ body {
     margin-top: 12px;
 }
 
-.helper__hint {
-    margin: 10px 0 0;
-    font-size: 0.8rem;
-    color: var(--muted, #928a7d);
-}
 
 .keyboard-hint {
     margin: 0 0 16px;

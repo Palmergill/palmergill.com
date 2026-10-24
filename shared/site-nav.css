@@ -318,10 +318,6 @@ button.site-nav__link:disabled,
     display: block;
 }
 
-.site-nav__hint {
-    display: none;
-}
-
 @media (max-width: 979px) {
     .site-nav {
         /* No backdrop-filter on mobile: it would become the containing block
@@ -485,10 +481,6 @@ button.site-nav__link:disabled,
         color: var(--site-nav-green-dim);
     }
 
-    .site-nav__mobile-subtitle {
-        display: none;
-    }
-
     .site-nav__panel {
         position: fixed;
         top: 0;
@@ -582,14 +574,6 @@ button.site-nav__link:disabled,
 
     .site-nav__label {
         font-weight: 600;
-    }
-
-    .site-nav__hint {
-        display: block;
-        margin-top: 2px;
-        color: var(--site-nav-muted);
-        font-size: 0.72rem;
-        line-height: 1.2;
     }
 
     .site-nav__backdrop {
