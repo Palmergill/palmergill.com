@@ -2849,3 +2849,14 @@ html.shelby-lock, html.shelby-lock body { overflow: hidden; }
 .shelby-overlay.is-static .shelby-heart-fill { opacity: 1; transform: none; transition: none; animation: none; }
 .shelby-overlay.is-static .shelby-line { stroke-dashoffset: 0; animation: none; }
 .shelby-overlay.is-static .shelby-hint { transition-delay: 0s; }
+
+.header-portfolio-link {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--sage);
+    text-decoration: none;
+    padding: 4px 10px;
+    border: 1px solid var(--line-strong);
+    border-radius: 999px;
+}
+.header-portfolio-link:hover { background: var(--sage-soft); }

@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Portfolio — Stock Research</title>
+    <meta name="description" content="Upload your holdings or trades and see your portfolio broken down by position, sector, and gain.">
+    <meta name="theme-color" content="#faf6f0">
+    <!-- A private page behind a sign-in makes a poor search result. -->
+    <meta name="robots" content="noindex, nofollow">
+    <link rel="icon" type="image/png" href="/assets/palmer-gill-logo-small.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/shared/site-nav.css?v=19">
+    <link rel="stylesheet" href="portfolio.css?v=1">
+</head>
+<body>
+<noscript>
+    <p class="site-noscript">This page builds its content with JavaScript, so it needs scripts enabled. <a href="/">Browse the other projects</a> in the meantime.</p>
+</noscript>
+    <main class="pf" id="main">
+        <header class="pf-head">
+            <div>
+                <a class="pf-back" href="/stock-research/">← Stock Research</a>
+                <h1>My Portfolio</h1>
+            </div>
+            <div class="pf-head__actions" id="headActions" hidden>
+                <button type="button" class="pf-button pf-button--quiet" id="refreshButton">Refresh prices</button>
+                <button type="button" class="pf-button" id="uploadToggle" aria-expanded="false" aria-controls="uploadPanel">Upload</button>
+            </div>
+        </header>
+
+        <p id="errorBanner" class="pf-banner pf-banner--error" role="alert" hidden></p>
+        <p id="noticeBanner" class="pf-banner" role="status" hidden></p>
+
+        <section id="loadingView" class="pf-empty"><p>Loading your portfolio…</p></section>
+
+        <!-- Shown when the API returns 403: not signed in. -->
+        <section id="signedOutView" class="pf-card pf-signed-out" hidden>
+            <h2>Sign in to see your portfolio</h2>
+            <p>Upload your holdings or your trade history and get a breakdown by position, sector, and gain. Your portfolio belongs to your account and no one else can see it.</p>
+            <div class="pf-row">
+                <a class="pf-button" href="/login/?next=/stock-research/portfolio/">Sign in</a>
+                <a class="pf-button pf-button--quiet" href="/signup/">Create an account</a>
+            </div>
+        </section>
+
+        <section id="uploadPanel" class="pf-card pf-upload" hidden>
+            <div class="pf-card__head">
+                <h2 class="pf-card__title" id="uploadTitle">Add your portfolio</h2>
+                <p class="pf-card__sub">Only you can see what you upload.</p>
+            </div>
+            <form id="uploadForm">
+                <label class="pf-drop" id="dropZone">
+                    <input type="file" id="fileInput" accept=".csv,text/csv,text/plain">
+                    <span class="pf-drop__title">Drop a CSV here, or <u>choose a file</u></span>
+                    <span class="pf-drop__hint" id="fileName">A positions or transactions export from your broker works as is.</span>
+                </label>
+                <details class="pf-paste">
+                    <summary>Or paste CSV text</summary>
+                    <textarea id="pasteInput" rows="6" spellcheck="false" placeholder="Symbol,Quantity,Cost Basis&#10;AAPL,10,1500&#10;MSFT,4,1320"></textarea>
+                </details>
+                <fieldset class="pf-kind">
+                    <legend>This file is</legend>
+                    <label><input type="radio" name="kind" value="auto" checked> Detect it for me</label>
+                    <label><input type="radio" name="kind" value="holdings"> My current holdings</label>
+                    <label><input type="radio" name="kind" value="transactions"> My buys and sells</label>
+                </fieldset>
+                <div class="pf-row pf-options">
+                    <label class="pf-field" id="asOfField">Holdings as of
+                        <input type="date" id="asOfInput">
+                    </label>
+                    <label class="pf-check" id="replaceField"><input type="checkbox" id="replaceInput"> Replace my saved transactions</label>
+                </div>
+                <div class="pf-row">
+                    <button type="submit" class="pf-button" id="uploadButton">Upload</button>
+                    <button type="button" class="pf-button pf-button--quiet" id="sampleButton">Try a sample</button>
+                </div>
+            </form>
+            <details class="pf-help">
+                <summary>What the file needs</summary>
+                <p><strong>Holdings</strong> need a <code>Symbol</code> and <code>Quantity</code> column. Add <code>Cost Basis</code> (total) or <code>Average Cost</code> to see your gain. A new holdings upload replaces the last one.</p>
+                <p><strong>Transactions</strong> also need a <code>Date</code>, an <code>Action</code> (buy or sell) and a <code>Price</code> (or <code>Amount</code>). Dividends and transfers are skipped.</p>
+                <p>With both, trades dated after the holdings' "as of" day are added on top; earlier ones are already in the holdings, so they're kept but not counted twice.</p>
+            </details>
+        </section>
+
+        <section id="dashboard" hidden>
+            <div class="pf-tiles" id="tiles"></div>
+            <p class="pf-note" id="sampleNote" hidden>Prices here are generated sample values, not live quotes.</p>
+
+            <section class="pf-card">
+                <div class="pf-card__head">
+                    <h2 class="pf-card__title">Allocation</h2>
+                    <p class="pf-card__sub" id="allocationSub"></p>
+                </div>
+                <div class="pf-stack" id="allocationBar" role="img"></div>
+                <ul class="pf-legend" id="allocationLegend"></ul>
+            </section>
+
+            <div class="pf-grid">
+                <section class="pf-card">
+                    <div class="pf-card__head">
+                        <h2 class="pf-card__title">By sector</h2>
+                    </div>
+                    <ul class="pf-bars" id="sectorBars"></ul>
+                </section>
+                <section class="pf-card">
+                    <div class="pf-card__head">
+                        <h2 class="pf-card__title">At a glance</h2>
+                    </div>
+                    <ul class="pf-insights" id="insights"></ul>
+                </section>
+            </div>
+
+            <section class="pf-card">
+                <div class="pf-card__head">
+                    <h2 class="pf-card__title">Holdings</h2>
+                    <p class="pf-card__sub" id="holdingsSub"></p>
+                </div>
+                <div class="pf-table-wrap">
+                    <table class="pf-table" id="holdingsTable">
+                        <thead>
+                            <tr>
+                                <th scope="col">Ticker</th>
+                                <th scope="col" class="num">Shares</th>
+                                <th scope="col" class="num">Price</th>
+                                <th scope="col" class="num">Value</th>
+                                <th scope="col" class="num pf-weight-col">Weight</th>
+                                <th scope="col" class="num">Cost</th>
+                                <th scope="col" class="num">Gain</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section class="pf-card">
+                <div class="pf-card__head pf-card__head--row">
+                    <div>
+                        <h2 class="pf-card__title">Transactions</h2>
+                        <p class="pf-card__sub" id="transactionsSub"></p>
+                    </div>
+                    <button type="button" class="pf-button pf-button--quiet" id="addToggle" aria-expanded="false" aria-controls="addForm">Add a trade</button>
+                </div>
+                <form id="addForm" class="pf-add" hidden>
+                    <label class="pf-field">Ticker <input id="addTicker" required maxlength="12" autocomplete="off" placeholder="AAPL"></label>
+                    <label class="pf-field">Side
+                        <select id="addSide"><option value="buy">Buy</option><option value="sell">Sell</option></select>
+                    </label>
+                    <label class="pf-field">Shares <input id="addShares" type="number" step="any" min="0" required></label>
+                    <label class="pf-field">Price <input id="addPrice" type="number" step="any" min="0" required></label>
+                    <label class="pf-field">Date <input id="addDate" type="date" required></label>
+                    <button type="submit" class="pf-button">Save trade</button>
+                </form>
+                <div class="pf-table-wrap">
+                    <table class="pf-table pf-table--tx" id="transactionsTable">
+                        <thead>
+                            <tr>
+                                <th scope="col">Date</th>
+                                <th scope="col">Ticker</th>
+                                <th scope="col">Side</th>
+                                <th scope="col" class="num">Shares</th>
+                                <th scope="col" class="num">Price</th>
+                                <th scope="col"><span class="visually-hidden">Remove</span></th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </section>
+
+            <div class="pf-row pf-danger">
+                <button type="button" class="pf-link" id="clearHoldingsButton">Remove uploaded holdings</button>
+                <button type="button" class="pf-link" id="clearAllButton">Delete my whole portfolio</button>
+            </div>
+        </section>
+    </main>
+
+    <script src="/shared/api-base.js?v=1"></script>
+    <script src="/shared/site-nav.js?v=22"></script>
+    <script src="/shared/analytics.js?v=1"></script>
+    <script src="portfolio.js?v=1"></script>
+</body>
+</html>

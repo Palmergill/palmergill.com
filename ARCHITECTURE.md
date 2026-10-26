@@ -29,6 +29,7 @@ The active public site is static:
 - `/docs/` - website documentation from `docs/index.html`
 - `/login/` - protected workspace sign-in
 - `/stock-research/` - stock research app
+- `/stock-research/portfolio/` - a member's private portfolio: upload holdings and/or a trade history as CSV and get value, gain, allocation and sector breakdowns. Not a member path (it sits under the demo `/stock-research` prefix and shows a sign-in panel to anonymous visitors); `/api/stocks/portfolio*` is the real boundary.
 - `/bitcoin-chat/` - Bitcoin chat app
 - `/fantasy/` - ESPN league hub, and the section's home page. Deliberately NOT a member path: it renders a teaser plus a sign-in prompt for anonymous visitors, which an edge login redirect would pre-empt. The page is an empty shell — every byte of league data comes from `/api/fantasy/league/*`, where `require_member` is the real boundary.
 - `/fantasy/week/` - weekly recap for the league (members only; see `MEMBER_PATH_PREFIXES`)
@@ -75,6 +76,7 @@ The backend is a FastAPI service in `backend/app`.
 Important routes:
 
 - `/api/stocks/*`
+- `/api/stocks/portfolio*` (personal portfolio; every route is account-owned and returns a JSON 403 to anonymous callers, even though `/api/stocks` is otherwise a demo prefix. Every query in `services/portfolio.py` filters on the caller, so another account's transaction is a 404 — including to the admin. A holdings upload is a snapshot "as of" a date that replaces the last one; trades dated after it are applied on top at average cost, earlier ones are kept but not double-counted. Prices come from the `stock_summaries` cache when under 12h old, else up to 8 fresh provider fetches per request, and the page re-asks for the rest. The router is included before `stocks` so `GET /api/stocks/{ticker}` can't swallow it)
 - `/api/poker/*` (includes the `GET /api/poker/games/{game_id}/ws` WebSocket push channel)
 - `/api/craps/*`
 - `/api/bitcoin/*`
@@ -124,6 +126,8 @@ API with no data yet) opt out with `test.use({ allowErrors: [...] })`.
 The backend unit tests are `backend/tests/test_security_regressions.py`, for
 invariants no page exposes: session-token signing, proxy-hop IP parsing, CSV
 formula injection, log redaction, and rate limits; and
+`backend/tests/test_portfolio_api.py`, for the portfolio's auth boundary, its
+CSV importer and its cost-basis math; and
 `backend/tests/test_gifts_api.py`, for the gift board's auth boundary and its
 rule that ideas are never served to anyone but their author. CI runs both.
 

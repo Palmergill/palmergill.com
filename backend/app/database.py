@@ -1242,6 +1242,48 @@ class CastleDefenseOpenScore(_CastleDefenseRun, Base):
     )
 
 
+class PortfolioHolding(Base):
+    """One position from a member's uploaded holdings snapshot.
+
+    A new holdings upload replaces every row for that username, so the
+    snapshot is always one brokerage statement, not a pile of them. Only ever
+    read through ``services/portfolio.py``, which filters on the caller.
+    """
+
+    __tablename__ = "portfolio_holdings"
+    __table_args__ = (Index("ix_portfolio_holdings_username", "username"),)
+
+    id = Column(Integer, primary_key=True, index=True)
+    # Normalized account name, as in gift_people: no ForeignKey, because the
+    # admin authenticates from env vars and has no app_users row.
+    username = Column(String, nullable=False)
+    ticker = Column(String, nullable=False)
+    shares = Column(Float, nullable=False)
+    # Total cost of the position, not per share. Null when the statement
+    # didn't say, so the breakdown shows no gain rather than a made-up one.
+    cost_basis = Column(Float, nullable=True)
+    # The snapshot's date. Transactions after it are applied on top.
+    as_of = Column(Date, nullable=False)
+    created_at = Column(DateTime, default=utc_now, nullable=False)
+
+
+class PortfolioTransaction(Base):
+    """One buy or sell from a member's uploaded or hand-entered history."""
+
+    __tablename__ = "portfolio_transactions"
+    __table_args__ = (Index("ix_portfolio_transactions_username", "username"),)
+
+    id = Column(Integer, primary_key=True, index=True)
+    username = Column(String, nullable=False)
+    ticker = Column(String, nullable=False)
+    side = Column(String, nullable=False)  # buy | sell
+    shares = Column(Float, nullable=False)
+    price = Column(Float, nullable=False)
+    fees = Column(Float, nullable=False, default=0.0)
+    trade_date = Column(Date, nullable=False)
+    created_at = Column(DateTime, default=utc_now, nullable=False)
+
+
 def get_db():
     db = SessionLocal()
     try:

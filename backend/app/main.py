@@ -25,6 +25,7 @@ from app.routers import (
     analytics,
     bitcoin,
     stocks,
+    portfolio,
     poker,
     draft_order,
     fantasy,
@@ -1213,6 +1214,8 @@ else:
         allow_headers=["*"],
     )
 
+# Before stocks: its GET /api/stocks/{ticker} would swallow /api/stocks/portfolio.
+app.include_router(portfolio.router)
 app.include_router(stocks.router)
 app.include_router(poker.router)
 app.include_router(bitcoin.router)

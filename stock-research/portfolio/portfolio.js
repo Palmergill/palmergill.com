@@ -1,0 +1,482 @@
+// My Portfolio: a member's own holdings and trades, broken down.
+// Every byte comes from /api/stocks/portfolio, which answers anonymous
+// callers with a JSON 403; the page turns that into its sign-in panel.
+(function () {
+    const API_BASE = window.API_ORIGIN || '';
+    const SERIES = ['var(--series-1)', 'var(--series-2)', 'var(--series-3)', 'var(--series-4)', 'var(--series-5)'];
+    const OTHER = 'var(--series-other)';
+    // Prices still loading on the server (it fetches a few per request).
+    const PENDING_RETRY_MS = 4000;
+    const MAX_PENDING_RETRIES = 6;
+
+    const SAMPLE_CSV = [
+        'Symbol,Quantity,Cost Basis',
+        'AAPL,40,6200',
+        'MSFT,15,4900',
+        'NVDA,30,2400',
+        'GOOGL,20,2900',
+        'AMZN,18,2700',
+        'JPM,25,4100',
+        'XOM,30,3200',
+    ].join('\n');
+
+    const $ = (id) => document.getElementById(id);
+    const els = {
+        headActions: $('headActions'),
+        refreshButton: $('refreshButton'),
+        uploadToggle: $('uploadToggle'),
+        errorBanner: $('errorBanner'),
+        noticeBanner: $('noticeBanner'),
+        loadingView: $('loadingView'),
+        signedOutView: $('signedOutView'),
+        uploadPanel: $('uploadPanel'),
+        uploadTitle: $('uploadTitle'),
+        uploadForm: $('uploadForm'),
+        uploadButton: $('uploadButton'),
+        sampleButton: $('sampleButton'),
+        dropZone: $('dropZone'),
+        fileInput: $('fileInput'),
+        fileName: $('fileName'),
+        pasteInput: $('pasteInput'),
+        asOfField: $('asOfField'),
+        asOfInput: $('asOfInput'),
+        replaceField: $('replaceField'),
+        replaceInput: $('replaceInput'),
+        dashboard: $('dashboard'),
+        tiles: $('tiles'),
+        sampleNote: $('sampleNote'),
+        allocationSub: $('allocationSub'),
+        allocationBar: $('allocationBar'),
+        allocationLegend: $('allocationLegend'),
+        sectorBars: $('sectorBars'),
+        insights: $('insights'),
+        holdingsSub: $('holdingsSub'),
+        holdingsBody: document.querySelector('#holdingsTable tbody'),
+        transactionsSub: $('transactionsSub'),
+        transactionsBody: document.querySelector('#transactionsTable tbody'),
+        addToggle: $('addToggle'),
+        addForm: $('addForm'),
+        clearHoldingsButton: $('clearHoldingsButton'),
+        clearAllButton: $('clearAllButton'),
+    };
+
+    let fileText = null;
+    let pendingRetries = 0;
+    let pendingTimer = null;
+
+    class ForbiddenError extends Error {}
+
+    // ── formatting ─────────────────────────────────────────────────────────
+
+    const money = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
+    const moneyWhole = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
+    const shareFormat = new Intl.NumberFormat('en-US', { maximumFractionDigits: 4 });
+
+    function fmtMoney(value, whole = false) {
+        if (value == null) return '—';
+        return (whole && Math.abs(value) >= 1000 ? moneyWhole : money).format(value);
+    }
+    function fmtSigned(value, whole = false) {
+        if (value == null) return '—';
+        const text = fmtMoney(Math.abs(value), whole);
+        return value > 0 ? `+${text}` : value < 0 ? `−${text}` : text;
+    }
+    function fmtPct(value, signed = false) {
+        if (value == null) return '—';
+        const pct = value * 100;
+        const text = `${Math.abs(pct).toFixed(Math.abs(pct) < 10 ? 1 : 0)}%`;
+        if (!signed) return text;
+        return pct > 0 ? `+${text}` : pct < 0 ? `−${text}` : text;
+    }
+    function tone(value) {
+        if (value == null || Math.abs(value) < 0.005) return '';
+        return value > 0 ? 'is-gain' : 'is-loss';
+    }
+    function escapeHtml(text) {
+        return String(text ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    }
+    function today() {
+        const d = new Date();
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    }
+
+    // ── API ────────────────────────────────────────────────────────────────
+
+    async function api(path = '', options = {}) {
+        const response = await fetch(`${API_BASE}/api/stocks/portfolio${path}`, {
+            credentials: 'same-origin',
+            headers: options.body ? { 'Content-Type': 'application/json' } : {},
+            ...options,
+            body: options.body ? JSON.stringify(options.body) : undefined,
+        });
+        let data = null;
+        try { data = await response.json(); } catch { /* empty body */ }
+        if (response.status === 403) throw new ForbiddenError(data?.detail || 'Sign in to see your portfolio.');
+        if (!response.ok) {
+            const detail = Array.isArray(data?.detail)
+                ? data.detail.map((d) => d.msg).join('; ')
+                : data?.detail;
+            throw new Error(detail || `Request failed (${response.status}).`);
+        }
+        return data;
+    }
+
+    function showError(message) {
+        els.errorBanner.textContent = message;
+        els.errorBanner.hidden = !message;
+    }
+    function showNotice(message) {
+        els.noticeBanner.textContent = message;
+        els.noticeBanner.hidden = !message;
+    }
+
+    async function run(work) {
+        showError('');
+        try {
+            return await work();
+        } catch (error) {
+            if (error instanceof ForbiddenError) {
+                showSignedOut();
+                return null;
+            }
+            showError(error.message);
+            return null;
+        }
+    }
+
+    // ── views ──────────────────────────────────────────────────────────────
+
+    function showSignedOut() {
+        els.loadingView.hidden = true;
+        els.dashboard.hidden = true;
+        els.uploadPanel.hidden = true;
+        els.headActions.hidden = true;
+        els.signedOutView.hidden = false;
+    }
+
+    function setUploadOpen(open) {
+        els.uploadPanel.hidden = !open;
+        els.uploadToggle.setAttribute('aria-expanded', String(open));
+    }
+
+    function render(data) {
+        els.loadingView.hidden = true;
+        els.signedOutView.hidden = true;
+        const empty = data.positions.length === 0 && data.transactions.length === 0;
+        els.dashboard.hidden = empty;
+        els.headActions.hidden = empty;
+        els.uploadTitle.textContent = empty ? 'Add your portfolio' : 'Upload more';
+        if (empty) setUploadOpen(true);
+        if (empty) return;
+
+        els.sampleNote.hidden = !data.sampleData;
+        renderTiles(data);
+        renderAllocation(data);
+        renderSectors(data);
+        renderInsights(data);
+        renderHoldings(data);
+        renderTransactions(data);
+        els.clearHoldingsButton.hidden = !data.holdings.count;
+        schedulePendingRetry(data);
+    }
+
+    function tile(label, value, sub = '', valueClass = '') {
+        return `<div class="pf-tile">
+            <div class="pf-tile__label">${label}</div>
+            <div class="pf-tile__value ${valueClass}">${value}</div>
+            <div class="pf-tile__sub">${sub}</div>
+        </div>`;
+    }
+
+    function renderTiles(data) {
+        const t = data.totals;
+        const priced = t.pricedPositions < t.positions
+            ? `${t.pricedPositions} of ${t.positions} priced`
+            : `${t.positions} position${t.positions === 1 ? '' : 's'}`;
+        els.tiles.innerHTML = [
+            tile('Total value', fmtMoney(t.marketValue, true), priced),
+            tile('Unrealized gain', fmtSigned(t.gain, true), t.gainPct == null ? 'Needs a cost basis' : `${fmtPct(t.gainPct, true)} on ${fmtMoney(t.costBasis, true)}`, tone(t.gain)),
+            tile('Realized gain', fmtSigned(t.realizedGain, true), t.realizedGain == null ? 'No sells on record' : 'From your sells', tone(t.realizedGain)),
+            tile('Largest position', data.positions[0]?.weight != null ? fmtPct(data.positions[0].weight) : '—', data.positions[0] ? escapeHtml(data.positions[0].ticker) : ''),
+        ].join('');
+    }
+
+    function allocationSlices(positions) {
+        const priced = positions.filter((p) => p.marketValue != null && p.marketValue > 0);
+        const slices = priced.slice(0, SERIES.length).map((p, i) => ({
+            label: p.ticker, value: p.marketValue, weight: p.weight, color: SERIES[i],
+        }));
+        const rest = priced.slice(SERIES.length);
+        if (rest.length) {
+            slices.push({
+                label: `Other (${rest.length})`,
+                value: rest.reduce((sum, p) => sum + p.marketValue, 0),
+                weight: rest.reduce((sum, p) => sum + (p.weight || 0), 0),
+                color: OTHER,
+            });
+        }
+        return slices;
+    }
+
+    let tip = null;
+    function showTip(event, text) {
+        if (!tip) {
+            tip = document.createElement('div');
+            tip.className = 'pf-tip';
+            document.body.appendChild(tip);
+        }
+        tip.textContent = text;
+        tip.hidden = false;
+        const x = Math.min(event.clientX + 12, window.innerWidth - tip.offsetWidth - 8);
+        tip.style.left = `${x}px`;
+        tip.style.top = `${event.clientY - 36}px`;
+    }
+    function hideTip() { if (tip) tip.hidden = true; }
+
+    function renderAllocation(data) {
+        const slices = allocationSlices(data.positions);
+        els.allocationSub.textContent = slices.length
+            ? `${fmtMoney(data.totals.marketValue, true)} across ${data.totals.pricedPositions} priced position${data.totals.pricedPositions === 1 ? '' : 's'}`
+            : 'No prices yet.';
+        els.allocationBar.setAttribute('aria-label', slices.map((s) => `${s.label} ${fmtPct(s.weight)}`).join(', '));
+        els.allocationBar.innerHTML = slices.map((s, i) => (
+            `<div class="pf-stack__seg" data-i="${i}" style="flex:${s.weight} 1 0; background:${s.color}"></div>`
+        )).join('');
+        els.allocationBar.querySelectorAll('.pf-stack__seg').forEach((seg) => {
+            const s = slices[Number(seg.dataset.i)];
+            const text = `${s.label} · ${fmtMoney(s.value, true)} · ${fmtPct(s.weight)}`;
+            seg.addEventListener('mousemove', (event) => showTip(event, text));
+            seg.addEventListener('mouseleave', hideTip);
+        });
+        els.allocationLegend.innerHTML = slices.map((s) => (
+            `<li><span class="pf-swatch" style="background:${s.color}"></span><strong>${escapeHtml(s.label)}</strong> ${fmtPct(s.weight)}</li>`
+        )).join('');
+    }
+
+    function renderSectors(data) {
+        if (!data.sectors.length) {
+            els.sectorBars.innerHTML = '<li class="pf-muted">No prices yet.</li>';
+            return;
+        }
+        const max = Math.max(...data.sectors.map((s) => s.weight || 0)) || 1;
+        els.sectorBars.innerHTML = data.sectors.map((s) => `
+            <li>
+                <div class="pf-bars__label"><span>${escapeHtml(s.sector)}</span><span>${fmtPct(s.weight)} · ${fmtMoney(s.marketValue, true)}</span></div>
+                <div class="pf-bars__track"><div class="pf-bars__fill" style="width:${((s.weight || 0) / max) * 100}%"></div></div>
+            </li>`).join('');
+    }
+
+    function renderInsights(data) {
+        const items = [];
+        const priced = data.positions.filter((p) => p.weight != null);
+        if (priced.length) {
+            const top = priced[0];
+            const topFive = priced.slice(0, 5).reduce((sum, p) => sum + p.weight, 0);
+            items.push(`<strong>${escapeHtml(top.ticker)}</strong> is your largest position at <strong>${fmtPct(top.weight)}</strong> of the portfolio.`);
+            if (priced.length > 5) items.push(`Your top five holdings make up <strong>${fmtPct(topFive)}</strong>.`);
+        }
+        const sector = data.sectors[0];
+        if (sector && data.sectors.length > 1) {
+            items.push(`<strong>${escapeHtml(sector.sector)}</strong> is your heaviest sector, <strong>${fmtPct(sector.weight)}</strong> of the total.`);
+        } else if (sector) {
+            items.push(`Everything priced is in one sector: <strong>${escapeHtml(sector.sector)}</strong>.`);
+        }
+        const withGain = data.positions.filter((p) => p.gainPct != null);
+        if (withGain.length > 1) {
+            const best = withGain.reduce((a, b) => (b.gainPct > a.gainPct ? b : a));
+            const worst = withGain.reduce((a, b) => (b.gainPct < a.gainPct ? b : a));
+            items.push(`Best performer: <strong>${escapeHtml(best.ticker)}</strong> <span class="${tone(best.gain)}">${fmtPct(best.gainPct, true)}</span>. Weakest: <strong>${escapeHtml(worst.ticker)}</strong> <span class="${tone(worst.gain)}">${fmtPct(worst.gainPct, true)}</span>.`);
+        }
+        const noBasis = data.positions.filter((p) => p.costBasis == null).length;
+        if (noBasis) items.push(`${noBasis} position${noBasis === 1 ? ' has' : 's have'} no cost basis, so ${noBasis === 1 ? 'its' : 'their'} gain isn't counted.`);
+        if (data.oversold.length) items.push(`Sells of <strong>${data.oversold.map(escapeHtml).join(', ')}</strong> exceed the shares on record; the extra was ignored.`);
+        els.insights.innerHTML = items.length ? items.map((text) => `<li>${text}</li>`).join('') : '<li class="pf-muted">Nothing to note yet.</li>';
+    }
+
+    function priceCell(p) {
+        if (p.price == null) {
+            const label = p.priceStatus === 'pending' ? 'Loading…' : 'Unavailable';
+            return `<span class="pf-muted">${label}</span>`;
+        }
+        const stale = p.priceStatus === 'stale' ? '<span class="pf-sub">older quote</span>' : '';
+        return `${fmtMoney(p.price)}${stale}`;
+    }
+
+    function renderHoldings(data) {
+        const asOf = data.holdings.asOf;
+        els.holdingsSub.textContent = asOf
+            ? `Holdings as of ${asOf}${data.transactions.some((t) => t.counted) ? ', plus later trades' : ''}.`
+            : 'Built from your trades, at average cost.';
+        els.holdingsBody.innerHTML = data.positions.map((p) => `
+            <tr>
+                <td>
+                    <a class="pf-ticker" href="/stock-research/?ticker=${encodeURIComponent(p.ticker)}">${escapeHtml(p.ticker)}</a>
+                    ${p.name && p.name !== p.ticker ? `<span class="pf-name" title="${escapeHtml(p.name)}">${escapeHtml(p.name)}</span>` : ''}
+                </td>
+                <td class="num">${shareFormat.format(p.shares)}</td>
+                <td class="num">${priceCell(p)}</td>
+                <td class="num">${fmtMoney(p.marketValue)}</td>
+                <td class="num pf-weight-col">${p.weight == null ? '—' : `<span class="pf-weight"><span class="pf-weight__track"><span class="pf-weight__fill" style="display:block;width:${p.weight * 100}%"></span></span>${fmtPct(p.weight)}</span>`}</td>
+                <td class="num">${fmtMoney(p.costBasis)}${p.avgCost != null ? `<span class="pf-sub">${fmtMoney(p.avgCost)}/sh</span>` : ''}</td>
+                <td class="num ${tone(p.gain)}">${fmtSigned(p.gain)}${p.gainPct != null ? `<span class="pf-sub ${tone(p.gain)}">${fmtPct(p.gainPct, true)}</span>` : ''}</td>
+            </tr>`).join('') || '<tr><td colspan="7" class="pf-muted">No open positions.</td></tr>';
+    }
+
+    function renderTransactions(data) {
+        const count = data.transactions.length;
+        els.transactionsSub.textContent = count
+            ? `${count} trade${count === 1 ? '' : 's'}${data.transactionsIgnored ? ` · ${data.transactionsIgnored} already in your holdings` : ''}`
+            : 'No trades yet. Upload a history or add one by hand.';
+        document.getElementById('transactionsTable').hidden = !count;
+        els.transactionsBody.innerHTML = data.transactions.map((t) => `
+            <tr class="${t.counted ? '' : 'pf-tx-ignored'}">
+                <td>${t.tradeDate}${t.counted ? '' : '<span class="pf-tag" title="On or before your holdings date, so it is already in them">in holdings</span>'}</td>
+                <td><strong>${escapeHtml(t.ticker)}</strong></td>
+                <td>${t.side === 'buy' ? 'Buy' : 'Sell'}</td>
+                <td class="num">${shareFormat.format(t.shares)}</td>
+                <td class="num">${fmtMoney(t.price)}</td>
+                <td class="num"><button type="button" class="pf-remove" data-id="${t.id}" aria-label="Remove ${t.side} of ${escapeHtml(t.ticker)} on ${t.tradeDate}">×</button></td>
+            </tr>`).join('');
+    }
+
+    function schedulePendingRetry(data) {
+        clearTimeout(pendingTimer);
+        if (!data.totals.pendingPrices) {
+            pendingRetries = 0;
+            return;
+        }
+        if (pendingRetries >= MAX_PENDING_RETRIES) return;
+        pendingRetries += 1;
+        pendingTimer = setTimeout(() => load(), PENDING_RETRY_MS);
+    }
+
+    async function load() {
+        const data = await run(() => api());
+        if (data) render(data);
+    }
+
+    // ── upload ─────────────────────────────────────────────────────────────
+
+    function selectedKind() {
+        return els.uploadForm.querySelector('input[name="kind"]:checked').value;
+    }
+    function syncKindOptions() {
+        const kind = selectedKind();
+        els.asOfField.hidden = kind === 'transactions';
+        els.replaceField.hidden = kind === 'holdings';
+    }
+
+    async function readFile(file) {
+        if (!file) return;
+        if (file.size > 1_000_000) {
+            showError('That file is too large. Keep it under 1 MB.');
+            return;
+        }
+        fileText = await file.text();
+        els.fileName.textContent = file.name;
+    }
+
+    async function upload(csv) {
+        const body = { csv, kind: selectedKind(), replace: els.replaceInput.checked };
+        if (els.asOfInput.value) body.as_of = els.asOfInput.value;
+        els.uploadButton.disabled = true;
+        const result = await run(() => api('/import', { method: 'POST', body }));
+        els.uploadButton.disabled = false;
+        if (!result) return;
+
+        const { kind, count } = result.imported;
+        const what = kind === 'holdings' ? `holding${count === 1 ? '' : 's'}` : `trade${count === 1 ? '' : 's'}`;
+        const skipped = result.skipped.length
+            ? ` Skipped ${result.skipped.length} row${result.skipped.length === 1 ? '' : 's'}: ${summarizeSkipped(result.skipped)}.`
+            : '';
+        showNotice(`Imported ${count} ${what}.${skipped}`);
+        fileText = null;
+        els.fileInput.value = '';
+        els.pasteInput.value = '';
+        els.fileName.textContent = 'A positions or transactions export from your broker works as is.';
+        pendingRetries = 0;
+        render(result.portfolio);
+        if (count) setUploadOpen(false);
+    }
+
+    function summarizeSkipped(skipped) {
+        const reasons = new Map();
+        skipped.forEach((s) => reasons.set(s.reason, (reasons.get(s.reason) || 0) + 1));
+        return [...reasons].slice(0, 3).map(([reason, n]) => `${reason}${n > 1 ? ` (${n})` : ''}`).join('; ');
+    }
+
+    els.uploadForm.addEventListener('submit', (event) => {
+        event.preventDefault();
+        const csv = fileText || els.pasteInput.value.trim();
+        if (!csv) {
+            showError('Choose a CSV file or paste its text first.');
+            return;
+        }
+        upload(csv);
+    });
+    els.sampleButton.addEventListener('click', () => {
+        els.uploadForm.querySelector('input[value="holdings"]').checked = true;
+        syncKindOptions();
+        upload(SAMPLE_CSV);
+    });
+    els.uploadForm.querySelectorAll('input[name="kind"]').forEach((input) => input.addEventListener('change', syncKindOptions));
+    els.fileInput.addEventListener('change', () => readFile(els.fileInput.files[0]));
+    ['dragenter', 'dragover'].forEach((type) => els.dropZone.addEventListener(type, (event) => {
+        event.preventDefault();
+        els.dropZone.classList.add('is-over');
+    }));
+    ['dragleave', 'drop'].forEach((type) => els.dropZone.addEventListener(type, () => els.dropZone.classList.remove('is-over')));
+    els.dropZone.addEventListener('drop', (event) => {
+        event.preventDefault();
+        readFile(event.dataTransfer.files[0]);
+    });
+
+    // ── edits ──────────────────────────────────────────────────────────────
+
+    els.uploadToggle.addEventListener('click', () => setUploadOpen(els.uploadPanel.hidden));
+    els.refreshButton.addEventListener('click', () => { pendingRetries = 0; load(); });
+    els.addToggle.addEventListener('click', () => {
+        const open = els.addForm.hidden;
+        els.addForm.hidden = !open;
+        els.addToggle.setAttribute('aria-expanded', String(open));
+        if (open) $('addTicker').focus();
+    });
+    els.addForm.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const data = await run(() => api('/transactions', {
+            method: 'POST',
+            body: {
+                ticker: $('addTicker').value.trim(),
+                side: $('addSide').value,
+                shares: Number($('addShares').value),
+                price: Number($('addPrice').value),
+                trade_date: $('addDate').value,
+            },
+        }));
+        if (!data) return;
+        els.addForm.reset();
+        $('addDate').value = today();
+        render(data);
+    });
+    els.transactionsBody.addEventListener('click', async (event) => {
+        const button = event.target.closest('.pf-remove');
+        if (!button) return;
+        const data = await run(() => api(`/transactions/${button.dataset.id}`, { method: 'DELETE' }));
+        if (data) render(data);
+    });
+    els.clearHoldingsButton.addEventListener('click', async () => {
+        if (!window.confirm('Remove your uploaded holdings? Your trades stay.')) return;
+        const data = await run(() => api('/holdings', { method: 'DELETE' }));
+        if (data) render(data);
+    });
+    els.clearAllButton.addEventListener('click', async () => {
+        if (!window.confirm('Delete your whole portfolio, holdings and trades? This can\'t be undone.')) return;
+        const data = await run(() => api('', { method: 'DELETE' }));
+        if (data) { showNotice('Your portfolio was deleted.'); render(data); }
+    });
+
+    $('addDate').value = today();
+    els.asOfInput.value = today();
+    syncKindOptions();
+    load();
+})();
