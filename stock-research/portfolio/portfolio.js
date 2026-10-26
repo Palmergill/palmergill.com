@@ -5,9 +5,10 @@
     const API_BASE = window.API_ORIGIN || '';
     const SERIES = ['var(--series-1)', 'var(--series-2)', 'var(--series-3)', 'var(--series-4)', 'var(--series-5)'];
     const OTHER = 'var(--series-other)';
-    // Prices still loading on the server (it fetches a few per request).
-    const PENDING_RETRY_MS = 4000;
-    const MAX_PENDING_RETRIES = 6;
+    // Prices still loading on the server: it fetches a few per request, and
+    // pauses when the provider's per-minute allowance runs out. Its
+    // `retryAfter` says when to ask again.
+    const MAX_PENDING_RETRIES = 30;
 
     // A year of trades, dated relative to today, so the sample has a value
     // line that starts small and builds up rather than one flat snapshot.
@@ -376,8 +377,7 @@
         { key: '1Y', days: 366 },
         { key: 'All', days: Infinity },
     ];
-    const HISTORY_RETRY_MS = 3000;
-    const MAX_HISTORY_RETRIES = 8;
+    const MAX_HISTORY_RETRIES = 30;
     const SVG_NS = 'http://www.w3.org/2000/svg';
     const shortDate = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
     const monthYear = new Intl.DateTimeFormat('en-US', { month: 'short', year: '2-digit', timeZone: 'UTC' });
@@ -411,10 +411,13 @@
             return;
         }
         if (!data.complete) {
-            $('historySub').textContent = `Loading price history for ${data.pending.length} more ticker${data.pending.length === 1 ? '' : 's'}…`;
+            const n = data.pending.length;
+            $('historySub').textContent = data.retryAfter > 5
+                ? `Loading price history for ${n} more ticker${n === 1 ? '' : 's'}. The data provider limits requests per minute, so this can take a minute or two the first time.`
+                : `Loading price history for ${n} more ticker${n === 1 ? '' : 's'}…`;
             if (history.retries < MAX_HISTORY_RETRIES) {
                 history.retries += 1;
-                history.timer = setTimeout(loadHistory, HISTORY_RETRY_MS);
+                history.timer = setTimeout(loadHistory, (data.retryAfter || 3) * 1000);
             }
             return;
         }
@@ -619,7 +622,7 @@
         }
         if (pendingRetries >= MAX_PENDING_RETRIES) return;
         pendingRetries += 1;
-        pendingTimer = setTimeout(() => load(), PENDING_RETRY_MS);
+        pendingTimer = setTimeout(() => load(), (data.retryAfter || 3) * 1000);
     }
 
     async function load() {

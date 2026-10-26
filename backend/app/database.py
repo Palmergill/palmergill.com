@@ -1284,6 +1284,23 @@ class PortfolioTransaction(Base):
     created_at = Column(DateTime, default=utc_now, nullable=False)
 
 
+class PriceClose(Base):
+    """One ticker's close on one trading day, as the portfolio uses it.
+
+    Not per account: a close is public market data. Past closes never change,
+    so once stored they are never fetched again; the portfolio only asks the
+    provider for the days since the newest row.
+    """
+
+    __tablename__ = "price_closes"
+    __table_args__ = (UniqueConstraint("ticker", "day", name="uq_price_closes_ticker_day"),)
+
+    id = Column(Integer, primary_key=True)
+    ticker = Column(String, nullable=False)
+    day = Column(Date, nullable=False)
+    close = Column(Float, nullable=False)
+
+
 def get_db():
     db = SessionLocal()
     try:

@@ -14,15 +14,17 @@ import csv
 import io
 import logging
 import re
-from concurrent.futures import ThreadPoolExecutor
+import threading
 from datetime import date, datetime, timedelta, timezone
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 from fastapi import HTTPException
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app import accounts
-from app.database import PortfolioHolding, PortfolioTransaction, SessionLocal, StockSummary
+from app.database import PortfolioHolding, PortfolioTransaction, PriceClose, StockSummary
+from app.services.polygon_client import PolygonRateLimited
 from app.services.stock_data_client import stock_data_client
 
 logger = logging.getLogger(__name__)
@@ -30,13 +32,6 @@ logger = logging.getLogger(__name__)
 MAX_CSV_CHARS = 1_000_000
 MAX_ROWS = 2_000
 MAX_TRANSACTIONS = 5_000
-# The summary price is a daily close, so a cached row is good for most of a day.
-QUOTE_MAX_AGE = timedelta(hours=12)
-# Each uncached ticker is a few provider calls. Cap them per request so a
-# fifty-line portfolio loads its first prices quickly; the page asks again
-# for the rest.
-MAX_FRESH_QUOTES = 8
-QUOTE_WORKERS = 4
 EPSILON = 1e-9
 
 TICKER_PATTERN = re.compile(r"^[A-Z][A-Z0-9]{0,5}([.\-/][A-Z0-9]{1,3})?$")
@@ -322,64 +317,201 @@ def build_positions(
 
 
 # ── prices ──────────────────────────────────────────────────────────────────
+#
+# Every price here is a daily close from one provider call per ticker: a
+# range of daily bars. The newest close is the position's price and the rest
+# draw the value chart. Closes are stored in `price_closes` and past ones
+# never change, so after the first fill a ticker costs one small call a few
+# times a day. That matters because the provider plan allows only a handful
+# of calls a minute: each request spends at most CALLS_PER_REQUEST, and a 429
+# stops all fetching for a minute and leaves the rest "pending", which the
+# page asks about again after `retryAfter` seconds.
+
+PRICE_HISTORY_DAYS = 365
+CALLS_PER_REQUEST = 4
+# How long a ticker's newest close counts as current before asking for more.
+PRICE_RECHECK = timedelta(hours=4)
+RATE_LIMIT_COOLDOWN = timedelta(seconds=65)
+# A close this many days old (a long weekend, a holiday) is still current.
+STALE_AFTER_DAYS = 5
+
+_lock = threading.Lock()
+_checked: Dict[str, datetime] = {}
+# The earliest close the provider has for a ticker (it listed later), so a
+# window reaching before it doesn't ask again on every request.
+_listed_from: Dict[str, date] = {}
+_meta: Dict[str, Dict[str, Optional[str]]] = {}
+_rate_limited_until: Optional[datetime] = None
 
 
-def _quote_from_summary(row: StockSummary, status: str) -> Dict[str, Any]:
-    return {"price": row.current_price, "name": row.name, "sector": row.sector, "status": status}
+def _now() -> datetime:
+    return datetime.now(timezone.utc)
 
 
-def _fetch_quote(ticker: str) -> Dict[str, Any]:
-    # Each worker thread gets its own session: a Session isn't thread-safe.
-    db = SessionLocal()
+def retry_after_seconds() -> int:
+    if _rate_limited_until and _rate_limited_until > _now():
+        return int((_rate_limited_until - _now()).total_seconds()) + 1
+    return 2
+
+
+def _fetch_closes(ticker: str, start: date, end: date) -> List[Tuple[date, float]]:
+    if stock_data_client._use_mock():
+        history = stock_data_client.mock.get_price_history(ticker, days=(end - start).days + 1)
+        rows = [(parse_date(r.get("date")), r.get("close")) for r in history]
+        return [(d, float(c)) for d, c in rows if d and c is not None and start <= d <= end]
+    stock_data_client._require_real_data_configured()
+    return stock_data_client.polygon.get_daily_closes(ticker, start, end)
+
+
+def _fetch_meta(ticker: str) -> Dict[str, Optional[str]]:
+    if stock_data_client._use_mock():
+        data = stock_data_client.mock.get_stock_data(ticker) or {}
+        return {"name": data.get("name"), "sector": data.get("sector")}
+    polygon = stock_data_client.polygon
     try:
-        data = stock_data_client.get_stock_data(ticker, db)
-        summary = data.get("summary") or {}
-        return {
-            "price": summary.get("current_price"), "name": data.get("name"),
-            "sector": data.get("sector"), "status": "live",
-        }
-    except Exception as exc:  # noqa: BLE001 - one bad ticker shouldn't sink the page
-        logger.warning("[%s] portfolio quote unavailable: %s", ticker, type(exc).__name__)
-        return {"price": None, "name": None, "sector": None, "status": "unavailable"}
-    finally:
-        db.close()
+        details = polygon._get_ticker_details(ticker)
+    except Exception as exc:  # noqa: BLE001 - a name is nice to have
+        if "429" in str(exc):
+            raise PolygonRateLimited(ticker) from exc
+        return {"name": None, "sector": None}
+    return {"name": details.get("name"), "sector": polygon._company_metadata(details).get("sector")}
+
+
+class _Budget:
+    def __init__(self, calls: int):
+        self.calls = calls
+
+    def spend(self) -> bool:
+        global _rate_limited_until
+        if _rate_limited_until and _rate_limited_until > _now():
+            return False
+        if self.calls <= 0:
+            return False
+        self.calls -= 1
+        return True
+
+
+def _rate_limited() -> None:
+    global _rate_limited_until
+    _rate_limited_until = _now() + RATE_LIMIT_COOLDOWN
+    logger.warning("Price provider rate limit hit; pausing portfolio price fetches")
+
+
+def _store(db: Session, ticker: str, rows: List[Tuple[date, float]]) -> None:
+    if not rows:
+        return
+    have = {
+        d for (d,) in db.query(PriceClose.day).filter(
+            PriceClose.ticker == ticker, PriceClose.day >= rows[0][0], PriceClose.day <= rows[-1][0]
+        )
+    }
+    for day, close in rows:
+        if day not in have:
+            db.add(PriceClose(ticker=ticker, day=day, close=close))
+            have.add(day)
+    db.commit()
+
+
+def ensure_closes(db: Session, tickers: List[str], since: date, budget: _Budget) -> Dict[str, str]:
+    """Fetch what's missing, within budget. Each ticker comes back "ready"
+    (closes cover `since` to recently), "pending" (not fetched yet; ask
+    again) or "unavailable" (the provider has nothing for it)."""
+    today = utc_today()
+    status: Dict[str, str] = {}
+    with _lock:  # the breakdown and the chart load together; fetch once
+        for ticker in tickers:
+            first, last = db.query(
+                func.min(PriceClose.day), func.max(PriceClose.day)
+            ).filter(PriceClose.ticker == ticker).one()
+            listed = _listed_from.get(ticker)
+            head_missing = first is None or (first - since).days > STALE_AFTER_DAYS and not (listed and listed >= first)
+            checked = _checked.get(ticker)
+            tail_due = last is None or (last < today and (not checked or _now() - checked > PRICE_RECHECK))
+
+            if head_missing:
+                if not budget.spend():
+                    status[ticker] = "pending"
+                    continue
+                end = today if first is None else first - timedelta(days=1)
+                try:
+                    rows = _fetch_closes(ticker, since, end)
+                except PolygonRateLimited:
+                    _rate_limited()
+                    status[ticker] = "pending"
+                    continue
+                except Exception as exc:  # noqa: BLE001 - one bad ticker shouldn't sink the page
+                    logger.warning("[%s] daily closes unavailable: %s", ticker, type(exc).__name__)
+                    status[ticker] = "unavailable" if first is None else "ready"
+                    continue
+                _store(db, ticker, rows)
+                if first is None and not rows:
+                    status[ticker] = "unavailable"
+                    _checked[ticker] = _now()
+                    continue
+                _listed_from[ticker] = rows[0][0] if rows else first
+                if first is None:
+                    _checked[ticker] = _now()
+                    tail_due = False
+
+            elif tail_due and budget.spend():
+                try:
+                    _store(db, ticker, _fetch_closes(ticker, last + timedelta(days=1), today))
+                    _checked[ticker] = _now()
+                except PolygonRateLimited:
+                    _rate_limited()
+                except Exception as exc:  # noqa: BLE001 - keep serving what's stored
+                    logger.warning("[%s] daily closes refresh failed: %s", ticker, type(exc).__name__)
+            status[ticker] = "ready"
+    return status
+
+
+def _company(db: Session, tickers: List[str], budget: _Budget) -> Dict[str, Dict[str, Optional[str]]]:
+    """Name and sector: the stock pages' cache if it has them, else one
+    details call each, with whatever budget the prices left over."""
+    summaries = {row.ticker: row for row in db.query(StockSummary).filter(StockSummary.ticker.in_(tickers))}
+    result = {}
+    for ticker in tickers:
+        row = summaries.get(ticker)
+        if row and row.sector:
+            result[ticker] = {"name": row.name, "sector": row.sector}
+        elif ticker in _meta:
+            result[ticker] = _meta[ticker]
+        elif budget.spend():
+            try:
+                _meta[ticker] = _fetch_meta(ticker)
+            except PolygonRateLimited:
+                _rate_limited()
+                _meta.pop(ticker, None)
+            result[ticker] = _meta.get(ticker) or {"name": row.name if row else None, "sector": None}
+        else:
+            result[ticker] = {"name": row.name if row else None, "sector": None}
+    return result
 
 
 def quotes(db: Session, tickers: List[str]) -> Dict[str, Dict[str, Any]]:
     if not tickers:
         return {}
-    if stock_data_client._use_mock():
-        result = {}
-        for ticker in tickers:
-            data = stock_data_client.mock.get_stock_data(ticker) or {}
-            result[ticker] = {
-                "price": (data.get("summary") or {}).get("current_price"), "name": data.get("name"),
-                "sector": data.get("sector"), "status": "sample",
-            }
-        return result
-
-    cached = {row.ticker: row for row in db.query(StockSummary).filter(StockSummary.ticker.in_(tickers))}
-    now = datetime.now(timezone.utc).replace(tzinfo=None)
-    result: Dict[str, Dict[str, Any]] = {}
-    to_fetch: List[str] = []
+    budget = _Budget(CALLS_PER_REQUEST)
+    status = ensure_closes(db, tickers, utc_today() - timedelta(days=PRICE_HISTORY_DAYS), budget)
+    latest = dict(
+        db.query(PriceClose.ticker, func.max(PriceClose.day))
+        .filter(PriceClose.ticker.in_(tickers)).group_by(PriceClose.ticker).all()
+    )
+    company = _company(db, tickers, budget)
+    stale_before = utc_today() - timedelta(days=STALE_AFTER_DAYS)
+    result = {}
     for ticker in tickers:
-        row = cached.get(ticker)
-        if row and row.current_price is not None and row.fetched_at and now - row.fetched_at <= QUOTE_MAX_AGE:
-            result[ticker] = _quote_from_summary(row, "live")
+        day = latest.get(ticker)
+        price = None
+        if day:
+            price = db.query(PriceClose.close).filter(PriceClose.ticker == ticker, PriceClose.day == day).scalar()
+        if price is None:
+            state = status.get(ticker, "pending")
+        elif stock_data_client._use_mock():
+            state = "sample"
         else:
-            to_fetch.append(ticker)
-
-    fetching, waiting = to_fetch[:MAX_FRESH_QUOTES], to_fetch[MAX_FRESH_QUOTES:]
-    if fetching:
-        with ThreadPoolExecutor(max_workers=QUOTE_WORKERS) as pool:
-            for ticker, quote in zip(fetching, pool.map(_fetch_quote, fetching)):
-                result[ticker] = quote
-    for ticker in fetching + waiting:
-        row = cached.get(ticker)
-        if result.get(ticker, {}).get("price") is None and row and row.current_price is not None:
-            result[ticker] = _quote_from_summary(row, "stale")
-        elif ticker not in result:
-            result[ticker] = {"price": None, "name": None, "sector": None, "status": "pending"}
+            state = "live" if day >= stale_before else "stale"
+        result[ticker] = {**company[ticker], "price": price, "status": state, "asOf": day.isoformat() if day else None}
     return result
 
 
@@ -471,6 +603,7 @@ def breakdown(db: Session, username: str) -> Dict[str, Any]:
             "pricedPositions": sum(1 for r in rows if r["marketValue"] is not None),
             "pendingPrices": sum(1 for r in rows if r["priceStatus"] == "pending"),
         },
+        "retryAfter": retry_after_seconds(),
         "positions": rows,
         "sectors": sector_rows,
         "holdings": {"count": len(holdings), "asOf": as_of.isoformat() if as_of else None},
@@ -494,43 +627,6 @@ def breakdown(db: Session, username: str) -> Dict[str, Any]:
 
 HISTORY_DEFAULT_DAYS = 365
 HISTORY_MAX_DAYS = 1000
-# Daily closes only change once a day; keep each ticker's for a few hours.
-HISTORY_CACHE_TTL = timedelta(hours=6)
-MAX_FRESH_HISTORIES = 8
-_history_cache: Dict[Tuple[str, int], Tuple[datetime, List[Dict[str, Any]]]] = {}
-
-
-def _fetch_history(ticker: str, days: int) -> Optional[List[Dict[str, Any]]]:
-    try:
-        return stock_data_client.get_price_history(ticker, days=days)
-    except Exception as exc:  # noqa: BLE001 - reported as a missing ticker
-        logger.warning("[%s] portfolio history unavailable: %s", ticker, type(exc).__name__)
-        return None
-
-
-def price_histories(tickers: List[str], days: int) -> Tuple[Dict[str, List[Dict[str, Any]]], List[str], List[str]]:
-    """Closes per ticker, plus the tickers still to fetch and those that failed."""
-    now = datetime.now(timezone.utc)
-    found: Dict[str, List[Dict[str, Any]]] = {}
-    to_fetch: List[str] = []
-    for ticker in tickers:
-        cached = _history_cache.get((ticker, days))
-        if cached and now - cached[0] <= HISTORY_CACHE_TTL:
-            found[ticker] = cached[1]
-        else:
-            to_fetch.append(ticker)
-
-    fetching, pending = to_fetch[:MAX_FRESH_HISTORIES], to_fetch[MAX_FRESH_HISTORIES:]
-    failed: List[str] = []
-    if fetching:
-        with ThreadPoolExecutor(max_workers=QUOTE_WORKERS) as pool:
-            for ticker, history in zip(fetching, pool.map(lambda t: _fetch_history(t, days), fetching)):
-                if history:
-                    _history_cache[(ticker, days)] = (now, history)
-                    found[ticker] = history
-                else:
-                    failed.append(ticker)
-    return found, pending, failed
 
 
 def _shares_by_day(
@@ -578,28 +674,28 @@ def value_history(db: Session, username: str, days: int = HISTORY_DEFAULT_DAYS) 
     tickers = sorted({h.ticker for h in holdings} | {tx.ticker for tx in transactions})
     base = {
         "points": [], "start": start.isoformat(), "asOf": as_of.isoformat() if as_of else None,
-        "pending": [], "missing": [], "complete": True, "sampleData": stock_data_client._use_mock(),
+        "pending": [], "missing": [], "complete": True, "retryAfter": None,
+        "sampleData": stock_data_client._use_mock(),
     }
     if not tickers:
         return base
 
-    histories, pending, failed = price_histories(tickers, days)
-    base["missing"] = failed
+    status = ensure_closes(db, tickers, start, _Budget(CALLS_PER_REQUEST))
+    pending = [t for t, state in status.items() if state == "pending"]
+    base["missing"] = [t for t, state in status.items() if state == "unavailable"]
     if pending:
         # Half a line would read as a crash, so draw nothing until every
         # ticker's closes are in. The page asks again.
-        return {**base, "pending": pending, "complete": False}
+        return {**base, "pending": pending, "complete": False, "retryAfter": retry_after_seconds()}
 
     closes: Dict[str, Dict[date, float]] = {}
     trading_days = set()
-    for ticker, history in histories.items():
-        by_day = {}
-        for row in history:
-            day = parse_date(row.get("date"))
-            if day and day >= start and row.get("close") is not None:
-                by_day[day] = float(row["close"])
-        closes[ticker] = by_day
-        trading_days |= set(by_day)
+    for ticker, day, close in (
+        db.query(PriceClose.ticker, PriceClose.day, PriceClose.close)
+        .filter(PriceClose.ticker.in_(tickers), PriceClose.day >= start)
+    ):
+        closes.setdefault(ticker, {})[day] = close
+        trading_days.add(day)
     day_list = sorted(trading_days)
     shares = _shares_by_day(holdings, transactions, day_list)
 

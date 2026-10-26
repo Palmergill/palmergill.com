@@ -18,6 +18,8 @@ from app.services import portfolio
 ADMIN = "palmer"
 SECRET = "secret"
 PRICES = {"AAPL": 200.0, "MSFT": 400.0, "NVDA": 100.0}
+# The autouse fixture swaps quotes for fixed prices; one test needs the real one.
+REAL_QUOTES = portfolio.quotes
 
 
 @pytest.fixture(autouse=True)
@@ -203,19 +205,36 @@ def test_a_file_without_the_needed_columns_is_a_clear_422():
 # ── value over time ─────────────────────────────────────────────────────────
 
 
-def _flat_history(monkeypatch, closes):
+def _flat_history(monkeypatch, closes, calls=None):
     """Every ticker closes at closes[ticker] on every weekday of the window."""
     from datetime import timedelta
 
-    def fake(ticker, days):
-        end = portfolio.utc_today()
+    def fake(ticker, start, end):
+        if calls is not None:
+            calls.append(ticker)
+        days = (end - start).days + 1
         return [
-            {"date": (end - timedelta(days=i)).isoformat(), "close": closes[ticker]}
-            for i in range(days) if (end - timedelta(days=i)).weekday() < 5
+            (start + timedelta(days=i), closes[ticker])
+            for i in range(days) if (start + timedelta(days=i)).weekday() < 5
         ]
 
-    monkeypatch.setattr(portfolio.stock_data_client, "get_price_history", fake)
-    portfolio._history_cache.clear()
+    _reset_prices(monkeypatch)
+    monkeypatch.setattr(portfolio, "_fetch_closes", fake)
+
+
+def _reset_prices(monkeypatch):
+    from app.database import PriceClose
+
+    db = SessionLocal()
+    try:
+        db.query(PriceClose).delete()
+        db.commit()
+    finally:
+        db.close()
+    for cache in (portfolio._checked, portfolio._listed_from, portfolio._meta):
+        cache.clear()
+    monkeypatch.setattr(portfolio, "_rate_limited_until", None)
+    monkeypatch.setattr(portfolio, "_fetch_meta", lambda t: {"name": t, "sector": "Technology"})
 
 
 def test_history_is_member_only():
@@ -258,12 +277,57 @@ def test_history_rolls_a_snapshot_back_through_earlier_trades(monkeypatch):
 
 
 def test_history_waits_until_every_ticker_has_prices(monkeypatch):
-    _flat_history(monkeypatch, {t: 1.0 for t in ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"]})
+    tickers = "ABCDEFGHIJ"
+    _flat_history(monkeypatch, {t: 1.0 for t in tickers})
     client = _member_client()
-    rows = "\n".join(f"{t},1" for t in "ABCDEFGHIJ")
+    rows = "\n".join(f"{t},1" for t in tickers)
     client.post("/api/stocks/portfolio/import", json={"csv": f"Symbol,Quantity\n{rows}\n", "kind": "holdings"})
 
+    # Each request spends a few provider calls, never all ten at once.
     first = client.get("/api/stocks/portfolio/history").json()
-    assert first["complete"] is False and len(first["pending"]) == 2 and first["points"] == []
-    second = client.get("/api/stocks/portfolio/history").json()
-    assert second["complete"] is True and second["points"][-1]["value"] == 10.0
+    assert first["complete"] is False and first["points"] == [] and first["retryAfter"]
+    for _ in range(5):
+        body = client.get("/api/stocks/portfolio/history").json()
+        if body["complete"]:
+            break
+    assert body["complete"] is True and body["points"][-1]["value"] == 10.0
+
+
+def test_stored_closes_are_not_fetched_again(monkeypatch):
+    calls = []
+    _flat_history(monkeypatch, {"AAPL": 10.0}, calls)
+    client = _member_client()
+    _buy(client, shares=1, price=10.0)
+    client.get("/api/stocks/portfolio/history")
+    client.get("/api/stocks/portfolio/history")
+    assert calls == ["AAPL"]
+
+
+def test_a_rate_limit_pauses_fetching_and_leaves_tickers_pending(monkeypatch):
+    from app.services.polygon_client import PolygonRateLimited
+
+    calls = []
+
+    def limited(ticker, start, end):
+        calls.append(ticker)
+        raise PolygonRateLimited(ticker)
+
+    _reset_prices(monkeypatch)
+    monkeypatch.setattr(portfolio, "_fetch_closes", limited)
+    client = _member_client()
+    _buy(client, "AAPL", shares=1)
+
+    body = client.get("/api/stocks/portfolio/history").json()
+    assert body["complete"] is False and body["pending"] == ["AAPL"]
+    assert body["retryAfter"] > 2
+    client.get("/api/stocks/portfolio/history")
+    assert calls == ["AAPL"]  # no second call inside the cooldown
+
+
+def test_the_breakdown_prices_positions_from_stored_closes(monkeypatch):
+    _flat_history(monkeypatch, {"AAPL": 12.0})
+    monkeypatch.setattr(portfolio, "quotes", REAL_QUOTES)
+    client = _member_client()
+    body = _buy(client, "AAPL", shares=2, price=10.0)
+    (aapl,) = body["positions"]
+    assert aapl["price"] == 12.0 and aapl["marketValue"] == 24.0 and aapl["sector"] == "Technology"

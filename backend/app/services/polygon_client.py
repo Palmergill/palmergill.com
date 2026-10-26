@@ -1,10 +1,14 @@
 import requests
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict, List
 import os
 import logging
 
 logger = logging.getLogger(__name__)
+
+class PolygonRateLimited(Exception):
+    """Polygon answered 429: the plan's per-minute call allowance is spent."""
+
 
 class PolygonClient:
     """Polygon.io API client - primary data source"""
@@ -229,6 +233,27 @@ class PolygonClient:
             "website": details.get("homepage_url"),
         }
     
+    def get_daily_closes(self, ticker: str, start, end) -> List[tuple]:
+        """(date, close) for each trading day in [start, end], in one call.
+
+        Unlike the private helpers above, this raises instead of returning []
+        on failure, so a caller can tell "no such ticker" from "try later".
+        """
+        url = f"{self.BASE_URL}/v2/aggs/ticker/{ticker}/range/1/day/{start.isoformat()}/{end.isoformat()}"
+        response = requests.get(
+            url,
+            params={"adjusted": "true", "sort": "asc", "limit": 50000, "apiKey": self.api_key},
+            timeout=15,
+        )
+        if response.status_code == 429:
+            raise PolygonRateLimited(ticker)
+        response.raise_for_status()
+        return [
+            (datetime.fromtimestamp(r["t"] / 1000, tz=timezone.utc).date(), float(r["c"]))
+            for r in response.json().get("results") or []
+            if r.get("c") is not None
+        ]
+
     def _get_previous_close(self, ticker: str) -> Dict:
         """Get previous day's close price"""
         url = f"{self.BASE_URL}/v2/aggs/ticker/{ticker}/prev"
