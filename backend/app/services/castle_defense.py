@@ -6,6 +6,9 @@ same engine the page runs (castle-defense/castleDefenseGame.js, inside an
 embedded V8) and stores what that replay earns. The engine is deterministic
 — seeded map and horde, fixed time step — so the replay matches the run the
 player watched.
+
+Each mode — the classic road and the open field — has its own board, in its
+own table, ranked under its own rules number.
 """
 import json
 import os
@@ -17,9 +20,10 @@ from typing import Any, Dict, List, Optional
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
-from app.database import CastleDefenseScore, utc_now
+from app.database import CastleDefenseOpenScore, CastleDefenseScore, utc_now
 
 BOARD_SIZE = 50
+MODELS = {"classic": CastleDefenseScore, "open": CastleDefenseOpenScore}
 # Replays cost real CPU (about 0.1s each), so cap how often one account posts.
 MAX_RUNS_PER_DAY = 60
 
@@ -54,15 +58,17 @@ def _eval(expression: str) -> str:
         ctx.close()
 
 
-@lru_cache(maxsize=1)
-def current_rules() -> int:
-    """The engine's own RULES number, so the server can't drift from it."""
-    return int(_eval("CastleDefenseGame.RULES"))
+@lru_cache(maxsize=None)
+def current_rules(mode: str = "classic") -> int:
+    """The engine's own rules number for `mode`, so the server can't drift from it."""
+    return int(_eval(f"CastleDefenseGame.RULES_BY_MODE[{json.dumps(mode)}]"))
 
 
-def replay(day: str, layout: List[Dict[str, Any]]) -> Dict[str, Any]:
-    """Run `layout` on `day`'s map to the end and return the engine's result."""
-    return json.loads(_eval(f"JSON.stringify(CastleDefenseGame.replay({json.dumps(day)}, {json.dumps(layout)}))"))
+def replay(day: str, layout: List[Dict[str, Any]], mode: str = "classic") -> Dict[str, Any]:
+    """Run `layout` on `day`'s `mode` map to the end and return the engine's result."""
+    return json.loads(
+        _eval(f"JSON.stringify(CastleDefenseGame.replay({json.dumps(day)}, {json.dumps(layout)}, {json.dumps(mode)}))")
+    )
 
 
 def postable_days(now: Optional[datetime] = None) -> set:
@@ -79,31 +85,28 @@ def validate_day(day: str) -> str:
         raise HTTPException(status_code=422, detail="That isn't a date.")
 
 
-def _day(db: Session, day: str):
-    """A day's rows that count: the ones played under the current rules."""
-    return db.query(CastleDefenseScore).filter(
-        CastleDefenseScore.day == day, CastleDefenseScore.rules == current_rules()
-    )
+def _day(db: Session, day: str, mode: str = "classic"):
+    """A day's rows that count: the ones played under the mode's current rules."""
+    model = MODELS[mode]
+    return db.query(model).filter(model.day == day, model.rules == current_rules(mode))
 
 
-def _board_query(db: Session, day: str):
-    return (
-        _day(db, day)
-        .order_by(CastleDefenseScore.kills.desc(), CastleDefenseScore.achieved_at.asc(), CastleDefenseScore.id.asc())
-    )
+def _board_query(db: Session, day: str, mode: str = "classic"):
+    model = MODELS[mode]
+    return _day(db, day, mode).order_by(model.kills.desc(), model.achieved_at.asc(), model.id.asc())
 
 
-def rank_of(db: Session, row: CastleDefenseScore) -> int:
+def rank_of(db: Session, row, mode: str = "classic") -> int:
     """Standard competition ranking: tied scores share a place (1, 2, 2, 4)."""
-    ahead = _day(db, row.day).filter(CastleDefenseScore.kills > row.kills).count()
+    ahead = _day(db, row.day, mode).filter(MODELS[mode].kills > row.kills).count()
     return ahead + 1
 
 
-def player_count(db: Session, day: str) -> int:
-    return _day(db, day).count()
+def player_count(db: Session, day: str, mode: str = "classic") -> int:
+    return _day(db, day, mode).count()
 
 
-def entry(row: CastleDefenseScore, rank: int, username: Optional[str] = None) -> Dict[str, Any]:
+def entry(row, rank: int, username: Optional[str] = None) -> Dict[str, Any]:
     return {
         "rank": rank,
         "name": row.display_name,
@@ -114,8 +117,8 @@ def entry(row: CastleDefenseScore, rank: int, username: Optional[str] = None) ->
     }
 
 
-def leaderboard(db: Session, day: str, username: Optional[str] = None) -> Dict[str, Any]:
-    rows = _board_query(db, day).limit(BOARD_SIZE).all()
+def leaderboard(db: Session, day: str, username: Optional[str] = None, mode: str = "classic") -> Dict[str, Any]:
+    rows = _board_query(db, day, mode).limit(BOARD_SIZE).all()
     entries = []
     previous = None
     for index, row in enumerate(rows):
@@ -124,28 +127,31 @@ def leaderboard(db: Session, day: str, username: Optional[str] = None) -> Dict[s
         previous = row.kills
     you = None
     if username:
-        mine = _day(db, day).filter(CastleDefenseScore.username == username).first()
+        mine = _day(db, day, mode).filter(MODELS[mode].username == username).first()
         if mine:
-            you = entry(mine, rank_of(db, mine), username)
-    return {"day": day, "players": player_count(db, day), "entries": entries, "you": you}
+            you = entry(mine, rank_of(db, mine, mode), username)
+    return {"day": day, "players": player_count(db, day, mode), "entries": entries, "you": you}
 
 
-def submit(db: Session, day: str, layout: List[Dict[str, Any]], username: str, display_name: str) -> Dict[str, Any]:
+def submit(
+    db: Session, day: str, layout: List[Dict[str, Any]], username: str, display_name: str, mode: str = "classic"
+) -> Dict[str, Any]:
     if day not in postable_days():
         raise HTTPException(status_code=422, detail="Only today's map is ranked.")
 
-    row = db.query(CastleDefenseScore).filter_by(day=day, username=username).first()
+    model = MODELS[mode]
+    row = db.query(model).filter_by(day=day, username=username).first()
     if row and row.runs >= MAX_RUNS_PER_DAY:
         raise HTTPException(status_code=429, detail="That's a lot of runs for one day. Try again tomorrow.")
 
-    result = replay(day, layout)
+    result = replay(day, layout, mode)
     if not result.get("ok"):
         raise HTTPException(status_code=422, detail=result.get("reason") or "That layout isn't valid.")
 
     kills, wave, rules = int(result["kills"]), int(result["wave"]), int(result["rules"])
     improved = False
     if row is None:
-        row = CastleDefenseScore(
+        row = model(
             day=day,
             username=username,
             display_name=display_name,
@@ -172,6 +178,6 @@ def submit(db: Session, day: str, layout: List[Dict[str, Any]], username: str, d
         "kills": kills,
         "wave": wave,
         "improved": improved,
-        "best": entry(row, rank_of(db, row), username),
-        "players": player_count(db, day),
+        "best": entry(row, rank_of(db, row, mode), username),
+        "players": player_count(db, day, mode),
     }

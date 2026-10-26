@@ -126,3 +126,35 @@ test('a signed-in run lands on the board and its place goes in the share', async
     const copied = await page.evaluate(() => navigator.clipboard.readText());
     expect(copied).toMatch(/\n🏆 \d+(st|nd|rd|th) of \d+ today/);
 });
+
+// ── the open field ──────────────────────────────────────────────────────────
+
+// Day 1's open field: the castle at (4, 4), a tree at (2, 2), and no road.
+// Its allotment: 1 Archer, 3 Cannons, 2 Frost, 1 Mage, 3 Tar pits, 3 Mines, no Spikes.
+const DAY_ONE_OPEN = '/castle-defense/?mode=open&date=2026-10-18';
+
+test('the open field takes traps on the grass and sends the horde in from an edge', async ({ page }) => {
+    await page.goto(DAY_ONE_OPEN);
+    await expect(page.getByRole('heading', { name: 'Hold the field' })).toBeVisible();
+    await page.getByRole('button', { name: 'Start building' }).click();
+    await expect(page.getByRole('link', { name: 'Open field' })).toHaveAttribute('aria-current', 'page');
+    // Switching back keeps the day.
+    await expect(page.getByRole('link', { name: 'Classic' })).toHaveAttribute('href', './?date=2026-10-18');
+    await expect(page.locator('#pieceCount')).toHaveText('13 to place');
+
+    await page.getByRole('button', { name: /Archer/ }).click();
+    await clickTile(page, 4, 4);
+    await expect(page.locator('#toast')).toHaveText("That's the castle.");
+    await clickTile(page, 2, 2);
+    await expect(page.locator('#toast')).toHaveText("You can't build there.");
+    await clickTile(page, 3, 4);
+
+    // Any grass will do for a trap out here.
+    await page.getByRole('button', { name: /Tar pit/ }).click();
+    await clickTile(page, 2, 4);
+    await expect(page.getByRole('button', { name: /Tar pit/ })).toContainText('2 of 3 left');
+
+    await page.locator('#playButton').click();
+    await expect(page.locator('#toast')).toHaveText('Wave 1 from the west');
+    await expect(page.locator('#waveValue')).toHaveText('1');
+});

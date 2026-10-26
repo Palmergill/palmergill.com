@@ -21,7 +21,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/shared/site-nav.css?v=19">
-    <link rel="stylesheet" href="./style.css?v=9">
+    <link rel="stylesheet" href="./style.css?v=10">
 </head>
 <body>
 <noscript>
@@ -33,7 +33,13 @@
                 <p class="cd-eyebrow" id="dayLabel">Daily puzzle</p>
                 <h1>Castle Defense</h1>
             </div>
-            <p class="cd-lede">Place towers on the grass and traps on the road, then press play. Score is zombies killed before the castle falls.</p>
+            <div class="cd-head__side">
+                <nav class="cd-modes" aria-label="Game mode">
+                    <a class="cd-chip" id="modeClassic" href="./">Classic</a>
+                    <a class="cd-chip" id="modeOpen" href="./?mode=open">Open field</a>
+                </nav>
+                <p class="cd-lede" id="lede">Place towers on the grass and traps on the road, then press play. Score is zombies killed before the castle falls.</p>
+            </div>
         </header>
 
         <section class="cd-hud" aria-label="Game status">
@@ -84,7 +90,7 @@
                     <div id="shop">
                         <h3 class="cd-group">Towers <span>go on the grass</span></h3>
                         <div class="cd-towers" id="shopTowers"></div>
-                        <h3 class="cd-group">Traps <span>go on the road</span></h3>
+                        <h3 class="cd-group">Traps <span id="trapWhere">go on the road</span></h3>
                         <div class="cd-towers" id="shopTraps"></div>
                     </div>
                     <div class="cd-towers" id="roster" hidden></div>
@@ -107,7 +113,7 @@
 
                 <section class="cd-panel cd-rules">
                     <h2 class="cd-panel__title">How it scores</h2>
-                    <ul>
+                    <ul id="rules">
                         <li>One point for every zombie killed. The run ends when the castle falls.</li>
                         <li>Waves never stop, and each one is bigger and tougher than the last.</li>
                         <li>Everything levels up on its own, up to level <span id="maxLevel">10</span> — a kill is 2 XP, an assist 1.</li>
@@ -130,7 +136,7 @@
     <script src="/shared/site-nav.js?v=22"></script>
     <script src="/shared/analytics.js?v=1"></script>
     <script src="/shared/api-base.js?v=1"></script>
-    <script src="./castleDefenseGame.js?v=6"></script>
-    <script src="./app.js?v=8"></script>
+    <script src="./castleDefenseGame.js?v=7"></script>
+    <script src="./app.js?v=9"></script>
 </body>
 </html>

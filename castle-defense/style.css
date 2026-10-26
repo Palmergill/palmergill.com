@@ -53,6 +53,14 @@ button { font: inherit; color: inherit; }
     letter-spacing: -0.03em;
     line-height: 1;
 }
+.cd-head__side { display: grid; gap: 10px; justify-items: start; min-width: 0; }
+.cd-modes { display: flex; gap: 6px; flex-wrap: wrap; }
+.cd-modes .cd-chip { color: var(--ink); text-decoration: none; }
+.cd-modes .cd-chip[aria-current="page"] {
+    background: var(--sage-soft);
+    border-color: var(--sage);
+    color: var(--sage-dim);
+}
 .cd-lede {
     margin: 0;
     max-width: 58ch;
@@ -183,7 +191,7 @@ button { font: inherit; color: inherit; }
     transition: background 0.15s ease, border-color 0.15s ease;
 }
 .cd-btn:hover { border-color: var(--sage); }
-.cd-btn:focus-visible, .cd-chip:focus-visible, .cd-tower:focus-visible {
+.cd-btn:focus-visible, .cd-chip:focus-visible, .cd-tower:focus-visible, .cd-modes .cd-chip:focus-visible {
     outline: none;
     box-shadow: var(--focus-ring);
 }

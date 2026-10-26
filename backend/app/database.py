@@ -1191,19 +1191,12 @@ class GiftItem(Base):
 
 
 
-class CastleDefenseScore(Base):
-    """A member's best Castle Defense run on one day's map.
-
-    One row per (day, username): a better run replaces the score, a worse one
-    only bumps `runs`. `kills` is always the server's own replay of `layout`,
-    never a number the browser reported.
+class _CastleDefenseRun:
+    """Columns shared by every Castle Defense board: a member's best run on
+    one day's map, one row per (day, username). A better run replaces the
+    score, a worse one only bumps `runs`. `kills` is always the server's own
+    replay of `layout`, never a number the browser reported.
     """
-
-    __tablename__ = "castle_defense_scores"
-    __table_args__ = (
-        UniqueConstraint("day", "username", name="uq_castle_defense_day_user"),
-        Index("ix_castle_defense_day_kills", "day", "kills"),
-    )
 
     id = Column(Integer, primary_key=True, index=True)
     # The player's local date, as the page uses it to seed the map.
@@ -1224,6 +1217,26 @@ class CastleDefenseScore(Base):
     # When `kills` was last set. Ties on the board go to whoever got there first.
     achieved_at = Column(DateTime, default=utc_now, nullable=False)
     updated_at = Column(DateTime, default=utc_now, onupdate=utc_now, nullable=False)
+
+
+class CastleDefenseScore(_CastleDefenseRun, Base):
+    """The classic mode's board: zombies follow the road."""
+
+    __tablename__ = "castle_defense_scores"
+    __table_args__ = (
+        UniqueConstraint("day", "username", name="uq_castle_defense_day_user"),
+        Index("ix_castle_defense_day_kills", "day", "kills"),
+    )
+
+
+class CastleDefenseOpenScore(_CastleDefenseRun, Base):
+    """The open mode's board: zombies walk in from the edges of the field."""
+
+    __tablename__ = "castle_defense_open_scores"
+    __table_args__ = (
+        UniqueConstraint("day", "username", name="uq_castle_defense_open_day_user"),
+        Index("ix_castle_defense_open_day_kills", "day", "kills"),
+    )
 
 
 def get_db():

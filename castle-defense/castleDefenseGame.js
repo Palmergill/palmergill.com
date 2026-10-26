@@ -5,6 +5,11 @@
 // many zombies died first. Every defense levels itself up from kills and
 // assists.
 //
+// That's the classic mode. The open mode drops the road: the castle stands
+// in the middle of a field, the horde walks in from the map's edges, and each
+// zombie heads for the nearest thing it can tear down — a tower, or the
+// castle itself. Towers there have walls of their own and can fall.
+//
 // Pure state + step(): no DOM, so the page (app.js) only draws and forwards
 // input, and node can drive it for balance runs. Positions are in tile units;
 // a tile's centre is (x + 0.5, y + 0.5).
@@ -19,6 +24,9 @@
     // Bumped whenever a change makes old scores incomparable; the leaderboard
     // only ranks runs played under the current rules. 1 was the gold budget.
     const RULES = 2;
+    // Each mode ranks on its own board, under its own rules number.
+    const MODES = ["classic", "open"];
+    const RULES_BY_MODE = { classic: RULES, open: 1 };
     const MAX_EACH = 3;
     // Limits on a day's allotment, checked by simulation (see dailyAllotment).
     const ALLOT_MIN_TOWERS = 3;
@@ -49,7 +57,7 @@
             name: "Archer",
             plural: "Archers",
             blurb: "Long reach, one target at a time. Best against Brutes and the King.",
-            base: { damage: 22, range: 2.3, rate: 2.0 },
+            base: { damage: 22, range: 2.3, rate: 2.0, hp: 90 },
             projectile: { kind: "arrow", speed: 11, homing: true }
         },
         cannon: {
@@ -57,7 +65,7 @@
             name: "Cannon",
             plural: "Cannons",
             blurb: "Shells burst across a crowd, but fast zombies can outrun them.",
-            base: { damage: 20, range: 1.7, rate: 0.5, splash: 0.75 },
+            base: { damage: 20, range: 1.7, rate: 0.5, splash: 0.75, hp: 120 },
             projectile: { kind: "shell", speed: 6, homing: false }
         },
         frost: {
@@ -65,7 +73,7 @@
             name: "Frost",
             plural: "Frost towers",
             blurb: "Barely hurts, but slows the pack so the others get more shots.",
-            base: { damage: 4, range: 1.7, rate: 1.0, splash: 0.7, slow: 0.28, slowGrowth: 0.04, slowCap: 0.45, slowFor: 1.6 },
+            base: { damage: 4, range: 1.7, rate: 1.0, splash: 0.7, slow: 0.28, slowGrowth: 0.04, slowCap: 0.45, slowFor: 1.6, hp: 100 },
             projectile: { kind: "shard", speed: 9, homing: true }
         },
         mage: {
@@ -73,7 +81,7 @@
             name: "Mage",
             plural: "Mages",
             blurb: "Lightning jumps between zombies. Strong when they bunch up.",
-            base: { damage: 23, range: 2.0, rate: 0.75, chains: 2, chainRange: 1.6 },
+            base: { damage: 23, range: 2.0, rate: 0.75, chains: 2, chainRange: 1.6, hp: 80 },
             projectile: null
         },
         spikes: {
@@ -101,12 +109,16 @@
     const TOWER_TYPES = Object.keys(DEFENSES).filter((t) => DEFENSES[t].kind === "tower");
     const TRAP_TYPES = Object.keys(DEFENSES).filter((t) => DEFENSES[t].kind === "trap");
 
+    // `damage` is what a zombie takes off the castle's walls when it gets in;
+    // `bite` is how fast it tears at a tower in the open mode (HP a second).
     const ZOMBIES = {
-        walker: { name: "Walker", hp: 34, speed: 0.85, damage: 1, radius: 0.2 },
-        runner: { name: "Runner", hp: 20, speed: 1.6, damage: 1, radius: 0.16 },
-        brute: { name: "Brute", hp: 140, speed: 0.5, damage: 2, radius: 0.27 },
-        king: { name: "Zombie King", hp: 1200, speed: 0.38, damage: 5, radius: 0.34 }
+        walker: { name: "Walker", hp: 34, speed: 0.85, damage: 1, radius: 0.2, bite: 4 },
+        runner: { name: "Runner", hp: 20, speed: 1.6, damage: 1, radius: 0.16, bite: 3 },
+        brute: { name: "Brute", hp: 140, speed: 0.5, damage: 2, radius: 0.27, bite: 11 },
+        king: { name: "Zombie King", hp: 1200, speed: 0.38, damage: 5, radius: 0.34, bite: 32 }
     };
+    // A bite grows this much a wave, so late towers fall faster.
+    const BITE_GROWTH = 0.06;
 
     // ---------- seeded randomness ----------
     function hashString(str) {
@@ -235,7 +247,8 @@
         return reach[0] + reach[1] + reach[2];
     }
 
-    function dailyMap(dateStr) {
+    function dailyMap(dateStr, mode = "classic") {
+        if (mode === "open") return openMap(dateStr);
         const seed = hashString(`castle-defense:${dateStr}`);
         const rng = mulberry32(seed);
         // Reroll roads that towers can barely reach — ones hugging the edge
@@ -270,6 +283,7 @@
         const map = {
             date: dateStr,
             day: dayNumber(dateStr),
+            mode: "classic",
             seed,
             path: road.path,
             entry: road.entry,
@@ -284,6 +298,74 @@
         map.obstacleSet = new Set(obstacles.map((o) => `${o.x},${o.y}`));
         map.allotment = dailyAllotment(seed);
         return map;
+    }
+
+    // The open field: no road, the castle near the middle, and a few trees
+    // and rocks that zombies have to walk around. Its own seed, so the open
+    // day isn't just the classic day with the road painted over.
+    const SIDES = ["north", "east", "south", "west"];
+    // Which way is "outward" from each side, as [dx, dy].
+    const SIDE_OUT = { north: [0, -1], east: [1, 0], south: [0, 1], west: [-1, 0] };
+
+    function openMap(dateStr) {
+        const seed = hashString(`castle-defense:open:${dateStr}`);
+        const rng = mulberry32(seed);
+        const castle = { x: 3 + Math.floor(rng() * 2), y: 3 + Math.floor(rng() * 2) };
+        const key = (x, y) => `${x},${y}`;
+        const nearCastle = (x, y) => Math.abs(x - castle.x) <= 1 && Math.abs(y - castle.y) <= 1;
+        const spots = [];
+        for (let x = 0; x < SIZE; x++) {
+            for (let y = 0; y < SIZE; y++) if (!nearCastle(x, y)) spots.push([x, y]);
+        }
+        // Reroll until every open tile can still reach the castle, so no
+        // zombie can be born in a pocket sealed off by rocks.
+        let obstacles;
+        for (;;) {
+            const want = 4 + Math.floor(rng() * 3);
+            obstacles = shuffle(rng, spots.slice()).slice(0, want).map(([x, y], i) => ({ x, y, kind: i % 3 === 2 ? "rock" : "tree" }));
+            const blocked = new Set([key(castle.x, castle.y), ...obstacles.map((o) => key(o.x, o.y))]);
+            const seen = new Set();
+            const queue = [[castle.x + 1, castle.y]];
+            seen.add(key(castle.x + 1, castle.y));
+            while (queue.length) {
+                const [x, y] = queue.shift();
+                for (const [dx, dy] of DIRS) {
+                    const k = key(x + dx, y + dy);
+                    if (!inGrid(x + dx, y + dy) || blocked.has(k) || seen.has(k)) continue;
+                    seen.add(k);
+                    queue.push([x + dx, y + dy]);
+                }
+            }
+            if (seen.size === SIZE * SIZE - blocked.size) break;
+        }
+
+        const leans = ["walker", "runner", "brute"];
+        const lean = leans[Math.floor(rng() * leans.length)];
+        const obstacleSet = new Set(obstacles.map((o) => key(o.x, o.y)));
+        // The tiles zombies can walk in from, side by side.
+        const edges = {};
+        SIDES.forEach((side) => {
+            edges[side] = [];
+            for (let i = 0; i < SIZE; i++) {
+                const [x, y] = { north: [i, 0], east: [SIZE - 1, i], south: [i, SIZE - 1], west: [0, i] }[side];
+                if (!obstacleSet.has(key(x, y))) edges[side].push({ x, y });
+            }
+        });
+        return {
+            date: dateStr,
+            day: dayNumber(dateStr),
+            mode: "open",
+            seed,
+            path: [],
+            castle,
+            obstacles,
+            lean,
+            edges,
+            // The castle is the only tile that isn't grass or scenery.
+            pathSet: new Set([key(castle.x, castle.y)]),
+            obstacleSet,
+            allotment: dailyAllotment(seed)
+        };
     }
 
     // What everyone gets to place today: 0–3 of each defense, from its own
@@ -364,6 +446,17 @@
         const hpMul = Math.min(1.3, Math.max(0.7, (perZombie * count) / actual));
         list.forEach((s) => { s.hpMul = hpMul; });
         if (wave % KING_EVERY === 0) list.push({ type: "king", at: t + 1.5, wave, hpMul: 1 });
+        if (map.mode === "open") {
+            // A wave comes in from one side at first, then two, then three,
+            // from its own stream so the zombies themselves don't change.
+            const srng = mulberry32(hashString(`${map.seed}:sides:${wave}`));
+            const sides = shuffle(srng, SIDES.slice()).slice(0, wave < 3 ? 1 : wave < 8 ? 2 : 3);
+            list.forEach((s) => {
+                s.side = sides[Math.floor(srng() * sides.length)];
+                s.along = srng();
+            });
+            list.sides = sides;
+        }
         return list;
     }
 
@@ -409,6 +502,7 @@
             s.chainRange = b.chainRange;
         }
         if (b.rearm != null) s.rearm = +(b.rearm * Math.pow(0.92, up)).toFixed(2);
+        if (b.hp != null) s.hp = Math.round(b.hp * (1 + 0.3 * up));
         return s;
     }
 
@@ -440,10 +534,12 @@
         if (!Number.isInteger(x) || !Number.isInteger(y) || !inGrid(x, y)) return "That's off the map.";
         if (defenseAt(state, x, y)) return "Something is already there.";
         if (x === state.map.castle.x && y === state.map.castle.y) return "That's the castle.";
-        if (def.kind === "tower" && !isGrass(state.map, x, y)) {
+        if (state.map.mode === "open") {
+            if (!isGrass(state.map, x, y)) return "You can't build there.";
+        } else if (def.kind === "tower" && !isGrass(state.map, x, y)) {
             return state.map.pathSet.has(`${x},${y}`) ? "Towers go on the grass — traps go on the road." : "You can't build there.";
         }
-        if (def.kind === "trap" && !isRoad(state.map, x, y)) return "Traps go on the road.";
+        if (state.map.mode !== "open" && def.kind === "trap" && !isRoad(state.map, x, y)) return "Traps go on the road.";
         if (!(state.stock[type] > 0)) {
             return state.map.allotment[type] ? `No ${def.plural} left — that's all of today's.` : `There are no ${def.plural} today.`;
         }
@@ -482,6 +578,12 @@
         state.defenses.sort((a, b) => a.y - b.y || a.x - b.x);
         state.defenses.forEach((d, i) => { d.id = i + 1; });
         state.nextId = state.defenses.length + 1;
+        if (state.map.mode === "open") {
+            state.defenses.forEach((d) => {
+                if (d.kind === "tower") d.hp = d.maxHp = stats(d.type, 1).hp;
+            });
+            state.fieldDirty = true;
+        }
         state.phase = "running";
         state.time = 0;
         state.nextWaveAt = 0;
@@ -516,7 +618,8 @@
             dx: 1,
             dy: 0
         };
-        placeZombie(state.map, z);
+        if (state.map.mode === "open") enterField(state, z, spawn);
+        else placeZombie(state.map, z);
         state.zombies.push(z);
     }
 
@@ -532,6 +635,12 @@
         d.xp += amount;
         while (d.level < MAX_LEVEL && d.xp >= LEVEL_XP[d.level - 1]) {
             d.level += 1;
+            // A tower that grows gets the new wall on top of what's left.
+            if (d.maxHp != null) {
+                const grown = stats(d.type, d.level).hp;
+                d.hp += grown - d.maxHp;
+                d.maxHp = grown;
+            }
             state.effects.push({ kind: "levelup", x: d.x + 0.5, y: d.y + 0.5, text: `Level ${d.level}`, ttl: 1.2, life: 1.2 });
             state.events.push({ type: "level-up", id: d.id, level: d.level });
         }
@@ -574,11 +683,19 @@
         return Math.floor(z.x) === d.x && Math.floor(z.y) === d.y;
     }
 
+    // On the road a tower shoots whoever is furthest along it; in the open
+    // there's no "along", so it shoots whoever is closest to itself.
     function pickTarget(state, x, y, range) {
+        const open = state.map.mode === "open";
         let best = null;
+        let bestGap = Infinity;
         for (const z of live(state)) {
-            if (Math.hypot(z.x - x, z.y - y) > range + z.radius * 0.5) continue;
-            if (!best || z.dist > best.dist) best = z;
+            const gap = Math.hypot(z.x - x, z.y - y);
+            if (gap > range + z.radius * 0.5) continue;
+            if (open ? gap < bestGap : !best || z.dist > best.dist) {
+                best = z;
+                bestGap = gap;
+            }
         }
         return best;
     }
@@ -680,6 +797,163 @@
         trap.active = here.length > 0;
     }
 
+    // ---------- the open field ----------
+    // Zombies there steer by a flow field: every walkable tile holds how many
+    // steps it is from standing next to something they can attack — a live
+    // tower or the castle. Walking downhill on it is walking to the nearest
+    // threat. It's rebuilt whenever a tower falls and opens new ground.
+    function tileIndex(x, y) {
+        return y * SIZE + x;
+    }
+
+    function liveTowerAt(state, x, y) {
+        return state.defenses.find((d) => d.kind === "tower" && !d.destroyed && d.x === x && d.y === y) || null;
+    }
+
+    function isCastle(map, x, y) {
+        return x === map.castle.x && y === map.castle.y;
+    }
+
+    function walkable(state, x, y) {
+        return inGrid(x, y) && !state.map.obstacleSet.has(`${x},${y}`) && !isCastle(state.map, x, y) && !liveTowerAt(state, x, y);
+    }
+
+    function buildField(state) {
+        const field = new Array(SIZE * SIZE).fill(Infinity);
+        const queue = [];
+        const targets = state.defenses.filter((d) => d.kind === "tower" && !d.destroyed).concat([state.map.castle]);
+        for (const t of targets) {
+            for (const [dx, dy] of DIRS) {
+                const x = t.x + dx;
+                const y = t.y + dy;
+                if (!walkable(state, x, y) || field[tileIndex(x, y)] === 0) continue;
+                field[tileIndex(x, y)] = 0;
+                queue.push([x, y]);
+            }
+        }
+        for (let i = 0; i < queue.length; i++) {
+            const [x, y] = queue[i];
+            const next = field[tileIndex(x, y)] + 1;
+            for (const [dx, dy] of DIRS) {
+                const nx = x + dx;
+                const ny = y + dy;
+                if (!walkable(state, nx, ny) || field[tileIndex(nx, ny)] <= next) continue;
+                field[tileIndex(nx, ny)] = next;
+                queue.push([nx, ny]);
+            }
+        }
+        state.field = field;
+        state.fieldDirty = false;
+    }
+
+    // A zombie walks on from just outside its edge tile.
+    function enterField(state, z, spawn) {
+        const map = state.map;
+        const free = (side) => map.edges[side].filter((t) => !liveTowerAt(state, t.x, t.y));
+        let tiles = free(spawn.side);
+        if (!tiles.length) tiles = SIDES.flatMap(free);
+        const tile = tiles[Math.floor(spawn.along * tiles.length)];
+        const [ox, oy] = SIDE_OUT[spawn.side];
+        const r = mulberry32(z.id * 7919 + map.seed);
+        // Where in a tile this zombie likes to stand, so a crowd spreads out.
+        z.ox = (r() - 0.5) * 0.36;
+        z.oy = (r() - 0.5) * 0.36;
+        z.gx = tile.x;
+        z.gy = tile.y;
+        z.x = tile.x + 0.5 + ox * 0.8 + z.ox;
+        z.y = tile.y + 0.5 + oy * 0.8 + z.oy;
+        z.dx = -ox;
+        z.dy = -oy;
+        z.target = null;
+        z.bite = ZOMBIES[spawn.type].bite * (1 + BITE_GROWTH * (spawn.wave - 1));
+    }
+
+    // Standing on its goal tile: attack whatever is next to it, or pick the
+    // next tile downhill. Ties are split by id so a crowd fans out.
+    function decide(state, z) {
+        const here = state.field[tileIndex(z.gx, z.gy)];
+        z.target = null;
+        if (here === 0) {
+            for (let i = 0; i < 4; i++) {
+                const [dx, dy] = DIRS[(i + z.id) % 4];
+                const x = z.gx + dx;
+                const y = z.gy + dy;
+                if (isCastle(state.map, x, y)) z.target = { x, y, castle: true };
+                else {
+                    const tower = liveTowerAt(state, x, y);
+                    if (tower) z.target = { x, y, tower };
+                }
+                if (z.target) return;
+            }
+        }
+        const options = [];
+        for (const [dx, dy] of DIRS) {
+            const x = z.gx + dx;
+            const y = z.gy + dy;
+            if (walkable(state, x, y) && state.field[tileIndex(x, y)] < here) options.push([x, y]);
+        }
+        if (!options.length) return;
+        const [x, y] = options[z.id % options.length];
+        z.gx = x;
+        z.gy = y;
+    }
+
+    function walkTo(z, x, y, move) {
+        const gap = Math.hypot(x - z.x, y - z.y);
+        if (gap > 1e-6) {
+            z.dx = (x - z.x) / gap;
+            z.dy = (y - z.y) / gap;
+        }
+        if (gap <= move) {
+            z.x = x;
+            z.y = y;
+            return true;
+        }
+        z.x += z.dx * move;
+        z.y += z.dy * move;
+        return false;
+    }
+
+    function moveOpen(state, z, move, dt) {
+        if (z.target && z.target.tower && z.target.tower.destroyed) decide(state, z);
+        const t = z.target;
+        if (!t) {
+            if (walkTo(z, z.gx + 0.5 + z.ox, z.gy + 0.5 + z.oy, move)) decide(state, z);
+            return;
+        }
+        // Close in on the side of the tile facing the target.
+        const fx = t.x - z.gx;
+        const fy = t.y - z.gy;
+        const reach = t.castle ? 0.5 : 0.5 - z.radius * 0.6;
+        const side = fx ? z.oy : z.ox;
+        const ax = z.gx + 0.5 + fx * reach + (fx ? 0 : side);
+        const ay = z.gy + 0.5 + fy * reach + (fy ? 0 : side);
+        if (!walkTo(z, ax, ay, move)) return;
+        z.dx = fx;
+        z.dy = fy;
+        if (t.castle) {
+            breach(state, z);
+            return;
+        }
+        const tower = t.tower;
+        tower.hp -= z.bite * dt;
+        tower.hitFlash = 0.12;
+        if (tower.hp > 0) return;
+        tower.hp = 0;
+        tower.destroyed = true;
+        state.fieldDirty = true;
+        state.effects.push({ kind: "boom", x: tower.x + 0.5, y: tower.y + 0.5, r: 0.6, ttl: 0.5, life: 0.5 });
+        state.events.push({ type: "tower-down", id: tower.id });
+    }
+
+    function breach(state, z) {
+        z.gone = true;
+        state.leaked += 1;
+        state.hp = Math.max(0, state.hp - z.damage);
+        state.effects.push({ kind: "breach", x: state.map.castle.x + 0.5, y: state.map.castle.y + 0.1, text: `-${z.damage}`, ttl: 0.9, life: 0.9 });
+        state.events.push({ type: "breach", damage: z.damage });
+    }
+
     function step(state, dt) {
         if (state.phase !== "running" || dt <= 0) return;
         state.time += dt;
@@ -691,26 +965,29 @@
             const spawns = waveSpawns(state.map, state.wave);
             spawns.forEach((s) => state.queue.push({ ...s, at: s.at + state.time }));
             state.nextWaveAt = state.time + spawns[spawns.length - 1].at + WAVE_BREAK;
-            state.events.push({ type: "wave", wave: state.wave });
+            state.events.push({ type: "wave", wave: state.wave, sides: spawns.sides });
+            if (spawns.sides) state.waveSides = spawns.sides;
         }
         while (state.queue.length && state.queue[0].at <= state.time) spawnZombie(state, state.queue.shift());
 
+        const open = state.map.mode === "open";
         for (const z of state.zombies) {
             if (z.gone) continue;
             const slowed = z.slowUntil > state.time ? 1 - z.slowAmt : 1;
-            z.dist += z.speed * slowed * dt;
             z.hitFlash = Math.max(0, z.hitFlash - dt);
-            placeZombie(state.map, z);
-            if (z.dist >= state.map.length) {
-                z.gone = true;
-                state.leaked += 1;
-                state.hp = Math.max(0, state.hp - z.damage);
-                state.effects.push({ kind: "breach", x: state.map.castle.x + 0.5, y: state.map.castle.y + 0.1, text: `-${z.damage}`, ttl: 0.9, life: 0.9 });
-                state.events.push({ type: "breach", damage: z.damage });
+            if (open) {
+                if (state.fieldDirty) buildField(state);
+                moveOpen(state, z, z.speed * slowed * dt, dt);
+                continue;
             }
+            z.dist += z.speed * slowed * dt;
+            placeZombie(state.map, z);
+            if (z.dist >= state.map.length) breach(state, z);
         }
 
         for (const d of state.defenses) {
+            if (d.hitFlash) d.hitFlash = Math.max(0, d.hitFlash - dt);
+            if (d.destroyed) continue;
             if (d.kind === "trap") {
                 runTrap(state, d, dt);
                 continue;
@@ -761,8 +1038,9 @@
 
     // The official result of a layout on a date. The server replays this to
     // rank a run, so a posted score can't claim more than the layout earns.
-    function replay(dateStr, layout) {
-        const state = createGame(dailyMap(dateStr));
+    function replay(dateStr, layout, mode = "classic") {
+        if (!MODES.includes(mode)) return { ok: false, reason: "Unknown mode." };
+        const state = createGame(dailyMap(dateStr, mode));
         if (!Array.isArray(layout) || !layout.length) return { ok: false, reason: "Build something first." };
         for (const d of layout) {
             const res = place(state, d && d.type, d && d.x, d && d.y);
@@ -775,7 +1053,7 @@
             step(state, STEP);
             steps += 1;
         }
-        return { ok: true, kills: state.kills, wave: state.wave, rules: RULES };
+        return { ok: true, kills: state.kills, wave: state.wave, rules: RULES_BY_MODE[mode] };
     }
 
     function drainEvents(state) {
@@ -787,6 +1065,9 @@
     return {
         SIZE,
         RULES,
+        MODES,
+        RULES_BY_MODE,
+        SIDES,
         MAX_EACH,
         START_HP,
         KING_EVERY,

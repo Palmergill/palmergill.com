@@ -12,7 +12,7 @@ from fastapi.testclient import TestClient
 from py_mini_racer import MiniRacer
 
 from app import accounts
-from app.database import CastleDefenseScore, SessionLocal
+from app.database import CastleDefenseOpenScore, CastleDefenseScore, SessionLocal
 from app.main import ROLE_MEMBER, SESSION_COOKIE_NAME, app, create_app_session_token
 from app.services import castle_defense
 
@@ -33,6 +33,7 @@ def _clean_board():
     db = SessionLocal()
     try:
         db.query(CastleDefenseScore).delete()
+        db.query(CastleDefenseOpenScore).delete()
         db.commit()
     finally:
         db.close()
@@ -178,3 +179,65 @@ def test_scores_from_older_rules_are_left_off_and_then_replaced():
     body = member.post("/api/castle-defense/runs", json={"day": TODAY, "layout": _one_piece(TODAY)}).json()
     assert body["improved"] and body["best"]["kills"] == body["kills"] < 99999
     assert body["players"] == 1 and body["best"]["runs"] == 2
+
+
+# ── the open field ──────────────────────────────────────────────────────────
+
+
+def _open_layout(day: str):
+    """Every piece in the open day's allotment, packed around the castle."""
+    ctx = MiniRacer()
+    try:
+        ctx.eval(castle_defense.engine_source())
+        raw = ctx.eval(
+            "(() => { const G = CastleDefenseGame; const m = G.dailyMap(%s, 'open'); const grass = [];"
+            " for (let x = 0; x < 8; x++) for (let y = 0; y < 8; y++) if (G.isGrass(m, x, y)) grass.push([x, y]);"
+            " const gap = ([x, y]) => Math.hypot(x - m.castle.x, y - m.castle.y);"
+            " grass.sort((a, b) => gap(a) - gap(b)); const out = [];"
+            " for (const [t, n] of Object.entries(m.allotment)) for (let i = 0; i < n; i++) {"
+            "  const [x, y] = grass.shift(); out.push({ type: t, x, y }); }"
+            " return JSON.stringify(out); })()" % json.dumps(day)
+        )
+    finally:
+        ctx.close()
+    return json.loads(raw)
+
+
+def test_open_runs_are_scored_on_their_own_board():
+    client = _member("Erin")
+    layout = _open_layout(TODAY)
+    body = client.post("/api/castle-defense/runs", json={"day": TODAY, "mode": "open", "layout": layout}).json()
+    expected = castle_defense.replay(TODAY, layout, "open")
+    assert body["kills"] == expected["kills"] > 0
+    assert body["best"]["rank"] == 1 and body["players"] == 1
+
+    open_board = client.get(f"/api/castle-defense/leaderboard?day={TODAY}&mode=open").json()
+    assert [e["name"] for e in open_board["entries"]] == ["Erin"]
+    # The classic board never sees it.
+    assert client.get(f"/api/castle-defense/leaderboard?day={TODAY}").json()["players"] == 0
+
+    classic = client.post("/api/castle-defense/runs", json={"day": TODAY, "layout": _one_piece(TODAY)}).json()
+    assert classic["players"] == 1 and classic["best"]["runs"] == 1
+
+
+def test_an_open_layout_is_checked_against_the_open_map():
+    layout = _open_layout(TODAY)
+    castle = json.loads(_eval_open(f"JSON.stringify(CastleDefenseGame.dailyMap({json.dumps(TODAY)}, 'open').castle)"))
+    bad = [{"type": layout[0]["type"], "x": castle["x"], "y": castle["y"]}]
+    response = _member().post("/api/castle-defense/runs", json={"day": TODAY, "mode": "open", "layout": bad})
+    assert response.status_code == 422
+    assert "castle" in response.json()["detail"]
+
+
+def test_unknown_modes_are_refused():
+    response = TestClient(app).get(f"/api/castle-defense/leaderboard?day={TODAY}&mode=sideways")
+    assert response.status_code == 422
+
+
+def _eval_open(expression: str) -> str:
+    ctx = MiniRacer()
+    try:
+        ctx.eval(castle_defense.engine_source())
+        return ctx.eval(expression)
+    finally:
+        ctx.close()

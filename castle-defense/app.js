@@ -13,11 +13,16 @@
     const overlay = $("overlay");
 
     // ?date=YYYY-MM-DD replays another day's map; otherwise it's today's.
-    const requested = new URLSearchParams(location.search).get("date");
+    // ?mode=open plays the open field instead of the road.
+    const params = new URLSearchParams(location.search);
+    const requested = params.get("date");
     const today = G.localDateString();
     const date = /^\d{4}-\d{2}-\d{2}$/.test(requested || "") && !Number.isNaN(Date.parse(requested)) ? requested : today;
-    const map = G.dailyMap(date);
-    const storeKey = `castle-defense:v4:${date}`;
+    const mode = params.get("mode") === "open" ? "open" : "classic";
+    const open = mode === "open";
+    const map = G.dailyMap(date, mode);
+    const storeKey = open ? `castle-defense:open:v1:${date}` : `castle-defense:v4:${date}`;
+    const SIDE_NAME = { north: "the north", east: "the east", south: "the south", west: "the west" };
 
     let record = readRecord();
     let state = G.createGame(map);
@@ -66,6 +71,8 @@
     // Only today's map is ranked; ?date= replays are for practice.
     const ranked = date === today;
     const API = `${window.API_ORIGIN || ""}/api/castle-defense`;
+    const modeQuery = open ? "?mode=open" : "";
+    const pageHref = `/castle-defense/${modeQuery}`;
     // The latest post of this run: { kills, best, players } or { signedOut }.
     let placement = null;
     let posting = null;
@@ -114,11 +121,11 @@
         if (!ranked) {
             $("boardTitle").textContent = "Leaderboard";
             $("board-list").innerHTML = "";
-            note.innerHTML = `You're replaying ${escapeHtml(prettyDate(date))}. Only today's map is ranked — <a href="/castle-defense/">play today's</a>.`;
+            note.innerHTML = `You're replaying ${escapeHtml(prettyDate(date))}. Only today's map is ranked — <a href="${pageHref}">play today's</a>.`;
             return;
         }
         try {
-            const board = await api(`/leaderboard?day=${date}`);
+            const board = await api(`/leaderboard?day=${date}&mode=${mode}`);
             renderBoard(board);
             return board;
         } catch {
@@ -137,14 +144,14 @@
     }
 
     function signInHref() {
-        return `/login/?next=${encodeURIComponent("/castle-defense/")}`;
+        return `/login/?next=${encodeURIComponent(pageHref)}`;
     }
 
     // Post a finished run. The server replays the layout and keeps the
     // account's best; anything signed out is kept to post after sign-in.
     function postRun(layout) {
         if (!ranked) return Promise.resolve(null);
-        posting = api("/runs", { method: "POST", body: { day: date, layout } })
+        posting = api("/runs", { method: "POST", body: { day: date, mode, layout } })
             .then(async (res) => {
                 placement = res;
                 if (record.pending) {
@@ -254,6 +261,24 @@
             }
         }
 
+        if (open) {
+            // No road: the horde walks in out of the dark at the edges.
+            const band = 0.55;
+            [[0, 0, 0, band], [0, G.SIZE, 0, G.SIZE - band], [0, 0, band, 0], [G.SIZE, 0, G.SIZE - band, 0]].forEach(([x0, y0, x1, y1]) => {
+                const grad = c.createLinearGradient(x0, y0, x1, y1);
+                grad.addColorStop(0, "rgba(30, 45, 20, 0.45)");
+                grad.addColorStop(1, "rgba(30, 45, 20, 0)");
+                c.fillStyle = grad;
+                c.fillRect(0, 0, G.SIZE, G.SIZE);
+            });
+        } else {
+            paintRoad(c);
+        }
+        paintObstacles(c);
+        return off;
+    }
+
+    function paintRoad(c) {
         const pts = map.waypoints;
         c.lineJoin = "round";
         c.lineCap = "butt";
@@ -286,7 +311,9 @@
             c.ellipse(px, py, 0.05, 0.032, Math.atan2(f.y - e.y, f.x - e.x), 0, Math.PI * 2);
             c.fill();
         }
+    }
 
+    function paintObstacles(c) {
         map.obstacles.forEach((o) => {
             const cx = o.x + 0.5;
             const cy = o.y + 0.5;
@@ -319,8 +346,6 @@
                 circle(c, cx - 0.14, cy - 0.14, 0.07, "rgba(255,255,255,0.12)");
             }
         });
-
-        return off;
     }
 
     // ---------- castle ----------
@@ -329,7 +354,7 @@
         const cx = x + 0.5;
         const cy = y + 0.5;
         const prev = map.path[map.path.length - 2];
-        const facing = Math.atan2(prev[1] - y, prev[0] - x);
+        const facing = prev ? Math.atan2(prev[1] - y, prev[0] - x) : Math.PI / 2;
         const hpRatio = state.hp / state.maxHp;
         const dark = "#7d7466";
         const clock = performance.now() / 1000;
@@ -530,19 +555,50 @@
         c.restore();
     }
 
+    function drawRubble(d) {
+        const cx = d.x + 0.5;
+        const cy = d.y + 0.5;
+        circle(ctx, cx + 0.04, cy + 0.06, 0.34, "rgba(30, 40, 20, 0.25)");
+        [[-0.16, -0.08, 0.14], [0.12, -0.12, 0.11], [0.02, 0.12, 0.15], [-0.18, 0.16, 0.09], [0.2, 0.14, 0.1]].forEach(([ox, oy, r], i) => {
+            circle(ctx, cx + ox, cy + oy, r, i % 2 ? "#a49c8d" : "#8f887b", "#6f685c", 0.02);
+        });
+    }
+
+    // A tower's walls, once something has bitten into them.
+    function drawTowerHp(d) {
+        if (d.maxHp == null || d.destroyed || d.hp >= d.maxHp) return;
+        const bx = d.x + 0.12;
+        const by = d.y + 0.04;
+        const bw = 0.76;
+        ctx.fillStyle = "rgba(20, 20, 20, 0.6)";
+        ctx.fillRect(bx, by, bw, 0.07);
+        const ratio = Math.max(0, d.hp / d.maxHp);
+        ctx.fillStyle = ratio > 0.5 ? "#8fd16a" : ratio > 0.25 ? "#e6c14a" : "#e3573e";
+        ctx.fillRect(bx, by, bw * ratio, 0.07);
+    }
+
     function drawDefense(c, d, time, alpha = 1) {
+        if (d.destroyed) {
+            drawRubble(d);
+            return;
+        }
         if (G.DEFENSES[d.type].kind === "trap") {
             const s = G.stats(d.type, d.level || 1);
             const armed = d.type === "mine" && d.cooldown > 0 ? 1 - d.cooldown / s.rearm : 1;
             drawTrap(c, d.type, d.x + 0.5, d.y + 0.5, time, { alpha, armed, active: d.active });
         } else {
             drawTower(c, d.type, d.x + 0.5, d.y + 0.5, d.angle ?? -Math.PI / 2, time, alpha);
+            if (d.hitFlash > 0) {
+                roundRect(c, d.x + 0.1, d.y + 0.1, 0.8, 0.8, 0.12);
+                c.fillStyle = `rgba(255, 90, 60, ${d.hitFlash * 3})`;
+                c.fill();
+            }
         }
     }
 
     // A small numbered badge in the corner once something has levelled.
     function drawLevel(d) {
-        if (d.level < 2) return;
+        if (d.level < 2 || d.destroyed) return;
         const bx = d.x + 0.82;
         const by = d.y + 0.82;
         circle(ctx, bx, by, 0.15, d.level >= G.MAX_LEVEL ? "#e2b746" : "#fff7e0", "#8d6a1c", 0.025);
@@ -728,6 +784,21 @@
             });
         }
 
+        // In the open, the sides this wave is coming from glow while it arrives.
+        if (open && state.phase === "running" && state.queue.length && state.waveSides) {
+            const pulse = 0.28 + Math.sin(clock * 5) * 0.1;
+            const band = 0.7;
+            const lines = { north: [0, 0, 0, band], south: [0, G.SIZE, 0, G.SIZE - band], west: [0, 0, band, 0], east: [G.SIZE, 0, G.SIZE - band, 0] };
+            state.waveSides.forEach((side) => {
+                const [x0, y0, x1, y1] = lines[side];
+                const grad = ctx.createLinearGradient(x0, y0, x1, y1);
+                grad.addColorStop(0, `rgba(200, 60, 40, ${pulse})`);
+                grad.addColorStop(1, "rgba(200, 60, 40, 0)");
+                ctx.fillStyle = grad;
+                ctx.fillRect(0, 0, G.SIZE, G.SIZE);
+            });
+        }
+
         state.defenses.forEach((d) => {
             if (d.kind === "trap") drawDefense(ctx, d, time);
         });
@@ -741,6 +812,7 @@
         state.zombies.forEach(drawZombie);
         state.projectiles.forEach(drawProjectile);
         state.defenses.forEach(drawLevel);
+        state.defenses.forEach(drawTowerHp);
         state.effects.forEach((e) => {
             if (e.kind !== "splat") drawEffect(e);
         });
@@ -789,7 +861,11 @@
     function handleEvents() {
         for (const e of G.drainEvents(state)) {
             if (e.type === "wave") {
-                toast(e.wave % G.KING_EVERY === 0 ? `Wave ${e.wave} — the Zombie King walks` : `Wave ${e.wave}`);
+                const from = e.sides ? ` from ${listText(e.sides.map((s) => SIDE_NAME[s]))}` : "";
+                toast(e.wave % G.KING_EVERY === 0 ? `Wave ${e.wave} — the Zombie King walks` : `Wave ${e.wave}${from}`);
+            } else if (e.type === "tower-down") {
+                const d = G.findDefense(state, e.id);
+                if (d) toast(`Your ${G.DEFENSES[d.type].name} fell`, true);
             } else if (e.type === "level-up") {
                 const d = G.findDefense(state, e.id);
                 if (d && e.level % 2 === 0) toast(`${G.DEFENSES[d.type].name} reached level ${e.level}`);
@@ -804,6 +880,10 @@
                 finishRun(e);
             }
         }
+    }
+
+    function listText(items) {
+        return items.length < 2 ? items.join("") : `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`;
     }
 
     // ---------- overlay ----------
@@ -839,6 +919,21 @@
     }
 
     function showIntro() {
+        if (open) {
+            showOverlay({
+                eyebrow: `Open field · Day ${map.day} · ${prettyDate(date)}`,
+                title: "Hold the field",
+                body: `
+                    <p>There's no road out here. Zombies walk in from the edges of the map and go for the nearest thing they can tear down — one of your towers, or the castle. Each one that reaches the castle knocks down part of the wall; lose all ${G.START_HP} walls and it falls.</p>
+                    <ol class="cd-howto">
+                        <li>Place today's towers and traps anywhere on the grass. Everyone gets the same 0–${G.MAX_EACH} of each.</li>
+                        <li>Towers have walls of their own. Zombies will chew through them, and a tower that falls is gone for the run.</li>
+                        <li>Press play. Your score is how many zombies you kill before the castle falls.</li>
+                    </ol>`,
+                actions: [{ label: "Start building", primary: true, onClick: hideOverlay }]
+            });
+            return;
+        }
         showOverlay({
             eyebrow: `Day ${map.day} · ${prettyDate(date)}`,
             title: "Hold the castle",
@@ -869,13 +964,13 @@
     }
 
     function shareText(kills, wave) {
-        const lines = [`Castle Defense #${map.day} — ${kills.toLocaleString()} zombies`];
+        const lines = [`Castle Defense${open ? " · Open field" : ""} #${map.day} — ${kills.toLocaleString()} zombies`];
         if (placement && placement.best) {
             const medal = { 1: " 🥇", 2: " 🥈", 3: " 🥉" }[placement.best.rank] || "";
             const which = placement.improved ? "" : " (my best today)";
             lines.push(`🏆 ${placeText(placement.best, placement.players)}${medal}${which}`);
         }
-        lines.push(`🏰 Fell on wave ${wave}`, buildSummary(), "https://palmergill.com/castle-defense/");
+        lines.push(`🏰 Fell on wave ${wave}`, buildSummary(), `https://palmergill.com${pageHref}`);
         return lines.join("\n");
     }
 
@@ -993,7 +1088,7 @@
             const row = document.createElement("div");
             row.className = "cd-result-tower";
             row.append(iconCanvas(d.type, 30));
-            row.insertAdjacentHTML("beforeend", `<span><b>${G.DEFENSES[d.type].name}</b> · level ${d.level}</span><span>${d.kills} kills · ${d.assists} assists</span>`);
+            row.insertAdjacentHTML("beforeend", `<span><b>${G.DEFENSES[d.type].name}</b> · level ${d.level}${d.destroyed ? " · fell" : ""}</span><span>${d.kills} kills · ${d.assists} assists</span>`);
             list.append(row);
         });
         placement = null;
@@ -1072,7 +1167,7 @@
         const setup = state.phase === "setup";
         const sig = setup
             ? `s|${selectedType}|${layoutOf(state).map((d) => `${d.type}@${d.x},${d.y}`).join(",")}`
-            : `r|${state.defenses.map((d) => `${d.level}:${d.xp}:${d.kills}:${d.assists}`).join(",")}`;
+            : `r|${state.defenses.map((d) => `${d.level}:${d.xp}:${d.kills}:${d.assists}:${d.destroyed ? 1 : 0}`).join(",")}`;
         if (sig === lastPanel) return;
         lastPanel = sig;
 
@@ -1097,7 +1192,7 @@
             let note;
             if (selectedType) {
                 const def = G.DEFENSES[selectedType];
-                note = `Click ${def.kind === "tower" ? "the grass" : "the road"} to place ${/^[AEIOU]/.test(def.name) ? "an" : "a"} ${def.name}. Click anything you placed to pick it back up.`;
+                note = `Click ${def.kind === "tower" || open ? "the grass" : "the road"} to place ${/^[AEIOU]/.test(def.name) ? "an" : "a"} ${def.name}. Click anything you placed to pick it back up.`;
             } else if (!state.defenses.length) {
                 note = "Pick a tower or trap to start building.";
             } else {
@@ -1124,11 +1219,11 @@
                 const floor = d.level > 1 ? G.LEVEL_XP[d.level - 2] : 0;
                 const pct = need == null ? 100 : Math.min(100, ((d.xp - floor) / (need - floor)) * 100);
                 const row = document.createElement("div");
-                row.className = "cd-tower is-placed";
+                row.className = `cd-tower is-placed${d.destroyed ? " is-poor" : ""}`;
                 row.append(iconCanvas(d.type, 40));
                 row.insertAdjacentHTML(
                     "beforeend",
-                    `<span class="cd-tower__name">${def.name}</span><span class="cd-tower__blurb">${def.kind === "tower" ? "Tower" : "Trap"} at ${"ABCDEFGH"[d.x]}${d.y + 1}</span><span class="cd-tower__state"><span class="cd-tower__level">Lv ${d.level}${need == null ? " · max" : ""}</span><span class="cd-xp"><span style="width:${pct}%"></span></span>${d.kills} K · ${d.assists} A</span>`
+                    `<span class="cd-tower__name">${def.name}</span><span class="cd-tower__blurb">${def.kind === "tower" ? "Tower" : "Trap"} at ${"ABCDEFGH"[d.x]}${d.y + 1}</span><span class="cd-tower__state"><span class="cd-tower__level">${d.destroyed ? "Fell · " : ""}Lv ${d.level}${need == null ? " · max" : ""}</span><span class="cd-xp"><span style="width:${pct}%"></span></span>${d.kills} K · ${d.assists} A</span>`
                 );
                 box.append(row);
             });
@@ -1254,10 +1349,25 @@
     function describeHorde() {
         const lean = { walker: "Walkers", runner: "Runners", brute: "Brutes" }[map.lean];
         const first = G.waveSpawns(map, 1).length;
-        $("horde").innerHTML = `Heavy on <b>${lean}</b> today. Wave 1 is ${first} zombies; every wave after is bigger and tougher, and the <b>Zombie King</b> joins every ${G.KING_EVERY}th. It doesn't stop until the castle falls.`;
+        const where = open ? " Waves walk in from one side at first, then two, then three." : "";
+        $("horde").innerHTML = `Heavy on <b>${lean}</b> today. Wave 1 is ${first} zombies; every wave after is bigger and tougher, and the <b>Zombie King</b> joins every ${G.KING_EVERY}th.${where} It doesn't stop until the castle falls.`;
     }
 
-    $("dayLabel").textContent = `Daily puzzle · Day ${map.day}${date !== today ? ` · ${date}` : ""}`;
+    // The mode switch keeps whatever day you're on.
+    function setUpModes() {
+        const dated = date !== today ? `date=${date}` : "";
+        $("modeClassic").href = `./${dated ? `?${dated}` : ""}`;
+        $("modeOpen").href = `./?mode=open${dated ? `&${dated}` : ""}`;
+        $(open ? "modeOpen" : "modeClassic").setAttribute("aria-current", "page");
+        if (!open) return;
+        $("lede").textContent = "No road this time. Zombies come in from the edges and attack whatever is nearest — your towers included. Score is zombies killed before the castle falls.";
+        $("trapWhere").textContent = "go on the grass too";
+        $("rules").insertAdjacentHTML("beforeend", "<li>Zombies go for the nearest tower or the castle. A tower they tear down is gone for the run.</li>");
+        canvas.setAttribute("aria-label", "Open field. Pick a tower or trap, then click any grass tile to place it. Click something you placed to pick it back up.");
+    }
+
+    $("dayLabel").textContent = `${open ? "Open field" : "Daily puzzle"} · Day ${map.day}${date !== today ? ` · ${date}` : ""}`;
+    setUpModes();
     $("hpMax").textContent = G.START_HP;
     $("maxLevel").textContent = G.MAX_LEVEL;
     describeHorde();
