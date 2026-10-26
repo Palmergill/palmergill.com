@@ -1,0 +1,10 @@
+#!/bin/sh
+# Sync service worker precache versions with the pages that load them, and
+# stage any worker the sync rewrote. Enabled by `npm install` (core.hooksPath).
+cd "$(git rev-parse --show-toplevel)" || exit 1
+
+changed=$(node scripts/sync-sw-versions.mjs) || exit 1
+[ -z "$changed" ] && exit 0
+
+echo "$changed"
+echo "$changed" | sed -n 's#^\([^ ]*/sw\.js\):$#\1#p' | xargs git add

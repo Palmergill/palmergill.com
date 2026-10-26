@@ -4,7 +4,9 @@
   "description": "Personal project site with shared API-backed apps",
   "scripts": {
     "test": "playwright test",
-    "test:ui": "playwright test --ui"
+    "test:ui": "playwright test --ui",
+    "prepare": "git config core.hooksPath .githooks",
+    "sync:sw": "node scripts/sync-sw-versions.mjs"
   },
   "dependencies": {
     "@vercel/functions": "^3.5.0"
