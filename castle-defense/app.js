@@ -918,36 +918,6 @@
         return new Date(y, m - 1, d).toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" });
     }
 
-    function showIntro() {
-        if (open) {
-            showOverlay({
-                eyebrow: `Open field · Day ${map.day} · ${prettyDate(date)}`,
-                title: "Hold the field",
-                body: `
-                    <p>There's no road out here. Zombies walk in from the edges of the map and go for the nearest thing they can tear down — one of your towers, or the castle. Each one that reaches the castle knocks down part of the wall; lose all ${G.START_HP} walls and it falls.</p>
-                    <ol class="cd-howto">
-                        <li>Place today's towers and traps anywhere on the grass. Everyone gets the same 0–${G.MAX_EACH} of each.</li>
-                        <li>Towers have walls of their own. Zombies will chew through them, and a tower that falls is gone for the run.</li>
-                        <li>Press play. Your score is how many zombies you kill before the castle falls.</li>
-                    </ol>`,
-                actions: [{ label: "Start building", primary: true, onClick: hideOverlay }]
-            });
-            return;
-        }
-        showOverlay({
-            eyebrow: `Day ${map.day} · ${prettyDate(date)}`,
-            title: "Hold the castle",
-            body: `
-                <p>Zombies follow the road to your castle, and they never stop coming. Each one that gets in knocks down part of the wall; lose all ${G.START_HP} walls and it falls.</p>
-                <ol class="cd-howto">
-                    <li>Place today's towers and traps — everyone gets the same 0–${G.MAX_EACH} of each. Towers go on the grass, traps on the road.</li>
-                    <li>Press play. From then on it runs itself, and everything levels up from its kills.</li>
-                    <li>Your score is how many zombies you kill before the castle falls.</li>
-                </ol>`,
-            actions: [{ label: "Start building", primary: true, onClick: hideOverlay }]
-        });
-    }
-
     function untilTomorrow() {
         const now = new Date();
         const next = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
@@ -1374,7 +1344,6 @@
     buildShop();
     applyLayout(state, record.layout);
     refreshPanel();
-    if (!record.runs) showIntro();
     loadBoard();
     // A run finished while signed out posts itself once you're signed in.
     // The nav publishes window.SiteSession on DOMContentLoaded, which is

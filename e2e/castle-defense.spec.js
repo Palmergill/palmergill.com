@@ -14,7 +14,6 @@ async function clickTile(page, x, y) {
 
 test("place the day's allotment, then start the run", async ({ page }) => {
     await page.goto(DAY_ONE);
-    await page.getByRole('button', { name: 'Start building' }).click();
     const count = page.locator('#pieceCount');
     const play = page.locator('#playButton');
     await expect(count).toHaveText('11 to place');
@@ -52,7 +51,6 @@ test("place the day's allotment, then start the run", async ({ page }) => {
 test('share copies the result and says so', async ({ page, context }) => {
     await context.grantPermissions(['clipboard-read', 'clipboard-write']);
     await page.goto(DAY_ONE);
-    await page.getByRole('button', { name: 'Start building' }).click();
     await page.getByRole('button', { name: /Spikes/ }).click();
     await clickTile(page, 5, 1);
     await page.locator('#playButton').click();
@@ -75,7 +73,6 @@ test('share copies the result and says so', async ({ page, context }) => {
 // grass farthest from the road, where it can't reach a single zombie.
 async function quickRun(page) {
     await page.goto('/castle-defense/');
-    await page.getByRole('button', { name: 'Start building' }).click();
     const piece = await page.evaluate(() => {
         const G = window.CastleDefenseGame;
         const map = G.dailyMap(G.localDateString());
@@ -133,10 +130,10 @@ test('a signed-in run lands on the board and its place goes in the share', async
 // Its allotment: 1 Archer, 3 Cannons, 2 Frost, 1 Mage, 3 Tar pits, 3 Mines, no Spikes.
 const DAY_ONE_OPEN = '/castle-defense/?mode=open&date=2026-10-18';
 
-test('the open field takes traps on the grass and sends the horde in from an edge', async ({ page }) => {
+test('the open field opens straight onto the board, takes traps on the grass and sends the horde in from an edge', async ({ page }) => {
     await page.goto(DAY_ONE_OPEN);
-    await expect(page.getByRole('heading', { name: 'Hold the field' })).toBeVisible();
-    await page.getByRole('button', { name: 'Start building' }).click();
+    // No intro card: the board is ready to build on.
+    await expect(page.locator('#overlay')).toBeHidden();
     await expect(page.getByRole('link', { name: 'Open field' })).toHaveAttribute('aria-current', 'page');
     // Switching back keeps the day.
     await expect(page.getByRole('link', { name: 'Classic' })).toHaveAttribute('href', './?date=2026-10-18');
