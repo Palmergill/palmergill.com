@@ -17,8 +17,10 @@ test("place the day's allotment, then start the run", async ({ page }) => {
     const count = page.locator('#pieceCount');
     const play = page.locator('#playButton');
     await expect(count).toHaveText('11 to place');
-    // The day's goal sits beside the kill count.
-    await expect(page.locator('#goalValue')).toHaveText(/^\d+$/);
+    // The kill count reads against the next tier, starting from the bottom one.
+    await expect(page.locator('#nextValue')).toHaveText(/^\d+$/);
+    await expect(page.locator('#tierName')).toHaveText('Are you undead??');
+    await expect(page.locator('#tiers li')).toHaveCount(5);
     await expect(play).toBeDisabled();
     await expect(page.getByRole('button', { name: /Mine/ })).toBeDisabled();
     await expect(page.getByRole('button', { name: /Mine/ })).toContainText('None today');
@@ -66,9 +68,9 @@ test('share copies the result and says so', async ({ page, context }) => {
     await share.click();
     await expect(page.getByRole('button', { name: 'Copied!' })).toBeVisible();
     const copied = await page.evaluate(() => navigator.clipboard.readText());
-    // One Spikes trap is nowhere near day 1's goal.
-    expect(copied).toMatch(/^Castle Defense #1 — \d+ zombies\n🎯 Goal \d+ ❌\n🏰 Fell on wave \d+\n🔱\n/);
-    await expect(page.locator('.cd-final__goal')).toContainText("short of today's goal");
+    // One Spikes trap is nowhere near day 1's top tier.
+    expect(copied).toMatch(/^Castle Defense #1 — \d+ zombies\n🏅 .+ \([1-4]\/5\)\n🏰 Fell on wave \d+\n🔱\n/);
+    await expect(page.locator('.cd-final__tier')).toContainText(/Tier [1-4] of 5 · \d+ more for /);
 });
 
 // ── today's leaderboard ─────────────────────────────────────────────────────

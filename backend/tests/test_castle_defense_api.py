@@ -243,18 +243,21 @@ def _eval_open(expression: str) -> str:
         ctx.close()
 
 
-# ── daily goals ─────────────────────────────────────────────────────────────
+# ── daily tiers ─────────────────────────────────────────────────────────────
 
 
-def test_daily_goals_are_current_and_run_well_ahead():
-    """castle-defense/goals.json is made offline, so it can go stale: after a
+def test_daily_tiers_are_current_and_run_well_ahead():
+    """castle-defense/tiers.json is made offline, so it can go stale: after a
     balance change (its rules no longer match the engine's), or as its last
-    day comes near. Rerun scripts/castle-defense-goals.mjs when this fails."""
-    goals_path = next(p.parent / "goals.json" for p in castle_defense._ENGINE_CANDIDATES if (p.parent / "goals.json").is_file())
-    goals = json.loads(goals_path.read_text(encoding="utf-8"))
+    day comes near. Rerun scripts/castle-defense-tiers.mjs when this fails."""
+    path = next(p.parent / "tiers.json" for p in castle_defense._ENGINE_CANDIDATES if (p.parent / "tiers.json").is_file())
+    tiers = json.loads(path.read_text(encoding="utf-8"))
     for mode in ("classic", "open"):
-        assert goals["rules"][mode] == castle_defense.current_rules(mode), f"{mode} goals were set under other rules"
+        assert tiers["rules"][mode] == castle_defense.current_rules(mode), f"{mode} tiers were set under other rules"
     today = datetime.now(timezone.utc).date()
     for offset in range(-1, 60):
         day = (today + timedelta(days=offset)).isoformat()
-        assert set(goals["days"].get(day, {})) == {"classic", "open"}, f"no goals for {day}"
+        assert set(tiers["days"].get(day, {})) == {"classic", "open"}, f"no tiers for {day}"
+        for mode, cut in tiers["days"][day].items():
+            # Tiers 2–5, each needing more kills than the one below.
+            assert len(cut) == 4 and all(a < b for a, b in zip([0] + cut, cut)), f"{day} {mode}: {cut}"

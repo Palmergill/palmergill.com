@@ -35,9 +35,11 @@
     let lastFrame = 0;
     let acc = 0;
     let toastTimer = 0;
-    // Today's goal, from goals.json: null until it loads, or if there's none.
-    let goal = null;
-    let goalToasted = false;
+    // Today's tier cut-offs, from tiers.json: [0, tier 2, … tier 5] once it
+    // loads, or null if there are none for today.
+    const TIER_NAMES = ["Are you undead??", "Zombie food", "Novice hunter", "Zombie slayer", "Zombie King"];
+    let cuts = null;
+    let shownTier = 0;
 
     // ---------- storage ----------
     function readRecord() {
@@ -177,30 +179,33 @@
         return posting;
     }
 
-    // ---------- daily goal ----------
-    // Each day's goal is set offline (scripts/castle-defense-goals.mjs) by
-    // playing hundreds of trial layouts of the day's allotment; it sits where
-    // four in five of them fall short. Goals made under other rules don't count.
-    async function loadGoal() {
+    // ---------- daily tiers ----------
+    // Each day's tiers are set offline (scripts/castle-defense-tiers.mjs) by
+    // playing hundreds of trial layouts of the day's allotment: tier 2 beats
+    // 40% of them, tier 3 60%, tier 4 80% and tier 5 90%. Tiers made under
+    // other rules don't count.
+    async function loadTiers() {
         try {
-            const res = await fetch("./goals.json?v=1");
+            const res = await fetch("./tiers.json?v=1");
             const data = await res.json();
             const day = data.days[date];
             if (!day || data.rules[mode] !== G.RULES_BY_MODE[mode] || !day[mode]) return;
-            goal = day[mode];
-            const fail = Math.round(data.failShare * 100);
-            $("goalValue").textContent = goal.toLocaleString();
-            $("goalOf").hidden = false;
-            $("scoreLabel").textContent = "Kills · goal";
-            $("rules").insertAdjacentHTML("afterbegin", `<li>Today's goal is <b>${goal.toLocaleString()}</b> kills. We played ${data.trials} different layouts of today's pieces; ${fail}% of them fell short.</li>`);
+            cuts = [0, ...day[mode]];
+            $("tiers").innerHTML = TIER_NAMES.map((name, i) => `<li data-tier="${i}"><span>${escapeHtml(name)}</span><span>${i ? `${cuts[i].toLocaleString()}+` : "any"}</span></li>`).reverse().join("");
+            $("tiersNote").textContent = `Set by playing ${data.trials} different layouts of today's pieces. ${Math.round(data.failShares[data.failShares.length - 1] * 100)}% of them fell short of ${TIER_NAMES[4]}.`;
+            $("tiersPanel").hidden = false;
+            $("tierName").hidden = false;
             lastHud = "";
         } catch {
-            /* no goal today: the page plays the same without one */
+            /* no tiers today: the page plays the same without them */
         }
     }
 
-    function beatGoal(kills) {
-        return goal != null && kills >= goal;
+    // 0 (worst) to 4 (best).
+    function tierOf(kills) {
+        let tier = 0;
+        while (tier < 4 && kills >= cuts[tier + 1]) tier += 1;
+        return tier;
     }
 
     // ---------- sizing ----------
@@ -969,7 +974,7 @@
             const which = placement.improved ? "" : " (my best today)";
             lines.push(`🏆 ${placeText(placement.best, placement.players)}${medal}${which}`);
         }
-        if (goal != null) lines.push(`🎯 Goal ${goal.toLocaleString()} ${beatGoal(kills) ? "✅" : "❌"}`);
+        if (cuts) lines.push(`🏅 ${TIER_NAMES[tierOf(kills)]} (${tierOf(kills) + 1}/5)`);
         lines.push(`🏰 Fell on wave ${wave}`, buildSummary(), `https://palmergill.com${pageHref}`);
         return lines.join("\n");
     }
@@ -1044,6 +1049,12 @@
         return c;
     }
 
+    function tierLine(kills) {
+        const tier = tierOf(kills);
+        const next = tier < 4 ? `${(cuts[tier + 1] - kills).toLocaleString()} more for ${escapeHtml(TIER_NAMES[tier + 1])}` : "Today's top tier";
+        return `<p class="cd-final__tier"><b>${escapeHtml(TIER_NAMES[tier])}</b><span>Tier ${tier + 1} of 5 · ${next}</span></p>`;
+    }
+
     function finishRun({ kills, wave }) {
         const isBest = record.best == null || kills > record.best;
         record.runs += 1;
@@ -1063,9 +1074,7 @@
                     <span class="cd-final__label">zombies killed</span>
                     ${badge}
                 </div>
-                ${goal == null ? "" : beatGoal(kills)
-                    ? `<p class="cd-final__goal is-beaten">🎯 Beat today's goal of ${goal.toLocaleString()}</p>`
-                    : `<p class="cd-final__goal is-short">🎯 ${(goal - kills).toLocaleString()} short of today's goal of ${goal.toLocaleString()}</p>`}
+                ${cuts ? tierLine(kills) : ""}
                 <p class="cd-place is-muted" id="placeLine"${ranked ? "" : " hidden"}>Posting to today's leaderboard…</p>
                 <div class="cd-result-towers" id="resultTowers"></div>
                 <section class="cd-result-board" id="resultBoard" hidden>
@@ -1131,7 +1140,7 @@
     function resetRun() {
         const layout = layoutOf(state);
         state = G.createGame(map);
-        goalToasted = false;
+        shownTier = 0;
         applyLayout(state, layout);
         selectedType = null;
         acc = 0;
@@ -1243,14 +1252,10 @@
     let lastHud = "";
     function updateUi() {
         updatePanel();
-        const hud = `${state.hp}|${state.wave}|${state.kills}|${state.phase}|${state.defenses.length}|${record.best}|${goal}`;
+        const hud = `${state.hp}|${state.wave}|${state.kills}|${state.phase}|${state.defenses.length}|${record.best}|${cuts}`;
         if (hud === lastHud) return;
         lastHud = hud;
-        $("scoreStat").classList.toggle("is-beaten", beatGoal(state.kills));
-        if (beatGoal(state.kills) && state.phase === "running" && !goalToasted) {
-            goalToasted = true;
-            toast(`Goal reached — ${goal.toLocaleString()} kills`);
-        }
+        if (cuts) updateTier();
         $("hpValue").textContent = state.hp;
         $("hpMax").textContent = state.maxHp;
         $("hpBar").style.width = `${(state.hp / state.maxHp) * 100}%`;
@@ -1273,6 +1278,24 @@
             $("playLabel").textContent = "Try again";
             $("playHint").textContent = "";
         }
+    }
+
+    // The kill count reads against the next tier up, with the tier you're in
+    // underneath; reaching a new one mid-run gets a toast.
+    function updateTier() {
+        const tier = tierOf(state.kills);
+        $("tierName").textContent = TIER_NAMES[tier];
+        $("nextOf").hidden = tier === 4;
+        if (tier < 4) $("nextValue").textContent = cuts[tier + 1].toLocaleString();
+        $("scoreLabel").textContent = tier < 4 ? "Kills · next tier" : "Kills";
+        $("scoreStat").classList.toggle("is-top", tier === 4);
+        document.querySelectorAll("#tiers li").forEach((li) => {
+            const i = Number(li.dataset.tier);
+            li.classList.toggle("is-reached", state.phase !== "setup" && i <= tier);
+            li.classList.toggle("is-current", state.phase !== "setup" && i === tier);
+        });
+        if (state.phase === "running" && tier > shownTier) toast(`${TIER_NAMES[tier]} — tier ${tier + 1} of 5`);
+        shownTier = tier;
     }
 
     // ---------- input ----------
@@ -1380,7 +1403,7 @@
     $("hpMax").textContent = G.START_HP;
     $("maxLevel").textContent = G.MAX_LEVEL;
     describeHorde();
-    loadGoal();
+    loadTiers();
     buildShop();
     applyLayout(state, record.layout);
     refreshPanel();

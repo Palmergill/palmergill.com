@@ -21,7 +21,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/shared/site-nav.css?v=19">
-    <link rel="stylesheet" href="./style.css?v=11">
+    <link rel="stylesheet" href="./style.css?v=12">
 </head>
 <body>
 <noscript>
@@ -54,7 +54,8 @@
             </div>
             <div class="cd-stat cd-stat--score" id="scoreStat">
                 <span class="cd-stat__label" id="scoreLabel">Kills</span>
-                <span class="cd-stat__value"><span id="scoreValue">0</span><span class="cd-stat__of" id="goalOf" hidden>/<span id="goalValue"></span></span></span>
+                <span class="cd-stat__value"><span id="scoreValue">0</span><span class="cd-stat__of" id="nextOf" hidden>/<span id="nextValue"></span></span></span>
+                <span class="cd-stat__tier" id="tierName" hidden></span>
             </div>
             <div class="cd-stat">
                 <span class="cd-stat__label">Best today</span>
@@ -106,6 +107,12 @@
                     <p class="cd-note" id="boardNote">Loading…</p>
                 </section>
 
+                <section class="cd-panel" id="tiersPanel" hidden>
+                    <h2 class="cd-panel__title">Today's tiers</h2>
+                    <ol class="cd-tiers" id="tiers"></ol>
+                    <p class="cd-note" id="tiersNote"></p>
+                </section>
+
                 <section class="cd-panel">
                     <h2 class="cd-panel__title">Today's horde</h2>
                     <p class="cd-horde" id="horde"></p>
@@ -137,6 +144,6 @@
     <script src="/shared/analytics.js?v=1"></script>
     <script src="/shared/api-base.js?v=1"></script>
     <script src="./castleDefenseGame.js?v=7"></script>
-    <script src="./app.js?v=11"></script>
+    <script src="./app.js?v=12"></script>
 </body>
 </html>

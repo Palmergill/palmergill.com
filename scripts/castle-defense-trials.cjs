@@ -1,6 +1,6 @@
 // Castle Defense trial layouts: many seeded variations of one day's
-// allotment, played to the end. scripts/castle-defense-goals.mjs uses them to
-// set each day's goal; they're deterministic, so a rerun gives the same goals.
+// allotment, played to the end. scripts/castle-defense-tiers.mjs uses them to
+// set each day's tiers; they're deterministic, so a rerun gives the same tiers.
 const G = require("../castle-defense/castleDefenseGame.js");
 
 function mulberry32(seed) {
@@ -107,10 +107,10 @@ function runTrials(date, mode, count) {
     return out;
 }
 
-// The goal: the fewest kills that at most `share` of the trials reached.
-function goalFor(kills, share) {
+// A cut-off: the fewest kills that at most `share` of the trials reached.
+function cutoffFor(kills, share) {
     const sorted = kills.slice().sort((a, b) => b - a);
     return sorted[Math.floor(sorted.length * share)] + 1;
 }
 
-module.exports = { KINDS, runTrials, goalFor };
+module.exports = { KINDS, runTrials, cutoffFor };
