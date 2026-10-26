@@ -115,7 +115,7 @@ test.describe('rejections', () => {
 
         await page.context().clearCookies();
         await signInWithPasskey(page);
-        await expect(page.locator('#loginStatus')).toHaveText(/isn't set up for this site/);
+        await expect(page.locator('#loginStatus')).toHaveText(/no longer set up here/);
         await expect(page).toHaveURL(/\/login\//);
     });
 
