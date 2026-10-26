@@ -122,7 +122,12 @@
                 signal: autofillRequest.signal,
             }));
         } catch (error) {
-            if (!passkeys.isCancelled(error)) setStatus(error.message);
+            if (passkeys.isCancelled(error)) return;
+            setStatus(error.message);
+            // A passkey the server turned down: offer the list again so
+            // another can be picked. Anything else (the options request
+            // failing) would only fail again, so stop there.
+            if (error.status === 401) startPasskeyAutofill();
         }
     }
 
@@ -139,6 +144,9 @@
                     window.pgAnalytics?.track?.("login_failed", { status: error.status, method: "passkey" });
                     setStatus(error.message || "Unable to sign in with a passkey.");
                 }
+                // The click aborted the autofill request; put it back so the
+                // username field offers passkeys again.
+                startPasskeyAutofill();
             } finally {
                 passkeyButton.disabled = false;
             }

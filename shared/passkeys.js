@@ -55,6 +55,7 @@
         if (!response.ok) {
             const error = new Error(data.error || "Something went wrong. Try again.");
             error.status = response.status;
+            error.data = data;
             throw error;
         }
         return data;
@@ -106,7 +107,19 @@
             mediation: conditional ? "conditional" : undefined,
             signal,
         });
-        return postJSON("/login/passkey", { credential: credentialToJSON(credential), next });
+        try {
+            return await postJSON("/login/passkey", { credential: credentialToJSON(credential), next });
+        } catch (error) {
+            // The server no longer holds this passkey. Where the browser
+            // supports it, ask it to drop the passkey so it stops offering it.
+            if (error.data?.unknownCredential) {
+                PublicKeyCredential.signalUnknownCredential?.({
+                    rpId: publicKey.rpId,
+                    credentialId: error.data.credentialId,
+                })?.catch?.(() => {});
+            }
+            throw error;
+        }
     }
 
     window.Passkeys = { supported, conditionalSupported, register, signIn, isCancelled };

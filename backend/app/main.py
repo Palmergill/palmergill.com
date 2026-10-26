@@ -1036,7 +1036,9 @@ async def passkey_registration_options(request: Request):
             record_auth_failure(request)
             return JSONResponse({"error": "That password isn't right."}, status_code=401)
 
-        options = passkeys.registration_options(db, request, owner)
+        options = passkeys.registration_options(
+            db, request, owner, passkeys.client_key(client_ip(request))
+        )
     except AccountError as error:
         return JSONResponse({"error": error.message}, status_code=error.status_code)
     finally:
@@ -1118,9 +1120,9 @@ async def passkey_authentication_options(request: Request):
 
     db = SessionLocal()
     try:
-        options = passkeys.authentication_options(db, request)
-    except AccountError as error:
-        return JSONResponse({"error": error.message}, status_code=error.status_code)
+        options = passkeys.authentication_options(
+            db, request, passkeys.client_key(client_ip(request))
+        )
     finally:
         db.close()
     return JSONResponse({"publicKey": options}, headers={"Cache-Control": "no-store"})
@@ -1151,6 +1153,20 @@ async def passkey_sign_in(request: Request):
             body.get("credential"),
             config["username"],
             session_signing_secret(config["password"]),
+        )
+    except passkeys.UnknownPasskey as unknown:
+        # Not a guess: assertions can't be guessed, and this one answered a
+        # live challenge. Counting it would let a passkey removed on the
+        # account page, still offered by the device, lock that network out
+        # of password sign-in too. `credentialId` lets the page ask the
+        # browser to forget it.
+        return JSONResponse(
+            {
+                "error": "That passkey is no longer set up here. Sign in with your password instead.",
+                "unknownCredential": True,
+                "credentialId": unknown.credential_id,
+            },
+            status_code=401,
         )
     finally:
         db.close()

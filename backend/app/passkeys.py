@@ -50,6 +50,7 @@ CHALLENGE_TTL = timedelta(minutes=5)
 CEREMONY_TIMEOUT_MS = 120_000
 MAX_PASSKEYS_PER_ACCOUNT = 10
 MAX_OPEN_CHALLENGES = 2000
+MAX_OPEN_CHALLENGES_PER_CLIENT = 10
 NAME_MAX_LENGTH = 60
 PURPOSE_REGISTER = "register"
 PURPOSE_AUTHENTICATE = "authenticate"
@@ -83,6 +84,14 @@ def relying_party(request: Request) -> tuple[str, list[str]]:
     if not origins:
         origins = list(DEFAULT_ORIGINS)
     return rp_id or urlsplit(origins[0]).hostname, origins
+
+
+class UnknownPasskey(Exception):
+    """A sign-in answered a live challenge with a credential we don't hold."""
+
+    def __init__(self, credential_id: str):
+        super().__init__(credential_id)
+        self.credential_id = credential_id
 
 
 def admin_binding(secret: str, credential_id: str, public_key: str, owner: str) -> str:
@@ -127,20 +136,53 @@ def _owned_query(db: Session, owner: dict):
     return query
 
 
-def _store_challenge(db: Session, challenge: bytes, purpose: str, owner: dict | None = None) -> None:
+def client_key(ip_address: str) -> str:
+    """Who opened a ceremony, hashed: the row only needs to group requests."""
+    return hashlib.sha256(f"passkey-client|{ip_address}".encode("utf-8")).hexdigest()
+
+
+def _evict_oldest(db: Session, query, keep: int) -> None:
+    """Delete the oldest challenges in `query` until at most `keep` remain."""
+    excess = query.count() - keep
+    if excess <= 0:
+        return
+    stale = [
+        row.challenge
+        for row in query.order_by(PasskeyChallenge.expires_at.asc()).limit(excess).all()
+    ]
+    db.query(PasskeyChallenge).filter(PasskeyChallenge.challenge.in_(stale)).delete(
+        synchronize_session=False
+    )
+
+
+def _store_challenge(
+    db: Session,
+    challenge: bytes,
+    purpose: str,
+    requester: str,
+    owner: dict | None = None,
+) -> None:
     now = utc_now()
     db.query(PasskeyChallenge).filter(PasskeyChallenge.expires_at <= now).delete()
-    # Sign-in options are public, so bound how many open ceremonies anyone
-    # can make the database hold at once.
-    if db.query(PasskeyChallenge).count() >= MAX_OPEN_CHALLENGES:
-        db.commit()
-        raise AccountError("Too many passkey requests right now. Try again in a few minutes.", 429)
+    # Sign-in options are public, so bound how many open ceremonies the
+    # database holds. Making room by dropping the oldest, rather than
+    # refusing, means a flood can never lock everyone out: refusing let one
+    # anonymous script hold all MAX_OPEN_CHALLENGES slots and turn passkeys
+    # off for the whole site. A visitor's own newest ceremony is the one
+    # they are looking at, so their oldest goes first.
+    _evict_oldest(
+        db,
+        db.query(PasskeyChallenge).filter(PasskeyChallenge.client_key == requester),
+        MAX_OPEN_CHALLENGES_PER_CLIENT - 1,
+    )
+    _evict_oldest(db, db.query(PasskeyChallenge), MAX_OPEN_CHALLENGES - 1)
     db.add(PasskeyChallenge(
         challenge=bytes_to_base64url(challenge),
         purpose=purpose,
         role=owner["role"] if owner else None,
         owner=owner["owner"] if owner else None,
         member_id=owner["member_id"] if owner else None,
+        client_key=requester,
         expires_at=now + CHALLENGE_TTL,
     ))
     db.commit()
@@ -178,7 +220,7 @@ def _claim_challenge(db: Session, credential: object, purpose: str) -> dict | No
     return claimed
 
 
-def registration_options(db: Session, request: Request, owner: dict) -> dict:
+def registration_options(db: Session, request: Request, owner: dict, requester: str) -> dict:
     existing = _owned_query(db, owner).all()
     if len(existing) >= MAX_PASSKEYS_PER_ACCOUNT:
         raise AccountError(
@@ -203,7 +245,7 @@ def registration_options(db: Session, request: Request, owner: dict) -> dict:
             for row in existing
         ],
     )
-    _store_challenge(db, options.challenge, PURPOSE_REGISTER, owner)
+    _store_challenge(db, options.challenge, PURPOSE_REGISTER, requester, owner)
     return json.loads(options_to_json(options))
 
 
@@ -273,7 +315,7 @@ def finish_registration(
     return row
 
 
-def authentication_options(db: Session, request: Request) -> dict:
+def authentication_options(db: Session, request: Request, requester: str) -> dict:
     rp_id, _ = relying_party(request)
     # No allowCredentials: the browser offers whichever discoverable passkey
     # the person has for this site, so the form needs no username first.
@@ -282,7 +324,7 @@ def authentication_options(db: Session, request: Request) -> dict:
         timeout=CEREMONY_TIMEOUT_MS,
         user_verification=UserVerificationRequirement.REQUIRED,
     )
-    _store_challenge(db, options.challenge, PURPOSE_AUTHENTICATE)
+    _store_challenge(db, options.challenge, PURPOSE_AUTHENTICATE, requester)
     return json.loads(options_to_json(options))
 
 
@@ -293,7 +335,11 @@ def finish_authentication(
     admin_username: str,
     signing_secret: str,
 ) -> dict | None:
-    """Verify a sign-in assertion and return {"username", "role"}, or None."""
+    """Verify a sign-in assertion and return {"username", "role"}, or None.
+
+    Raises UnknownPasskey when the challenge was ours but the credential is
+    not, which callers treat as a stale passkey rather than a failed guess.
+    """
     claimed = _claim_challenge(db, credential, PURPOSE_AUTHENTICATE)
     if claimed is None:
         return None
@@ -303,7 +349,9 @@ def finish_authentication(
         return None
     row = db.query(PasskeyCredential).filter(PasskeyCredential.credential_id == credential_id).first()
     if row is None:
-        return None
+        # A real ceremony for a passkey this site no longer has, most often
+        # one removed on the account page but still saved on the device.
+        raise UnknownPasskey(credential_id)
 
     rp_id, origins = relying_party(request)
     try:

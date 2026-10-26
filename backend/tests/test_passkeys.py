@@ -242,3 +242,87 @@ def test_members_only_see_and_remove_their_own_passkeys():
     assert other.delete(f"/login/passkey/credentials/{passkey_id}").status_code == 404
     assert owner.delete(f"/login/passkey/credentials/{passkey_id}").status_code == 200
     assert owner.get("/login/passkey/credentials").json()["passkeys"] == []
+
+
+def _visitor(ip: str) -> TestClient:
+    return TestClient(app, headers={"X-Real-IP": ip})
+
+
+def test_an_anonymous_flood_cannot_lock_everyone_out_of_passkeys(monkeypatch):
+    # Regression: open challenges were capped site-wide and the cap refused
+    # new ones, so one script asking for sign-in options over and over held
+    # every slot and passkey sign-in and setup 429'd for everybody.
+    from app import main, passkeys
+    from app.database import PasskeyChallenge
+
+    monkeypatch.setattr(main, "TRUST_PROXY_HEADERS", True)
+    monkeypatch.setattr(passkeys, "MAX_OPEN_CHALLENGES", 30)
+    owner, _ = _member()
+    authenticator = SoftAuthenticator()
+    assert _register(owner, authenticator, MEMBER_PASSWORD).status_code == 201
+
+    for attacker in range(5):
+        flood = _visitor(f"203.0.113.{attacker}")
+        assert {flood.post("/login/passkey/options").status_code for _ in range(20)} == {200}
+
+    victim = _visitor("198.51.100.7")
+    options = victim.post("/login/passkey/options")
+    assert options.status_code == 200, options.text
+    signed_in = victim.post(
+        "/login/passkey",
+        json={"credential": authenticator.get(options.json()["publicKey"]), "next": "/"},
+    )
+    assert signed_in.status_code == 200, signed_in.text
+
+    db = SessionLocal()
+    try:
+        assert db.query(PasskeyChallenge).count() <= 30
+        assert db.query(PasskeyChallenge).filter(
+            PasskeyChallenge.client_key == passkeys.client_key("203.0.113.0")
+        ).count() <= passkeys.MAX_OPEN_CHALLENGES_PER_CLIENT
+    finally:
+        db.close()
+
+
+def test_a_visitor_keeps_only_their_newest_challenges(monkeypatch):
+    from app import main, passkeys
+
+    monkeypatch.setattr(main, "TRUST_PROXY_HEADERS", True)
+    owner, _ = _member()
+    authenticator = SoftAuthenticator()
+    assert _register(owner, authenticator, MEMBER_PASSWORD).status_code == 201
+
+    visitor = _visitor("198.51.100.8")
+    issued = [
+        visitor.post("/login/passkey/options").json()["publicKey"]
+        for _ in range(passkeys.MAX_OPEN_CHALLENGES_PER_CLIENT + 1)
+    ]
+    oldest = visitor.post("/login/passkey", json={"credential": authenticator.get(issued[0])})
+    newest = visitor.post("/login/passkey", json={"credential": authenticator.get(issued[-1])})
+    assert oldest.status_code == 401
+    assert newest.status_code == 200, newest.text
+
+
+def test_a_removed_passkey_does_not_count_as_a_failed_login(monkeypatch):
+    # Regression: picking a passkey the account page had removed, but the
+    # device still offered, counted as a failed login, so a few tries locked
+    # that network out of password sign-in too.
+    from app import main
+
+    monkeypatch.setattr(main, "TRUST_PROXY_HEADERS", True)
+    owner, name = _member()
+    authenticator = SoftAuthenticator()
+    registered = _register(owner, authenticator, MEMBER_PASSWORD)
+    passkey_id = registered.json()["passkeys"][0]["id"]
+    assert owner.delete(f"/login/passkey/credentials/{passkey_id}").status_code == 200
+
+    visitor = _visitor("198.51.100.9")
+    for _ in range(main.AUTH_RATE_LIMIT_MAX_ATTEMPTS + 2):
+        options = visitor.post("/login/passkey/options").json()["publicKey"]
+        stale = visitor.post("/login/passkey", json={"credential": authenticator.get(options)})
+        assert stale.status_code == 401
+        assert stale.json()["unknownCredential"] is True
+        assert stale.json()["credentialId"] == b64url(authenticator.credential_id)
+
+    password = visitor.post("/login/session", json={"username": name, "password": MEMBER_PASSWORD})
+    assert password.status_code == 200, password.text

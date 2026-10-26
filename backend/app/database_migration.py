@@ -186,6 +186,14 @@ def migrate_database():
         # under; rows from before the tag were the gold-budget rules, 1.
         _add_column_if_missing(inspector, "castle_defense_scores", "rules", "INTEGER NOT NULL DEFAULT 1")
 
+        # Open passkey challenges are bounded per visitor as well as overall.
+        if _add_column_if_missing(inspector, "passkey_challenges", "client_key", "VARCHAR"):
+            with engine.begin() as conn:
+                conn.execute(text(
+                    "CREATE INDEX IF NOT EXISTS ix_passkey_challenges_client_key "
+                    "ON passkey_challenges (client_key)"
+                ))
+
         refreshed = inspect(engine)
         if (
             "ff_draft_sessions" in refreshed.get_table_names()

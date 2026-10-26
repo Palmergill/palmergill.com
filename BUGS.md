@@ -21,6 +21,8 @@ Closed items are trimmed quarterly.
 
 ## Closed
 
+- (passkeys) Open sign-in challenges were capped at 2,000 site-wide and the cap refused new ones, so one anonymous script calling `POST /login/passkey/options` held every slot and passkey sign-in and setup 429'd for everyone; challenges now carry a hashed client key, each visitor keeps at most 10, and a full table drops its oldest instead of refusing. Also: a passkey removed on the account page but still offered by the device counted as a failed login (enough of them locked that network out of passwords) and now returns `unknownCredential` so the page can ask the browser to forget it; and the login page restarts passkey autofill after the button flow fails. Pinned in `backend/tests/test_passkeys.py`. — closed 2026-10-25
+
 - The 2026-10-15 whole-codebase review closed ten findings, each pinned in `backend/tests/test_review_regressions.py`.
   (1) `GET /api/stocks/{ticker}` echoed the provider exception, whose request URL carries `apiKey=`, so any signed-up member could read the Polygon key; details are now generic and provider errors are redacted. Rotate the key — it was exposed.
   (2) Any signed-in request cleared its IP's auth-failure count, at the origin and the edge, so a free account reset the login rate limit between guesses; only a correct password clears it now.

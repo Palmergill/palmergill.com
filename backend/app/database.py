@@ -244,6 +244,9 @@ class PasskeyChallenge(Base):
     role = Column(String, nullable=True)
     owner = Column(String, nullable=True)
     member_id = Column(Integer, nullable=True)
+    # A hash of who asked (see app.passkeys.client_key), so one visitor can
+    # only hold a few open ceremonies at a time.
+    client_key = Column(String, index=True, nullable=True)
     expires_at = Column(DateTime, index=True, nullable=False)
 
 
