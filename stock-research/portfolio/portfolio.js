@@ -9,16 +9,36 @@
     const PENDING_RETRY_MS = 4000;
     const MAX_PENDING_RETRIES = 6;
 
-    const SAMPLE_CSV = [
-        'Symbol,Quantity,Cost Basis',
-        'AAPL,40,6200',
-        'MSFT,15,4900',
-        'NVDA,30,2400',
-        'GOOGL,20,2900',
-        'AMZN,18,2700',
-        'JPM,25,4100',
-        'XOM,30,3200',
-    ].join('\n');
+    // A year of trades, dated relative to today, so the sample has a value
+    // line that starts small and builds up rather than one flat snapshot.
+    // [days ago, action, ticker, shares, price]
+    const SAMPLE_TRADES = [
+        [360, 'Buy', 'AAPL', 20, 228],
+        [352, 'Buy', 'MSFT', 8, 415],
+        [330, 'Buy', 'NVDA', 40, 135],
+        [300, 'Buy', 'JPM', 15, 240],
+        [270, 'Buy', 'AAPL', 15, 240],
+        [240, 'Buy', 'GOOGL', 25, 170],
+        [205, 'Sell', 'NVDA', 15, 120],
+        [180, 'Buy', 'AMZN', 20, 195],
+        [150, 'Buy', 'XOM', 30, 108],
+        [120, 'Buy', 'MSFT', 6, 455],
+        [90, 'Sell', 'JPM', 5, 265],
+        [60, 'Buy', 'NVDA', 20, 170],
+        [30, 'Buy', 'GOOGL', 10, 245],
+    ];
+
+    function sampleCsv() {
+        const rows = SAMPLE_TRADES.map(([daysAgo, action, ticker, shares, price]) => {
+            const day = new Date();
+            day.setDate(day.getDate() - daysAgo);
+            // Markets are shut at weekends; move back to the Friday.
+            while (day.getDay() === 0 || day.getDay() === 6) day.setDate(day.getDate() - 1);
+            const date = `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, '0')}-${String(day.getDate()).padStart(2, '0')}`;
+            return `${date},${action},${ticker},${shares},${price}`;
+        });
+        return ['Date,Action,Symbol,Quantity,Price', ...rows].join('\n');
+    }
 
     const $ = (id) => document.getElementById(id);
     const els = {
@@ -170,6 +190,8 @@
         els.dashboard.hidden = empty;
         els.headActions.hidden = empty;
         els.uploadTitle.textContent = empty ? 'Add your portfolio' : 'Upload more';
+        // The sample adds trades to whatever is there, so offer it only to an empty portfolio.
+        els.sampleButton.hidden = !empty;
         if (empty) setUploadOpen(true);
         if (empty) return;
 
@@ -444,14 +466,19 @@
         const first = points[0].value;
         const last = points[points.length - 1].value;
         const change = last - first;
-        sub.innerHTML = `${fmtMoney(last, true)} · <span class="pf-history-change ${tone(change)}">${fmtSigned(change, true)} (${fmtPct(first ? change / first : null, true)})</span> since ${longDate.format(new Date(`${points[0].date}T00:00:00Z`))}`;
+        // With trades inside the range, a percent change would mostly be new
+        // money (a first $2k buy growing to $45k reads as +2,000%), so show
+        // the dollar change alone.
+        const tradedInRange = lastData?.transactions.some((t) => t.tradeDate > points[0].date);
+        const pct = tradedInRange || !first ? '' : ` (${fmtPct(change / first, true)})`;
+        sub.innerHTML = `${fmtMoney(last, true)} · <span class="pf-history-change ${tone(change)}">${fmtSigned(change, true)}${pct}</span> since ${longDate.format(new Date(`${points[0].date}T00:00:00Z`))}`;
 
         const notes = [];
         const asOf = history.data.asOf;
         if (asOf && points[0].date < asOf) {
             notes.push(`Before ${longDate.format(new Date(`${asOf}T00:00:00Z`))}, this assumes you held the holdings you uploaded, less any trades you've added since.`);
         }
-        if (lastData?.transactions.some((t) => t.tradeDate > points[0].date)) {
+        if (tradedInRange) {
             notes.push('Buys and sells in this range move the line too, so it shows money added as well as growth.');
         }
         if (history.data.missing.length) {
@@ -660,9 +687,9 @@
         upload(csv);
     });
     els.sampleButton.addEventListener('click', () => {
-        els.uploadForm.querySelector('input[value="holdings"]').checked = true;
+        els.uploadForm.querySelector('input[value="transactions"]').checked = true;
         syncKindOptions();
-        upload(SAMPLE_CSV);
+        upload(sampleCsv());
     });
     els.uploadForm.querySelectorAll('input[name="kind"]').forEach((input) => input.addEventListener('change', syncKindOptions));
     els.fileInput.addEventListener('change', () => readFile(els.fileInput.files[0]));

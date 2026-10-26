@@ -244,3 +244,5 @@ body {
     #historyCard .pf-card__head--row { flex-direction: column; }
     .pf-chart { height: 200px; }
 }
+
+.pf-button[hidden] { display: none; }
