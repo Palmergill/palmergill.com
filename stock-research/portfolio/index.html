@@ -13,7 +13,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/shared/site-nav.css?v=19">
-    <link rel="stylesheet" href="portfolio.css?v=1">
+    <link rel="stylesheet" href="portfolio.css?v=2">
 </head>
 <body>
 <noscript>
@@ -89,6 +89,18 @@
         <section id="dashboard" hidden>
             <div class="pf-tiles" id="tiles"></div>
             <p class="pf-note" id="sampleNote" hidden>Prices here are generated sample values, not live quotes.</p>
+
+            <section class="pf-card" id="historyCard">
+                <div class="pf-card__head pf-card__head--row">
+                    <div>
+                        <h2 class="pf-card__title">Value over time</h2>
+                        <p class="pf-card__sub" id="historySub">Loading price history…</p>
+                    </div>
+                    <div class="pf-ranges" id="historyRanges" role="group" aria-label="Time range"></div>
+                </div>
+                <div class="pf-chart" id="historyChart"></div>
+                <p class="pf-note" id="historyNote" hidden></p>
+            </section>
 
             <section class="pf-card">
                 <div class="pf-card__head">
@@ -182,6 +194,6 @@
     <script src="/shared/api-base.js?v=1"></script>
     <script src="/shared/site-nav.js?v=22"></script>
     <script src="/shared/analytics.js?v=1"></script>
-    <script src="portfolio.js?v=1"></script>
+    <script src="portfolio.js?v=2"></script>
 </body>
 </html>

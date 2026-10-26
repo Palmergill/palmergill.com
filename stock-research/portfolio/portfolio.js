@@ -84,7 +84,8 @@
     function fmtPct(value, signed = false) {
         if (value == null) return '—';
         const pct = value * 100;
-        const text = `${Math.abs(pct).toFixed(Math.abs(pct) < 10 ? 1 : 0)}%`;
+        const digits = Math.abs(pct) < 1 ? 2 : Math.abs(pct) < 10 ? 1 : 0;
+        const text = `${Math.abs(pct).toFixed(digits)}%`;
         if (!signed) return text;
         return pct > 0 ? `+${text}` : pct < 0 ? `−${text}` : text;
     }
@@ -159,7 +160,10 @@
         els.uploadToggle.setAttribute('aria-expanded', String(open));
     }
 
+    let lastData = null;
+
     function render(data) {
+        lastData = data;
         els.loadingView.hidden = true;
         els.signedOutView.hidden = true;
         const empty = data.positions.length === 0 && data.transactions.length === 0;
@@ -176,6 +180,7 @@
         renderInsights(data);
         renderHoldings(data);
         renderTransactions(data);
+        maybeLoadHistory(data);
         els.clearHoldingsButton.hidden = !data.holdings.count;
         schedulePendingRetry(data);
     }
@@ -338,6 +343,246 @@
                 <td class="num"><button type="button" class="pf-remove" data-id="${t.id}" aria-label="Remove ${t.side} of ${escapeHtml(t.ticker)} on ${t.tradeDate}">×</button></td>
             </tr>`).join('');
     }
+
+    // ── value over time ────────────────────────────────────────────────────
+
+    const RANGES = [
+        { key: '1M', days: 31 },
+        { key: '3M', days: 92 },
+        { key: '6M', days: 183 },
+        { key: 'YTD', days: null },
+        { key: '1Y', days: 366 },
+        { key: 'All', days: Infinity },
+    ];
+    const HISTORY_RETRY_MS = 3000;
+    const MAX_HISTORY_RETRIES = 8;
+    const SVG_NS = 'http://www.w3.org/2000/svg';
+    const shortDate = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
+    const monthYear = new Intl.DateTimeFormat('en-US', { month: 'short', year: '2-digit', timeZone: 'UTC' });
+    const longDate = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
+
+    const history = { data: null, range: '1Y', signature: null, retries: 0, timer: null };
+
+    // Reload the history only when what it's built from changed, not when the
+    // breakdown is re-fetched for prices.
+    function historySignature(data) {
+        return JSON.stringify([data.holdings.asOf, data.holdings.count, data.transactions.map((t) => t.id)]);
+    }
+
+    function maybeLoadHistory(data) {
+        const signature = historySignature(data);
+        if (signature === history.signature) return;
+        history.signature = signature;
+        history.retries = 0;
+        loadHistory();
+    }
+
+    async function loadHistory() {
+        clearTimeout(history.timer);
+        let data;
+        try {
+            data = await api('/history');
+        } catch (error) {
+            if (error instanceof ForbiddenError) return;
+            $('historySub').textContent = 'Price history is unavailable right now.';
+            drawChart([]);
+            return;
+        }
+        if (!data.complete) {
+            $('historySub').textContent = `Loading price history for ${data.pending.length} more ticker${data.pending.length === 1 ? '' : 's'}…`;
+            if (history.retries < MAX_HISTORY_RETRIES) {
+                history.retries += 1;
+                history.timer = setTimeout(loadHistory, HISTORY_RETRY_MS);
+            }
+            return;
+        }
+        history.data = data;
+        renderHistory();
+    }
+
+    function pointsInRange() {
+        const points = history.data?.points || [];
+        if (!points.length) return points;
+        const range = RANGES.find((r) => r.key === history.range);
+        const last = new Date(`${points[points.length - 1].date}T00:00:00Z`);
+        let from;
+        if (range.days === null) from = new Date(Date.UTC(last.getUTCFullYear(), 0, 1));
+        else if (range.days === Infinity) return points;
+        else from = new Date(last.getTime() - range.days * 86400000);
+        const cutoff = from.toISOString().slice(0, 10);
+        return points.filter((p) => p.date >= cutoff);
+    }
+
+    function renderRanges(points) {
+        const span = points.length
+            ? (new Date(points[points.length - 1].date) - new Date(points[0].date)) / 86400000
+            : 0;
+        // Offer a range only if the data reaches back past the one before it.
+        const offered = RANGES.filter((r, i) => {
+            if (r.days === null || r.days === Infinity) return true;
+            const previous = RANGES.slice(0, i).reverse().find((q) => q.days && q.days !== Infinity);
+            return !previous || span > previous.days;
+        });
+        if (!offered.some((r) => r.key === history.range)) history.range = 'All';
+        $('historyRanges').innerHTML = offered.map((r) => (
+            `<button type="button" data-range="${r.key}" aria-pressed="${r.key === history.range}">${r.key}</button>`
+        )).join('');
+    }
+
+    function renderHistory() {
+        const all = history.data.points;
+        renderRanges(all);
+        const points = pointsInRange();
+        const sub = $('historySub');
+        const note = $('historyNote');
+        if (points.length < 2) {
+            sub.textContent = all.length ? 'Not enough days in this range yet.' : 'No price history for these tickers.';
+            note.hidden = true;
+            drawChart([]);
+            return;
+        }
+        const first = points[0].value;
+        const last = points[points.length - 1].value;
+        const change = last - first;
+        sub.innerHTML = `${fmtMoney(last, true)} · <span class="pf-history-change ${tone(change)}">${fmtSigned(change, true)} (${fmtPct(first ? change / first : null, true)})</span> since ${longDate.format(new Date(`${points[0].date}T00:00:00Z`))}`;
+
+        const notes = [];
+        const asOf = history.data.asOf;
+        if (asOf && points[0].date < asOf) {
+            notes.push(`Before ${longDate.format(new Date(`${asOf}T00:00:00Z`))}, this assumes you held the holdings you uploaded, less any trades you've added since.`);
+        }
+        if (lastData?.transactions.some((t) => t.tradeDate > points[0].date)) {
+            notes.push('Buys and sells in this range move the line too, so it shows money added as well as growth.');
+        }
+        if (history.data.missing.length) {
+            notes.push(`No price history for ${history.data.missing.join(', ')}, so ${history.data.missing.length === 1 ? 'it is' : 'they are'} left out.`);
+        }
+        if (history.data.sampleData) notes.push('Generated sample prices, not real history.');
+        note.textContent = notes.join(' ');
+        note.hidden = !notes.length;
+        drawChart(points);
+    }
+
+    function svg(tag, attrs = {}) {
+        const node = document.createElementNS(SVG_NS, tag);
+        Object.entries(attrs).forEach(([k, v]) => node.setAttribute(k, v));
+        return node;
+    }
+
+    function niceTicks(min, max, count) {
+        const span = max - min || Math.abs(max) || 1;
+        const raw = span / count;
+        const magnitude = 10 ** Math.floor(Math.log10(raw));
+        const step = [1, 2, 2.5, 5, 10].map((m) => m * magnitude).find((s) => s >= raw);
+        const ticks = [];
+        for (let v = Math.ceil(min / step) * step; v <= max + step * 1e-9; v += step) ticks.push(v);
+        return ticks;
+    }
+
+    function compactMoney(value) {
+        const abs = Math.abs(value);
+        if (abs >= 1e6) return `$${(value / 1e6).toFixed(abs >= 1e7 ? 0 : 1)}M`;
+        if (abs >= 1e3) return `$${(value / 1e3).toFixed(abs >= 1e5 ? 0 : 1)}k`;
+        return `$${Math.round(value)}`;
+    }
+
+    function drawChart(points) {
+        const host = $('historyChart');
+        host.innerHTML = '';
+        if (points.length < 2) {
+            host.innerHTML = '<div class="pf-chart__empty">No chart yet.</div>';
+            return;
+        }
+        const width = host.clientWidth;
+        const height = host.clientHeight;
+        const pad = { top: 10, right: 8, bottom: 24, left: 48 };
+        const innerW = width - pad.left - pad.right;
+        const innerH = height - pad.top - pad.bottom;
+
+        const values = points.map((p) => p.value);
+        let lo = Math.min(...values);
+        let hi = Math.max(...values);
+        const margin = (hi - lo) * 0.08 || hi * 0.05 || 1;
+        lo = Math.max(0, lo - margin);
+        hi += margin;
+        const ticks = niceTicks(lo, hi, 4);
+        lo = Math.min(lo, ticks[0]);
+        hi = Math.max(hi, ticks[ticks.length - 1]);
+
+        const x = (i) => pad.left + (i / (points.length - 1)) * innerW;
+        const y = (v) => pad.top + (1 - (v - lo) / (hi - lo)) * innerH;
+
+        const root = svg('svg', { viewBox: `0 0 ${width} ${height}`, role: 'img', 'aria-label': `Portfolio value from ${points[0].date} to ${points[points.length - 1].date}` });
+        ticks.forEach((t) => {
+            root.appendChild(svg('line', { class: 'pf-chart__grid', x1: pad.left, x2: width - pad.right, y1: y(t), y2: y(t) }));
+            const label = svg('text', { class: 'pf-chart__axis', x: pad.left - 8, y: y(t) + 4, 'text-anchor': 'end' });
+            label.textContent = compactMoney(t);
+            root.appendChild(label);
+        });
+
+        // About one date label per 110px, never crowding the ends.
+        const span = (new Date(points[points.length - 1].date) - new Date(points[0].date)) / 86400000;
+        const fmt = span > 200 ? monthYear : shortDate;
+        const labelCount = Math.max(2, Math.floor(innerW / 110));
+        for (let k = 0; k < labelCount; k += 1) {
+            const i = Math.round((k / (labelCount - 1)) * (points.length - 1));
+            const label = svg('text', {
+                class: 'pf-chart__axis', x: x(i), y: height - 6,
+                'text-anchor': k === 0 ? 'start' : k === labelCount - 1 ? 'end' : 'middle',
+            });
+            label.textContent = fmt.format(new Date(`${points[i].date}T00:00:00Z`));
+            root.appendChild(label);
+        }
+
+        const line = points.map((p, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(p.value).toFixed(1)}`).join('');
+        root.appendChild(svg('path', { class: 'pf-chart__area', d: `${line}L${x(points.length - 1)},${y(lo)}L${x(0)},${y(lo)}Z` }));
+        root.appendChild(svg('path', { class: 'pf-chart__line', d: line }));
+
+        const cross = svg('line', { class: 'pf-chart__cross', y1: pad.top, y2: pad.top + innerH, visibility: 'hidden' });
+        const dot = svg('circle', { class: 'pf-chart__dot', r: 4.5, visibility: 'hidden' });
+        root.appendChild(cross);
+        root.appendChild(dot);
+        // The hit area is the whole plot, not the 2px line.
+        const hit = svg('rect', { x: pad.left, y: pad.top, width: innerW, height: innerH, fill: 'transparent' });
+        root.appendChild(hit);
+
+        function hover(event) {
+            const box = root.getBoundingClientRect();
+            const px = ((event.clientX - box.left) / box.width) * width;
+            const i = Math.max(0, Math.min(points.length - 1, Math.round(((px - pad.left) / innerW) * (points.length - 1))));
+            const p = points[i];
+            cross.setAttribute('x1', x(i));
+            cross.setAttribute('x2', x(i));
+            dot.setAttribute('cx', x(i));
+            dot.setAttribute('cy', y(p.value));
+            cross.setAttribute('visibility', 'visible');
+            dot.setAttribute('visibility', 'visible');
+            const vsStart = p.value - points[0].value;
+            showTip(event, `${longDate.format(new Date(`${p.date}T00:00:00Z`))} · ${fmtMoney(p.value, true)} · ${fmtSigned(vsStart, true)}`);
+        }
+        hit.addEventListener('mousemove', hover);
+        hit.addEventListener('touchmove', (event) => { hover(event.touches[0]); event.preventDefault(); }, { passive: false });
+        const leave = () => {
+            cross.setAttribute('visibility', 'hidden');
+            dot.setAttribute('visibility', 'hidden');
+            hideTip();
+        };
+        hit.addEventListener('mouseleave', leave);
+        hit.addEventListener('touchend', leave);
+        host.appendChild(root);
+    }
+
+    $('historyRanges').addEventListener('click', (event) => {
+        const button = event.target.closest('button[data-range]');
+        if (!button || !history.data) return;
+        history.range = button.dataset.range;
+        renderHistory();
+    });
+    let resizeTimer = null;
+    window.addEventListener('resize', () => {
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(() => { if (history.data && !els.dashboard.hidden) renderHistory(); }, 120);
+    });
 
     function schedulePendingRetry(data) {
         clearTimeout(pendingTimer);

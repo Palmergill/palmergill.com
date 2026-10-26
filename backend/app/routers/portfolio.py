@@ -12,7 +12,7 @@ would otherwise answer ``GET /api/stocks/portfolio``.
 from datetime import date
 from typing import Any, Dict, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Path, Request
+from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -56,6 +56,17 @@ class TransactionRequest(BaseModel):
 @router.get("")
 def read_portfolio(username: str = Depends(caller), db: Session = Depends(get_db)) -> Dict[str, Any]:
     return portfolio.breakdown(db, username)
+
+
+@router.get("/history")
+def read_value_history(
+    days: int = Query(portfolio.HISTORY_DEFAULT_DAYS, ge=7, le=portfolio.HISTORY_MAX_DAYS),
+    username: str = Depends(caller),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """Daily portfolio value. Separate from the breakdown so a slow price
+    history never holds up the numbers the page shows first."""
+    return portfolio.value_history(db, username, days)
 
 
 @router.post("/import")

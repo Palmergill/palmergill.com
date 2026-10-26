@@ -481,3 +481,139 @@ def breakdown(db: Session, username: str) -> Dict[str, Any]:
         "oversold": meta["oversold"],
         "sampleData": stock_data_client._use_mock(),
     }
+
+
+# ── value over time ─────────────────────────────────────────────────────────
+#
+# The value on a day is the shares held that day times that day's close.
+# Shares come from the same two sources as the breakdown: with a holdings
+# snapshot, days after it add later trades and days before it take back the
+# trades between that day and the snapshot; with no snapshot, shares are the
+# running total of trades. Before the earliest record we know about, a
+# snapshot's shares are assumed held, which the page says in words.
+
+HISTORY_DEFAULT_DAYS = 365
+HISTORY_MAX_DAYS = 1000
+# Daily closes only change once a day; keep each ticker's for a few hours.
+HISTORY_CACHE_TTL = timedelta(hours=6)
+MAX_FRESH_HISTORIES = 8
+_history_cache: Dict[Tuple[str, int], Tuple[datetime, List[Dict[str, Any]]]] = {}
+
+
+def _fetch_history(ticker: str, days: int) -> Optional[List[Dict[str, Any]]]:
+    try:
+        return stock_data_client.get_price_history(ticker, days=days)
+    except Exception as exc:  # noqa: BLE001 - reported as a missing ticker
+        logger.warning("[%s] portfolio history unavailable: %s", ticker, type(exc).__name__)
+        return None
+
+
+def price_histories(tickers: List[str], days: int) -> Tuple[Dict[str, List[Dict[str, Any]]], List[str], List[str]]:
+    """Closes per ticker, plus the tickers still to fetch and those that failed."""
+    now = datetime.now(timezone.utc)
+    found: Dict[str, List[Dict[str, Any]]] = {}
+    to_fetch: List[str] = []
+    for ticker in tickers:
+        cached = _history_cache.get((ticker, days))
+        if cached and now - cached[0] <= HISTORY_CACHE_TTL:
+            found[ticker] = cached[1]
+        else:
+            to_fetch.append(ticker)
+
+    fetching, pending = to_fetch[:MAX_FRESH_HISTORIES], to_fetch[MAX_FRESH_HISTORIES:]
+    failed: List[str] = []
+    if fetching:
+        with ThreadPoolExecutor(max_workers=QUOTE_WORKERS) as pool:
+            for ticker, history in zip(fetching, pool.map(lambda t: _fetch_history(t, days), fetching)):
+                if history:
+                    _history_cache[(ticker, days)] = (now, history)
+                    found[ticker] = history
+                else:
+                    failed.append(ticker)
+    return found, pending, failed
+
+
+def _shares_by_day(
+    holdings: List[PortfolioHolding], transactions: List[PortfolioTransaction], days: List[date]
+) -> Dict[str, List[float]]:
+    as_of = holdings[0].as_of if holdings else None
+    base = {h.ticker: h.shares for h in holdings}
+    deltas: Dict[str, List[Tuple[date, float]]] = {}
+    for tx in transactions:
+        sign = 1.0 if tx.side == "buy" else -1.0
+        deltas.setdefault(tx.ticker, []).append((tx.trade_date, sign * tx.shares))
+
+    series: Dict[str, List[float]] = {}
+    for ticker in set(base) | set(deltas):
+        trades = deltas.get(ticker, [])
+        values = []
+        for day in days:
+            if as_of is None:
+                shares = sum(n for d, n in trades if d <= day)
+            elif day >= as_of:
+                shares = base.get(ticker, 0.0) + sum(n for d, n in trades if as_of < d <= day)
+            else:
+                shares = base.get(ticker, 0.0) - sum(n for d, n in trades if day < d <= as_of)
+            values.append(max(shares, 0.0))
+        series[ticker] = values
+    return series
+
+
+def value_history(db: Session, username: str, days: int = HISTORY_DEFAULT_DAYS) -> Dict[str, Any]:
+    holdings = db.query(PortfolioHolding).filter(PortfolioHolding.username == username).all()
+    transactions = db.query(PortfolioTransaction).filter(PortfolioTransaction.username == username).all()
+    today = utc_today()
+    as_of = holdings[0].as_of if holdings else None
+
+    # Trades-only: start at the first trade, so the line doesn't open on a
+    # year of zeros. Either way, reach back far enough to show every trade.
+    first_trade = min((tx.trade_date for tx in transactions), default=None)
+    if as_of is None and first_trade:
+        days = (today - first_trade).days + 1
+    elif first_trade:
+        days = max(days, (today - first_trade).days + 1)
+    days = max(7, min(days, HISTORY_MAX_DAYS))
+    start = today - timedelta(days=days - 1)
+
+    tickers = sorted({h.ticker for h in holdings} | {tx.ticker for tx in transactions})
+    base = {
+        "points": [], "start": start.isoformat(), "asOf": as_of.isoformat() if as_of else None,
+        "pending": [], "missing": [], "complete": True, "sampleData": stock_data_client._use_mock(),
+    }
+    if not tickers:
+        return base
+
+    histories, pending, failed = price_histories(tickers, days)
+    base["missing"] = failed
+    if pending:
+        # Half a line would read as a crash, so draw nothing until every
+        # ticker's closes are in. The page asks again.
+        return {**base, "pending": pending, "complete": False}
+
+    closes: Dict[str, Dict[date, float]] = {}
+    trading_days = set()
+    for ticker, history in histories.items():
+        by_day = {}
+        for row in history:
+            day = parse_date(row.get("date"))
+            if day and day >= start and row.get("close") is not None:
+                by_day[day] = float(row["close"])
+        closes[ticker] = by_day
+        trading_days |= set(by_day)
+    day_list = sorted(trading_days)
+    shares = _shares_by_day(holdings, transactions, day_list)
+
+    points = []
+    last_close: Dict[str, float] = {}
+    for index, day in enumerate(day_list):
+        value = 0.0
+        for ticker, by_day in closes.items():
+            if day in by_day:
+                last_close[ticker] = by_day[day]
+            if ticker in last_close:
+                value += shares[ticker][index] * last_close[ticker]
+        points.append({"date": day.isoformat(), "value": round(value, 2)})
+    # Leading zeros are days before anything was bought.
+    while points and points[0]["value"] == 0:
+        points.pop(0)
+    return {**base, "points": points}

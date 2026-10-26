@@ -198,3 +198,72 @@ def test_a_file_without_the_needed_columns_is_a_clear_422():
     response = client.post("/api/stocks/portfolio/import", json={"csv": "Name,Amount\nFoo,1\n"})
     assert response.status_code == 422
     assert "Symbol" in response.json()["detail"]
+
+
+# ── value over time ─────────────────────────────────────────────────────────
+
+
+def _flat_history(monkeypatch, closes):
+    """Every ticker closes at closes[ticker] on every weekday of the window."""
+    from datetime import timedelta
+
+    def fake(ticker, days):
+        end = portfolio.utc_today()
+        return [
+            {"date": (end - timedelta(days=i)).isoformat(), "close": closes[ticker]}
+            for i in range(days) if (end - timedelta(days=i)).weekday() < 5
+        ]
+
+    monkeypatch.setattr(portfolio.stock_data_client, "get_price_history", fake)
+    portfolio._history_cache.clear()
+
+
+def test_history_is_member_only():
+    assert TestClient(app).get("/api/stocks/portfolio/history").status_code == 403
+
+
+def test_history_follows_trades_from_the_first_one(monkeypatch):
+    from datetime import timedelta
+
+    _flat_history(monkeypatch, {"AAPL": 10.0})
+    client = _member_client()
+    today = portfolio.utc_today()
+    first = today - timedelta(days=30)
+    while first.weekday() >= 5:
+        first -= timedelta(days=1)
+    _buy(client, shares=2, price=10.0, day=first.isoformat())
+    _buy(client, shares=3, price=10.0, day=(today - timedelta(days=7)).isoformat())
+
+    body = client.get("/api/stocks/portfolio/history").json()
+    assert body["complete"] is True
+    assert body["points"][0] == {"date": first.isoformat(), "value": 20.0}
+    assert body["points"][-1]["value"] == 50.0
+
+
+def test_history_rolls_a_snapshot_back_through_earlier_trades(monkeypatch):
+    from datetime import timedelta
+
+    _flat_history(monkeypatch, {"AAPL": 10.0})
+    client = _member_client()
+    today = portfolio.utc_today()
+    client.post("/api/stocks/portfolio/import", json={
+        "csv": "Symbol,Quantity\nAAPL,10\n", "kind": "holdings", "as_of": today.isoformat(),
+    })
+    # Bought 4 of the 10 twenty days ago: before that, only 6 were held.
+    _buy(client, shares=4, price=10.0, day=(today - timedelta(days=20)).isoformat())
+
+    points = client.get("/api/stocks/portfolio/history").json()["points"]
+    assert points[0]["value"] == 60.0
+    assert points[-1]["value"] == 100.0
+
+
+def test_history_waits_until_every_ticker_has_prices(monkeypatch):
+    _flat_history(monkeypatch, {t: 1.0 for t in ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"]})
+    client = _member_client()
+    rows = "\n".join(f"{t},1" for t in "ABCDEFGHIJ")
+    client.post("/api/stocks/portfolio/import", json={"csv": f"Symbol,Quantity\n{rows}\n", "kind": "holdings"})
+
+    first = client.get("/api/stocks/portfolio/history").json()
+    assert first["complete"] is False and len(first["pending"]) == 2 and first["points"] == []
+    second = client.get("/api/stocks/portfolio/history").json()
+    assert second["complete"] is True and second["points"][-1]["value"] == 10.0
