@@ -101,6 +101,10 @@ button { font: inherit; color: inherit; }
 }
 .cd-stat__of { color: var(--muted); font-size: 0.9rem; font-weight: 600; }
 .cd-stat--score .cd-stat__value { color: var(--gold); }
+.cd-stat--score.is-beaten { border-color: var(--gold); }
+.cd-final__goal { margin: 10px 0 0; text-align: center; font-weight: 700; }
+.cd-final__goal.is-beaten { color: var(--gold); }
+.cd-final__goal.is-short { color: var(--soft); }
 .cd-stat--hp.is-hit { animation: cd-shake 0.3s ease; border-color: var(--danger); }
 .cd-hpbar {
     display: block;

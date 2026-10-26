@@ -35,6 +35,9 @@
     let lastFrame = 0;
     let acc = 0;
     let toastTimer = 0;
+    // Today's goal, from goals.json: null until it loads, or if there's none.
+    let goal = null;
+    let goalToasted = false;
 
     // ---------- storage ----------
     function readRecord() {
@@ -172,6 +175,32 @@
                 return placement;
             });
         return posting;
+    }
+
+    // ---------- daily goal ----------
+    // Each day's goal is set offline (scripts/castle-defense-goals.mjs) by
+    // playing hundreds of trial layouts of the day's allotment; it sits where
+    // four in five of them fall short. Goals made under other rules don't count.
+    async function loadGoal() {
+        try {
+            const res = await fetch("./goals.json?v=1");
+            const data = await res.json();
+            const day = data.days[date];
+            if (!day || data.rules[mode] !== G.RULES_BY_MODE[mode] || !day[mode]) return;
+            goal = day[mode];
+            const fail = Math.round(data.failShare * 100);
+            $("goalValue").textContent = goal.toLocaleString();
+            $("goalOf").hidden = false;
+            $("scoreLabel").textContent = "Kills · goal";
+            $("rules").insertAdjacentHTML("afterbegin", `<li>Today's goal is <b>${goal.toLocaleString()}</b> kills. We played ${data.trials} different layouts of today's pieces; ${fail}% of them fell short.</li>`);
+            lastHud = "";
+        } catch {
+            /* no goal today: the page plays the same without one */
+        }
+    }
+
+    function beatGoal(kills) {
+        return goal != null && kills >= goal;
     }
 
     // ---------- sizing ----------
@@ -940,6 +969,7 @@
             const which = placement.improved ? "" : " (my best today)";
             lines.push(`🏆 ${placeText(placement.best, placement.players)}${medal}${which}`);
         }
+        if (goal != null) lines.push(`🎯 Goal ${goal.toLocaleString()} ${beatGoal(kills) ? "✅" : "❌"}`);
         lines.push(`🏰 Fell on wave ${wave}`, buildSummary(), `https://palmergill.com${pageHref}`);
         return lines.join("\n");
     }
@@ -1033,6 +1063,9 @@
                     <span class="cd-final__label">zombies killed</span>
                     ${badge}
                 </div>
+                ${goal == null ? "" : beatGoal(kills)
+                    ? `<p class="cd-final__goal is-beaten">🎯 Beat today's goal of ${goal.toLocaleString()}</p>`
+                    : `<p class="cd-final__goal is-short">🎯 ${(goal - kills).toLocaleString()} short of today's goal of ${goal.toLocaleString()}</p>`}
                 <p class="cd-place is-muted" id="placeLine"${ranked ? "" : " hidden"}>Posting to today's leaderboard…</p>
                 <div class="cd-result-towers" id="resultTowers"></div>
                 <section class="cd-result-board" id="resultBoard" hidden>
@@ -1098,6 +1131,7 @@
     function resetRun() {
         const layout = layoutOf(state);
         state = G.createGame(map);
+        goalToasted = false;
         applyLayout(state, layout);
         selectedType = null;
         acc = 0;
@@ -1209,9 +1243,14 @@
     let lastHud = "";
     function updateUi() {
         updatePanel();
-        const hud = `${state.hp}|${state.wave}|${state.kills}|${state.phase}|${state.defenses.length}|${record.best}`;
+        const hud = `${state.hp}|${state.wave}|${state.kills}|${state.phase}|${state.defenses.length}|${record.best}|${goal}`;
         if (hud === lastHud) return;
         lastHud = hud;
+        $("scoreStat").classList.toggle("is-beaten", beatGoal(state.kills));
+        if (beatGoal(state.kills) && state.phase === "running" && !goalToasted) {
+            goalToasted = true;
+            toast(`Goal reached — ${goal.toLocaleString()} kills`);
+        }
         $("hpValue").textContent = state.hp;
         $("hpMax").textContent = state.maxHp;
         $("hpBar").style.width = `${(state.hp / state.maxHp) * 100}%`;
@@ -1341,6 +1380,7 @@
     $("hpMax").textContent = G.START_HP;
     $("maxLevel").textContent = G.MAX_LEVEL;
     describeHorde();
+    loadGoal();
     buildShop();
     applyLayout(state, record.layout);
     refreshPanel();

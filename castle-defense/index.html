@@ -21,7 +21,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/shared/site-nav.css?v=19">
-    <link rel="stylesheet" href="./style.css?v=10">
+    <link rel="stylesheet" href="./style.css?v=11">
 </head>
 <body>
 <noscript>
@@ -52,9 +52,9 @@
                 <span class="cd-stat__label">Wave</span>
                 <span class="cd-stat__value" id="waveValue">0</span>
             </div>
-            <div class="cd-stat cd-stat--score">
-                <span class="cd-stat__label">Kills</span>
-                <span class="cd-stat__value" id="scoreValue">0</span>
+            <div class="cd-stat cd-stat--score" id="scoreStat">
+                <span class="cd-stat__label" id="scoreLabel">Kills</span>
+                <span class="cd-stat__value"><span id="scoreValue">0</span><span class="cd-stat__of" id="goalOf" hidden>/<span id="goalValue"></span></span></span>
             </div>
             <div class="cd-stat">
                 <span class="cd-stat__label">Best today</span>
@@ -137,6 +137,6 @@
     <script src="/shared/analytics.js?v=1"></script>
     <script src="/shared/api-base.js?v=1"></script>
     <script src="./castleDefenseGame.js?v=7"></script>
-    <script src="./app.js?v=10"></script>
+    <script src="./app.js?v=11"></script>
 </body>
 </html>

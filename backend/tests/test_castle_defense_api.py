@@ -241,3 +241,20 @@ def _eval_open(expression: str) -> str:
         return ctx.eval(expression)
     finally:
         ctx.close()
+
+
+# ── daily goals ─────────────────────────────────────────────────────────────
+
+
+def test_daily_goals_are_current_and_run_well_ahead():
+    """castle-defense/goals.json is made offline, so it can go stale: after a
+    balance change (its rules no longer match the engine's), or as its last
+    day comes near. Rerun scripts/castle-defense-goals.mjs when this fails."""
+    goals_path = next(p.parent / "goals.json" for p in castle_defense._ENGINE_CANDIDATES if (p.parent / "goals.json").is_file())
+    goals = json.loads(goals_path.read_text(encoding="utf-8"))
+    for mode in ("classic", "open"):
+        assert goals["rules"][mode] == castle_defense.current_rules(mode), f"{mode} goals were set under other rules"
+    today = datetime.now(timezone.utc).date()
+    for offset in range(-1, 60):
+        day = (today + timedelta(days=offset)).isoformat()
+        assert set(goals["days"].get(day, {})) == {"classic", "open"}, f"no goals for {day}"
