@@ -161,3 +161,22 @@ test('the open field opens straight onto the board, takes traps on the grass and
     await expect(page.locator('#toast')).toHaveText('Wave 1 from the west');
     await expect(page.locator('#waveValue')).toHaveText('1');
 });
+
+test("today's leaderboard opens from the header before you've played", async ({ page }) => {
+    await page.goto('/castle-defense/');
+    await page.getByRole('button', { name: /Leaderboard/ }).click();
+    const card = page.getByRole('dialog');
+    await expect(card.getByRole('heading', { name: "Today's leaderboard" })).toBeVisible();
+    await expect(card.getByRole('button', { name: 'Classic' })).toHaveAttribute('aria-pressed', 'true');
+    // Other tests may have posted runs already; either way the board answers.
+    await expect(page.locator('#fullBoardNote')).toHaveText(/No scores yet today|\d+ players?/);
+
+    // The other mode's board is one click away.
+    await card.getByRole('button', { name: 'Open field' }).click();
+    await expect(card.getByRole('button', { name: 'Open field' })).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.locator('#fullBoardNote')).toHaveText(/No scores yet today|\d+ players?/);
+
+    await card.getByRole('button', { name: 'Close' }).click();
+    await expect(card).toBeHidden();
+    await expect(page.locator('#playLabel')).toHaveText('Play');
+});

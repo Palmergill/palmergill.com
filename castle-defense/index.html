@@ -21,7 +21,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/shared/site-nav.css?v=19">
-    <link rel="stylesheet" href="./style.css?v=12">
+    <link rel="stylesheet" href="./style.css?v=13">
 </head>
 <body>
 <noscript>
@@ -34,10 +34,13 @@
                 <h1>Castle Defense</h1>
             </div>
             <div class="cd-head__side">
-                <nav class="cd-modes" aria-label="Game mode">
-                    <a class="cd-chip" id="modeClassic" href="./">Classic</a>
-                    <a class="cd-chip" id="modeOpen" href="./?mode=open">Open field</a>
-                </nav>
+                <div class="cd-head__bar">
+                    <nav class="cd-modes" aria-label="Game mode">
+                        <a class="cd-chip" id="modeClassic" href="./">Classic</a>
+                        <a class="cd-chip" id="modeOpen" href="./?mode=open">Open field</a>
+                    </nav>
+                    <button class="cd-chip" type="button" id="leaderboardButton">🏆 Leaderboard</button>
+                </div>
                 <p class="cd-lede" id="lede">Place towers on the grass and traps on the road, then press play. Score is zombies killed before the castle falls.</p>
             </div>
         </header>
@@ -144,6 +147,6 @@
     <script src="/shared/analytics.js?v=1"></script>
     <script src="/shared/api-base.js?v=1"></script>
     <script src="./castleDefenseGame.js?v=7"></script>
-    <script src="./app.js?v=12"></script>
+    <script src="./app.js?v=13"></script>
 </body>
 </html>

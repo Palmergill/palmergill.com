@@ -148,6 +148,44 @@
         else note.innerHTML = `<a href="${signInHref()}">Sign in</a> to put your runs on the board.`;
     }
 
+    // The full board for either mode, open any time from the header. Only
+    // today's maps are ranked, so it's always today's, whatever day is loaded.
+    let boardRequest = 0;
+    async function showLeaderboard(which = mode) {
+        const label = { classic: "Classic", open: "Open field" };
+        showOverlay({
+            eyebrow: prettyDate(today),
+            title: "Today's leaderboard",
+            body: `
+                <div class="cd-board-tabs" role="group" aria-label="Mode">
+                    ${G.MODES.map((m) => `<button class="cd-chip" type="button" data-board="${m}" aria-pressed="${m === which}">${label[m]}</button>`).join("")}
+                </div>
+                <p class="cd-note" id="fullBoardNote">Loading…</p>
+                <ol class="cd-board cd-board--full" id="fullBoard"></ol>`,
+            actions: [{ label: "Close", primary: true, onClick: hideOverlay }]
+        });
+        document.querySelectorAll("[data-board]").forEach((btn) => {
+            btn.addEventListener("click", () => {
+                if (btn.dataset.board !== which) showLeaderboard(btn.dataset.board);
+            });
+        });
+        const request = ++boardRequest;
+        let board;
+        try {
+            board = await api(`/leaderboard?day=${today}&mode=${which}`);
+        } catch {
+            if (request === boardRequest) $("fullBoardNote").textContent = "The leaderboard couldn't be loaded right now.";
+            return;
+        }
+        // A tab clicked while this was loading has the overlay now.
+        if (request !== boardRequest || overlay.hidden) return;
+        $("fullBoard").innerHTML = boardRows(board, 50);
+        const note = $("fullBoardNote");
+        if (!board.players) note.textContent = "No scores yet today. Be the first.";
+        else if (board.you) note.textContent = `${board.players} ${board.players === 1 ? "player" : "players"} · you're ${placeText(board.you, board.players)}.`;
+        else note.innerHTML = `${board.players} ${board.players === 1 ? "player" : "players"} · <a href="${signInHref()}">Sign in</a> to get on the board.`;
+    }
+
     function signInHref() {
         return `/login/?next=${encodeURIComponent(pageHref)}`;
     }
@@ -1339,6 +1377,7 @@
     });
 
     $("playButton").addEventListener("click", startOrRetry);
+    $("leaderboardButton").addEventListener("click", () => showLeaderboard());
 
     function startOrRetry() {
         if (state.phase === "over") {

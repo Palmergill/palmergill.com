@@ -54,7 +54,10 @@ button { font: inherit; color: inherit; }
     line-height: 1;
 }
 .cd-head__side { display: grid; gap: 10px; justify-items: start; min-width: 0; }
+.cd-head__bar { display: flex; gap: 6px 14px; flex-wrap: wrap; align-items: center; }
 .cd-modes { display: flex; gap: 6px; flex-wrap: wrap; }
+.cd-board-tabs { display: flex; gap: 6px; margin-bottom: 12px; }
+.cd-board--full { max-height: min(52vh, 460px); overflow-y: auto; margin: 0; }
 .cd-modes .cd-chip { color: var(--ink); text-decoration: none; }
 .cd-modes .cd-chip[aria-current="page"] {
     background: var(--sage-soft);
