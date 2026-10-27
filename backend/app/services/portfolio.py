@@ -887,11 +887,12 @@ def _same_price(a: float, b: float) -> bool:
     return abs(a - b) <= max(0.02, 0.002 * max(a, b))
 
 
-def find_duplicates(transactions: List[Any]) -> Dict[int, Any]:
-    """Map each duplicate trade's id to the trade it duplicates."""
+def find_duplicates(transactions: List[Any], across_labels: bool = False) -> Dict[int, Any]:
+    """Map each duplicate trade's id to the trade it duplicates. With
+    `across_labels`, trades pair whatever security they're filed under."""
     groups: Dict[Tuple[str, str], List[Any]] = {}
     for tx in transactions:
-        groups.setdefault((tx.ticker, tx.side), []).append(tx)
+        groups.setdefault(("*" if across_labels else tx.ticker, tx.side), []).append(tx)
     duplicates: Dict[int, Any] = {}
     paired = set()
     for group in groups.values():
@@ -912,10 +913,54 @@ def find_duplicates(transactions: List[Any]) -> Dict[int, Any]:
     return duplicates
 
 
+def find_aliases(transactions: List[Any]) -> Dict[str, str]:
+    """Names that are really tickers: {"Twenty One Capital": "XXI"}.
+
+    One feed can label a security by name where another export gives its
+    ticker, so the same buys show up under both and neither label holds the
+    whole position. A name is taken to be a ticker when at least two of its
+    trades repeat that ticker's trades from another source (same side and
+    quantity, prices within a cent or two, dates a few days apart), and those
+    repeats are at least half of the smaller side's trades.
+    """
+    named: Dict[str, List[Any]] = {}
+    tickers: Dict[str, List[Any]] = {}
+    for tx in transactions:
+        (named if tx.asset == "other" else tickers).setdefault(tx.ticker, []).append(tx)
+    aliases: Dict[str, str] = {}
+    for name, own in named.items():
+        best, best_pairs = None, 0
+        for ticker, theirs in tickers.items():
+            # Only pairs with one trade under each label say they're the same
+            # security; a ticker's own repeats across feeds say nothing.
+            pairs = sum(
+                1 for dup_id, kept in find_duplicates(own + theirs, across_labels=True).items()
+                if (kept.ticker == name) != (dup_id in {t.id for t in own})
+            )
+            if pairs > best_pairs:
+                best, best_pairs = ticker, pairs
+        if best and best_pairs >= 2 and best_pairs * 2 >= min(len(own), len(tickers[best])):
+            aliases[name] = best
+    return aliases
+
+
 def load_adjusted(db: Session, username: str, budget: Optional[_Budget] = None) -> Tuple[list, list, Dict[str, Any]]:
     """Holdings and trades in today's shares, without cross-source duplicates,
     plus what was adjusted and what was left out."""
-    holdings, stored = _load(db, username)
+    holdings, rows = _load(db, username)
+    # Plain copies: the stored rows are never changed by what follows.
+    stored = [
+        SimpleNamespace(
+            id=t.id, ticker=t.ticker, asset=t.asset or "stock", side=t.side, trade_date=t.trade_date,
+            shares=t.shares, price=t.price, fees=t.fees or 0.0, account=t.account, source=t.source,
+            notes=t.notes, amount=t.amount, realized_reported=t.realized_reported, label=t.ticker,
+        )
+        for t in rows
+    ]
+    aliases = find_aliases(stored)
+    for tx in stored:
+        if tx.ticker in aliases:
+            tx.ticker, tx.asset = aliases[tx.ticker], "stock"
     duplicates = find_duplicates(stored)
     transactions = [t for t in stored if t.id not in duplicates]
     stocks = sorted({t.ticker for t in transactions if (t.asset or "stock") == "stock"} | {h.ticker for h in holdings})
@@ -990,6 +1035,7 @@ def load_adjusted(db: Session, username: str, budget: Optional[_Budget] = None) 
             dup_id: {"id": kept.id, "source": kept.source, "account": kept.account, "date": kept.trade_date.isoformat()}
             for dup_id, kept in duplicates.items()
         },
+        "aliases": [{"name": name, "ticker": ticker} for name, ticker in sorted(aliases.items())],
         "duplicatePairs": [
             {"duplicateSource": a, "keptSource": b, "count": n}
             for (a, b), n in sorted(pair_counts.items(), key=lambda kv: -kv[1])
@@ -1159,7 +1205,8 @@ def breakdown(db: Session, username: str) -> Dict[str, Any]:
             # The page's own figure for the same sells, to set beside it.
             "computed": sum(meta["realized_by_tx"].get(t.id, 0.0) for t in reported) if reported else None,
         },
-        "splits": {k: v for k, v in split_info.items() if k not in ("duplicates", "duplicatePairs")},
+        "splits": {k: v for k, v in split_info.items() if k not in ("duplicates", "duplicatePairs", "aliases")},
+        "aliases": split_info["aliases"],
         "duplicates": {"count": len(split_info["duplicates"]), "pairs": split_info["duplicatePairs"]},
         "facets": {
             "accounts": sorted({_label(t.account, "No account") for t in transactions}),
@@ -1222,6 +1269,8 @@ def list_transactions(
                 "counted": tx.id not in duplicates and not (as_of and tx.trade_date <= as_of),
                 # The trade this one repeats from another source, if it does.
                 "duplicateOf": duplicates.get(tx.id),
+                # The ticker a named security was matched to, if it was.
+                "aliasOf": adjusted[tx.id].ticker if tx.id in adjusted and adjusted[tx.id].ticker != tx.ticker else None,
                 # In today's shares, when a later split changed them.
                 "splitFactor": adjusted[tx.id].split_factor if tx.id in adjusted else 1.0,
                 "adjustedShares": adjusted[tx.id].shares if tx.id in adjusted else tx.shares,

@@ -564,3 +564,37 @@ def test_one_trade_from_two_feeds_is_counted_once():
     tagged = [r for r in rows if r["duplicateOf"]]
     assert {(r["ticker"], r["source"]) for r in tagged} == {("TGT", "Uploaded CSV"), ("NVDA", "Robinhood")}
     assert all(not r["counted"] for r in tagged)
+
+
+def test_a_name_that_repeats_a_tickers_trades_is_counted_as_that_ticker():
+    # One feed files the stock by name, the other export by ticker; the
+    # name's feed also has the later buys and the sale that closed it.
+    csv = """date,source,account,type,security,quantity,price,amount_usd,fees_usd,realized_gain_loss,notes
+2025-12-09,Uploaded CSV,Robinhood,buy,XXI,25,11.02,275.50,0,,
+2025-12-10,Uploaded CSV,Robinhood,buy,XXI,25,12.00,300.00,0,,
+2025-12-10,Robinhood,Robinhood individual,buy,Twenty One Capital,25,11.02,275.50,0,,buy 25 shares of Twenty One Capital
+2025-12-11,Robinhood,Robinhood individual,buy,Twenty One Capital,25,12.00,300.00,0,,buy 25 shares of Twenty One Capital
+2026-01-21,Robinhood,Robinhood individual,buy,Twenty One Capital,25,8.40,210.00,0,,buy 25 shares of Twenty One Capital
+2026-07-22,Robinhood,Robinhood individual,sell,Twenty One Capital,75,4.80,360.00,0,,sell 75 shares of Twenty One Capital
+"""
+    client = _member_client()
+    body = client.post("/api/stocks/portfolio/import", json={"csv": csv}).json()["portfolio"]
+    assert body["aliases"] == [{"name": "Twenty One Capital", "ticker": "XXI"}]
+    assert body["positions"] == []
+    assert [c["ticker"] for c in body["closedPositions"]] == ["XXI"]
+    assert body["duplicates"]["count"] == 2
+    sale = client.get("/api/stocks/portfolio/transactions", params={"side": "sell"}).json()["rows"][0]
+    assert (sale["ticker"], sale["aliasOf"]) == ("Twenty One Capital", "XXI")
+
+
+def test_a_name_is_not_matched_to_a_ticker_on_one_coincidence():
+    csv = """date,source,account,type,security,quantity,price,amount_usd,fees_usd,realized_gain_loss,notes
+2025-12-09,Uploaded CSV,Robinhood,buy,AAPL,1,200.00,200,0,,
+2025-12-09,Robinhood,Robinhood individual,buy,Some Fund,1,200.00,200,0,,
+2025-12-20,Robinhood,Robinhood individual,buy,Some Fund,3,50.00,150,0,,
+2026-01-20,Robinhood,Robinhood individual,buy,Some Fund,3,52.00,156,0,,
+"""
+    client = _member_client()
+    body = client.post("/api/stocks/portfolio/import", json={"csv": csv}).json()["portfolio"]
+    assert body["aliases"] == []
+    assert {p["ticker"] for p in body["positions"]} == {"AAPL", "Some Fund"}

@@ -387,6 +387,10 @@
             const worst = withGain.reduce((a, b) => (b.gainPct < a.gainPct ? b : a));
             items.push(`Best performer: <strong>${escapeHtml(best.ticker)}</strong> <span class="${tone(best.gain)}">${fmtPct(best.gainPct, true)}</span>. Weakest: <strong>${escapeHtml(worst.ticker)}</strong> <span class="${tone(worst.gain)}">${fmtPct(worst.gainPct, true)}</span>.`);
         }
+        if (data.aliases.length) {
+            const named = data.aliases.map((a) => `“${escapeHtml(a.name)}” as <strong>${escapeHtml(a.ticker)}</strong>`).join(', ');
+            items.push(`Counted ${named}: the same trades appear under both in different sources.`);
+        }
         if (data.duplicates.count) {
             const pairs = data.duplicates.pairs.map((p) => `${countFormat.format(p.count)} from ${escapeHtml(p.duplicateSource)} repeating ${escapeHtml(p.keptSource)}`).join(', ');
             items.push(`<strong>${plural(data.duplicates.count, 'trade')}</strong> appear twice across your sources (${pairs}), so each is counted once. <a href="#activity">They're tagged in Activity.</a>`);
@@ -712,7 +716,7 @@
                 <td>${fmtDay(t.tradeDate)}${t.duplicateOf
                     ? `<span class="pf-tag" title="The same trade as the ${escapeHtml(t.duplicateOf.source || 'other')} row on ${fmtDay(t.duplicateOf.date)}, so it's counted once">duplicate</span>`
                     : t.counted ? '' : '<span class="pf-tag" title="On or before your holdings date, so it is already in them">in holdings</span>'}</td>
-                <td>${securityLink(t)}${t.notes ? `<span class="pf-name pf-note-cell" title="${escapeHtml(t.notes)}">${escapeHtml(t.notes)}</span>` : ''}</td>
+                <td>${t.aliasOf ? `${securityLink({ ticker: t.aliasOf, asset: 'stock' })}<span class="pf-tag" title="Filed as “${escapeHtml(t.ticker)}” in this source">${escapeHtml(t.ticker)}</span>` : securityLink(t)}${t.notes ? `<span class="pf-name pf-note-cell" title="${escapeHtml(t.notes)}">${escapeHtml(t.notes)}</span>` : ''}</td>
                 <td><span class="pf-side pf-side--${t.side}">${t.side === 'buy' ? 'Buy' : 'Sell'}</span></td>
                 ${t.splitFactor !== 1
                     ? `<td class="num" title="Adjusted for stock splits since the trade">${shareFormat.format(t.adjustedShares)}<span class="pf-sub">${shareFormat.format(t.shares)} as traded</span></td>
