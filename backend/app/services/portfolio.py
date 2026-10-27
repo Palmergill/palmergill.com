@@ -19,8 +19,10 @@ import csv
 import io
 import logging
 import re
+import math
 import threading
 from datetime import date, datetime, timedelta, timezone
+from types import SimpleNamespace
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 from fastapi import HTTPException
@@ -29,7 +31,7 @@ from sqlalchemy.orm import Session
 
 from app import accounts
 from app.database import (
-    PortfolioHolding, PortfolioTransaction, PriceClose, PriceCoverage, StockSummary,
+    PortfolioHolding, PortfolioTransaction, PriceClose, PriceCoverage, SplitCheck, StockSplit, StockSummary,
 )
 from app.services.polygon_client import PolygonPlanLimited, PolygonRateLimited
 from app.services.stock_data_client import stock_data_client
@@ -753,6 +755,181 @@ def quotes(db: Session, positions: Dict[str, Dict[str, Any]]) -> Dict[str, Dict[
     return result
 
 
+# ── stock splits ────────────────────────────────────────────────────────────
+#
+# A trade from before a split is recorded in the old shares: 10 NVDA bought
+# in 2017 are 400 today. Trades are stored exactly as uploaded and adjusted
+# when read, so every share count, average cost and chart point is in
+# today's shares (which is also how the provider's closes are adjusted).
+# Splits come from the provider, one call per ticker, rechecked weekly; until
+# it answers, a built-in list of well-known splits stands in.
+#
+# Some sources adjust old trades themselves. A trade whose price already
+# matches that day's split-adjusted close is left alone rather than
+# adjusted twice.
+
+SPLIT_RECHECK = timedelta(days=7)
+SPLIT_CALLS_PER_REQUEST = 2
+# (ticker, execution date, split_from, split_to)
+KNOWN_SPLITS = [
+    ("AAPL", date(2020, 8, 31), 1, 4),
+    ("TSLA", date(2020, 8, 31), 1, 5), ("TSLA", date(2022, 8, 25), 1, 3),
+    ("NVDA", date(2021, 7, 20), 1, 4), ("NVDA", date(2024, 6, 10), 1, 10),
+    ("AMZN", date(2022, 6, 6), 1, 20),
+    ("GOOGL", date(2022, 7, 18), 1, 20), ("GOOG", date(2022, 7, 18), 1, 20),
+    ("SHOP", date(2022, 6, 29), 1, 10),
+    ("AVGO", date(2024, 7, 15), 1, 10),
+    ("CMG", date(2024, 6, 26), 1, 50),
+    ("WMT", date(2024, 2, 26), 1, 3),
+    ("SCHD", date(2024, 10, 11), 1, 3),
+    ("SMCI", date(2024, 10, 1), 1, 10),
+    ("LRCX", date(2024, 10, 3), 1, 10),
+    ("MSTR", date(2024, 8, 8), 1, 10),
+    ("NFLX", date(2025, 11, 17), 1, 10),
+]
+
+
+def _fetch_splits(ticker: str) -> List[Tuple[date, float, float]]:
+    if stock_data_client._use_mock():
+        return [(d, f, t) for k, d, f, t in KNOWN_SPLITS if k == ticker]
+    stock_data_client._require_real_data_configured()
+    return stock_data_client.polygon.get_splits(ticker)
+
+
+def ensure_splits(db: Session, tickers: List[str], budget: _Budget) -> None:
+    """Ask the provider for each stock's splits once a week, within budget."""
+    checks = {c.ticker: c for c in db.query(SplitCheck).filter(SplitCheck.ticker.in_(tickers))}
+    for ticker in tickers:
+        check = checks.get(ticker)
+        if check and _naive_now() - check.checked_at < SPLIT_RECHECK:
+            continue
+        if not budget.spend():
+            return
+        try:
+            found = _fetch_splits(ticker)
+        except PolygonRateLimited:
+            _rate_limited()
+            return
+        except Exception as exc:  # noqa: BLE001 - the built-in list stands in
+            logger.warning("[%s] splits unavailable: %s", ticker, type(exc).__name__)
+            found = None
+        if found is not None:
+            db.query(StockSplit).filter(StockSplit.ticker == ticker).delete()
+            for day, split_from, split_to in found:
+                db.add(StockSplit(ticker=ticker, execution_date=day, split_from=split_from, split_to=split_to))
+        if check is None:
+            check = SplitCheck(ticker=ticker, checked_at=_naive_now(), found=found is not None)
+            db.add(check)
+            checks[ticker] = check
+        else:
+            check.checked_at = _naive_now()
+            check.found = check.found or found is not None
+        db.commit()
+
+
+def splits_for(db: Session, tickers: List[str]) -> Dict[str, List[Tuple[date, float]]]:
+    """Each ticker's splits as (execution date, new shares per old share):
+    the provider's where it has answered, else the built-in list."""
+    answered = {c.ticker for c in db.query(SplitCheck).filter(SplitCheck.ticker.in_(tickers), SplitCheck.found.is_(True))}
+    result: Dict[str, List[Tuple[date, float]]] = {}
+    for row in db.query(StockSplit).filter(StockSplit.ticker.in_(list(answered))):
+        if row.split_from > 0 and row.split_to > 0:
+            result.setdefault(row.ticker, []).append((row.execution_date, row.split_to / row.split_from))
+    for ticker, day, split_from, split_to in KNOWN_SPLITS:
+        if ticker in tickers and ticker not in answered:
+            result.setdefault(ticker, []).append((day, split_to / split_from))
+    return {t: sorted(v) for t, v in result.items()}
+
+
+def _split_factor(splits: List[Tuple[date, float]], day: date) -> float:
+    # A split takes effect from the open on its execution date, so a trade
+    # on that day is already in the new shares.
+    factor = 1.0
+    for execution_date, ratio in splits:
+        if execution_date > day:
+            factor *= ratio
+    return factor
+
+
+def _already_adjusted(price: float, factor: float, close: Optional[float]) -> bool:
+    """True when the trade's price sits nearer the split-adjusted close than
+    the unadjusted one would: the source has adjusted it already."""
+    if not close or price <= 0:
+        return False
+    ratio = price / close
+    return abs(math.log(ratio)) < abs(math.log(ratio / factor))
+
+
+def load_adjusted(db: Session, username: str, budget: Optional[_Budget] = None) -> Tuple[list, list, Dict[str, Any]]:
+    """Holdings and trades in today's shares, plus what was adjusted."""
+    holdings, transactions = _load(db, username)
+    stocks = sorted({t.ticker for t in transactions if (t.asset or "stock") == "stock"} | {h.ticker for h in holdings})
+    if budget is not None and stocks:
+        ensure_splits(db, stocks, budget)
+    splits = splits_for(db, stocks)
+
+    # Closes near each pre-split trade, to spot trades already adjusted.
+    affected = {t.ticker for t in transactions if t.ticker in splits and _split_factor(splits[t.ticker], t.trade_date) != 1.0}
+    closes: Dict[str, List[Tuple[date, float]]] = {}
+    if affected and not stock_data_client._use_mock():
+        for ticker, day, close in (
+            db.query(PriceClose.ticker, PriceClose.day, PriceClose.close)
+            .filter(PriceClose.ticker.in_(list(affected))).order_by(PriceClose.day)
+        ):
+            closes.setdefault(ticker, []).append((day, close))
+
+    def close_near(ticker: str, day: date) -> Optional[float]:
+        best = None
+        for close_day, close in closes.get(ticker, []):
+            if close_day > day:
+                break
+            if (day - close_day).days <= STALE_AFTER_DAYS:
+                best = close
+        return best
+
+    adjusted_trades = []
+    applied: Dict[Tuple[str, date], Dict[str, Any]] = {}
+    already = 0
+    for tx in transactions:
+        factor = _split_factor(splits.get(tx.ticker, []), tx.trade_date) if (tx.asset or "stock") == "stock" else 1.0
+        if factor != 1.0 and _already_adjusted(tx.price, factor, close_near(tx.ticker, tx.trade_date)):
+            factor, already = 1.0, already + 1
+        view = SimpleNamespace(
+            id=tx.id, ticker=tx.ticker, asset=tx.asset or "stock", side=tx.side, trade_date=tx.trade_date,
+            shares=tx.shares * factor, price=tx.price / factor, fees=tx.fees or 0.0,
+            account=tx.account, source=tx.source, notes=tx.notes, amount=tx.amount,
+            realized_reported=tx.realized_reported, split_factor=factor,
+            original_shares=tx.shares, original_price=tx.price,
+        )
+        adjusted_trades.append(view)
+        if factor != 1.0:
+            for execution_date, ratio in splits[tx.ticker]:
+                if execution_date > tx.trade_date:
+                    entry = applied.setdefault((tx.ticker, execution_date), {
+                        "ticker": tx.ticker, "date": execution_date.isoformat(), "ratio": ratio, "trades": 0,
+                    })
+                    entry["trades"] += 1
+
+    as_of = holdings[0].as_of if holdings else None
+    adjusted_holdings = []
+    for h in holdings:
+        # A snapshot is in its own day's shares; later splits still apply.
+        factor = 1.0
+        for execution_date, ratio in splits.get(h.ticker, []):
+            if as_of and execution_date > as_of:
+                factor *= ratio
+        adjusted_holdings.append(SimpleNamespace(
+            ticker=h.ticker, shares=h.shares * factor, cost_basis=h.cost_basis, as_of=h.as_of,
+        ))
+
+    info = {
+        "applied": sorted(applied.values(), key=lambda a: a["date"], reverse=True),
+        "tradesAdjusted": sum(1 for t in adjusted_trades if t.split_factor != 1.0),
+        "alreadyAdjusted": already,
+    }
+    return adjusted_holdings, adjusted_trades, info
+
+
 # ── the breakdown ───────────────────────────────────────────────────────────
 
 
@@ -798,7 +975,7 @@ def _activity_summary(transactions: List[PortfolioTransaction], field: str, fall
 
 
 def breakdown(db: Session, username: str) -> Dict[str, Any]:
-    holdings, transactions = _load(db, username)
+    holdings, transactions, split_info = load_adjusted(db, username, _Budget(SPLIT_CALLS_PER_REQUEST))
     positions, meta = build_positions(holdings, transactions)
     open_positions = {t: p for t, p in positions.items() if p["shares"] > EPSILON}
     prices = quotes(db, open_positions)
@@ -914,6 +1091,7 @@ def breakdown(db: Session, username: str) -> Dict[str, Any]:
             # The page's own figure for the same sells, to set beside it.
             "computed": sum(meta["realized_by_tx"].get(t.id, 0.0) for t in reported) if reported else None,
         },
+        "splits": split_info,
         "facets": {
             "accounts": sorted({_label(t.account, "No account") for t in transactions}),
             "sources": sorted({_label(t.source, "No source") for t in transactions}),
@@ -935,9 +1113,10 @@ def list_transactions(
 ) -> Dict[str, Any]:
     """One page of trades, newest first, filtered. Each row carries the
     page's realized gain for a sell beside the one the source reported."""
-    holdings, transactions = _load(db, username)
+    holdings, transactions, _ = load_adjusted(db, username)
     _, meta = build_positions(holdings, transactions)
     as_of = meta["as_of"]
+    adjusted = {t.id: t for t in transactions}
 
     query = db.query(PortfolioTransaction).filter(PortfolioTransaction.username == username)
     if q:
@@ -971,6 +1150,10 @@ def list_transactions(
                 "notes": tx.notes, "realizedReported": tx.realized_reported,
                 "realized": meta["realized_by_tx"].get(tx.id),
                 "counted": not (as_of and tx.trade_date <= as_of),
+                # In today's shares, when a later split changed them.
+                "splitFactor": adjusted[tx.id].split_factor if tx.id in adjusted else 1.0,
+                "adjustedShares": adjusted[tx.id].shares if tx.id in adjusted else tx.shares,
+                "adjustedPrice": adjusted[tx.id].price if tx.id in adjusted else tx.price,
             }
             for tx in page
         ],
@@ -994,7 +1177,7 @@ ESTIMATE_SHARE = 0.02
 
 
 def value_history(db: Session, username: str) -> Dict[str, Any]:
-    holdings, transactions = _load(db, username)
+    holdings, transactions, _ = load_adjusted(db, username)
     today = utc_today()
     as_of = holdings[0].as_of if holdings else None
     first_trade = transactions[0].trade_date if transactions else None

@@ -1313,6 +1313,32 @@ class PriceClose(Base):
     close = Column(Float, nullable=False)
 
 
+class StockSplit(Base):
+    """One stock split, as the price provider reports it: `split_to` new
+    shares for every `split_from` old ones, from the open on
+    `execution_date`. Public market data, not per account."""
+
+    __tablename__ = "stock_splits"
+    __table_args__ = (UniqueConstraint("ticker", "execution_date", name="uq_stock_splits_ticker_day"),)
+
+    id = Column(Integer, primary_key=True)
+    ticker = Column(String, nullable=False)
+    execution_date = Column(Date, nullable=False)
+    split_from = Column(Float, nullable=False)
+    split_to = Column(Float, nullable=False)
+
+
+class SplitCheck(Base):
+    """When a ticker's splits were last asked for, found or not."""
+
+    __tablename__ = "split_checks"
+
+    ticker = Column(String, primary_key=True)
+    checked_at = Column(DateTime, nullable=False)
+    # False when the provider couldn't answer, so the built-in list stands in.
+    found = Column(Boolean, nullable=False, default=False)
+
+
 class PriceCoverage(Base):
     """Which days the price provider has been asked about for one symbol.
 

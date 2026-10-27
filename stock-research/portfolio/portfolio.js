@@ -271,6 +271,7 @@
         renderInsights(data);
         renderHoldings(data);
         renderClosed(data);
+        renderSplits(data);
         renderFilters(data);
         renderAccounts(data);
         renderGains(data);
@@ -386,6 +387,10 @@
             const worst = withGain.reduce((a, b) => (b.gainPct < a.gainPct ? b : a));
             items.push(`Best performer: <strong>${escapeHtml(best.ticker)}</strong> <span class="${tone(best.gain)}">${fmtPct(best.gainPct, true)}</span>. Weakest: <strong>${escapeHtml(worst.ticker)}</strong> <span class="${tone(worst.gain)}">${fmtPct(worst.gainPct, true)}</span>.`);
         }
+        if (data.splits.tradesAdjusted) {
+            const tickers = [...new Set(data.splits.applied.map((a) => a.ticker))];
+            items.push(`Adjusted ${plural(data.splits.tradesAdjusted, 'trade')} for ${plural(data.splits.applied.length, 'stock split')} (${tickers.slice(0, 4).map(escapeHtml).join(', ')}${tickers.length > 4 ? '…' : ''}). <a href="#holdings">See splits</a>`);
+        }
         if (t.estimatedPositions) {
             items.push(`${plural(t.estimatedPositions, 'position')} ${t.estimatedPositions === 1 ? 'has' : 'have'} no market price, so ${t.estimatedPositions === 1 ? "it's" : "they're"} valued at your last trade.`);
         }
@@ -479,6 +484,30 @@
                 <td class="num pf-hide-sm">${countFormat.format(c.trades)}</td>
                 <td class="num">${fmtMonth(c.first)}<span class="pf-sub">to ${fmtMonth(c.last)}</span></td>
             </tr>`).join('');
+    }
+
+    function splitLabel(ratio) {
+        const whole = (n) => (Number.isInteger(n) ? n : Number(n.toFixed(3)));
+        return ratio >= 1 ? `${whole(ratio)}-for-1` : `1-for-${whole(1 / ratio)}`;
+    }
+
+    function renderSplits(data) {
+        const { applied, tradesAdjusted, alreadyAdjusted } = data.splits;
+        $('splitsCard').hidden = !applied.length && !alreadyAdjusted;
+        const parts = [];
+        if (tradesAdjusted) parts.push(`${plural(tradesAdjusted, 'trade')} from before a split ${tradesAdjusted === 1 ? 'is' : 'are'} counted in today's shares; the money paid doesn't change.`);
+        if (alreadyAdjusted) parts.push(`${plural(alreadyAdjusted, 'trade')} already matched the split-adjusted price, so ${alreadyAdjusted === 1 ? 'it was' : 'they were'} left as recorded.`);
+        $('splitsSub').textContent = parts.join(' ');
+        $('splitsTable').innerHTML = applied.length ? `
+            <thead><tr><th scope="col">Security</th><th scope="col">Split</th><th scope="col" class="num">Date</th><th scope="col" class="num">Trades adjusted</th></tr></thead>
+            <tbody>${applied.map((a) => `
+                <tr>
+                    <td>${securityLink({ ticker: a.ticker, asset: 'stock' })}</td>
+                    <td>${splitLabel(a.ratio)}</td>
+                    <td class="num">${fmtDay(a.date)}</td>
+                    <td class="num">${countFormat.format(a.trades)}</td>
+                </tr>`).join('')}
+            </tbody>` : '';
     }
 
     // ── accounts ───────────────────────────────────────────────────────────
@@ -678,8 +707,11 @@
                 <td>${fmtDay(t.tradeDate)}${t.counted ? '' : '<span class="pf-tag" title="On or before your holdings date, so it is already in them">in holdings</span>'}</td>
                 <td>${securityLink(t)}${t.notes ? `<span class="pf-name pf-note-cell" title="${escapeHtml(t.notes)}">${escapeHtml(t.notes)}</span>` : ''}</td>
                 <td><span class="pf-side pf-side--${t.side}">${t.side === 'buy' ? 'Buy' : 'Sell'}</span></td>
-                <td class="num">${shareFormat.format(t.shares)}</td>
-                <td class="num pf-hide-sm">${fmtMoney(t.price)}</td>
+                ${t.splitFactor !== 1
+                    ? `<td class="num" title="Adjusted for stock splits since the trade">${shareFormat.format(t.adjustedShares)}<span class="pf-sub">${shareFormat.format(t.shares)} as traded</span></td>
+                <td class="num pf-hide-sm">${fmtMoney(t.adjustedPrice)}<span class="pf-sub">${fmtMoney(t.price)} as traded</span></td>`
+                    : `<td class="num">${shareFormat.format(t.shares)}</td>
+                <td class="num pf-hide-sm">${fmtMoney(t.price)}</td>`}
                 <td class="num">${fmtMoney(t.amount)}${t.fees ? `<span class="pf-sub">${fmtMoney(t.fees)} fees</span>` : ''}</td>
                 <td class="num pf-hide-md">${realized}</td>
                 <td class="pf-hide-md pf-wrap">${escapeHtml(t.account || '—')}</td>

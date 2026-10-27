@@ -439,3 +439,94 @@ def test_a_sell_with_nothing_on_record_does_not_erase_later_gains():
     assert body["oversold"] == ["AAPL"]
     assert body["totals"]["realizedGain"] == pytest.approx(4 * 50.0)
     assert body["realizedByTicker"][0]["realizedGain"] == pytest.approx(200.0)
+
+
+# ── stock splits ────────────────────────────────────────────────────────────
+
+
+@pytest.fixture
+def _splits(monkeypatch):
+    """The provider answers with NVDA's two splits; nothing for anyone else."""
+    from app.database import PriceClose, SplitCheck, StockSplit
+
+    db = SessionLocal()
+    try:
+        for model in (SplitCheck, StockSplit, PriceClose):
+            db.query(model).delete()
+        db.commit()
+    finally:
+        db.close()
+    nvda = [(date(2021, 7, 20), 1.0, 4.0), (date(2024, 6, 10), 1.0, 10.0)]
+    monkeypatch.setattr(portfolio, "_fetch_splits", lambda ticker: nvda if ticker == "NVDA" else [])
+
+
+def test_trades_before_a_split_are_counted_in_todays_shares(_splits):
+    client = _member_client()
+    _buy(client, "NVDA", shares=10, price=200.0, day="2020-01-02")    # before both: x40
+    _buy(client, "NVDA", shares=5, price=400.0, day="2023-01-03")     # before the second: x10
+    body = _buy(client, "NVDA", shares=10, price=120.0, day="2024-06-10")  # on the split day: as is
+    (nvda,) = body["positions"]
+    assert nvda["shares"] == pytest.approx(10 * 40 + 5 * 10 + 10)
+    # Splits move shares, not money: the cost basis is what was paid.
+    assert nvda["costBasis"] == pytest.approx(2000 + 2000 + 1200)
+    assert body["splits"]["tradesAdjusted"] == 2
+    assert [a["ratio"] for a in body["splits"]["applied"]] == [10.0, 4.0]
+
+    rows = client.get("/api/stocks/portfolio/transactions").json()["rows"]
+    oldest = rows[-1]
+    assert (oldest["shares"], oldest["adjustedShares"], oldest["splitFactor"]) == (10, 400, 40)
+    assert oldest["adjustedPrice"] == pytest.approx(5.0)
+
+
+def test_a_sell_after_a_split_realizes_against_adjusted_cost(_splits):
+    client = _member_client()
+    _buy(client, "NVDA", shares=10, price=400.0, day="2023-01-03")       # 100 shares at $40
+    body = _buy(client, "NVDA", shares=50, price=100.0, day="2024-07-01", side="sell")
+    assert body["oversold"] == []
+    assert body["totals"]["realizedGain"] == pytest.approx(50 * (100 - 40))
+    assert body["positions"][0]["shares"] == pytest.approx(50)
+
+
+def test_a_trade_the_source_already_adjusted_is_left_alone(_splits, monkeypatch):
+    from app.database import PriceClose
+
+    db = SessionLocal()
+    try:
+        # The split-adjusted close on the trade's day: $5 (a $200 share / 40).
+        db.add(PriceClose(ticker="NVDA", day=date(2020, 1, 2), close=5.0))
+        db.commit()
+    finally:
+        db.close()
+    client = _member_client()
+    body = _buy(client, "NVDA", shares=400, price=5.1, day="2020-01-02")  # already in today's shares
+    assert body["positions"][0]["shares"] == pytest.approx(400)
+    assert body["splits"]["alreadyAdjusted"] == 1 and body["splits"]["tradesAdjusted"] == 0
+
+
+def test_a_holdings_snapshot_from_before_a_split_scales_up(_splits):
+    client = _member_client()
+    body = client.post("/api/stocks/portfolio/import", json={
+        "csv": "Symbol,Quantity,Cost Basis\nNVDA,10,4000\n", "kind": "holdings", "as_of": "2024-01-02",
+    }).json()["portfolio"]
+    assert body["positions"][0]["shares"] == pytest.approx(100)
+    assert body["positions"][0]["costBasis"] == pytest.approx(4000)
+
+
+def test_known_splits_stand_in_until_the_provider_answers(monkeypatch):
+    from app.database import SplitCheck, StockSplit
+
+    db = SessionLocal()
+    try:
+        for model in (SplitCheck, StockSplit):
+            db.query(model).delete()
+        db.commit()
+    finally:
+        db.close()
+
+    def unavailable(ticker):
+        raise RuntimeError("no provider")
+
+    monkeypatch.setattr(portfolio, "_fetch_splits", unavailable)
+    client = _member_client()
+    body = _buy(client, "AAPL", shares=1, price=400.0, day="2020-08-28")  # AAPL split 4-for-1 on 2020-08-31
+    assert body["positions"][0]["shares"] == pytest.approx(4)

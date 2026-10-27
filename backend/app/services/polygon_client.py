@@ -261,6 +261,22 @@ class PolygonClient:
             if r.get("c") is not None
         ]
 
+    def get_splits(self, ticker: str) -> List[tuple]:
+        """(execution date, split_from, split_to) for every split, in one call."""
+        response = requests.get(
+            f"{self.BASE_URL}/v3/reference/splits",
+            params={"ticker": ticker, "limit": 1000, "apiKey": self.api_key},
+            timeout=15,
+        )
+        if response.status_code == 429:
+            raise PolygonRateLimited(ticker)
+        response.raise_for_status()
+        return [
+            (datetime.strptime(r["execution_date"], "%Y-%m-%d").date(), float(r["split_from"]), float(r["split_to"]))
+            for r in response.json().get("results") or []
+            if r.get("execution_date") and r.get("split_from") and r.get("split_to")
+        ]
+
     def _get_previous_close(self, ticker: str) -> Dict:
         """Get previous day's close price"""
         url = f"{self.BASE_URL}/v2/aggs/ticker/{ticker}/prev"
