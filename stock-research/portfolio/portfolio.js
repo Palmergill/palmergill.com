@@ -64,11 +64,11 @@
         replaceField: $('replaceField'),
         replaceInput: $('replaceInput'),
         dashboard: $('dashboard'),
-        tiles: $('tiles'),
-        sampleNote: $('sampleNote'),
-        allocationSub: $('allocationSub'),
+        heroValue: $('heroValue'),
+        heroStats: $('heroStats'),
+        insightGrid: $('insightGrid'),
+        sectorCard: $('sectorCard'),
         allocationBar: $('allocationBar'),
-        allocationLegend: $('allocationLegend'),
         sectorBars: $('sectorBars'),
         insights: $('insights'),
         holdingsSub: $('holdingsSub'),
@@ -95,7 +95,7 @@
 
     function fmtMoney(value, whole = false) {
         if (value == null) return '—';
-        return (whole && Math.abs(value) >= 1000 ? moneyWhole : money).format(value);
+        return (whole ? moneyWhole : money).format(value);
     }
     function fmtSigned(value, whole = false) {
         if (value == null) return '—';
@@ -196,8 +196,7 @@
         if (empty) setUploadOpen(true);
         if (empty) return;
 
-        els.sampleNote.hidden = !data.sampleData;
-        renderTiles(data);
+        renderHero(data);
         renderAllocation(data);
         renderSectors(data);
         renderInsights(data);
@@ -208,25 +207,21 @@
         schedulePendingRetry(data);
     }
 
-    function tile(label, value, sub = '', valueClass = '') {
-        return `<div class="pf-tile">
-            <div class="pf-tile__label">${label}</div>
-            <div class="pf-tile__value ${valueClass}">${value}</div>
-            <div class="pf-tile__sub">${sub}</div>
-        </div>`;
-    }
-
-    function renderTiles(data) {
+    function renderHero(data) {
         const t = data.totals;
-        const priced = t.pricedPositions < t.positions
-            ? `${t.pricedPositions} of ${t.positions} priced`
-            : `${t.positions} position${t.positions === 1 ? '' : 's'}`;
-        els.tiles.innerHTML = [
-            tile('Total value', fmtMoney(t.marketValue, true), priced),
-            tile('Unrealized gain', fmtSigned(t.gain, true), t.gainPct == null ? 'Needs a cost basis' : `${fmtPct(t.gainPct, true)} on ${fmtMoney(t.costBasis, true)}`, tone(t.gain)),
-            tile('Realized gain', fmtSigned(t.realizedGain, true), t.realizedGain == null ? 'No sells on record' : 'From your sells', tone(t.realizedGain)),
-            tile('Largest position', data.positions[0]?.weight != null ? fmtPct(data.positions[0].weight) : '—', data.positions[0] ? escapeHtml(data.positions[0].ticker) : ''),
-        ].join('');
+        els.heroValue.textContent = fmtMoney(t.marketValue, true);
+        const stats = [];
+        if (t.gain != null) {
+            stats.push(`<span class="${tone(t.gain)}">${fmtSigned(t.gain, true)} (${fmtPct(t.gainPct, true)})</span> unrealized`);
+        }
+        if (t.realizedGain != null) {
+            stats.push(`<span class="${tone(t.realizedGain)}">${fmtSigned(t.realizedGain, true)}</span> realized`);
+        }
+        stats.push(t.pricedPositions < t.positions
+            ? `${t.pricedPositions} of ${t.positions} positions priced`
+            : `${t.positions} position${t.positions === 1 ? '' : 's'}`);
+        // Each stat stays on one line; the row wraps between them.
+        els.heroStats.innerHTML = stats.map((text) => `<span class="pf-stat">${text}</span>`).join(' <span class="pf-dot" aria-hidden="true">·</span> ');
     }
 
     function allocationSlices(positions) {
@@ -263,9 +258,7 @@
 
     function renderAllocation(data) {
         const slices = allocationSlices(data.positions);
-        els.allocationSub.textContent = slices.length
-            ? `${fmtMoney(data.totals.marketValue, true)} across ${data.totals.pricedPositions} priced position${data.totals.pricedPositions === 1 ? '' : 's'}`
-            : 'No prices yet.';
+        els.allocationBar.hidden = !slices.length;
         els.allocationBar.setAttribute('aria-label', slices.map((s) => `${s.label} ${fmtPct(s.weight)}`).join(', '));
         els.allocationBar.innerHTML = slices.map((s, i) => (
             `<div class="pf-stack__seg" data-i="${i}" style="flex:${s.weight} 1 0; background:${s.color}"></div>`
@@ -276,16 +269,17 @@
             seg.addEventListener('mousemove', (event) => showTip(event, text));
             seg.addEventListener('mouseleave', hideTip);
         });
-        els.allocationLegend.innerHTML = slices.map((s) => (
-            `<li><span class="pf-swatch" style="background:${s.color}"></span><strong>${escapeHtml(s.label)}</strong> ${fmtPct(s.weight)}</li>`
-        )).join('');
+    }
+
+    function knownSectors(data) {
+        return data.sectors.filter((s) => s.sector !== 'Other');
     }
 
     function renderSectors(data) {
-        if (!data.sectors.length) {
-            els.sectorBars.innerHTML = '<li class="pf-muted">No prices yet.</li>';
-            return;
-        }
+        const known = knownSectors(data).length > 0;
+        els.sectorCard.hidden = !known;
+        els.insightGrid.classList.toggle('pf-grid--single', !known);
+        if (!known) return;
         const max = Math.max(...data.sectors.map((s) => s.weight || 0)) || 1;
         els.sectorBars.innerHTML = data.sectors.map((s) => `
             <li>
@@ -303,11 +297,11 @@
             items.push(`<strong>${escapeHtml(top.ticker)}</strong> is your largest position at <strong>${fmtPct(top.weight)}</strong> of the portfolio.`);
             if (priced.length > 5) items.push(`Your top five holdings make up <strong>${fmtPct(topFive)}</strong>.`);
         }
-        const sector = data.sectors[0];
-        if (sector && data.sectors.length > 1) {
-            items.push(`<strong>${escapeHtml(sector.sector)}</strong> is your heaviest sector, <strong>${fmtPct(sector.weight)}</strong> of the total.`);
-        } else if (sector) {
-            items.push(`Everything priced is in one sector: <strong>${escapeHtml(sector.sector)}</strong>.`);
+        const sectors = knownSectors(data);
+        if (sectors.length > 1) {
+            items.push(`<strong>${escapeHtml(sectors[0].sector)}</strong> is your heaviest sector, <strong>${fmtPct(sectors[0].weight)}</strong> of the total.`);
+        } else if (sectors.length === 1 && sectors[0].weight > 0.99) {
+            items.push(`Everything priced is in one sector: <strong>${escapeHtml(sectors[0].sector)}</strong>.`);
         }
         const withGain = data.positions.filter((p) => p.gainPct != null);
         if (withGain.length > 1) {
@@ -335,20 +329,34 @@
         els.holdingsSub.textContent = asOf
             ? `Holdings as of ${asOf}${data.transactions.some((t) => t.counted) ? ', plus later trades' : ''}.`
             : 'Built from your trades, at average cost.';
-        els.holdingsBody.innerHTML = data.positions.map((p) => `
+        // Each row's swatch is its segment in the allocation bar above.
+        let priced = 0;
+        els.holdingsBody.innerHTML = data.positions.map((p) => {
+            const color = p.marketValue > 0 ? (SERIES[priced++] || OTHER) : 'transparent';
+            return `
             <tr>
                 <td>
-                    <a class="pf-ticker" href="/stock-research/?ticker=${encodeURIComponent(p.ticker)}">${escapeHtml(p.ticker)}</a>
-                    ${p.name && p.name !== p.ticker ? `<span class="pf-name" title="${escapeHtml(p.name)}">${escapeHtml(p.name)}</span>` : ''}
+                    <span class="pf-ticker-cell">
+                        <span class="pf-swatch" style="background:${color}"></span>
+                        <span>
+                            <a class="pf-ticker" href="/stock-research/?ticker=${encodeURIComponent(p.ticker)}">${escapeHtml(p.ticker)}</a>
+                            ${p.name && p.name !== p.ticker ? `<span class="pf-name" title="${escapeHtml(p.name)}">${escapeHtml(p.name)}</span>` : ''}
+                        </span>
+                    </span>
                 </td>
-                <td class="num">${shareFormat.format(p.shares)}</td>
-                <td class="num">${priceCell(p)}</td>
-                <td class="num">${fmtMoney(p.marketValue)}</td>
-                <td class="num pf-weight-col">${p.weight == null ? '—' : `<span class="pf-weight"><span class="pf-weight__track"><span class="pf-weight__fill" style="display:block;width:${p.weight * 100}%"></span></span>${fmtPct(p.weight)}</span>`}</td>
-                <td class="num">${fmtMoney(p.costBasis)}${p.avgCost != null ? `<span class="pf-sub">${fmtMoney(p.avgCost)}/sh</span>` : ''}</td>
-                <td class="num ${tone(p.gain)}">${fmtSigned(p.gain)}${p.gainPct != null ? `<span class="pf-sub ${tone(p.gain)}">${fmtPct(p.gainPct, true)}</span>` : ''}</td>
-            </tr>`).join('') || '<tr><td colspan="7" class="pf-muted">No open positions.</td></tr>';
+                <td class="num pf-strong">${p.weight == null ? '—' : fmtPct(p.weight)}</td>
+                <td class="num pf-strong">${fmtMoney(p.marketValue, true)}</td>
+                <td class="num pf-hide-sm">${shareFormat.format(p.shares)}</td>
+                <td class="num pf-hide-sm">${priceCell(p)}</td>
+                <td class="num pf-hide-sm">${fmtMoney(p.costBasis, true)}${p.avgCost != null ? `<span class="pf-sub">${fmtMoney(p.avgCost)}/sh</span>` : ''}</td>
+                <td class="num ${tone(p.gain)}">${fmtSigned(p.gain, true)}${p.gainPct != null ? `<span class="pf-sub ${tone(p.gain)}">${fmtPct(p.gainPct, true)}</span>` : ''}</td>
+            </tr>`;
+        }).join('') || '<tr><td colspan="7" class="pf-muted">No open positions.</td></tr>';
     }
+
+    const TRADES_SHOWN = 6;
+    const tradeDate = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
+    let showAllTrades = false;
 
     function renderTransactions(data) {
         const count = data.transactions.length;
@@ -356,11 +364,15 @@
             ? `${count} trade${count === 1 ? '' : 's'}${data.transactionsIgnored ? ` · ${data.transactionsIgnored} already in your holdings` : ''}`
             : 'No trades yet. Upload a history or add one by hand.';
         document.getElementById('transactionsTable').hidden = !count;
-        els.transactionsBody.innerHTML = data.transactions.map((t) => `
+        const shown = showAllTrades ? data.transactions : data.transactions.slice(0, TRADES_SHOWN);
+        const toggle = $('tradesToggle');
+        toggle.hidden = count <= TRADES_SHOWN;
+        toggle.textContent = showAllTrades ? 'Show fewer' : `Show all ${count} trades`;
+        els.transactionsBody.innerHTML = shown.map((t) => `
             <tr class="${t.counted ? '' : 'pf-tx-ignored'}">
-                <td>${t.tradeDate}${t.counted ? '' : '<span class="pf-tag" title="On or before your holdings date, so it is already in them">in holdings</span>'}</td>
+                <td>${tradeDate.format(new Date(`${t.tradeDate}T00:00:00Z`))}${t.counted ? '' : '<span class="pf-tag" title="On or before your holdings date, so it is already in them">in holdings</span>'}</td>
                 <td><strong>${escapeHtml(t.ticker)}</strong></td>
-                <td>${t.side === 'buy' ? 'Buy' : 'Sell'}</td>
+                <td><span class="pf-side pf-side--${t.side}">${t.side === 'buy' ? 'Buy' : 'Sell'}</span></td>
                 <td class="num">${shareFormat.format(t.shares)}</td>
                 <td class="num">${fmtMoney(t.price)}</td>
                 <td class="num"><button type="button" class="pf-remove" data-id="${t.id}" aria-label="Remove ${t.side} of ${escapeHtml(t.ticker)} on ${t.tradeDate}">×</button></td>
@@ -474,7 +486,7 @@
         // the dollar change alone.
         const tradedInRange = lastData?.transactions.some((t) => t.tradeDate > points[0].date);
         const pct = tradedInRange || !first ? '' : ` (${fmtPct(change / first, true)})`;
-        sub.innerHTML = `${fmtMoney(last, true)} · <span class="pf-history-change ${tone(change)}">${fmtSigned(change, true)}${pct}</span> since ${longDate.format(new Date(`${points[0].date}T00:00:00Z`))}`;
+        sub.innerHTML = `<span class="pf-history-change ${tone(change)}">${fmtSigned(change, true)}${pct}</span> since ${longDate.format(new Date(`${points[0].date}T00:00:00Z`))}`;
 
         const notes = [];
         const asOf = history.data.asOf;
@@ -710,6 +722,10 @@
 
     els.uploadToggle.addEventListener('click', () => setUploadOpen(els.uploadPanel.hidden));
     els.refreshButton.addEventListener('click', () => { pendingRetries = 0; load(); });
+    $('tradesToggle').addEventListener('click', () => {
+        showAllTrades = !showAllTrades;
+        if (lastData) renderTransactions(lastData);
+    });
     els.addToggle.addEventListener('click', () => {
         const open = els.addForm.hidden;
         els.addForm.hidden = !open;

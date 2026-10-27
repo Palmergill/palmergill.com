@@ -22,7 +22,7 @@ test('a member uploads holdings, sees the breakdown, and nobody else does', asyn
     await expect(page.getByText('Imported 2 holdings. Skipped 1 row: cash or money market.')).toBeVisible();
     await expect(page.locator('#holdingsTable').getByRole('link', { name: 'AAPL' })).toBeVisible();
     // The suite has no market data provider, so assert on what was uploaded.
-    await expect(page.locator('#holdingsTable')).toContainText('$1,500.00');
+    await expect(page.locator('#holdingsTable')).toContainText('$1,500');
     await expect(page.locator('#holdingsTable')).toContainText('$330.00/sh');
 
     // A second account sees its own empty portfolio, not this one.

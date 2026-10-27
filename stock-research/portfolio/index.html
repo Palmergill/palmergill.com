@@ -13,7 +13,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/shared/site-nav.css?v=19">
-    <link rel="stylesheet" href="portfolio.css?v=3">
+    <link rel="stylesheet" href="portfolio.css?v=6">
 </head>
 <body>
 <noscript>
@@ -87,60 +87,37 @@
         </section>
 
         <section id="dashboard" hidden>
-            <div class="pf-tiles" id="tiles"></div>
-            <p class="pf-note" id="sampleNote" hidden>Prices here are generated sample values, not live quotes.</p>
-
-            <section class="pf-card" id="historyCard">
-                <div class="pf-card__head pf-card__head--row">
+            <!-- The headline: one number, what it's done, and the line that got it there. -->
+            <section class="pf-card pf-hero" id="historyCard">
+                <div class="pf-hero__top">
                     <div>
-                        <h2 class="pf-card__title">Value over time</h2>
-                        <p class="pf-card__sub" id="historySub">Loading price history…</p>
+                        <p class="pf-hero__label">Total value</p>
+                        <p class="pf-hero__value" id="heroValue">—</p>
+                        <p class="pf-hero__stats" id="heroStats"></p>
                     </div>
                     <div class="pf-ranges" id="historyRanges" role="group" aria-label="Time range"></div>
                 </div>
+                <p class="pf-hero__change" id="historySub">Loading price history…</p>
                 <div class="pf-chart" id="historyChart"></div>
                 <p class="pf-note" id="historyNote" hidden></p>
             </section>
 
             <section class="pf-card">
                 <div class="pf-card__head">
-                    <h2 class="pf-card__title">Allocation</h2>
-                    <p class="pf-card__sub" id="allocationSub"></p>
-                </div>
-                <div class="pf-stack" id="allocationBar" role="img"></div>
-                <ul class="pf-legend" id="allocationLegend"></ul>
-            </section>
-
-            <div class="pf-grid">
-                <section class="pf-card">
-                    <div class="pf-card__head">
-                        <h2 class="pf-card__title">By sector</h2>
-                    </div>
-                    <ul class="pf-bars" id="sectorBars"></ul>
-                </section>
-                <section class="pf-card">
-                    <div class="pf-card__head">
-                        <h2 class="pf-card__title">At a glance</h2>
-                    </div>
-                    <ul class="pf-insights" id="insights"></ul>
-                </section>
-            </div>
-
-            <section class="pf-card">
-                <div class="pf-card__head">
                     <h2 class="pf-card__title">Holdings</h2>
                     <p class="pf-card__sub" id="holdingsSub"></p>
                 </div>
+                <div class="pf-stack" id="allocationBar" role="img"></div>
                 <div class="pf-table-wrap">
                     <table class="pf-table" id="holdingsTable">
                         <thead>
                             <tr>
                                 <th scope="col">Ticker</th>
-                                <th scope="col" class="num">Shares</th>
-                                <th scope="col" class="num">Price</th>
+                                <th scope="col" class="num">Weight</th>
                                 <th scope="col" class="num">Value</th>
-                                <th scope="col" class="num pf-weight-col">Weight</th>
-                                <th scope="col" class="num">Cost</th>
+                                <th scope="col" class="num pf-hide-sm">Shares</th>
+                                <th scope="col" class="num pf-hide-sm">Price</th>
+                                <th scope="col" class="num pf-hide-sm">Cost</th>
                                 <th scope="col" class="num">Gain</th>
                             </tr>
                         </thead>
@@ -148,6 +125,21 @@
                     </table>
                 </div>
             </section>
+
+            <div class="pf-grid" id="insightGrid">
+                <section class="pf-card">
+                    <div class="pf-card__head">
+                        <h2 class="pf-card__title">At a glance</h2>
+                    </div>
+                    <ul class="pf-insights" id="insights"></ul>
+                </section>
+                <section class="pf-card" id="sectorCard">
+                    <div class="pf-card__head">
+                        <h2 class="pf-card__title">By sector</h2>
+                    </div>
+                    <ul class="pf-bars" id="sectorBars"></ul>
+                </section>
+            </div>
 
             <section class="pf-card">
                 <div class="pf-card__head pf-card__head--row">
@@ -182,6 +174,7 @@
                         <tbody></tbody>
                     </table>
                 </div>
+                <button type="button" class="pf-more" id="tradesToggle" hidden></button>
             </section>
 
             <div class="pf-row pf-danger">
@@ -194,6 +187,6 @@
     <script src="/shared/api-base.js?v=1"></script>
     <script src="/shared/site-nav.js?v=22"></script>
     <script src="/shared/analytics.js?v=1"></script>
-    <script src="portfolio.js?v=5"></script>
+    <script src="portfolio.js?v=8"></script>
 </body>
 </html>
