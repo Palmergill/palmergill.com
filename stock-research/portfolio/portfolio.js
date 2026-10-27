@@ -387,6 +387,10 @@
             const worst = withGain.reduce((a, b) => (b.gainPct < a.gainPct ? b : a));
             items.push(`Best performer: <strong>${escapeHtml(best.ticker)}</strong> <span class="${tone(best.gain)}">${fmtPct(best.gainPct, true)}</span>. Weakest: <strong>${escapeHtml(worst.ticker)}</strong> <span class="${tone(worst.gain)}">${fmtPct(worst.gainPct, true)}</span>.`);
         }
+        if (data.duplicates.count) {
+            const pairs = data.duplicates.pairs.map((p) => `${countFormat.format(p.count)} from ${escapeHtml(p.duplicateSource)} repeating ${escapeHtml(p.keptSource)}`).join(', ');
+            items.push(`<strong>${plural(data.duplicates.count, 'trade')}</strong> appear twice across your sources (${pairs}), so each is counted once. <a href="#activity">They're tagged in Activity.</a>`);
+        }
         if (data.splits.tradesAdjusted) {
             const tickers = [...new Set(data.splits.applied.map((a) => a.ticker))];
             items.push(`Adjusted ${plural(data.splits.tradesAdjusted, 'trade')} for ${plural(data.splits.applied.length, 'stock split')} (${tickers.slice(0, 4).map(escapeHtml).join(', ')}${tickers.length > 4 ? '…' : ''}). <a href="#holdings">See splits</a>`);
@@ -695,8 +699,9 @@
         if (!data) return;
         trades.total = data.total;
         const filtered = filterParams().toString().replace(/(^|&)(offset|limit)=[^&]*/g, '') !== '';
+        const dupes = lastData?.duplicates.count || 0;
         els.transactionsSub.textContent = lastData?.transactionCount
-            ? `${filtered ? `${plural(data.total, 'trade')} match, of ` : ''}${plural(lastData.transactionCount, 'trade')}${lastData.transactionsIgnored ? ` · ${countFormat.format(lastData.transactionsIgnored)} already in your holdings` : ''}`
+            ? `${filtered ? `${plural(data.total, 'row')} match · ` : ''}${plural(lastData.transactionCount, 'trade')} counted${dupes ? ` · ${countFormat.format(dupes)} duplicate${dupes === 1 ? '' : 's'} across sources not counted` : ''}${lastData.transactionsIgnored ? ` · ${countFormat.format(lastData.transactionsIgnored)} already in your holdings` : ''}`
             : 'No trades yet. Upload a history or add one by hand.';
         els.transactionsBody.innerHTML = data.rows.map((t) => {
             const realized = t.side === 'sell' && (t.realized != null || t.realizedReported != null)
@@ -704,7 +709,9 @@
                 : '';
             return `
             <tr class="${t.counted ? '' : 'pf-tx-ignored'}">
-                <td>${fmtDay(t.tradeDate)}${t.counted ? '' : '<span class="pf-tag" title="On or before your holdings date, so it is already in them">in holdings</span>'}</td>
+                <td>${fmtDay(t.tradeDate)}${t.duplicateOf
+                    ? `<span class="pf-tag" title="The same trade as the ${escapeHtml(t.duplicateOf.source || 'other')} row on ${fmtDay(t.duplicateOf.date)}, so it's counted once">duplicate</span>`
+                    : t.counted ? '' : '<span class="pf-tag" title="On or before your holdings date, so it is already in them">in holdings</span>'}</td>
                 <td>${securityLink(t)}${t.notes ? `<span class="pf-name pf-note-cell" title="${escapeHtml(t.notes)}">${escapeHtml(t.notes)}</span>` : ''}</td>
                 <td><span class="pf-side pf-side--${t.side}">${t.side === 'buy' ? 'Buy' : 'Sell'}</span></td>
                 ${t.splitFactor !== 1

@@ -42,6 +42,9 @@ MAX_CSV_CHARS = 5_000_000
 MAX_ROWS = 20_000
 MAX_TRANSACTIONS = 20_000
 EPSILON = 1e-9
+# Fewer shares than this left after a sell is rounding between sources, not
+# a position: a full sale recorded as 12.04173 against 12.04174 bought.
+DUST_SHARES = 1e-4
 
 TICKER_PATTERN = re.compile(r"^[A-Z][A-Z0-9]{0,5}([.\-/][A-Z0-9]{1,3})?$")
 NOT_FOUND = "No such transaction."
@@ -467,7 +470,7 @@ def build_positions(
         # else: nothing on record to sell (it's in `oversold`); later sells of
         # shares that were bought still count.
         position["shares"] -= sold
-        if position["shares"] < EPSILON:
+        if position["shares"] < DUST_SHARES:
             position["shares"] = 0.0
             if position["cost"] is not None:
                 position["cost"] = 0.0
@@ -860,9 +863,61 @@ def _already_adjusted(price: float, factor: float, close: Optional[float]) -> bo
     return abs(math.log(ratio)) < abs(math.log(ratio / factor))
 
 
+# ── duplicates across sources ───────────────────────────────────────────────
+#
+# A history merged from several feeds often has one trade twice: once from a
+# brokerage feed and once from an older export of the same account. The two
+# copies rarely match exactly (a price a cent apart, a settlement date a day
+# or three after the trade date), so an exact-match dedupe lets them through
+# and the shares count double. When reading, two rows from different
+# sources or accounts with the same security, side and quantity, prices
+# within a cent or two and dates a few days apart are treated as one trade:
+# the earlier is counted and the other is marked as its duplicate. Rows from
+# the same source and account are never paired, since a repeated buy there is
+# real. Nothing stored is changed.
+
+DUPLICATE_DAYS = 4
+
+
+def _same_amount(a: float, b: float) -> bool:
+    return abs(a - b) <= max(1e-6, 1e-6 * max(abs(a), abs(b)))
+
+
+def _same_price(a: float, b: float) -> bool:
+    return abs(a - b) <= max(0.02, 0.002 * max(a, b))
+
+
+def find_duplicates(transactions: List[Any]) -> Dict[int, Any]:
+    """Map each duplicate trade's id to the trade it duplicates."""
+    groups: Dict[Tuple[str, str], List[Any]] = {}
+    for tx in transactions:
+        groups.setdefault((tx.ticker, tx.side), []).append(tx)
+    duplicates: Dict[int, Any] = {}
+    paired = set()
+    for group in groups.values():
+        group.sort(key=lambda t: (t.trade_date, t.id))
+        for i, first in enumerate(group):
+            if first.id in paired:
+                continue
+            origin = (first.source or "", first.account or "")
+            for second in group[i + 1:]:
+                if (second.trade_date - first.trade_date).days > DUPLICATE_DAYS:
+                    break
+                if second.id in paired or (second.source or "", second.account or "") == origin:
+                    continue
+                if _same_amount(first.shares, second.shares) and _same_price(first.price, second.price):
+                    paired.update({first.id, second.id})
+                    duplicates[second.id] = first
+                    break
+    return duplicates
+
+
 def load_adjusted(db: Session, username: str, budget: Optional[_Budget] = None) -> Tuple[list, list, Dict[str, Any]]:
-    """Holdings and trades in today's shares, plus what was adjusted."""
-    holdings, transactions = _load(db, username)
+    """Holdings and trades in today's shares, without cross-source duplicates,
+    plus what was adjusted and what was left out."""
+    holdings, stored = _load(db, username)
+    duplicates = find_duplicates(stored)
+    transactions = [t for t in stored if t.id not in duplicates]
     stocks = sorted({t.ticker for t in transactions if (t.asset or "stock") == "stock"} | {h.ticker for h in holdings})
     if budget is not None and stocks:
         ensure_splits(db, stocks, budget)
@@ -922,10 +977,23 @@ def load_adjusted(db: Session, username: str, budget: Optional[_Budget] = None) 
             ticker=h.ticker, shares=h.shares * factor, cost_basis=h.cost_basis, as_of=h.as_of,
         ))
 
+    pair_counts: Dict[Tuple[str, str], int] = {}
+    for dup_id, kept in duplicates.items():
+        dup = next(t for t in stored if t.id == dup_id)
+        key = (_label(dup.source, "No source"), _label(kept.source, "No source"))
+        pair_counts[key] = pair_counts.get(key, 0) + 1
     info = {
         "applied": sorted(applied.values(), key=lambda a: a["date"], reverse=True),
         "tradesAdjusted": sum(1 for t in adjusted_trades if t.split_factor != 1.0),
         "alreadyAdjusted": already,
+        "duplicates": {
+            dup_id: {"id": kept.id, "source": kept.source, "account": kept.account, "date": kept.trade_date.isoformat()}
+            for dup_id, kept in duplicates.items()
+        },
+        "duplicatePairs": [
+            {"duplicateSource": a, "keptSource": b, "count": n}
+            for (a, b), n in sorted(pair_counts.items(), key=lambda kv: -kv[1])
+        ],
     }
     return adjusted_holdings, adjusted_trades, info
 
@@ -1091,7 +1159,8 @@ def breakdown(db: Session, username: str) -> Dict[str, Any]:
             # The page's own figure for the same sells, to set beside it.
             "computed": sum(meta["realized_by_tx"].get(t.id, 0.0) for t in reported) if reported else None,
         },
-        "splits": split_info,
+        "splits": {k: v for k, v in split_info.items() if k not in ("duplicates", "duplicatePairs")},
+        "duplicates": {"count": len(split_info["duplicates"]), "pairs": split_info["duplicatePairs"]},
         "facets": {
             "accounts": sorted({_label(t.account, "No account") for t in transactions}),
             "sources": sorted({_label(t.source, "No source") for t in transactions}),
@@ -1113,10 +1182,11 @@ def list_transactions(
 ) -> Dict[str, Any]:
     """One page of trades, newest first, filtered. Each row carries the
     page's realized gain for a sell beside the one the source reported."""
-    holdings, transactions, _ = load_adjusted(db, username)
+    holdings, transactions, info = load_adjusted(db, username)
     _, meta = build_positions(holdings, transactions)
     as_of = meta["as_of"]
     adjusted = {t.id: t for t in transactions}
+    duplicates = info["duplicates"]
 
     query = db.query(PortfolioTransaction).filter(PortfolioTransaction.username == username)
     if q:
@@ -1149,7 +1219,9 @@ def list_transactions(
                 "tradeDate": tx.trade_date.isoformat(), "account": tx.account, "source": tx.source,
                 "notes": tx.notes, "realizedReported": tx.realized_reported,
                 "realized": meta["realized_by_tx"].get(tx.id),
-                "counted": not (as_of and tx.trade_date <= as_of),
+                "counted": tx.id not in duplicates and not (as_of and tx.trade_date <= as_of),
+                # The trade this one repeats from another source, if it does.
+                "duplicateOf": duplicates.get(tx.id),
                 # In today's shares, when a later split changed them.
                 "splitFactor": adjusted[tx.id].split_factor if tx.id in adjusted else 1.0,
                 "adjustedShares": adjusted[tx.id].shares if tx.id in adjusted else tx.shares,
@@ -1279,7 +1351,7 @@ def value_history(db: Session, username: str) -> Dict[str, Any]:
             value = estimated = 0.0
             invested: Optional[float] = 0.0
             for ticker, count in shares.items():
-                if count <= EPSILON:
+                if count < DUST_SHARES:
                     continue
                 symbol = market_symbol(ticker, assets.get(ticker, "stock"))
                 close = current.get(symbol) if symbol else None

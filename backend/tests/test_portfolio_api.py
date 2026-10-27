@@ -530,3 +530,37 @@ def test_known_splits_stand_in_until_the_provider_answers(monkeypatch):
     client = _member_client()
     body = _buy(client, "AAPL", shares=1, price=400.0, day="2020-08-28")  # AAPL split 4-for-1 on 2020-08-31
     assert body["positions"][0]["shares"] == pytest.approx(4)
+
+
+# ── duplicates across sources ───────────────────────────────────────────────
+
+TWO_FEEDS = """date,source,account,type,security,quantity,price,amount_usd,fees_usd,realized_gain_loss,notes
+2023-02-21,M1 Finance,M1 Finance My Portfolio,buy,TGT,0.00906,169.88,1.54,0,,PURCHASED
+2023-02-21,Uploaded CSV,Imported Account,buy,TGT,0.00906,169.89,1.54,0,,0.00906 shares of TGT purchased.
+2023-03-01,Uploaded CSV,Imported Account,buy,TGT,1.2,166.55,199.86,0,,1.2 shares of TGT purchased.
+2025-05-02,Uploaded CSV,Imported Account,sell,TGT,1.20905,98.14,118.66,0,,1.20905 shares of TGT sold.
+2025-08-12,Uploaded CSV,Robinhood,buy,NVDA,5,182.08,910.40,0,,
+2025-08-13,Robinhood,Robinhood individual,buy,NVDA,5,182.08,910.40,0,,buy 5 shares of NVIDIA
+2025-09-02,Robinhood,Robinhood individual,buy,NVDA,1,170.00,170.00,0,,buy 1 share
+2025-09-03,Robinhood,Robinhood individual,buy,NVDA,1,170.00,170.00,0,,buy 1 share
+"""
+
+
+def test_one_trade_from_two_feeds_is_counted_once():
+    client = _member_client()
+    body = client.post("/api/stocks/portfolio/import", json={"csv": TWO_FEEDS}).json()["portfolio"]
+    held = {p["ticker"]: p["shares"] for p in body["positions"]}
+    # NVDA: the export's 5 and the feed's 5 a day later are one buy; the two
+    # 1-share buys are both real (same source, so never paired).
+    assert held["NVDA"] == pytest.approx(7)
+    # TGT: a cent apart is still the same buy, and with it counted once the
+    # sell closes the position, rounding sliver and all.
+    assert "TGT" not in held
+    assert [c["ticker"] for c in body["closedPositions"]] == ["TGT"]
+    assert body["duplicates"]["count"] == 2
+    assert body["transactionCount"] == 6
+
+    rows = client.get("/api/stocks/portfolio/transactions", params={"limit": 20}).json()["rows"]
+    tagged = [r for r in rows if r["duplicateOf"]]
+    assert {(r["ticker"], r["source"]) for r in tagged} == {("TGT", "Uploaded CSV"), ("NVDA", "Robinhood")}
+    assert all(not r["counted"] for r in tagged)
