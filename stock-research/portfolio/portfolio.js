@@ -1,6 +1,11 @@
 // My Portfolio: a member's own holdings and trades, broken down.
 // Every byte comes from /api/stocks/portfolio, which answers anonymous
 // callers with a JSON 403; the page turns that into its sign-in panel.
+//
+// Five tabs (#overview, #holdings, #activity, #accounts, #gains) share one
+// breakdown from the server. The trade list is the exception: a history can
+// run to thousands of trades, so the Activity tab asks for one filtered page
+// at a time.
 (function () {
     const API_BASE = window.API_ORIGIN || '';
     const SERIES = ['var(--series-1)', 'var(--series-2)', 'var(--series-3)', 'var(--series-4)', 'var(--series-5)'];
@@ -9,9 +14,14 @@
     // pauses when the provider's per-minute allowance runs out. Its
     // `retryAfter` says when to ask again.
     const MAX_PENDING_RETRIES = 30;
+    const TOP_HOLDINGS = 8;
+    const TRADES_PER_PAGE = 50;
+    const REALIZED_SHOWN = 12;
+    const TABS = ['overview', 'holdings', 'activity', 'accounts', 'gains'];
 
     // A year of trades, dated relative to today, so the sample has a value
     // line that starts small and builds up rather than one flat snapshot.
+    // Tagged "Sample" so a real upload replaces them.
     // [days ago, action, ticker, shares, price]
     const SAMPLE_TRADES = [
         [360, 'Buy', 'AAPL', 20, 228],
@@ -35,10 +45,9 @@
             day.setDate(day.getDate() - daysAgo);
             // Markets are shut at weekends; move back to the Friday.
             while (day.getDay() === 0 || day.getDay() === 6) day.setDate(day.getDate() - 1);
-            const date = `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, '0')}-${String(day.getDate()).padStart(2, '0')}`;
-            return `${date},${action},${ticker},${shares},${price}`;
+            return `${isoDay(day)},${action},${ticker},${shares},${price},Sample`;
         });
-        return ['Date,Action,Symbol,Quantity,Price', ...rows].join('\n');
+        return ['Date,Action,Symbol,Quantity,Price,Source', ...rows].join('\n');
     }
 
     const $ = (id) => document.getElementById(id);
@@ -63,7 +72,9 @@
         asOfInput: $('asOfInput'),
         replaceField: $('replaceField'),
         replaceInput: $('replaceInput'),
+        replaceLabel: $('replaceLabel'),
         dashboard: $('dashboard'),
+        tabs: $('tabs'),
         heroValue: $('heroValue'),
         heroStats: $('heroStats'),
         insightGrid: $('insightGrid'),
@@ -71,10 +82,20 @@
         allocationBar: $('allocationBar'),
         sectorBars: $('sectorBars'),
         insights: $('insights'),
+        topHoldingsSub: $('topHoldingsSub'),
+        topHoldingsBody: document.querySelector('#topHoldingsTable tbody'),
+        allHoldingsLink: $('allHoldingsLink'),
         holdingsSub: $('holdingsSub'),
         holdingsBody: document.querySelector('#holdingsTable tbody'),
+        closedCard: $('closedCard'),
+        closedSub: $('closedSub'),
+        closedBody: document.querySelector('#closedTable tbody'),
         transactionsSub: $('transactionsSub'),
         transactionsBody: document.querySelector('#transactionsTable tbody'),
+        filters: $('filters'),
+        pagerText: $('pagerText'),
+        pagePrev: $('pagePrev'),
+        pageNext: $('pageNext'),
         addToggle: $('addToggle'),
         addForm: $('addForm'),
         clearHoldingsButton: $('clearHoldingsButton'),
@@ -84,6 +105,7 @@
     let fileText = null;
     let pendingRetries = 0;
     let pendingTimer = null;
+    let lastData = null;
 
     class ForbiddenError extends Error {}
 
@@ -91,7 +113,10 @@
 
     const money = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
     const moneyWhole = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
-    const shareFormat = new Intl.NumberFormat('en-US', { maximumFractionDigits: 4 });
+    const shareFormat = new Intl.NumberFormat('en-US', { maximumFractionDigits: 6 });
+    const countFormat = new Intl.NumberFormat('en-US');
+    const longDate = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
+    const monthYearLong = new Intl.DateTimeFormat('en-US', { month: 'short', year: 'numeric', timeZone: 'UTC' });
 
     function fmtMoney(value, whole = false) {
         if (value == null) return '—';
@@ -110,6 +135,15 @@
         if (!signed) return text;
         return pct > 0 ? `+${text}` : pct < 0 ? `−${text}` : text;
     }
+    function fmtDay(iso) {
+        return iso ? longDate.format(new Date(`${iso}T00:00:00Z`)) : '—';
+    }
+    function fmtMonth(iso) {
+        return iso ? monthYearLong.format(new Date(`${iso}T00:00:00Z`)) : '—';
+    }
+    function plural(n, word) {
+        return `${countFormat.format(n)} ${word}${n === 1 ? '' : 's'}`;
+    }
     function tone(value) {
         if (value == null || Math.abs(value) < 0.005) return '';
         return value > 0 ? 'is-gain' : 'is-loss';
@@ -117,9 +151,20 @@
     function escapeHtml(text) {
         return String(text ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
     }
-    function today() {
-        const d = new Date();
+    function isoDay(d) {
         return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    }
+    function today() {
+        return isoDay(new Date());
+    }
+    const ASSET_TAGS = { crypto: 'Crypto', other: 'No ticker' };
+    function securityLink(row) {
+        // Only a stock has a research page to go to.
+        const label = escapeHtml(row.ticker);
+        const tag = ASSET_TAGS[row.asset] ? `<span class="pf-tag">${ASSET_TAGS[row.asset]}</span>` : '';
+        return row.asset === 'stock'
+            ? `<a class="pf-ticker" href="/stock-research/?ticker=${encodeURIComponent(row.ticker)}">${label}</a>${tag}`
+            : `<span class="pf-ticker">${label}</span>${tag}`;
     }
 
     // ── API ────────────────────────────────────────────────────────────────
@@ -166,6 +211,28 @@
         }
     }
 
+    // ── tabs ───────────────────────────────────────────────────────────────
+
+    function currentTab() {
+        const hash = window.location.hash.replace('#', '');
+        return TABS.includes(hash) ? hash : 'overview';
+    }
+
+    function showTab() {
+        const tab = currentTab();
+        els.tabs.querySelectorAll('a[data-tab]').forEach((link) => {
+            if (link.dataset.tab === tab) link.setAttribute('aria-current', 'page');
+            else link.removeAttribute('aria-current');
+        });
+        document.querySelectorAll('.pf-panel').forEach((panel) => {
+            panel.hidden = panel.dataset.panel !== tab;
+        });
+        // The chart measures its box, so draw it once its tab is showing.
+        if (tab === 'overview' && history.data) renderHistory();
+        if (tab === 'activity' && lastData) loadTrades();
+    }
+    window.addEventListener('hashchange', showTab);
+
     // ── views ──────────────────────────────────────────────────────────────
 
     function showSignedOut() {
@@ -181,29 +248,35 @@
         els.uploadToggle.setAttribute('aria-expanded', String(open));
     }
 
-    let lastData = null;
-
     function render(data) {
         lastData = data;
         els.loadingView.hidden = true;
         els.signedOutView.hidden = true;
-        const empty = data.positions.length === 0 && data.transactions.length === 0;
+        const empty = data.positions.length === 0 && data.transactionCount === 0;
         els.dashboard.hidden = empty;
         els.headActions.hidden = empty;
         els.uploadTitle.textContent = empty ? 'Add your portfolio' : 'Upload more';
         // The sample adds trades to whatever is there, so offer it only to an empty portfolio.
         els.sampleButton.hidden = !empty;
+        els.replaceLabel.textContent = data.transactionCount
+            ? `Replace my ${plural(data.transactionCount, 'saved trade')} with this file`
+            : 'Replace my saved trades with this file';
         if (empty) setUploadOpen(true);
         if (empty) return;
 
         renderHero(data);
         renderAllocation(data);
+        renderTopHoldings(data);
         renderSectors(data);
         renderInsights(data);
         renderHoldings(data);
-        renderTransactions(data);
+        renderClosed(data);
+        renderFilters(data);
+        renderAccounts(data);
+        renderGains(data);
         maybeLoadHistory(data);
         els.clearHoldingsButton.hidden = !data.holdings.count;
+        showTab();
         schedulePendingRetry(data);
     }
 
@@ -218,8 +291,8 @@
             stats.push(`<span class="${tone(t.realizedGain)}">${fmtSigned(t.realizedGain, true)}</span> realized`);
         }
         stats.push(t.pricedPositions < t.positions
-            ? `${t.pricedPositions} of ${t.positions} positions priced`
-            : `${t.positions} position${t.positions === 1 ? '' : 's'}`);
+            ? `${t.pricedPositions} of ${plural(t.positions, 'position')} priced`
+            : plural(t.positions, 'position'));
         // Each stat stays on one line; the row wraps between them.
         els.heroStats.innerHTML = stats.map((text) => `<span class="pf-stat">${text}</span>`).join(' <span class="pf-dot" aria-hidden="true">·</span> ');
     }
@@ -251,7 +324,7 @@
         tip.textContent = text;
         tip.hidden = false;
         const x = Math.min(event.clientX + 12, window.innerWidth - tip.offsetWidth - 8);
-        tip.style.left = `${x}px`;
+        tip.style.left = `${Math.max(8, x)}px`;
         tip.style.top = `${event.clientY - 36}px`;
     }
     function hideTip() { if (tip) tip.hidden = true; }
@@ -290,18 +363,22 @@
 
     function renderInsights(data) {
         const items = [];
+        const t = data.totals;
         const priced = data.positions.filter((p) => p.weight != null);
+        if (data.firstTrade) {
+            items.push(`<strong>${plural(data.transactionCount, 'trade')}</strong> since ${fmtMonth(data.firstTrade)}, across <strong>${plural(data.accounts.length, 'account')}</strong>.`);
+        }
         if (priced.length) {
             const top = priced[0];
-            const topFive = priced.slice(0, 5).reduce((sum, p) => sum + p.weight, 0);
             items.push(`<strong>${escapeHtml(top.ticker)}</strong> is your largest position at <strong>${fmtPct(top.weight)}</strong> of the portfolio.`);
-            if (priced.length > 5) items.push(`Your top five holdings make up <strong>${fmtPct(topFive)}</strong>.`);
+            if (priced.length > 5) {
+                const topFive = priced.slice(0, 5).reduce((sum, p) => sum + p.weight, 0);
+                items.push(`Your top five holdings make up <strong>${fmtPct(topFive)}</strong>.`);
+            }
         }
         const sectors = knownSectors(data);
         if (sectors.length > 1) {
             items.push(`<strong>${escapeHtml(sectors[0].sector)}</strong> is your heaviest sector, <strong>${fmtPct(sectors[0].weight)}</strong> of the total.`);
-        } else if (sectors.length === 1 && sectors[0].weight > 0.99) {
-            items.push(`Everything priced is in one sector: <strong>${escapeHtml(sectors[0].sector)}</strong>.`);
         }
         const withGain = data.positions.filter((p) => p.gainPct != null);
         if (withGain.length > 1) {
@@ -309,9 +386,14 @@
             const worst = withGain.reduce((a, b) => (b.gainPct < a.gainPct ? b : a));
             items.push(`Best performer: <strong>${escapeHtml(best.ticker)}</strong> <span class="${tone(best.gain)}">${fmtPct(best.gainPct, true)}</span>. Weakest: <strong>${escapeHtml(worst.ticker)}</strong> <span class="${tone(worst.gain)}">${fmtPct(worst.gainPct, true)}</span>.`);
         }
+        if (t.estimatedPositions) {
+            items.push(`${plural(t.estimatedPositions, 'position')} ${t.estimatedPositions === 1 ? 'has' : 'have'} no market price, so ${t.estimatedPositions === 1 ? "it's" : "they're"} valued at your last trade.`);
+        }
         const noBasis = data.positions.filter((p) => p.costBasis == null).length;
-        if (noBasis) items.push(`${noBasis} position${noBasis === 1 ? ' has' : 's have'} no cost basis, so ${noBasis === 1 ? 'its' : 'their'} gain isn't counted.`);
-        if (data.oversold.length) items.push(`Sells of <strong>${data.oversold.map(escapeHtml).join(', ')}</strong> exceed the shares on record; the extra was ignored.`);
+        if (noBasis) items.push(`${plural(noBasis, 'position')} ${noBasis === 1 ? 'has' : 'have'} no cost basis, so ${noBasis === 1 ? 'its' : 'their'} gain isn't counted.`);
+        if (data.oversold.length) {
+            items.push(`Sells of <strong>${data.oversold.map(escapeHtml).join(', ')}</strong> exceed the shares on record before them; the extra was ignored. A missing buy, or one filed under a different date, usually explains it.`);
+        }
         els.insights.innerHTML = items.length ? items.map((text) => `<li>${text}</li>`).join('') : '<li class="pf-muted">Nothing to note yet.</li>';
     }
 
@@ -320,64 +402,315 @@
             const label = p.priceStatus === 'pending' ? 'Loading…' : 'Unavailable';
             return `<span class="pf-muted">${label}</span>`;
         }
-        const stale = p.priceStatus === 'stale' ? '<span class="pf-sub">older quote</span>' : '';
-        return `${fmtMoney(p.price)}${stale}`;
+        const note = p.priceStatus === 'stale' ? `<span class="pf-sub">close ${fmtDay(p.priceAsOf)}</span>`
+            : p.priceStatus === 'trade' ? '<span class="pf-sub">last trade</span>' : '';
+        return `${fmtMoney(p.price)}${note}`;
+    }
+
+    function swatches(positions) {
+        // Each row's swatch is its segment in the allocation bar.
+        let priced = 0;
+        return positions.map((p) => (p.marketValue > 0 ? (SERIES[priced++] || OTHER) : 'transparent'));
+    }
+
+    function securityCell(p, color) {
+        return `<span class="pf-ticker-cell">
+            <span class="pf-swatch" style="background:${color}"></span>
+            <span>
+                ${securityLink(p)}
+                ${p.name && p.name !== p.ticker ? `<span class="pf-name" title="${escapeHtml(p.name)}">${escapeHtml(p.name)}</span>` : ''}
+            </span>
+        </span>`;
+    }
+
+    function gainCell(p) {
+        return `<td class="num ${tone(p.gain)}">${fmtSigned(p.gain, true)}${p.gainPct != null ? `<span class="pf-sub ${tone(p.gain)}">${fmtPct(p.gainPct, true)}</span>` : ''}</td>`;
+    }
+
+    function renderTopHoldings(data) {
+        const colors = swatches(data.positions);
+        const top = data.positions.slice(0, TOP_HOLDINGS);
+        els.topHoldingsSub.textContent = data.positions.length > TOP_HOLDINGS
+            ? `The largest ${TOP_HOLDINGS} of ${data.positions.length} open positions.`
+            : plural(data.positions.length, 'open position');
+        els.allHoldingsLink.textContent = data.totals.closedPositions
+            ? `All holdings and ${data.totals.closedPositions} closed`
+            : 'All holdings';
+        els.topHoldingsBody.innerHTML = top.map((p, i) => `
+            <tr>
+                <td>${securityCell(p, colors[i])}</td>
+                <td class="num pf-strong">${p.weight == null ? '—' : fmtPct(p.weight)}</td>
+                <td class="num pf-strong">${fmtMoney(p.marketValue, true)}</td>
+                ${gainCell(p)}
+            </tr>`).join('') || '<tr><td colspan="4" class="pf-muted">No open positions.</td></tr>';
     }
 
     function renderHoldings(data) {
         const asOf = data.holdings.asOf;
         els.holdingsSub.textContent = asOf
-            ? `Holdings as of ${asOf}${data.transactions.some((t) => t.counted) ? ', plus later trades' : ''}.`
-            : 'Built from your trades, at average cost.';
-        // Each row's swatch is its segment in the allocation bar above.
-        let priced = 0;
-        els.holdingsBody.innerHTML = data.positions.map((p) => {
-            const color = p.marketValue > 0 ? (SERIES[priced++] || OTHER) : 'transparent';
-            return `
+            ? `Holdings as of ${fmtDay(asOf)}${data.transactionCount ? ', plus later trades' : ''}. Cost is average cost across every account.`
+            : `Built from ${plural(data.transactionCount, 'trade')}, at average cost across every account.`;
+        const colors = swatches(data.positions);
+        els.holdingsBody.innerHTML = data.positions.map((p, i) => `
             <tr>
-                <td>
-                    <span class="pf-ticker-cell">
-                        <span class="pf-swatch" style="background:${color}"></span>
-                        <span>
-                            <a class="pf-ticker" href="/stock-research/?ticker=${encodeURIComponent(p.ticker)}">${escapeHtml(p.ticker)}</a>
-                            ${p.name && p.name !== p.ticker ? `<span class="pf-name" title="${escapeHtml(p.name)}">${escapeHtml(p.name)}</span>` : ''}
-                        </span>
-                    </span>
-                </td>
+                <td>${securityCell(p, colors[i])}</td>
                 <td class="num pf-strong">${p.weight == null ? '—' : fmtPct(p.weight)}</td>
                 <td class="num pf-strong">${fmtMoney(p.marketValue, true)}</td>
                 <td class="num pf-hide-sm">${shareFormat.format(p.shares)}</td>
                 <td class="num pf-hide-sm">${priceCell(p)}</td>
                 <td class="num pf-hide-sm">${fmtMoney(p.costBasis, true)}${p.avgCost != null ? `<span class="pf-sub">${fmtMoney(p.avgCost)}/sh</span>` : ''}</td>
-                <td class="num ${tone(p.gain)}">${fmtSigned(p.gain, true)}${p.gainPct != null ? `<span class="pf-sub ${tone(p.gain)}">${fmtPct(p.gainPct, true)}</span>` : ''}</td>
-            </tr>`;
-        }).join('') || '<tr><td colspan="7" class="pf-muted">No open positions.</td></tr>';
+                ${gainCell(p)}
+                <td class="num pf-hide-md ${tone(p.realizedGain)}">${fmtSigned(p.realizedGain, true)}</td>
+                <td class="num pf-hide-md">${fmtMonth(p.firstTrade)}<span class="pf-sub">${plural(p.trades, 'trade')}</span></td>
+            </tr>`).join('') || '<tr><td colspan="9" class="pf-muted">No open positions.</td></tr>';
     }
 
-    const TRADES_SHOWN = 6;
-    const tradeDate = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
-    let showAllTrades = false;
-
-    function renderTransactions(data) {
-        const count = data.transactions.length;
-        els.transactionsSub.textContent = count
-            ? `${count} trade${count === 1 ? '' : 's'}${data.transactionsIgnored ? ` · ${data.transactionsIgnored} already in your holdings` : ''}`
-            : 'No trades yet. Upload a history or add one by hand.';
-        document.getElementById('transactionsTable').hidden = !count;
-        const shown = showAllTrades ? data.transactions : data.transactions.slice(0, TRADES_SHOWN);
-        const toggle = $('tradesToggle');
-        toggle.hidden = count <= TRADES_SHOWN;
-        toggle.textContent = showAllTrades ? 'Show fewer' : `Show all ${count} trades`;
-        els.transactionsBody.innerHTML = shown.map((t) => `
-            <tr class="${t.counted ? '' : 'pf-tx-ignored'}">
-                <td>${tradeDate.format(new Date(`${t.tradeDate}T00:00:00Z`))}${t.counted ? '' : '<span class="pf-tag" title="On or before your holdings date, so it is already in them">in holdings</span>'}</td>
-                <td><strong>${escapeHtml(t.ticker)}</strong></td>
-                <td><span class="pf-side pf-side--${t.side}">${t.side === 'buy' ? 'Buy' : 'Sell'}</span></td>
-                <td class="num">${shareFormat.format(t.shares)}</td>
-                <td class="num">${fmtMoney(t.price)}</td>
-                <td class="num"><button type="button" class="pf-remove" data-id="${t.id}" aria-label="Remove ${t.side} of ${escapeHtml(t.ticker)} on ${t.tradeDate}">×</button></td>
+    function renderClosed(data) {
+        const closed = data.closedPositions;
+        els.closedCard.hidden = !closed.length;
+        const realized = closed.reduce((sum, c) => sum + (c.realizedGain || 0), 0);
+        els.closedSub.innerHTML = `${plural(closed.length, 'position')} you've sold out of, newest first. <span class="${tone(realized)}">${fmtSigned(realized, true)}</span> realized between them.`;
+        els.closedBody.innerHTML = closed.map((c) => `
+            <tr>
+                <td>${securityLink(c)}</td>
+                <td class="num pf-strong ${tone(c.realizedGain)}">${fmtSigned(c.realizedGain, true)}</td>
+                <td class="num pf-hide-sm">${fmtMoney(c.bought, true)}</td>
+                <td class="num pf-hide-sm">${fmtMoney(c.sold, true)}</td>
+                <td class="num pf-hide-sm">${countFormat.format(c.trades)}</td>
+                <td class="num">${fmtMonth(c.first)}<span class="pf-sub">to ${fmtMonth(c.last)}</span></td>
             </tr>`).join('');
     }
+
+    // ── accounts ───────────────────────────────────────────────────────────
+
+    function activityTable(table, rows, kind) {
+        const showReported = rows.some((r) => r.realizedReported != null);
+        table.innerHTML = `
+            <thead><tr>
+                <th scope="col">${kind}</th>
+                <th scope="col" class="num">Trades</th>
+                <th scope="col" class="num">Bought</th>
+                <th scope="col" class="num pf-hide-sm">Sold</th>
+                <th scope="col" class="num">Net in</th>
+                <th scope="col" class="num pf-hide-md">Securities</th>
+                ${showReported ? '<th scope="col" class="num pf-hide-md">Reported realized</th>' : ''}
+                <th scope="col" class="num pf-hide-sm">Active</th>
+            </tr></thead>
+            <tbody>${rows.map((r) => `
+                <tr>
+                    <td><button type="button" class="pf-linkish" data-filter="${kind === 'Account' ? 'account' : 'source'}" data-value="${escapeHtml(r.name)}">${escapeHtml(r.name)}</button></td>
+                    <td class="num">${countFormat.format(r.trades)}<span class="pf-sub">${countFormat.format(r.buys)} buys · ${countFormat.format(r.sells)} sells</span></td>
+                    <td class="num">${fmtMoney(r.bought, true)}</td>
+                    <td class="num pf-hide-sm">${fmtMoney(r.sold, true)}</td>
+                    <td class="num pf-strong">${fmtSigned(r.net, true)}</td>
+                    <td class="num pf-hide-md">${countFormat.format(r.securities)}</td>
+                    ${showReported ? `<td class="num pf-hide-md ${tone(r.realizedReported)}">${fmtSigned(r.realizedReported, true)}</td>` : ''}
+                    <td class="num pf-hide-sm">${fmtMonth(r.first)}<span class="pf-sub">to ${fmtMonth(r.last)}</span></td>
+                </tr>`).join('')}
+            </tbody>`;
+    }
+
+    function renderAccounts(data) {
+        activityTable($('accountsTable'), data.accounts, 'Account');
+        activityTable($('sourcesTable'), data.sources, 'Source');
+        $('accountOptions').innerHTML = data.facets.accounts.map((a) => `<option value="${escapeHtml(a)}">`).join('');
+    }
+
+    // An account or source name jumps to its trades.
+    ['accountsTable', 'sourcesTable'].forEach((id) => $(id).addEventListener('click', (event) => {
+        const button = event.target.closest('button[data-filter]');
+        if (!button) return;
+        resetFilters();
+        $(button.dataset.filter === 'account' ? 'filterAccount' : 'filterSource').value = button.dataset.value;
+        window.location.hash = 'activity';
+    }));
+
+    // ── gains ──────────────────────────────────────────────────────────────
+
+    function gainTile(label, value, sub, valueClass = '') {
+        return `<div class="pf-tile">
+            <div class="pf-tile__label">${label}</div>
+            <div class="pf-tile__value ${valueClass}">${value}</div>
+            <div class="pf-tile__sub">${sub}</div>
+        </div>`;
+    }
+
+    let showAllRealized = false;
+
+    function renderGains(data) {
+        const t = data.totals;
+        const total = (t.gain || 0) + (t.realizedGain || 0);
+        $('gainTiles').innerHTML = [
+            gainTile('Unrealized', fmtSigned(t.gain, true), t.gainPct == null ? 'On open positions' : `${fmtPct(t.gainPct, true)} on ${fmtMoney(t.costBasis, true)} cost`, tone(t.gain)),
+            gainTile('Realized', fmtSigned(t.realizedGain, true), 'From every sell, at average cost', tone(t.realizedGain)),
+            gainTile('Total gain', fmtSigned(total, true), 'Unrealized plus realized', tone(total)),
+            gainTile('Fees paid', fmtMoney(t.fees, true), `${fmtMoney(t.invested, true)} bought · ${fmtMoney(t.withdrawn, true)} sold`),
+        ].join('');
+
+        // Realized gain by year: one bar each, up for gains and down for losses
+        // from a shared zero line.
+        // The zero line sits where the data puts it: at the foot when every
+        // year is a gain, part way up when some are losses.
+        const years = [...data.years].reverse();
+        const up = Math.max(0, ...years.map((y) => y.realized));
+        const down = Math.max(0, ...years.map((y) => -y.realized));
+        const range = up + down || 1;
+        const zero = (up / range) * 100; // % from the top
+        $('yearBars').style.setProperty('--zero', `${zero}%`);
+        $('yearBars').setAttribute('aria-label', years.map((y) => `${y.year}: ${fmtSigned(y.realized, true)} realized`).join(', '));
+        $('yearBars').innerHTML = years.map((y) => {
+            const size = (Math.abs(y.realized) / range) * 100;
+            const cls = y.realized >= 0 ? 'pf-yearbar__bar--gain' : 'pf-yearbar__bar--loss';
+            const pos = y.realized >= 0 ? `bottom:${100 - zero}%;height:${size}%` : `top:${zero}%;height:${size}%`;
+            return `<div class="pf-yearbar" title="${y.year}: ${fmtSigned(y.realized, true)} realized">
+                <div class="pf-yearbar__plot"><span class="pf-yearbar__bar ${cls}" style="${pos}"></span></div>
+                <span class="pf-yearbar__label">${String(y.year).slice(2)}</span>
+            </div>`;
+        }).join('');
+
+        $('yearsTable').innerHTML = `
+            <thead><tr>
+                <th scope="col">Year</th>
+                <th scope="col" class="num">Realized</th>
+                <th scope="col" class="num">Trades</th>
+                <th scope="col" class="num pf-hide-sm">Bought</th>
+                <th scope="col" class="num pf-hide-sm">Sold</th>
+                <th scope="col" class="num">Net in</th>
+                <th scope="col" class="num pf-hide-md">Fees</th>
+            </tr></thead>
+            <tbody>${data.years.map((y) => `
+                <tr>
+                    <td><button type="button" class="pf-linkish" data-year="${y.year}">${y.year}</button></td>
+                    <td class="num pf-strong ${tone(y.realized)}">${fmtSigned(y.realized, true)}</td>
+                    <td class="num">${countFormat.format(y.trades)}</td>
+                    <td class="num pf-hide-sm">${fmtMoney(y.bought, true)}</td>
+                    <td class="num pf-hide-sm">${fmtMoney(y.sold, true)}</td>
+                    <td class="num">${fmtSigned(y.net, true)}</td>
+                    <td class="num pf-hide-md">${fmtMoney(y.fees, true)}</td>
+                </tr>`).join('')}
+            </tbody>`;
+
+        const reported = data.reportedRealized;
+        const realized = data.realizedByTicker;
+        $('realizedSub').innerHTML = reported.count
+            ? `Your file reported <strong class="${tone(reported.reported)}">${fmtSigned(reported.reported, true)}</strong> realized on ${plural(reported.count, 'sell')}; at average cost across all your accounts, the same sells come to <strong class="${tone(reported.computed)}">${fmtSigned(reported.computed, true)}</strong>. The two differ when the source matched lots differently (first in, first out) or saw only one account.`
+            : 'Gain on every security you have sold, at average cost.';
+        const shown = showAllRealized ? realized : realized.slice(0, REALIZED_SHOWN);
+        $('realizedTable').innerHTML = `
+            <thead><tr><th scope="col">Security</th><th scope="col" class="num">Realized</th><th scope="col" class="num">Sold</th></tr></thead>
+            <tbody>${shown.map((r) => `
+                <tr>
+                    <td><strong>${escapeHtml(r.ticker)}</strong></td>
+                    <td class="num pf-strong ${tone(r.realizedGain)}">${fmtSigned(r.realizedGain, true)}</td>
+                    <td class="num">${fmtMoney(r.sold, true)}</td>
+                </tr>`).join('') || '<tr><td colspan="3" class="pf-muted">No sells yet.</td></tr>'}
+            </tbody>`;
+        const toggle = $('realizedToggle');
+        toggle.hidden = realized.length <= REALIZED_SHOWN;
+        toggle.textContent = showAllRealized ? 'Show fewer' : `Show all ${realized.length}`;
+    }
+
+    $('realizedToggle').addEventListener('click', () => {
+        showAllRealized = !showAllRealized;
+        if (lastData) renderGains(lastData);
+    });
+    $('yearsTable').addEventListener('click', (event) => {
+        const button = event.target.closest('button[data-year]');
+        if (!button) return;
+        resetFilters();
+        $('filterYear').value = button.dataset.year;
+        window.location.hash = 'activity';
+    });
+
+    // ── activity ───────────────────────────────────────────────────────────
+
+    const trades = { offset: 0, total: 0, version: null, timer: null };
+
+    function fillSelect(select, values, allLabel) {
+        const current = select.value;
+        select.innerHTML = `<option value="">${allLabel}</option>` + values.map((v) => `<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join('');
+        if (values.map(String).includes(current)) select.value = current;
+    }
+
+    function renderFilters(data) {
+        fillSelect($('filterYear'), data.facets.years, 'All years');
+        fillSelect($('filterAccount'), data.facets.accounts, 'All accounts');
+        fillSelect($('filterSource'), data.facets.sources, 'All sources');
+        $('filterAsset').hidden = data.facets.assets.length < 2;
+        $('filterSource').hidden = data.facets.sources.length < 2;
+        $('filterAccount').hidden = data.facets.accounts.length < 2;
+        // New or removed trades: the open page is out of date.
+        if (trades.version !== data.transactionVersion) {
+            trades.version = data.transactionVersion;
+            if (currentTab() === 'activity') loadTrades();
+        }
+    }
+
+    function resetFilters() {
+        els.filters.reset();
+        trades.offset = 0;
+    }
+
+    function filterParams() {
+        const params = new URLSearchParams({ offset: String(trades.offset), limit: String(TRADES_PER_PAGE) });
+        const fields = { q: 'filterQuery', side: 'filterSide', year: 'filterYear', account: 'filterAccount', source: 'filterSource', asset: 'filterAsset' };
+        Object.entries(fields).forEach(([key, id]) => {
+            const value = $(id).value.trim();
+            if (value) params.set(key, value);
+        });
+        return params;
+    }
+
+    async function loadTrades() {
+        const data = await run(() => api(`/transactions?${filterParams()}`));
+        if (!data) return;
+        trades.total = data.total;
+        const filtered = filterParams().toString().replace(/(^|&)(offset|limit)=[^&]*/g, '') !== '';
+        els.transactionsSub.textContent = lastData?.transactionCount
+            ? `${filtered ? `${plural(data.total, 'trade')} match, of ` : ''}${plural(lastData.transactionCount, 'trade')}${lastData.transactionsIgnored ? ` · ${countFormat.format(lastData.transactionsIgnored)} already in your holdings` : ''}`
+            : 'No trades yet. Upload a history or add one by hand.';
+        els.transactionsBody.innerHTML = data.rows.map((t) => {
+            const realized = t.side === 'sell' && (t.realized != null || t.realizedReported != null)
+                ? `<span class="${tone(t.realized)}">${fmtSigned(t.realized, true)}</span>${t.realizedReported != null ? `<span class="pf-sub" title="As your file reported it">file: ${fmtSigned(t.realizedReported, true)}</span>` : ''}`
+                : '';
+            return `
+            <tr class="${t.counted ? '' : 'pf-tx-ignored'}">
+                <td>${fmtDay(t.tradeDate)}${t.counted ? '' : '<span class="pf-tag" title="On or before your holdings date, so it is already in them">in holdings</span>'}</td>
+                <td>${securityLink(t)}${t.notes ? `<span class="pf-name pf-note-cell" title="${escapeHtml(t.notes)}">${escapeHtml(t.notes)}</span>` : ''}</td>
+                <td><span class="pf-side pf-side--${t.side}">${t.side === 'buy' ? 'Buy' : 'Sell'}</span></td>
+                <td class="num">${shareFormat.format(t.shares)}</td>
+                <td class="num pf-hide-sm">${fmtMoney(t.price)}</td>
+                <td class="num">${fmtMoney(t.amount)}${t.fees ? `<span class="pf-sub">${fmtMoney(t.fees)} fees</span>` : ''}</td>
+                <td class="num pf-hide-md">${realized}</td>
+                <td class="pf-hide-md pf-wrap">${escapeHtml(t.account || '—')}</td>
+                <td class="pf-hide-lg pf-wrap">${escapeHtml(t.source || '—')}</td>
+                <td class="num"><button type="button" class="pf-remove" data-id="${t.id}" aria-label="Remove ${t.side} of ${escapeHtml(t.ticker)} on ${t.tradeDate}">×</button></td>
+            </tr>`;
+        }).join('') || '<tr><td colspan="10" class="pf-muted">No trades match.</td></tr>';
+
+        const from = data.total ? trades.offset + 1 : 0;
+        const to = Math.min(trades.offset + TRADES_PER_PAGE, data.total);
+        els.pagerText.textContent = data.total ? `${countFormat.format(from)}–${countFormat.format(to)} of ${countFormat.format(data.total)}` : '';
+        els.pagePrev.disabled = trades.offset === 0;
+        els.pageNext.disabled = to >= data.total;
+        $('pager').hidden = data.total <= TRADES_PER_PAGE;
+    }
+
+    els.filters.addEventListener('input', (event) => {
+        trades.offset = 0;
+        clearTimeout(trades.timer);
+        // Typing waits for a pause; the menus apply at once.
+        trades.timer = setTimeout(loadTrades, event.target.id === 'filterQuery' ? 250 : 0);
+    });
+    els.filters.addEventListener('submit', (event) => event.preventDefault());
+    els.pagePrev.addEventListener('click', () => {
+        trades.offset = Math.max(0, trades.offset - TRADES_PER_PAGE);
+        loadTrades();
+    });
+    els.pageNext.addEventListener('click', () => {
+        trades.offset += TRADES_PER_PAGE;
+        loadTrades();
+    });
 
     // ── value over time ────────────────────────────────────────────────────
 
@@ -387,20 +720,21 @@
         { key: '6M', days: 183 },
         { key: 'YTD', days: null },
         { key: '1Y', days: 366 },
+        { key: '5Y', days: 1827 },
         { key: 'All', days: Infinity },
     ];
-    const MAX_HISTORY_RETRIES = 30;
+    const MAX_HISTORY_RETRIES = 60;
     const SVG_NS = 'http://www.w3.org/2000/svg';
     const shortDate = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
     const monthYear = new Intl.DateTimeFormat('en-US', { month: 'short', year: '2-digit', timeZone: 'UTC' });
-    const longDate = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
+    const yearOnly = new Intl.DateTimeFormat('en-US', { year: 'numeric', timeZone: 'UTC' });
 
     const history = { data: null, range: '1Y', signature: null, retries: 0, timer: null };
 
     // Reload the history only when what it's built from changed, not when the
     // breakdown is re-fetched for prices.
     function historySignature(data) {
-        return JSON.stringify([data.holdings.asOf, data.holdings.count, data.transactions.map((t) => t.id)]);
+        return JSON.stringify([data.holdings.asOf, data.holdings.count, data.transactionVersion]);
     }
 
     function maybeLoadHistory(data) {
@@ -422,19 +756,13 @@
             drawChart([]);
             return;
         }
-        if (!data.complete) {
-            const n = data.pending.length;
-            $('historySub').textContent = data.retryAfter > 5
-                ? `Loading price history for ${n} more ticker${n === 1 ? '' : 's'}. The data provider limits requests per minute, so this can take a minute or two the first time.`
-                : `Loading price history for ${n} more ticker${n === 1 ? '' : 's'}…`;
-            if (history.retries < MAX_HISTORY_RETRIES) {
-                history.retries += 1;
-                history.timer = setTimeout(loadHistory, (data.retryAfter || 3) * 1000);
-            }
-            return;
-        }
         history.data = data;
-        renderHistory();
+        // Draw what's in while the rest loads: missing prices show as estimates.
+        if (currentTab() === 'overview') renderHistory();
+        if (!data.complete && history.retries < MAX_HISTORY_RETRIES) {
+            history.retries += 1;
+            history.timer = setTimeout(loadHistory, (data.retryAfter || 3) * 1000);
+        }
     }
 
     function pointsInRange() {
@@ -472,9 +800,11 @@
         const points = pointsInRange();
         const sub = $('historySub');
         const note = $('historyNote');
+        const pending = history.data.pending.length;
         if (points.length < 2) {
-            sub.textContent = all.length ? 'Not enough days in this range yet.' : 'No price history for these tickers.';
+            sub.textContent = pending ? 'Loading price history…' : all.length ? 'Not enough days in this range yet.' : 'No price history for these holdings.';
             note.hidden = true;
+            $('historyLegend').hidden = true;
             drawChart([]);
             return;
         }
@@ -484,24 +814,30 @@
         // With trades inside the range, a percent change would mostly be new
         // money (a first $2k buy growing to $45k reads as +2,000%), so show
         // the dollar change alone.
-        const tradedInRange = lastData?.transactions.some((t) => t.tradeDate > points[0].date);
+        const tradedInRange = lastData?.lastTrade && lastData.lastTrade > points[0].date;
         const pct = tradedInRange || !first ? '' : ` (${fmtPct(change / first, true)})`;
-        sub.innerHTML = `<span class="pf-history-change ${tone(change)}">${fmtSigned(change, true)}${pct}</span> since ${longDate.format(new Date(`${points[0].date}T00:00:00Z`))}`;
+        sub.innerHTML = `<span class="pf-history-change ${tone(change)}">${fmtSigned(change, true)}${pct}</span> since ${fmtDay(points[0].date)}`;
 
         const notes = [];
         const asOf = history.data.asOf;
         if (asOf && points[0].date < asOf) {
-            notes.push(`Before ${longDate.format(new Date(`${asOf}T00:00:00Z`))}, this assumes you held the holdings you uploaded, less any trades you've added since.`);
+            notes.push(`Before ${fmtDay(asOf)}, this assumes you held the holdings you uploaded, less any trades you've added since.`);
         }
         if (tradedInRange) {
-            notes.push('Buys and sells in this range move the line too, so it shows money added as well as growth.');
+            notes.push('Buys and sells move the value line too; the gap between it and the invested line is the gain.');
         }
-        if (history.data.missing.length) {
-            notes.push(`No price history for ${history.data.missing.join(', ')}, so ${history.data.missing.length === 1 ? 'it is' : 'they are'} left out.`);
+        const estimated = points.some((p) => p.estimated);
+        if (estimated) {
+            notes.push('Dashed stretches use your own trade prices where no market close was available (older history than the price plan covers, or a position with no ticker).');
+        }
+        if (pending) {
+            notes.push(`Still loading prices for ${plural(pending, 'symbol')}${history.data.retryAfter > 5 ? '; the price provider limits requests per minute, so a long history fills in over a few minutes the first time' : ''}.`);
         }
         if (history.data.sampleData) notes.push('Generated sample prices, not real history.');
         note.textContent = notes.join(' ');
         note.hidden = !notes.length;
+        $('historyLegend').hidden = false;
+        $('estimatedKey').hidden = !estimated;
         drawChart(points);
     }
 
@@ -528,6 +864,26 @@
         return `$${Math.round(value)}`;
     }
 
+    // Split a series into runs where `test` holds, each run sharing its end
+    // points with its neighbours so the dashed and solid stretches join up.
+    function runs(points, test) {
+        const out = [];
+        let current = null;
+        points.forEach((p, i) => {
+            const on = test(p, i);
+            if (on && !current) {
+                current = i > 0 ? [i - 1, i] : [i];
+                out.push(current);
+            } else if (on) {
+                current.push(i);
+            } else if (current) {
+                current.push(i);
+                current = null;
+            }
+        });
+        return out;
+    }
+
     function drawChart(points) {
         const host = $('historyChart');
         host.innerHTML = '';
@@ -537,11 +893,12 @@
         }
         const width = host.clientWidth;
         const height = host.clientHeight;
+        if (!width) return; // hidden tab: drawn when it's shown
         const pad = { top: 10, right: 8, bottom: 24, left: 48 };
         const innerW = width - pad.left - pad.right;
         const innerH = height - pad.top - pad.bottom;
 
-        const values = points.map((p) => p.value);
+        const values = points.flatMap((p) => (p.invested != null ? [p.value, p.invested] : [p.value]));
         let lo = Math.min(...values);
         let hi = Math.max(...values);
         const margin = (hi - lo) * 0.08 || hi * 0.05 || 1;
@@ -553,8 +910,9 @@
 
         const x = (i) => pad.left + (i / (points.length - 1)) * innerW;
         const y = (v) => pad.top + (1 - (v - lo) / (hi - lo)) * innerH;
+        const path = (indices, key) => indices.map((i, k) => `${k ? 'L' : 'M'}${x(i).toFixed(1)},${y(points[i][key]).toFixed(1)}`).join('');
 
-        const root = svg('svg', { viewBox: `0 0 ${width} ${height}`, role: 'img', 'aria-label': `Portfolio value from ${points[0].date} to ${points[points.length - 1].date}` });
+        const root = svg('svg', { viewBox: `0 0 ${width} ${height}`, role: 'img', 'aria-label': `Portfolio value and amount invested from ${points[0].date} to ${points[points.length - 1].date}` });
         ticks.forEach((t) => {
             root.appendChild(svg('line', { class: 'pf-chart__grid', x1: pad.left, x2: width - pad.right, y1: y(t), y2: y(t) }));
             const label = svg('text', { class: 'pf-chart__axis', x: pad.left - 8, y: y(t) + 4, 'text-anchor': 'end' });
@@ -564,7 +922,7 @@
 
         // About one date label per 110px, never crowding the ends.
         const span = (new Date(points[points.length - 1].date) - new Date(points[0].date)) / 86400000;
-        const fmt = span > 200 ? monthYear : shortDate;
+        const fmt = span > 1500 ? yearOnly : span > 200 ? monthYear : shortDate;
         const labelCount = Math.max(2, Math.floor(innerW / 110));
         for (let k = 0; k < labelCount; k += 1) {
             const i = Math.round((k / (labelCount - 1)) * (points.length - 1));
@@ -576,9 +934,18 @@
             root.appendChild(label);
         }
 
-        const line = points.map((p, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(p.value).toFixed(1)}`).join('');
-        root.appendChild(svg('path', { class: 'pf-chart__area', d: `${line}L${x(points.length - 1)},${y(lo)}L${x(0)},${y(lo)}Z` }));
-        root.appendChild(svg('path', { class: 'pf-chart__line', d: line }));
+        const all = points.map((_, i) => i);
+        const valueLine = path(all, 'value');
+        root.appendChild(svg('path', { class: 'pf-chart__area', d: `${valueLine}L${x(points.length - 1)},${y(lo)}L${x(0)},${y(lo)}Z` }));
+        runs(points, (p) => p.invested != null).forEach((indices) => {
+            root.appendChild(svg('path', { class: 'pf-chart__invested', d: path(indices, 'invested') }));
+        });
+        runs(points, (p) => !p.estimated).forEach((indices) => {
+            root.appendChild(svg('path', { class: 'pf-chart__line', d: path(indices, 'value') }));
+        });
+        runs(points, (p) => p.estimated).forEach((indices) => {
+            root.appendChild(svg('path', { class: 'pf-chart__line pf-chart__line--estimated', d: path(indices, 'value') }));
+        });
 
         const cross = svg('line', { class: 'pf-chart__cross', y1: pad.top, y2: pad.top + innerH, visibility: 'hidden' });
         const dot = svg('circle', { class: 'pf-chart__dot', r: 4.5, visibility: 'hidden' });
@@ -599,8 +966,9 @@
             dot.setAttribute('cy', y(p.value));
             cross.setAttribute('visibility', 'visible');
             dot.setAttribute('visibility', 'visible');
-            const vsStart = p.value - points[0].value;
-            showTip(event, `${longDate.format(new Date(`${p.date}T00:00:00Z`))} · ${fmtMoney(p.value, true)} · ${fmtSigned(vsStart, true)}`);
+            const parts = [fmtDay(p.date), `${fmtMoney(p.value, true)}${p.estimated ? ' (est.)' : ''}`];
+            if (p.invested != null) parts.push(`invested ${fmtMoney(p.invested, true)}`, fmtSigned(p.value - p.invested, true));
+            showTip(event, parts.join(' · '));
         }
         hit.addEventListener('mousemove', hover);
         hit.addEventListener('touchmove', (event) => { hover(event.touches[0]); event.preventDefault(); }, { passive: false });
@@ -623,7 +991,9 @@
     let resizeTimer = null;
     window.addEventListener('resize', () => {
         clearTimeout(resizeTimer);
-        resizeTimer = setTimeout(() => { if (history.data && !els.dashboard.hidden) renderHistory(); }, 120);
+        resizeTimer = setTimeout(() => {
+            if (history.data && !els.dashboard.hidden && currentTab() === 'overview') renderHistory();
+        }, 120);
     });
 
     function schedulePendingRetry(data) {
@@ -655,8 +1025,8 @@
 
     async function readFile(file) {
         if (!file) return;
-        if (file.size > 1_000_000) {
-            showError('That file is too large. Keep it under 1 MB.');
+        if (file.size > 5_000_000) {
+            showError('That file is too large. Keep it under 5 MB.');
             return;
         }
         fileText = await file.text();
@@ -667,19 +1037,25 @@
         const body = { csv, kind: selectedKind(), replace: els.replaceInput.checked };
         if (els.asOfInput.value) body.as_of = els.asOfInput.value;
         els.uploadButton.disabled = true;
+        els.uploadButton.textContent = 'Uploading…';
         const result = await run(() => api('/import', { method: 'POST', body }));
         els.uploadButton.disabled = false;
+        els.uploadButton.textContent = 'Upload';
         if (!result) return;
 
-        const { kind, count } = result.imported;
-        const what = kind === 'holdings' ? `holding${count === 1 ? '' : 's'}` : `trade${count === 1 ? '' : 's'}`;
-        const skipped = result.skipped.length
-            ? ` Skipped ${result.skipped.length} row${result.skipped.length === 1 ? '' : 's'}: ${summarizeSkipped(result.skipped)}.`
-            : '';
-        showNotice(`Imported ${count} ${what}.${skipped}`);
+        const { kind, count, duplicates, removedSample } = result.imported;
+        const what = kind === 'holdings' ? plural(count, 'holding') : plural(count, 'trade');
+        const parts = [`Imported ${what}.`];
+        if (duplicates) parts.push(`${plural(duplicates, 'row')} ${duplicates === 1 ? 'was' : 'were'} already saved.`);
+        if (removedSample) parts.push(`Removed the ${countFormat.format(removedSample)} sample trades.`);
+        if (result.skipped.length) {
+            parts.push(`Skipped ${plural(result.skipped.length, 'row')}: ${summarizeSkipped(result.skipped)}.`);
+        }
+        showNotice(parts.join(' '));
         fileText = null;
         els.fileInput.value = '';
         els.pasteInput.value = '';
+        els.replaceInput.checked = false;
         els.fileName.textContent = 'A positions or transactions export from your broker works as is.';
         pendingRetries = 0;
         render(result.portfolio);
@@ -722,10 +1098,6 @@
 
     els.uploadToggle.addEventListener('click', () => setUploadOpen(els.uploadPanel.hidden));
     els.refreshButton.addEventListener('click', () => { pendingRetries = 0; load(); });
-    $('tradesToggle').addEventListener('click', () => {
-        showAllTrades = !showAllTrades;
-        if (lastData) renderTransactions(lastData);
-    });
     els.addToggle.addEventListener('click', () => {
         const open = els.addForm.hidden;
         els.addForm.hidden = !open;
@@ -742,6 +1114,7 @@
                 shares: Number($('addShares').value),
                 price: Number($('addPrice').value),
                 trade_date: $('addDate').value,
+                account: $('addAccount').value.trim() || null,
             },
         }));
         if (!data) return;

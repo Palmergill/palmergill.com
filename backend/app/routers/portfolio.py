@@ -41,12 +41,13 @@ class ImportRequest(BaseModel):
 
 
 class TransactionRequest(BaseModel):
-    ticker: str = Field(..., min_length=1, max_length=12)
+    ticker: str = Field(..., min_length=1, max_length=60)
     side: str = Field(..., pattern="^(buy|sell)$")
     shares: float = Field(..., gt=0, le=1e9)
     price: float = Field(..., ge=0, le=1e7)
     fees: float = Field(0.0, ge=0, le=1e7)
     trade_date: date
+    account: Optional[str] = Field(None, max_length=120)
 
 
 # Every plain `def`: the price lookups are synchronous provider calls, which
@@ -59,28 +60,43 @@ def read_portfolio(username: str = Depends(caller), db: Session = Depends(get_db
 
 
 @router.get("/history")
-def read_value_history(
-    days: int = Query(portfolio.HISTORY_DEFAULT_DAYS, ge=7, le=portfolio.HISTORY_MAX_DAYS),
+def read_value_history(username: str = Depends(caller), db: Session = Depends(get_db)) -> Dict[str, Any]:
+    """Daily portfolio value and cost basis since the first trade. Separate
+    from the breakdown so a slow price history never holds up the numbers
+    the page shows first."""
+    return portfolio.value_history(db, username)
+
+
+@router.get("/transactions")
+def read_transactions(
+    offset: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=portfolio.TRADE_PAGE_MAX),
+    q: str = Query("", max_length=60),
+    side: str = Query("", pattern="^(|buy|sell)$"),
+    account: str = Query("", max_length=120),
+    source: str = Query("", max_length=120),
+    year: Optional[int] = Query(None, ge=1900, le=2200),
+    asset: str = Query("", pattern="^(|stock|crypto|other)$"),
     username: str = Depends(caller),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
-    """Daily portfolio value. Separate from the breakdown so a slow price
-    history never holds up the numbers the page shows first."""
-    return portfolio.value_history(db, username, days)
+    return portfolio.list_transactions(
+        db, username, offset=offset, limit=limit, q=q, side=side, account=account,
+        source=source, year=year, asset=asset,
+    )
 
 
 @router.post("/import")
 def import_csv(body: ImportRequest, username: str = Depends(caller), db: Session = Depends(get_db)) -> Dict[str, Any]:
     parsed = portfolio.parse_csv(body.csv, body.kind)
+    result = {"added": 0, "duplicates": 0, "removedSample": 0}
     if parsed["kind"] == "holdings":
-        if not parsed["rows"]:
-            count = 0  # Don't wipe a good snapshot with an empty one.
-        else:
-            count = portfolio.replace_holdings(db, username, parsed["rows"], body.as_of or portfolio.utc_today())
+        if parsed["rows"]:  # Don't wipe a good snapshot with an empty one.
+            result["added"] = portfolio.replace_holdings(db, username, parsed["rows"], body.as_of or portfolio.utc_today())
     else:
-        count = portfolio.add_transactions(db, username, parsed["rows"], replace=body.replace)
+        result = portfolio.add_transactions(db, username, parsed["rows"], replace=body.replace)
     return {
-        "imported": {"kind": parsed["kind"], "count": count},
+        "imported": {"kind": parsed["kind"], "count": result["added"], **result},
         "skipped": parsed["skipped"],
         "portfolio": portfolio.breakdown(db, username),
     }
@@ -88,13 +104,14 @@ def import_csv(body: ImportRequest, username: str = Depends(caller), db: Session
 
 @router.post("/transactions", status_code=201)
 def add_transaction(body: TransactionRequest, username: str = Depends(caller), db: Session = Depends(get_db)) -> Dict[str, Any]:
-    ticker, reason = portfolio.clean_ticker(body.ticker)
+    ticker, asset, reason = portfolio.classify_security(body.ticker, body.account or "")
     if not ticker:
         raise HTTPException(status_code=422, detail=f"Ticker: {reason}.")
+    # By hand, a second identical trade is meant: no duplicate check.
     portfolio.add_transactions(db, username, [{
-        "ticker": ticker, "side": body.side, "shares": body.shares, "price": body.price,
-        "fees": body.fees, "trade_date": body.trade_date,
-    }])
+        "ticker": ticker, "asset": asset, "side": body.side, "shares": body.shares, "price": body.price,
+        "fees": body.fees, "trade_date": body.trade_date, "account": body.account, "source": "Added by hand",
+    }], upload=False)
     return portfolio.breakdown(db, username)
 
 

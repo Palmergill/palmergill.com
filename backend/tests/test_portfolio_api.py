@@ -29,9 +29,12 @@ def _env(monkeypatch):
     monkeypatch.delenv("LOCAL_SITE_ROOT", raising=False)
     monkeypatch.delenv("LOCAL_AUTH_USER", raising=False)
     # No provider calls: a fixed price per ticker.
-    monkeypatch.setattr(portfolio, "quotes", lambda db, tickers: {
-        t: {"price": PRICES.get(t), "name": t, "sector": "Technology", "status": "live" if t in PRICES else "unavailable"}
-        for t in tickers
+    monkeypatch.setattr(portfolio, "quotes", lambda db, positions: {
+        t: {
+            "price": PRICES.get(t), "name": t, "sector": "Technology", "asOf": None,
+            "status": "live" if t in PRICES else "unavailable",
+        }
+        for t in positions
     })
 
 
@@ -63,6 +66,8 @@ def _buy(client, ticker="AAPL", shares=10, price=150.0, day="2026-01-05", side="
 
 @pytest.mark.parametrize("method,path", [
     ("get", "/api/stocks/portfolio"),
+    ("get", "/api/stocks/portfolio/history"),
+    ("get", "/api/stocks/portfolio/transactions"),
     ("post", "/api/stocks/portfolio/import"),
     ("post", "/api/stocks/portfolio/transactions"),
     ("delete", "/api/stocks/portfolio/transactions/1"),
@@ -82,10 +87,12 @@ def test_portfolio_route_is_not_swallowed_by_the_ticker_route():
 
 def test_a_portfolio_is_never_served_to_another_account():
     owner, other, admin = _member_client(), _member_client(), _admin_client()
-    tx_id = _buy(owner)["transactions"][0]["id"]
+    _buy(owner)
+    tx_id = owner.get("/api/stocks/portfolio/transactions").json()["rows"][0]["id"]
 
     for stranger in (other, admin):
         assert stranger.get("/api/stocks/portfolio").json()["positions"] == []
+        assert stranger.get("/api/stocks/portfolio/transactions").json()["total"] == 0
         assert stranger.delete(f"/api/stocks/portfolio/transactions/{tx_id}").status_code == 404
         stranger.delete("/api/stocks/portfolio")
 
@@ -119,7 +126,8 @@ def test_transactions_on_or_before_the_snapshot_are_not_counted_twice():
     assert aapl["shares"] == 15
     assert aapl["costBasis"] == pytest.approx(1500 + 900)
     assert body["transactionsIgnored"] == 1
-    assert [t["counted"] for t in body["transactions"]] == [True, False]
+    rows = client.get("/api/stocks/portfolio/transactions").json()["rows"]
+    assert [t["counted"] for t in rows] == [True, False]
 
 
 def test_weights_and_sectors_add_up():
@@ -174,7 +182,7 @@ def test_brokerage_positions_export_auto_detects_as_holdings():
 def test_holdings_upload_merges_accounts_and_replaces_the_snapshot():
     client = _member_client()
     body = client.post("/api/stocks/portfolio/import", json={"csv": FIDELITY_POSITIONS}).json()
-    assert body["imported"] == {"kind": "holdings", "count": 2}
+    assert body["imported"]["kind"] == "holdings" and body["imported"]["count"] == 2
     aapl = next(p for p in body["portfolio"]["positions"] if p["ticker"] == "AAPL")
     assert aapl["shares"] == 15 and aapl["costBasis"] == pytest.approx(2400.0)
 
@@ -186,8 +194,10 @@ def test_brokerage_history_export_auto_detects_as_transactions():
     parsed = portfolio.parse_csv(SCHWAB_HISTORY)
     assert parsed["kind"] == "transactions"
     rows = {r["ticker"]: r for r in parsed["rows"]}
-    assert rows["MSFT"] == {
-        "ticker": "MSFT", "side": "buy", "shares": 3.0, "price": 410.0, "fees": 1.0, "trade_date": date(2026, 10, 1),
+    msft = rows["MSFT"]
+    assert {k: msft[k] for k in ("ticker", "asset", "side", "shares", "price", "fees", "trade_date", "amount", "notes")} == {
+        "ticker": "MSFT", "asset": "stock", "side": "buy", "shares": 3.0, "price": 410.0, "fees": 1.0,
+        "trade_date": date(2026, 10, 1), "amount": 1231.0, "notes": "MICROSOFT CORP",
     }
     assert rows["AAPL"]["side"] == "sell"
     # Price from the amount when the export leaves it blank.
@@ -231,8 +241,15 @@ def _reset_prices(monkeypatch):
         db.commit()
     finally:
         db.close()
-    for cache in (portfolio._checked, portfolio._listed_from, portfolio._meta):
-        cache.clear()
+    from app.database import PriceCoverage
+
+    db = SessionLocal()
+    try:
+        db.query(PriceCoverage).delete()
+        db.commit()
+    finally:
+        db.close()
+    portfolio._meta.clear()
     monkeypatch.setattr(portfolio, "_rate_limited_until", None)
     monkeypatch.setattr(portfolio, "_fetch_meta", lambda t: {"name": t, "sector": "Technology"})
 
@@ -255,7 +272,7 @@ def test_history_follows_trades_from_the_first_one(monkeypatch):
 
     body = client.get("/api/stocks/portfolio/history").json()
     assert body["complete"] is True
-    assert body["points"][0] == {"date": first.isoformat(), "value": 20.0}
+    assert body["points"][0] == {"date": first.isoformat(), "value": 20.0, "invested": 20.0, "estimated": False}
     assert body["points"][-1]["value"] == 50.0
 
 
@@ -285,7 +302,8 @@ def test_history_waits_until_every_ticker_has_prices(monkeypatch):
 
     # Each request spends a few provider calls, never all ten at once.
     first = client.get("/api/stocks/portfolio/history").json()
-    assert first["complete"] is False and first["points"] == [] and first["retryAfter"]
+    # Drawn as it fills in: unpriced tickers are estimated from trade prices.
+    assert first["complete"] is False and first["retryAfter"] and first["pending"]
     for _ in range(5):
         body = client.get("/api/stocks/portfolio/history").json()
         if body["complete"]:
@@ -331,3 +349,93 @@ def test_the_breakdown_prices_positions_from_stored_closes(monkeypatch):
     body = _buy(client, "AAPL", shares=2, price=10.0)
     (aapl,) = body["positions"]
     assert aapl["price"] == 12.0 and aapl["marketValue"] == 24.0 and aapl["sector"] == "Technology"
+
+
+# ── a full multi-broker history, like the one the importer was fixed for ────
+
+MULTI_BROKER = """date,source,account,type,security,quantity,price,amount_usd,fees_usd,realized_gain_loss,notes
+2017-02-06,Uploaded CSV,Robinhood,buy,NVDA,10,25.00,250.00,0,,10 shares of NVDA purchased
+2018-05-01,Uploaded CSV,Robinhood,sell,NVDA,4,60.00,240.00,0,135.00,4 shares of NVDA sold
+2020-01-02,M1 Finance,M1 Finance My Portfolio,buy,VOO,0.12345,300.00,37.04,0,,0.12345 shares of VOO purchased
+2021-03-01,BTC transactions CSV,Crypto Account,buy,BTC,0.01,50000.00,500.00,1.50,,Bought BTC
+2025-01-06,Robinhood,Robinhood individual,buy,IBIT call $100,2,4.10,8.20,0,,IBIT $100 Call 3/21/2025
+2025-12-10,Robinhood,Robinhood Roth IRA,buy,Twenty One Capital,40,11.50,460.00,0,,Twenty One Capital Class A purchased
+"""
+
+
+def test_a_multi_broker_history_imports_every_row_with_its_details():
+    parsed = portfolio.parse_csv(MULTI_BROKER)
+    assert parsed["kind"] == "transactions" and parsed["skipped"] == []
+    by_ticker = {r["ticker"]: r for r in parsed["rows"]}
+    assert set(by_ticker) == {"NVDA", "VOO", "BTC", "IBIT call $100", "Twenty One Capital"}
+    assert by_ticker["BTC"]["asset"] == "crypto" and by_ticker["BTC"]["fees"] == 1.5
+    assert by_ticker["Twenty One Capital"]["asset"] == "other"
+    assert by_ticker["VOO"]["shares"] == pytest.approx(0.12345)
+    sell = next(r for r in parsed["rows"] if r["side"] == "sell")
+    assert (sell["account"], sell["source"], sell["realized_reported"]) == ("Robinhood", "Uploaded CSV", 135.0)
+
+
+def test_uploading_the_same_history_twice_adds_nothing_the_second_time():
+    client = _member_client()
+    first = client.post("/api/stocks/portfolio/import", json={"csv": MULTI_BROKER}).json()["imported"]
+    second = client.post("/api/stocks/portfolio/import", json={"csv": MULTI_BROKER}).json()["imported"]
+    assert (first["added"], second["added"], second["duplicates"]) == (6, 0, 6)
+
+
+def test_a_real_upload_replaces_the_sample_trades():
+    client = _member_client()
+    sample = "Date,Action,Symbol,Quantity,Price,Source\n2026-01-05,Buy,AAPL,20,228,Sample\n"
+    client.post("/api/stocks/portfolio/import", json={"csv": sample})
+    imported = client.post("/api/stocks/portfolio/import", json={"csv": MULTI_BROKER}).json()["imported"]
+    assert imported["removedSample"] == 1
+    assert client.get("/api/stocks/portfolio/transactions").json()["total"] == 6
+
+
+def test_the_breakdown_reports_accounts_years_closed_and_reported_gains():
+    client = _member_client()
+    body = client.post("/api/stocks/portfolio/import", json={"csv": MULTI_BROKER}).json()["portfolio"]
+    assert {a["name"] for a in body["accounts"]} >= {"Robinhood", "Crypto Account", "Robinhood Roth IRA"}
+    assert [y["year"] for y in body["years"]][:2] == [2025, 2021]
+    nvda_sell_realized = 4 * 60.0 - 4 * 25.0
+    assert body["reportedRealized"] == {"count": 1, "reported": 135.0, "computed": pytest.approx(nvda_sell_realized)}
+    assert body["totals"]["realizedGain"] == pytest.approx(nvda_sell_realized)
+    # The option was bought and never sold here, so it is still open.
+    assert "IBIT call $100" in {p["ticker"] for p in body["positions"]}
+
+
+def test_the_trade_list_pages_and_filters():
+    client = _member_client()
+    client.post("/api/stocks/portfolio/import", json={"csv": MULTI_BROKER})
+    page = client.get("/api/stocks/portfolio/transactions", params={"limit": 2}).json()
+    assert page["total"] == 6 and len(page["rows"]) == 2
+    assert page["rows"][0]["ticker"] == "Twenty One Capital"  # newest first
+    sells = client.get("/api/stocks/portfolio/transactions", params={"side": "sell"}).json()
+    assert sells["total"] == 1 and sells["rows"][0]["realized"] == pytest.approx(140.0)
+    crypto = client.get("/api/stocks/portfolio/transactions", params={"asset": "crypto"}).json()
+    assert [r["ticker"] for r in crypto["rows"]] == ["BTC"]
+    by_year = client.get("/api/stocks/portfolio/transactions", params={"year": 2017}).json()
+    assert by_year["total"] == 1
+    found = client.get("/api/stocks/portfolio/transactions", params={"q": "class a"}).json()
+    assert found["total"] == 1
+
+
+def test_history_reaches_back_to_the_first_trade_and_estimates_without_closes(monkeypatch):
+    _reset_prices(monkeypatch)
+    # The provider has nothing: every point is valued at trade prices.
+    monkeypatch.setattr(portfolio, "_fetch_closes", lambda symbol, start, end: [])
+    client = _member_client()
+    client.post("/api/stocks/portfolio/import", json={"csv": MULTI_BROKER})
+    body = client.get("/api/stocks/portfolio/history").json()
+    assert body["points"][0]["date"] == "2017-02-06"
+    assert body["points"][0]["value"] == 250.0 and body["points"][0]["estimated"] is True
+    assert body["points"][0]["invested"] == 250.0
+
+
+def test_a_sell_with_nothing_on_record_does_not_erase_later_gains():
+    client = _member_client()
+    _buy(client, "AAPL", shares=5, price=100.0, day="2020-01-02", side="sell")  # no buy before it
+    _buy(client, "AAPL", shares=10, price=100.0, day="2020-02-03")
+    body = _buy(client, "AAPL", shares=4, price=150.0, day="2020-03-02", side="sell")
+    assert body["oversold"] == ["AAPL"]
+    assert body["totals"]["realizedGain"] == pytest.approx(4 * 50.0)
+    assert body["realizedByTicker"][0]["realizedGain"] == pytest.approx(200.0)

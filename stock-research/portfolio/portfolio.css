@@ -285,3 +285,89 @@ body {
 }
 
 .pf-button[hidden] { display: none; }
+
+/* Tabs: one breakdown, five views of it. */
+.pf-tabs {
+    display: flex;
+    gap: 4px;
+    overflow-x: auto;
+    border-bottom: 1px solid var(--line);
+    scrollbar-width: none;
+}
+.pf-tabs::-webkit-scrollbar { display: none; }
+.pf-tabs a {
+    flex: none;
+    padding: 10px 14px;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--soft);
+    text-decoration: none;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+}
+.pf-tabs a:hover { color: var(--ink); }
+.pf-tabs a[aria-current="page"] { color: var(--ink); border-bottom-color: var(--sage); }
+.pf-tabs a:focus-visible { outline: none; box-shadow: var(--focus-ring); border-radius: 6px; }
+.pf-panel { display: flex; flex-direction: column; gap: 16px; }
+.pf-panel[hidden] { display: none; }
+
+/* The chart's second line and its estimated stretches. */
+.pf-chart__invested { fill: none; stroke: var(--soft); stroke-width: 1.5; stroke-linejoin: round; opacity: 0.75; }
+.pf-chart__line--estimated { stroke-dasharray: 4 4; opacity: 0.8; }
+.pf-chart-legend { list-style: none; display: flex; flex-wrap: wrap; gap: 4px 16px; margin-top: 8px; font-size: 12px; color: var(--soft); }
+.pf-chart-legend[hidden] { display: none; }
+.pf-chart-legend li { display: inline-flex; align-items: center; gap: 6px; }
+.pf-chart-legend li[hidden] { display: none; }
+.pf-key { width: 16px; height: 0; border-top: 2px solid var(--series-1); }
+.pf-key--invested { border-top: 1.5px solid var(--soft); }
+.pf-key--estimated { border-top: 2px dashed var(--series-1); }
+
+/* Gains tiles. */
+.pf-tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+@media (max-width: 720px) { .pf-tiles { grid-template-columns: repeat(2, 1fr); } }
+.pf-tile { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px; }
+.pf-tile__label { font-size: 12px; color: var(--muted); font-weight: 600; }
+.pf-tile__value { font-size: 22px; color: var(--ink); font-weight: 700; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.pf-tile__sub { font-size: 12px; color: var(--soft); font-variant-numeric: tabular-nums; }
+
+/* Realized by year: bars up for gains, down for losses, from one zero line. */
+.pf-yearbars { display: flex; gap: 6px; height: 120px; align-items: stretch; margin-bottom: 16px; }
+.pf-yearbar { flex: 1 1 0; display: flex; flex-direction: column; align-items: center; min-width: 0; }
+.pf-yearbar__plot { position: relative; flex: 1; width: 100%; border-bottom: 0; }
+.pf-yearbar__plot::after { content: ""; position: absolute; left: 0; right: 0; top: var(--zero, 50%); border-top: 1px solid var(--line-strong); }
+.pf-yearbar__bar { position: absolute; left: 18%; right: 18%; border-radius: 4px; min-height: 1px; }
+.pf-yearbar__bar--gain { background: var(--gain); border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
+.pf-yearbar__bar--loss { background: var(--loss); border-top-left-radius: 0; border-top-right-radius: 0; }
+.pf-yearbar__label { font-size: 11px; color: var(--muted); margin-top: 4px; font-variant-numeric: tabular-nums; }
+
+/* Activity: filters and the pager. */
+.pf-filters { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.pf-filters input, .pf-filters select {
+    font: inherit;
+    font-size: 13px;
+    color: var(--ink);
+    padding: 7px 10px;
+    border: 1px solid var(--line-strong);
+    border-radius: 8px;
+    background: var(--card);
+    min-width: 0;
+}
+.pf-filters input { flex: 1 1 180px; }
+.pf-filters select { flex: 0 1 auto; max-width: 100%; }
+.pf-filters [hidden] { display: none; }
+.pf-pager { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 12px; font-size: 13px; color: var(--soft); font-variant-numeric: tabular-nums; }
+.pf-pager[hidden] { display: none; }
+.pf-pager .pf-button:disabled { opacity: 0.4; cursor: default; }
+.pf-note-cell { max-width: 28ch; }
+.pf-wrap { white-space: normal; max-width: 16ch; font-size: 13px; color: var(--soft); }
+.pf-linkish { background: none; border: 0; padding: 0; font: inherit; font-weight: 600; color: var(--ink); cursor: pointer; text-align: left; }
+.pf-linkish:hover { color: var(--sage); text-decoration: underline; }
+.pf-linkish:focus-visible { outline: none; box-shadow: var(--focus-ring); border-radius: 4px; }
+.pf-ticker + .pf-tag { vertical-align: 1px; }
+
+@media (max-width: 1100px) {
+    .pf-hide-lg { display: none; }
+}
+@media (max-width: 860px) {
+    .pf-hide-md { display: none; }
+}

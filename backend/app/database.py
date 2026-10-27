@@ -1281,6 +1281,18 @@ class PortfolioTransaction(Base):
     price = Column(Float, nullable=False)
     fees = Column(Float, nullable=False, default=0.0)
     trade_date = Column(Date, nullable=False)
+    # stock | crypto | other. "other" is a position with no market symbol (an
+    # option, a name from a trade description), valued at its last trade.
+    asset = Column(String, nullable=False, default="stock", server_default="stock")
+    # Where the row came from, as the uploaded file said: the brokerage
+    # account, the export it was pulled from, and its own description.
+    account = Column(String, nullable=True)
+    source = Column(String, nullable=True)
+    notes = Column(Text, nullable=True)
+    # The trade's total as the source reported it, and a realized gain the
+    # source computed itself (kept beside the page's own average-cost figure).
+    amount = Column(Float, nullable=True)
+    realized_reported = Column(Float, nullable=True)
     created_at = Column(DateTime, default=utc_now, nullable=False)
 
 
@@ -1299,6 +1311,21 @@ class PriceClose(Base):
     ticker = Column(String, nullable=False)
     day = Column(Date, nullable=False)
     close = Column(Float, nullable=False)
+
+
+class PriceCoverage(Base):
+    """Which days the price provider has been asked about for one symbol.
+
+    Kept so a restart doesn't re-ask for history the plan can't serve (old
+    years on a short-history plan) or a symbol it has never heard of.
+    """
+
+    __tablename__ = "price_coverage"
+
+    symbol = Column(String, primary_key=True)
+    requested_from = Column(Date, nullable=False)
+    requested_to = Column(Date, nullable=False)
+    checked_at = Column(DateTime, nullable=False)
 
 
 def get_db():

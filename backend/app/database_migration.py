@@ -186,6 +186,14 @@ def migrate_database():
         # under; rows from before the tag were the gold-budget rules, 1.
         _add_column_if_missing(inspector, "castle_defense_scores", "rules", "INTEGER NOT NULL DEFAULT 1")
 
+        # Portfolio trades keep everything the uploaded file said about them.
+        _add_column_if_missing(inspector, "portfolio_transactions", "asset", "VARCHAR NOT NULL DEFAULT 'stock'")
+        for column, definition in (
+            ("account", "VARCHAR"), ("source", "VARCHAR"), ("notes", "TEXT"),
+            ("amount", "FLOAT"), ("realized_reported", "FLOAT"),
+        ):
+            _add_column_if_missing(inspector, "portfolio_transactions", column, definition)
+
         # Open passkey challenges are bounded per visitor as well as overall.
         if _add_column_if_missing(inspector, "passkey_challenges", "client_key", "VARCHAR"):
             with engine.begin() as conn:

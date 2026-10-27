@@ -10,6 +10,11 @@ class PolygonRateLimited(Exception):
     """Polygon answered 429: the plan's per-minute call allowance is spent."""
 
 
+class PolygonPlanLimited(Exception):
+    """Polygon answered 403: the plan doesn't reach this far back (or this
+    asset class)."""
+
+
 class PolygonClient:
     """Polygon.io API client - primary data source"""
     
@@ -247,6 +252,8 @@ class PolygonClient:
         )
         if response.status_code == 429:
             raise PolygonRateLimited(ticker)
+        if response.status_code == 403:
+            raise PolygonPlanLimited(ticker)
         response.raise_for_status()
         return [
             (datetime.fromtimestamp(r["t"] / 1000, tz=timezone.utc).date(), float(r["c"]))

@@ -13,7 +13,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/shared/site-nav.css?v=19">
-    <link rel="stylesheet" href="portfolio.css?v=6">
+    <link rel="stylesheet" href="portfolio.css?v=9">
 </head>
 <body>
 <noscript>
@@ -71,7 +71,7 @@
                     <label class="pf-field" id="asOfField">Holdings as of
                         <input type="date" id="asOfInput">
                     </label>
-                    <label class="pf-check" id="replaceField"><input type="checkbox" id="replaceInput"> Replace my saved transactions</label>
+                    <label class="pf-check" id="replaceField"><input type="checkbox" id="replaceInput"> <span id="replaceLabel">Replace my saved trades with this file</span></label>
                 </div>
                 <div class="pf-row">
                     <button type="submit" class="pf-button" id="uploadButton">Upload</button>
@@ -81,101 +81,229 @@
             <details class="pf-help">
                 <summary>What the file needs</summary>
                 <p><strong>Holdings</strong> need a <code>Symbol</code> and <code>Quantity</code> column. Add <code>Cost Basis</code> (total) or <code>Average Cost</code> to see your gain. A new holdings upload replaces the last one.</p>
-                <p><strong>Transactions</strong> also need a <code>Date</code>, an <code>Action</code> (buy or sell) and a <code>Price</code> (or <code>Amount</code>). Dividends and transfers are skipped.</p>
+                <p><strong>Transactions</strong> also need a <code>Date</code>, an <code>Action</code> or <code>Type</code> (buy or sell) and a <code>Price</code> (or <code>Amount</code>). Dividends and transfers are skipped. <code>Account</code>, <code>Source</code>, <code>Fees</code>, <code>Notes</code> and a <code>Realized gain/loss</code> column are kept and shown too. Crypto like BTC is priced as crypto; a position with no ticker (an option, a name) is kept and valued at your last trade.</p>
+                <p>Uploading the same file again only adds trades that aren't already saved.</p>
                 <p>With both, trades dated after the holdings' "as of" day are added on top; earlier ones are already in the holdings, so they're kept but not counted twice.</p>
             </details>
         </section>
 
         <section id="dashboard" hidden>
-            <!-- The headline: one number, what it's done, and the line that got it there. -->
-            <section class="pf-card pf-hero" id="historyCard">
-                <div class="pf-hero__top">
-                    <div>
-                        <p class="pf-hero__label">Total value</p>
-                        <p class="pf-hero__value" id="heroValue">—</p>
-                        <p class="pf-hero__stats" id="heroStats"></p>
+            <nav class="pf-tabs" id="tabs" aria-label="Portfolio sections">
+                <a href="#overview" data-tab="overview">Overview</a>
+                <a href="#holdings" data-tab="holdings">Holdings</a>
+                <a href="#activity" data-tab="activity">Activity</a>
+                <a href="#accounts" data-tab="accounts">Accounts</a>
+                <a href="#gains" data-tab="gains">Gains</a>
+            </nav>
+
+            <!-- Overview: the headline, the line that got there, the top holdings. -->
+            <div class="pf-panel" data-panel="overview">
+                <section class="pf-card pf-hero" id="historyCard">
+                    <div class="pf-hero__top">
+                        <div>
+                            <p class="pf-hero__label">Total value</p>
+                            <p class="pf-hero__value" id="heroValue">—</p>
+                            <p class="pf-hero__stats" id="heroStats"></p>
+                        </div>
+                        <div class="pf-ranges" id="historyRanges" role="group" aria-label="Time range"></div>
                     </div>
-                    <div class="pf-ranges" id="historyRanges" role="group" aria-label="Time range"></div>
-                </div>
-                <p class="pf-hero__change" id="historySub">Loading price history…</p>
-                <div class="pf-chart" id="historyChart"></div>
-                <p class="pf-note" id="historyNote" hidden></p>
-            </section>
+                    <p class="pf-hero__change" id="historySub">Loading price history…</p>
+                    <div class="pf-chart" id="historyChart"></div>
+                    <ul class="pf-chart-legend" id="historyLegend" hidden>
+                        <li><span class="pf-key pf-key--value"></span>Value</li>
+                        <li><span class="pf-key pf-key--invested"></span>Invested (cost basis)</li>
+                        <li id="estimatedKey" hidden><span class="pf-key pf-key--estimated"></span>Estimated from your trade prices</li>
+                    </ul>
+                    <p class="pf-note" id="historyNote" hidden></p>
+                </section>
 
-            <section class="pf-card">
-                <div class="pf-card__head">
-                    <h2 class="pf-card__title">Holdings</h2>
-                    <p class="pf-card__sub" id="holdingsSub"></p>
-                </div>
-                <div class="pf-stack" id="allocationBar" role="img"></div>
-                <div class="pf-table-wrap">
-                    <table class="pf-table" id="holdingsTable">
-                        <thead>
-                            <tr>
-                                <th scope="col">Ticker</th>
-                                <th scope="col" class="num">Weight</th>
-                                <th scope="col" class="num">Value</th>
-                                <th scope="col" class="num pf-hide-sm">Shares</th>
-                                <th scope="col" class="num pf-hide-sm">Price</th>
-                                <th scope="col" class="num pf-hide-sm">Cost</th>
-                                <th scope="col" class="num">Gain</th>
-                            </tr>
-                        </thead>
-                        <tbody></tbody>
-                    </table>
-                </div>
-            </section>
+                <section class="pf-card">
+                    <div class="pf-card__head pf-card__head--row">
+                        <div>
+                            <h2 class="pf-card__title">Top holdings</h2>
+                            <p class="pf-card__sub" id="topHoldingsSub"></p>
+                        </div>
+                        <a class="pf-button pf-button--quiet" href="#holdings" id="allHoldingsLink">All holdings</a>
+                    </div>
+                    <div class="pf-stack" id="allocationBar" role="img"></div>
+                    <div class="pf-table-wrap">
+                        <table class="pf-table" id="topHoldingsTable">
+                            <thead>
+                                <tr>
+                                    <th scope="col">Security</th>
+                                    <th scope="col" class="num">Weight</th>
+                                    <th scope="col" class="num">Value</th>
+                                    <th scope="col" class="num">Gain</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </section>
 
-            <div class="pf-grid" id="insightGrid">
+                <div class="pf-grid" id="insightGrid">
+                    <section class="pf-card">
+                        <div class="pf-card__head">
+                            <h2 class="pf-card__title">At a glance</h2>
+                        </div>
+                        <ul class="pf-insights" id="insights"></ul>
+                    </section>
+                    <section class="pf-card" id="sectorCard">
+                        <div class="pf-card__head">
+                            <h2 class="pf-card__title">By sector</h2>
+                        </div>
+                        <ul class="pf-bars" id="sectorBars"></ul>
+                    </section>
+                </div>
+            </div>
+
+            <!-- Holdings: every open position, then everything you've sold out of. -->
+            <div class="pf-panel" data-panel="holdings" hidden>
                 <section class="pf-card">
                     <div class="pf-card__head">
-                        <h2 class="pf-card__title">At a glance</h2>
+                        <h2 class="pf-card__title">Open positions</h2>
+                        <p class="pf-card__sub" id="holdingsSub"></p>
                     </div>
-                    <ul class="pf-insights" id="insights"></ul>
+                    <div class="pf-table-wrap">
+                        <table class="pf-table" id="holdingsTable">
+                            <thead>
+                                <tr>
+                                    <th scope="col">Security</th>
+                                    <th scope="col" class="num">Weight</th>
+                                    <th scope="col" class="num">Value</th>
+                                    <th scope="col" class="num pf-hide-sm">Shares</th>
+                                    <th scope="col" class="num pf-hide-sm">Price</th>
+                                    <th scope="col" class="num pf-hide-sm">Cost</th>
+                                    <th scope="col" class="num">Gain</th>
+                                    <th scope="col" class="num pf-hide-md">Realized</th>
+                                    <th scope="col" class="num pf-hide-md">Since</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
                 </section>
-                <section class="pf-card" id="sectorCard">
+                <section class="pf-card" id="closedCard">
                     <div class="pf-card__head">
-                        <h2 class="pf-card__title">By sector</h2>
+                        <h2 class="pf-card__title">Closed positions</h2>
+                        <p class="pf-card__sub" id="closedSub"></p>
                     </div>
-                    <ul class="pf-bars" id="sectorBars"></ul>
+                    <div class="pf-table-wrap">
+                        <table class="pf-table" id="closedTable">
+                            <thead>
+                                <tr>
+                                    <th scope="col">Security</th>
+                                    <th scope="col" class="num">Realized</th>
+                                    <th scope="col" class="num pf-hide-sm">Bought</th>
+                                    <th scope="col" class="num pf-hide-sm">Sold</th>
+                                    <th scope="col" class="num pf-hide-sm">Trades</th>
+                                    <th scope="col" class="num">Held</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
                 </section>
             </div>
 
-            <section class="pf-card">
-                <div class="pf-card__head pf-card__head--row">
-                    <div>
-                        <h2 class="pf-card__title">Transactions</h2>
-                        <p class="pf-card__sub" id="transactionsSub"></p>
+            <!-- Activity: every trade, filtered and paged by the server. -->
+            <div class="pf-panel" data-panel="activity" hidden>
+                <section class="pf-card">
+                    <div class="pf-card__head pf-card__head--row">
+                        <div>
+                            <h2 class="pf-card__title">Trades</h2>
+                            <p class="pf-card__sub" id="transactionsSub"></p>
+                        </div>
+                        <button type="button" class="pf-button pf-button--quiet" id="addToggle" aria-expanded="false" aria-controls="addForm">Add a trade</button>
                     </div>
-                    <button type="button" class="pf-button pf-button--quiet" id="addToggle" aria-expanded="false" aria-controls="addForm">Add a trade</button>
-                </div>
-                <form id="addForm" class="pf-add" hidden>
-                    <label class="pf-field">Ticker <input id="addTicker" required maxlength="12" autocomplete="off" placeholder="AAPL"></label>
-                    <label class="pf-field">Side
-                        <select id="addSide"><option value="buy">Buy</option><option value="sell">Sell</option></select>
-                    </label>
-                    <label class="pf-field">Shares <input id="addShares" type="number" step="any" min="0" required></label>
-                    <label class="pf-field">Price <input id="addPrice" type="number" step="any" min="0" required></label>
-                    <label class="pf-field">Date <input id="addDate" type="date" required></label>
-                    <button type="submit" class="pf-button">Save trade</button>
-                </form>
-                <div class="pf-table-wrap">
-                    <table class="pf-table pf-table--tx" id="transactionsTable">
-                        <thead>
-                            <tr>
-                                <th scope="col">Date</th>
-                                <th scope="col">Ticker</th>
-                                <th scope="col">Side</th>
-                                <th scope="col" class="num">Shares</th>
-                                <th scope="col" class="num">Price</th>
-                                <th scope="col"><span class="visually-hidden">Remove</span></th>
-                            </tr>
-                        </thead>
-                        <tbody></tbody>
-                    </table>
-                </div>
-                <button type="button" class="pf-more" id="tradesToggle" hidden></button>
-            </section>
+                    <form id="addForm" class="pf-add" hidden>
+                        <label class="pf-field">Security <input id="addTicker" required maxlength="60" autocomplete="off" placeholder="AAPL"></label>
+                        <label class="pf-field">Side
+                            <select id="addSide"><option value="buy">Buy</option><option value="sell">Sell</option></select>
+                        </label>
+                        <label class="pf-field">Shares <input id="addShares" type="number" step="any" min="0" required></label>
+                        <label class="pf-field">Price <input id="addPrice" type="number" step="any" min="0" required></label>
+                        <label class="pf-field">Date <input id="addDate" type="date" required></label>
+                        <label class="pf-field">Account <input id="addAccount" maxlength="120" autocomplete="off" list="accountOptions"></label>
+                        <datalist id="accountOptions"></datalist>
+                        <button type="submit" class="pf-button">Save trade</button>
+                    </form>
+                    <form class="pf-filters" id="filters" role="search">
+                        <input type="search" id="filterQuery" placeholder="Search ticker or note" aria-label="Search trades" autocomplete="off">
+                        <select id="filterSide" aria-label="Side"><option value="">Buys and sells</option><option value="buy">Buys</option><option value="sell">Sells</option></select>
+                        <select id="filterYear" aria-label="Year"><option value="">All years</option></select>
+                        <select id="filterAccount" aria-label="Account"><option value="">All accounts</option></select>
+                        <select id="filterSource" aria-label="Source"><option value="">All sources</option></select>
+                        <select id="filterAsset" aria-label="Asset type"><option value="">All assets</option><option value="stock">Stocks and funds</option><option value="crypto">Crypto</option><option value="other">Other</option></select>
+                    </form>
+                    <div class="pf-table-wrap">
+                        <table class="pf-table pf-table--tx" id="transactionsTable">
+                            <thead>
+                                <tr>
+                                    <th scope="col">Date</th>
+                                    <th scope="col">Security</th>
+                                    <th scope="col">Side</th>
+                                    <th scope="col" class="num">Shares</th>
+                                    <th scope="col" class="num pf-hide-sm">Price</th>
+                                    <th scope="col" class="num">Amount</th>
+                                    <th scope="col" class="num pf-hide-md">Realized</th>
+                                    <th scope="col" class="pf-hide-md">Account</th>
+                                    <th scope="col" class="pf-hide-lg">Source</th>
+                                    <th scope="col"><span class="visually-hidden">Remove</span></th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                    <div class="pf-pager" id="pager">
+                        <span id="pagerText"></span>
+                        <span class="pf-row">
+                            <button type="button" class="pf-button pf-button--quiet" id="pagePrev">Newer</button>
+                            <button type="button" class="pf-button pf-button--quiet" id="pageNext">Older</button>
+                        </span>
+                    </div>
+                </section>
+            </div>
+
+            <!-- Accounts: what happened where. Activity, not cost basis: account
+                 labels across exports don't line up well enough to split that. -->
+            <div class="pf-panel" data-panel="accounts" hidden>
+                <section class="pf-card">
+                    <div class="pf-card__head">
+                        <h2 class="pf-card__title">By account</h2>
+                        <p class="pf-card__sub">Trading activity in each account, as your file labels them.</p>
+                    </div>
+                    <div class="pf-table-wrap"><table class="pf-table" id="accountsTable"></table></div>
+                </section>
+                <section class="pf-card">
+                    <div class="pf-card__head">
+                        <h2 class="pf-card__title">By source</h2>
+                        <p class="pf-card__sub">Where each trade came from.</p>
+                    </div>
+                    <div class="pf-table-wrap"><table class="pf-table" id="sourcesTable"></table></div>
+                </section>
+            </div>
+
+            <!-- Gains: realized by year and by security, and the totals. -->
+            <div class="pf-panel" data-panel="gains" hidden>
+                <div class="pf-tiles" id="gainTiles"></div>
+                <section class="pf-card">
+                    <div class="pf-card__head">
+                        <h2 class="pf-card__title">By year</h2>
+                        <p class="pf-card__sub">Realized gain at average cost, and money in and out, for each calendar year.</p>
+                    </div>
+                    <div class="pf-yearbars" id="yearBars" role="img"></div>
+                    <div class="pf-table-wrap"><table class="pf-table" id="yearsTable"></table></div>
+                </section>
+                <section class="pf-card">
+                    <div class="pf-card__head">
+                        <h2 class="pf-card__title">Realized by security</h2>
+                        <p class="pf-card__sub" id="realizedSub"></p>
+                    </div>
+                    <div class="pf-table-wrap"><table class="pf-table" id="realizedTable"></table></div>
+                    <button type="button" class="pf-more" id="realizedToggle" hidden></button>
+                </section>
+            </div>
 
             <div class="pf-row pf-danger">
                 <button type="button" class="pf-link" id="clearHoldingsButton">Remove uploaded holdings</button>
@@ -187,6 +315,6 @@
     <script src="/shared/api-base.js?v=1"></script>
     <script src="/shared/site-nav.js?v=22"></script>
     <script src="/shared/analytics.js?v=1"></script>
-    <script src="portfolio.js?v=8"></script>
+    <script src="portfolio.js?v=11"></script>
 </body>
 </html>
