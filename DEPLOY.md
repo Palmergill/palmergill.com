@@ -94,6 +94,8 @@ POLYGON_API_KEY=<secret Polygon key>
 
 `USE_REAL_DATA` defaults to `true` in the app and Docker image; set it to `false` only for local development with synthetic stock data.
 
+The portfolio chart (`/stock-research/portfolio/`) reaches back to a member's first trade, further than the Polygon plan's roughly two years of daily bars. Set `TIINGO_API_KEY` (a free Tiingo account's key) and the older days are fetched from Tiingo once per symbol and stored; without it those days are estimated from the member's own trade prices.
+
 Bitcoin Dashboard uses mempool.space as the default live provider. Configure:
 
 ```text

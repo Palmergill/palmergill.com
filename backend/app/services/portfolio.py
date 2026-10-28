@@ -31,10 +31,12 @@ from sqlalchemy.orm import Session
 
 from app import accounts
 from app.database import (
-    PortfolioHolding, PortfolioTransaction, PriceClose, PriceCoverage, SplitCheck, StockSplit, StockSummary,
+    PortfolioHolding, PortfolioTransaction, PriceBackfill, PriceClose, PriceCoverage, SplitCheck, StockSplit,
+    StockSummary,
 )
 from app.services.polygon_client import PolygonPlanLimited, PolygonRateLimited
 from app.services.stock_data_client import stock_data_client
+from app.services.tiingo_client import TiingoRateLimited, tiingo_client
 
 logger = logging.getLogger(__name__)
 
@@ -1281,6 +1283,86 @@ def list_transactions(
     }
 
 
+# ── older history ───────────────────────────────────────────────────────────
+#
+# The main provider's plan reaches back about two years; a trade history can
+# reach back ten. For the chart, each symbol's days before its earliest
+# stored close are asked of Tiingo once (one call, from the first day wanted
+# through today so every later split is in it) and stored with the rest.
+# Only the days before the main provider's own closes are kept, so the two
+# sources never overlap. Tiingo's free tier allows a limited number of calls
+# an hour: a few per request, and a pause when it says the allowance is spent.
+
+BACKFILL_CALLS_PER_REQUEST = 3
+BACKFILL_COOLDOWN = timedelta(minutes=10)
+# A symbol Tiingo had nothing for is asked again after this long.
+BACKFILL_RETRY = timedelta(hours=24)
+_backfill_paused_until: Optional[datetime] = None
+
+
+def backfill_configured() -> bool:
+    return not stock_data_client._use_mock() and tiingo_client.is_configured()
+
+
+def _fetch_old_closes(symbol: str, start: date) -> List[Tuple[date, float]]:
+    if symbol.startswith("X:"):
+        return tiingo_client.get_crypto_closes(symbol[2:], start)
+    return tiingo_client.get_daily_closes(symbol, start)
+
+
+def backfill_retry_after() -> Optional[int]:
+    if _backfill_paused_until and _backfill_paused_until > _now():
+        return int((_backfill_paused_until - _now()).total_seconds()) + 1
+    return None
+
+
+def backfill_closes(db: Session, wants: Dict[str, Tuple[date, date]], calls: int) -> List[str]:
+    """Fill each symbol's days before its earliest stored close. Returns the
+    symbols still waiting for a call."""
+    global _backfill_paused_until
+    if not wants or not backfill_configured():
+        return []
+    pending: List[str] = []
+    with _lock:
+        earliest = dict(
+            db.query(PriceClose.ticker, func.min(PriceClose.day))
+            .filter(PriceClose.ticker.in_(list(wants))).group_by(PriceClose.ticker).all()
+        )
+        checks = {c.symbol: c for c in db.query(PriceBackfill).filter(PriceBackfill.symbol.in_(list(wants)))}
+        for symbol, (start, _end) in wants.items():
+            first = earliest.get(symbol)
+            if first is not None and (first - start).days <= STALE_AFTER_DAYS:
+                continue  # the main provider already covers it
+            check = checks.get(symbol)
+            if check and check.requested_from <= start + timedelta(days=STALE_AFTER_DAYS) and (
+                check.found or _naive_now() - check.checked_at < BACKFILL_RETRY
+            ):
+                continue
+            if (_backfill_paused_until and _backfill_paused_until > _now()) or calls <= 0:
+                pending.append(symbol)
+                continue
+            calls -= 1
+            try:
+                rows = _fetch_old_closes(symbol, start)
+            except TiingoRateLimited:
+                _backfill_paused_until = _now() + BACKFILL_COOLDOWN
+                logger.warning("Tiingo allowance spent; pausing portfolio backfill")
+                pending.append(symbol)
+                continue
+            except Exception as exc:  # noqa: BLE001 - the chart keeps its estimates
+                logger.warning("[%s] older closes unavailable: %s", symbol, type(exc).__name__)
+                rows = []
+            _store(db, symbol, [r for r in rows if first is None or r[0] < first])
+            if check is None:
+                check = PriceBackfill(symbol=symbol, requested_from=start, checked_at=_naive_now(), found=bool(rows))
+                db.add(check)
+            else:
+                check.requested_from, check.checked_at = min(check.requested_from, start), _naive_now()
+                check.found = bool(rows)
+            db.commit()
+    return pending
+
+
 # ── value over time ─────────────────────────────────────────────────────────
 #
 # The value on a day is the shares held that day times that day's price. A
@@ -1337,6 +1419,10 @@ def value_history(db: Session, username: str) -> Dict[str, Any]:
     wants = dict(sorted(wants.items(), key=lambda kv: kv[1][1], reverse=True))
     status = ensure_closes(db, wants, _Budget(CALLS_PER_REQUEST))
     pending = [s for s, state in status.items() if state == "pending"]
+    # Older days only once the main provider has said what it has.
+    backfilling = backfill_closes(
+        db, {s: w for s, w in wants.items() if status.get(s) == "ready"}, BACKFILL_CALLS_PER_REQUEST,
+    )
 
     closes: Dict[str, List[Tuple[date, float]]] = {}
     for symbol, day, close in (
@@ -1421,7 +1507,13 @@ def value_history(db: Session, username: str) -> Dict[str, Any]:
                 })
         day += timedelta(days=1)
 
+    waiting = pending + backfilling
+    retry = None
+    if waiting:
+        # A paused backfill is worth asking about every minute or two, not
+        # every couple of seconds.
+        retry = max(retry_after_seconds() if pending else 2, min(backfill_retry_after() or 2, 120) if backfilling else 2)
     return {
-        **base, "points": points, "pending": pending, "complete": not pending,
-        "retryAfter": retry_after_seconds() if pending else None,
+        **base, "points": points, "pending": waiting, "backfilling": backfilling,
+        "complete": not waiting, "retryAfter": retry,
     }

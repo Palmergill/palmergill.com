@@ -598,3 +598,87 @@ def test_a_name_is_not_matched_to_a_ticker_on_one_coincidence():
     body = client.post("/api/stocks/portfolio/import", json={"csv": csv}).json()["portfolio"]
     assert body["aliases"] == []
     assert {p["ticker"] for p in body["positions"]} == {"AAPL", "Some Fund"}
+
+
+# ── older history from Tiingo ───────────────────────────────────────────────
+
+
+def test_tiingo_closes_are_split_adjusted_and_nothing_else(monkeypatch):
+    from app.services import tiingo_client as tiingo
+
+    rows = [
+        {"date": "2024-06-06T00:00:00.000Z", "close": 1200.0, "splitFactor": 1.0, "adjClose": 119.0},
+        {"date": "2024-06-07T00:00:00.000Z", "close": 1210.0, "splitFactor": 1.0, "adjClose": 120.0},
+        {"date": "2024-06-10T00:00:00.000Z", "close": 121.0, "splitFactor": 10.0, "adjClose": 121.0},
+        {"date": "2024-06-11T00:00:00.000Z", "close": 122.0, "splitFactor": 1.0, "adjClose": 122.0},
+    ]
+    monkeypatch.setattr(tiingo.TiingoClient, "_get", lambda self, path, params: rows)
+    closes = tiingo.TiingoClient().get_daily_closes("NVDA", date(2024, 6, 6))
+    assert closes == [
+        (date(2024, 6, 6), 120.0), (date(2024, 6, 7), 121.0),
+        (date(2024, 6, 10), 121.0), (date(2024, 6, 11), 122.0),
+    ]
+
+
+@pytest.fixture
+def _backfill(monkeypatch):
+    """Polygon has only the last few weeks; Tiingo has everything."""
+    from datetime import timedelta
+
+    from app.database import PriceBackfill
+
+    _reset_prices(monkeypatch)
+    db = SessionLocal()
+    try:
+        db.query(PriceBackfill).delete()
+        db.commit()
+    finally:
+        db.close()
+    today = portfolio.utc_today()
+    recent_from = today - timedelta(days=30)
+
+    def weekdays(start, end, close):
+        return [(start + timedelta(days=i), close) for i in range((end - start).days + 1) if (start + timedelta(days=i)).weekday() < 5]
+
+    monkeypatch.setattr(portfolio, "_fetch_closes", lambda symbol, start, end: weekdays(max(start, recent_from), end, 20.0))
+    calls = []
+
+    def tiingo(symbol, start):
+        calls.append(symbol)
+        return weekdays(start, today, 10.0)
+
+    monkeypatch.setattr(portfolio, "_fetch_old_closes", tiingo)
+    monkeypatch.setattr(portfolio, "backfill_configured", lambda: True)
+    monkeypatch.setattr(portfolio, "_backfill_paused_until", None)
+    return calls
+
+
+def test_old_days_come_from_the_backfill_and_recent_ones_from_polygon(_backfill):
+    client = _member_client()
+    # MSFT: no split since, so 2 shares are 2 shares.
+    _buy(client, "MSFT", shares=2, price=10.0, day="2020-03-02")
+    points = client.get("/api/stocks/portfolio/history").json()["points"]
+    assert points[0]["date"] == "2020-03-02"
+    assert points[0] == {"date": "2020-03-02", "value": 20.0, "invested": 20.0, "estimated": False}
+    # The last weeks are Polygon's closes, not Tiingo's for the same days.
+    assert points[-1]["value"] == 40.0
+    assert not any(p["estimated"] for p in points)
+    client.get("/api/stocks/portfolio/history")
+    assert _backfill == ["MSFT"]  # asked once, stored
+
+
+def test_a_spent_tiingo_allowance_pauses_the_backfill(_backfill, monkeypatch):
+    from app.services.tiingo_client import TiingoRateLimited
+
+    def spent(symbol, start):
+        _backfill.append(symbol)
+        raise TiingoRateLimited("hourly allocation")
+
+    monkeypatch.setattr(portfolio, "_fetch_old_closes", spent)
+    client = _member_client()
+    _buy(client, "AAPL", shares=1, price=10.0, day="2020-03-02")
+    body = client.get("/api/stocks/portfolio/history").json()
+    assert body["backfilling"] == ["AAPL"] and body["complete"] is False
+    assert body["retryAfter"] >= 60
+    client.get("/api/stocks/portfolio/history")
+    assert _backfill == ["AAPL"]  # paused: not asked again yet

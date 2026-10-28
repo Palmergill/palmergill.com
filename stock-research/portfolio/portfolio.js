@@ -871,9 +871,12 @@
         }
         const estimated = points.some((p) => p.estimated);
         if (estimated) {
-            notes.push('Dashed stretches use your own trade prices where no market close was available (older history than the price plan covers, or a position with no ticker).');
+            notes.push('Dashed stretches use your own trade prices where no market close was available (a position with no ticker, or history not loaded yet).');
         }
-        if (pending) {
+        const backfilling = (history.data.backfilling || []).length;
+        if (backfilling) {
+            notes.push(`Fetching older prices for ${plural(backfilling, 'symbol')}; the dashed stretches fill in with real closes as they arrive${history.data.retryAfter > 60 ? ' (the history source limits requests per hour, so this can take a while the first time)' : ''}.`);
+        } else if (pending) {
             notes.push(`Still loading prices for ${plural(pending, 'symbol')}${history.data.retryAfter > 5 ? '; the price provider limits requests per minute, so a long history fills in over a few minutes the first time' : ''}.`);
         }
         if (history.data.sampleData) notes.push('Generated sample prices, not real history.');

@@ -1313,6 +1313,18 @@ class PriceClose(Base):
     close = Column(Float, nullable=False)
 
 
+class PriceBackfill(Base):
+    """When a symbol's older closes were last asked of the long-history
+    source (Tiingo), for the days the main provider's plan doesn't reach."""
+
+    __tablename__ = "price_backfills"
+
+    symbol = Column(String, primary_key=True)
+    requested_from = Column(Date, nullable=False)
+    checked_at = Column(DateTime, nullable=False)
+    found = Column(Boolean, nullable=False, default=False)
+
+
 class StockSplit(Base):
     """One stock split, as the price provider reports it: `split_to` new
     shares for every `split_from` old ones, from the open on
