@@ -67,6 +67,17 @@ def read_value_history(username: str = Depends(caller), db: Session = Depends(ge
     return portfolio.value_history(db, username)
 
 
+@router.get("/holding")
+def read_holding(
+    ticker: str = Query(..., min_length=1, max_length=60),
+    username: str = Depends(caller),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """One security's price history, trades and position, for its page. A
+    query parameter, since a named security (an option) can contain a slash."""
+    return portfolio.holding_detail(db, username, ticker)
+
+
 @router.get("/transactions")
 def read_transactions(
     offset: int = Query(0, ge=0),

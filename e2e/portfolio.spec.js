@@ -26,6 +26,14 @@ test('a member uploads holdings, sees the breakdown, and nobody else does', asyn
     await expect(page.locator('#holdingsTable')).toContainText('$1,500');
     await expect(page.locator('#holdingsTable')).toContainText('$330.00/sh');
 
+    // Tapping a row opens that holding, and its back link returns to the list.
+    await page.locator('#holdingsTable tr[data-ticker="MSFT"] td').nth(2).click();
+    await expect(page).toHaveURL(/#holding\/MSFT$/);
+    await expect(page.locator('#holdingName')).toContainText('MSFT');
+    await expect(page.locator('#holdingTiles')).toContainText('$330.00');
+    await page.getByRole('link', { name: '← Holdings' }).click();
+    await expect(page.locator('#holdingsTable')).toBeVisible();
+
     // A second account sees its own empty portfolio, not this one.
     const other = await browser.newPage();
     await signUp(other);

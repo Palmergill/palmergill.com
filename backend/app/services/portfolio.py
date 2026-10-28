@@ -1332,6 +1332,133 @@ def list_transactions(
     }
 
 
+# ── one holding ─────────────────────────────────────────────────────────────
+
+# What the detail view shows from the stock pages' cached summary.
+COMPANY_FACTS = (
+    "market_cap", "pe_ratio", "beta", "profit_margin", "revenue_growth", "next_earnings_date",
+)
+
+
+def _company_facts(db: Session, ticker: str) -> Optional[Dict[str, Any]]:
+    """The research page's summary of a stock, if it has one: only what's
+    cached (or mock data), never a provider call, since a full summary costs
+    a burst of calls the plan can't spare. Opening the research page fills it."""
+    if stock_data_client._use_mock():
+        data = stock_data_client.mock.get_stock_data(ticker)
+        if not data:
+            return None
+    else:
+        row = db.query(StockSummary).filter(StockSummary.ticker == ticker).first()
+        if not row:
+            return None
+        data = stock_data_client._format_response(ticker, row, [])
+    summary = data.get("summary") or {}
+    return {
+        "name": data.get("name"), "description": data.get("description"),
+        "sector": data.get("sector"), "industry": data.get("industry"),
+        "website": data.get("website"), "headquarters": data.get("headquarters"),
+        "employees": data.get("employees"),
+        **{key: summary.get(key) for key in COMPANY_FACTS},
+    }
+
+
+def holding_detail(db: Session, username: str, ticker: str) -> Dict[str, Any]:
+    """One security the caller holds or has held: its daily closes back past
+    the first trade, the trades on it, the position, and what the stock
+    pages know about the company."""
+    holdings, transactions, _ = load_adjusted(db, username, _Budget(SPLIT_CALLS_PER_REQUEST))
+    positions, meta = build_positions(holdings, transactions)
+    ticker = ticker.strip().upper()
+    position = positions.get(ticker)
+    if position is None:
+        raise HTTPException(status_code=404, detail="Not in your portfolio.")
+
+    today = utc_today()
+    symbol = market_symbol(ticker, position["asset"])
+    start = min(position["first"] or today, today - timedelta(days=365))
+    status, backfilling = "ready", []
+    if symbol:
+        status = ensure_closes(db, {symbol: (start, today)}, _Budget(CALLS_PER_REQUEST)).get(symbol, "ready")
+        if status == "ready":
+            backfilling = backfill_closes(db, {symbol: (start, today)}, 1)
+    closes = [
+        {"date": day.isoformat(), "close": round(close, 4)}
+        for day, close in (
+            db.query(PriceClose.day, PriceClose.close)
+            .filter(PriceClose.ticker == symbol, PriceClose.day >= start)
+            .order_by(PriceClose.day)
+        )
+    ] if symbol else []
+
+    is_open = position["shares"] > EPSILON
+    quote = quotes(db, {ticker: position})[ticker] if is_open else None
+    price = quote["price"] if quote else (closes[-1]["close"] if closes else None)
+    value = position["shares"] * price if is_open and price is not None else None
+    cost = position["cost"] if is_open else None
+    gain = value - cost if value is not None and cost is not None else None
+    day_change = base = None
+    if quote and value is not None and quote["prevClose"]:
+        day_change, base = _day_change(position["shares"], price, quote["prevClose"], [
+            t for t in transactions if t.ticker == ticker and t.trade_date == quote["day"]
+        ])
+
+    def since(days: Optional[int]) -> Optional[float]:
+        """The price change since `days` ago (None: since Jan 1)."""
+        if not closes:
+            return None
+        cutoff = (date(today.year, 1, 1) if days is None else today - timedelta(days=days)).isoformat()
+        before = [c for c in closes if c["date"] <= cutoff]
+        return _ratio(closes[-1]["close"] - before[-1]["close"], before[-1]["close"]) if before else None
+
+    year = [c["close"] for c in closes if c["date"] >= (today - timedelta(days=365)).isoformat()]
+    trades = sorted((t for t in transactions if t.ticker == ticker), key=lambda t: (t.trade_date, t.id))
+    facts = _company_facts(db, ticker) if position["asset"] == "stock" else None
+    name = (facts or {}).get("name") or (quote or {}).get("name") or CRYPTO_NAMES.get(ticker)
+    return {
+        "ticker": ticker,
+        "asset": position["asset"],
+        "name": name,
+        "open": is_open,
+        "price": price,
+        "priceStatus": quote["status"] if quote else ("closed" if closes else "unavailable"),
+        "priceAsOf": quote["asOf"] if quote else (closes[-1]["date"] if closes else None),
+        "dayChange": day_change,
+        "dayChangePct": _ratio(day_change, base) if day_change is not None else None,
+        "position": {
+            "shares": position["shares"] if is_open else 0.0,
+            "marketValue": value,
+            "costBasis": cost,
+            "avgCost": _ratio(cost, position["shares"]) if is_open else None,
+            "gain": gain,
+            "gainPct": _ratio(gain, cost),
+            "realizedGain": position["realized"] if position["realizedCounted"] else None,
+            "bought": position["bought"],
+            "sold": position["sold"],
+            "trades": position["trades"],
+            "firstTrade": position["first"].isoformat() if position["first"] else None,
+            "lastTrade": position["last"].isoformat() if position["last"] else None,
+        },
+        "performance": {
+            "1M": since(31), "YTD": since(None), "1Y": since(365),
+            "high52w": max(year) if year else None, "low52w": min(year) if year else None,
+        },
+        "closes": closes,
+        "trades": [
+            {
+                "id": t.id, "date": t.trade_date.isoformat(), "side": t.side, "shares": t.shares,
+                "price": t.price, "fees": t.fees or 0.0, "account": t.account, "source": t.source,
+                "realized": meta["realized_by_tx"].get(t.id),
+            }
+            for t in trades
+        ],
+        "company": facts,
+        "pending": status == "pending" or bool(backfilling),
+        "retryAfter": retry_after_seconds() if status == "pending" else (min(backfill_retry_after() or 2, 120) if backfilling else None),
+        "sampleData": stock_data_client._use_mock(),
+    }
+
+
 # ── older history ───────────────────────────────────────────────────────────
 #
 # The main provider's plan reaches back about two years; a trade history can
@@ -1506,14 +1633,9 @@ def value_history(db: Session, username: str) -> Dict[str, Any]:
     day = start
     while day <= today:
         if day.weekday() < 5 or day == today:
-            # Money put in (or taken out) since the last point, so the day's
-            # return isn't a deposit.
-            flow = 0.0
             while t_index < len(trades) and trades[t_index].trade_date <= day:
                 tx = trades[t_index]
                 t_index += 1
-                fees = tx.fees or 0.0
-                flow += tx.shares * tx.price + fees if tx.side == "buy" else -(tx.shares * tx.price - fees)
                 held_now = shares.get(tx.ticker, 0.0)
                 basis = cost.get(tx.ticker, 0.0) if tx.ticker in cost else 0.0
                 if tx.side == "buy":
@@ -1553,19 +1675,11 @@ def value_history(db: Session, username: str) -> Dict[str, Any]:
                 basis = cost.get(ticker)
                 invested = None if invested is None or basis is None else invested + basis
             if value > 0 or points:
-                change = change_pct = None
-                if points:
-                    previous = points[-1]["value"]
-                    change = value - previous - flow
-                    # Of what was there at the last close plus what came in.
-                    change_pct = _ratio(change, previous + max(flow, 0.0))
                 points.append({
                     "date": day.isoformat(),
                     "value": round(value, 2),
                     "invested": round(invested, 2) if invested is not None else None,
                     "estimated": value > 0 and estimated / value > ESTIMATE_SHARE,
-                    "change": round(change, 2) if change is not None else None,
-                    "changePct": round(change_pct, 6) if change_pct is not None else None,
                 })
         day += timedelta(days=1)
 

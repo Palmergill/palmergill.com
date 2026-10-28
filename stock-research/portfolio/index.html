@@ -13,7 +13,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/shared/site-nav.css?v=19">
-    <link rel="stylesheet" href="portfolio.css?v=10">
+    <link rel="stylesheet" href="portfolio.css?v=11">
 </head>
 <body>
 <noscript>
@@ -105,13 +105,7 @@
                             <p class="pf-hero__value" id="heroValue">—</p>
                             <p class="pf-hero__stats" id="heroStats"></p>
                         </div>
-                        <div class="pf-chart-controls">
-                            <div class="pf-ranges" id="historyModes" role="group" aria-label="Chart">
-                                <button type="button" data-mode="value" aria-pressed="true">Value</button>
-                                <button type="button" data-mode="daily" aria-pressed="false">Daily return</button>
-                            </div>
-                            <div class="pf-ranges" id="historyRanges" role="group" aria-label="Time range"></div>
-                        </div>
+                        <div class="pf-ranges" id="historyRanges" role="group" aria-label="Time range"></div>
                     </div>
                     <p class="pf-hero__change" id="historySub">Loading price history…</p>
                     <div class="pf-chart" id="historyChart"></div>
@@ -321,6 +315,68 @@
                 </section>
             </div>
 
+            <!-- One security: its price, your trades on it, and the company. -->
+            <div class="pf-panel" data-panel="holding" hidden>
+                <a class="pf-back" id="holdingBack" href="#holdings">← All holdings</a>
+                <section class="pf-card pf-hero">
+                    <div class="pf-hero__top">
+                        <div>
+                            <p class="pf-hero__label" id="holdingName"></p>
+                            <p class="pf-hero__value" id="holdingPrice">—</p>
+                            <p class="pf-hero__stats" id="holdingStats"></p>
+                        </div>
+                        <div class="pf-ranges" id="holdingRanges" role="group" aria-label="Time range"></div>
+                    </div>
+                    <p class="pf-hero__change" id="holdingSub">Loading…</p>
+                    <div class="pf-chart" id="holdingChart"></div>
+                    <ul class="pf-chart-legend" id="holdingLegend" hidden>
+                        <li><span class="pf-key"></span>Daily close</li>
+                        <li id="avgCostKey"><span class="pf-key pf-key--avg"></span>Your average cost</li>
+                        <li id="tradeKeys"><span class="pf-marker pf-marker--buy"></span>Buy <span class="pf-marker pf-marker--sell"></span>Sell</li>
+                    </ul>
+                    <p class="pf-note" id="holdingNote" hidden></p>
+                </section>
+                <div class="pf-tiles" id="holdingTiles"></div>
+                <div class="pf-grid">
+                    <section class="pf-card">
+                        <div class="pf-card__head">
+                            <h2 class="pf-card__title">Key data</h2>
+                            <p class="pf-card__sub" id="holdingFactsSub"></p>
+                        </div>
+                        <dl class="pf-facts" id="holdingFacts"></dl>
+                    </section>
+                    <section class="pf-card">
+                        <div class="pf-card__head pf-card__head--row">
+                            <h2 class="pf-card__title">About</h2>
+                            <a class="pf-button pf-button--quiet" id="holdingResearch" href="#">Full research</a>
+                        </div>
+                        <div class="pf-about" id="holdingAbout"></div>
+                    </section>
+                </div>
+                <section class="pf-card">
+                    <div class="pf-card__head">
+                        <h2 class="pf-card__title">Your trades</h2>
+                        <p class="pf-card__sub" id="holdingTradesSub"></p>
+                    </div>
+                    <div class="pf-table-wrap">
+                        <table class="pf-table">
+                            <thead>
+                                <tr>
+                                    <th scope="col">Date</th>
+                                    <th scope="col">Side</th>
+                                    <th scope="col" class="num">Shares</th>
+                                    <th scope="col" class="num">Price</th>
+                                    <th scope="col" class="num pf-hide-sm">Amount</th>
+                                    <th scope="col" class="num">Realized</th>
+                                    <th scope="col" class="pf-hide-md">Account</th>
+                                </tr>
+                            </thead>
+                            <tbody id="holdingTrades"></tbody>
+                        </table>
+                    </div>
+                </section>
+            </div>
+
             <div class="pf-row pf-danger">
                 <button type="button" class="pf-link" id="clearHoldingsButton">Remove uploaded holdings</button>
                 <button type="button" class="pf-link" id="clearAllButton">Delete my whole portfolio</button>
@@ -331,6 +387,6 @@
     <script src="/shared/api-base.js?v=1"></script>
     <script src="/shared/site-nav.js?v=22"></script>
     <script src="/shared/analytics.js?v=1"></script>
-    <script src="portfolio.js?v=16"></script>
+    <script src="portfolio.js?v=17"></script>
 </body>
 </html>

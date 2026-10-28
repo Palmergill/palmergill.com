@@ -158,13 +158,12 @@
         return isoDay(new Date());
     }
     const ASSET_TAGS = { crypto: 'Crypto', other: 'No ticker' };
+    function holdingHref(ticker) {
+        return `#holding/${encodeURIComponent(ticker)}`;
+    }
     function securityLink(row) {
-        // Only a stock has a research page to go to.
-        const label = escapeHtml(row.ticker);
         const tag = ASSET_TAGS[row.asset] ? `<span class="pf-tag">${ASSET_TAGS[row.asset]}</span>` : '';
-        return row.asset === 'stock'
-            ? `<a class="pf-ticker" href="/stock-research/?ticker=${encodeURIComponent(row.ticker)}">${label}</a>${tag}`
-            : `<span class="pf-ticker">${label}</span>${tag}`;
+        return `<a class="pf-ticker" href="${holdingHref(row.ticker)}">${escapeHtml(row.ticker)}</a>${tag}`;
     }
 
     // ── API ────────────────────────────────────────────────────────────────
@@ -215,11 +214,22 @@
 
     function currentTab() {
         const hash = window.location.hash.replace('#', '');
+        if (hash.startsWith('holding/')) return 'holding';
         return TABS.includes(hash) ? hash : 'overview';
     }
+    function holdingTicker() {
+        try {
+            return decodeURIComponent(window.location.hash.slice('#holding/'.length));
+        } catch {
+            return '';
+        }
+    }
+    // The list a holding was opened from, for its back link.
+    let listTab = 'holdings';
 
     function showTab() {
         const tab = currentTab();
+        if (tab !== 'holding') listTab = tab;
         els.tabs.querySelectorAll('a[data-tab]').forEach((link) => {
             if (link.dataset.tab === tab) link.setAttribute('aria-current', 'page');
             else link.removeAttribute('aria-current');
@@ -230,7 +240,20 @@
         // The chart measures its box, so draw it once its tab is showing.
         if (tab === 'overview' && history.data) renderHistory();
         if (tab === 'activity' && lastData) loadTrades();
+        if (tab === 'holding') {
+            const back = $('holdingBack');
+            back.href = `#${listTab}`;
+            back.textContent = `← ${listTab[0].toUpperCase()}${listTab.slice(1)}`;
+            if (holding.ticker !== holdingTicker()) window.scrollTo(0, 0);
+            loadHolding(holdingTicker());
+        }
     }
+    // Tapping anywhere on a security's row opens it.
+    document.addEventListener('click', (event) => {
+        const row = event.target.closest('tr[data-ticker]');
+        if (!row || event.target.closest('a, button, input, select')) return;
+        window.location.hash = holdingHref(row.dataset.ticker);
+    });
     window.addEventListener('hashchange', showTab);
 
     // ── views ──────────────────────────────────────────────────────────────
@@ -460,7 +483,7 @@
             ? `All holdings and ${data.totals.closedPositions} closed`
             : 'All holdings';
         els.topHoldingsBody.innerHTML = top.map((p, i) => `
-            <tr>
+            <tr data-ticker="${escapeHtml(p.ticker)}">
                 <td>${securityCell(p, colors[i])}</td>
                 <td class="num pf-strong">${p.weight == null ? '—' : fmtPct(p.weight)}</td>
                 <td class="num pf-strong">${fmtMoney(p.marketValue, true)}</td>
@@ -476,7 +499,7 @@
             : `Built from ${plural(data.transactionCount, 'trade')}, at average cost across every account.`;
         const colors = swatches(data.positions);
         els.holdingsBody.innerHTML = data.positions.map((p, i) => `
-            <tr>
+            <tr data-ticker="${escapeHtml(p.ticker)}">
                 <td>${securityCell(p, colors[i])}</td>
                 <td class="num pf-strong pf-hide-sm">${p.weight == null ? '—' : fmtPct(p.weight)}</td>
                 <td class="num pf-strong">${fmtMoney(p.marketValue, true)}</td>
@@ -496,7 +519,7 @@
         const realized = closed.reduce((sum, c) => sum + (c.realizedGain || 0), 0);
         els.closedSub.innerHTML = `${plural(closed.length, 'position')} you've sold out of, newest first. <span class="${tone(realized)}">${fmtSigned(realized, true)}</span> realized between them.`;
         els.closedBody.innerHTML = closed.map((c) => `
-            <tr>
+            <tr data-ticker="${escapeHtml(c.ticker)}">
                 <td>${securityLink(c)}</td>
                 <td class="num pf-strong ${tone(c.realizedGain)}">${fmtSigned(c.realizedGain, true)}</td>
                 <td class="num pf-hide-sm">${fmtMoney(c.bought, true)}</td>
@@ -785,7 +808,7 @@
     const monthYear = new Intl.DateTimeFormat('en-US', { month: 'short', year: '2-digit', timeZone: 'UTC' });
     const yearOnly = new Intl.DateTimeFormat('en-US', { year: 'numeric', timeZone: 'UTC' });
 
-    const history = { data: null, range: '1Y', mode: 'value', signature: null, retries: 0, timer: null };
+    const history = { data: null, range: '1Y', signature: null, retries: 0, timer: null };
 
     // Reload the history only when what it's built from changed, not when the
     // breakdown is re-fetched for prices.
@@ -821,10 +844,9 @@
         }
     }
 
-    function pointsInRange() {
-        const points = history.data?.points || [];
+    function pointsInRange(points = history.data?.points || [], key = history.range) {
         if (!points.length) return points;
-        const range = RANGES.find((r) => r.key === history.range);
+        const range = RANGES.find((r) => r.key === key);
         const last = new Date(`${points[points.length - 1].date}T00:00:00Z`);
         let from;
         if (range.days === null) from = new Date(Date.UTC(last.getUTCFullYear(), 0, 1));
@@ -834,7 +856,8 @@
         return points.filter((p) => p.date >= cutoff);
     }
 
-    function renderRanges(points) {
+    // Draws the range buttons the data can fill and returns the one to show.
+    function renderRanges(points, container = $('historyRanges'), selected = history.range) {
         const span = points.length
             ? (new Date(points[points.length - 1].date) - new Date(points[0].date)) / 86400000
             : 0;
@@ -844,15 +867,16 @@
             const previous = RANGES.slice(0, i).reverse().find((q) => q.days && q.days !== Infinity);
             return !previous || span > previous.days;
         });
-        if (!offered.some((r) => r.key === history.range)) history.range = 'All';
-        $('historyRanges').innerHTML = offered.map((r) => (
-            `<button type="button" data-range="${r.key}" aria-pressed="${r.key === history.range}">${r.key}</button>`
+        const key = offered.some((r) => r.key === selected) ? selected : 'All';
+        container.innerHTML = offered.map((r) => (
+            `<button type="button" data-range="${r.key}" aria-pressed="${r.key === key}">${r.key}</button>`
         )).join('');
+        return key;
     }
 
     function renderHistory() {
         const all = history.data.points;
-        renderRanges(all);
+        history.range = renderRanges(all);
         const points = pointsInRange();
         const sub = $('historySub');
         const note = $('historyNote');
@@ -862,10 +886,6 @@
             note.hidden = true;
             $('historyLegend').hidden = true;
             drawChart([]);
-            return;
-        }
-        if (history.mode === 'daily') {
-            renderDaily(points);
             return;
         }
         $('historyLegend').hidden = false;
@@ -902,36 +922,6 @@
         note.hidden = !notes.length;
         $('estimatedKey').hidden = !estimated;
         drawChart(points);
-    }
-
-    // Each day's gain or loss, net of money put in or taken out that day.
-    function renderDaily(points) {
-        const days = points.filter((p) => p.change != null);
-        const sub = $('historySub');
-        const note = $('historyNote');
-        $('historyLegend').hidden = true;
-        if (!days.length) {
-            sub.textContent = 'Not enough days in this range yet.';
-            note.hidden = true;
-            drawBars([]);
-            return;
-        }
-        const up = days.filter((p) => p.change > 0).length;
-        const best = days.reduce((a, b) => (b.change > a.change ? b : a));
-        const worst = days.reduce((a, b) => (b.change < a.change ? b : a));
-        const total = days.reduce((sum, p) => sum + p.change, 0);
-        const stat = (p) => `<span class="${tone(p.change)}">${fmtSigned(p.change, true)}</span> ${shortDate.format(new Date(`${p.date}T00:00:00Z`))}`;
-        sub.innerHTML = [
-            `<span class="pf-history-change ${tone(total)}">${fmtSigned(total, true)}</span> over ${plural(days.length, 'day')}`,
-            `up ${up} of ${days.length}`,
-            `best ${stat(best)}`,
-            `worst ${stat(worst)}`,
-        ].map((text) => `<span class="pf-stat">${text}</span>`).join(' <span class="pf-dot" aria-hidden="true">·</span> ');
-        const notes = ['Each bar is that day’s gain or loss, not counting money you added or took out by buying or selling.'];
-        if (days.some((p) => p.estimated)) notes.push('Faded bars are days valued partly at your own trade prices.');
-        note.textContent = notes.join(' ');
-        note.hidden = false;
-        drawBars(days);
     }
 
     function svg(tag, attrs = {}) {
@@ -991,78 +981,6 @@
             label.textContent = fmt.format(new Date(`${points[i].date}T00:00:00Z`));
             root.appendChild(label);
         }
-    }
-
-    function drawBars(days) {
-        const host = $('historyChart');
-        host.innerHTML = '';
-        if (!days.length) {
-            host.innerHTML = '<div class="pf-chart__empty">No chart yet.</div>';
-            return;
-        }
-        const width = host.clientWidth;
-        const height = host.clientHeight;
-        if (!width) return;
-        const pad = { top: 10, right: 8, bottom: 24, left: 48 };
-        const innerW = width - pad.left - pad.right;
-        const innerH = height - pad.top - pad.bottom;
-
-        // Scale to the days with real closes, so one estimated jump (a
-        // position's first real price) doesn't flatten the rest; it's clipped.
-        const scaled = days.some((p) => !p.estimated) ? days.filter((p) => !p.estimated) : days;
-        let lo = Math.min(0, ...scaled.map((p) => p.change));
-        let hi = Math.max(0, ...scaled.map((p) => p.change));
-        if (lo === hi) hi = 1;
-        const ticks = niceTicks(lo, hi, 4);
-        lo = Math.min(lo, ticks[0]);
-        hi = Math.max(hi, ticks[ticks.length - 1]);
-        const y = (v) => pad.top + (1 - (Math.max(lo, Math.min(hi, v)) - lo) / (hi - lo)) * innerH;
-        const slot = innerW / days.length;
-        const x = (i) => pad.left + (i + 0.5) * slot;
-        const barW = Math.max(1, slot * (days.length > 60 ? 0.9 : 0.7));
-
-        const root = svg('svg', { viewBox: `0 0 ${width} ${height}`, role: 'img', 'aria-label': `Daily gain or loss from ${days[0].date} to ${days[days.length - 1].date}` });
-        ticks.forEach((t) => {
-            root.appendChild(svg('line', { class: t === 0 ? 'pf-chart__zero' : 'pf-chart__grid', x1: pad.left, x2: width - pad.right, y1: y(t), y2: y(t) }));
-            const label = svg('text', { class: 'pf-chart__axis', x: pad.left - 8, y: y(t) + 4, 'text-anchor': 'end' });
-            label.textContent = t < 0 ? `−${compactMoney(-t)}` : compactMoney(t);
-            root.appendChild(label);
-        });
-        dateLabels(root, days, x, innerW, height);
-        const bars = days.map((p, i) => {
-            const top = y(Math.max(p.change, 0));
-            const bar = svg('rect', {
-                class: `pf-chart__bar--${p.change < 0 ? 'loss' : 'gain'}${p.estimated ? ' pf-chart__bar--estimated' : ''}`,
-                x: x(i) - barW / 2, y: top, width: barW, height: Math.max(1, y(Math.min(p.change, 0)) - top),
-            });
-            root.appendChild(bar);
-            return bar;
-        });
-
-        const hit = svg('rect', { x: pad.left, y: pad.top, width: innerW, height: innerH, fill: 'transparent' });
-        root.appendChild(hit);
-        let active = null;
-        function hover(event) {
-            const box = root.getBoundingClientRect();
-            const px = ((event.clientX - box.left) / box.width) * width;
-            const i = Math.max(0, Math.min(days.length - 1, Math.floor((px - pad.left) / slot)));
-            const p = days[i];
-            active?.classList.remove('pf-chart__bar--hover');
-            active = bars[i];
-            active.classList.add('pf-chart__bar--hover');
-            const parts = [fmtDay(p.date), `${fmtSigned(p.change, true)}${p.changePct != null ? ` (${fmtPct(p.changePct, true)})` : ''}${p.estimated ? ' (est.)' : ''}`, `value ${fmtMoney(p.value, true)}`];
-            showTip(event, parts.join(' · '));
-        }
-        hit.addEventListener('mousemove', hover);
-        hit.addEventListener('touchmove', (event) => { hover(event.touches[0]); event.preventDefault(); }, { passive: false });
-        const leave = () => {
-            active?.classList.remove('pf-chart__bar--hover');
-            active = null;
-            hideTip();
-        };
-        hit.addEventListener('mouseleave', leave);
-        hit.addEventListener('touchend', leave);
-        host.appendChild(root);
     }
 
     function drawChart(points) {
@@ -1151,13 +1069,250 @@
         host.appendChild(root);
     }
 
-    $('historyModes').addEventListener('click', (event) => {
-        const button = event.target.closest('button[data-mode]');
-        if (!button) return;
-        history.mode = button.dataset.mode;
-        $('historyModes').querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String(b === button)));
-        if (history.data) renderHistory();
+    // ── one holding ────────────────────────────────────────────────────────
+
+    const holding = { ticker: null, data: null, range: '1Y', timer: null, retries: 0 };
+
+    async function loadHolding(ticker, retry = false) {
+        clearTimeout(holding.timer);
+        if (!ticker) return;
+        if (!retry) {
+            if (holding.ticker === ticker && holding.data) {
+                renderHolding();
+                return;
+            }
+            holding.ticker = ticker;
+            holding.data = null;
+            holding.retries = 0;
+            $('holdingName').textContent = ticker;
+            $('holdingPrice').textContent = '—';
+            $('holdingStats').textContent = '';
+            $('holdingSub').textContent = 'Loading…';
+            $('holdingChart').innerHTML = '';
+            ['holdingTiles', 'holdingFacts', 'holdingAbout', 'holdingTrades', 'holdingRanges'].forEach((id) => { $(id).innerHTML = ''; });
+        }
+        let data;
+        try {
+            data = await api(`/holding?ticker=${encodeURIComponent(ticker)}`);
+        } catch (error) {
+            if (error instanceof ForbiddenError) {
+                showSignedOut();
+                return;
+            }
+            if (holding.ticker === ticker) $('holdingSub').textContent = error.message;
+            return;
+        }
+        if (holding.ticker !== ticker) return; // opened another meanwhile
+        holding.data = data;
+        if (currentTab() === 'holding') renderHolding();
+        if (data.pending && holding.retries < MAX_HISTORY_RETRIES) {
+            holding.retries += 1;
+            holding.timer = setTimeout(() => loadHolding(ticker, true), (data.retryAfter || 3) * 1000);
+        }
+    }
+
+    function factRow(label, value) {
+        return value == null || value === '' || value === '—' ? '' : `<div><dt>${label}</dt><dd>${value}</dd></div>`;
+    }
+    function bigMoney(value) {
+        if (value == null) return null;
+        const abs = Math.abs(value);
+        if (abs >= 1e12) return `$${(value / 1e12).toFixed(2)}T`;
+        if (abs >= 1e9) return `$${(value / 1e9).toFixed(1)}B`;
+        if (abs >= 1e6) return `$${(value / 1e6).toFixed(1)}M`;
+        return fmtMoney(value, true);
+    }
+
+    function renderHolding() {
+        const d = holding.data;
+        const pos = d.position;
+        const tag = ASSET_TAGS[d.asset] ? ` · ${ASSET_TAGS[d.asset]}` : '';
+        $('holdingName').textContent = `${d.ticker}${d.name && d.name !== d.ticker ? ` · ${d.name}` : ''}${tag}`;
+        $('holdingPrice').textContent = fmtMoney(d.price);
+        const stats = [];
+        if (d.dayChange != null) {
+            const when = d.priceAsOf === today() ? 'today' : `on ${shortDate.format(new Date(`${d.priceAsOf}T00:00:00Z`))}`;
+            stats.push(`<span class="${tone(d.dayChange)}">${fmtSigned(d.dayChange, true)} (${fmtPct(d.dayChangePct, true)})</span> ${when} on your shares`);
+        }
+        if (d.priceAsOf) stats.push(`${d.priceStatus === 'trade' ? 'last trade' : 'close'} ${fmtDay(d.priceAsOf)}`);
+        if (!d.open) stats.push('position closed');
+        $('holdingStats').innerHTML = stats.map((text) => `<span class="pf-stat">${text}</span>`).join(' <span class="pf-dot" aria-hidden="true">·</span> ');
+
+        // Price chart.
+        holding.range = renderRanges(d.closes, $('holdingRanges'), holding.range);
+        const points = pointsInRange(d.closes, holding.range);
+        const sub = $('holdingSub');
+        if (points.length < 2) {
+            sub.textContent = d.pending ? 'Loading price history…' : d.asset === 'other' ? 'No market price for this one; it’s valued at your last trade.' : 'No price history yet.';
+            $('holdingLegend').hidden = true;
+            $('holdingChart').innerHTML = '';
+        } else {
+            const first = points[0].close;
+            const change = points[points.length - 1].close - first;
+            sub.innerHTML = `<span class="pf-history-change ${tone(change)}">${fmtSigned(change)} (${fmtPct(change / first, true)})</span> a share since ${fmtDay(points[0].date)}`;
+            const avg = d.open ? pos.avgCost : null;
+            const trades = d.trades.filter((t) => t.date >= points[0].date);
+            $('holdingLegend').hidden = false;
+            $('avgCostKey').hidden = avg == null;
+            $('tradeKeys').hidden = !trades.length;
+            drawPriceChart(points, avg, trades);
+        }
+        const notes = [];
+        if (d.pending) notes.push('Older prices are still loading; the chart fills in as they arrive.');
+        if (d.trades.some((t) => t.price && points.length && t.date >= points[0].date)) notes.push('Dots mark your trades at the price you paid or got.');
+        if (d.sampleData) notes.push('Generated sample prices, not real history.');
+        $('holdingNote').textContent = notes.join(' ');
+        $('holdingNote').hidden = !notes.length;
+
+        // The position.
+        $('holdingTiles').innerHTML = (d.open ? [
+            gainTile('Value', fmtMoney(pos.marketValue, true), `${shareFormat.format(pos.shares)} shares`),
+            gainTile('Unrealized', fmtSigned(pos.gain, true), pos.gainPct == null ? 'No cost basis' : `${fmtPct(pos.gainPct, true)} on ${fmtMoney(pos.costBasis, true)}`, tone(pos.gain)),
+            gainTile('Average cost', fmtMoney(pos.avgCost), 'A share, across every account'),
+            gainTile('Realized', fmtSigned(pos.realizedGain, true), 'From your sells', tone(pos.realizedGain)),
+        ] : [
+            gainTile('Realized', fmtSigned(pos.realizedGain, true), 'At average cost', tone(pos.realizedGain)),
+            gainTile('Bought', fmtMoney(pos.bought, true), plural(pos.trades, 'trade')),
+            gainTile('Sold', fmtMoney(pos.sold, true), `Last ${fmtDay(pos.lastTrade)}`),
+            gainTile('Held', fmtMonth(pos.firstTrade), `to ${fmtMonth(pos.lastTrade)}`),
+        ]).join('');
+
+        // Key data: the price's own, then the company's if the research page has it.
+        const perf = d.performance;
+        const c = d.company || {};
+        const pctFact = (v) => (v == null ? null : `<span class="${tone(v)}">${fmtPct(v, true)}</span>`);
+        $('holdingFacts').innerHTML = [
+            factRow('1 month', pctFact(perf['1M'])),
+            factRow('Year to date', pctFact(perf.YTD)),
+            factRow('1 year', pctFact(perf['1Y'])),
+            factRow('52-week range', perf.low52w != null ? `${fmtMoney(perf.low52w)} – ${fmtMoney(perf.high52w)}` : null),
+            factRow('Market cap', bigMoney(c.market_cap)),
+            factRow('P/E', c.pe_ratio != null ? c.pe_ratio.toFixed(1) : null),
+            factRow('Beta', c.beta != null ? c.beta.toFixed(2) : null),
+            // Stored in percent, as the research page shows it.
+            factRow('Profit margin', c.profit_margin != null ? fmtPct(c.profit_margin / 100) : null),
+            factRow('Revenue growth', c.revenue_growth != null ? pctFact(c.revenue_growth / 100) : null),
+            factRow('Next earnings', c.next_earnings_date ? fmtDay(c.next_earnings_date) : null),
+            factRow('First bought', fmtDay(pos.firstTrade)),
+            factRow('Trades', countFormat.format(pos.trades)),
+        ].join('');
+        $('holdingFactsSub').textContent = d.priceAsOf ? `Price moves from daily closes through ${fmtDay(d.priceAsOf)}.` : '';
+
+        const research = $('holdingResearch');
+        research.hidden = d.asset !== 'stock';
+        research.href = `/stock-research/?ticker=${encodeURIComponent(d.ticker)}`;
+        const meta = [...new Set([c.sector, c.industry, c.headquarters, c.employees ? `${countFormat.format(c.employees)} employees` : null].filter(Boolean))];
+        $('holdingAbout').innerHTML = d.asset !== 'stock'
+            ? `<p>${d.asset === 'crypto' ? `${escapeHtml(d.name || d.ticker)} is a cryptocurrency, priced in US dollars.` : 'A security without a ticker (an option, say), so there’s no market data for it.'}</p>`
+            : d.company
+                ? `${meta.length ? `<p class="pf-about__meta">${meta.map(escapeHtml).join(' · ')}</p>` : ''}
+                   <p>${escapeHtml(c.description || 'No description on file.')}</p>
+                   ${c.website ? `<p><a class="pf-link" href="${escapeHtml(c.website)}" rel="noopener" target="_blank">${escapeHtml(c.website.replace(/^https?:\/\//, '').replace(/\/$/, ''))}</a></p>` : ''}`
+                : '<p>Company details load once this stock has been looked up in Stock Research. Open the full research page to fetch them.</p>';
+
+        // Trades, newest first.
+        $('holdingTradesSub').textContent = `${plural(d.trades.length, 'trade')}, in today’s shares where a split changed them.`;
+        $('holdingTrades').innerHTML = [...d.trades].reverse().map((t) => `
+            <tr>
+                <td>${fmtDay(t.date)}</td>
+                <td><span class="pf-side pf-side--${t.side}">${t.side === 'buy' ? 'Buy' : 'Sell'}</span></td>
+                <td class="num">${shareFormat.format(t.shares)}</td>
+                <td class="num">${fmtMoney(t.price)}</td>
+                <td class="num pf-hide-sm">${fmtMoney(t.shares * t.price, true)}</td>
+                <td class="num ${tone(t.realized)}">${t.side === 'sell' ? fmtSigned(t.realized, true) : ''}</td>
+                <td class="pf-hide-md pf-muted">${escapeHtml(t.account || t.source || '')}</td>
+            </tr>`).join('') || '<tr><td colspan="7" class="pf-muted">No trades.</td></tr>';
+    }
+
+    function drawPriceChart(points, avgCost, trades) {
+        const host = $('holdingChart');
+        host.innerHTML = '';
+        const width = host.clientWidth;
+        const height = host.clientHeight;
+        if (!width) return;
+        const pad = { top: 10, right: 8, bottom: 24, left: 52 };
+        const innerW = width - pad.left - pad.right;
+        const innerH = height - pad.top - pad.bottom;
+
+        const values = points.map((p) => p.close).concat(avgCost != null ? [avgCost] : [], trades.map((t) => t.price).filter((v) => v > 0));
+        let lo = Math.min(...values);
+        let hi = Math.max(...values);
+        const margin = (hi - lo) * 0.08 || hi * 0.05 || 1;
+        lo = Math.max(0, lo - margin);
+        hi += margin;
+        const ticks = niceTicks(lo, hi, 4);
+        lo = Math.min(lo, ticks[0]);
+        hi = Math.max(hi, ticks[ticks.length - 1]);
+        const x = (i) => pad.left + (i / (points.length - 1)) * innerW;
+        const y = (v) => pad.top + (1 - (v - lo) / (hi - lo)) * innerH;
+        // A trade sits on the first close on or after its date.
+        const indexOf = (iso) => {
+            const i = points.findIndex((p) => p.date >= iso);
+            return i === -1 ? points.length - 1 : i;
+        };
+
+        const root = svg('svg', { viewBox: `0 0 ${width} ${height}`, role: 'img', 'aria-label': `Daily closing price from ${points[0].date} to ${points[points.length - 1].date}` });
+        ticks.forEach((t) => {
+            root.appendChild(svg('line', { class: 'pf-chart__grid', x1: pad.left, x2: width - pad.right, y1: y(t), y2: y(t) }));
+            const label = svg('text', { class: 'pf-chart__axis', x: pad.left - 8, y: y(t) + 4, 'text-anchor': 'end' });
+            label.textContent = hi - lo < 20 ? `$${t.toFixed(2)}` : compactMoney(t);
+            root.appendChild(label);
+        });
+        dateLabels(root, points, x, innerW, height);
+        const line = points.map((p, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(p.close).toFixed(1)}`).join('');
+        root.appendChild(svg('path', { class: 'pf-chart__area', d: `${line}L${x(points.length - 1)},${y(lo)}L${x(0)},${y(lo)}Z` }));
+        if (avgCost != null) {
+            root.appendChild(svg('line', { class: 'pf-chart__avg', x1: pad.left, x2: width - pad.right, y1: y(avgCost), y2: y(avgCost) }));
+        }
+        root.appendChild(svg('path', { class: 'pf-chart__line', d: line }));
+        const byDay = new Map();
+        trades.forEach((t) => {
+            const i = indexOf(t.date);
+            if (!byDay.has(i)) byDay.set(i, []);
+            byDay.get(i).push(t);
+            if (t.price > 0) root.appendChild(svg('circle', { class: `pf-chart__trade--${t.side}`, cx: x(i), cy: y(t.price), r: trades.length > 80 ? 3 : 4.5 }));
+        });
+
+        const cross = svg('line', { class: 'pf-chart__cross', y1: pad.top, y2: pad.top + innerH, visibility: 'hidden' });
+        const dot = svg('circle', { class: 'pf-chart__dot', r: 4.5, visibility: 'hidden' });
+        root.appendChild(cross);
+        root.appendChild(dot);
+        const hit = svg('rect', { x: pad.left, y: pad.top, width: innerW, height: innerH, fill: 'transparent' });
+        root.appendChild(hit);
+        function hover(event) {
+            const box = root.getBoundingClientRect();
+            const px = ((event.clientX - box.left) / box.width) * width;
+            const i = Math.max(0, Math.min(points.length - 1, Math.round(((px - pad.left) / innerW) * (points.length - 1))));
+            const p = points[i];
+            cross.setAttribute('x1', x(i));
+            cross.setAttribute('x2', x(i));
+            dot.setAttribute('cx', x(i));
+            dot.setAttribute('cy', y(p.close));
+            cross.setAttribute('visibility', 'visible');
+            dot.setAttribute('visibility', 'visible');
+            const parts = [fmtDay(p.date), fmtMoney(p.close)];
+            (byDay.get(i) || []).forEach((t) => parts.push(`${t.side === 'buy' ? 'bought' : 'sold'} ${shareFormat.format(t.shares)} at ${fmtMoney(t.price)}`));
+            showTip(event, parts.join(' · '));
+        }
+        hit.addEventListener('mousemove', hover);
+        hit.addEventListener('touchmove', (event) => { hover(event.touches[0]); event.preventDefault(); }, { passive: false });
+        const leave = () => {
+            cross.setAttribute('visibility', 'hidden');
+            dot.setAttribute('visibility', 'hidden');
+            hideTip();
+        };
+        hit.addEventListener('mouseleave', leave);
+        hit.addEventListener('touchend', leave);
+        host.appendChild(root);
+    }
+
+    $('holdingRanges').addEventListener('click', (event) => {
+        const button = event.target.closest('button[data-range]');
+        if (!button || !holding.data) return;
+        holding.range = button.dataset.range;
+        renderHolding();
     });
+
     $('historyRanges').addEventListener('click', (event) => {
         const button = event.target.closest('button[data-range]');
         if (!button || !history.data) return;
@@ -1169,6 +1324,7 @@
         clearTimeout(resizeTimer);
         resizeTimer = setTimeout(() => {
             if (history.data && !els.dashboard.hidden && currentTab() === 'overview') renderHistory();
+            if (holding.data && currentTab() === 'holding') renderHolding();
         }, 120);
     });
 

@@ -274,40 +274,8 @@ def test_history_follows_trades_from_the_first_one(monkeypatch):
     assert body["complete"] is True
     assert body["points"][0] == {
         "date": first.isoformat(), "value": 20.0, "invested": 20.0, "estimated": False,
-        "change": None, "changePct": None,
     }
     assert body["points"][-1]["value"] == 50.0
-    # Flat prices: buying more is money in, not a return.
-    assert {p["change"] for p in body["points"][1:]} == {0.0}
-
-
-def test_history_gives_each_day_its_return(monkeypatch):
-    from datetime import timedelta
-
-    today = portfolio.utc_today()
-    first = today - timedelta(days=14)
-    while first.weekday() >= 5:
-        first -= timedelta(days=1)
-
-    def rising(ticker, start, end):
-        # $10 on the first trade day, then up a dollar every weekday.
-        out, price, day = [], 10.0, start
-        while day <= end:
-            if day.weekday() < 5:
-                out.append((day, price if day >= first else 10.0))
-                if day >= first:
-                    price += 1.0
-            day += timedelta(days=1)
-        return out
-
-    _reset_prices(monkeypatch)
-    monkeypatch.setattr(portfolio, "_fetch_closes", rising)
-    client = _member_client()
-    _buy(client, shares=2, price=10.0, day=first.isoformat())
-
-    points = client.get("/api/stocks/portfolio/history").json()["points"]
-    assert points[1]["change"] == 2.0
-    assert points[1]["changePct"] == pytest.approx(0.1)
 
 
 def test_history_rolls_a_snapshot_back_through_earlier_trades(monkeypatch):
@@ -695,7 +663,6 @@ def test_old_days_come_from_the_backfill_and_recent_ones_from_polygon(_backfill)
     assert points[0]["date"] == "2020-03-02"
     assert points[0] == {
         "date": "2020-03-02", "value": 20.0, "invested": 20.0, "estimated": False,
-        "change": None, "changePct": None,
     }
     # The last weeks are Polygon's closes, not Tiingo's for the same days.
     assert points[-1]["value"] == 40.0
@@ -753,3 +720,44 @@ def test_breakdown_shows_each_position_and_the_total_day_change(monkeypatch):
     assert body["totals"]["dayChange"] == pytest.approx(40.0 + 8.0)
     assert body["totals"]["dayChangePct"] == pytest.approx(48.0 / (1960.0 + 392.0))
     assert body["totals"]["dayChangeAsOf"] == "2026-10-27"
+
+
+def test_a_holding_is_member_only_and_only_the_callers():
+    assert TestClient(app).get("/api/stocks/portfolio/holding", params={"ticker": "AAPL"}).status_code == 403
+    owner = _member_client()
+    _buy(owner, ticker="AAPL", shares=10, price=150.0)
+    assert _member_client().get("/api/stocks/portfolio/holding", params={"ticker": "AAPL"}).status_code == 404
+    assert _admin_client().get("/api/stocks/portfolio/holding", params={"ticker": "AAPL"}).status_code == 404
+
+
+def test_a_holding_has_its_closes_trades_and_position(monkeypatch):
+    from datetime import timedelta
+
+    _flat_history(monkeypatch, {"AAPL": 200.0})
+    client = _member_client()
+    today = portfolio.utc_today()
+    _buy(client, ticker="AAPL", shares=10, price=150.0, day=(today - timedelta(days=60)).isoformat())
+    _buy(client, ticker="AAPL", shares=4, price=180.0, day=(today - timedelta(days=20)).isoformat(), side="sell")
+
+    body = client.get("/api/stocks/portfolio/holding", params={"ticker": "aapl"}).json()
+    assert body["ticker"] == "AAPL" and body["open"] is True
+    assert [t["side"] for t in body["trades"]] == ["buy", "sell"]
+    assert body["trades"][1]["realized"] == pytest.approx(4 * 30.0)
+    assert body["position"]["shares"] == 6
+    assert body["position"]["avgCost"] == pytest.approx(150.0)
+    assert body["position"]["marketValue"] == pytest.approx(6 * 200.0)
+    # A year of closes at least, reaching back past the first trade.
+    assert body["closes"][0]["date"] <= (today - timedelta(days=360)).isoformat()
+    assert body["performance"]["1Y"] == pytest.approx(0.0)
+
+
+def test_a_closed_holding_still_has_its_page(monkeypatch):
+    _flat_history(monkeypatch, {"MSFT": 400.0})
+    client = _member_client()
+    _buy(client, ticker="MSFT", shares=2, price=300.0)
+    _buy(client, ticker="MSFT", shares=2, price=350.0, side="sell")
+
+    body = client.get("/api/stocks/portfolio/holding", params={"ticker": "MSFT"}).json()
+    assert body["open"] is False
+    assert body["position"]["realizedGain"] == pytest.approx(100.0)
+    assert body["position"]["marketValue"] is None
