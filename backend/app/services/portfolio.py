@@ -21,6 +21,7 @@ import logging
 import re
 import math
 import threading
+from collections import Counter
 from datetime import date, datetime, timedelta, timezone
 from types import SimpleNamespace
 from typing import Any, Dict, Iterable, List, Optional, Tuple
@@ -737,9 +738,15 @@ def quotes(db: Session, positions: Dict[str, Dict[str, Any]]) -> Dict[str, Dict[
     for ticker, position in positions.items():
         symbol = symbols[ticker]
         day = latest.get(symbol) if symbol else None
-        price = None
+        price = prev = None
         if day:
             price = db.query(PriceClose.close).filter(PriceClose.ticker == symbol, PriceClose.day == day).scalar()
+            # The close before it, for the day's change.
+            prev = (
+                db.query(PriceClose.day, PriceClose.close)
+                .filter(PriceClose.ticker == symbol, PriceClose.day < day)
+                .order_by(PriceClose.day.desc()).first()
+            )
         if position["asset"] == "crypto":
             info = {"name": CRYPTO_NAMES.get(ticker, ticker), "sector": "Crypto"}
         elif position["asset"] == "other":
@@ -756,7 +763,10 @@ def quotes(db: Session, positions: Dict[str, Dict[str, Any]]) -> Dict[str, Dict[
             price, day, state = position["lastPrice"], position["lastTradeDate"], "trade"
         else:
             state = "unavailable"
-        result[ticker] = {**info, "price": price, "status": state, "asOf": day.isoformat() if day else None}
+        result[ticker] = {
+            **info, "price": price, "status": state, "asOf": day.isoformat() if day else None,
+            "day": day, "prevClose": prev[1] if prev and state != "trade" else None,
+        }
     return result
 
 
@@ -1090,6 +1100,25 @@ def _activity_summary(transactions: List[PortfolioTransaction], field: str, fall
     return sorted(rows, key=lambda r: -r["trades"])
 
 
+def _day_change(shares: float, price: float, prev_close: float, trades: List[Any]) -> Tuple[float, float]:
+    """(change, base) for a position over its latest day. Shares bought that
+    day count from their buy price, not the close before; shares sold that day
+    count to their sell price. The base is what the change is a percent of."""
+    bought_shares = sold_shares = bought = change = 0.0
+    for tx in trades:
+        if tx.side == "buy":
+            bought_shares += tx.shares
+            bought += tx.shares * tx.price
+            change += tx.shares * (price - tx.price)
+        else:
+            sold_shares += tx.shares
+            change += tx.shares * (tx.price - prev_close)
+    # Held through the day: everything now that wasn't bought today.
+    change += max(shares - bought_shares, 0.0) * (price - prev_close)
+    start_shares = max(shares - bought_shares + sold_shares, 0.0)
+    return change, start_shares * prev_close + bought
+
+
 def breakdown(db: Session, username: str) -> Dict[str, Any]:
     holdings, transactions, split_info = load_adjusted(db, username, _Budget(SPLIT_CALLS_PER_REQUEST))
     positions, meta = build_positions(holdings, transactions)
@@ -1100,6 +1129,12 @@ def breakdown(db: Session, username: str) -> Dict[str, Any]:
     for ticker, position in open_positions.items():
         quote = prices[ticker]
         value = position["shares"] * quote["price"] if quote["price"] is not None else None
+        day_change = day_change_pct = None
+        if value is not None and quote["prevClose"]:
+            day_change, base = _day_change(position["shares"], quote["price"], quote["prevClose"], [
+                t for t in transactions if t.ticker == ticker and t.trade_date == quote["day"]
+            ])
+            day_change_pct = _ratio(day_change, base)
         cost = position["cost"]
         gain = value - cost if value is not None and cost is not None else None
         rows.append({
@@ -1112,6 +1147,9 @@ def breakdown(db: Session, username: str) -> Dict[str, Any]:
             "priceStatus": quote["status"],
             "priceAsOf": quote["asOf"],
             "marketValue": value,
+            "prevClose": quote["prevClose"],
+            "dayChange": day_change,
+            "dayChangePct": day_change_pct,
             "costBasis": cost,
             "avgCost": _ratio(cost, position["shares"]),
             "gain": gain,
@@ -1157,6 +1195,13 @@ def breakdown(db: Session, username: str) -> Dict[str, Any]:
         key=lambda s: -s["marketValue"],
     )
 
+    # The day's change over positions that have one; its percent is of what
+    # they were worth at the close before (plus anything bought that day).
+    moved = [r for r in rows if r["dayChange"] is not None]
+    day_total = sum(r["dayChange"] for r in moved)
+    day_base = sum(r["dayChange"] / r["dayChangePct"] for r in moved if r["dayChangePct"])
+    day_dates = Counter(prices[r["ticker"]]["asOf"] for r in moved)
+
     reported = [t for t in transactions if t.realized_reported is not None]
     years = [
         {"year": year, **stats, "net": stats["bought"] - stats["sold"]}
@@ -1176,6 +1221,10 @@ def breakdown(db: Session, username: str) -> Dict[str, Any]:
             "gainPct": _ratio(gain_total, cost_total) if comparable else None,
             # None, not $0, until a counted sell has realized something.
             "realizedGain": realized_total if meta["realized_by_tx"] else None,
+            "dayChange": day_total if moved else None,
+            "dayChangePct": _ratio(day_total, day_base) if moved else None,
+            # Most positions' latest close; crypto can be a day ahead.
+            "dayChangeAsOf": day_dates.most_common(1)[0][0] if moved else None,
             "positions": len(rows),
             "pricedPositions": sum(1 for r in rows if r["marketValue"] is not None),
             "pendingPrices": sum(1 for r in rows if r["priceStatus"] == "pending"),
@@ -1457,9 +1506,14 @@ def value_history(db: Session, username: str) -> Dict[str, Any]:
     day = start
     while day <= today:
         if day.weekday() < 5 or day == today:
+            # Money put in (or taken out) since the last point, so the day's
+            # return isn't a deposit.
+            flow = 0.0
             while t_index < len(trades) and trades[t_index].trade_date <= day:
                 tx = trades[t_index]
                 t_index += 1
+                fees = tx.fees or 0.0
+                flow += tx.shares * tx.price + fees if tx.side == "buy" else -(tx.shares * tx.price - fees)
                 held_now = shares.get(tx.ticker, 0.0)
                 basis = cost.get(tx.ticker, 0.0) if tx.ticker in cost else 0.0
                 if tx.side == "buy":
@@ -1499,11 +1553,19 @@ def value_history(db: Session, username: str) -> Dict[str, Any]:
                 basis = cost.get(ticker)
                 invested = None if invested is None or basis is None else invested + basis
             if value > 0 or points:
+                change = change_pct = None
+                if points:
+                    previous = points[-1]["value"]
+                    change = value - previous - flow
+                    # Of what was there at the last close plus what came in.
+                    change_pct = _ratio(change, previous + max(flow, 0.0))
                 points.append({
                     "date": day.isoformat(),
                     "value": round(value, 2),
                     "invested": round(invested, 2) if invested is not None else None,
                     "estimated": value > 0 and estimated / value > ESTIMATE_SHARE,
+                    "change": round(change, 2) if change is not None else None,
+                    "changePct": round(change_pct, 6) if change_pct is not None else None,
                 })
         day += timedelta(days=1)
 

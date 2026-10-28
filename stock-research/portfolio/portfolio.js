@@ -285,6 +285,10 @@
         const t = data.totals;
         els.heroValue.textContent = fmtMoney(t.marketValue, true);
         const stats = [];
+        if (t.dayChange != null) {
+            const when = t.dayChangeAsOf === today() ? 'today' : `on ${shortDate.format(new Date(`${t.dayChangeAsOf}T00:00:00Z`))}`;
+            stats.push(`<span class="${tone(t.dayChange)}">${fmtSigned(t.dayChange, true)} (${fmtPct(t.dayChangePct, true)})</span> ${when}`);
+        }
         if (t.gain != null) {
             stats.push(`<span class="${tone(t.gain)}">${fmtSigned(t.gain, true)} (${fmtPct(t.gainPct, true)})</span> unrealized`);
         }
@@ -436,8 +440,14 @@
         </span>`;
     }
 
-    function gainCell(p) {
-        return `<td class="num ${tone(p.gain)}">${fmtSigned(p.gain, true)}${p.gainPct != null ? `<span class="pf-sub ${tone(p.gain)}">${fmtPct(p.gainPct, true)}</span>` : ''}</td>`;
+    function gainCell(p, extra = '') {
+        return `<td class="num ${extra} ${tone(p.gain)}">${fmtSigned(p.gain, true)}${p.gainPct != null ? `<span class="pf-sub ${tone(p.gain)}">${fmtPct(p.gainPct, true)}</span>` : ''}</td>`;
+    }
+
+    // The latest day's move, against the close before it.
+    function dayCell(p) {
+        if (p.dayChange == null) return '<td class="num pf-muted">—</td>';
+        return `<td class="num ${tone(p.dayChange)}">${fmtSigned(p.dayChange, true)}<span class="pf-sub ${tone(p.dayChange)}">${fmtPct(p.dayChangePct, true)}</span></td>`;
     }
 
     function renderTopHoldings(data) {
@@ -454,8 +464,9 @@
                 <td>${securityCell(p, colors[i])}</td>
                 <td class="num pf-strong">${p.weight == null ? '—' : fmtPct(p.weight)}</td>
                 <td class="num pf-strong">${fmtMoney(p.marketValue, true)}</td>
-                ${gainCell(p)}
-            </tr>`).join('') || '<tr><td colspan="4" class="pf-muted">No open positions.</td></tr>';
+                ${dayCell(p)}
+                ${gainCell(p, 'pf-hide-sm')}
+            </tr>`).join('') || '<tr><td colspan="5" class="pf-muted">No open positions.</td></tr>';
     }
 
     function renderHoldings(data) {
@@ -467,15 +478,16 @@
         els.holdingsBody.innerHTML = data.positions.map((p, i) => `
             <tr>
                 <td>${securityCell(p, colors[i])}</td>
-                <td class="num pf-strong">${p.weight == null ? '—' : fmtPct(p.weight)}</td>
+                <td class="num pf-strong pf-hide-sm">${p.weight == null ? '—' : fmtPct(p.weight)}</td>
                 <td class="num pf-strong">${fmtMoney(p.marketValue, true)}</td>
+                ${dayCell(p)}
                 <td class="num pf-hide-sm">${shareFormat.format(p.shares)}</td>
                 <td class="num pf-hide-sm">${priceCell(p)}</td>
                 <td class="num pf-hide-sm">${fmtMoney(p.costBasis, true)}${p.avgCost != null ? `<span class="pf-sub">${fmtMoney(p.avgCost)}/sh</span>` : ''}</td>
                 ${gainCell(p)}
                 <td class="num pf-hide-md ${tone(p.realizedGain)}">${fmtSigned(p.realizedGain, true)}</td>
                 <td class="num pf-hide-md">${fmtMonth(p.firstTrade)}<span class="pf-sub">${plural(p.trades, 'trade')}</span></td>
-            </tr>`).join('') || '<tr><td colspan="9" class="pf-muted">No open positions.</td></tr>';
+            </tr>`).join('') || '<tr><td colspan="10" class="pf-muted">No open positions.</td></tr>';
     }
 
     function renderClosed(data) {
@@ -758,6 +770,7 @@
     // ── value over time ────────────────────────────────────────────────────
 
     const RANGES = [
+        { key: '1W', days: 7 },
         { key: '1M', days: 31 },
         { key: '3M', days: 92 },
         { key: '6M', days: 183 },
@@ -772,7 +785,7 @@
     const monthYear = new Intl.DateTimeFormat('en-US', { month: 'short', year: '2-digit', timeZone: 'UTC' });
     const yearOnly = new Intl.DateTimeFormat('en-US', { year: 'numeric', timeZone: 'UTC' });
 
-    const history = { data: null, range: '1Y', signature: null, retries: 0, timer: null };
+    const history = { data: null, range: '1Y', mode: 'value', signature: null, retries: 0, timer: null };
 
     // Reload the history only when what it's built from changed, not when the
     // breakdown is re-fetched for prices.
@@ -851,6 +864,11 @@
             drawChart([]);
             return;
         }
+        if (history.mode === 'daily') {
+            renderDaily(points);
+            return;
+        }
+        $('historyLegend').hidden = false;
         const first = points[0].value;
         const last = points[points.length - 1].value;
         const change = last - first;
@@ -882,9 +900,38 @@
         if (history.data.sampleData) notes.push('Generated sample prices, not real history.');
         note.textContent = notes.join(' ');
         note.hidden = !notes.length;
-        $('historyLegend').hidden = false;
         $('estimatedKey').hidden = !estimated;
         drawChart(points);
+    }
+
+    // Each day's gain or loss, net of money put in or taken out that day.
+    function renderDaily(points) {
+        const days = points.filter((p) => p.change != null);
+        const sub = $('historySub');
+        const note = $('historyNote');
+        $('historyLegend').hidden = true;
+        if (!days.length) {
+            sub.textContent = 'Not enough days in this range yet.';
+            note.hidden = true;
+            drawBars([]);
+            return;
+        }
+        const up = days.filter((p) => p.change > 0).length;
+        const best = days.reduce((a, b) => (b.change > a.change ? b : a));
+        const worst = days.reduce((a, b) => (b.change < a.change ? b : a));
+        const total = days.reduce((sum, p) => sum + p.change, 0);
+        const stat = (p) => `<span class="${tone(p.change)}">${fmtSigned(p.change, true)}</span> ${shortDate.format(new Date(`${p.date}T00:00:00Z`))}`;
+        sub.innerHTML = [
+            `<span class="pf-history-change ${tone(total)}">${fmtSigned(total, true)}</span> over ${plural(days.length, 'day')}`,
+            `up ${up} of ${days.length}`,
+            `best ${stat(best)}`,
+            `worst ${stat(worst)}`,
+        ].map((text) => `<span class="pf-stat">${text}</span>`).join(' <span class="pf-dot" aria-hidden="true">·</span> ');
+        const notes = ['Each bar is that day’s gain or loss, not counting money you added or took out by buying or selling.'];
+        if (days.some((p) => p.estimated)) notes.push('Faded bars are days valued partly at your own trade prices.');
+        note.textContent = notes.join(' ');
+        note.hidden = false;
+        drawBars(days);
     }
 
     function svg(tag, attrs = {}) {
@@ -930,6 +977,94 @@
         return out;
     }
 
+    // About one date label per 110px, never crowding the ends.
+    function dateLabels(root, points, x, innerW, height) {
+        const span = (new Date(points[points.length - 1].date) - new Date(points[0].date)) / 86400000;
+        const fmt = span > 1500 ? yearOnly : span > 200 ? monthYear : shortDate;
+        const labelCount = Math.max(2, Math.min(points.length, Math.floor(innerW / 110)));
+        for (let k = 0; k < labelCount; k += 1) {
+            const i = Math.round((k / (labelCount - 1)) * (points.length - 1));
+            const label = svg('text', {
+                class: 'pf-chart__axis', x: x(i), y: height - 6,
+                'text-anchor': k === 0 ? 'start' : k === labelCount - 1 ? 'end' : 'middle',
+            });
+            label.textContent = fmt.format(new Date(`${points[i].date}T00:00:00Z`));
+            root.appendChild(label);
+        }
+    }
+
+    function drawBars(days) {
+        const host = $('historyChart');
+        host.innerHTML = '';
+        if (!days.length) {
+            host.innerHTML = '<div class="pf-chart__empty">No chart yet.</div>';
+            return;
+        }
+        const width = host.clientWidth;
+        const height = host.clientHeight;
+        if (!width) return;
+        const pad = { top: 10, right: 8, bottom: 24, left: 48 };
+        const innerW = width - pad.left - pad.right;
+        const innerH = height - pad.top - pad.bottom;
+
+        // Scale to the days with real closes, so one estimated jump (a
+        // position's first real price) doesn't flatten the rest; it's clipped.
+        const scaled = days.some((p) => !p.estimated) ? days.filter((p) => !p.estimated) : days;
+        let lo = Math.min(0, ...scaled.map((p) => p.change));
+        let hi = Math.max(0, ...scaled.map((p) => p.change));
+        if (lo === hi) hi = 1;
+        const ticks = niceTicks(lo, hi, 4);
+        lo = Math.min(lo, ticks[0]);
+        hi = Math.max(hi, ticks[ticks.length - 1]);
+        const y = (v) => pad.top + (1 - (Math.max(lo, Math.min(hi, v)) - lo) / (hi - lo)) * innerH;
+        const slot = innerW / days.length;
+        const x = (i) => pad.left + (i + 0.5) * slot;
+        const barW = Math.max(1, slot * (days.length > 60 ? 0.9 : 0.7));
+
+        const root = svg('svg', { viewBox: `0 0 ${width} ${height}`, role: 'img', 'aria-label': `Daily gain or loss from ${days[0].date} to ${days[days.length - 1].date}` });
+        ticks.forEach((t) => {
+            root.appendChild(svg('line', { class: t === 0 ? 'pf-chart__zero' : 'pf-chart__grid', x1: pad.left, x2: width - pad.right, y1: y(t), y2: y(t) }));
+            const label = svg('text', { class: 'pf-chart__axis', x: pad.left - 8, y: y(t) + 4, 'text-anchor': 'end' });
+            label.textContent = t < 0 ? `−${compactMoney(-t)}` : compactMoney(t);
+            root.appendChild(label);
+        });
+        dateLabels(root, days, x, innerW, height);
+        const bars = days.map((p, i) => {
+            const top = y(Math.max(p.change, 0));
+            const bar = svg('rect', {
+                class: `pf-chart__bar--${p.change < 0 ? 'loss' : 'gain'}${p.estimated ? ' pf-chart__bar--estimated' : ''}`,
+                x: x(i) - barW / 2, y: top, width: barW, height: Math.max(1, y(Math.min(p.change, 0)) - top),
+            });
+            root.appendChild(bar);
+            return bar;
+        });
+
+        const hit = svg('rect', { x: pad.left, y: pad.top, width: innerW, height: innerH, fill: 'transparent' });
+        root.appendChild(hit);
+        let active = null;
+        function hover(event) {
+            const box = root.getBoundingClientRect();
+            const px = ((event.clientX - box.left) / box.width) * width;
+            const i = Math.max(0, Math.min(days.length - 1, Math.floor((px - pad.left) / slot)));
+            const p = days[i];
+            active?.classList.remove('pf-chart__bar--hover');
+            active = bars[i];
+            active.classList.add('pf-chart__bar--hover');
+            const parts = [fmtDay(p.date), `${fmtSigned(p.change, true)}${p.changePct != null ? ` (${fmtPct(p.changePct, true)})` : ''}${p.estimated ? ' (est.)' : ''}`, `value ${fmtMoney(p.value, true)}`];
+            showTip(event, parts.join(' · '));
+        }
+        hit.addEventListener('mousemove', hover);
+        hit.addEventListener('touchmove', (event) => { hover(event.touches[0]); event.preventDefault(); }, { passive: false });
+        const leave = () => {
+            active?.classList.remove('pf-chart__bar--hover');
+            active = null;
+            hideTip();
+        };
+        hit.addEventListener('mouseleave', leave);
+        hit.addEventListener('touchend', leave);
+        host.appendChild(root);
+    }
+
     function drawChart(points) {
         const host = $('historyChart');
         host.innerHTML = '';
@@ -966,19 +1101,7 @@
             root.appendChild(label);
         });
 
-        // About one date label per 110px, never crowding the ends.
-        const span = (new Date(points[points.length - 1].date) - new Date(points[0].date)) / 86400000;
-        const fmt = span > 1500 ? yearOnly : span > 200 ? monthYear : shortDate;
-        const labelCount = Math.max(2, Math.floor(innerW / 110));
-        for (let k = 0; k < labelCount; k += 1) {
-            const i = Math.round((k / (labelCount - 1)) * (points.length - 1));
-            const label = svg('text', {
-                class: 'pf-chart__axis', x: x(i), y: height - 6,
-                'text-anchor': k === 0 ? 'start' : k === labelCount - 1 ? 'end' : 'middle',
-            });
-            label.textContent = fmt.format(new Date(`${points[i].date}T00:00:00Z`));
-            root.appendChild(label);
-        }
+        dateLabels(root, points, x, innerW, height);
 
         const all = points.map((_, i) => i);
         const valueLine = path(all, 'value');
@@ -1028,6 +1151,13 @@
         host.appendChild(root);
     }
 
+    $('historyModes').addEventListener('click', (event) => {
+        const button = event.target.closest('button[data-mode]');
+        if (!button) return;
+        history.mode = button.dataset.mode;
+        $('historyModes').querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String(b === button)));
+        if (history.data) renderHistory();
+    });
     $('historyRanges').addEventListener('click', (event) => {
         const button = event.target.closest('button[data-range]');
         if (!button || !history.data) return;

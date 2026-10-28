@@ -32,7 +32,7 @@ def _env(monkeypatch):
     monkeypatch.setattr(portfolio, "quotes", lambda db, positions: {
         t: {
             "price": PRICES.get(t), "name": t, "sector": "Technology", "asOf": None,
-            "status": "live" if t in PRICES else "unavailable",
+            "status": "live" if t in PRICES else "unavailable", "day": None, "prevClose": None,
         }
         for t in positions
     })
@@ -272,8 +272,42 @@ def test_history_follows_trades_from_the_first_one(monkeypatch):
 
     body = client.get("/api/stocks/portfolio/history").json()
     assert body["complete"] is True
-    assert body["points"][0] == {"date": first.isoformat(), "value": 20.0, "invested": 20.0, "estimated": False}
+    assert body["points"][0] == {
+        "date": first.isoformat(), "value": 20.0, "invested": 20.0, "estimated": False,
+        "change": None, "changePct": None,
+    }
     assert body["points"][-1]["value"] == 50.0
+    # Flat prices: buying more is money in, not a return.
+    assert {p["change"] for p in body["points"][1:]} == {0.0}
+
+
+def test_history_gives_each_day_its_return(monkeypatch):
+    from datetime import timedelta
+
+    today = portfolio.utc_today()
+    first = today - timedelta(days=14)
+    while first.weekday() >= 5:
+        first -= timedelta(days=1)
+
+    def rising(ticker, start, end):
+        # $10 on the first trade day, then up a dollar every weekday.
+        out, price, day = [], 10.0, start
+        while day <= end:
+            if day.weekday() < 5:
+                out.append((day, price if day >= first else 10.0))
+                if day >= first:
+                    price += 1.0
+            day += timedelta(days=1)
+        return out
+
+    _reset_prices(monkeypatch)
+    monkeypatch.setattr(portfolio, "_fetch_closes", rising)
+    client = _member_client()
+    _buy(client, shares=2, price=10.0, day=first.isoformat())
+
+    points = client.get("/api/stocks/portfolio/history").json()["points"]
+    assert points[1]["change"] == 2.0
+    assert points[1]["changePct"] == pytest.approx(0.1)
 
 
 def test_history_rolls_a_snapshot_back_through_earlier_trades(monkeypatch):
@@ -659,7 +693,10 @@ def test_old_days_come_from_the_backfill_and_recent_ones_from_polygon(_backfill)
     _buy(client, "MSFT", shares=2, price=10.0, day="2020-03-02")
     points = client.get("/api/stocks/portfolio/history").json()["points"]
     assert points[0]["date"] == "2020-03-02"
-    assert points[0] == {"date": "2020-03-02", "value": 20.0, "invested": 20.0, "estimated": False}
+    assert points[0] == {
+        "date": "2020-03-02", "value": 20.0, "invested": 20.0, "estimated": False,
+        "change": None, "changePct": None,
+    }
     # The last weeks are Polygon's closes, not Tiingo's for the same days.
     assert points[-1]["value"] == 40.0
     assert not any(p["estimated"] for p in points)
@@ -682,3 +719,37 @@ def test_a_spent_tiingo_allowance_pauses_the_backfill(_backfill, monkeypatch):
     assert body["retryAfter"] >= 60
     client.get("/api/stocks/portfolio/history")
     assert _backfill == ["AAPL"]  # paused: not asked again yet
+
+
+def test_day_change_counts_trades_from_their_own_price():
+    from types import SimpleNamespace as Tx
+
+    # Held 10 overnight at a $100 close; bought 5 at $104 today; now $105.
+    change, base = portfolio._day_change(15, 105.0, 100.0, [Tx(side="buy", shares=5, price=104.0)])
+    assert change == pytest.approx(10 * 5 + 5 * 1)
+    assert base == pytest.approx(10 * 100 + 5 * 104)
+    # Sold 4 of 10 at $103 today; the other 6 closed at $105.
+    change, base = portfolio._day_change(6, 105.0, 100.0, [Tx(side="sell", shares=4, price=103.0)])
+    assert change == pytest.approx(6 * 5 + 4 * 3)
+    assert base == pytest.approx(1000.0)
+
+
+def test_breakdown_shows_each_position_and_the_total_day_change(monkeypatch):
+    monkeypatch.setattr(portfolio, "quotes", lambda db, positions: {
+        t: {
+            "price": PRICES[t], "name": t, "sector": "Technology", "asOf": "2026-10-27",
+            "status": "live", "day": date(2026, 10, 27), "prevClose": PRICES[t] * 0.98,
+        }
+        for t in positions
+    })
+    client = _member_client()
+    _buy(client, ticker="AAPL", shares=10, price=150.0)
+    _buy(client, ticker="MSFT", shares=1, price=300.0)
+
+    body = client.get("/api/stocks/portfolio").json()
+    aapl = next(p for p in body["positions"] if p["ticker"] == "AAPL")
+    assert aapl["dayChange"] == pytest.approx(10 * 4.0)
+    assert aapl["dayChangePct"] == pytest.approx(4.0 / 196.0)
+    assert body["totals"]["dayChange"] == pytest.approx(40.0 + 8.0)
+    assert body["totals"]["dayChangePct"] == pytest.approx(48.0 / (1960.0 + 392.0))
+    assert body["totals"]["dayChangeAsOf"] == "2026-10-27"

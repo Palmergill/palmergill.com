@@ -13,7 +13,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/shared/site-nav.css?v=19">
-    <link rel="stylesheet" href="portfolio.css?v=9">
+    <link rel="stylesheet" href="portfolio.css?v=10">
 </head>
 <body>
 <noscript>
@@ -105,7 +105,13 @@
                             <p class="pf-hero__value" id="heroValue">—</p>
                             <p class="pf-hero__stats" id="heroStats"></p>
                         </div>
-                        <div class="pf-ranges" id="historyRanges" role="group" aria-label="Time range"></div>
+                        <div class="pf-chart-controls">
+                            <div class="pf-ranges" id="historyModes" role="group" aria-label="Chart">
+                                <button type="button" data-mode="value" aria-pressed="true">Value</button>
+                                <button type="button" data-mode="daily" aria-pressed="false">Daily return</button>
+                            </div>
+                            <div class="pf-ranges" id="historyRanges" role="group" aria-label="Time range"></div>
+                        </div>
                     </div>
                     <p class="pf-hero__change" id="historySub">Loading price history…</p>
                     <div class="pf-chart" id="historyChart"></div>
@@ -133,7 +139,8 @@
                                     <th scope="col">Security</th>
                                     <th scope="col" class="num">Weight</th>
                                     <th scope="col" class="num">Value</th>
-                                    <th scope="col" class="num">Gain</th>
+                                    <th scope="col" class="num">Day</th>
+                                    <th scope="col" class="num pf-hide-sm">Gain</th>
                                 </tr>
                             </thead>
                             <tbody></tbody>
@@ -169,8 +176,9 @@
                             <thead>
                                 <tr>
                                     <th scope="col">Security</th>
-                                    <th scope="col" class="num">Weight</th>
+                                    <th scope="col" class="num pf-hide-sm">Weight</th>
                                     <th scope="col" class="num">Value</th>
+                                    <th scope="col" class="num">Day</th>
                                     <th scope="col" class="num pf-hide-sm">Shares</th>
                                     <th scope="col" class="num pf-hide-sm">Price</th>
                                     <th scope="col" class="num pf-hide-sm">Cost</th>
@@ -323,6 +331,6 @@
     <script src="/shared/api-base.js?v=1"></script>
     <script src="/shared/site-nav.js?v=22"></script>
     <script src="/shared/analytics.js?v=1"></script>
-    <script src="portfolio.js?v=15"></script>
+    <script src="portfolio.js?v=16"></script>
 </body>
 </html>
