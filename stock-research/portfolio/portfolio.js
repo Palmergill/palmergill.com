@@ -1068,7 +1068,6 @@
             cross.setAttribute('visibility', 'visible');
             dot.setAttribute('visibility', 'visible');
             const parts = [fmtDay(p.date), `${fmtMoney(p.value, true)}${p.estimated ? ' (est.)' : ''}`];
-            if (p.invested != null) parts.push(`invested ${fmtMoney(p.invested, true)}`, fmtSigned(p.value - p.invested, true));
             showTip(event, parts.join(' · '));
         }
         hit.addEventListener('mousemove', hover);
