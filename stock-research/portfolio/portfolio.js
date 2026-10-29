@@ -413,9 +413,6 @@
         }
         const noBasis = data.positions.filter((p) => p.costBasis == null).length;
         if (noBasis) items.push(`${plural(noBasis, 'position')} ${noBasis === 1 ? 'has' : 'have'} no cost basis, so ${noBasis === 1 ? 'its' : 'their'} gain isn't counted.`);
-        if (data.oversold.length) {
-            items.push(`Sells of <strong>${data.oversold.map(escapeHtml).join(', ')}</strong> exceed the shares on record before them; the extra was ignored. A missing buy, or one filed under a different date, usually explains it.`);
-        }
         els.insights.innerHTML = items.length ? items.map((text) => `<li>${text}</li>`).join('') : '<li class="pf-muted">Nothing to note yet.</li>';
     }
 
