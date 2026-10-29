@@ -14,7 +14,7 @@
     // pauses when the provider's per-minute allowance runs out. Its
     // `retryAfter` says when to ask again.
     const MAX_PENDING_RETRIES = 30;
-    const TOP_HOLDINGS = 8;
+    const TOP_HOLDINGS = 10;
     const TRADES_PER_PAGE = 50;
     const REALIZED_SHOWN = 12;
     const TABS = ['overview', 'holdings', 'activity', 'accounts', 'gains'];
@@ -451,6 +451,12 @@
         if (p.dayChange == null) return '<td class="num pf-muted">—</td>';
         return `<td class="num ${tone(p.dayChange)}">${fmtSigned(p.dayChange, true)}<span class="pf-sub ${tone(p.dayChange)}">${fmtPct(p.dayChangePct, true)}</span></td>`;
     }
+    // The same, as a green or red pill: the day's percent, dollars under it.
+    function dayPill(p) {
+        if (p.dayChange == null) return '<td class="num pf-muted">—</td>';
+        const t = tone(p.dayChange);
+        return `<td class="num"><span class="pf-day ${t ? `pf-day--${t === 'is-gain' ? 'up' : 'down'}` : ''}">${fmtPct(p.dayChangePct, true)}</span><span class="pf-sub ${t}">${fmtSigned(p.dayChange, true)}</span></td>`;
+    }
 
     function renderTopHoldings(data) {
         const colors = swatches(data.positions);
@@ -466,7 +472,7 @@
                 <td>${securityCell(p, colors[i])}</td>
                 <td class="num pf-strong">${p.weight == null ? '—' : fmtPct(p.weight)}</td>
                 <td class="num pf-strong">${fmtMoney(p.marketValue, true)}</td>
-                ${dayCell(p)}
+                ${dayPill(p)}
                 ${gainCell(p, 'pf-hide-sm')}
             </tr>`).join('') || '<tr><td colspan="5" class="pf-muted">No open positions.</td></tr>';
     }
