@@ -21,7 +21,6 @@ import logging
 import re
 import math
 import threading
-from collections import Counter
 from datetime import date, datetime, timedelta, timezone
 from types import SimpleNamespace
 from typing import Any, Dict, Iterable, List, Optional, Tuple
@@ -1195,13 +1194,6 @@ def breakdown(db: Session, username: str) -> Dict[str, Any]:
         key=lambda s: -s["marketValue"],
     )
 
-    # The day's change over positions that have one; its percent is of what
-    # they were worth at the close before (plus anything bought that day).
-    moved = [r for r in rows if r["dayChange"] is not None]
-    day_total = sum(r["dayChange"] for r in moved)
-    day_base = sum(r["dayChange"] / r["dayChangePct"] for r in moved if r["dayChangePct"])
-    day_dates = Counter(prices[r["ticker"]]["asOf"] for r in moved)
-
     reported = [t for t in transactions if t.realized_reported is not None]
     years = [
         {"year": year, **stats, "net": stats["bought"] - stats["sold"]}
@@ -1221,10 +1213,6 @@ def breakdown(db: Session, username: str) -> Dict[str, Any]:
             "gainPct": _ratio(gain_total, cost_total) if comparable else None,
             # None, not $0, until a counted sell has realized something.
             "realizedGain": realized_total if meta["realized_by_tx"] else None,
-            "dayChange": day_total if moved else None,
-            "dayChangePct": _ratio(day_total, day_base) if moved else None,
-            # Most positions' latest close; crypto can be a day ahead.
-            "dayChangeAsOf": day_dates.most_common(1)[0][0] if moved else None,
             "positions": len(rows),
             "pricedPositions": sum(1 for r in rows if r["marketValue"] is not None),
             "pendingPrices": sum(1 for r in rows if r["priceStatus"] == "pending"),

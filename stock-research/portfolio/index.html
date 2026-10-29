@@ -13,7 +13,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/shared/site-nav.css?v=19">
-    <link rel="stylesheet" href="portfolio.css?v=12">
+    <link rel="stylesheet" href="portfolio.css?v=13">
 </head>
 <body>
 <noscript>
@@ -103,11 +103,11 @@
                         <div>
                             <p class="pf-hero__label">Total value</p>
                             <p class="pf-hero__value" id="heroValue">—</p>
-                            <p class="pf-hero__stats" id="heroStats"></p>
+                            <!-- The change over the chosen range, and nothing else. -->
+                            <p class="pf-hero__stats" id="historySub">Loading price history…</p>
                         </div>
                         <div class="pf-ranges" id="historyRanges" role="group" aria-label="Time range"></div>
                     </div>
-                    <p class="pf-hero__change" id="historySub">Loading price history…</p>
                     <div class="pf-chart" id="historyChart"></div>
                     <ul class="pf-chart-legend" id="historyLegend" hidden>
                         <li><span class="pf-key pf-key--value"></span>Value</li>
@@ -387,6 +387,6 @@
     <script src="/shared/api-base.js?v=1"></script>
     <script src="/shared/site-nav.js?v=22"></script>
     <script src="/shared/analytics.js?v=1"></script>
-    <script src="portfolio.js?v=18"></script>
+    <script src="portfolio.js?v=19"></script>
 </body>
 </html>

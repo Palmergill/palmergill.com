@@ -701,7 +701,7 @@ def test_day_change_counts_trades_from_their_own_price():
     assert base == pytest.approx(1000.0)
 
 
-def test_breakdown_shows_each_position_and_the_total_day_change(monkeypatch):
+def test_breakdown_shows_each_positions_day_change(monkeypatch):
     monkeypatch.setattr(portfolio, "quotes", lambda db, positions: {
         t: {
             "price": PRICES[t], "name": t, "sector": "Technology", "asOf": "2026-10-27",
@@ -717,9 +717,8 @@ def test_breakdown_shows_each_position_and_the_total_day_change(monkeypatch):
     aapl = next(p for p in body["positions"] if p["ticker"] == "AAPL")
     assert aapl["dayChange"] == pytest.approx(10 * 4.0)
     assert aapl["dayChangePct"] == pytest.approx(4.0 / 196.0)
-    assert body["totals"]["dayChange"] == pytest.approx(40.0 + 8.0)
-    assert body["totals"]["dayChangePct"] == pytest.approx(48.0 / (1960.0 + 392.0))
-    assert body["totals"]["dayChangeAsOf"] == "2026-10-27"
+    msft = next(p for p in body["positions"] if p["ticker"] == "MSFT")
+    assert msft["dayChange"] == pytest.approx(8.0)
 
 
 def test_a_holding_is_member_only_and_only_the_callers():

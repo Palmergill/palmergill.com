@@ -76,7 +76,6 @@
         dashboard: $('dashboard'),
         tabs: $('tabs'),
         heroValue: $('heroValue'),
-        heroStats: $('heroStats'),
         insightGrid: $('insightGrid'),
         sectorCard: $('sectorCard'),
         allocationBar: $('allocationBar'),
@@ -305,24 +304,7 @@
     }
 
     function renderHero(data) {
-        const t = data.totals;
-        els.heroValue.textContent = fmtMoney(t.marketValue, true);
-        const stats = [];
-        if (t.dayChange != null) {
-            const when = t.dayChangeAsOf === today() ? 'today' : `on ${shortDate.format(new Date(`${t.dayChangeAsOf}T00:00:00Z`))}`;
-            stats.push(`<span class="${tone(t.dayChange)}">${fmtSigned(t.dayChange, true)} (${fmtPct(t.dayChangePct, true)})</span> ${when}`);
-        }
-        if (t.gain != null) {
-            stats.push(`<span class="${tone(t.gain)}">${fmtSigned(t.gain, true)} (${fmtPct(t.gainPct, true)})</span> unrealized`);
-        }
-        if (t.realizedGain != null) {
-            stats.push(`<span class="${tone(t.realizedGain)}">${fmtSigned(t.realizedGain, true)}</span> realized`);
-        }
-        stats.push(t.pricedPositions < t.positions
-            ? `${t.pricedPositions} of ${plural(t.positions, 'position')} priced`
-            : plural(t.positions, 'position'));
-        // Each stat stays on one line; the row wraps between them.
-        els.heroStats.innerHTML = stats.map((text) => `<span class="pf-stat">${text}</span>`).join(' <span class="pf-dot" aria-hidden="true">·</span> ');
+        els.heroValue.textContent = fmtMoney(data.totals.marketValue, true);
     }
 
     function allocationSlices(positions) {

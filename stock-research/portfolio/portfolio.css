@@ -156,8 +156,9 @@ body {
 }
 .pf-hero__stats { margin-top: 6px; font-size: 14px; color: var(--soft); font-variant-numeric: tabular-nums; }
 .pf-hero__stats .pf-stat { white-space: nowrap; }
-.pf-hero__stats .pf-stat > span { font-weight: 600; }
+.pf-hero__stats .pf-stat > span, .pf-hero__stats .pf-history-change { font-weight: 600; }
 .pf-dot { margin: 0 4px; color: var(--line-strong); }
+.pf-hero__top + .pf-chart { margin-top: 18px; }
 .pf-hero__change { margin: 18px 0 6px; font-size: 13px; color: var(--soft); }
 .pf-hero__change .pf-history-change { font-weight: 600; }
 .pf-hero__change .pf-stat { white-space: nowrap; }
