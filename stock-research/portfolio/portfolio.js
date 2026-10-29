@@ -451,11 +451,11 @@
         if (p.dayChange == null) return '<td class="num pf-muted">—</td>';
         return `<td class="num ${tone(p.dayChange)}">${fmtSigned(p.dayChange, true)}<span class="pf-sub ${tone(p.dayChange)}">${fmtPct(p.dayChangePct, true)}</span></td>`;
     }
-    // The same, as a green or red pill: the day's percent, dollars under it.
+    // The same, as a green or red pill: the day's dollars, percent under it.
     function dayPill(p) {
         if (p.dayChange == null) return '<td class="num pf-muted">—</td>';
         const t = tone(p.dayChange);
-        return `<td class="num"><span class="pf-day ${t ? `pf-day--${t === 'is-gain' ? 'up' : 'down'}` : ''}">${fmtPct(p.dayChangePct, true)}</span><span class="pf-sub ${t}">${fmtSigned(p.dayChange, true)}</span></td>`;
+        return `<td class="num"><span class="pf-day ${t ? `pf-day--${t === 'is-gain' ? 'up' : 'down'}` : ''}">${fmtSigned(p.dayChange, true)}</span><span class="pf-sub ${t}">${fmtPct(p.dayChangePct, true)}</span></td>`;
     }
 
     function renderTopHoldings(data) {
