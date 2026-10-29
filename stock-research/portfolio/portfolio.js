@@ -1096,7 +1096,6 @@
             holding.retries = 0;
             $('holdingName').textContent = ticker;
             $('holdingPrice').textContent = '—';
-            $('holdingStats').textContent = '';
             $('holdingSub').textContent = 'Loading…';
             $('holdingChart').innerHTML = '';
             ['holdingTiles', 'holdingFacts', 'holdingAbout', 'holdingTrades', 'holdingRanges'].forEach((id) => { $(id).innerHTML = ''; });
@@ -1139,14 +1138,6 @@
         const tag = ASSET_TAGS[d.asset] ? ` · ${ASSET_TAGS[d.asset]}` : '';
         $('holdingName').textContent = `${d.ticker}${d.name && d.name !== d.ticker ? ` · ${d.name}` : ''}${tag}`;
         $('holdingPrice').textContent = fmtMoney(d.price);
-        const stats = [];
-        if (d.dayChange != null) {
-            const when = d.priceAsOf === today() ? 'today' : `on ${shortDate.format(new Date(`${d.priceAsOf}T00:00:00Z`))}`;
-            stats.push(`<span class="${tone(d.dayChange)}">${fmtSigned(d.dayChange, true)} (${fmtPct(d.dayChangePct, true)})</span> ${when} on your shares`);
-        }
-        if (d.priceAsOf) stats.push(`${d.priceStatus === 'trade' ? 'last trade' : 'close'} ${fmtDay(d.priceAsOf)}`);
-        if (!d.open) stats.push('position closed');
-        $('holdingStats').innerHTML = stats.map((text) => `<span class="pf-stat">${text}</span>`).join(' <span class="pf-dot" aria-hidden="true">·</span> ');
 
         // Price chart.
         holding.range = renderRanges(d.closes, $('holdingRanges'), holding.range);
@@ -1159,7 +1150,7 @@
         } else {
             const first = points[0].close;
             const change = points[points.length - 1].close - first;
-            sub.innerHTML = `<span class="pf-history-change ${tone(change)}">${fmtSigned(change)} (${fmtPct(change / first, true)})</span> a share since ${fmtDay(points[0].date)}`;
+            sub.innerHTML = `<span class="pf-history-change ${tone(change)}">${fmtSigned(change)} (${fmtPct(change / first, true)})</span>`;
             const avg = d.open ? pos.avgCost : null;
             const trades = d.trades.filter((t) => t.date >= points[0].date);
             $('holdingLegend').hidden = false;
@@ -1169,7 +1160,6 @@
         }
         const notes = [];
         if (d.pending) notes.push('Older prices are still loading; the chart fills in as they arrive.');
-        if (d.trades.some((t) => t.price && points.length && t.date >= points[0].date)) notes.push('Dots mark your trades at the price you paid or got.');
         if (d.sampleData) notes.push('Generated sample prices, not real history.');
         $('holdingNote').textContent = notes.join(' ');
         $('holdingNote').hidden = !notes.length;
@@ -1276,11 +1266,8 @@
             root.appendChild(svg('line', { class: 'pf-chart__avg', x1: pad.left, x2: width - pad.right, y1: y(cost), y2: y(cost) }));
         }
         root.appendChild(svg('path', { class: 'pf-chart__line', d: line }));
-        const byDay = new Map();
         trades.forEach((t) => {
             const i = indexOf(t.date);
-            if (!byDay.has(i)) byDay.set(i, []);
-            byDay.get(i).push(t);
             if (t.price > 0) root.appendChild(svg('circle', { class: `pf-chart__trade--${t.side}`, cx: x(i), cy: y(t.price), r: trades.length > 80 ? 3 : 4.5 }));
         });
 
@@ -1301,9 +1288,7 @@
             dot.setAttribute('cy', y(p.close));
             cross.setAttribute('visibility', 'visible');
             dot.setAttribute('visibility', 'visible');
-            const parts = [fmtDay(p.date), fmtMoney(p.close)];
-            (byDay.get(i) || []).forEach((t) => parts.push(`${t.side === 'buy' ? 'bought' : 'sold'} ${shareFormat.format(t.shares)} at ${fmtMoney(t.price)}`));
-            showTip(event, parts.join(' · '));
+            showTip(event, `${fmtDay(p.date)} · ${fmtMoney(p.close)}`);
         }
         hit.addEventListener('mousemove', hover);
         hit.addEventListener('touchmove', (event) => { hover(event.touches[0]); event.preventDefault(); }, { passive: false });

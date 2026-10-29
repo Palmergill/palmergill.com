@@ -1385,12 +1385,6 @@ def holding_detail(db: Session, username: str, ticker: str) -> Dict[str, Any]:
     value = position["shares"] * price if is_open and price is not None else None
     cost = position["cost"] if is_open else None
     gain = value - cost if value is not None and cost is not None else None
-    day_change = base = None
-    if quote and value is not None and quote["prevClose"]:
-        day_change, base = _day_change(position["shares"], price, quote["prevClose"], [
-            t for t in transactions if t.ticker == ticker and t.trade_date == quote["day"]
-        ])
-
     def since(days: Optional[int]) -> Optional[float]:
         """The price change since `days` ago (None: since Jan 1)."""
         if not closes:
@@ -1411,8 +1405,6 @@ def holding_detail(db: Session, username: str, ticker: str) -> Dict[str, Any]:
         "price": price,
         "priceStatus": quote["status"] if quote else ("closed" if closes else "unavailable"),
         "priceAsOf": quote["asOf"] if quote else (closes[-1]["date"] if closes else None),
-        "dayChange": day_change,
-        "dayChangePct": _ratio(day_change, base) if day_change is not None else None,
         "position": {
             "shares": position["shares"] if is_open else 0.0,
             "marketValue": value,
