@@ -911,7 +911,7 @@
         $('historyLegend').hidden = false;
         const tradedInRange = lastData?.lastTrade && lastData.lastTrade > points[0].date;
         const { gain, pct } = rangeReturn(points);
-        sub.innerHTML = `<span class="pf-history-change ${tone(gain)}">${fmtSigned(gain, true)}${pct == null ? '' : ` (${fmtPct(pct, true)})`}</span> ${tradedInRange ? 'gain ' : ''}since ${fmtDay(points[0].date)}`;
+        sub.innerHTML = `<span class="pf-history-change ${tone(gain)}">${fmtSigned(gain, true)}${pct == null ? '' : ` (${fmtPct(pct, true)})`}</span>`;
 
         const notes = [];
         const asOf = history.data.asOf;
