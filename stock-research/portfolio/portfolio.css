@@ -321,6 +321,16 @@ body {
 .pf-chart-legend li[hidden] { display: none; }
 .pf-key { width: 16px; height: 0; border-top: 2px solid var(--series-1); }
 .pf-key--invested { border-top: 1.5px solid var(--soft); }
+/* A legend entry that shows or hides its line. */
+.pf-legend-toggle {
+    display: inline-flex; align-items: center; gap: 6px;
+    border: 1px solid var(--line); border-radius: 999px; background: var(--card);
+    font: inherit; color: inherit; padding: 2px 10px 2px 8px; cursor: pointer;
+}
+.pf-legend-toggle:hover { border-color: var(--line-strong); }
+.pf-legend-toggle:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.pf-legend-toggle[aria-pressed="false"] { color: var(--muted); text-decoration: line-through; }
+.pf-legend-toggle[aria-pressed="false"] .pf-key { opacity: 0.35; }
 .pf-key--estimated { border-top: 2px dashed var(--series-1); }
 
 /* One holding: tap a row to open it. */

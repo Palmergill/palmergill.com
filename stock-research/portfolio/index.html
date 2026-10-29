@@ -13,7 +13,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/shared/site-nav.css?v=19">
-    <link rel="stylesheet" href="portfolio.css?v=11">
+    <link rel="stylesheet" href="portfolio.css?v=12">
 </head>
 <body>
 <noscript>
@@ -111,7 +111,7 @@
                     <div class="pf-chart" id="historyChart"></div>
                     <ul class="pf-chart-legend" id="historyLegend" hidden>
                         <li><span class="pf-key pf-key--value"></span>Value</li>
-                        <li><span class="pf-key pf-key--invested"></span>Invested (cost basis)</li>
+                        <li><button type="button" class="pf-legend-toggle" data-cost-toggle aria-pressed="true"><span class="pf-key pf-key--invested"></span>Invested (cost basis)</button></li>
                         <li id="estimatedKey" hidden><span class="pf-key pf-key--estimated"></span>Estimated from your trade prices</li>
                     </ul>
                     <p class="pf-note" id="historyNote" hidden></p>
@@ -331,7 +331,7 @@
                     <div class="pf-chart" id="holdingChart"></div>
                     <ul class="pf-chart-legend" id="holdingLegend" hidden>
                         <li><span class="pf-key"></span>Daily close</li>
-                        <li id="avgCostKey"><span class="pf-key pf-key--avg"></span>Your average cost</li>
+                        <li id="avgCostKey"><button type="button" class="pf-legend-toggle" data-cost-toggle aria-pressed="true"><span class="pf-key pf-key--avg"></span>Your average cost</button></li>
                         <li id="tradeKeys"><span class="pf-marker pf-marker--buy"></span>Buy <span class="pf-marker pf-marker--sell"></span>Sell</li>
                     </ul>
                     <p class="pf-note" id="holdingNote" hidden></p>
@@ -387,6 +387,6 @@
     <script src="/shared/api-base.js?v=1"></script>
     <script src="/shared/site-nav.js?v=22"></script>
     <script src="/shared/analytics.js?v=1"></script>
-    <script src="portfolio.js?v=17"></script>
+    <script src="portfolio.js?v=18"></script>
 </body>
 </html>

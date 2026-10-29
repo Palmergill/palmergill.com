@@ -273,7 +273,7 @@ def test_history_follows_trades_from_the_first_one(monkeypatch):
     body = client.get("/api/stocks/portfolio/history").json()
     assert body["complete"] is True
     assert body["points"][0] == {
-        "date": first.isoformat(), "value": 20.0, "invested": 20.0, "estimated": False,
+        "date": first.isoformat(), "value": 20.0, "invested": 20.0, "estimated": False, "flow": 20.0,
     }
     assert body["points"][-1]["value"] == 50.0
 
@@ -662,7 +662,7 @@ def test_old_days_come_from_the_backfill_and_recent_ones_from_polygon(_backfill)
     points = client.get("/api/stocks/portfolio/history").json()["points"]
     assert points[0]["date"] == "2020-03-02"
     assert points[0] == {
-        "date": "2020-03-02", "value": 20.0, "invested": 20.0, "estimated": False,
+        "date": "2020-03-02", "value": 20.0, "invested": 20.0, "estimated": False, "flow": 20.0,
     }
     # The last weeks are Polygon's closes, not Tiingo's for the same days.
     assert points[-1]["value"] == 40.0

@@ -810,6 +810,23 @@
 
     const history = { data: null, range: '1Y', signature: null, retries: 0, timer: null };
 
+    // Whether the cost lines (invested, average cost) are drawn; remembered
+    // per browser. Hidden, the y axis fits the price or value alone.
+    let showCost = true;
+    try { showCost = localStorage.getItem('pf.showCost') !== 'false'; } catch { /* storage blocked */ }
+    function syncCostToggles() {
+        document.querySelectorAll('[data-cost-toggle]').forEach((b) => b.setAttribute('aria-pressed', String(showCost)));
+    }
+    syncCostToggles();
+    document.addEventListener('click', (event) => {
+        if (!event.target.closest('[data-cost-toggle]')) return;
+        showCost = !showCost;
+        try { localStorage.setItem('pf.showCost', String(showCost)); } catch { /* storage blocked */ }
+        syncCostToggles();
+        if (currentTab() === 'overview' && history.data) renderHistory();
+        if (currentTab() === 'holding' && holding.data) renderHolding();
+    });
+
     // Reload the history only when what it's built from changed, not when the
     // breakdown is re-fetched for prices.
     function historySignature(data) {
@@ -874,6 +891,27 @@
         return key;
     }
 
+    // The gain over a range, less money put in or taken out, and its percent
+    // as a time-weighted return: each day's gain on what was invested that
+    // day, chained. A first $2k buy growing to $45k by adding money then
+    // reads as its real gain, not +2,000%.
+    function rangeReturn(points) {
+        let gain = 0;
+        let growth = 1;
+        let counted = false;
+        for (let i = 1; i < points.length; i += 1) {
+            const flow = points[i].flow || 0;
+            const day = points[i].value - points[i - 1].value - flow;
+            gain += day;
+            const base = points[i - 1].value + Math.max(flow, 0);
+            if (base > 0) {
+                growth *= 1 + day / base;
+                counted = true;
+            }
+        }
+        return { gain, pct: counted ? growth - 1 : null };
+    }
+
     function renderHistory() {
         const all = history.data.points;
         history.range = renderRanges(all);
@@ -889,15 +927,9 @@
             return;
         }
         $('historyLegend').hidden = false;
-        const first = points[0].value;
-        const last = points[points.length - 1].value;
-        const change = last - first;
-        // With trades inside the range, a percent change would mostly be new
-        // money (a first $2k buy growing to $45k reads as +2,000%), so show
-        // the dollar change alone.
         const tradedInRange = lastData?.lastTrade && lastData.lastTrade > points[0].date;
-        const pct = tradedInRange || !first ? '' : ` (${fmtPct(change / first, true)})`;
-        sub.innerHTML = `<span class="pf-history-change ${tone(change)}">${fmtSigned(change, true)}${pct}</span> since ${fmtDay(points[0].date)}`;
+        const { gain, pct } = rangeReturn(points);
+        sub.innerHTML = `<span class="pf-history-change ${tone(gain)}">${fmtSigned(gain, true)}${pct == null ? '' : ` (${fmtPct(pct, true)})`}</span> ${tradedInRange ? 'gain ' : ''}since ${fmtDay(points[0].date)}`;
 
         const notes = [];
         const asOf = history.data.asOf;
@@ -905,7 +937,7 @@
             notes.push(`Before ${fmtDay(asOf)}, this assumes you held the holdings you uploaded, less any trades you've added since.`);
         }
         if (tradedInRange) {
-            notes.push('Buys and sells move the value line too; the gap between it and the invested line is the gain.');
+            notes.push('Buys and sells move the value line too, so the gain above leaves out money you put in or took out, and its percent is a time-weighted return.');
         }
         const estimated = points.some((p) => p.estimated);
         if (estimated) {
@@ -997,7 +1029,7 @@
         const innerW = width - pad.left - pad.right;
         const innerH = height - pad.top - pad.bottom;
 
-        const values = points.flatMap((p) => (p.invested != null ? [p.value, p.invested] : [p.value]));
+        const values = points.flatMap((p) => (showCost && p.invested != null ? [p.value, p.invested] : [p.value]));
         let lo = Math.min(...values);
         let hi = Math.max(...values);
         const margin = (hi - lo) * 0.08 || hi * 0.05 || 1;
@@ -1024,7 +1056,7 @@
         const all = points.map((_, i) => i);
         const valueLine = path(all, 'value');
         root.appendChild(svg('path', { class: 'pf-chart__area', d: `${valueLine}L${x(points.length - 1)},${y(lo)}L${x(0)},${y(lo)}Z` }));
-        runs(points, (p) => p.invested != null).forEach((indices) => {
+        runs(points, (p) => showCost && p.invested != null).forEach((indices) => {
             root.appendChild(svg('path', { class: 'pf-chart__invested', d: path(indices, 'invested') }));
         });
         runs(points, (p) => !p.estimated).forEach((indices) => {
@@ -1234,7 +1266,8 @@
         const innerW = width - pad.left - pad.right;
         const innerH = height - pad.top - pad.bottom;
 
-        const values = points.map((p) => p.close).concat(avgCost != null ? [avgCost] : [], trades.map((t) => t.price).filter((v) => v > 0));
+        const cost = showCost ? avgCost : null;
+        const values = points.map((p) => p.close).concat(cost != null ? [cost] : [], trades.map((t) => t.price).filter((v) => v > 0));
         let lo = Math.min(...values);
         let hi = Math.max(...values);
         const margin = (hi - lo) * 0.08 || hi * 0.05 || 1;
@@ -1261,8 +1294,8 @@
         dateLabels(root, points, x, innerW, height);
         const line = points.map((p, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(p.close).toFixed(1)}`).join('');
         root.appendChild(svg('path', { class: 'pf-chart__area', d: `${line}L${x(points.length - 1)},${y(lo)}L${x(0)},${y(lo)}Z` }));
-        if (avgCost != null) {
-            root.appendChild(svg('line', { class: 'pf-chart__avg', x1: pad.left, x2: width - pad.right, y1: y(avgCost), y2: y(avgCost) }));
+        if (cost != null) {
+            root.appendChild(svg('line', { class: 'pf-chart__avg', x1: pad.left, x2: width - pad.right, y1: y(cost), y2: y(cost) }));
         }
         root.appendChild(svg('path', { class: 'pf-chart__line', d: line }));
         const byDay = new Map();

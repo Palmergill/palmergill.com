@@ -1633,9 +1633,14 @@ def value_history(db: Session, username: str) -> Dict[str, Any]:
     day = start
     while day <= today:
         if day.weekday() < 5 or day == today:
+            # Money put in (bought) or taken out (sold) since the last point,
+            # so the page can tell a gain from a deposit.
+            flow = 0.0
             while t_index < len(trades) and trades[t_index].trade_date <= day:
                 tx = trades[t_index]
                 t_index += 1
+                fees = tx.fees or 0.0
+                flow += tx.shares * tx.price + fees if tx.side == "buy" else -(tx.shares * tx.price - fees)
                 held_now = shares.get(tx.ticker, 0.0)
                 basis = cost.get(tx.ticker, 0.0) if tx.ticker in cost else 0.0
                 if tx.side == "buy":
@@ -1680,6 +1685,7 @@ def value_history(db: Session, username: str) -> Dict[str, Any]:
                     "value": round(value, 2),
                     "invested": round(invested, 2) if invested is not None else None,
                     "estimated": value > 0 and estimated / value > ESTIMATE_SHARE,
+                    "flow": round(flow, 2),
                 })
         day += timedelta(days=1)
 
