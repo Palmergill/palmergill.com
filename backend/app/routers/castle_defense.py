@@ -19,7 +19,6 @@ router = APIRouter(prefix="/api/castle-defense", tags=["castle-defense"])
 
 DAY_PATTERN = r"^\d{4}-\d{2}-\d{2}$"
 TYPE_PATTERN = "^(archer|cannon|frost|mage|spikes|tar|mine)$"
-MODE_PATTERN = "^(classic|open)$"
 
 
 class Placement(BaseModel):
@@ -30,7 +29,6 @@ class Placement(BaseModel):
 
 class RunRequest(BaseModel):
     day: str = Field(..., pattern=DAY_PATTERN)
-    mode: str = Field("classic", pattern=MODE_PATTERN)
     # 1,000 gold at 75 a trap is at most 13 pieces.
     layout: List[Placement] = Field(..., min_length=1, max_length=16)
 
@@ -51,19 +49,14 @@ def _display_name(db: Session, username: str) -> str:
 def get_leaderboard(
     request: Request,
     day: str = Query(..., pattern=DAY_PATTERN),
-    mode: str = Query("classic", pattern=MODE_PATTERN),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
-    return castle_defense.leaderboard(db, castle_defense.validate_day(day), _username(request), mode)
+    return castle_defense.leaderboard(db, castle_defense.validate_day(day), _username(request))
 
 
 @router.get("/all-time")
-def get_all_time(
-    request: Request,
-    mode: str = Query("classic", pattern=MODE_PATTERN),
-    db: Session = Depends(get_db),
-) -> Dict[str, Any]:
-    return castle_defense.all_time(db, _username(request), mode)
+def get_all_time(request: Request, db: Session = Depends(get_db)) -> Dict[str, Any]:
+    return castle_defense.all_time(db, _username(request))
 
 
 @router.post("/runs")
@@ -75,4 +68,4 @@ def post_run(body: RunRequest, request: Request, db: Session = Depends(get_db)) 
         raise HTTPException(status_code=403, detail=message)
     day = castle_defense.validate_day(body.day)
     layout = [p.model_dump() for p in body.layout]
-    return castle_defense.submit(db, day, layout, username, _display_name(db, username), body.mode)
+    return castle_defense.submit(db, day, layout, username, _display_name(db, username))

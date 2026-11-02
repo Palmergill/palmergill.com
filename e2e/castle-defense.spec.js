@@ -14,6 +14,8 @@ async function clickTile(page, x, y) {
 
 test("place the day's allotment, then start the run", async ({ page }) => {
     await page.goto(DAY_ONE);
+    // No intro card: the board is ready to build on.
+    await expect(page.locator('#overlay')).toBeHidden();
     const count = page.locator('#pieceCount');
     const play = page.locator('#playButton');
     await expect(count).toHaveText('11 to place');
@@ -130,56 +132,19 @@ test('a signed-in run lands on the board and its place goes in the share', async
     expect(copied).toMatch(/\n🏆 \d+(st|nd|rd|th) of \d+ today/);
 });
 
-// ── the open field ──────────────────────────────────────────────────────────
-
-// Day 1's open field: the castle at (4, 4), a tree at (2, 2), and no road.
-// Its allotment: 1 Archer, 3 Cannons, 2 Frost, 1 Mage, 3 Tar pits, 3 Mines, no Spikes.
-const DAY_ONE_OPEN = '/castle-defense/?mode=open&date=2026-10-18';
-
-test('the open field opens straight onto the board, takes traps on the grass and sends the horde in from an edge', async ({ page }) => {
-    await page.goto(DAY_ONE_OPEN);
-    // No intro card: the board is ready to build on.
-    await expect(page.locator('#overlay')).toBeHidden();
-    await expect(page.getByRole('link', { name: 'Open field' })).toHaveAttribute('aria-current', 'page');
-    // Switching back keeps the day.
-    await expect(page.getByRole('link', { name: 'Classic' })).toHaveAttribute('href', './?date=2026-10-18');
-    await expect(page.locator('#pieceCount')).toHaveText('13 to place');
-
-    await page.getByRole('button', { name: /Archer/ }).click();
-    await clickTile(page, 4, 4);
-    await expect(page.locator('#toast')).toHaveText("That's the castle.");
-    await clickTile(page, 2, 2);
-    await expect(page.locator('#toast')).toHaveText("You can't build there.");
-    await clickTile(page, 3, 4);
-
-    // Any grass will do for a trap out here.
-    await page.getByRole('button', { name: /Tar pit/ }).click();
-    await clickTile(page, 2, 4);
-    await expect(page.getByRole('button', { name: /Tar pit/ })).toContainText('2 of 3 left');
-
-    await page.locator('#playButton').click();
-    await expect(page.locator('#toast')).toHaveText('Wave 1 from the west');
-    await expect(page.locator('#waveValue')).toHaveText('1');
-});
-
 test("today's leaderboard opens from the header before you've played", async ({ page }) => {
     await page.goto('/castle-defense/');
     await page.getByRole('button', { name: /Leaderboard/ }).click();
     const card = page.getByRole('dialog');
     await expect(card.getByRole('heading', { name: "Today's leaderboard" })).toBeVisible();
-    await expect(card.getByRole('button', { name: 'Classic' })).toHaveAttribute('aria-pressed', 'true');
+    await expect(card.getByRole('button', { name: 'Today' })).toHaveAttribute('aria-pressed', 'true');
     // Other tests may have posted runs already; either way the board answers.
-    await expect(page.locator('#fullBoardNote')).toHaveText(/No scores yet today|\d+ players?/);
-
-    // The other mode's board is one click away.
-    await card.getByRole('button', { name: 'Open field' }).click();
-    await expect(card.getByRole('button', { name: 'Open field' })).toHaveAttribute('aria-pressed', 'true');
     await expect(page.locator('#fullBoardNote')).toHaveText(/No scores yet today|\d+ players?/);
 
     // All time counts days finished 1st and in the top 3.
     await card.getByRole('button', { name: 'All time' }).click();
     await expect(card.getByRole('heading', { name: 'All-time leaderboard' })).toBeVisible();
-    await expect(card.getByRole('button', { name: 'Open field' })).toHaveAttribute('aria-pressed', 'true');
+    await expect(card.getByRole('button', { name: 'All time' })).toHaveAttribute('aria-pressed', 'true');
     await expect(page.locator('#fullBoardNote')).toHaveText(/No scores yet\.|\d+ players? over \d+ days?/);
 
     await card.getByRole('button', { name: 'Close' }).click();

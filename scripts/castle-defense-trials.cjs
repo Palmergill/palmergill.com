@@ -25,22 +25,17 @@ function hash(str) {
 
 // How promising each tile looks for a tower and for a trap, the way a
 // player sizing up the map might judge it.
-function tileScores(map, mode) {
+function tileScores(map) {
     const towers = [];
     const traps = [];
     const road = [];
-    if (mode === "classic") {
-        for (let d = 0; d < map.length; d += 0.2) road.push(G.pointAt(map, d));
-    }
+    for (let d = 0; d < map.length; d += 0.2) road.push(G.pointAt(map, d));
     for (let x = 0; x < G.SIZE; x++) {
         for (let y = 0; y < G.SIZE; y++) {
             if (G.isGrass(map, x, y)) {
-                const score = mode === "classic"
-                    ? road.filter((p) => Math.hypot(p.x - x - 0.5, p.y - y - 0.5) < 2).length + 0.5
-                    : 1 / (0.5 + Math.hypot(x - map.castle.x, y - map.castle.y));
+                const score = road.filter((p) => Math.hypot(p.x - x - 0.5, p.y - y - 0.5) < 2).length + 0.5;
                 towers.push({ x, y, score });
-                if (mode === "open") traps.push({ x, y, score: 1 / (0.5 + Math.abs(Math.hypot(x - map.castle.x, y - map.castle.y) - 2)) });
-            } else if (mode === "classic" && G.isRoad(map, x, y)) {
+            } else if (G.isRoad(map, x, y)) {
                 traps.push({ x, y, score: 1 });
             }
         }
@@ -67,7 +62,7 @@ function draw(rng, pool, used, sharp) {
 //   partial — half to all of the pieces, aimed
 const KINDS = ["scatter", "aimed", "partial"];
 
-function trialLayout(map, mode, scores, index) {
+function trialLayout(map, scores, index) {
     const rng = mulberry32(hash(`${map.seed}:trial:${index}`));
     const kind = KINDS[index % KINDS.length];
     const sharp = kind === "scatter" ? 0 : 1 + rng() * 3;
@@ -94,14 +89,14 @@ function trialLayout(map, mode, scores, index) {
     return { kind, layout };
 }
 
-function runTrials(date, mode, count) {
-    const map = G.dailyMap(date, mode);
-    const scores = tileScores(map, mode);
+function runTrials(date, count) {
+    const map = G.dailyMap(date);
+    const scores = tileScores(map);
     const out = [];
     for (let i = 0; i < count; i++) {
-        const { kind, layout } = trialLayout(map, mode, scores, i);
-        const res = G.replay(date, layout, mode);
-        if (!res.ok) throw new Error(`${date} ${mode} trial ${i}: ${res.reason}`);
+        const { kind, layout } = trialLayout(map, scores, i);
+        const res = G.replay(date, layout);
+        if (!res.ok) throw new Error(`${date} trial ${i}: ${res.reason}`);
         out.push({ kind, kills: res.kills });
     }
     return out;

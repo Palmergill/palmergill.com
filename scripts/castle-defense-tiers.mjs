@@ -1,5 +1,5 @@
-// Sets Castle Defense's daily tiers. For every day in the range and each
-// mode, it plays TRIALS seeded variations of that day's allotment (see
+// Sets Castle Defense's daily tiers. For every day in the range, it plays
+// TRIALS seeded variations of that day's allotment (see
 // castle-defense-trials.cjs) and puts each tier's kill count where the
 // matching share of them fall short: tier 2 beats 40% of trials, tier 3 60%,
 // tier 4 80%, tier 5 90%. Tier 1 is any score. Writes
@@ -25,19 +25,15 @@ if (!isMainThread) {
     const G = require("../castle-defense/castleDefenseGame.js");
     const { runTrials, cutoffFor } = require("./castle-defense-trials.cjs");
     parentPort.on("message", (date) => {
-        const day = {};
-        for (const mode of G.MODES) {
-            const kills = runTrials(date, mode, TRIALS).map((t) => t.kills);
-            // Ties at the bottom can stack two cut-offs on one score; each
-            // tier still needs at least one more kill than the one below.
-            const cuts = [];
-            FAIL_SHARES.forEach((fail) => {
-                const cut = cutoffFor(kills, +(1 - fail).toFixed(6));
-                cuts.push(Math.max(cut, (cuts[cuts.length - 1] || 0) + 1));
-            });
-            day[mode] = cuts;
-        }
-        parentPort.postMessage({ date, day });
+        const kills = runTrials(date, TRIALS).map((t) => t.kills);
+        // Ties at the bottom can stack two cut-offs on one score; each tier
+        // still needs at least one more kill than the one below.
+        const cuts = [];
+        FAIL_SHARES.forEach((fail) => {
+            const cut = cutoffFor(kills, +(1 - fail).toFixed(6));
+            cuts.push(Math.max(cut, (cuts[cuts.length - 1] || 0) + 1));
+        });
+        parentPort.postMessage({ date, day: cuts });
     });
 } else {
     const G = require("../castle-defense/castleDefenseGame.js");
@@ -49,7 +45,7 @@ if (!isMainThread) {
     const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
     const old = existsSync(OUT) ? JSON.parse(readFileSync(OUT, "utf8")) : null;
     // Tiers made under other rules or cut-offs are thrown away, not merged.
-    const days = old && same(old.rules, G.RULES_BY_MODE) && same(old.failShares, FAIL_SHARES) ? old.days : {};
+    const days = old && old.rules === G.RULES && same(old.failShares, FAIL_SHARES) ? old.days : {};
     const queue = dates.slice();
     let done = 0;
     const started = Date.now();
@@ -59,7 +55,7 @@ if (!isMainThread) {
         const lines = sorted.map(([date, day]) => `    ${JSON.stringify(date)}: ${JSON.stringify(day)}`);
         writeFileSync(
             OUT,
-            `{\n  "rules": ${JSON.stringify(G.RULES_BY_MODE)},\n  "trials": ${TRIALS},\n  "failShares": ${JSON.stringify(FAIL_SHARES)},\n  "days": {\n${lines.join(",\n")}\n  }\n}\n`
+            `{\n  "rules": ${G.RULES},\n  "trials": ${TRIALS},\n  "failShares": ${JSON.stringify(FAIL_SHARES)},\n  "days": {\n${lines.join(",\n")}\n  }\n}\n`
         );
     };
     const workers = Math.min(availableParallelism(), queue.length);
@@ -70,7 +66,7 @@ if (!isMainThread) {
         w.on("message", ({ date, day }) => {
             days[date] = day;
             done += 1;
-            console.log(`${date}  ${Object.entries(day).map(([m, c]) => `${m} ${c.join("/")}`).join(", ")}  [${done}/${dates.length}, ${Math.round((Date.now() - started) / 1000)}s]`);
+            console.log(`${date}  ${day.join("/")}  [${done}/${dates.length}, ${Math.round((Date.now() - started) / 1000)}s]`);
             next();
         });
         next();

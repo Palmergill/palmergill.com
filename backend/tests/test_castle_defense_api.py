@@ -12,7 +12,7 @@ from fastapi.testclient import TestClient
 from py_mini_racer import MiniRacer
 
 from app import accounts
-from app.database import CastleDefenseOpenScore, CastleDefenseScore, SessionLocal
+from app.database import CastleDefenseScore, SessionLocal
 from app.main import ROLE_MEMBER, SESSION_COOKIE_NAME, app, create_app_session_token
 from app.services import castle_defense
 
@@ -33,7 +33,6 @@ def _clean_board():
     db = SessionLocal()
     try:
         db.query(CastleDefenseScore).delete()
-        db.query(CastleDefenseOpenScore).delete()
         db.commit()
     finally:
         db.close()
@@ -181,68 +180,6 @@ def test_scores_from_older_rules_are_left_off_and_then_replaced():
     assert body["players"] == 1 and body["best"]["runs"] == 2
 
 
-# ── the open field ──────────────────────────────────────────────────────────
-
-
-def _open_layout(day: str):
-    """Every piece in the open day's allotment, packed around the castle."""
-    ctx = MiniRacer()
-    try:
-        ctx.eval(castle_defense.engine_source())
-        raw = ctx.eval(
-            "(() => { const G = CastleDefenseGame; const m = G.dailyMap(%s, 'open'); const grass = [];"
-            " for (let x = 0; x < 8; x++) for (let y = 0; y < 8; y++) if (G.isGrass(m, x, y)) grass.push([x, y]);"
-            " const gap = ([x, y]) => Math.hypot(x - m.castle.x, y - m.castle.y);"
-            " grass.sort((a, b) => gap(a) - gap(b)); const out = [];"
-            " for (const [t, n] of Object.entries(m.allotment)) for (let i = 0; i < n; i++) {"
-            "  const [x, y] = grass.shift(); out.push({ type: t, x, y }); }"
-            " return JSON.stringify(out); })()" % json.dumps(day)
-        )
-    finally:
-        ctx.close()
-    return json.loads(raw)
-
-
-def test_open_runs_are_scored_on_their_own_board():
-    client = _member("Erin")
-    layout = _open_layout(TODAY)
-    body = client.post("/api/castle-defense/runs", json={"day": TODAY, "mode": "open", "layout": layout}).json()
-    expected = castle_defense.replay(TODAY, layout, "open")
-    assert body["kills"] == expected["kills"] > 0
-    assert body["best"]["rank"] == 1 and body["players"] == 1
-
-    open_board = client.get(f"/api/castle-defense/leaderboard?day={TODAY}&mode=open").json()
-    assert [e["name"] for e in open_board["entries"]] == ["Erin"]
-    # The classic board never sees it.
-    assert client.get(f"/api/castle-defense/leaderboard?day={TODAY}").json()["players"] == 0
-
-    classic = client.post("/api/castle-defense/runs", json={"day": TODAY, "layout": _one_piece(TODAY)}).json()
-    assert classic["players"] == 1 and classic["best"]["runs"] == 1
-
-
-def test_an_open_layout_is_checked_against_the_open_map():
-    layout = _open_layout(TODAY)
-    castle = json.loads(_eval_open(f"JSON.stringify(CastleDefenseGame.dailyMap({json.dumps(TODAY)}, 'open').castle)"))
-    bad = [{"type": layout[0]["type"], "x": castle["x"], "y": castle["y"]}]
-    response = _member().post("/api/castle-defense/runs", json={"day": TODAY, "mode": "open", "layout": bad})
-    assert response.status_code == 422
-    assert "castle" in response.json()["detail"]
-
-
-def test_unknown_modes_are_refused():
-    response = TestClient(app).get(f"/api/castle-defense/leaderboard?day={TODAY}&mode=sideways")
-    assert response.status_code == 422
-
-
-def _eval_open(expression: str) -> str:
-    ctx = MiniRacer()
-    try:
-        ctx.eval(castle_defense.engine_source())
-        return ctx.eval(expression)
-    finally:
-        ctx.close()
-
-
 # ── daily tiers ─────────────────────────────────────────────────────────────
 
 
@@ -252,29 +189,28 @@ def test_daily_tiers_are_current_and_run_well_ahead():
     day comes near. Rerun scripts/castle-defense-tiers.mjs when this fails."""
     path = next(p.parent / "tiers.json" for p in castle_defense._ENGINE_CANDIDATES if (p.parent / "tiers.json").is_file())
     tiers = json.loads(path.read_text(encoding="utf-8"))
-    for mode in ("classic", "open"):
-        assert tiers["rules"][mode] == castle_defense.current_rules(mode), f"{mode} tiers were set under other rules"
+    assert tiers["rules"] == castle_defense.current_rules(), "tiers were set under other rules"
     today = datetime.now(timezone.utc).date()
     for offset in range(-1, 60):
         day = (today + timedelta(days=offset)).isoformat()
-        assert set(tiers["days"].get(day, {})) == {"classic", "open"}, f"no tiers for {day}"
-        for mode, cut in tiers["days"][day].items():
-            # Tiers 2–5, each needing more kills than the one below.
-            assert len(cut) == 4 and all(a < b for a, b in zip([0] + cut, cut)), f"{day} {mode}: {cut}"
+        cut = tiers["days"].get(day)
+        assert cut, f"no tiers for {day}"
+        # Tiers 2–5, each needing more kills than the one below.
+        assert len(cut) == 4 and all(a < b for a, b in zip([0] + cut, cut)), f"{day}: {cut}"
 
 
 # ── all time ────────────────────────────────────────────────────────────────
 
 
-def _score(model, day, username, kills, rules=None):
-    return model(
+def _score(day, username, kills, rules=None):
+    return CastleDefenseScore(
         day=day, username=username, display_name=username.title(), kills=kills, wave=10,
-        layout="[]", runs=1, rules=rules if rules is not None else castle_defense.current_rules("classic"),
+        layout="[]", runs=1, rules=rules if rules is not None else castle_defense.current_rules(),
     )
 
 
 def test_all_time_counts_first_places_and_top_threes():
-    rules = castle_defense.current_rules("classic")
+    rules = castle_defense.current_rules()
     days = {
         # Ann wins outright; Bo and Cy share 2nd; Di is 4th.
         "2026-10-20": {"ann": 300, "bo": 250, "cy": 250, "di": 200},
@@ -287,9 +223,9 @@ def test_all_time_counts_first_places_and_top_threes():
     try:
         for day, scores in days.items():
             for name, kills in scores.items():
-                db.add(_score(CastleDefenseScore, day, name, kills))
+                db.add(_score(day, name, kills))
         # A score from older rules on a day played under newer ones doesn't place.
-        db.add(_score(CastleDefenseScore, "2026-10-22", "eve", 99999, rules=rules - 1))
+        db.add(_score("2026-10-22", "eve", 99999, rules=rules - 1))
         db.commit()
     finally:
         db.close()
@@ -305,5 +241,3 @@ def test_all_time_counts_first_places_and_top_threes():
     }
     assert [e["name"] for e in board["entries"]][::3] == ["Ann", "Di"]
     assert board["days"] == 3 and board["players"] == 4
-    # The open field keeps its own count.
-    assert TestClient(app).get("/api/castle-defense/all-time?mode=open").json()["players"] == 0
