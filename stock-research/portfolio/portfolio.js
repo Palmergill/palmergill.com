@@ -117,12 +117,26 @@
     const longDate = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
     const monthYearLong = new Intl.DateTimeFormat('en-US', { month: 'short', year: 'numeric', timeZone: 'UTC' });
 
-    function fmtMoney(value, whole = false) {
+    // Privacy mode masks what says how much you hold (values, gains, share
+    // counts) and leaves percents and market prices; remembered per browser.
+    let privacy = false;
+    try { privacy = localStorage.getItem('pf.privacy') === 'true'; } catch { /* storage blocked */ }
+    const MASK = '•••';
+
+    function fmtPrice(value, whole = false) {
         if (value == null) return '—';
         return (whole ? moneyWhole : money).format(value);
     }
+    function fmtMoney(value, whole = false) {
+        if (value != null && privacy) return MASK;
+        return fmtPrice(value, whole);
+    }
+    function fmtShares(value) {
+        return privacy ? MASK : shareFormat.format(value);
+    }
     function fmtSigned(value, whole = false) {
         if (value == null) return '—';
+        if (privacy) return MASK;
         const text = fmtMoney(Math.abs(value), whole);
         return value > 0 ? `+${text}` : value < 0 ? `−${text}` : text;
     }
@@ -303,8 +317,11 @@
         schedulePendingRetry(data);
     }
 
+    // Private, the hero shows the range's return instead (set with the chart).
     function renderHero(data) {
-        els.heroValue.textContent = fmtMoney(data.totals.marketValue, true);
+        $('heroLabel').textContent = privacy ? 'Return' : 'Total value';
+        els.heroValue.className = 'pf-hero__value';
+        els.heroValue.textContent = privacy ? '—' : fmtMoney(data.totals.marketValue, true);
     }
 
     function allocationSlices(positions) {
@@ -348,7 +365,7 @@
         )).join('');
         els.allocationBar.querySelectorAll('.pf-stack__seg').forEach((seg) => {
             const s = slices[Number(seg.dataset.i)];
-            const text = `${s.label} · ${fmtMoney(s.value, true)} · ${fmtPct(s.weight)}`;
+            const text = privacy ? `${s.label} · ${fmtPct(s.weight)}` : `${s.label} · ${fmtMoney(s.value, true)} · ${fmtPct(s.weight)}`;
             seg.addEventListener('mousemove', (event) => showTip(event, text));
             seg.addEventListener('mouseleave', hideTip);
         });
@@ -366,7 +383,7 @@
         const max = Math.max(...data.sectors.map((s) => s.weight || 0)) || 1;
         els.sectorBars.innerHTML = data.sectors.map((s) => `
             <li>
-                <div class="pf-bars__label"><span>${escapeHtml(s.sector)}</span><span>${fmtPct(s.weight)} · ${fmtMoney(s.marketValue, true)}</span></div>
+                <div class="pf-bars__label"><span>${escapeHtml(s.sector)}</span><span>${fmtPct(s.weight)}${privacy ? '' : ` · ${fmtMoney(s.marketValue, true)}`}</span></div>
                 <div class="pf-bars__track"><div class="pf-bars__fill" style="width:${((s.weight || 0) / max) * 100}%"></div></div>
             </li>`).join('');
     }
@@ -423,7 +440,7 @@
         }
         const note = p.priceStatus === 'stale' ? `<span class="pf-sub">close ${fmtDay(p.priceAsOf)}</span>`
             : p.priceStatus === 'trade' ? '<span class="pf-sub">last trade</span>' : '';
-        return `${fmtMoney(p.price)}${note}`;
+        return `${fmtPrice(p.price)}${note}`;
     }
 
     function swatches(positions) {
@@ -443,19 +460,23 @@
     }
 
     function gainCell(p, extra = '') {
+        if (privacy) return `<td class="num ${extra} ${tone(p.gain)}">${fmtPct(p.gainPct, true)}</td>`;
         return `<td class="num ${extra} ${tone(p.gain)}">${fmtSigned(p.gain, true)}${p.gainPct != null ? `<span class="pf-sub ${tone(p.gain)}">${fmtPct(p.gainPct, true)}</span>` : ''}</td>`;
     }
 
     // The latest day's move, against the close before it.
     function dayCell(p) {
         if (p.dayChange == null) return '<td class="num pf-muted">—</td>';
+        if (privacy) return `<td class="num ${tone(p.dayChange)}">${fmtPct(p.dayChangePct, true)}</td>`;
         return `<td class="num ${tone(p.dayChange)}">${fmtSigned(p.dayChange, true)}<span class="pf-sub ${tone(p.dayChange)}">${fmtPct(p.dayChangePct, true)}</span></td>`;
     }
     // The same, as a green or red pill: the day's dollars, percent under it.
     function dayPill(p) {
         if (p.dayChange == null) return '<td class="num pf-muted">—</td>';
         const t = tone(p.dayChange);
-        return `<td class="num"><span class="pf-day ${t ? `pf-day--${t === 'is-gain' ? 'up' : 'down'}` : ''}">${fmtSigned(p.dayChange, true)}</span><span class="pf-sub ${t}">${fmtPct(p.dayChangePct, true)}</span></td>`;
+        const pill = `<span class="pf-day ${t ? `pf-day--${t === 'is-gain' ? 'up' : 'down'}` : ''}">`;
+        if (privacy) return `<td class="num">${pill}${fmtPct(p.dayChangePct, true)}</span></td>`;
+        return `<td class="num">${pill}${fmtSigned(p.dayChange, true)}</span><span class="pf-sub ${t}">${fmtPct(p.dayChangePct, true)}</span></td>`;
     }
 
     function renderTopHoldings(data) {
@@ -489,9 +510,9 @@
                 <td class="num pf-strong pf-hide-sm">${p.weight == null ? '—' : fmtPct(p.weight)}</td>
                 <td class="num pf-strong">${fmtMoney(p.marketValue, true)}</td>
                 ${dayCell(p)}
-                <td class="num pf-hide-sm">${shareFormat.format(p.shares)}</td>
+                <td class="num pf-hide-sm">${fmtShares(p.shares)}</td>
                 <td class="num pf-hide-sm">${priceCell(p)}</td>
-                <td class="num pf-hide-sm">${fmtMoney(p.costBasis, true)}${p.avgCost != null ? `<span class="pf-sub">${fmtMoney(p.avgCost)}/sh</span>` : ''}</td>
+                <td class="num pf-hide-sm">${fmtMoney(p.costBasis, true)}${p.avgCost != null ? `<span class="pf-sub">${fmtPrice(p.avgCost)}/sh</span>` : ''}</td>
                 ${gainCell(p)}
                 <td class="num pf-hide-md ${tone(p.realizedGain)}">${fmtSigned(p.realizedGain, true)}</td>
                 <td class="num pf-hide-md">${fmtMonth(p.firstTrade)}<span class="pf-sub">${plural(p.trades, 'trade')}</span></td>
@@ -598,10 +619,12 @@
         const t = data.totals;
         const total = (t.gain || 0) + (t.realizedGain || 0);
         $('gainTiles').innerHTML = [
-            gainTile('Unrealized', fmtSigned(t.gain, true), t.gainPct == null ? 'On open positions' : `${fmtPct(t.gainPct, true)} on ${fmtMoney(t.costBasis, true)} cost`, tone(t.gain)),
+            privacy
+                ? gainTile('Unrealized', fmtPct(t.gainPct, true), 'On open positions', tone(t.gain))
+                : gainTile('Unrealized', fmtSigned(t.gain, true), t.gainPct == null ? 'On open positions' : `${fmtPct(t.gainPct, true)} on ${fmtMoney(t.costBasis, true)} cost`, tone(t.gain)),
             gainTile('Realized', fmtSigned(t.realizedGain, true), 'From every sell, at average cost', tone(t.realizedGain)),
             gainTile('Total gain', fmtSigned(total, true), 'Unrealized plus realized', tone(total)),
-            gainTile('Fees paid', fmtMoney(t.fees, true), `${fmtMoney(t.invested, true)} bought · ${fmtMoney(t.withdrawn, true)} sold`),
+            gainTile('Fees paid', fmtMoney(t.fees, true), privacy ? '' : `${fmtMoney(t.invested, true)} bought · ${fmtMoney(t.withdrawn, true)} sold`),
         ].join('');
 
         // Realized gain by year: one bar each, up for gains and down for losses
@@ -739,10 +762,10 @@
                 <td>${t.aliasOf ? `${securityLink({ ticker: t.aliasOf, asset: 'stock' })}<span class="pf-tag" title="Filed as “${escapeHtml(t.ticker)}” in this source">${escapeHtml(t.ticker)}</span>` : securityLink(t)}${t.notes ? `<span class="pf-name pf-note-cell" title="${escapeHtml(t.notes)}">${escapeHtml(t.notes)}</span>` : ''}</td>
                 <td><span class="pf-side pf-side--${t.side}">${t.side === 'buy' ? 'Buy' : 'Sell'}</span></td>
                 ${t.splitFactor !== 1
-                    ? `<td class="num" title="Adjusted for stock splits since the trade">${shareFormat.format(t.adjustedShares)}<span class="pf-sub">${shareFormat.format(t.shares)} as traded</span></td>
-                <td class="num pf-hide-sm">${fmtMoney(t.adjustedPrice)}<span class="pf-sub">${fmtMoney(t.price)} as traded</span></td>`
-                    : `<td class="num">${shareFormat.format(t.shares)}</td>
-                <td class="num pf-hide-sm">${fmtMoney(t.price)}</td>`}
+                    ? `<td class="num" title="Adjusted for stock splits since the trade">${fmtShares(t.adjustedShares)}<span class="pf-sub">${fmtShares(t.shares)} as traded</span></td>
+                <td class="num pf-hide-sm">${fmtPrice(t.adjustedPrice)}<span class="pf-sub">${fmtPrice(t.price)} as traded</span></td>`
+                    : `<td class="num">${fmtShares(t.shares)}</td>
+                <td class="num pf-hide-sm">${fmtPrice(t.price)}</td>`}
                 <td class="num">${fmtMoney(t.amount)}${t.fees ? `<span class="pf-sub">${fmtMoney(t.fees)} fees</span>` : ''}</td>
                 <td class="num pf-hide-md">${realized}</td>
                 <td class="pf-hide-md pf-wrap">${escapeHtml(t.account || '—')}</td>
@@ -810,6 +833,21 @@
         syncCostToggles();
         if (currentTab() === 'overview' && history.data) renderHistory();
         if (currentTab() === 'holding' && holding.data) renderHolding();
+    });
+
+    function syncPrivacyToggle() {
+        const button = $('privacyToggle');
+        button.setAttribute('aria-pressed', String(privacy));
+        button.textContent = privacy ? 'Show amounts' : 'Hide amounts';
+    }
+    syncPrivacyToggle();
+    $('privacyToggle').addEventListener('click', () => {
+        privacy = !privacy;
+        try { localStorage.setItem('pf.privacy', String(privacy)); } catch { /* storage blocked */ }
+        syncPrivacyToggle();
+        if (lastData) render(lastData);
+        if (history.data) renderHistory();
+        if (holding.data) renderHolding();
     });
 
     // Reload the history only when what it's built from changed, not when the
@@ -913,7 +951,13 @@
         }
         $('historyLegend').hidden = false;
         const { gain, pct } = rangeReturn(points);
-        sub.innerHTML = `<span class="pf-history-change ${tone(gain)}">${fmtSigned(gain, true)}${pct == null ? '' : ` (${fmtPct(pct, true)})`}</span>`;
+        if (privacy) {
+            els.heroValue.className = `pf-hero__value ${tone(pct)}`;
+            els.heroValue.textContent = fmtPct(pct, true);
+            sub.textContent = `Over ${history.range}`;
+        } else {
+            sub.innerHTML = `<span class="pf-history-change ${tone(gain)}">${fmtSigned(gain, true)}${pct == null ? '' : ` (${fmtPct(pct, true)})`}</span>`;
+        }
 
         const notes = [];
         const estimated = points.some((p) => p.estimated);
@@ -1021,11 +1065,13 @@
         ticks.forEach((t) => {
             root.appendChild(svg('line', { class: 'pf-chart__grid', x1: pad.left, x2: width - pad.right, y1: y(t), y2: y(t) }));
             const label = svg('text', { class: 'pf-chart__axis', x: pad.left - 8, y: y(t) + 4, 'text-anchor': 'end' });
-            label.textContent = compactMoney(t);
+            label.textContent = privacy ? '' : compactMoney(t);
             root.appendChild(label);
         });
 
         dateLabels(root, points, x, innerW, height);
+        // Private, the tooltip gives the return from the range's start.
+        const returns = privacy ? points.map((_, i) => rangeReturn(points.slice(0, i + 1)).pct) : null;
 
         const all = points.map((_, i) => i);
         const valueLine = path(all, 'value');
@@ -1059,7 +1105,8 @@
             dot.setAttribute('cy', y(p.value));
             cross.setAttribute('visibility', 'visible');
             dot.setAttribute('visibility', 'visible');
-            const parts = [fmtDay(p.date), `${fmtMoney(p.value, true)}${p.estimated ? ' (est.)' : ''}`];
+            const shown = privacy ? fmtPct(returns[i] ?? 0, true) : fmtMoney(p.value, true);
+            const parts = [fmtDay(p.date), `${shown}${p.estimated ? ' (est.)' : ''}`];
             showTip(event, parts.join(' · '));
         }
         hit.addEventListener('mousemove', hover);
@@ -1124,7 +1171,7 @@
         if (abs >= 1e12) return `$${(value / 1e12).toFixed(2)}T`;
         if (abs >= 1e9) return `$${(value / 1e9).toFixed(1)}B`;
         if (abs >= 1e6) return `$${(value / 1e6).toFixed(1)}M`;
-        return fmtMoney(value, true);
+        return fmtPrice(value, true);
     }
 
     function renderHolding() {
@@ -1132,7 +1179,7 @@
         const pos = d.position;
         const tag = ASSET_TAGS[d.asset] ? ` · ${ASSET_TAGS[d.asset]}` : '';
         $('holdingName').textContent = `${d.ticker}${d.name && d.name !== d.ticker ? ` · ${d.name}` : ''}${tag}`;
-        $('holdingPrice').textContent = fmtMoney(d.price);
+        $('holdingPrice').textContent = fmtPrice(d.price);
 
         // Price chart.
         holding.range = renderRanges(d.closes, $('holdingRanges'), holding.range);
@@ -1145,7 +1192,7 @@
         } else {
             const first = points[0].close;
             const change = points[points.length - 1].close - first;
-            sub.innerHTML = `<span class="pf-history-change ${tone(change)}">${fmtSigned(change)} (${fmtPct(change / first, true)})</span>`;
+            sub.innerHTML = `<span class="pf-history-change ${tone(change)}">${privacy ? fmtPct(change / first, true) : `${fmtSigned(change)} (${fmtPct(change / first, true)})`}</span>`;
             const avg = d.open ? pos.avgCost : null;
             const trades = d.trades.filter((t) => t.date >= points[0].date);
             $('holdingLegend').hidden = false;
@@ -1161,9 +1208,11 @@
 
         // The position.
         $('holdingTiles').innerHTML = (d.open ? [
-            gainTile('Value', fmtMoney(pos.marketValue, true), `${shareFormat.format(pos.shares)} shares`),
-            gainTile('Unrealized', fmtSigned(pos.gain, true), pos.gainPct == null ? 'No cost basis' : `${fmtPct(pos.gainPct, true)} on ${fmtMoney(pos.costBasis, true)}`, tone(pos.gain)),
-            gainTile('Average cost', fmtMoney(pos.avgCost), 'Per share'),
+            gainTile('Value', fmtMoney(pos.marketValue, true), privacy ? '' : `${fmtShares(pos.shares)} shares`),
+            privacy
+                ? gainTile('Unrealized', fmtPct(pos.gainPct, true), pos.gainPct == null ? 'No cost basis' : '', tone(pos.gain))
+                : gainTile('Unrealized', fmtSigned(pos.gain, true), pos.gainPct == null ? 'No cost basis' : `${fmtPct(pos.gainPct, true)} on ${fmtMoney(pos.costBasis, true)}`, tone(pos.gain)),
+            gainTile('Average cost', fmtPrice(pos.avgCost), 'Per share'),
             gainTile('Realized', fmtSigned(pos.realizedGain, true), '', tone(pos.realizedGain)),
         ] : [
             gainTile('Realized', fmtSigned(pos.realizedGain, true), '', tone(pos.realizedGain)),
@@ -1180,7 +1229,7 @@
             factRow('1 month', pctFact(perf['1M'])),
             factRow('Year to date', pctFact(perf.YTD)),
             factRow('1 year', pctFact(perf['1Y'])),
-            factRow('52-week range', perf.low52w != null ? `${fmtMoney(perf.low52w)} – ${fmtMoney(perf.high52w)}` : null),
+            factRow('52-week range', perf.low52w != null ? `${fmtPrice(perf.low52w)} – ${fmtPrice(perf.high52w)}` : null),
             factRow('Market cap', bigMoney(c.market_cap)),
             factRow('P/E', c.pe_ratio != null ? c.pe_ratio.toFixed(1) : null),
             factRow('Beta', c.beta != null ? c.beta.toFixed(2) : null),
@@ -1211,8 +1260,8 @@
             <tr>
                 <td>${fmtDay(t.date)}</td>
                 <td><span class="pf-side pf-side--${t.side}">${t.side === 'buy' ? 'Buy' : 'Sell'}</span></td>
-                <td class="num">${shareFormat.format(t.shares)}</td>
-                <td class="num">${fmtMoney(t.price)}</td>
+                <td class="num">${fmtShares(t.shares)}</td>
+                <td class="num">${fmtPrice(t.price)}</td>
                 <td class="num pf-hide-sm">${fmtMoney(t.shares * t.price, true)}</td>
                 <td class="num ${tone(t.realized)}">${t.side === 'sell' ? fmtSigned(t.realized, true) : ''}</td>
                 <td class="pf-hide-md pf-muted">${escapeHtml(t.account || t.source || '')}</td>
@@ -1283,7 +1332,7 @@
             dot.setAttribute('cy', y(p.close));
             cross.setAttribute('visibility', 'visible');
             dot.setAttribute('visibility', 'visible');
-            showTip(event, `${fmtDay(p.date)} · ${fmtMoney(p.close)}`);
+            showTip(event, `${fmtDay(p.date)} · ${fmtPrice(p.close)}`);
         }
         hit.addEventListener('mousemove', hover);
         hit.addEventListener('touchmove', (event) => { hover(event.touches[0]); event.preventDefault(); }, { passive: false });

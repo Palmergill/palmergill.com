@@ -26,6 +26,7 @@
                 <h1>My Portfolio</h1>
             </div>
             <div class="pf-head__actions" id="headActions" hidden>
+                <button type="button" class="pf-button pf-button--quiet" id="privacyToggle" aria-pressed="false">Hide amounts</button>
                 <button type="button" class="pf-button pf-button--quiet" id="refreshButton">Refresh prices</button>
                 <button type="button" class="pf-button" id="uploadToggle" aria-expanded="false" aria-controls="uploadPanel">Upload</button>
             </div>
@@ -92,7 +93,7 @@
                 <section class="pf-card pf-hero" id="historyCard">
                     <div class="pf-hero__top">
                         <div>
-                            <p class="pf-hero__label">Total value</p>
+                            <p class="pf-hero__label" id="heroLabel">Total value</p>
                             <p class="pf-hero__value" id="heroValue">—</p>
                             <!-- The change over the chosen range, and nothing else. -->
                             <p class="pf-hero__stats" id="historySub">Loading price history…</p>
