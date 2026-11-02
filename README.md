@@ -13,7 +13,7 @@ navigation chrome.
 - `/docs/` - website documentation
 - `/login/` - protected workspace sign-in
 - `/stock-research/` - polished stock research app
-- `/bitcoin-chat/` - Bitcoin chat app
+- `/bitcoin-chat/` - Bitcoin dashboard
 - `/fantasy/` - ESPN league hub and the section's home: standings, power rankings, enriched rosters, start/sit advice, league free agents, team overviews, and league-aware chat. Members only, with a teaser for everyone else
 - `/fantasy/week/` - weekly league recap (members only)
 - `/fantasy/draft-recap/` - draft recap for the league (members only)
@@ -33,7 +33,7 @@ navigation chrome.
 
 - `/api/stocks/*` - stock research API
 - `/api/poker/*` - poker API
-- `/api/bitcoin/*` - Bitcoin chat API
+- `/api/bitcoin/*` - Bitcoin dashboard API
 - `/api/analytics/*` - public client analytics ingest (`POST /api/analytics/events`)
 - `/api/craps/*` - public craps strategy translation API
 - `/api/fantasy/*` - fantasy data and account-gated draft rooms
@@ -116,7 +116,7 @@ login/            Public sign-in page for protected admin tools
 about/            About page
 docs/             Website docs and provider/setup markdown docs
 stock-research/   Active stock research frontend
-bitcoin-chat/     Active Bitcoin chat frontend
+bitcoin-chat/     Bitcoin dashboard frontend
 fantasy/          Fantasy dashboard, Fourth & Fortune draft-order game, and the ESPN league hub
 casino/           Casino landing page and game rules
 poker/            Active poker frontend and supporting docs

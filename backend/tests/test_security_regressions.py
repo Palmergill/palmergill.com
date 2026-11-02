@@ -15,8 +15,7 @@ from app.routers import bitcoin as bitcoin_router
 from app.routers.admin import cleanup_old_logs
 from app.routers.analytics import cleanup_old_analytics, record_analytics_event, safe_json
 from app.routers import poker
-from app.routers.bitcoin import BITCOIN_SESSION_COOKIE
-from app.services import bitcoin_ai, bitcoin_tools
+from app.services import bitcoin_tools
 from app.poker_ai import AIManager
 from app.poker_game import Card, PokerGame, Rank, Suit
 from app.services.polygon_client import polygon_client
@@ -329,40 +328,6 @@ def test_poker_serialization_preserves_ai_personality_metadata():
     assert restored_manager.bots[bot.id].looseness == poker.PERSONALITIES["lp"]["looseness"]
 
 
-def test_bitcoin_chat_session_cookie_is_not_exposed_to_browser(monkeypatch):
-    seen_sessions = []
-
-    def fake_demo_answer(message, session_id=None, timezone_name=None):
-        seen_sessions.append(session_id)
-        return {
-            "answer": "demo answer",
-            "session_id": session_id or "issued-session",
-            "tools_used": [],
-            "data": {},
-            "warnings": [],
-        }
-
-    monkeypatch.setattr(bitcoin_ai, "answer_demo_chat", fake_demo_answer)
-    chat_client = TestClient(app)
-
-    first = chat_client.post("/api/bitcoin/chat", json={"message": "what is bitcoin?"})
-
-    assert first.status_code == 200
-    assert "session_id" not in first.json()
-    assert f"{BITCOIN_SESSION_COOKIE}=issued-session" in first.headers["set-cookie"]
-    assert "HttpOnly" in first.headers["set-cookie"]
-    assert seen_sessions == [None]
-
-    second = chat_client.post(
-        "/api/bitcoin/chat",
-        json={"message": "next", "session_id": "body-session"},
-    )
-
-    assert second.status_code == 200
-    assert "session_id" not in second.json()
-    assert seen_sessions[-1] == "issued-session"
-
-
 def test_bitcoin_address_lookup_returns_demo_utxos_without_auth():
     address = "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kygt080"
     response = client.get(f"/api/bitcoin/address/{address}", params={"utxo_limit": 1})
@@ -405,35 +370,6 @@ def test_demo_bitcoin_address_lookup_normalizes_address_and_uses_hex_hash():
     assert body["address"] == address
     assert len(block_hash) == 64
     int(block_hash, 16)
-
-
-def test_bitcoin_chat_routes_address_questions_to_address_tool():
-    address = "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kygt080"
-    result = bitcoin_ai.answer_demo_chat(f"what UTXOs are on {address}?", session_id="demo-session")
-
-    assert result["tools_used"] == ["get_address"]
-    assert result["data"]["address"] == address
-    assert result["data"]["utxos"]
-    assert "does not prove who controls the address" in result["answer"]
-
-
-def test_bitcoin_chat_routes_explicit_block_questions_to_block_tools():
-    current = bitcoin_ai.answer_demo_chat("what is the current block?", session_id="demo-session")
-    numbered = bitcoin_ai.answer_demo_chat("what is block 800000?", session_id="demo-session")
-
-    assert current["tools_used"] == ["get_latest_block"]
-    assert numbered["tools_used"] == ["get_block"]
-    assert numbered["data"]["height"] == 800000
-
-
-def test_bitcoin_chat_keeps_mining_questions_on_conceptual_route():
-    result = bitcoin_ai.answer_demo_chat(
-        "How does mining work? Who adds new blocks?",
-        session_id="demo-session",
-    )
-
-    assert result["tools_used"] == []
-    assert result["answer"].startswith("**Mining**")
 
 
 def test_stock_price_history_rejects_unbounded_day_ranges():
@@ -887,37 +823,6 @@ def test_public_analytics_events_are_rate_limited(monkeypatch):
         assert db.query(AnalyticsEvent).filter(AnalyticsEvent.event_name == "rate_limit_probe").count() == 2
     finally:
         db.close()
-
-
-def test_bitcoin_mined_yesterday_uses_yesterday_window(monkeypatch):
-    captured = {}
-
-    def fake_tool_call(demo, name, start_time, end_time):
-        captured["demo"] = demo
-        captured["name"] = name
-        captured["start_time"] = start_time
-        captured["end_time"] = end_time
-        return {
-            "source": "demo",
-            "blocks_counted": 144,
-            "subsidy_btc": 450,
-            "warnings": [],
-        }
-
-    monkeypatch.setattr(bitcoin_ai, "_local_tool_call", fake_tool_call)
-
-    response = bitcoin_ai.answer_demo_chat("How many BTC were mined yesterday?", timezone_name="UTC")
-    start = datetime.fromisoformat(captured["start_time"].replace("Z", "+00:00"))
-    end = datetime.fromisoformat(captured["end_time"].replace("Z", "+00:00"))
-    expected_day = datetime.now(timezone.utc).date() - timedelta(days=1)
-
-    assert captured["demo"] is True
-    assert captured["name"] == "get_mined_stats"
-    assert start.date() == expected_day
-    assert start.hour == 0 and start.minute == 0 and start.second == 0
-    assert end.date() == expected_day
-    assert end.hour == 23 and end.minute == 59 and end.second == 59
-    assert "yesterday" in response["answer"].lower()
 
 
 def test_session_token_signed_with_dedicated_secret_not_password(monkeypatch):

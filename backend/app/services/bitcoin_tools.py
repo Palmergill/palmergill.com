@@ -2,7 +2,6 @@ import math
 import os
 import re
 import time
-from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Any, Dict, List
 
@@ -13,7 +12,6 @@ from app.services.bitcoin_rpc import BitcoinRPCError, bitcoin_rpc_client
 from app.services import bitcoin_supply
 
 
-MAX_MINED_STATS_BLOCKS = int(os.getenv("BITCOIN_MAX_MINED_STATS_BLOCKS", "1008"))
 BITCOIN_DATA_PROVIDER = os.getenv("BITCOIN_DATA_PROVIDER", "mempool").strip().lower()
 DEMO_WARNING = "Public demo mode uses estimated sample Bitcoin data and does not call Palmer's live node or mempool.space."
 BITCOIN_ADDRESS_PATTERN = r"(?:bc1[ac-hj-np-z02-9]{11,71}|[13][a-km-zA-HJ-NP-Z1-9]{25,34})"
@@ -95,47 +93,6 @@ def get_demo_price() -> Dict[str, Any]:
         "source": "demo",
         "usd": 67250.0,
         "time": iso_from_unix(int(time.time())),
-        "warnings": [DEMO_WARNING],
-    }
-
-
-def get_demo_fee_estimate(confirmation_target_blocks: int) -> Dict[str, Any]:
-    if confirmation_target_blocks < 1 or confirmation_target_blocks > 1008:
-        raise ValueError("Confirmation target must be between 1 and 1008 blocks")
-
-    demo_rate = max(1.0, round(30 / confirmation_target_blocks, 2))
-    return {
-        "source": "demo",
-        "target_blocks": confirmation_target_blocks,
-        "btc_per_kvb": demo_rate / 100000,
-        "sats_vb": demo_rate,
-        "warnings": [DEMO_WARNING],
-    }
-
-
-def get_demo_mined_stats(start_time: str, end_time: str) -> Dict[str, Any]:
-    start_dt = _parse_iso_time(start_time)
-    end_dt = _parse_iso_time(end_time)
-    if start_dt >= end_dt:
-        raise ValueError("The start time must be before the end time.")
-
-    seconds = (end_dt - start_dt).total_seconds()
-    blocks_counted = max(0, round(seconds / 600))
-    latest_height = 840000
-    subsidy = block_subsidy_btc(latest_height)
-    return {
-        "source": "demo",
-        "start_time": start_dt.isoformat().replace("+00:00", "Z"),
-        "end_time": end_dt.isoformat().replace("+00:00", "Z"),
-        "blocks_counted": blocks_counted,
-        "first_height": latest_height - blocks_counted + 1 if blocks_counted else None,
-        "last_height": latest_height if blocks_counted else None,
-        "subsidy_btc": round(blocks_counted * subsidy, 8),
-        "fees_available": False,
-        "fees_btc": None,
-        "total_miner_reward_available": False,
-        "total_miner_reward_btc": None,
-        "average_block_interval_seconds": 600 if blocks_counted > 1 else None,
         "warnings": [DEMO_WARNING],
     }
 
@@ -563,107 +520,6 @@ def get_difficulty_adjustment() -> Dict[str, Any]:
     }
 
 
-def estimate_fee(confirmation_target_blocks: int) -> Dict[str, Any]:
-    if confirmation_target_blocks < 1 or confirmation_target_blocks > 1008:
-        raise ValueError("Confirmation target must be between 1 and 1008 blocks")
-
-    if _provider_not_configured():
-        return get_demo_fee_estimate(confirmation_target_blocks)
-
-    if _use_mempool_space():
-        try:
-            fees = mempool_space_client.get_recommended_fees()
-        except MempoolSpaceError as exc:
-            return _api_error_response(exc)
-
-        sats_vb = _recommended_fee_for_target(fees, confirmation_target_blocks)
-        return {
-            "source": "mempool.space",
-            "target_blocks": confirmation_target_blocks,
-            "btc_per_kvb": _sats_vb_to_btc_kvb(sats_vb),
-            "sats_vb": sats_vb,
-            "warnings": [],
-        }
-
-    try:
-        estimate = bitcoin_rpc_client.call("estimatesmartfee", [confirmation_target_blocks])
-    except BitcoinRPCError as exc:
-        return _rpc_error_response(exc)
-
-    btc_per_kvb = estimate.get("feerate")
-    return {
-        "source": "node",
-        "target_blocks": confirmation_target_blocks,
-        "btc_per_kvb": btc_per_kvb,
-        "sats_vb": fee_rate_sats_vb(btc_per_kvb),
-        "warnings": estimate.get("errors", []),
-    }
-
-
-def get_mined_stats(start_time: str, end_time: str, max_blocks: int = MAX_MINED_STATS_BLOCKS) -> Dict[str, Any]:
-    start_dt = _parse_iso_time(start_time)
-    end_dt = _parse_iso_time(end_time)
-    if start_dt >= end_dt:
-        raise ValueError("The start time must be before the end time.")
-    if max_blocks < 1 or max_blocks > MAX_MINED_STATS_BLOCKS:
-        raise ValueError(f"max_blocks must be between 1 and {MAX_MINED_STATS_BLOCKS}.")
-
-    if _provider_not_configured():
-        return get_demo_mined_stats(start_time, end_time)
-
-    if _use_mempool_space():
-        return _get_mined_stats_from_mempool_space(start_dt, end_dt, max_blocks)
-
-    start_ts = int(start_dt.timestamp())
-    end_ts = int(end_dt.timestamp())
-    warnings: List[str] = []
-
-    try:
-        height = bitcoin_rpc_client.call("getblockcount")
-        matching_blocks = []
-        scanned = 0
-
-        while height >= 0 and scanned < max_blocks:
-            block_hash = bitcoin_rpc_client.call("getblockhash", [height])
-            block = bitcoin_rpc_client.call("getblock", [block_hash, 1])
-            block_time = block.get("time")
-            scanned += 1
-
-            if block_time is not None and start_ts <= block_time <= end_ts:
-                matching_blocks.append(block)
-
-            if block_time is not None and block_time < start_ts:
-                break
-            height -= 1
-    except BitcoinRPCError as exc:
-        return _rpc_error_response(exc)
-
-    if scanned >= max_blocks and (not matching_blocks or matching_blocks[-1].get("time", end_ts) >= start_ts):
-        warnings.append(
-            f"Stopped after scanning {max_blocks} blocks. Narrow the time window or raise BITCOIN_MAX_MINED_STATS_BLOCKS for larger ranges."
-        )
-
-    heights = [block.get("height") for block in matching_blocks if block.get("height") is not None]
-    timestamps = sorted(block.get("time") for block in matching_blocks if block.get("time") is not None)
-    subsidy_total = sum(Decimal(str(block_subsidy_btc(block.get("height") or 0))) for block in matching_blocks)
-
-    return {
-        "source": "node",
-        "start_time": start_dt.isoformat().replace("+00:00", "Z"),
-        "end_time": end_dt.isoformat().replace("+00:00", "Z"),
-        "blocks_counted": len(matching_blocks),
-        "first_height": min(heights) if heights else None,
-        "last_height": max(heights) if heights else None,
-        "subsidy_btc": float(subsidy_total),
-        "fees_available": False,
-        "fees_btc": None,
-        "total_miner_reward_available": False,
-        "total_miner_reward_btc": None,
-        "average_block_interval_seconds": _average_interval_seconds(timestamps),
-        "warnings": warnings or ["Fee totals are not included; this counts new bitcoin subsidy only."],
-    }
-
-
 def get_transaction(txid: str) -> Dict[str, Any]:
     if len(txid) != 64 or any(char not in "0123456789abcdefABCDEF" for char in txid):
         raise ValueError("That does not look like a valid transaction id.")
@@ -764,45 +620,6 @@ def _format_block(block: Dict[str, Any], source: str) -> Dict[str, Any]:
         "subsidy_btc": block_subsidy_btc(height or 0),
         "warnings": [],
     }
-
-
-def safe_tool_call(name: str, *args: Any, **kwargs: Any) -> Dict[str, Any]:
-    try:
-        return globals()[name](*args, **kwargs)
-    except MempoolSpaceError as exc:
-        return _api_error_response(exc)
-    except BitcoinRPCError as exc:
-        return _rpc_error_response(exc)
-    except ValueError as exc:
-        return {
-            "source": "error",
-            "error": str(exc),
-            "warnings": [str(exc)],
-        }
-
-
-def safe_demo_tool_call(name: str, *args: Any, **kwargs: Any) -> Dict[str, Any]:
-    demo_handlers = {
-        "get_node_status": get_demo_node_status,
-        "get_latest_block": get_demo_latest_block,
-        "get_block": get_demo_block,
-        "get_transaction": get_demo_transaction,
-        "get_address": get_demo_address,
-        "get_mempool_summary": get_demo_mempool_summary,
-        "get_price": get_demo_price,
-        "estimate_fee": get_demo_fee_estimate,
-        "get_mined_stats": get_demo_mined_stats,
-    }
-    try:
-        return demo_handlers[name](*args, **kwargs)
-    except KeyError:
-        return {"source": "error", "error": f"Unknown tool: {name}", "warnings": [f"Unknown tool: {name}"]}
-    except ValueError as exc:
-        return {
-            "source": "error",
-            "error": str(exc),
-            "warnings": [str(exc)],
-        }
 
 
 def _rpc_error_response(exc: BitcoinRPCError) -> Dict[str, Any]:
@@ -929,73 +746,6 @@ def _format_mempool_utxo(utxo: Dict[str, Any], tip_height: int) -> Dict[str, Any
     }
 
 
-def _get_mined_stats_from_mempool_space(start_dt: datetime, end_dt: datetime, max_blocks: int) -> Dict[str, Any]:
-    start_ts = int(start_dt.timestamp())
-    end_ts = int(end_dt.timestamp())
-    warnings: List[str] = []
-
-    try:
-        height = mempool_space_client.get_tip_height()
-        matching_blocks = []
-        scanned = 0
-        done = False
-
-        while height >= 0 and scanned < max_blocks and not done:
-            blocks = mempool_space_client.get_blocks(height)
-            if not blocks:
-                break
-
-            for block in blocks:
-                scanned += 1
-                block_time = block.get("timestamp")
-                if block_time is not None and start_ts <= block_time <= end_ts:
-                    matching_blocks.append(block)
-                if block_time is not None and block_time < start_ts:
-                    done = True
-                    break
-                if scanned >= max_blocks:
-                    break
-
-            height = min(block.get("height", height) for block in blocks) - 1
-    except MempoolSpaceError as exc:
-        return _api_error_response(exc)
-
-    if scanned >= max_blocks and (not matching_blocks or matching_blocks[-1].get("timestamp", end_ts) >= start_ts):
-        warnings.append(
-            f"Stopped after scanning {max_blocks} blocks. Narrow the time window or raise BITCOIN_MAX_MINED_STATS_BLOCKS for larger ranges."
-        )
-
-    heights = [block.get("height") for block in matching_blocks if block.get("height") is not None]
-    timestamps = sorted(block.get("timestamp") for block in matching_blocks if block.get("timestamp") is not None)
-    subsidy_total = sum(Decimal(str(block_subsidy_btc(block.get("height") or 0))) for block in matching_blocks)
-
-    return {
-        "source": "mempool.space",
-        "start_time": start_dt.isoformat().replace("+00:00", "Z"),
-        "end_time": end_dt.isoformat().replace("+00:00", "Z"),
-        "blocks_counted": len(matching_blocks),
-        "first_height": min(heights) if heights else None,
-        "last_height": max(heights) if heights else None,
-        "subsidy_btc": float(subsidy_total),
-        "fees_available": False,
-        "fees_btc": None,
-        "total_miner_reward_available": False,
-        "total_miner_reward_btc": None,
-        "average_block_interval_seconds": _average_interval_seconds(timestamps),
-        "warnings": warnings or ["Fee totals are not included; this counts new bitcoin subsidy only."],
-    }
-
-
-def _recommended_fee_for_target(fees: Dict[str, Any], target_blocks: int) -> float | None:
-    if target_blocks <= 2:
-        return fees.get("fastestFee")
-    if target_blocks <= 3:
-        return fees.get("halfHourFee")
-    if target_blocks <= 6:
-        return fees.get("hourFee")
-    return fees.get("economyFee") or fees.get("minimumFee")
-
-
 def _validate_address(address: str) -> str:
     normalized = (address or "").strip()
     if not BITCOIN_ADDRESS_RE.match(normalized):
@@ -1012,24 +762,6 @@ def _sats_vb_to_btc_kvb(sats_vb: Any) -> float | None:
     if sats_vb is None:
         return None
     return round(float(sats_vb) / 100000, 8)
-
-
-def _parse_iso_time(value: str) -> datetime:
-    normalized = value.strip().replace("Z", "+00:00")
-    try:
-        parsed = datetime.fromisoformat(normalized)
-    except ValueError as exc:
-        raise ValueError("Times must be ISO 8601 strings, for example 2026-05-06T00:00:00Z.") from exc
-    if parsed.tzinfo is None:
-        parsed = parsed.replace(tzinfo=timezone.utc)
-    return parsed.astimezone(timezone.utc)
-
-
-def _average_interval_seconds(timestamps: List[int]) -> float | None:
-    if len(timestamps) < 2:
-        return None
-    intervals = [later - earlier for earlier, later in zip(timestamps, timestamps[1:])]
-    return round(sum(intervals) / len(intervals), 2)
 
 
 def _calculate_input_value(tx: Dict[str, Any]) -> tuple[Decimal | None, List[str]]:

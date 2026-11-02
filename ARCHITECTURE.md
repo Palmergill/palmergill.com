@@ -16,7 +16,7 @@ FastAPI backend
   +-- stock data clients and SQLite/Postgres cache
   +-- poker game APIs
   +-- craps strategy translation API
-  +-- Bitcoin chat APIs
+  +-- Bitcoin dashboard APIs
   +-- admin/log APIs
 ```
 
@@ -30,7 +30,7 @@ The active public site is static:
 - `/login/` - protected workspace sign-in
 - `/stock-research/` - stock research app
 - `/stock-research/portfolio/` - a member's private portfolio: upload holdings and/or a trade history as CSV (up to 20,000 trades, from any mix of brokers) and get it broken down across five hash-routed tabs: Overview (total, value-vs-invested chart since the first trade, top holdings), Holdings (open and closed positions), Activity (every trade, filtered and paged by the server), Accounts (activity per account and per source) and Gains (realized by year and by security, beside any realized figure the file itself reported). Not a member path (it sits under the demo `/stock-research` prefix and shows a sign-in panel to anonymous visitors); `/api/stocks/portfolio*` is the real boundary.
-- `/bitcoin-chat/` - Bitcoin chat app
+- `/bitcoin-chat/` - Bitcoin dashboard
 - `/fantasy/` - ESPN league hub, and the section's home page. Deliberately NOT a member path: it renders a teaser plus a sign-in prompt for anonymous visitors, which an edge login redirect would pre-empt. The page is an empty shell — every byte of league data comes from `/api/fantasy/league/*`, where `require_member` is the real boundary.
 - `/fantasy/week/` - weekly recap for the league (members only; see `MEMBER_PATH_PREFIXES`)
 - `/fantasy/draft-recap/` - draft recap for the league (members only)

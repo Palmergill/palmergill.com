@@ -1,20 +1,11 @@
 import asyncio
-from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, HTTPException, Query, Request
-from fastapi.responses import JSONResponse
-from pydantic import BaseModel, Field
 
-from app.services import bitcoin_ai, bitcoin_tools
+from app.services import bitcoin_tools
 
 
 router = APIRouter(prefix="/api/bitcoin", tags=["bitcoin"])
-
-# Session id is opaque and used to resume conversations. Issue it as an
-# HttpOnly cookie so XSS / third-party scripts can't read it from
-# localStorage. Frontend sends nothing — the browser attaches the cookie.
-BITCOIN_SESSION_COOKIE = "pg_bitcoin_session"
-BITCOIN_SESSION_TTL_SECONDS = 30 * 24 * 60 * 60
 
 
 def is_demo_request(request: Request) -> bool:
@@ -24,19 +15,6 @@ def is_demo_request(request: Request) -> bool:
 async def run_blocking(func, *args, **kwargs):
     """Run sync provider work off the event loop."""
     return await asyncio.to_thread(func, *args, **kwargs)
-
-
-class BitcoinChatRequest(BaseModel):
-    message: str = Field(..., min_length=1, max_length=1000)
-    session_id: Optional[str] = None
-    timezone: Optional[str] = None
-
-
-class BitcoinChatResponse(BaseModel):
-    answer: str
-    tools_used: list[str]
-    data: Dict[str, Any]
-    warnings: list[str] = []
 
 
 @router.get("/health")
@@ -163,35 +141,3 @@ async def mempool_summary(request: Request):
         if is_demo_request(request)
         else await run_blocking(bitcoin_tools.get_mempool_summary)
     )
-
-
-@router.post("/chat", response_model=BitcoinChatResponse)
-async def bitcoin_chat(http_request: Request, request: BitcoinChatRequest):
-    # Prefer the cookie over the body, so a stolen body token can't be
-    # replayed against a different victim.
-    session_id = http_request.cookies.get(BITCOIN_SESSION_COOKIE) or request.session_id
-
-    if is_demo_request(http_request):
-        result = bitcoin_ai.answer_demo_chat(request.message, session_id, request.timezone)
-    else:
-        result = await run_blocking(
-            bitcoin_ai.answer_chat,
-            request.message,
-            session_id,
-            request.timezone,
-        )
-
-    cookie_session_id = result["session_id"]
-    body = {key: value for key, value in result.items() if key != "session_id"}
-    response = JSONResponse(content=body)
-    secure = http_request.url.scheme == "https"
-    response.set_cookie(
-        BITCOIN_SESSION_COOKIE,
-        cookie_session_id,
-        max_age=BITCOIN_SESSION_TTL_SECONDS,
-        httponly=True,
-        samesite="lax",
-        secure=secure,
-        path="/api/bitcoin",
-    )
-    return response

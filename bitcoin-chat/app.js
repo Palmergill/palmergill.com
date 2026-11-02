@@ -5,15 +5,9 @@ const API_BASE = ((typeof window !== 'undefined' && typeof window.API_ORIGIN ===
     ? window.API_ORIGIN
     : '') + '/api/bitcoin';
 
-const messagesEl = document.getElementById('messages');
-const chatForm = document.getElementById('chatForm');
-const messageInput = document.getElementById('messageInput');
 const nodeStatus = document.getElementById('nodeStatus');
 const demoNotice = document.getElementById('demoNotice');
-const learnPaths = document.getElementById('learnPaths');
 const lookupToggle = document.getElementById('lookupToggle');
-const chatToggle = document.getElementById('chatToggle');
-const layoutEl = document.getElementById('layout');
 const rangeSwitch = document.getElementById('rangeSwitch');
 const priceValueEl = document.getElementById('priceValue');
 const priceChangeEl = document.getElementById('priceChange');
@@ -41,14 +35,7 @@ const explorerEls = {
     result: document.getElementById('explorerResult'),
 };
 
-// Session id is stored in an HttpOnly cookie issued by /api/bitcoin/chat.
-// JavaScript deliberately never receives or sends it; fetch attaches the
-// cookie automatically.
-// Clean up any session id left in localStorage from before the cookie cutover.
-try { localStorage.removeItem('bitcoinChatSessionId'); } catch { /* ignore */ }
-
 const RANGE_STORAGE_KEY = 'bitcoinDashRange';
-const CHAT_HIDDEN_STORAGE_KEY = 'bitcoinDashChatHidden';
 // A simple 1-input, 2-output segwit payment is ~140 vB; used to translate
 // fee rates into an approximate dollar cost in the fee tile.
 const TYPICAL_TX_VBYTES = 140;
@@ -70,262 +57,13 @@ let priceChartInstance = null;
 let supplyChartInstance = null;
 let livePriceUsd = null;
 const chartCache = {};
-const explorerState = {
-    lastResult: null,
-};
 const BITCOIN_ADDRESS_RE = /^(?:bc1[ac-hj-np-z02-9]{11,71}|[13][a-km-zA-HJ-NP-Z1-9]{25,34})$/i;
-
-function addMessage({ role, text, data, warnings, toolsUsed, loading = false, error = false }) {
-    const row = document.createElement('div');
-    row.className = `msg-row ${role}`;
-
-    if (role === 'assistant') {
-        const avatar = document.createElement('span');
-        avatar.className = 'avatar';
-        avatar.setAttribute('aria-hidden', 'true');
-        avatar.textContent = '₿';
-        row.appendChild(avatar);
-    }
-
-    const el = document.createElement('article');
-    el.className = `message${loading ? ' loading' : ''}${error ? ' error' : ''}`;
-    if (loading) {
-        const loadingText = document.createElement('span');
-        loadingText.textContent = text;
-        const dots = document.createElement('span');
-        dots.className = 'typing-dots';
-        dots.setAttribute('aria-hidden', 'true');
-        dots.innerHTML = '<span></span><span></span><span></span>';
-        el.append(loadingText, dots);
-    } else if (role === 'assistant') {
-        renderRichText(el, text);
-    } else {
-        el.textContent = text;
-    }
-
-    if (!loading && role === 'assistant') {
-        appendSourceSummary(el, { data, warnings, toolsUsed });
-    }
-
-    row.appendChild(el);
-    messagesEl.appendChild(row);
-    messagesEl.scrollTop = messagesEl.scrollHeight;
-    return row;
-}
-
-function appendInline(parent, text) {
-    const pattern = /(\[[^\]]+\]\(https?:\/\/[^)\s]+\)|`[^`]+`|\*\*[^*]+\*\*|\*[^*]+\*)/g;
-    let lastIndex = 0;
-    let match;
-
-    while ((match = pattern.exec(text)) !== null) {
-        if (match.index > lastIndex) {
-            parent.appendChild(document.createTextNode(text.slice(lastIndex, match.index)));
-        }
-
-        const token = match[0];
-        if (token.startsWith('**')) {
-            const strong = document.createElement('strong');
-            strong.textContent = token.slice(2, -2);
-            parent.appendChild(strong);
-        } else if (token.startsWith('*')) {
-            const em = document.createElement('em');
-            em.textContent = token.slice(1, -1);
-            parent.appendChild(em);
-        } else if (token.startsWith('`')) {
-            const code = document.createElement('code');
-            code.textContent = token.slice(1, -1);
-            parent.appendChild(code);
-        } else {
-            const linkMatch = token.match(/^\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)$/);
-            const link = document.createElement('a');
-            link.textContent = linkMatch[1];
-            link.href = linkMatch[2];
-            link.rel = 'noopener noreferrer';
-            link.target = '_blank';
-            parent.appendChild(link);
-        }
-
-        lastIndex = pattern.lastIndex;
-    }
-
-    if (lastIndex < text.length) {
-        parent.appendChild(document.createTextNode(text.slice(lastIndex)));
-    }
-}
-
-function appendParagraph(parent, lines) {
-    if (!lines.length) return;
-    const paragraph = document.createElement('p');
-    appendInline(paragraph, lines.join(' '));
-    parent.appendChild(paragraph);
-}
-
-function renderRichText(parent, text) {
-    const lines = text.split(/\r?\n/);
-    // Count fences up front. An odd number means the model returned an
-    // unmatched ``` somewhere; treat the *last* opener as malformed (drop
-    // it) so the trailing paragraphs render as prose instead of getting
-    // swallowed into a never-closing code block.
-    const fenceCount = lines.reduce((n, l) => n + (l.trim().startsWith('```') ? 1 : 0), 0);
-    let remainingFenceToggles = fenceCount - (fenceCount % 2);
-    let paragraphLines = [];
-    let listEl = null;
-    let codeBlock = null;
-
-    lines.forEach((line) => {
-        const trimmed = line.trim();
-
-        if (trimmed.startsWith('```')) {
-            if (remainingFenceToggles <= 0) {
-                // Unbalanced trailing fence — render the marker as prose.
-                paragraphLines.push(trimmed);
-                return;
-            }
-            remainingFenceToggles -= 1;
-            appendParagraph(parent, paragraphLines);
-            paragraphLines = [];
-            listEl = null;
-            if (codeBlock) {
-                parent.appendChild(codeBlock);
-                codeBlock = null;
-            } else {
-                codeBlock = document.createElement('pre');
-            }
-            return;
-        }
-
-        if (codeBlock) {
-            codeBlock.textContent += `${line}\n`;
-            return;
-        }
-
-        if (!trimmed) {
-            appendParagraph(parent, paragraphLines);
-            paragraphLines = [];
-            listEl = null;
-            return;
-        }
-
-        const headingMatch = trimmed.match(/^#{1,3}\s+(.+)$/);
-        if (headingMatch) {
-            appendParagraph(parent, paragraphLines);
-            paragraphLines = [];
-            listEl = null;
-            const heading = document.createElement('h3');
-            appendInline(heading, headingMatch[1]);
-            parent.appendChild(heading);
-            return;
-        }
-
-        const bulletMatch = trimmed.match(/^[-*]\s+(.+)$/);
-        const numberedMatch = trimmed.match(/^\d+\.\s+(.+)$/);
-        if (bulletMatch || numberedMatch) {
-            appendParagraph(parent, paragraphLines);
-            paragraphLines = [];
-            const listType = bulletMatch ? 'ul' : 'ol';
-            if (!listEl || listEl.tagName.toLowerCase() !== listType) {
-                listEl = document.createElement(listType);
-                parent.appendChild(listEl);
-            }
-            const item = document.createElement('li');
-            appendInline(item, bulletMatch?.[1] || numberedMatch[1]);
-            listEl.appendChild(item);
-            return;
-        }
-
-        listEl = null;
-        paragraphLines.push(trimmed);
-    });
-
-    if (codeBlock) {
-        parent.appendChild(codeBlock);
-    }
-    appendParagraph(parent, paragraphLines);
-}
 
 function setNodeStatus(text, state = 'live') {
     const dot = document.createElement('span');
     dot.className = `status-dot${state === 'live' ? '' : ` ${state}`}`;
     dot.setAttribute('aria-hidden', 'true');
     nodeStatus.replaceChildren(dot, document.createTextNode(text));
-}
-
-function truncate(text, length = 92) {
-    if (!text || text.length <= length) return text;
-    return `${text.slice(0, length - 3)}...`;
-}
-
-function formatSourceLabel(label) {
-    return label
-        .replace(/^result\./, '')
-        .replace(/_/g, ' ')
-        .replace(/\b\w/g, (char) => char.toUpperCase());
-}
-
-function formatToolName(tool) {
-    return tool.replace(/^get_/, '').replace(/_/g, ' ');
-}
-
-function flattenData(value, prefix = '') {
-    if (!value || typeof value !== 'object') return [];
-    return Object.entries(value).flatMap(([key, entry]) => {
-        const label = prefix ? `${prefix}.${key}` : key;
-        if (entry === null || typeof entry !== 'object') {
-            return [[label, String(entry)]];
-        }
-        if (Array.isArray(entry)) {
-            return [[label, `${entry.length} items`]];
-        }
-        return flattenData(entry, label);
-    });
-}
-
-function appendSourceSummary(parent, { data, toolsUsed, warnings } = {}) {
-    const hasData = data && typeof data === 'object' && Object.keys(data).length > 0;
-    const hasTools = Boolean(toolsUsed?.length);
-    const hasWarnings = Boolean(warnings?.length);
-
-    if (!hasData && !hasTools && !hasWarnings) {
-        return;
-    }
-
-    const source = document.createElement('div');
-    source.className = 'source-summary';
-
-    const heading = document.createElement('div');
-    heading.className = 'source-heading';
-    heading.textContent = hasTools || hasData ? 'live bitcoin context' : 'note';
-    source.appendChild(heading);
-
-    const items = document.createElement('div');
-    items.className = 'source-items';
-
-    if (hasTools) {
-        const item = document.createElement('span');
-        item.textContent = `tool: ${toolsUsed.map(formatToolName).join(', ')}`;
-        items.appendChild(item);
-    }
-
-    flattenData(hasData ? data : null).slice(0, 3).forEach(([label, value]) => {
-        if (label === 'warnings') return;
-        const item = document.createElement('span');
-        item.textContent = `${formatSourceLabel(label)}: ${truncate(value, 34)}`;
-        items.appendChild(item);
-    });
-
-    if (items.childElementCount) {
-        source.appendChild(items);
-    }
-
-    warnings?.slice(0, 2).forEach((warning) => {
-        const warningEl = document.createElement('div');
-        warningEl.className = 'source-warning';
-        warningEl.textContent = warning;
-        source.appendChild(warningEl);
-    });
-
-    parent.appendChild(source);
 }
 
 async function fetchJson(url, options = {}) {
@@ -1031,7 +769,6 @@ function appendWarnings(parent, warnings) {
 
 function renderExplorerResult(kind, data) {
     if (!explorerEls.result) return;
-    explorerState.lastResult = { kind, data };
     explorerEls.result.hidden = false;
     explorerEls.result.replaceChildren();
 
@@ -1039,12 +776,7 @@ function renderExplorerResult(kind, data) {
     heading.className = 'result-heading';
     const title = document.createElement('h3');
     title.textContent = kind === 'tx' ? 'Transaction' : kind === 'address' ? 'Address' : 'Block';
-    const ask = document.createElement('button');
-    ask.type = 'button';
-    ask.className = 'card-action';
-    ask.dataset.ask = 'result';
-    ask.textContent = 'Explain this';
-    heading.append(title, ask);
+    heading.append(title);
 
     const body = document.createElement('div');
     body.className = 'result-body';
@@ -1115,32 +847,6 @@ function appendUtxos(parent, utxos) {
     parent.appendChild(section);
 }
 
-function promptForExplorer(kind, data) {
-    if (!data || data.error) {
-        return 'Explain why this Bitcoin explorer lookup failed and what I should try next.';
-    }
-    if (kind === 'tx') {
-        return `Explain this Bitcoin transaction: ${data.txid}. Include confirmation status, fee rate, input/output counts, and what can and cannot be inferred.`;
-    }
-    if (kind === 'address') {
-        return `Explain this public Bitcoin address snapshot: ${data.address}. Include confirmed balance, unconfirmed delta, transaction counts, current UTXO count, and avoid inferring ownership or identity.`;
-    }
-    return `Explain Bitcoin block ${data.height || data.hash}. Include transaction count, subsidy, timestamp, and what this block tells us.`;
-}
-
-function askChat(prompt) {
-    if (!prompt) return;
-    setChatOpen(true);
-    messageInput.value = prompt;
-    messageInput.dispatchEvent(new Event('input'));
-    chatForm.requestSubmit();
-    // On stacked (mobile) layouts the chat lives below the fold — bring it
-    // into view so the question doesn't appear to vanish.
-    if (window.matchMedia('(max-width: 920px)').matches) {
-        document.getElementById('chatPanel')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
-}
-
 function inferLookupType(value, selected) {
     if (selected === 'block' || selected === 'tx' || selected === 'address') return selected;
     if (/^\d+$/.test(value)) return 'block';
@@ -1209,36 +915,6 @@ function wireExplorer() {
         event.preventDefault();
         lookupExplorer(explorerEls.input?.value || '', explorerEls.type?.value || 'auto');
     });
-    explorerEls.drawer.addEventListener('click', (event) => {
-        const button = event.target.closest('[data-ask]');
-        if (!button) return;
-        if (button.getAttribute('data-ask') === 'result' && explorerState.lastResult) {
-            askChat(promptForExplorer(explorerState.lastResult.kind, explorerState.lastResult.data));
-        }
-    });
-}
-
-/* ---------------- Chat panel ---------------- */
-
-function setChatOpen(open) {
-    layoutEl?.classList.toggle('chat-hidden', !open);
-    chatToggle?.setAttribute('aria-expanded', String(open));
-    try { localStorage.setItem(CHAT_HIDDEN_STORAGE_KEY, String(!open)); } catch { /* ignore */ }
-}
-
-function wireChatToggle() {
-    let hidden = false;
-    try { hidden = localStorage.getItem(CHAT_HIDDEN_STORAGE_KEY) === 'true'; } catch { /* ignore */ }
-    setChatOpen(!hidden);
-    chatToggle?.addEventListener('click', () => {
-        const opening = layoutEl.classList.contains('chat-hidden');
-        setChatOpen(opening);
-        // On stacked (mobile) layouts the chat lives below the fold —
-        // bring it into view so the toggle doesn't look like a no-op.
-        if (opening && window.matchMedia('(max-width: 920px)').matches) {
-            document.getElementById('chatPanel')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }
-    });
 }
 
 async function refreshStatus() {
@@ -1261,94 +937,6 @@ async function refreshStatus() {
     }
 }
 
-async function sendMessage(text) {
-    addMessage({ role: 'user', text });
-    const loadingEl = addMessage({ role: 'assistant', text: 'Working on your question...', loading: true });
-    setBusy(true);
-
-    try {
-        const payload = {
-            message: text,
-            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-        };
-        const result = await fetchJson(`${API_BASE}/chat`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify(payload),
-        });
-
-        loadingEl.remove();
-        addMessage({
-            role: 'assistant',
-            text: result.answer,
-            data: result.data,
-            warnings: result.warnings,
-            toolsUsed: result.tools_used,
-        });
-        window.pgAnalytics?.track?.('bitcoin_chat_answered', {
-            tools_used: result.tools_used || [],
-            warnings: result.warnings?.length || 0,
-        });
-        await refreshStatus();
-    } catch (error) {
-        loadingEl.remove();
-        addMessage({ role: 'assistant', text: error.message, error: true });
-        window.pgAnalytics?.track?.('bitcoin_chat_failed', { message: error.message });
-    } finally {
-        setBusy(false);
-        messageInput.focus();
-    }
-}
-
-function setBusy(isBusy) {
-    chatForm.querySelector('button').disabled = isBusy;
-    messageInput.disabled = isBusy;
-}
-
-messageInput.addEventListener('input', () => {
-    messageInput.style.height = 'auto';
-    messageInput.style.height = `${messageInput.scrollHeight}px`;
-});
-
-messageInput.addEventListener('keydown', (event) => {
-    if (event.key === 'Enter' && !event.shiftKey) {
-        event.preventDefault();
-        chatForm.requestSubmit();
-    }
-});
-
-chatForm.addEventListener('submit', async (event) => {
-    event.preventDefault();
-    const text = messageInput.value.trim();
-    if (!text) return;
-    window.pgAnalytics?.track?.('bitcoin_chat_sent', { length: text.length });
-    messageInput.value = '';
-    messageInput.style.height = 'auto';
-    await sendMessage(text);
-});
-
-// The starter message should sit above the learning-path chips, so render
-// it first and then move the (static) chips back to the end of the thread.
-if (learnPaths) {
-    messagesEl.appendChild(learnPaths);
-    learnPaths.querySelectorAll('.learn-chip').forEach((card) => {
-        card.addEventListener('click', () => {
-            askChat(card.getAttribute('data-prompt'));
-        });
-    });
-    chatForm.addEventListener('submit', () => {
-        learnPaths.hidden = true;
-    }, { once: true });
-}
-
-document.querySelectorAll('.stat-tile[data-prompt]').forEach((button) => {
-    button.addEventListener('click', () => {
-        askChat(button.getAttribute('data-prompt'));
-    });
-});
-
-wireChatToggle();
 wireRangeSwitch();
 wireSupplyRangeSwitch();
 wireExplorer();

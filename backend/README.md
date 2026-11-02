@@ -36,7 +36,7 @@ Protected local app routes, FastAPI docs/OpenAPI JSON, and protected API routes 
 APP_AUTH_USERNAME=palmer APP_AUTH_PASSWORD=your-password ./start.sh
 ```
 
-Poker, craps, craps strategy, blackjack, High Card Flush, login, `/api/poker/*`, `/api/craps/*`, and `/api/analytics/*` remain public. Stock research, Bitcoin chat, `/api/stocks/*`, and `/api/bitcoin/*` run in demo mode without credentials and use live provider-backed data with valid credentials. Admin, FastAPI docs, OpenAPI JSON, and other `/api/*` routes are protected. Protected routes return `503` if `APP_AUTH_PASSWORD` is missing.
+Poker, craps, craps strategy, blackjack, High Card Flush, login, `/api/poker/*`, `/api/craps/*`, and `/api/analytics/*` remain public. Stock research, the Bitcoin dashboard, `/api/stocks/*`, and `/api/bitcoin/*` run in demo mode without credentials and use live provider-backed data with valid credentials. Admin, FastAPI docs, OpenAPI JSON, and other `/api/*` routes are protected. Protected routes return `503` if `APP_AUTH_PASSWORD` is missing.
 
 ## Previewing the members-only league hub
 
@@ -178,7 +178,7 @@ actuals, so it stays empty on a season collected for the first time.
 - `http://127.0.0.1:8000/craps-strategy/` - craps strategy simulator
 - `http://127.0.0.1:8000/blackjack/` - blackjack app
 - `http://127.0.0.1:8000/high-card-flush/` - High Card Flush app
-- `http://127.0.0.1:8000/bitcoin-chat/` - Bitcoin chat app
+- `http://127.0.0.1:8000/bitcoin-chat/` - Bitcoin dashboard
 - `http://127.0.0.1:8000/admin/` - protected admin/log dashboard
 - `http://127.0.0.1:8000/fantasy/` - members-only league hub (see above)
 - `http://127.0.0.1:8000/health` - health check
@@ -189,7 +189,7 @@ actuals, so it stays empty on a season collected for the first time.
 - `/api/stocks/*` - stock lookup, summary, earnings, and price history.
 - `/api/poker/*` - active integrated poker game API plus the `GET /api/poker/games/{game_id}/ws` WebSocket push channel.
 - `/api/craps/*` - public craps strategy translation API.
-- `/api/bitcoin/*` - Bitcoin provider status, block/transaction/mempool lookups, and chat.
+- `/api/bitcoin/*` - Bitcoin provider status, block/transaction/mempool lookups, price and supply history.
 - `/api/analytics/*` - public client analytics ingest (`POST /api/analytics/events`).
 - `/api/admin/*` - protected structured log and file-tail endpoints, including the analytics summary surfaced in the admin dashboard and `GET /api/admin/users`, the member account roster behind the console's Members tab.
 
