@@ -209,14 +209,14 @@ def _score(day, username, kills, rules=None):
     )
 
 
-def test_all_time_counts_first_places_and_top_threes():
+def test_all_time_is_a_medal_table():
     rules = castle_defense.current_rules()
     days = {
-        # Ann wins outright; Bo and Cy share 2nd; Di is 4th.
+        # Ann takes gold; Bo and Cy share 2nd, a silver each; Di is 4th.
         "2026-10-20": {"ann": 300, "bo": 250, "cy": 250, "di": 200},
-        # A tie for 1st is a win for both; Ann is 3rd.
+        # A tie for 1st is two golds and no silver: Ann's 3rd is bronze.
         "2026-10-21": {"bo": 400, "cy": 400, "ann": 390, "di": 100},
-        # Di's only win.
+        # Di's gold, Ann's silver.
         "2026-10-22": {"di": 500, "ann": 10},
     }
     db = SessionLocal()
@@ -231,13 +231,13 @@ def test_all_time_counts_first_places_and_top_threes():
         db.close()
 
     board = TestClient(app).get("/api/castle-defense/all-time").json()
-    rows = {e["name"]: (e["rank"], e["wins"], e["top3"], e["days"]) for e in board["entries"]}
-    # Everyone has one win, so top 3s decide it; Bo and Cy share 2nd.
+    rows = {e["name"]: (e["rank"], e["gold"], e["silver"], e["bronze"], e["days"]) for e in board["entries"]}
+    # One gold each, so silvers and then bronzes decide it; Bo and Cy share 2nd.
     assert rows == {
-        "Ann": (1, 1, 3, 3),
-        "Bo": (2, 1, 2, 2),
-        "Cy": (2, 1, 2, 2),
-        "Di": (4, 1, 1, 3),
+        "Ann": (1, 1, 1, 1, 3),
+        "Bo": (2, 1, 1, 0, 2),
+        "Cy": (2, 1, 1, 0, 2),
+        "Di": (4, 1, 0, 0, 3),
     }
     assert [e["name"] for e in board["entries"]][::3] == ["Ann", "Di"]
     assert board["days"] == 3 and board["players"] == 4

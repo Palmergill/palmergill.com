@@ -56,6 +56,7 @@ button { font: inherit; color: inherit; }
 .cd-head__side { display: grid; gap: 10px; justify-items: start; min-width: 0; }
 .cd-board-tabs { display: flex; gap: 6px; margin-bottom: 12px; }
 .cd-board--full { max-height: min(52vh, 460px); overflow-y: auto; margin: 0; }
+.cd-medals { white-space: nowrap; font-variant-numeric: tabular-nums; }
 .cd-lede {
     margin: 0;
     max-width: 58ch;

@@ -141,7 +141,7 @@ test("today's leaderboard opens from the header before you've played", async ({ 
     // Other tests may have posted runs already; either way the board answers.
     await expect(page.locator('#fullBoardNote')).toHaveText(/No scores yet today|\d+ players?/);
 
-    // All time counts days finished 1st and in the top 3.
+    // All time is a medal table of each day's 1st, 2nd and 3rd places.
     await card.getByRole('button', { name: 'All time' }).click();
     await expect(card.getByRole('heading', { name: 'All-time leaderboard' })).toBeVisible();
     await expect(card.getByRole('button', { name: 'All time' })).toHaveAttribute('aria-pressed', 'true');
@@ -161,5 +161,5 @@ test('a signed-in run shows up on the all-time board', async ({ page }) => {
     await page.getByRole('dialog').getByRole('button', { name: 'All time' }).click();
     const mine = page.locator('#fullBoard .is-you');
     await expect(mine).toContainText('(you)');
-    await expect(mine).toContainText(/🥇 \d+ · top 3: \d+/);
+    await expect(mine).toContainText(/🥇 \d+ 🥈 \d+ 🥉 \d+/);
 });

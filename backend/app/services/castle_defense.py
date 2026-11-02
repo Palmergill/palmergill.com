@@ -139,17 +139,19 @@ def leaderboard(db: Session, day: str, username: Optional[str] = None) -> Dict[s
 
 
 def all_time(db: Session, username: Optional[str] = None) -> Dict[str, Any]:
-    """Every player's days at the top: how often they finished 1st and how
-    often in the top 3, ranking each day the way its own board does (tied
-    scores share a place). A day is judged under the rules it was played
-    under — the newest rules among its rows — and today's standings count
-    as they stand."""
+    """Every player's medals: a gold for each day they finished 1st, silver
+    for 2nd, bronze for 3rd, ranking each day the way its own board does
+    (tied scores share a place, so a tie for 1st is two golds and no silver).
+    A day is judged under the rules it was played under — the newest rules
+    among its rows — and today's standings count as they stand. Players rank
+    like a medal table: golds, then silvers, then bronzes."""
     model = CastleDefenseScore
     rows = db.query(model.day, model.username, model.display_name, model.kills, model.rules).all()
     by_day: Dict[str, list] = {}
     for row in rows:
         by_day.setdefault(row.day, []).append(row)
 
+    medals = {1: "gold", 2: "silver", 3: "bronze"}
     players: Dict[str, Dict[str, Any]] = {}
     # Oldest day first, so a player's newest display name is the one shown.
     for day in sorted(by_day):
@@ -159,21 +161,25 @@ def all_time(db: Session, username: Optional[str] = None) -> Dict[str, Any]:
         for index, row in enumerate(ranked):
             # Competition ranking: one more than the number of better scores.
             rank = 1 + sum(1 for other in ranked[:index] if other.kills > row.kills)
-            p = players.setdefault(row.username, {"name": row.display_name, "wins": 0, "top3": 0, "days": 0, "username": row.username})
+            p = players.setdefault(
+                row.username, {"username": row.username, "gold": 0, "silver": 0, "bronze": 0, "days": 0}
+            )
             p["name"] = row.display_name
             p["days"] += 1
-            p["wins"] += rank == 1
-            p["top3"] += rank <= 3
+            if rank in medals:
+                p[medals[rank]] += 1
 
-    order = sorted(players.values(), key=lambda p: (-p["wins"], -p["top3"], -p["days"], p["name"].lower()))
+    tally = lambda p: (p["gold"], p["silver"], p["bronze"])
+    order = sorted(players.values(), key=lambda p: (tuple(-n for n in tally(p)), -p["days"], p["name"].lower()))
     entries = []
     for index, p in enumerate(order):
-        tied = entries and (p["wins"], p["top3"]) == (order[index - 1]["wins"], order[index - 1]["top3"])
+        tied = entries and tally(p) == tally(order[index - 1])
         entries.append({
             "rank": entries[-1]["rank"] if tied else index + 1,
             "name": p["name"],
-            "wins": p["wins"],
-            "top3": p["top3"],
+            "gold": p["gold"],
+            "silver": p["silver"],
+            "bronze": p["bronze"],
             "days": p["days"],
             "you": username is not None and p["username"] == username,
         })

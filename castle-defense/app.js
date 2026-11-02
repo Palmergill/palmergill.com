@@ -143,10 +143,10 @@
 
     // The full board, open any time from the header: today's scores (only
     // today's map is ranked, so it's always today's, whatever day is loaded),
-    // or all time — who has finished 1st and top 3 most often.
+    // or all time — a medal table of every day's 1st, 2nd and 3rd places.
     let boardRequest = 0;
     function allTimeRows(board) {
-        const row = (e) => `<li class="${e.you ? "is-you" : ""}"><span class="cd-board__rank">${e.rank}</span><span class="cd-board__name">${escapeHtml(e.name)}${e.you ? " (you)" : ""}</span><span class="cd-board__kills">🥇 ${e.wins} <small>· top 3: ${e.top3}</small></span></li>`;
+        const row = (e) => `<li class="${e.you ? "is-you" : ""}"><span class="cd-board__rank">${e.rank}</span><span class="cd-board__name">${escapeHtml(e.name)}${e.you ? " (you)" : ""}</span><span class="cd-board__kills cd-medals">🥇 ${e.gold} 🥈 ${e.silver} 🥉 ${e.bronze}</span></li>`;
         let html = board.entries.map(row).join("");
         if (board.you && !board.entries.some((e) => e.you)) html += `<li class="is-gap">…</li>${row(board.you)}`;
         return html;
@@ -190,7 +190,7 @@
         if (period === "all") {
             $("fullBoard").innerHTML = allTimeRows(board);
             if (!board.players) note.textContent = "No scores yet.";
-            else note.innerHTML = `${players} over ${board.days} ${board.days === 1 ? "day" : "days"}. 🥇 is days finished 1st; ties share the place, and today counts as it stands.${board.you ? "" : ` ${join}`}`;
+            else note.innerHTML = `${players} over ${board.days} ${board.days === 1 ? "day" : "days"}. A medal for each day finished 1st, 2nd or 3rd; ties share the place, and today counts as it stands.${board.you ? "" : ` ${join}`}`;
             return;
         }
         $("fullBoard").innerHTML = boardRows(board, 50);
