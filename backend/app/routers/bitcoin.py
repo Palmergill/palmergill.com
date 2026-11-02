@@ -129,6 +129,15 @@ async def price_history(
         raise HTTPException(status_code=400, detail=str(exc))
 
 
+@router.get("/supply/history")
+async def supply_history(request: Request):
+    return (
+        bitcoin_tools.get_demo_supply_history()
+        if is_demo_request(request)
+        else await run_blocking(bitcoin_tools.get_supply_history)
+    )
+
+
 @router.get("/blocks/recent")
 async def recent_blocks(request: Request, limit: int = Query(8, ge=1, le=15)):
     return (

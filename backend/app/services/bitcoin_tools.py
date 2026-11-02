@@ -10,6 +10,7 @@ from app.services.bitcoin_coingecko import CoinGeckoError, coingecko_client
 from app.services.bitcoin_formatting import block_subsidy_btc, btc_to_sats, fee_rate_sats_vb, iso_from_unix, sats_to_btc
 from app.services.bitcoin_mempool_space import MempoolSpaceError, mempool_space_client
 from app.services.bitcoin_rpc import BitcoinRPCError, bitcoin_rpc_client
+from app.services import bitcoin_supply
 
 
 MAX_MINED_STATS_BLOCKS = int(os.getenv("BITCOIN_MAX_MINED_STATS_BLOCKS", "1008"))
@@ -470,6 +471,18 @@ def get_price_history(range_key: str) -> Dict[str, Any]:
     payload = _price_history_payload(range_key, _downsample_points(points), "coingecko", [])
     _price_history_cache[range_key] = (time.time(), payload)
     return payload
+
+
+def get_demo_supply_history() -> Dict[str, Any]:
+    return bitcoin_supply.get_demo_supply_history(DEMO_WARNING)
+
+
+def get_supply_history() -> Dict[str, Any]:
+    if _provider_not_configured():
+        return get_demo_supply_history()
+    latest = get_latest_block()
+    height = latest.get("height") if not latest.get("error") else None
+    return bitcoin_supply.get_supply_history(height)
 
 
 def get_demo_recent_blocks(limit: int = 8) -> Dict[str, Any]:

@@ -601,6 +601,64 @@ button {
     transition: color 160ms ease;
 }
 
+/* Supply chart */
+.supply-card {
+    border-bottom: 1px solid var(--line);
+    padding: 4px 0 12px;
+    margin-bottom: 16px;
+}
+
+.supply-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 18px;
+    margin-bottom: 8px;
+    color: var(--soft);
+    font-size: 12px;
+}
+
+.supply-key {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.supply-key i {
+    width: 10px;
+    height: 3px;
+    border-radius: 2px;
+    background: #e07c00;
+}
+
+.supply-key.m2 i {
+    background: var(--sage);
+}
+
+.supply-key b {
+    color: var(--ink);
+    font-weight: 600;
+}
+
+.supply-wrap {
+    position: relative;
+    height: clamp(200px, 28vh, 280px);
+}
+
+.supply-wrap canvas {
+    max-width: 100%;
+}
+
+.supply-note {
+    margin: 8px 2px 0;
+    color: var(--muted-2);
+    font-size: 11px;
+    font-style: italic;
+}
+
+.supply-note:empty {
+    display: none;
+}
+
 /* Recent blocks */
 .section-heading {
     display: flex;

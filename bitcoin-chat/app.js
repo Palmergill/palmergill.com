@@ -67,6 +67,7 @@ const MONO_STACK = '"SFMono-Regular", ui-monospace, Menlo, Consolas, monospace';
 
 let activeRange = readStoredRange();
 let priceChartInstance = null;
+let supplyChartInstance = null;
 let livePriceUsd = null;
 const chartCache = {};
 const explorerState = {
@@ -539,6 +540,143 @@ function renderChart(payload) {
             },
         },
     });
+}
+
+const SUPPLY_BTC_COLOR = '#e07c00';
+const SUPPLY_M2_COLOR = '#5b7152';
+
+function formatBtcMillions(value) {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return '--';
+    return `${(n / 1e6).toFixed(n < 1e7 ? 1 : 2)}M`;
+}
+
+function formatUsdTrillions(value) {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return '--';
+    return `$${(n / 1e12).toFixed(1)}T`;
+}
+
+function supplyAxis(position, color, callback, gridColor, extra = {}) {
+    return {
+        position,
+        beginAtZero: true,
+        ...extra,
+        grid: gridColor ? { color: gridColor } : { display: false },
+        border: { display: false },
+        ticks: {
+            color,
+            font: { family: MONO_STACK, size: 10 },
+            maxTicksLimit: 5,
+            callback,
+            ...(extra.ticks || {}),
+        },
+    };
+}
+
+function renderSupplyChart(payload) {
+    const canvas = document.getElementById('supplyChart');
+    const noteEl = document.getElementById('supplyNote');
+    if (!canvas || typeof Chart === 'undefined') return;
+
+    const points = payload.points || [];
+    document.getElementById('supplyBtcLast').textContent = `${formatBtcMillions(payload.btc_last)} BTC`;
+    document.getElementById('supplyM2Last').textContent = formatUsdTrillions(payload.m2_last);
+    noteEl.textContent = payload.source === 'demo'
+        ? 'sample data — log in for live data'
+        : (payload.warnings || [])[0] || '';
+
+    if (supplyChartInstance) supplyChartInstance.destroy();
+    const narrow = (canvas.parentElement.clientWidth || 600) < 500;
+
+    supplyChartInstance = new Chart(canvas.getContext('2d'), {
+        type: 'line',
+        data: {
+            labels: points.map((point) => new Date(point.t * 1000).getUTCFullYear()),
+            datasets: [
+                {
+                    label: 'Bitcoin supply',
+                    data: points.map((point) => point.btc),
+                    yAxisID: 'btc',
+                    borderColor: SUPPLY_BTC_COLOR,
+                    borderWidth: 2,
+                    tension: 0.2,
+                    pointRadius: 0,
+                    pointHoverRadius: 4,
+                    pointHoverBackgroundColor: SUPPLY_BTC_COLOR,
+                    pointHoverBorderColor: '#fffdf8',
+                },
+                {
+                    label: 'US M2',
+                    data: points.map((point) => point.m2_usd),
+                    yAxisID: 'm2',
+                    borderColor: SUPPLY_M2_COLOR,
+                    borderWidth: 2,
+                    tension: 0.2,
+                    pointRadius: 0,
+                    pointHoverRadius: 4,
+                    pointHoverBackgroundColor: SUPPLY_M2_COLOR,
+                    pointHoverBorderColor: '#fffdf8',
+                },
+            ],
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: false,
+            interaction: { intersect: false, mode: 'index' },
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    backgroundColor: 'rgba(255, 253, 248, 0.97)',
+                    borderColor: '#e3dccd',
+                    borderWidth: 1,
+                    titleColor: '#a39a87',
+                    bodyColor: '#1f1a12',
+                    titleFont: { family: MONO_STACK, size: 11 },
+                    bodyFont: { family: MONO_STACK, size: 13 },
+                    boxWidth: 8,
+                    boxHeight: 8,
+                    callbacks: {
+                        title: (items) => new Date(points[items[0].dataIndex].t * 1000)
+                            .toLocaleDateString('en-US', { month: 'short', year: 'numeric', timeZone: 'UTC' }),
+                        label: (item) => (item.dataset.yAxisID === 'btc'
+                            ? ` ${Math.round(item.parsed.y).toLocaleString('en-US')} BTC`
+                            : ` ${formatUsdTrillions(item.parsed.y)} M2`),
+                    },
+                },
+            },
+            scales: {
+                x: {
+                    grid: { display: false },
+                    border: { color: '#d9d1bf' },
+                    ticks: {
+                        color: '#a39a87',
+                        font: { family: MONO_STACK, size: 10 },
+                        maxTicksLimit: narrow ? 4 : 8,
+                        maxRotation: 0,
+                        autoSkip: true,
+                    },
+                },
+                btc: supplyAxis('left', SUPPLY_BTC_COLOR, (value) => `${value / 1e6}M`, '#eee8da', {
+                    max: TOTAL_SUPPLY_BTC,
+                    ticks: { stepSize: 7e6 },
+                }),
+                m2: supplyAxis('right', SUPPLY_M2_COLOR, (value) => `$${value / 1e12}T`),
+            },
+        },
+    });
+}
+
+async function loadSupplyChart() {
+    try {
+        const payload = await fetchJson(`${API_BASE}/supply/history`);
+        if (!payload.points?.length) throw new Error('no points');
+        renderSupplyChart(payload);
+    } catch {
+        const noteEl = document.getElementById('supplyNote');
+        if (noteEl) noteEl.textContent = 'Supply history is taking a break. Try again shortly.';
+    }
 }
 
 function renderPriceHero(payload) {
@@ -1109,6 +1247,7 @@ wireExplorer();
 refreshStatus();
 refreshPrice();
 loadChart(activeRange);
+loadSupplyChart();
 refreshDashboard();
 setInterval(refreshDashboard, 120000);
 setInterval(refreshPrice, 60000);
