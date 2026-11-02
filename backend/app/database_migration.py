@@ -185,6 +185,11 @@ def migrate_database():
         # Castle Defense scores are tagged with the rules they were played
         # under; rows from before the tag were the gold-budget rules, 1.
         _add_column_if_missing(inspector, "castle_defense_scores", "rules", "INTEGER NOT NULL DEFAULT 1")
+        # The open-field mode was removed (Nov 2026); its board went with it.
+        if "castle_defense_open_scores" in inspector.get_table_names():
+            logger.info("Dropping castle_defense_open_scores")
+            with engine.begin() as conn:
+                conn.execute(text("DROP TABLE castle_defense_open_scores"))
 
         # Portfolio trades keep everything the uploaded file said about them.
         _add_column_if_missing(inspector, "portfolio_transactions", "asset", "VARCHAR NOT NULL DEFAULT 'stock'")
