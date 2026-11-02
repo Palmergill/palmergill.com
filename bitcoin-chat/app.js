@@ -328,11 +328,33 @@ function supplyWindow(points, range) {
     const slice = points.slice(start);
     const btcBase = slice[0]?.btc ?? 0;
     const m2Base = slice.find((point) => point.m2_usd !== null)?.m2_usd ?? null;
-    return slice.map((point) => ({
-        t: point.t,
-        btc: point.btc - btcBase,
-        m2: point.m2_usd === null || m2Base === null ? null : point.m2_usd - m2Base,
-    }));
+    const pct = (delta, base) => (delta === null || !base ? null : (delta / base) * 100);
+    return slice.map((point) => {
+        const btc = point.btc - btcBase;
+        const m2 = point.m2_usd === null || m2Base === null ? null : point.m2_usd - m2Base;
+        return { t: point.t, btc, m2, btcPct: pct(btc, btcBase), m2Pct: pct(m2, m2Base) };
+    });
+}
+
+// Bitcoin's "All" range starts from the first 50 coins, where percent change
+// runs into the millions; leave those off rather than print a silly number.
+function formatPctChange(value) {
+    const n = Number(value);
+    if (value === null || !Number.isFinite(n) || Math.abs(n) >= 10000) return '';
+    const sign = n > 0 ? '+' : n < 0 ? '−' : '';
+    return `${sign}${Math.abs(n).toFixed(Math.abs(n) < 10 ? 1 : 0)}%`;
+}
+
+function setSupplyLegendValue(id, amount, pct) {
+    const el = document.getElementById(id);
+    el.textContent = amount;
+    const pctText = formatPctChange(pct);
+    if (pctText) {
+        const pctEl = document.createElement('span');
+        pctEl.className = 'supply-pct';
+        pctEl.textContent = pctText;
+        el.append(' ', pctEl);
+    }
 }
 
 function lastValue(points, key) {
@@ -396,8 +418,8 @@ function renderSupplyChart(payload, range) {
     if (!canvas || typeof Chart === 'undefined') return;
 
     const points = supplyWindow(payload.points || [], range);
-    document.getElementById('supplyBtcLast').textContent = formatBtcAdded(lastValue(points, 'btc'));
-    document.getElementById('supplyM2Last').textContent = formatUsdAdded(lastValue(points, 'm2'));
+    setSupplyLegendValue('supplyBtcLast', formatBtcAdded(lastValue(points, 'btc')), lastValue(points, 'btcPct'));
+    setSupplyLegendValue('supplyM2Last', formatUsdAdded(lastValue(points, 'm2')), lastValue(points, 'm2Pct'));
     noteEl.textContent = payload.source === 'demo'
         ? 'sample data — log in for live data'
         : (payload.warnings || [])[0] || '';
@@ -470,9 +492,13 @@ function renderSupplyChart(payload, range) {
                     callbacks: {
                         title: (items) => new Date(points[items[0].dataIndex].t * 1000)
                             .toLocaleDateString('en-US', { month: 'short', year: 'numeric', timeZone: 'UTC' }),
-                        label: (item) => (item.dataset.yAxisID === 'btc'
-                            ? ` ${formatBtcAdded(item.parsed.y)}`
-                            : ` ${formatUsdAdded(item.parsed.y)} M2`),
+                        label: (item) => {
+                            const point = points[item.dataIndex];
+                            const isBtc = item.dataset.yAxisID === 'btc';
+                            const amount = isBtc ? formatBtcAdded(item.parsed.y) : `${formatUsdAdded(item.parsed.y)} M2`;
+                            const pctText = formatPctChange(isBtc ? point.btcPct : point.m2Pct);
+                            return ` ${amount}${pctText ? ` (${pctText})` : ''}`;
+                        },
                     },
                 },
             },

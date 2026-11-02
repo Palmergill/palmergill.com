@@ -612,6 +612,11 @@ button {
     font-weight: 600;
 }
 
+.supply-pct {
+    color: var(--soft);
+    font-weight: 500;
+}
+
 .supply-wrap {
     position: relative;
     height: clamp(200px, 28vh, 280px);
