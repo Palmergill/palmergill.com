@@ -55,6 +55,7 @@ const MONO_STACK = '"SFMono-Regular", ui-monospace, Menlo, Consolas, monospace';
 let activeRange = readStoredRange();
 let priceChartInstance = null;
 let supplyChartInstance = null;
+let feeChartInstance = null;
 let livePriceUsd = null;
 const chartCache = {};
 const BITCOIN_ADDRESS_RE = /^(?:bc1[ac-hj-np-z02-9]{11,71}|[13][a-km-zA-HJ-NP-Z1-9]{25,34})$/i;
@@ -538,6 +539,137 @@ function wireSupplyRangeSwitch() {
     });
 }
 
+const FEE_TYPICAL_COLOR = '#e07c00';
+const FEE_PRIORITY_COLOR = '#7a7264';
+
+function formatSatsVb(value) {
+    const n = Number(value);
+    return Number.isFinite(n) ? `${n.toFixed(n < 10 ? 2 : 1)} sat/vB` : '--';
+}
+
+function typicalSendUsd(satsVb, btcUsd) {
+    const rate = Number(satsVb);
+    const usd = Number(btcUsd);
+    if (!Number.isFinite(rate) || !Number.isFinite(usd) || !usd) return null;
+    return (rate * TYPICAL_TX_VBYTES * usd) / 1e8;
+}
+
+function formatSendUsd(value) {
+    if (value === null) return '';
+    return `~$${value.toFixed(value < 10 ? 2 : 0)}`;
+}
+
+function renderFeeChart(payload) {
+    const canvas = document.getElementById('feeChart');
+    if (!canvas || typeof Chart === 'undefined') return;
+
+    const points = payload.points || [];
+    const last = points[points.length - 1] || {};
+    const typicalCost = formatSendUsd(typicalSendUsd(last.median, last.btc_usd ?? livePriceUsd));
+    document.getElementById('feeTypicalLast').textContent =
+        `${formatSatsVb(last.median)}${typicalCost ? ` · ${typicalCost}` : ''}`;
+    document.getElementById('feePriorityLast').textContent = formatSatsVb(last.priority);
+    document.getElementById('feeNote').textContent = payload.source === 'demo'
+        ? 'sample data — log in for live data'
+        : (payload.warnings || [])[0] || '';
+
+    if (feeChartInstance) feeChartInstance.destroy();
+    const narrow = (canvas.parentElement.clientWidth || 600) < 500;
+    const line = (color, dashed) => ({
+        borderColor: color,
+        borderWidth: dashed ? 1.5 : 2,
+        borderDash: dashed ? [4, 3] : [],
+        tension: 0.3,
+        pointRadius: 0,
+        pointHoverRadius: 4,
+        pointHoverBackgroundColor: color,
+        pointHoverBorderColor: '#fffdf8',
+    });
+
+    feeChartInstance = new Chart(canvas.getContext('2d'), {
+        type: 'line',
+        data: {
+            labels: points.map((point) => new Date(point.t * 1000)
+                .toLocaleDateString('en-US', { month: 'short', day: 'numeric' })),
+            datasets: [
+                { label: 'Typical', data: points.map((point) => point.median), ...line(FEE_TYPICAL_COLOR, false) },
+                { label: 'Priority', data: points.map((point) => point.priority), ...line(FEE_PRIORITY_COLOR, true) },
+            ],
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: false,
+            interaction: { intersect: false, mode: 'index' },
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    backgroundColor: 'rgba(255, 253, 248, 0.97)',
+                    borderColor: '#e3dccd',
+                    borderWidth: 1,
+                    titleColor: '#a39a87',
+                    bodyColor: '#1f1a12',
+                    titleFont: { family: MONO_STACK, size: 11 },
+                    bodyFont: { family: MONO_STACK, size: 13 },
+                    boxWidth: 8,
+                    boxHeight: 8,
+                    callbacks: {
+                        title: (items) => new Date(points[items[0].dataIndex].t * 1000)
+                            .toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric' }),
+                        label: (item) => {
+                            const point = points[item.dataIndex];
+                            const cost = formatSendUsd(typicalSendUsd(item.parsed.y, point.btc_usd));
+                            return ` ${item.dataset.label} ${formatSatsVb(item.parsed.y)}${cost ? ` (${cost})` : ''}`;
+                        },
+                    },
+                },
+            },
+            scales: {
+                x: {
+                    grid: { display: false },
+                    border: { color: '#d9d1bf' },
+                    ticks: {
+                        color: '#a39a87',
+                        font: { family: MONO_STACK, size: 10 },
+                        maxTicksLimit: narrow ? 4 : 7,
+                        maxRotation: 0,
+                        autoSkip: true,
+                    },
+                },
+                y: {
+                    position: 'right',
+                    beginAtZero: true,
+                    grid: { color: '#eee8da' },
+                    border: { display: false },
+                    ticks: {
+                        color: '#a39a87',
+                        font: { family: MONO_STACK, size: 10 },
+                        maxTicksLimit: 5,
+                        callback: (value) => `${value}`,
+                    },
+                    title: {
+                        display: true,
+                        text: 'sat/vB',
+                        color: '#a39a87',
+                        font: { family: MONO_STACK, size: 10 },
+                    },
+                },
+            },
+        },
+    });
+}
+
+async function loadFeeChart() {
+    try {
+        const payload = await fetchJson(`${API_BASE}/fees/history`);
+        if (payload.error || !payload.points?.length) throw new Error(payload.error || 'no points');
+        renderFeeChart(payload);
+    } catch {
+        const noteEl = document.getElementById('feeNote');
+        if (noteEl) noteEl.textContent = 'Fee history is taking a break. Try again shortly.';
+    }
+}
+
 async function loadSupplyChart() {
     try {
         const payload = await fetchJson(`${API_BASE}/supply/history`);
@@ -969,6 +1101,7 @@ wireExplorer();
 refreshStatus();
 refreshPrice();
 loadChart(activeRange);
+loadFeeChart();
 loadSupplyChart();
 refreshDashboard();
 setInterval(refreshDashboard, 120000);

@@ -607,6 +607,10 @@ button {
     background: var(--sage);
 }
 
+.supply-key.fee-priority i {
+    background: repeating-linear-gradient(90deg, #7a7264 0 4px, transparent 4px 6px);
+}
+
 .supply-key b {
     color: var(--ink);
     font-weight: 600;

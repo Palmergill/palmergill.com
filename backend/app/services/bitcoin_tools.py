@@ -442,6 +442,95 @@ def get_supply_history() -> Dict[str, Any]:
     return bitcoin_supply.get_supply_history(height)
 
 
+FEE_HISTORY_BUCKET_SECONDS = 6 * 60 * 60
+FEE_HISTORY_TTL_SECONDS = 1800
+_fee_history_cache: Dict[str, Any] = {}
+
+
+def _fee_history_payload(points: List[Dict[str, Any]], source: str, warnings: List[str]) -> Dict[str, Any]:
+    medians = [point["median"] for point in points]
+    return {
+        "source": source,
+        "range": "30d",
+        "points": points,
+        "median_avg": round(sum(medians) / len(medians), 2),
+        "median_last": medians[-1],
+        "warnings": warnings,
+    }
+
+
+def _bucket_fee_history(rates: List[Dict[str, Any]], prices: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Average mempool.space's per-block-group fee rates into 6-hour buckets,
+    which smooths their whole-number sat/vB values into a readable line."""
+    usd_by_time = {row.get("timestamp"): row.get("USD") for row in prices}
+    buckets: Dict[int, List[Dict[str, Any]]] = {}
+    for row in rates:
+        timestamp = row.get("timestamp")
+        if timestamp is None or row.get("avgFee_50") is None:
+            continue
+        buckets.setdefault(int(timestamp) // FEE_HISTORY_BUCKET_SECONDS, []).append(row)
+
+    points = []
+    for key in sorted(buckets):
+        rows = buckets[key]
+        usd = [usd_by_time.get(row["timestamp"]) for row in rows]
+        usd = [value for value in usd if value]
+        points.append({
+            "t": key * FEE_HISTORY_BUCKET_SECONDS,
+            "median": round(sum(row["avgFee_50"] for row in rows) / len(rows), 2),
+            "priority": round(sum(row.get("avgFee_90") or 0 for row in rows) / len(rows), 2),
+            "btc_usd": round(sum(usd) / len(usd), 2) if usd else None,
+        })
+    return points
+
+
+def get_demo_fee_history() -> Dict[str, Any]:
+    now = int(time.time())
+    start = now // FEE_HISTORY_BUCKET_SECONDS * FEE_HISTORY_BUCKET_SECONDS - 119 * FEE_HISTORY_BUCKET_SECONDS
+    points = []
+    for i in range(120):
+        progress = i / 119
+        wave = 1 + 0.45 * math.sin(progress * math.pi * 9) + 0.25 * math.sin(progress * math.pi * 31)
+        median = round(max(1.0, 3.2 * wave), 2)
+        points.append({
+            "t": start + i * FEE_HISTORY_BUCKET_SECONDS,
+            "median": median,
+            "priority": round(median * 2.4, 2),
+            "btc_usd": 67250.0,
+        })
+    return _fee_history_payload(points, "demo", [DEMO_WARNING])
+
+
+def get_fee_history() -> Dict[str, Any]:
+    cached = _fee_history_cache.get("30d")
+    if cached and time.time() - cached[0] < FEE_HISTORY_TTL_SECONDS:
+        return cached[1]
+    if _provider_not_configured() or not mempool_space_client.configured:
+        return get_demo_fee_history()
+
+    try:
+        rates = mempool_space_client.get_block_fee_rates("1m")
+        try:
+            prices = mempool_space_client.get_block_fees("1m")
+        except MempoolSpaceError:
+            prices = []
+    except MempoolSpaceError as exc:
+        if cached:
+            return cached[1]
+        return _api_error_response(exc)
+
+    points = _bucket_fee_history(rates or [], prices or [])
+    if not points:
+        return {
+            "source": "error",
+            "error": "mempool.space returned no fee history",
+            "warnings": ["The fee history service returned no data."],
+        }
+    payload = _fee_history_payload(points, "mempool.space", [])
+    _fee_history_cache["30d"] = (time.time(), payload)
+    return payload
+
+
 def get_demo_recent_blocks(limit: int = 8) -> Dict[str, Any]:
     now = int(time.time())
     blocks = []

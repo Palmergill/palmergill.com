@@ -53,6 +53,12 @@ class MempoolSpaceClient:
     def get_recommended_fees(self) -> Dict[str, Any]:
         return self.get_json("/v1/fees/recommended")
 
+    def get_block_fee_rates(self, period: str = "1m") -> List[Dict[str, Any]]:
+        return self.get_json(f"/v1/mining/blocks/fee-rates/{period}")
+
+    def get_block_fees(self, period: str = "1m") -> List[Dict[str, Any]]:
+        return self.get_json(f"/v1/mining/blocks/fees/{period}")
+
     def get_prices(self) -> Dict[str, Any]:
         return self.get_json("/v1/prices")
 
