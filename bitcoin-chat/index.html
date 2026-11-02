@@ -23,7 +23,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/shared/site-nav.css?v=19">
-    <link rel="stylesheet" href="style.css?v=11">
+    <link rel="stylesheet" href="style.css?v=12">
 </head>
 <body>
 <noscript>
@@ -115,6 +115,12 @@
                     <section class="supply-card" aria-label="Bitcoin supply vs US M2">
                         <div class="section-heading">
                             <h2>Supply: Bitcoin vs dollars</h2>
+                            <div class="range-switch" role="group" aria-label="Supply timeframe" id="supplyRangeSwitch">
+                                <button type="button" data-supply-range="1y" aria-pressed="false">1Y</button>
+                                <button type="button" data-supply-range="5y" aria-pressed="false">5Y</button>
+                                <button type="button" data-supply-range="10y" aria-pressed="false">10Y</button>
+                                <button type="button" data-supply-range="all" aria-pressed="true">All</button>
+                            </div>
                         </div>
                         <div class="supply-legend">
                             <span class="supply-key btc"><i aria-hidden="true"></i>Bitcoin supply <b class="mono" id="supplyBtcLast">—</b></span>
@@ -158,6 +164,6 @@
     <script src="/shared/site-nav.js?v=22"></script>
     <script src="/shared/analytics.js?v=1"></script>
     <script src="/shared/api-base.js?v=1"></script>
-    <script src="app.js?v=12"></script>
+    <script src="app.js?v=13"></script>
 </body>
 </html>

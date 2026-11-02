@@ -608,6 +608,13 @@ button {
     margin-bottom: 16px;
 }
 
+.supply-card .section-heading {
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    row-gap: 8px;
+}
+
 .supply-legend {
     display: flex;
     flex-wrap: wrap;

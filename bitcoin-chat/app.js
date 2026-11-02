@@ -545,54 +545,146 @@ function renderChart(payload) {
 const SUPPLY_BTC_COLOR = '#e07c00';
 const SUPPLY_M2_COLOR = '#5b7152';
 
-function formatBtcMillions(value) {
-    const n = Number(value);
-    if (!Number.isFinite(n)) return '--';
-    return `${(n / 1e6).toFixed(n < 1e7 ? 1 : 2)}M`;
+const SUPPLY_RANGE_STORAGE_KEY = 'bitcoinDashSupplyRange';
+const SUPPLY_RANGE_YEARS = { '1y': 1, '5y': 5, '10y': 10, all: null };
+const supplyRangeSwitch = document.getElementById('supplyRangeSwitch');
+let supplyPayload = null;
+let activeSupplyRange = readStoredSupplyRange();
+
+function readStoredSupplyRange() {
+    try {
+        const stored = localStorage.getItem(SUPPLY_RANGE_STORAGE_KEY);
+        if (stored in SUPPLY_RANGE_YEARS) return stored;
+    } catch { /* ignore */ }
+    return 'all';
 }
 
-function formatUsdTrillions(value) {
+function formatSigned(value, unitPrefix, unitSuffix, digits = 2) {
     const n = Number(value);
     if (!Number.isFinite(n)) return '--';
-    return `$${(n / 1e12).toFixed(1)}T`;
+    const abs = Math.abs(n);
+    let text;
+    if (abs >= 1e12) text = `${+(abs / 1e12).toFixed(digits)}T`;
+    else if (abs >= 1e9) text = `${+(abs / 1e9).toFixed(digits)}B`;
+    else if (abs >= 1e6) text = `${+(abs / 1e6).toFixed(digits)}M`;
+    else if (abs >= 1e3) text = `${+(abs / 1e3).toFixed(digits === 0 ? 0 : 1)}k`;
+    else text = `${Math.round(abs)}`;
+    const sign = n > 0 ? '+' : n < 0 ? '−' : '';
+    return `${sign}${unitPrefix}${text}${unitSuffix}`;
 }
 
-function supplyAxis(position, color, callback, gridColor, extra = {}) {
+const formatBtcAdded = (value, digits) => formatSigned(value, '', ' BTC', digits);
+const formatUsdAdded = (value, digits) => formatSigned(value, '$', '', digits);
+
+// Slice the monthly series to the range and re-base both lines so each
+// starts at zero: the values become "added since the start of the range".
+function supplyWindow(points, range) {
+    const years = SUPPLY_RANGE_YEARS[range];
+    let start = 0;
+    if (years) {
+        const now = new Date();
+        const cutoff = new Date(Date.UTC(now.getUTCFullYear() - years, now.getUTCMonth(), 1));
+        const found = points.findIndex((point) => point.t * 1000 >= cutoff.getTime());
+        start = found === -1 ? 0 : found;
+    }
+    const slice = points.slice(start);
+    const btcBase = slice[0]?.btc ?? 0;
+    const m2Base = slice.find((point) => point.m2_usd !== null)?.m2_usd ?? null;
+    return slice.map((point) => ({
+        t: point.t,
+        btc: point.btc - btcBase,
+        m2: point.m2_usd === null || m2Base === null ? null : point.m2_usd - m2Base,
+    }));
+}
+
+function lastValue(points, key) {
+    for (let i = points.length - 1; i >= 0; i -= 1) {
+        if (points[i][key] !== null) return points[i][key];
+    }
+    return null;
+}
+
+// Pick axis bounds so both zero lines sit at the same height, even when
+// one series dips below its starting value.
+function alignedZeroBounds(btcValues, m2Values) {
+    const extent = (values) => {
+        const finite = values.filter((v) => v !== null && Number.isFinite(v));
+        return { min: Math.min(0, ...finite), max: Math.max(0, ...finite) || 1 };
+    };
+    const btc = extent(btcValues);
+    const m2 = extent(m2Values);
+    const below = Math.max(-btc.min / btc.max, -m2.min / m2.max);
+    return {
+        btc: { min: -below * btc.max, max: btc.max },
+        m2: { min: -below * m2.max, max: m2.max },
+    };
+}
+
+// Bounds from alignedZeroBounds are rarely round numbers, so place ticks
+// ourselves on a round step (1, 2, 2.5 or 5 x 10^n) that includes zero.
+function roundStepTicks(axis) {
+    const target = (axis.max - axis.min) / 4;
+    if (!(target > 0)) return;
+    const magnitude = 10 ** Math.floor(Math.log10(target));
+    const step = [1, 2, 2.5, 5, 10]
+        .map((m) => m * magnitude)
+        .reduce((best, c) => (Math.abs(Math.log(c / target)) < Math.abs(Math.log(best / target)) ? c : best));
+    const ticks = [];
+    for (let k = Math.ceil(axis.min / step); k * step <= axis.max + step * 1e-9; k += 1) {
+        ticks.push({ value: k * step });
+    }
+    axis.ticks = ticks;
+}
+
+function supplyAxis(position, color, callback, gridColor, bounds) {
     return {
         position,
-        beginAtZero: true,
-        ...extra,
+        ...bounds,
+        afterBuildTicks: roundStepTicks,
         grid: gridColor ? { color: gridColor } : { display: false },
         border: { display: false },
         ticks: {
             color,
             font: { family: MONO_STACK, size: 10 },
-            maxTicksLimit: 5,
+            autoSkip: false,
             callback,
-            ...(extra.ticks || {}),
         },
     };
 }
 
-function renderSupplyChart(payload) {
+function renderSupplyChart(payload, range) {
     const canvas = document.getElementById('supplyChart');
     const noteEl = document.getElementById('supplyNote');
     if (!canvas || typeof Chart === 'undefined') return;
 
-    const points = payload.points || [];
-    document.getElementById('supplyBtcLast').textContent = `${formatBtcMillions(payload.btc_last)} BTC`;
-    document.getElementById('supplyM2Last').textContent = formatUsdTrillions(payload.m2_last);
+    const points = supplyWindow(payload.points || [], range);
+    document.getElementById('supplyBtcLast').textContent = formatBtcAdded(lastValue(points, 'btc'));
+    document.getElementById('supplyM2Last').textContent = formatUsdAdded(lastValue(points, 'm2'));
     noteEl.textContent = payload.source === 'demo'
         ? 'sample data — log in for live data'
         : (payload.warnings || [])[0] || '';
 
     if (supplyChartInstance) supplyChartInstance.destroy();
     const narrow = (canvas.parentElement.clientWidth || 600) < 500;
+    const bounds = alignedZeroBounds(points.map((p) => p.btc), points.map((p) => p.m2));
+    const monthly = range === '1y';
+    const label = (t) => new Date(t * 1000).toLocaleDateString('en-US', monthly
+        ? { month: 'short', year: '2-digit', timeZone: 'UTC' }
+        : { year: 'numeric', timeZone: 'UTC' });
+    // Multi-year ranges label each January, thinned to fit the width.
+    const spanYears = points.length / 12;
+    const yearStride = Math.max(1, Math.ceil(spanYears / (narrow ? 4 : 8)));
+    const yearTick = (value, index) => {
+        const date = new Date(points[index].t * 1000);
+        return date.getUTCMonth() === 0 && date.getUTCFullYear() % yearStride === 0
+            ? date.getUTCFullYear()
+            : null;
+    };
 
     supplyChartInstance = new Chart(canvas.getContext('2d'), {
         type: 'line',
         data: {
-            labels: points.map((point) => new Date(point.t * 1000).getUTCFullYear()),
+            labels: points.map((point) => label(point.t)),
             datasets: [
                 {
                     label: 'Bitcoin supply',
@@ -608,7 +700,7 @@ function renderSupplyChart(payload) {
                 },
                 {
                     label: 'US M2',
-                    data: points.map((point) => point.m2_usd),
+                    data: points.map((point) => point.m2),
                     yAxisID: 'm2',
                     borderColor: SUPPLY_M2_COLOR,
                     borderWidth: 2,
@@ -641,8 +733,8 @@ function renderSupplyChart(payload) {
                         title: (items) => new Date(points[items[0].dataIndex].t * 1000)
                             .toLocaleDateString('en-US', { month: 'short', year: 'numeric', timeZone: 'UTC' }),
                         label: (item) => (item.dataset.yAxisID === 'btc'
-                            ? ` ${Math.round(item.parsed.y).toLocaleString('en-US')} BTC`
-                            : ` ${formatUsdTrillions(item.parsed.y)} M2`),
+                            ? ` ${formatBtcAdded(item.parsed.y)}`
+                            : ` ${formatUsdAdded(item.parsed.y)} M2`),
                     },
                 },
             },
@@ -653,18 +745,32 @@ function renderSupplyChart(payload) {
                     ticks: {
                         color: '#a39a87',
                         font: { family: MONO_STACK, size: 10 },
-                        maxTicksLimit: narrow ? 4 : 8,
                         maxRotation: 0,
-                        autoSkip: true,
+                        ...(monthly
+                            ? { maxTicksLimit: narrow ? 4 : 7, autoSkip: true }
+                            : { autoSkip: false, callback: yearTick }),
                     },
                 },
-                btc: supplyAxis('left', SUPPLY_BTC_COLOR, (value) => `${value / 1e6}M`, '#eee8da', {
-                    max: TOTAL_SUPPLY_BTC,
-                    ticks: { stepSize: 7e6 },
-                }),
-                m2: supplyAxis('right', SUPPLY_M2_COLOR, (value) => `$${value / 1e12}T`),
+                btc: supplyAxis('left', SUPPLY_BTC_COLOR, (value) => formatSigned(value, '', '', 1), '#eee8da', bounds.btc),
+                m2: supplyAxis('right', SUPPLY_M2_COLOR, (value) => formatUsdAdded(value, 1), null, bounds.m2),
             },
         },
+    });
+}
+
+function setSupplyRange(range) {
+    activeSupplyRange = range;
+    try { localStorage.setItem(SUPPLY_RANGE_STORAGE_KEY, range); } catch { /* ignore */ }
+    supplyRangeSwitch?.querySelectorAll('button[data-supply-range]').forEach((button) => {
+        button.setAttribute('aria-pressed', String(button.dataset.supplyRange === range));
+    });
+    if (supplyPayload) renderSupplyChart(supplyPayload, range);
+}
+
+function wireSupplyRangeSwitch() {
+    supplyRangeSwitch?.addEventListener('click', (event) => {
+        const button = event.target.closest('button[data-supply-range]');
+        if (button) setSupplyRange(button.dataset.supplyRange);
     });
 }
 
@@ -672,7 +778,8 @@ async function loadSupplyChart() {
     try {
         const payload = await fetchJson(`${API_BASE}/supply/history`);
         if (!payload.points?.length) throw new Error('no points');
-        renderSupplyChart(payload);
+        supplyPayload = payload;
+        setSupplyRange(activeSupplyRange);
     } catch {
         const noteEl = document.getElementById('supplyNote');
         if (noteEl) noteEl.textContent = 'Supply history is taking a break. Try again shortly.';
@@ -1243,6 +1350,7 @@ document.querySelectorAll('.stat-tile[data-prompt]').forEach((button) => {
 
 wireChatToggle();
 wireRangeSwitch();
+wireSupplyRangeSwitch();
 wireExplorer();
 refreshStatus();
 refreshPrice();
