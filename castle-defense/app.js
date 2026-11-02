@@ -190,7 +190,7 @@
         if (period === "all") {
             $("fullBoard").innerHTML = allTimeRows(board);
             if (!board.players) note.textContent = "No scores yet.";
-            else note.innerHTML = `${players} over ${board.days} ${board.days === 1 ? "day" : "days"}. A medal for each day finished 1st, 2nd or 3rd; ties share the place, and today counts as it stands.${board.you ? "" : ` ${join}`}`;
+            else note.innerHTML = `${players} over ${board.days} ${board.days === 1 ? "day" : "days"}${board.you ? "" : ` · ${join}`}`;
             return;
         }
         $("fullBoard").innerHTML = boardRows(board, 50);
@@ -243,7 +243,6 @@
             if (!day || data.rules !== G.RULES) return;
             cuts = [0, ...day];
             $("tiers").innerHTML = TIER_NAMES.map((name, i) => `<li data-tier="${i}"><span>${escapeHtml(name)}</span><span>${i ? `${cuts[i].toLocaleString()}+` : "any"}</span></li>`).reverse().join("");
-            $("tiersNote").textContent = `Set by playing ${data.trials} different layouts of today's pieces. ${Math.round(data.failShares[data.failShares.length - 1] * 100)}% of them fell short of ${TIER_NAMES[4]}.`;
             $("tiersPanel").hidden = false;
             $("tierName").hidden = false;
             lastHud = "";
