@@ -148,17 +148,29 @@
         else note.innerHTML = `<a href="${signInHref()}">Sign in</a> to put your runs on the board.`;
     }
 
-    // The full board for either mode, open any time from the header. Only
-    // today's maps are ranked, so it's always today's, whatever day is loaded.
+    // The full board for either mode, open any time from the header: today's
+    // scores (only today's maps are ranked, so it's always today's, whatever
+    // day is loaded), or all time — who has finished 1st and top 3 most often.
     let boardRequest = 0;
-    async function showLeaderboard(which = mode) {
-        const label = { classic: "Classic", open: "Open field" };
+    function allTimeRows(board) {
+        const row = (e) => `<li class="${e.you ? "is-you" : ""}"><span class="cd-board__rank">${e.rank}</span><span class="cd-board__name">${escapeHtml(e.name)}${e.you ? " (you)" : ""}</span><span class="cd-board__kills">🥇 ${e.wins} <small>· top 3: ${e.top3}</small></span></li>`;
+        let html = board.entries.map(row).join("");
+        if (board.you && !board.entries.some((e) => e.you)) html += `<li class="is-gap">…</li>${row(board.you)}`;
+        return html;
+    }
+
+    async function showLeaderboard(which = mode, period = "today") {
+        const modeLabel = { classic: "Classic", open: "Open field" };
+        const tab = (attr, value, label, on) => `<button class="cd-chip" type="button" data-${attr}="${value}" aria-pressed="${on}">${label}</button>`;
         showOverlay({
-            eyebrow: prettyDate(today),
-            title: "Today's leaderboard",
+            eyebrow: period === "today" ? prettyDate(today) : "Every day so far",
+            title: period === "today" ? "Today's leaderboard" : "All-time leaderboard",
             body: `
+                <div class="cd-board-tabs" role="group" aria-label="When">
+                    ${tab("period", "today", "Today", period === "today")}${tab("period", "all", "All time", period === "all")}
+                </div>
                 <div class="cd-board-tabs" role="group" aria-label="Mode">
-                    ${G.MODES.map((m) => `<button class="cd-chip" type="button" data-board="${m}" aria-pressed="${m === which}">${label[m]}</button>`).join("")}
+                    ${G.MODES.map((m) => tab("board", m, modeLabel[m], m === which)).join("")}
                 </div>
                 <p class="cd-note" id="fullBoardNote">Loading…</p>
                 <ol class="cd-board cd-board--full" id="fullBoard"></ol>`,
@@ -166,24 +178,41 @@
         });
         document.querySelectorAll("[data-board]").forEach((btn) => {
             btn.addEventListener("click", () => {
-                if (btn.dataset.board !== which) showLeaderboard(btn.dataset.board);
+                if (btn.dataset.board !== which) showLeaderboard(btn.dataset.board, period);
+            });
+        });
+        document.querySelectorAll("[data-period]").forEach((btn) => {
+            btn.addEventListener("click", () => {
+                if (btn.dataset.period !== period) showLeaderboard(which, btn.dataset.period);
             });
         });
         const request = ++boardRequest;
         let board;
         try {
-            board = await api(`/leaderboard?day=${today}&mode=${which}`);
+            board = await api(period === "today" ? `/leaderboard?day=${today}&mode=${which}` : `/all-time?mode=${which}`);
         } catch {
             if (request === boardRequest) $("fullBoardNote").textContent = "The leaderboard couldn't be loaded right now.";
             return;
         }
         // A tab clicked while this was loading has the overlay now.
         if (request !== boardRequest || overlay.hidden) return;
-        $("fullBoard").innerHTML = boardRows(board, 50);
         const note = $("fullBoardNote");
+        const players = `${board.players} ${board.players === 1 ? "player" : "players"}`;
+        const session = await Promise.resolve(window.SiteSession).catch(() => null);
+        if (request !== boardRequest || overlay.hidden) return;
+        const join = session && session.authenticated
+            ? "Finish a run to get on the board."
+            : `<a href="${signInHref()}">Sign in</a> to get on the board.`;
+        if (period === "all") {
+            $("fullBoard").innerHTML = allTimeRows(board);
+            if (!board.players) note.textContent = "No scores yet.";
+            else note.innerHTML = `${players} over ${board.days} ${board.days === 1 ? "day" : "days"}. 🥇 is days finished 1st; ties share the place, and today counts as it stands.${board.you ? "" : ` ${join}`}`;
+            return;
+        }
+        $("fullBoard").innerHTML = boardRows(board, 50);
         if (!board.players) note.textContent = "No scores yet today. Be the first.";
-        else if (board.you) note.textContent = `${board.players} ${board.players === 1 ? "player" : "players"} · you're ${placeText(board.you, board.players)}.`;
-        else note.innerHTML = `${board.players} ${board.players === 1 ? "player" : "players"} · <a href="${signInHref()}">Sign in</a> to get on the board.`;
+        else if (board.you) note.textContent = `${players} · you're ${placeText(board.you, board.players)}.`;
+        else note.innerHTML = `${players} · ${join}`;
     }
 
     function signInHref() {

@@ -176,7 +176,25 @@ test("today's leaderboard opens from the header before you've played", async ({ 
     await expect(card.getByRole('button', { name: 'Open field' })).toHaveAttribute('aria-pressed', 'true');
     await expect(page.locator('#fullBoardNote')).toHaveText(/No scores yet today|\d+ players?/);
 
+    // All time counts days finished 1st and in the top 3.
+    await card.getByRole('button', { name: 'All time' }).click();
+    await expect(card.getByRole('heading', { name: 'All-time leaderboard' })).toBeVisible();
+    await expect(card.getByRole('button', { name: 'Open field' })).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.locator('#fullBoardNote')).toHaveText(/No scores yet\.|\d+ players? over \d+ days?/);
+
     await card.getByRole('button', { name: 'Close' }).click();
     await expect(card).toBeHidden();
     await expect(page.locator('#playLabel')).toHaveText('Play');
+});
+
+test('a signed-in run shows up on the all-time board', async ({ page }) => {
+    await signUp(page);
+    await quickRun(page);
+    await expect(page.locator('#placeLine')).toHaveText(/You're \d+(st|nd|rd|th) of \d+ today\./);
+    await page.getByRole('dialog').getByRole('button', { name: 'Try again' }).click();
+    await page.getByRole('button', { name: /Leaderboard/ }).click();
+    await page.getByRole('dialog').getByRole('button', { name: 'All time' }).click();
+    const mine = page.locator('#fullBoard .is-you');
+    await expect(mine).toContainText('(you)');
+    await expect(mine).toContainText(/🥇 \d+ · top 3: \d+/);
 });

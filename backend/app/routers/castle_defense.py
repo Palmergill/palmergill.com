@@ -57,6 +57,15 @@ def get_leaderboard(
     return castle_defense.leaderboard(db, castle_defense.validate_day(day), _username(request), mode)
 
 
+@router.get("/all-time")
+def get_all_time(
+    request: Request,
+    mode: str = Query("classic", pattern=MODE_PATTERN),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    return castle_defense.all_time(db, _username(request), mode)
+
+
 @router.post("/runs")
 def post_run(body: RunRequest, request: Request, db: Session = Depends(get_db)) -> Dict[str, Any]:
     message = "Sign in to put your score on the leaderboard."

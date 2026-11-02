@@ -261,3 +261,49 @@ def test_daily_tiers_are_current_and_run_well_ahead():
         for mode, cut in tiers["days"][day].items():
             # Tiers 2–5, each needing more kills than the one below.
             assert len(cut) == 4 and all(a < b for a, b in zip([0] + cut, cut)), f"{day} {mode}: {cut}"
+
+
+# ── all time ────────────────────────────────────────────────────────────────
+
+
+def _score(model, day, username, kills, rules=None):
+    return model(
+        day=day, username=username, display_name=username.title(), kills=kills, wave=10,
+        layout="[]", runs=1, rules=rules if rules is not None else castle_defense.current_rules("classic"),
+    )
+
+
+def test_all_time_counts_first_places_and_top_threes():
+    rules = castle_defense.current_rules("classic")
+    days = {
+        # Ann wins outright; Bo and Cy share 2nd; Di is 4th.
+        "2026-10-20": {"ann": 300, "bo": 250, "cy": 250, "di": 200},
+        # A tie for 1st is a win for both; Ann is 3rd.
+        "2026-10-21": {"bo": 400, "cy": 400, "ann": 390, "di": 100},
+        # Di's only win.
+        "2026-10-22": {"di": 500, "ann": 10},
+    }
+    db = SessionLocal()
+    try:
+        for day, scores in days.items():
+            for name, kills in scores.items():
+                db.add(_score(CastleDefenseScore, day, name, kills))
+        # A score from older rules on a day played under newer ones doesn't place.
+        db.add(_score(CastleDefenseScore, "2026-10-22", "eve", 99999, rules=rules - 1))
+        db.commit()
+    finally:
+        db.close()
+
+    board = TestClient(app).get("/api/castle-defense/all-time").json()
+    rows = {e["name"]: (e["rank"], e["wins"], e["top3"], e["days"]) for e in board["entries"]}
+    # Everyone has one win, so top 3s decide it; Bo and Cy share 2nd.
+    assert rows == {
+        "Ann": (1, 1, 3, 3),
+        "Bo": (2, 1, 2, 2),
+        "Cy": (2, 1, 2, 2),
+        "Di": (4, 1, 1, 3),
+    }
+    assert [e["name"] for e in board["entries"]][::3] == ["Ann", "Di"]
+    assert board["days"] == 3 and board["players"] == 4
+    # The open field keeps its own count.
+    assert TestClient(app).get("/api/castle-defense/all-time?mode=open").json()["players"] == 0

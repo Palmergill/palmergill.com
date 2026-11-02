@@ -133,6 +133,49 @@ def leaderboard(db: Session, day: str, username: Optional[str] = None, mode: str
     return {"day": day, "players": player_count(db, day, mode), "entries": entries, "you": you}
 
 
+def all_time(db: Session, username: Optional[str] = None, mode: str = "classic") -> Dict[str, Any]:
+    """Every player's days at the top: how often they finished 1st and how
+    often in the top 3, ranking each day the way its own board does (tied
+    scores share a place). A day is judged under the rules it was played
+    under — the newest rules among its rows — and today's standings count
+    as they stand."""
+    model = MODELS[mode]
+    rows = db.query(model.day, model.username, model.display_name, model.kills, model.rules).all()
+    by_day: Dict[str, list] = {}
+    for row in rows:
+        by_day.setdefault(row.day, []).append(row)
+
+    players: Dict[str, Dict[str, Any]] = {}
+    # Oldest day first, so a player's newest display name is the one shown.
+    for day in sorted(by_day):
+        day_rows = by_day[day]
+        rules = max(r.rules for r in day_rows)
+        ranked = sorted((r for r in day_rows if r.rules == rules), key=lambda r: -r.kills)
+        for index, row in enumerate(ranked):
+            # Competition ranking: one more than the number of better scores.
+            rank = 1 + sum(1 for other in ranked[:index] if other.kills > row.kills)
+            p = players.setdefault(row.username, {"name": row.display_name, "wins": 0, "top3": 0, "days": 0, "username": row.username})
+            p["name"] = row.display_name
+            p["days"] += 1
+            p["wins"] += rank == 1
+            p["top3"] += rank <= 3
+
+    order = sorted(players.values(), key=lambda p: (-p["wins"], -p["top3"], -p["days"], p["name"].lower()))
+    entries = []
+    for index, p in enumerate(order):
+        tied = entries and (p["wins"], p["top3"]) == (order[index - 1]["wins"], order[index - 1]["top3"])
+        entries.append({
+            "rank": entries[-1]["rank"] if tied else index + 1,
+            "name": p["name"],
+            "wins": p["wins"],
+            "top3": p["top3"],
+            "days": p["days"],
+            "you": username is not None and p["username"] == username,
+        })
+    you = next((e for e in entries if e["you"]), None)
+    return {"mode": mode, "players": len(entries), "days": len(by_day), "entries": entries[:BOARD_SIZE], "you": you}
+
+
 def submit(
     db: Session, day: str, layout: List[Dict[str, Any]], username: str, display_name: str, mode: str = "classic"
 ) -> Dict[str, Any]:
