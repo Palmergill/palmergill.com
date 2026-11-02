@@ -24,7 +24,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,500;0,700;0,900;1,500;1,700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/shared/casino-theme.css?v=3">
     <link rel="stylesheet" href="/shared/rules-viewer.css?v=1">
-    <link rel="stylesheet" href="style.css?v=25">
+    <link rel="stylesheet" href="style.css?v=26">
     <link rel="icon" type="image/png" href="/assets/palmer-gill-logo-small.png">
     <link rel="manifest" href="manifest.json">
     <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'%3E%3Crect fill='%230a0a0f' width='192' height='192' rx='24'/%3E%3Ctext x='96' y='130' font-size='100' text-anchor='middle'%3E🃏%3C/text%3E%3C/svg%3E">
@@ -60,19 +60,19 @@
                 </nav>
                 <div class="start-form">
                     <label class="sr-only" for="player-name">Player name</label>
-                    <input type="text" id="player-name" placeholder="Your name" maxlength="12" value="Palmer" data-tip="Shown at the table" data-tip-pos="below">
-                    <button id="start-btn" class="btn-primary" data-tip="Six-handed cash game against five bots" data-tip-pos="below">Play</button>
+                    <input type="text" id="player-name" placeholder="Your name" maxlength="12" value="Palmer">
+                    <button id="start-btn" class="btn-primary">Play</button>
                     <details class="secondary-modes">
                         <summary>More modes</summary>
-                        <button id="start-tournament-btn" class="btn-secondary" data-tip="Blinds rise every few hands until one player has every chip" data-tip-pos="below">Sit &amp; Go</button>
-                        <button id="create-multiplayer-btn" class="btn-secondary" data-tip="Open a table and share the game ID" data-tip-pos="below">Host table</button>
-                        <button id="join-multiplayer-btn" class="btn-secondary" data-tip="Enter a friend's game ID" data-tip-pos="below">Join table</button>
+                        <button id="start-tournament-btn" class="btn-secondary">Sit &amp; Go</button>
+                        <button id="create-multiplayer-btn" class="btn-secondary">Host table</button>
+                        <button id="join-multiplayer-btn" class="btn-secondary">Join table</button>
                     </details>
                 </div>
                 <div class="game-info">
-                    <span data-tip="You plus five AI opponents">6 seats</span>
-                    <span data-tip="Chips each player starts with">1,000 chips</span>
-                    <span data-tip="Small blind / big blind">10 / 20</span>
+                    <span>6 seats</span>
+                    <span>1,000 chips</span>
+                    <span>10 / 20</span>
                 </div>
                 <button id="stats-btn" class="btn-ghost stats-entry">Statistics</button>
             </div>
@@ -85,7 +85,7 @@
                 <h1>Join Table</h1>
                 <div class="start-form">
                     <label class="sr-only" for="join-game-id">Game ID</label>
-                    <input type="text" id="join-game-id" placeholder="Game ID" maxlength="8" data-tip="Eight characters, from the table host" data-tip-pos="below">
+                    <input type="text" id="join-game-id" placeholder="Game ID" maxlength="8">
                     <button id="join-btn" class="btn-primary">Join</button>
                     <button id="back-to-start" class="btn-ghost">Back</button>
                 </div>
@@ -98,7 +98,7 @@
                 <div class="logo" aria-hidden="true"><span class="suit-black">♠</span><span class="suit-red">♥</span><span class="suit-black">♣</span><span class="suit-red">♦</span></div>
                 <h1>Lobby</h1>
                 <div class="start-form">
-                    <p id="lobby-game-id" class="lobby-code" data-tip="Share this ID so friends can join" data-tip-pos="below"></p>
+                    <p id="lobby-game-id" class="lobby-code"></p>
                     <div id="lobby-players" class="lobby-players">
                         <!-- Players list populated by JS -->
                     </div>
@@ -119,26 +119,26 @@
         <div id="game-screen" class="screen" data-rules-game-panel>
             <div class="table-stage">
                 <div class="table-hud">
-                    <span class="hud-item" data-tip="Hands dealt at this table" data-tip-pos="below">#<span id="hand-number">1</span></span>
-                    <span class="hud-item hud-phase" id="phase" aria-live="polite" data-tip="Current betting round" data-tip-pos="below">Preflop</span>
-                    <span class="hud-item" id="hud-blinds" data-tip="Blinds — small / big" data-tip-pos="below">10 / 20</span>
-                    <span class="hud-item hud-tournament" id="tournament-banner" hidden data-tip="Tournament — current level, hands until the blinds rise, players still in" data-tip-pos="below">
+                    <span class="hud-item">#<span id="hand-number">1</span></span>
+                    <span class="hud-item hud-phase" id="phase" aria-live="polite">Preflop</span>
+                    <span class="hud-item" id="hud-blinds">10 / 20</span>
+                    <span class="hud-item hud-tournament" id="tournament-banner" hidden>
                         <span>Lv <strong id="tb-level">1</strong></span>
                         <span class="sr-only">Blinds <strong id="tb-blinds">10 / 20</strong></span>
                         <span>↑<strong id="tb-next">6</strong></span>
                         <span><strong id="tb-alive">6</strong> left</span>
                     </span>
                 </div>
-                <button class="hud-rules" type="button" data-rules-open data-tip="Hand rankings and rules" data-tip-pos="left" aria-label="Rules">?</button>
+                <button class="hud-rules" type="button" data-rules-open aria-label="Rules">?</button>
 
                 <div class="table">
                     <div class="table-felt">
                         <div class="table-center">
-                            <div class="pot" data-tip="Pot — chips already committed this hand">
+                            <div class="pot">
                                 <span class="pot-label">Pot</span>
                                 <span class="pot-value" id="pot-amount">0</span>
                             </div>
-                            <div class="community-cards" id="community-cards" data-tip="Community cards — shared by every player" data-tip-pos="below">
+                            <div class="community-cards" id="community-cards">
                                 <div class="card-slot" id="flop-1"></div>
                                 <div class="card-slot" id="flop-2"></div>
                                 <div class="card-slot" id="flop-3"></div>
@@ -156,16 +156,16 @@
             <!-- Your dock -->
             <div class="your-section">
                 <div class="dock-hand">
-                    <div class="your-cards" id="your-cards" data-tip="Your hole cards — only you see them"></div>
+                    <div class="your-cards" id="your-cards"></div>
                     <div class="dock-id">
                         <span class="your-name"><span id="your-name">Palmer</span><span class="your-position-chip" id="your-position-chip"></span></span>
-                        <span class="your-chips" id="your-chips" data-tip="Your stack">1000</span>
-                        <span class="hand-strength" id="hand-strength" aria-live="polite" aria-atomic="true" data-tip="Best five-card hand you can make right now" data-tip-pos="below"></span>
+                        <span class="your-chips" id="your-chips">1000</span>
+                        <span class="hand-strength" id="hand-strength" aria-live="polite" aria-atomic="true"></span>
                     </div>
                 </div>
 
                 <div class="dock-controls">
-                    <div class="decision-timer hidden" id="decision-timer" data-tip="Time left to act — you fold automatically at zero">
+                    <div class="decision-timer hidden" id="decision-timer">
                         <div class="timer-bar">
                             <div class="timer-fill" id="timer-fill" style="width: 100%"></div>
                         </div>
@@ -174,29 +174,29 @@
 
                     <!-- Action Buttons -->
                     <div class="actions" id="action-buttons">
-                        <button class="btn-action btn-fold" id="btn-fold" data-tip="Give up the hand (F)">Fold</button>
-                        <button class="btn-action btn-call" id="btn-call" data-tip="Match the current bet (C)">Call</button>
-                        <button class="btn-action btn-raise" id="btn-raise" data-tip="Bet more and put the table to a decision (R)">Raise</button>
+                        <button class="btn-action btn-fold" id="btn-fold">Fold</button>
+                        <button class="btn-action btn-call" id="btn-call">Call</button>
+                        <button class="btn-action btn-raise" id="btn-raise">Raise</button>
                     </div>
 
                     <!-- Raise Controls -->
                     <div class="raise-container hidden" id="raise-container">
                         <div class="raise-sizing">
-                            <button id="btn-min" data-tip="Smallest legal raise">Min</button>
-                            <button id="btn-pot" data-tip="Raise the size of the pot">Pot</button>
-                            <button id="btn-allin" data-tip="Push your whole stack">Max</button>
+                            <button id="btn-min">Min</button>
+                            <button id="btn-pot">Pot</button>
+                            <button id="btn-allin">Max</button>
                         </div>
                         <div class="raise-slide">
                             <input type="range" class="raise-slider" id="raise-slider" min="0" max="1000" value="0" aria-label="Raise amount">
                             <div class="slider-labels">
                                 <span class="slider-label" id="slider-min">Min: 0</span>
-                                <span class="raise-amount-display" id="raise-display" data-tip="Total chips you put in">0</span>
+                                <span class="raise-amount-display" id="raise-display">0</span>
                                 <span class="slider-label" id="slider-max">Max: 1000</span>
                             </div>
                         </div>
                         <div class="raise-actions">
-                            <button class="btn-ghost" id="btn-cancel" data-tip="Back to Fold / Call (Esc)">Cancel</button>
-                            <button class="btn-action btn-raise" id="btn-confirm-raise" data-tip="Confirm the raise (R)">Raise</button>
+                            <button class="btn-ghost" id="btn-cancel">Cancel</button>
+                            <button class="btn-action btn-raise" id="btn-confirm-raise">Raise</button>
                         </div>
                     </div>
                 </div>
@@ -241,7 +241,7 @@
                 </div>
                 <div class="stats-actions">
                     <button id="btn-close-stats" class="btn-primary">Close</button>
-                    <button id="btn-reset-stats" class="btn-ghost btn-danger" data-tip="Clears every stored hand">Reset</button>
+                    <button id="btn-reset-stats" class="btn-ghost btn-danger">Reset</button>
                 </div>
             </div>
         </div>
@@ -264,6 +264,6 @@
     <script src="/shared/analytics.js?v=1"></script>
     <script src="/shared/api-base.js?v=1"></script>
     <script src="/shared/rules-viewer.js?v=1"></script>
-    <script src="app.js?v=20"></script>
+    <script src="app.js?v=21"></script>
 </body>
 </html>

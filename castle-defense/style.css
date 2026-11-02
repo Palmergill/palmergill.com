@@ -57,12 +57,6 @@ button { font: inherit; color: inherit; }
 .cd-board-tabs { display: flex; gap: 6px; margin-bottom: 12px; }
 .cd-board--full { max-height: min(52vh, 460px); overflow-y: auto; margin: 0; }
 .cd-medals { white-space: nowrap; font-variant-numeric: tabular-nums; }
-.cd-lede {
-    margin: 0;
-    max-width: 58ch;
-    color: var(--soft);
-    font-size: 0.96rem;
-}
 
 /* ---- HUD ---- */
 .cd-hud {
@@ -290,6 +284,7 @@ button { font: inherit; color: inherit; }
 .cd-tower canvas { grid-row: span 2; width: 40px; height: 40px; }
 .cd-tower__name { font-size: 0.92rem; font-weight: 700; line-height: 1.25; }
 .cd-tower__blurb { grid-column: 2; color: var(--soft); font-size: 0.78rem; line-height: 1.35; }
+
 .cd-tower__state {
     grid-row: 1 / span 2;
     grid-column: 3;
@@ -314,8 +309,6 @@ button { font: inherit; color: inherit; }
 .cd-note { margin: 10px 0 0; color: var(--soft); font-size: 0.8rem; min-height: 1.2em; }
 .cd-horde { margin: 0; color: var(--soft); font-size: 0.86rem; }
 .cd-horde b { color: var(--ink); }
-.cd-rules ul { margin: 0; padding-left: 18px; color: var(--soft); font-size: 0.8rem; }
-.cd-rules li + li { margin-top: 4px; }
 
 /* ---- overlay ---- */
 .cd-overlay {
@@ -426,7 +419,6 @@ button { font: inherit; color: inherit; }
     font-size: 0.82rem;
     font-weight: 800;
 }
-.cd-group span { color: var(--muted); font-size: 0.74rem; font-weight: 600; }
 #shopTowers { margin-bottom: 12px; }
 .cd-tower.is-poor { opacity: 0.5; }
 .cd-tower__cost { color: var(--gold); }

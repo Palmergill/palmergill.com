@@ -595,12 +595,12 @@ let isRequestPending = false; // Lock to prevent race conditions
 const AI_POLL_INTERVAL_MS = 1800;
 // Betting rounds: the label on the table, the explanation on hover.
 const PHASES = {
-    waiting: { label: 'Waiting', tip: 'Waiting for the hand to start' },
-    preflop: { label: 'Preflop', tip: 'Two hole cards each, no community cards yet' },
-    flop: { label: 'Flop', tip: 'First three community cards are out' },
-    turn: { label: 'Turn', tip: 'Fourth community card is out' },
-    river: { label: 'River', tip: 'Fifth and last community card is out' },
-    showdown: { label: 'Showdown', tip: 'Cards face up — best five-card hand takes the pot' }
+    waiting: { label: 'Waiting' },
+    preflop: { label: 'Preflop' },
+    flop: { label: 'Flop' },
+    turn: { label: 'Turn' },
+    river: { label: 'River' },
+    showdown: { label: 'Showdown' }
 };
 
 const CLOCKWISE_OPPONENT_SEATS = {
@@ -1449,9 +1449,8 @@ function updateGameDisplay() {
 
     // Update the table HUD
     elements.handNumber.textContent = gameState.hand_number;
-    const phase = PHASES[gameState.phase] || { label: gameState.phase, tip: '' };
+    const phase = PHASES[gameState.phase] || { label: gameState.phase };
     elements.phase.textContent = phase.label;
-    elements.phase.dataset.tip = phase.tip;
     elements.potAmount.textContent = formatChips(gameState.pot);
     if (elements.hudBlinds && gameState.small_blind) {
         elements.hudBlinds.textContent = `${formatChips(gameState.small_blind)} / ${formatChips(gameState.big_blind)}`;
@@ -1568,13 +1567,13 @@ function getClockwiseOpponents(players, heroId) {
 // blind, so dealer takes priority over the blind chips.
 function renderPositionChip(player) {
     if (player.is_dealer) {
-        return `<span class="position-chip dealer" data-tip="Dealer button — acts last after the flop" aria-label="Dealer">D</span>`;
+        return `<span class="position-chip dealer" aria-label="Dealer">D</span>`;
     }
     if (player.is_small_blind) {
-        return `<span class="position-chip small-blind" data-tip="Small blind — posts ${gameState?.small_blind ?? ''} before the deal" aria-label="Small blind">SB</span>`;
+        return `<span class="position-chip small-blind" aria-label="Small blind">SB</span>`;
     }
     if (player.is_big_blind) {
-        return `<span class="position-chip big-blind" data-tip="Big blind — posts ${gameState?.big_blind ?? ''} before the deal" aria-label="Big blind">BB</span>`;
+        return `<span class="position-chip big-blind" aria-label="Big blind">BB</span>`;
     }
     return '';
 }
@@ -1606,8 +1605,8 @@ function renderOpponent(player, seatClass = 'seat-1') {
             <div class="seat-plate">
                 ${renderPositionChip(player)}
                 <span class="seat-name"><span class="seat-nick">${escapeHtml(player.name)}</span></span>
-                <span class="seat-stack" data-tip="Chips behind">${formatChips(player.chips)}</span>
-                ${player.bet > 0 ? `<span class="seat-bet" data-tip="Bet this round">${formatChips(player.bet)}</span>` : ''}
+                <span class="seat-stack">${formatChips(player.chips)}</span>
+                ${player.bet > 0 ? `<span class="seat-bet">${formatChips(player.bet)}</span>` : ''}
                 ${actionLabel ? `<span class="seat-action">${escapeHtml(actionLabel)}</span>` : ''}
             </div>
         </div>
@@ -1898,17 +1897,11 @@ function updateActionButtons() {
     if (toCall === 0) {
         elements.btnCall.textContent = 'Check';
         elements.btnCall.setAttribute('aria-label', 'Check (C)');
-        elements.btnCall.dataset.tip = 'Stay in the hand without betting (C)';
     } else {
         const callAmount = Math.min(toCall, myPlayer.chips);
         const label = myPlayer.chips <= toCall ? 'All in' : `Call ${formatChips(callAmount)}`;
         elements.btnCall.textContent = label;
         elements.btnCall.setAttribute('aria-label', `${label} (C)`);
-        // Pot odds are the one number that makes a call obviously right or
-        // obviously wrong, so it goes in the tooltip rather than on screen.
-        const potAfterCall = (gameState.pot || 0) + callAmount;
-        const breakEven = Math.round((callAmount / (potAfterCall + callAmount)) * 100);
-        elements.btnCall.dataset.tip = `Pay ${formatChips(callAmount)} to play for ${formatChips(potAfterCall)} — break even at ${breakEven}% (C)`;
     }
     elements.btnFold.setAttribute('aria-label', 'Fold (F)');
     elements.btnRaise.setAttribute('aria-label', 'Raise (R)');
@@ -1918,9 +1911,8 @@ function updateActionButtons() {
     const minRaise = gameState.min_raise || 20;
     const canRaise = myPlayer.chips > toCall + minRaise;
     elements.btnRaise.disabled = !canRaise;
-    elements.btnRaise.dataset.tip = canRaise
-        ? 'Bet more and put the table to a decision (R)'
-        : `Not enough chips to raise — a legal raise needs ${formatChips(toCall + minRaise)}`;
+    if (canRaise) delete elements.btnRaise.dataset.tip;
+    else elements.btnRaise.dataset.tip = `Not enough chips to raise — a legal raise needs ${formatChips(toCall + minRaise)}`;
 }
 
 function showHandResult() {
@@ -2049,27 +2041,27 @@ function showStats() {
 
     elements.statsContent.innerHTML = `
         <div class="stat-row">
-            <span class="stat-label" data-tip="Hands you have been dealt in" data-tip-pos="right">Hands</span>
+            <span class="stat-label">Hands</span>
             <span class="stat-value">${formatChips(stats.handsPlayed)}</span>
         </div>
         <div class="stat-row">
-            <span class="stat-label" data-tip="Hands where you took at least part of the pot" data-tip-pos="right">Won</span>
+            <span class="stat-label">Won</span>
             <span class="stat-value">${formatChips(stats.handsWon)}</span>
         </div>
         <div class="stat-row">
-            <span class="stat-label" data-tip="Share of hands you won" data-tip-pos="right">Win rate</span>
+            <span class="stat-label">Win rate</span>
             <span class="stat-value">${stats.winRate}%</span>
         </div>
         <div class="stat-row">
-            <span class="stat-label" data-tip="Largest single pot you have taken down" data-tip-pos="right">Biggest pot</span>
+            <span class="stat-label">Biggest pot</span>
             <span class="stat-value">${formatChips(stats.biggestPotWon)}</span>
         </div>
         <div class="stat-row">
-            <span class="stat-label" data-tip="Chips won minus chips lost, all time" data-tip-pos="right">Net</span>
+            <span class="stat-label">Net</span>
             <span class="stat-value ${netProfitClass}">${stats.netProfit >= 0 ? '+' : ''}${formatChips(stats.netProfit)}</span>
         </div>
         <div class="stat-row">
-            <span class="stat-label" data-tip="Strongest holding you have made at showdown" data-tip-pos="right">Best hand</span>
+            <span class="stat-label">Best hand</span>
             <span class="stat-value">${escapeHtml(stats.bestHand)}</span>
         </div>
         ${historyHtml}

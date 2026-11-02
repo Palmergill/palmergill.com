@@ -720,18 +720,6 @@ main {
     font-weight: 600;
 }
 
-.table-note {
-    margin: 12px 2px 0;
-    color: var(--ops-muted);
-    font-size: 0.76rem;
-    line-height: 1.6;
-}
-
-.table-note code {
-    font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
-    font-size: 0.72rem;
-}
-
 .empty {
     padding: 28px !important;
     color: var(--ops-muted);

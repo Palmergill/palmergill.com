@@ -291,7 +291,7 @@
 
         if (!past.length) {
             els.historyList.appendChild(
-                el("li", "empty-note", "This is the first season the league has kept.")
+                el("li", "empty-note", "No earlier seasons.")
             );
             return;
         }
@@ -311,9 +311,6 @@
         // a collector failure, so it says so rather than vanishing.
         if (!entry.available) {
             body.appendChild(el("p", "history__title history__title--quiet", "Private season"));
-            body.appendChild(
-                el("p", "history__detail", "This year is not public in ESPN's league settings.")
-            );
             item.classList.add("history__row--quiet");
             item.appendChild(body);
             return item;
@@ -390,8 +387,7 @@
         els.freshnessValue.textContent = F.formatAsOf(overview.freshness.league_sync);
 
         if (overview.mode === "preseason") {
-            els.modeBanner.textContent =
-                "The season hasn't kicked off yet — rosters are drafted, but no games have been played. Every column in the table fills in from week 1.";
+            els.modeBanner.textContent = "Preseason";
             els.modeBanner.hidden = false;
         } else {
             els.modeBanner.hidden = true;
@@ -579,23 +575,8 @@
     // and a screen reader too. Used by the table's column headers and by the
     // power board's two stats, which is where the method went when the lede
     // and the footnote came off that board.
-    function hintLabel(tag, id, label, hint) {
-        if (!hint) return document.createTextNode(label);
-
-        const wrap = el(tag, "col-hint");
-        wrap.tabIndex = 0;
-        wrap.appendChild(el("span", "col-hint__label", label));
-
-        const bubble = el("span", "col-hint__bubble", hint);
-        bubble.id = id;
-        bubble.setAttribute("role", "tooltip");
-        wrap.setAttribute("aria-describedby", bubble.id);
-        wrap.appendChild(bubble);
-        return wrap;
-    }
-
     function headerLabel(key, label) {
-        return hintLabel("span", `ledger-hint-${key}`, label, F.ledgerHint(key));
+        return document.createTextNode(label);
     }
 
     function ledgerHeadRow() {
@@ -726,29 +707,10 @@
             : `${teams.length} teams`;
 
         const rating = payload.manager_rating || {};
-        const excluded = rating.excluded_slots || [];
-        const exclusionNote = excluded.length
-            ? ` ${excluded.join("/")} is excluded because its aggregate actuals are not in the weekly player feed.`
-            : "";
         els.ledgerFootnote.textContent = rating.available
-            ? `Lineup is the share of each week's best legal lineup a manager actually started, ` +
-              `over ${rating.weeks.length} scored week${rating.weeks.length === 1 ? "" : "s"}. ` +
-              `League average ${(rating.league_average * 100).toFixed(1)}%.` + exclusionNote
-            : LINEUP_UNAVAILABLE[rating.reason] || "";
+            ? `Lineup league average ${(rating.league_average * 100).toFixed(1)}%`
+            : "";
     }
-
-    // Why a column is blank, in the reader's terms. A metric that silently
-    // shows nothing is indistinguishable from one that is broken.
-    const LINEUP_UNAVAILABLE = {
-        no_lineup_settings:
-            "Lineup efficiency needs this league's roster settings, which have not been collected yet.",
-        no_roster_snapshots:
-            "Lineup efficiency needs stored weekly rosters. None have been collected for this season.",
-        no_actuals:
-            "Lineup efficiency needs each player's actual points, which have not been collected for this season.",
-        no_scorable_weeks:
-            "No week has a full set of starter results yet, so lineup efficiency cannot be scored.",
-    };
 
     // ── the season charts ───────────────────────────────────────────────
 
@@ -766,10 +728,9 @@
         return row;
     }
 
-    function chartPanel(title, lede, rows, axis) {
+    function chartPanel(title, rows, axis) {
         const panel = el("section", "chart");
         panel.appendChild(el("h3", "chart__title", title));
-        panel.appendChild(el("p", "chart__lede", lede));
         rows.forEach((row) => panel.appendChild(row));
         if (axis) {
             const scale = el("div", "chart__axis");
@@ -794,7 +755,6 @@
         els.charts.appendChild(
             chartPanel(
                 "Luck index",
-                "Wins minus expected wins. Left of the line is below, right is above.",
                 F.sortLedger(scored, "luck").map((team) =>
                     chartRow(
                         team,
@@ -814,7 +774,6 @@
             els.charts.appendChild(
                 chartPanel(
                     "Manager rating",
-                    "Points started as a share of the best legal lineup that week.",
                     F.sortLedger(rated, "lineup").map((team) =>
                         chartRow(
                             team,
@@ -834,7 +793,6 @@
         els.charts.appendChild(
             chartPanel(
                 "Weekly range",
-                "Lowest to highest week, with the median. Long bars are boom-or-bust.",
                 F.sortLedger(scored, "scoring").map((team) =>
                     chartRow(
                         team,
@@ -1064,17 +1022,17 @@
         els.movesLede.textContent = "";
         if (!payload || !payload.available) {
             els.teamMoves.appendChild(
-                el("p", "empty-note", "Moves need this season's rosters and projections.")
+                el("p", "empty-note", "Unavailable.")
             );
             return;
         }
         const need = payload.need;
         if (!need) {
-            els.movesLede.textContent = "No starting seat is below the league average. Ideas, not orders.";
+            els.movesLede.textContent = "No seat below league average";
         } else if (need.empty) {
-            els.movesLede.textContent = `Weakest seat: ${need.seat}, which the roster has nobody for, against a league average of ${F.formatPoints(need.league_average)} a game. Ideas, not orders.`;
+            els.movesLede.textContent = `Weakest seat: ${need.seat} · empty · league avg ${F.formatPoints(need.league_average)}`;
         } else {
-            els.movesLede.textContent = `Weakest seat: ${need.seat}, ${need.name || "its starter"} at ${F.formatPoints(need.ppg)} a game against a league average of ${F.formatPoints(need.league_average)}. Ideas, not orders.`;
+            els.movesLede.textContent = `Weakest seat: ${need.seat} · ${need.name || "starter"} ${F.formatPoints(need.ppg)} · league avg ${F.formatPoints(need.league_average)}`;
         }
 
         const pickups = payload.pickups || [];
@@ -1083,7 +1041,7 @@
         if (trades.length) els.teamMoves.appendChild(movesGroup("Trade ideas", trades.map(tradeRow)));
         if (!pickups.length && !trades.length) {
             els.teamMoves.appendChild(
-                el("p", "empty-note", "No pickup or trade clearly upgrades this roster on paper.")
+                el("p", "empty-note", "No upgrades.")
             );
         }
     }
@@ -1216,9 +1174,7 @@
                 production[playerId] = room.players[playerId];
             });
         });
-        els.roomsLede.textContent = rooms && rooms.available
-            ? "Season points per game, for the players on this roster now, against the league average at each position."
-            : "";
+        els.roomsLede.textContent = "";
 
         F.groupByPosition(payload.entries).forEach((group) => {
             els.teamRoster.appendChild(
@@ -1255,7 +1211,7 @@
         els.lineupCard.hidden = false;
 
         const week = payload.week === 0 ? "season-long" : `week ${payload.week}`;
-        els.lineupMeta.textContent = `Best legal lineup for ${week}, on ${LEAGUE_SCORING_LABEL} projections`;
+        els.lineupMeta.textContent = `${week[0].toUpperCase()}${week.slice(1)} · ${LEAGUE_SCORING_LABEL}`;
 
         els.lineupTotals.replaceChildren();
         els.lineupTotals.appendChild(lineupTotal("Started", F.formatPoints(payload.current.total)));
@@ -1289,8 +1245,7 @@
         if (payload.unprojected_starters) {
             const count = payload.unprojected_starters;
             notes.push(
-                `${count} starter${count === 1 ? " has" : "s have"} no projection this week, ` +
-                    "so the overall gain cannot be calculated"
+                `${count} starter${count === 1 ? "" : "s"} unprojected`
             );
         }
         if (payload.unfilled_slots) {
@@ -1334,7 +1289,7 @@
                 el(
                     "p",
                     "empty-note",
-                    "The team overview is written every Tuesday morning."
+                    "No overview yet."
                 )
             );
             els.teamOverviewMeta.textContent = "";
@@ -1343,7 +1298,7 @@
 
         renderMarkdown(els.teamLede, payload.overview_md || "No overview available.");
         const legacy = /Power rank:|starter leaders \(PPR\)/i.test(payload.overview_md || "");
-        const parts = [legacy ? "Archived overview — power rank means results rank; projections below use PPR. Current advice above uses Half PPR." : "Team overview · Half PPR"];
+        const parts = [legacy ? "Archived overview · PPR" : "Team overview · Half PPR"];
         const written = F.formatAsOf(payload.generated_at);
         if (written) parts.push(written.replace(/^as of/, "written"));
         els.teamOverviewMeta.textContent = parts.join(" · ");
@@ -1428,9 +1383,7 @@
             renderMyTeamPicker(me);
             if (me.status !== "configured" || !me.snapshot || !me.selected_team_id) {
                 state.myTeamId = null;
-                unresolvedMyTeam(
-                    "Pick your team below and My Team will open straight to it."
-                );
+                unresolvedMyTeam();
                 return;
             }
             // The ledger highlights your row, so it needs to know which one
@@ -1508,7 +1461,7 @@
         state.pendingMyTeam = false;
         state.teamId = null;
         writeUrlState(true);
-        showNotice(message);
+        if (message) showNotice(message);
     }
 
     function showNotice(message) {
@@ -1625,13 +1578,6 @@
     // page's job is to make "why" legible — the weakest seat, and the good
     // players a roster cannot use.
 
-    const UNAVAILABLE_POWER = {
-        projection_season_mismatch:
-            "Power rankings use this season's projections, so they only cover the current season.",
-        missing_lineup_settings: "This season has no stored lineup settings to build lineups from.",
-        missing_roster_snapshot: "No roster snapshot has been collected for this season yet.",
-        missing_projections: "No player projections have been collected yet.",
-    };
 
     function rosterPowerTeam(teamId) {
         const payload = state.rosterPower;
@@ -1734,7 +1680,7 @@
     // what he has actually scored per game, weighted by games played.
     function playerSource(player) {
         const status = player.injury_status ? ` (${player.injury_status})` : "";
-        if (player.absence === "long") return `injured reserve or suspended${status} · counts 0`;
+        if (player.absence === "long") return `IR${status}`;
         const parts = [];
         if (player.projection !== null && player.projection !== undefined) {
             const when = player.projection_week === 0 ? "preseason" : `wk ${player.projection_week}`;
@@ -1743,7 +1689,7 @@
         if (player.actual_ppg !== null && player.actual_ppg !== undefined && player.games) {
             parts.push(`actual ${F.formatPoints(player.actual_ppg)}/g over ${player.games} g`);
         }
-        if (player.out) parts.push(`out${status} · counted at half`);
+        if (player.out) parts.push(`out${status}`);
         return parts.join(" · ");
     }
 
@@ -1752,7 +1698,7 @@
         if (!player) {
             row.classList.add("power-bd__player--empty");
             row.appendChild(el("span", "power-bd__slot", SLOT_LABELS[slot] || slot));
-            row.appendChild(el("span", "power-bd__who", "Empty — nobody on the roster can play here"));
+            row.appendChild(el("span", "power-bd__who", "Empty"));
             row.appendChild(el("span", "power-bd__pts", F.formatPoints(0)));
             return row;
         }
@@ -1770,13 +1716,6 @@
 
     function powerBreakdown(team, payload) {
         const box = el("div", "power-bd");
-        const absence = Math.round((payload.absence_rate || 0) * 100);
-
-        box.appendChild(el("p", "power-bd__lede",
-            "Only players on this roster count. Each blends his latest weekly projection (Sleeper and ESPN) " +
-            "with what he has actually scored per game, the actual counting for more as games pile up. " +
-            "Injured reserve counts 0, out this week counts half. Pts / wk is the best legal lineup, " +
-            "less what it loses to missed games."));
 
         box.appendChild(el("h4", "power-bd__title", "Starting lineup"));
         const starters = el("ol", "power-bd__list");
@@ -1795,8 +1734,7 @@
             math.appendChild(wrap);
         };
         line("Lineup total", F.formatPoints(team.lineup_points));
-        line("Missed games", `−${F.formatPoints(team.absence_cost)}`, "power-bd__line--minus",
-            `Starters sit about ${absence}% of weeks for byes and injuries; this is what the next man on the roster gives back.`);
+        line("Missed games", `−${F.formatPoints(team.absence_cost)}`, "power-bd__line--minus");
         line("Pts / wk", F.formatPoints(team.expected), "power-bd__line--total");
         box.appendChild(math);
 
@@ -1994,7 +1932,7 @@
         if (!payload.available) {
             els.powerNote.textContent = "";
             els.powerList.appendChild(
-                el("li", "empty-note", UNAVAILABLE_POWER[payload.unavailable_reason] || "Power rankings are unavailable.")
+                el("li", "empty-note", "Power rankings are unavailable.")
             );
             return;
         }
@@ -2015,14 +1953,14 @@
         head.setAttribute("aria-hidden", "false");
         head.appendChild(el("span", "power-head__team", "Team"));
         const ptsHead = el("span", "power-head__pts");
-        ptsHead.appendChild(hintLabel("span", "power-hint-expected", "Pts / wk", F.powerHint("expected")));
+        ptsHead.appendChild(document.createTextNode("Pts / wk"));
         const scale = el("span", "power-head__scale");
         scale.appendChild(el("span", null, String(lo)));
         scale.appendChild(el("span", null, String(hi)));
         ptsHead.appendChild(scale);
         head.appendChild(ptsHead);
         head.appendChild(el("span", "power-head__odds")).appendChild(
-            hintLabel("span", "power-hint-odds", "Playoffs", F.powerHint("odds"))
+            document.createTextNode("Playoffs")
         );
         els.powerList.appendChild(head);
 
@@ -2078,22 +2016,10 @@
     const SVG_NS = "http://www.w3.org/2000/svg";
 
     const CHART_METRICS = [
-        { key: "roster", label: "Power Rankings", note: "The board above, week by week" },
-        {
-            key: "resume",
-            label: "Results rank",
-            note: "Ranked on results so far: record, points, schedule and form",
-        },
+        { key: "roster", label: "Power Rankings" },
+        { key: "resume", label: "Results rank" },
     ];
 
-    const CHART_UNAVAILABLE = {
-        roster_power_not_recorded:
-            "Power rankings are written down as the season runs, and this site only " +
-            "started keeping them in September 2026. Earlier seasons hold one " +
-            "end-of-year roster snapshot rather than one a week, so this line " +
-            "cannot be drawn for them.",
-        missing_rankings: "No rankings have been computed for this season yet.",
-    };
 
     function svg(tag, attrs) {
         const node = document.createElementNS(SVG_NS, tag);
@@ -2108,7 +2034,6 @@
         CHART_METRICS.forEach((metric) => {
             const chip = el("button", "chip", metric.label);
             chip.type = "button";
-            chip.title = metric.note;
             if (metric.key === state.chartMetric) {
                 chip.classList.add("chip--active");
                 chip.setAttribute("aria-current", "true");
@@ -2172,10 +2097,7 @@
 
         if (!payload.available) {
             els.powerChartNote.textContent = "";
-            showChartEmpty(
-                CHART_UNAVAILABLE[payload.unavailable_reason] ||
-                    "Nothing to chart for this season yet."
-            );
+            showChartEmpty("Nothing to chart for this season yet.");
             return;
         }
 

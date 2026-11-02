@@ -23,8 +23,8 @@ test('a member keeps private ideas and a wishlist, and nobody else sees them', a
     await expect(column(page, 'My wishlist')).toBeVisible();
 
     // A person, two ideas for them, and something for my own wishlist.
-    await page.getByPlaceholder('Name, e.g. Mom').fill('Mom');
-    await page.getByPlaceholder('Name, e.g. Mom').press('Enter');
+    await page.getByPlaceholder('Name', { exact: true }).fill('Mom');
+    await page.getByPlaceholder('Name', { exact: true }).press('Enter');
     const mom = column(page, 'Mom');
     await expect(mom.getByText('Private')).toBeVisible();
     await mom.getByPlaceholder('+ Add an idea for Mom').fill('Pasta maker');
@@ -84,8 +84,8 @@ test('members browse each other\'s wishlists, link a contact, and save ideas fro
     const alice = await aliceContext.newPage();
     const aliceName = await signUp(alice);
     await alice.goto('/gifts/');
-    await alice.getByPlaceholder('Name, e.g. Mom').fill('Dad');
-    await alice.getByPlaceholder('Name, e.g. Mom').press('Enter');
+    await alice.getByPlaceholder('Name', { exact: true }).fill('Dad');
+    await alice.getByPlaceholder('Name', { exact: true }).press('Enter');
     await alice.getByPlaceholder('+ Add an idea for Dad').fill('Top secret watch');
     await alice.getByPlaceholder('+ Add an idea for Dad').press('Enter');
     await alice.getByPlaceholder("+ Add something you'd like").fill('Pour-over kettle');

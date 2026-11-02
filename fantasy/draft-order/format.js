@@ -63,7 +63,7 @@
         const turns = managers * rounds;
         const lowMinutes = Math.max(1, Math.ceil(turns * 10 / 60));
         const highMinutes = Math.max(lowMinutes, Math.ceil(turns * 20 / 60));
-        return `${turns} total turns · allow roughly ${lowMinutes}–${highMinutes} minutes.`;
+        return `${turns} turns · ~${lowMinutes}–${highMinutes} min`;
     }
 
     function roomModeName(mode) {

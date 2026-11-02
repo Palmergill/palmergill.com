@@ -408,7 +408,7 @@
             card.appendChild(el(
                 "p",
                 "season-props__status",
-                "No usable regular-season market data for this player yet. Only a few hundred players have a quote or bounded last trade."
+                "No market data yet."
             ));
             return card;
         }
@@ -858,9 +858,6 @@
                 ? data.projection_providers.filter(Boolean)
                 : [];
             const providerLabels = providerIds.map((id) => providerFor(id).label);
-            const providerList = providerLabels.length > 2
-                ? `${providerLabels.slice(0, -1).join(", ")}, and ${providerLabels[providerLabels.length - 1]}`
-                : providerLabels.join(" and ");
             if (src === "consensus" && providerLabels.length) {
                 els.seasonFantasyProjHead.textContent = `${providerLabels.join(" + ")} avg`;
                 els.seasonFantasyProjHead.dataset.mobileLabel = providerIds.length > 2
@@ -868,23 +865,17 @@
                     : providerIds
                         .map((id) => PROVIDER_SHORT_LABELS[id] || providerFor(id).label)
                         .join("+");
-                els.seasonFantasyProjHead.title =
-                    `Season-long projected points: per-player average across available data from ${providerList}.`;
             } else if (src === "consensus") {
                 els.seasonFantasyProjHead.textContent = "Avg projection";
                 els.seasonFantasyProjHead.dataset.mobileLabel = "Avg proj";
-                els.seasonFantasyProjHead.title =
-                    "Season-long projected points averaged across multiple sources; source names unavailable.";
             } else if (src) {
                 const provider = providerFor(src);
                 els.seasonFantasyProjHead.textContent = `${provider.label} proj`;
                 els.seasonFantasyProjHead.dataset.mobileLabel =
                     `${PROVIDER_SHORT_LABELS[src] || provider.label} proj`;
-                els.seasonFantasyProjHead.title = `Season-long projected points from ${provider.label}.`;
             } else {
                 els.seasonFantasyProjHead.textContent = "Projection";
                 els.seasonFantasyProjHead.dataset.mobileLabel = "Proj";
-                els.seasonFantasyProjHead.title = "Season-long projected points; source unavailable.";
             }
         }
 
@@ -1110,19 +1101,15 @@
         projected: [
             { label: "#", className: "col-rank" },
             { label: "Player" },
-            { label: "Proj", className: "col-proj", title: "Consensus projected points" },
-            { label: "Move", className: "col-proj", title: "Rank movement since last week's board" },
+            { label: "Proj", className: "col-proj" },
+            { label: "Move", className: "col-proj" },
         ],
         results: [
             { label: "#", className: "col-rank" },
             { label: "Player" },
-            {
-                label: "Proj",
-                className: "col-proj col-week-proj",
-                title: "What this board projected before the week was played",
-            },
-            { label: "Actual", className: "col-proj", title: "Points actually scored" },
-            { label: "+/-", className: "col-proj", title: "Actual minus projected" },
+            { label: "Proj", className: "col-proj col-week-proj" },
+            { label: "Actual", className: "col-proj" },
+            { label: "+/-", className: "col-proj" },
         ],
     };
 
@@ -1391,7 +1378,7 @@
             cell.appendChild(el("span", "sr-only", ` (${pairs.missing})`));
         }
         const title = [detail, entry.edge_is_qualified
-            ? `Market total covers ${pairs.scored || "nothing"} only — ${pairs.missing}, so this gap is partly missing data, not market disagreement.`
+            ? `Missing ${pairs.missing}`
             : ""].filter(Boolean).join(" · ");
         if (title) cell.title = title;
         return cell;
@@ -1405,7 +1392,7 @@
         cell.colSpan = 9;
         cell.textContent = total
             ? `No ${position} has a complete yardage and touchdown market pair yet.`
-            : "No betting lines have been collected yet. The research panels below and your league tools still work.";
+            : "No betting lines yet.";
         row.appendChild(cell);
         els.seasonFantasyLeaders.appendChild(row);
     }
@@ -1638,7 +1625,6 @@
         const teamLink = el("a", "hero-snapshot__team", team.name || team.abbrev || "Team");
         teamLink.href = `/fantasy/?season=${encodeURIComponent(state.season)}` +
             `&team=${encodeURIComponent(data.selected_team_id)}`;
-        teamLink.title = "Open your team in the league hub";
         els.memberTeam.appendChild(teamLink);
         els.memberMetrics.innerHTML = "";
         const record = snapshot.record || {};
@@ -1977,7 +1963,7 @@
                         // `scored`, not `gaps.scored`: compare sends the raw
                         // quoted markets rather than the scoring categories,
                         // so the resolved string is the one with content.
-                        delta.title = `Market total covers ${scored} only — ${gaps.missing}, so this gap is partly missing data, not market disagreement.`;
+                        delta.title = `Missing ${gaps.missing}`;
                     }
                     col.appendChild(delta);
                 }

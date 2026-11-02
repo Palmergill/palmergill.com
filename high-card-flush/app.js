@@ -23,7 +23,6 @@
         decisionPanel: document.getElementById("decisionPanel"),
         settlementPanel: document.getElementById("settlementPanel"),
         wagerHelp: document.getElementById("wagerHelp"),
-        raiseHelp: document.getElementById("raiseHelp"),
         anteAmount: document.getElementById("anteAmount"),
         flushBonusAmount: document.getElementById("flushBonusAmount"),
         straightFlushBonusAmount: document.getElementById("straightFlushBonusAmount"),
@@ -161,11 +160,7 @@
         els.tableAnte.textContent = game.formatMoney(state.wagers.ante);
         els.tableRaise.textContent = state.wagers.raise ? game.formatMoney(state.wagers.raise) : "—";
 
-        if (state.status === "betting" && validation.valid) {
-            els.wagerHelp.textContent = `${game.formatMoney(validation.initialStake)} placed on Deal; ${game.formatMoney(state.wagers.ante)} reserved for Raise.`;
-        } else {
-            els.wagerHelp.textContent = validation.message;
-        }
+        els.wagerHelp.textContent = state.status === "betting" && validation.valid ? "" : validation.message;
         els.wagerHelp.classList.toggle("is-error", state.status === "betting" && !validation.valid);
         els.dealButton.disabled = state.status !== "betting" || !validation.valid;
 
@@ -182,9 +177,6 @@
 
     function renderDecision() {
         const maximum = state.playerFlush ? game.maxRaiseMultiplier(state.playerFlush) : 1;
-        els.raiseHelp.textContent = state.playerFlush
-            ? `${state.playerFlush.length}-card flush allows up to a ${maximum}× Raise.`
-            : "Choose a legal Raise for your flush.";
 
         document.querySelectorAll("[data-raise]").forEach((button) => {
             const multiplier = Number(button.dataset.raise);

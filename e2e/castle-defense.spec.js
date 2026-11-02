@@ -105,7 +105,7 @@ test.describe('signed out', () => {
 
     test('a run asks you to sign in, then posts itself once you have', async ({ page }) => {
         await quickRun(page);
-        await expect(page.locator('#placeLine')).toContainText("Sign in to put this run on today's leaderboard");
+        await expect(page.locator('#placeLine')).toContainText('Sign in to post this run');
 
         await signUp(page);
         await page.goto('/castle-defense/');

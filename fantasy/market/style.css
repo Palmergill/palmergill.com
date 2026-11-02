@@ -891,6 +891,7 @@ h1, h2, .drawer__head h2 { font-family: "Libre Caslon Display", Georgia, serif; 
 .disclosure__title { margin: 0; color: var(--fantasy-forest); font-family: "Libre Caslon Display", Georgia, serif; font-size: 1.25rem; font-weight: 400; }
 .disclosure[open] summary { border-bottom: 1px solid var(--fantasy-line); }
 .disclosure__body { padding: 20px; }
+main > .betting-disclaimer { margin: 18px 0 0; color: var(--fantasy-muted); font-size: .78rem; }
 .prose { max-width: none; color: var(--fantasy-muted); font-size: .78rem; }
 .prose p { max-width: 78ch; }
 

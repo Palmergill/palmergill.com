@@ -17,34 +17,11 @@
         matchup: "The result",
     };
 
-    // What each sub-score is actually claiming, in the manager's own terms.
-    const COMPONENT_BLURBS = {
-        scoring: "What the starting lineup actually put on the board.",
-        management: "The share of this roster's best legal lineup that started.",
-        matchup: "Margin against the team the schedule handed you.",
-    };
-
     const STATUS_LABELS = {
         complete: "Final",
         in_progress: "In progress",
         not_played: "Not played yet",
         unknown: "Status unknown",
-    };
-
-    // Why a lineup could not be graded, in words rather than a reason code.
-    const LINEUP_REASONS = {
-        no_lineup_settings:
-            "The league's starting lineup was never collected, so nothing can be " +
-            "said about who should have started.",
-        no_roster_snapshot:
-            "No roster snapshot was stored for this week, so there is no lineup " +
-            "to measure against the best one available.",
-        no_actuals:
-            "No player results were collected for this week, so bench points " +
-            "cannot be counted.",
-        no_scorable_lineups:
-            "Every lineup this week had a starter the stat feed does not cover, " +
-            "so no efficiency is claimed.",
     };
 
     // Grades are a curve across one league, so the colour ramp is too.
@@ -110,10 +87,6 @@
         return COMPONENT_LABELS[key] || key;
     }
 
-    function componentBlurb(key) {
-        return COMPONENT_BLURBS[key] || "";
-    }
-
     // A z-score maps onto a 0-100 bar. Three sigma each way covers everything
     // a ten-team league produces, and clamping keeps one outlier from
     // flattening every other bar on the card.
@@ -131,18 +104,6 @@
         if (!delta) return `Results rank ${power.rank}`;
         const arrow = delta > 0 ? "▲" : "▼";
         return `Results rank ${power.rank} ${arrow}${Math.abs(delta)}`;
-    }
-
-    // The recap has to be able to say why half of it is missing.
-    function lineupNote(lineups) {
-        if (!lineups) return "";
-        if (lineups.available) {
-            const excluded = lineups.excluded_slots || [];
-            return excluded.length
-                ? `Lineup efficiency excludes ${excluded.join(", ")}: the stat feed scores individual players, not team defenses.`
-                : "Lineup efficiency is measured on what players actually scored.";
-        }
-        return LINEUP_REASONS[lineups.reason] || "";
     }
 
     function sortTeams(rows, key, direction) {
@@ -190,17 +151,14 @@
 
     return {
         COMPONENT_LABELS,
-        LINEUP_REASONS,
         awardsForTeam,
         componentBarWidth,
-        componentBlurb,
         componentLabel,
         formatAllPlay,
         formatPercent,
         formatPoints,
         formatSigned,
         gradeTier,
-        lineupNote,
         movementLabel,
         resultLine,
         sortTeams,

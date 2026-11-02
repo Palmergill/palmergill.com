@@ -61,7 +61,6 @@ body {
     letter-spacing: -0.02em;
 }
 
-
 /* ── banners and empty states ────────────────────────────────────────────── */
 
 .banner {
@@ -268,7 +267,6 @@ body {
     margin: 0 0 6px;
     font-size: 1.2rem;
 }
-
 
 .new-board__row {
     display: flex;
@@ -535,17 +533,6 @@ body {
     flex-wrap: wrap;
     gap: 8px;
     margin-top: 12px;
-}
-
-
-.keyboard-hint {
-    margin: 0 0 16px;
-    padding: 12px 16px;
-    border-radius: 12px;
-    background: var(--surface, #f3eee4);
-    font-size: 0.85rem;
-    color: var(--soft, #5d574e);
-    max-width: 72ch;
 }
 
 /* ── the list ────────────────────────────────────────────────────────────── */

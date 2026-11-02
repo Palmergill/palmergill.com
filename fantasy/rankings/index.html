@@ -14,7 +14,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/shared/site-nav.css?v=19">
     <link rel="stylesheet" href="/shared/fantasy-header.css?v=4">
-    <link rel="stylesheet" href="style.css?v=6">
+    <link rel="stylesheet" href="style.css?v=7">
     <link rel="stylesheet" href="/shared/fantasy-design.css?v=3">
 </head>
 <body>
@@ -41,10 +41,6 @@
         <!-- Shown when the board API returns 403: not signed in. -->
         <section id="signedOutView" class="signed-out" hidden>
             <h2>Sign in to build your rankings</h2>
-            <p>
-                Ranking boards belong to an account, so yours is waiting wherever you
-                sign in. Boards are private unless you publish them.
-            </p>
             <div class="signed-out__actions">
                 <a class="button" id="signInLink" href="/login/">Sign in</a>
                 <a class="button button--quiet" id="createAccountLink" href="/signup/">Create an account</a>
@@ -136,7 +132,7 @@
                 </div>
             </section>
 
-            <p class="keyboard-hint" id="keyboardHint">
+            <p class="sr-only" id="keyboardHint">
                 Drag the handle to reorder, or focus a row and use Alt with the arrow
                 keys. Press Enter to pick a player up, arrow keys to place him, Enter
                 again to drop. Type a number in the rank box to send someone straight
@@ -145,10 +141,7 @@
 
             <ol class="rank-list" id="rankList"></ol>
 
-            <p class="empty-state" id="boardEmptyState" hidden>
-                Nothing here yet. Add players by name above, or reset to the site
-                consensus to start from a full board.
-            </p>
+            <p class="empty-state" id="boardEmptyState" hidden>Nothing here yet.</p>
         </section>
 
         <!-- Published boards and the public site consensus share one read-only view. -->
@@ -176,7 +169,7 @@
             </div>
             <p class="reader-note" id="readerNote"></p>
             <ol class="rank-list rank-list--reader" id="readerList"></ol>
-            <p class="empty-state" id="readerEmptyState" hidden>No published boards for this format yet. Choose My boards to create one, or try another scoring format.</p>
+            <p class="empty-state" id="readerEmptyState" hidden>No published boards for this format yet.</p>
         </section>
 
         <!-- One region announces every move, however it was made. -->
@@ -189,6 +182,6 @@
     <script src="/shared/fantasy-header.js?v=9"></script>
     <script>window.FantasyHeader.mount({ page: "rankings" });</script>
     <script src="format.js?v=4"></script>
-    <script src="app.js?v=7"></script>
+    <script src="app.js?v=8"></script>
 </body>
 </html>

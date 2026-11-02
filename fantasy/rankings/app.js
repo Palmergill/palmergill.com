@@ -1681,9 +1681,7 @@
             els.readerTitle.textContent = "Site consensus";
             els.readerMeta.textContent = F.boardLabel(reader);
             els.readerNote.textContent = reader.boardCount
-                ? `${reader.boardCount} published ${reader.boardCount === 1 ? "board" : "boards"}. ` +
-                    `Players must appear on at least ${reader.appearanceFloor}. Avg is the mean rank; ` +
-                    `the range is best–worst, and the last number is appearances.`
+                ? `${reader.boardCount} published ${reader.boardCount === 1 ? "board" : "boards"}`
                 : "";
             renderChipRow(
                 els.consensusScoringChips,
@@ -1709,7 +1707,7 @@
                 ? reader.title || `${reader.owner}'s rankings`
                 : "Shared board unavailable";
             els.readerMeta.textContent = reader.owner ? `${F.boardLabel(reader)} · by ${reader.owner}` : "";
-            els.readerNote.textContent = reader.owner ? "Read-only published ranking board." : "";
+            els.readerNote.textContent = "";
         }
         renderReaderScopeChips();
         renderReaderList();

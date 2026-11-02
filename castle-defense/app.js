@@ -119,7 +119,7 @@
         if (!ranked) {
             $("boardTitle").textContent = "Leaderboard";
             $("board-list").innerHTML = "";
-            note.innerHTML = `You're replaying ${escapeHtml(prettyDate(date))}. Only today's map is ranked — <a href="/castle-defense/">play today's</a>.`;
+            note.innerHTML = `Replaying ${escapeHtml(prettyDate(date))} · <a href="/castle-defense/">Play today's</a>`;
             return;
         }
         try {
@@ -136,9 +136,9 @@
         $("board-list").innerHTML = boardRows(board, 10);
         $("boardCount").textContent = board.players ? `${board.players} ${board.players === 1 ? "player" : "players"}` : "";
         const note = $("boardNote");
-        if (!board.players) note.textContent = "No scores yet today. Be the first.";
-        else if (board.you) note.textContent = `You're ${placeText(board.you, board.players)}. Your best run counts.`;
-        else note.innerHTML = `<a href="${signInHref()}">Sign in</a> to put your runs on the board.`;
+        if (!board.players) note.textContent = "No scores yet today.";
+        else if (board.you) note.textContent = `You're ${placeText(board.you, board.players)}.`;
+        else note.innerHTML = `<a href="${signInHref()}">Sign in</a> to get on the board.`;
     }
 
     // The full board, open any time from the header: today's scores (only
@@ -185,18 +185,18 @@
         const session = await Promise.resolve(window.SiteSession).catch(() => null);
         if (request !== boardRequest || overlay.hidden) return;
         const join = session && session.authenticated
-            ? "Finish a run to get on the board."
-            : `<a href="${signInHref()}">Sign in</a> to get on the board.`;
+            ? ""
+            : ` · <a href="${signInHref()}">Sign in</a> to get on the board.`;
         if (period === "all") {
             $("fullBoard").innerHTML = allTimeRows(board);
             if (!board.players) note.textContent = "No scores yet.";
-            else note.innerHTML = `${players} over ${board.days} ${board.days === 1 ? "day" : "days"}${board.you ? "" : ` · ${join}`}`;
+            else note.innerHTML = `${players} over ${board.days} ${board.days === 1 ? "day" : "days"}${board.you ? "" : join}`;
             return;
         }
         $("fullBoard").innerHTML = boardRows(board, 50);
-        if (!board.players) note.textContent = "No scores yet today. Be the first.";
+        if (!board.players) note.textContent = "No scores yet today.";
         else if (board.you) note.textContent = `${players} · you're ${placeText(board.you, board.players)}.`;
-        else note.innerHTML = `${players} · ${join}`;
+        else note.innerHTML = `${players}${join}`;
     }
 
     function signInHref() {
@@ -1108,7 +1108,7 @@
                 : `Your best today (${res.best.kills.toLocaleString()}) still stands — <b>${placeText(res.best, res.players)}</b>.`;
             line.innerHTML = best;
         } else if (res.signedOut) {
-            line.innerHTML = `<a href="${signInHref()}">Sign in</a> to put this run on today's leaderboard — it'll post when you're back.`;
+            line.innerHTML = `<a href="${signInHref()}">Sign in</a> to post this run.`;
         } else {
             line.textContent = `Couldn't post this run: ${res.error}`;
         }
@@ -1140,7 +1140,7 @@
             btn.append(iconCanvas(type, 40));
             btn.insertAdjacentHTML(
                 "beforeend",
-                `<span class="cd-tower__name">${def.name}</span><span class="cd-tower__blurb">${def.blurb}</span><span class="cd-tower__state"><span class="cd-tower__count"></span></span>`
+                `<span class="cd-tower__name">${def.name}</span><span class="cd-tower__state"><span class="cd-tower__count"></span></span>`
             );
             btn.addEventListener("click", () => chooseType(type));
             $(def.kind === "tower" ? "shopTowers" : "shopTraps").append(btn);
@@ -1180,21 +1180,8 @@
                 btn.disabled = given === 0;
                 btn.querySelector(".cd-tower__count").textContent = given ? `${remaining} of ${given} left` : "None today";
             });
-            let note;
-            if (selectedType) {
-                const def = G.DEFENSES[selectedType];
-                note = `Click ${def.kind === "tower" ? "the grass" : "the road"} to place ${/^[AEIOU]/.test(def.name) ? "an" : "a"} ${def.name}. Click anything you placed to pick it back up.`;
-            } else if (!state.defenses.length) {
-                note = "Pick a tower or trap to start building.";
-            } else {
-                note = left
-                    ? `${left} more to place. You don't have to use them all — click anything you placed to pick it up, or press play.`
-                    : "Everything's placed. Click anything to pick it up and move it, or press play.";
-            }
-            $("shopNote").textContent = note;
         } else {
             renderRoster();
-            $("shopNote").textContent = "Levels come from kills (2 XP) and assists (1 XP).";
         }
     }
 
@@ -1246,7 +1233,7 @@
         if (state.phase === "setup") {
             play.disabled = !state.defenses.length;
             $("playLabel").textContent = "Play";
-            $("playHint").textContent = state.defenses.length ? "" : "Build something first";
+            $("playHint").textContent = "";
         } else if (state.phase === "running") {
             play.disabled = true;
             $("playLabel").textContent = "Defending…";
@@ -1360,12 +1347,11 @@
     function describeHorde() {
         const lean = { walker: "Walkers", runner: "Runners", brute: "Brutes" }[map.lean];
         const first = G.waveSpawns(map, 1).length;
-        $("horde").innerHTML = `Heavy on <b>${lean}</b> today. Wave 1 is ${first} zombies; every wave after is bigger and tougher, and the <b>Zombie King</b> joins every ${G.KING_EVERY}th. It doesn't stop until the castle falls.`;
+        $("horde").innerHTML = `Heavy on <b>${lean}</b> · ${first} in wave 1 · <b>Zombie King</b> every ${G.KING_EVERY}th wave`;
     }
 
     $("dayLabel").textContent = `Daily puzzle · Day ${map.day}${date !== today ? ` · ${date}` : ""}`;
     $("hpMax").textContent = G.START_HP;
-    $("maxLevel").textContent = G.MAX_LEVEL;
     describeHorde();
     loadTiers();
     buildShop();

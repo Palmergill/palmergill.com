@@ -74,11 +74,6 @@ const explorerState = {
 };
 const BITCOIN_ADDRESS_RE = /^(?:bc1[ac-hj-np-z02-9]{11,71}|[13][a-km-zA-HJ-NP-Z1-9]{25,34})$/i;
 
-const starterMessage = {
-    role: 'assistant',
-    text: 'I\'m the helper for this dashboard — ask about anything you see here, or anything Bitcoin. Clicking any metric also sends me a question about it.',
-};
-
 function addMessage({ role, text, data, warnings, toolsUsed, loading = false, error = false }) {
     const row = document.createElement('div');
     row.className = `msg-row ${role}`;
@@ -423,10 +418,10 @@ function issuedSupplyBtc(height) {
 }
 
 function feeBusynessLabel(satsVb) {
-    if (satsVb < 5) return 'a very cheap moment to transact';
-    if (satsVb < 20) return 'a cheap day to transact';
-    if (satsVb < 80) return 'a typical day to transact';
-    return 'a busy, expensive day to transact';
+    if (satsVb < 5) return 'very cheap';
+    if (satsVb < 20) return 'cheap';
+    if (satsVb < 80) return 'typical';
+    return 'busy';
 }
 
 /* ---------------- Price chart ---------------- */
@@ -625,21 +620,19 @@ async function refreshPrice() {
 function renderChainTile(block) {
     if (!block || block.error) {
         tiles.chainValue.textContent = '--';
-        tiles.chainCaption.textContent = 'chain data unavailable right now';
+        tiles.chainCaption.textContent = 'unavailable';
         return;
     }
     tiles.chainValue.textContent = formatInteger(block.height);
     const mined = relativeMinutes(block.time);
-    tiles.chainCaption.textContent = mined
-        ? `blocks ever mined — the last one ${mined}`
-        : 'blocks ever mined — a new one ~every 10 min';
+    tiles.chainCaption.textContent = mined ? `last block ${mined}` : '';
 }
 
 function renderFeeTile(mempool, price) {
     const fast = Number(mempool?.fee_estimates_sats_vb?.['2']);
     if (!mempool || mempool.error || !Number.isFinite(fast)) {
         tiles.feeValue.textContent = '--';
-        tiles.feeCaption.textContent = 'fee data unavailable right now';
+        tiles.feeCaption.textContent = 'unavailable';
         return;
     }
     const usd = Number(price?.usd);
@@ -649,21 +642,21 @@ function renderFeeTile(mempool, price) {
         tiles.feeCaption.textContent = `${fast.toFixed(fast < 10 ? 1 : 0)} sat/vB — ${feeBusynessLabel(fast)}`;
     } else {
         tiles.feeValue.textContent = `${fast.toFixed(fast < 10 ? 1 : 0)} sat/vB`;
-        tiles.feeCaption.textContent = 'the going rate to confirm within ~20 minutes';
+        tiles.feeCaption.textContent = '';
     }
 }
 
 function renderMempoolTile(mempool) {
     if (!mempool || mempool.error) {
         tiles.mempoolValue.textContent = '--';
-        tiles.mempoolCaption.textContent = 'mempool data unavailable right now';
+        tiles.mempoolCaption.textContent = 'unavailable';
         return;
     }
     tiles.mempoolValue.textContent = formatInteger(mempool.tx_count);
     const vsize = Number(mempool.virtual_size_vb);
     tiles.mempoolCaption.textContent = Number.isFinite(vsize) && vsize > 0
-        ? `payments queued · ~${Math.round(vsize / 1e6)} vMB waiting`
-        : 'payments queued for the next blocks';
+        ? `~${Math.round(vsize / 1e6)} vMB`
+        : '';
 }
 
 function renderSupplyTile(block) {
@@ -671,14 +664,14 @@ function renderSupplyTile(block) {
     const supply = issuedSupplyBtc(height);
     if (!block || block.error || supply === null) {
         tiles.supplyValue.textContent = '--';
-        tiles.supplyCaption.textContent = 'of all 21M bitcoin already exist';
+        tiles.supplyCaption.textContent = 'unavailable';
         return;
     }
     tiles.supplyValue.textContent = `${((supply / TOTAL_SUPPLY_BTC) * 100).toFixed(1)}%`;
     const nextHalving = (Math.floor(height / HALVING_INTERVAL) + 1) * HALVING_INTERVAL;
     const remainingDays = Math.round(((nextHalving - height) * 600) / 86400);
     tiles.supplyCaption.textContent =
-        `of 21M exist · next halving in ~${remainingDays.toLocaleString()} days`;
+        `next halving in ~${remainingDays.toLocaleString()} days`;
 }
 
 function renderDifficultyTile(diff) {
@@ -686,7 +679,7 @@ function renderDifficultyTile(diff) {
     if (!diff || diff.error || !Number.isFinite(change)) {
         tiles.difficultyValue.textContent = '--';
         tiles.difficultyValue.classList.remove('up', 'down');
-        tiles.difficultyCaption.textContent = 'difficulty data unavailable right now';
+        tiles.difficultyCaption.textContent = 'unavailable';
         return;
     }
     tiles.difficultyValue.textContent = `${change >= 0 ? '+' : ''}${change.toFixed(1)}%`;
@@ -694,8 +687,8 @@ function renderDifficultyTile(diff) {
     tiles.difficultyValue.classList.toggle('down', change < 0);
     const progress = Number(diff.progress_percent);
     tiles.difficultyCaption.textContent = Number.isFinite(progress)
-        ? `${Math.round(progress)}% of the way to the next retarget`
-        : 'the network self-tunes every 2,016 blocks';
+        ? `${Math.round(progress)}% to next retarget`
+        : '';
 }
 
 function renderBlocksStrip(payload) {
@@ -1092,7 +1085,6 @@ chatForm.addEventListener('submit', async (event) => {
 
 // The starter message should sit above the learning-path chips, so render
 // it first and then move the (static) chips back to the end of the thread.
-addMessage(starterMessage);
 if (learnPaths) {
     messagesEl.appendChild(learnPaths);
     learnPaths.querySelectorAll('.learn-chip').forEach((card) => {

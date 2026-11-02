@@ -13,7 +13,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/shared/site-nav.css?v=19">
-    <link rel="stylesheet" href="style.css?v=11">
+    <link rel="stylesheet" href="style.css?v=12">
 </head>
 <body>
 <noscript>
@@ -48,11 +48,6 @@
         <section id="signedOutView" class="signed-out" hidden>
             <div class="signed-out__copy">
                 <h2>Sign in to start your gift board</h2>
-                <p>
-                    Your board belongs to your account. Ideas you file under other
-                    people stay private to you. Your own wishlist is the part other
-                    members can see, so they know what you'd like.
-                </p>
                 <div class="signed-out__actions">
                     <a class="button" id="signInLink" href="/login/?next=/gifts/">Sign in</a>
                     <a class="button button--quiet" href="/signup/">Create an account</a>
@@ -79,10 +74,6 @@
         <section id="boardView" hidden>
             <div class="board" id="board" aria-label="Gift board"></div>
             <div class="graph" id="graph" hidden></div>
-            <p class="graph__legend" id="graphLegend" hidden>
-                Inner ring: your wishlist. Outer ring: your people, with their gift
-                ideas beyond them. Select any gift or person to edit it.
-            </p>
         </section>
 
         <!-- Every member with something on their wishlist. -->
@@ -133,7 +124,7 @@
                     <details class="image-override" id="imageOverride">
                         <summary>Use a different picture</summary>
                         <div class="image-field">
-                            <input type="url" name="imageUrl" maxlength="2000" aria-label="Picture address" placeholder="Paste an image address (https://…)">
+                            <input type="url" name="imageUrl" maxlength="2000" aria-label="Picture address" placeholder="https://">
                             <button type="button" class="button button--quiet button--small" id="findImage">Look up again</button>
                         </div>
                     </details>
@@ -151,7 +142,7 @@
                 <div class="field-row" id="givenFields">
                     <label class="field">
                         <span>Occasion</span>
-                        <input type="text" name="occasion" maxlength="80" placeholder="Birthday, holidays…">
+                        <input type="text" name="occasion" maxlength="80">
                     </label>
                     <label class="field">
                         <span>Given on</span>
@@ -205,12 +196,11 @@
             </label>
             <label class="field">
                 <span>Notes</span>
-                <textarea name="note" rows="3" maxlength="2000" placeholder="Sizes, favourite colours, things they already have…"></textarea>
+                <textarea name="note" rows="3" maxlength="2000"></textarea>
             </label>
             <label class="field">
                 <span>Site account (optional)</span>
-                <input type="text" name="linkedUsername" maxlength="64" autocomplete="off" placeholder="Their username on this site">
-                <small class="field__hint">Shows their wishlist in this column. They aren't told, and they can't see your ideas.</small>
+                <input type="text" name="linkedUsername" maxlength="64" autocomplete="off">
             </label>
             <p class="editor__error" id="personError" role="alert" hidden></p>
             <div class="editor__actions">
@@ -226,6 +216,6 @@
     <script src="/shared/site-nav.js?v=22"></script>
     <script src="/shared/analytics.js?v=1"></script>
     <script src="graph.js?v=4"></script>
-    <script src="app.js?v=7"></script>
+    <script src="app.js?v=8"></script>
 </body>
 </html>

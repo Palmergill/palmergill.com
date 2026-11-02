@@ -107,11 +107,11 @@
                 <div class="wager-panel__intro">
                     <span class="control-kicker">Before the deal</span>
                     <h2>Set the table</h2>
-                    <p id="wagerHelp">Ante includes a matching 1× Raise reserve.</p>
+                    <p id="wagerHelp"></p>
                 </div>
 
                 <div class="wager-card wager-card--ante" data-wager-card="ante">
-                    <div><span>Ante</span><small>Required</small></div>
+                    <div><span>Ante</span></div>
                     <strong id="anteAmount">$25</strong>
                     <div class="stepper" aria-label="Ante wager">
                         <button type="button" data-wager="ante" data-delta="-5" aria-label="Decrease Ante by five dollars">−</button>
@@ -120,7 +120,7 @@
                 </div>
 
                 <div class="wager-card" data-wager-card="flushBonus">
-                    <div><span>Flush Bonus</span><small>4+ cards · optional</small></div>
+                    <div><span>Flush Bonus</span><small>4+ cards</small></div>
                     <strong id="flushBonusAmount">$0</strong>
                     <div class="stepper" aria-label="Flush Bonus wager">
                         <button type="button" data-wager="flushBonus" data-delta="-5" aria-label="Decrease Flush Bonus by five dollars">−</button>
@@ -129,7 +129,7 @@
                 </div>
 
                 <div class="wager-card" data-wager-card="straightFlushBonus">
-                    <div><span>Straight Flush</span><small>3+ cards · optional</small></div>
+                    <div><span>Straight Flush</span><small>3+ cards</small></div>
                     <strong id="straightFlushBonusAmount">$0</strong>
                     <div class="stepper" aria-label="Straight Flush Bonus wager">
                         <button type="button" data-wager="straightFlushBonus" data-delta="-5" aria-label="Decrease Straight Flush Bonus by five dollars">−</button>
@@ -144,7 +144,6 @@
                 <div>
                     <span class="control-kicker">Your decision</span>
                     <h2>Raise or fold</h2>
-                    <p id="raiseHelp">Choose a legal Raise for your flush.</p>
                 </div>
                 <div class="decision-actions">
                     <button class="fold-action" id="foldButton" type="button">Fold</button>
@@ -198,7 +197,7 @@
     <script src="/shared/analytics.js?v=1"></script>
     <script src="/shared/rules-viewer.js?v=1"></script>
     <script src="./highCardFlushGame.js?v=1"></script>
-    <script src="./app.js?v=2"></script>
+    <script src="./app.js?v=3"></script>
     <script src="/shared/site-nav.js?v=22"></script>
 </body>
 </html>

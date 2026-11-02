@@ -13,7 +13,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/shared/site-nav.css?v=19">
-    <link rel="stylesheet" href="portfolio.css?v=14">
+    <link rel="stylesheet" href="portfolio.css?v=15">
 </head>
 <body>
 <noscript>
@@ -39,7 +39,6 @@
         <!-- Shown when the API returns 403: not signed in. -->
         <section id="signedOutView" class="pf-card pf-signed-out" hidden>
             <h2>Sign in to see your portfolio</h2>
-            <p>Upload your holdings or your trade history and get a breakdown by position, sector, and gain. Your portfolio belongs to your account and no one else can see it.</p>
             <div class="pf-row">
                 <a class="pf-button" href="/login/?next=/stock-research/portfolio/">Sign in</a>
                 <a class="pf-button pf-button--quiet" href="/signup/">Create an account</a>
@@ -49,13 +48,12 @@
         <section id="uploadPanel" class="pf-card pf-upload" hidden>
             <div class="pf-card__head">
                 <h2 class="pf-card__title" id="uploadTitle">Add your portfolio</h2>
-                <p class="pf-card__sub">Only you can see what you upload.</p>
             </div>
             <form id="uploadForm">
                 <label class="pf-drop" id="dropZone">
                     <input type="file" id="fileInput" accept=".csv,text/csv,text/plain">
                     <span class="pf-drop__title">Drop a CSV here, or <u>choose a file</u></span>
-                    <span class="pf-drop__hint" id="fileName">A positions or transactions export from your broker works as is.</span>
+                    <span class="pf-drop__hint" id="fileName"></span>
                 </label>
                 <details class="pf-paste">
                     <summary>Or paste CSV text</summary>
@@ -78,13 +76,6 @@
                     <button type="button" class="pf-button pf-button--quiet" id="sampleButton">Try a sample</button>
                 </div>
             </form>
-            <details class="pf-help">
-                <summary>What the file needs</summary>
-                <p><strong>Holdings</strong> need a <code>Symbol</code> and <code>Quantity</code> column. Add <code>Cost Basis</code> (total) or <code>Average Cost</code> to see your gain. A new holdings upload replaces the last one.</p>
-                <p><strong>Transactions</strong> also need a <code>Date</code>, an <code>Action</code> or <code>Type</code> (buy or sell) and a <code>Price</code> (or <code>Amount</code>). Dividends and transfers are skipped. <code>Account</code>, <code>Source</code>, <code>Fees</code>, <code>Notes</code> and a <code>Realized gain/loss</code> column are kept and shown too. Crypto like BTC is priced as crypto; a position with no ticker (an option, a name) is kept and valued at your last trade.</p>
-                <p>Uploading the same file again only adds trades that aren't already saved.</p>
-                <p>With both, trades dated after the holdings' "as of" day are added on top; earlier ones are already in the holdings, so they're kept but not counted twice.</p>
-            </details>
         </section>
 
         <section id="dashboard" hidden>
@@ -112,7 +103,7 @@
                     <ul class="pf-chart-legend" id="historyLegend" hidden>
                         <li><span class="pf-key pf-key--value"></span>Value</li>
                         <li><button type="button" class="pf-legend-toggle" data-cost-toggle aria-pressed="true"><span class="pf-key pf-key--invested"></span>Invested (cost basis)</button></li>
-                        <li id="estimatedKey" hidden><span class="pf-key pf-key--estimated"></span>Estimated from your trade prices</li>
+                        <li id="estimatedKey" hidden><span class="pf-key pf-key--estimated"></span>Estimated</li>
                     </ul>
                     <p class="pf-note" id="historyNote" hidden></p>
                 </section>
@@ -281,14 +272,12 @@
                 <section class="pf-card">
                     <div class="pf-card__head">
                         <h2 class="pf-card__title">By account</h2>
-                        <p class="pf-card__sub">Trading activity in each account, as your file labels them.</p>
                     </div>
                     <div class="pf-table-wrap"><table class="pf-table" id="accountsTable"></table></div>
                 </section>
                 <section class="pf-card">
                     <div class="pf-card__head">
                         <h2 class="pf-card__title">By source</h2>
-                        <p class="pf-card__sub">Where each trade came from.</p>
                     </div>
                     <div class="pf-table-wrap"><table class="pf-table" id="sourcesTable"></table></div>
                 </section>
@@ -300,7 +289,6 @@
                 <section class="pf-card">
                     <div class="pf-card__head">
                         <h2 class="pf-card__title">By year</h2>
-                        <p class="pf-card__sub">Realized gain at average cost, and money in and out, for each calendar year.</p>
                     </div>
                     <div class="pf-yearbars" id="yearBars" role="img"></div>
                     <div class="pf-table-wrap"><table class="pf-table" id="yearsTable"></table></div>
@@ -386,6 +374,6 @@
     <script src="/shared/api-base.js?v=1"></script>
     <script src="/shared/site-nav.js?v=22"></script>
     <script src="/shared/analytics.js?v=1"></script>
-    <script src="portfolio.js?v=25"></script>
+    <script src="portfolio.js?v=26"></script>
 </body>
 </html>

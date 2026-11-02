@@ -148,7 +148,7 @@
         if (demoRows.length) {
             notice.className = 'compare-demo-notice';
             notice.setAttribute('role', 'status');
-            notice.textContent = `Sample data: ${demoRows.map((row) => row.ticker).join(', ')} ${demoRows.length === 1 ? 'uses' : 'use'} generated stock values. Sign in for live market data.`;
+            notice.textContent = `Sample data: ${demoRows.map((row) => row.ticker).join(', ')}`;
         }
 
         const table = document.createElement('table');

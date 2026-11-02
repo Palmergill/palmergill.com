@@ -353,70 +353,6 @@
 
     // What the column prints. Separate from ledgerValue because a rank sorts
     // as a negative and prints as "3".
-    // ── what each column means ──────────────────────────────────────────
-    //
-    // Half this table is derived, and the headers that carry the derivation
-    // are the ones a reader cannot guess: xW, All-play, Résumé, Luck. The
-    // lede under the heading could only ever define two of them before it
-    // became a paragraph nobody reads, so the definitions live on the
-    // headers themselves.
-    //
-    // Keyed by the same data-key the header and its cells carry, so a
-    // column cannot be added without the miss being visible here.
-    const LEDGER_HINTS = {
-        seed: "Position in this table, by whichever column it is sorted on.",
-        team: "The manager's team. Open one for its roster, results and start/sit.",
-        record: "Wins and losses as the schedule actually fell, ties included where there are any.",
-        median_record:
-            "The scheduled result plus one result each week for scoring above or below "
-            + "the league median. Each week can finish 2-0, 1-1 or 0-2.",
-        points_for: "Total points scored so far this season.",
-        all_play:
-            "Record against every team that played that week, every week — what the "
-            + "season would look like if everyone played everyone. Ties count half.",
-        expected:
-            "Games played times all-play win percentage: the wins this team's scoring "
-            + "should have earned it against an average schedule.",
-        luck:
-            "Wins minus expected wins. It sums to zero across the league, so one "
-            + "team's kind schedule is another's cruel one.",
-        lineup:
-            "Share of each week's best legal lineup the manager actually started. "
-            + "100% means nothing startable was left on the bench.",
-        scoring: "Median weekly score. The bar spans this team's lowest week to its highest.",
-        power:
-            "Where this team ranks on its results so far. It weighs record most, "
-            + "then points scored minus points allowed, then how tough the "
-            + "schedule was, with consistency and recent form as tie-breakers.",
-        odds:
-            "How often this team makes the playoffs across ten thousand simulated "
-            + "seasons. Early on a team's scoring average is weighted against the "
-            + "league's, because one good week is not a season.",
-        form: "Results rank week by week, earliest week at the left.",
-    };
-
-    function ledgerHint(key) {
-        return LEDGER_HINTS[key] || "";
-    }
-
-    // The power board used to carry its method in a lede and a footnote, and
-    // a reasons list under every row. It is two numbers now, so the method
-    // hangs off their labels the same way the table's columns do.
-    const POWER_HINTS = {
-        expected:
-            "The team's best legal lineup in points a week, each player valued on his "
-            + "latest projection and his actual scoring this season, after the bench "
-            + "covers byes and injuries. Tap a team to see the math.",
-        odds:
-            "How often this team makes the playoffs across ten thousand simulated "
-            + "seasons. Early on a team's scoring average is weighted against the "
-            + "league's, because one good week is not a season.",
-    };
-
-    function powerHint(key) {
-        return POWER_HINTS[key] || "";
-    }
-
     // ── the season-long rank chart ──────────────────────────────────────
     //
     // Geometry only: takes the history payload and returns the points every
@@ -782,8 +718,6 @@
         ledgerValue,
         ledgerText,
         ledgerMeta,
-        LEDGER_HINTS,
-        ledgerHint,
         finiteNumber,
         RANK_CHART_COLORS,
         rankChartColor,
@@ -791,8 +725,6 @@
         rankChartTicks,
         rankChartRankTicks,
         rankChartValueLabel,
-        POWER_HINTS,
-        powerHint,
         sortLedger,
         divergingBar,
         dotPosition,

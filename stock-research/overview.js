@@ -559,7 +559,7 @@
     // ---------- revenue by quarter (Fundamentals tab) ----------
     function renderRevenue(root, series) {
         const rows = series.filter((q) => q.revenue != null);
-        chartCard(root, 'Revenue by quarter', 'Total sales each quarter, before any costs');
+        chartCard(root, 'Revenue by quarter');
         if (rows.length < 2) {
             root.append(el('p', 'ov-empty', 'Quarterly revenue unavailable.'));
             return null;
@@ -656,7 +656,7 @@
 
     function renderPE(root) {
         const points = peHistory(state.data.earnings || [], state.prices);
-        chartCard(root, 'P/E ratio over time', 'Share price ÷ the last 12 months of earnings per share. Lower means cheaper for each dollar of profit.');
+        chartCard(root, 'P/E ratio over time');
         if (points.length < 2) {
             root.append(el('p', 'ov-empty', 'Not enough profitable quarters to chart P/E.'));
             return null;
@@ -675,7 +675,7 @@
         root.append(stats, box, readout);
 
         const legendNote = el('p', 'pe-note');
-        legendNote.append(el('span', 'pe-band-key'), document.createTextNode('Shaded band: 15–25×, where the broad market usually trades'));
+        legendNote.append(el('span', 'pe-band-key'), document.createTextNode('15–25×'));
         root.append(legendNote);
 
         return () => {
@@ -758,42 +758,42 @@
         const pct = (v) => (v == null ? null : `${v.toFixed(1)}%`);
         const x = (v, digits = 2) => (v == null ? null : `${v.toFixed(digits)}×`);
         const groups = [
-            ['Profitability', 'How efficiently sales turn into profit', [
-                ['Gross margin', pct(s.gross_margin), 'Revenue left after the cost of making the product'],
-                ['Operating margin', pct(s.operating_margin), 'Left after day-to-day running costs'],
-                ['Net margin', pct(s.profit_margin), 'Left as profit after everything, including taxes'],
-                ['Return on assets', pct(s.roa), 'Profit generated per dollar of assets'],
-                ['Return on equity', pct(s.roe), 'Profit generated per dollar shareholders own'],
-                ['Return on invested capital', pct(s.roic), 'Return on all money invested, debt and equity']
+            ['Profitability', [
+                ['Gross margin', pct(s.gross_margin)],
+                ['Operating margin', pct(s.operating_margin)],
+                ['Net margin', pct(s.profit_margin)],
+                ['Return on assets', pct(s.roa)],
+                ['Return on equity', pct(s.roe)],
+                ['Return on invested capital', pct(s.roic)]
             ]],
-            ['Financial health', 'Can the company comfortably pay its bills?', [
-                ['Current ratio', x(s.current_ratio), 'Short-term assets ÷ bills due within a year; above 1.5 is comfortable'],
-                ['Quick ratio', x(s.quick_ratio), 'Same, minus inventory; above 1 is comfortable'],
-                ['Interest coverage', x(s.interest_coverage), 'Operating profit ÷ interest owed; above 3 is safe'],
-                ['Debt to equity', x(s.debt_to_equity), 'Debt per dollar of shareholder equity'],
-                ['Cash', s.cash != null ? compactMoney(s.cash) : null, 'Cash and equivalents on hand'],
-                ['Working capital', s.working_capital != null ? compactMoney(s.working_capital) : null, 'Short-term assets minus short-term bills']
+            ['Financial health', [
+                ['Current ratio', x(s.current_ratio)],
+                ['Quick ratio', x(s.quick_ratio)],
+                ['Interest coverage', x(s.interest_coverage)],
+                ['Debt to equity', x(s.debt_to_equity)],
+                ['Cash', s.cash != null ? compactMoney(s.cash) : null],
+                ['Working capital', s.working_capital != null ? compactMoney(s.working_capital) : null]
             ]],
-            ['Valuation', 'What the market is paying for the business', [
-                ['P/E ratio', x(s.pe_ratio, 1), 'Price per dollar of yearly profit'],
-                ['Price / sales', x(s.ps_ratio, 1), 'Price per dollar of yearly revenue'],
-                ['Price / book', x(s.pb_ratio, 1), 'Price vs. the accounting value of its assets'],
-                ['EV / EBITDA', x(s.ev_ebitda, 1), 'Takeover price vs. operating cash profit'],
-                ['Market cap', s.market_cap != null ? compactMoney(s.market_cap) : null, 'Value of all shares combined'],
-                ['Enterprise value', s.enterprise_value != null ? compactMoney(s.enterprise_value) : null, 'Market cap plus debt, minus cash'],
-                ['Shares outstanding', s.shares_outstanding != null ? `${(s.shares_outstanding / 1e9).toFixed(2)}B` : null, 'Total shares held by investors']
+            ['Valuation', [
+                ['P/E ratio', x(s.pe_ratio, 1)],
+                ['Price / sales', x(s.ps_ratio, 1)],
+                ['Price / book', x(s.pb_ratio, 1)],
+                ['EV / EBITDA', x(s.ev_ebitda, 1)],
+                ['Market cap', s.market_cap != null ? compactMoney(s.market_cap) : null],
+                ['Enterprise value', s.enterprise_value != null ? compactMoney(s.enterprise_value) : null],
+                ['Shares outstanding', s.shares_outstanding != null ? `${(s.shares_outstanding / 1e9).toFixed(2)}B` : null]
             ]]
         ];
 
         root.replaceChildren();
-        groups.forEach(([title, subtitle, items]) => {
+        groups.forEach(([title, items]) => {
             const shown = items.filter(([, v]) => v != null);
             if (!shown.length) return;
-            const section = card(title, subtitle);
+            const section = card(title);
             const dl = el('dl', 'ov-glance fm-glance');
-            shown.forEach(([k, v, hint]) => {
+            shown.forEach(([k, v]) => {
                 const item = el('div', 'ov-glance-item');
-                item.append(el('dt', null, k), el('dd', null, v), el('p', 'fm-hint', hint));
+                item.append(el('dt', null, k), el('dd', null, v));
                 dl.append(item);
             });
             section.append(dl);
@@ -821,8 +821,7 @@
 
         const head = el('div', 'ov-card-head');
         head.append(
-            el('h3', 'ov-card-title', 'Earnings & free cash flow'),
-            el('p', 'ov-card-sub', 'Profit on paper vs. the cash the business actually brought in, by quarter')
+            el('h3', 'ov-card-title', 'Earnings & free cash flow')
         );
 
         const earn = ttm(rows, 'earnings').current;
@@ -926,7 +925,7 @@
         ].filter(([, v]) => v != null);
         if (!items.length) return;
 
-        const section = card('Profitability', 'How many cents of each revenue dollar the company keeps');
+        const section = card('Profitability');
         const list = el('div', 'ov-margins');
         items.forEach(([label, value, hint], i) => {
             const row = el('div', 'ov-margin');

@@ -133,37 +133,7 @@ body {
     line-height: 1.15;
 }
 
-.teaser__lede {
-    max-width: 62ch;
-    margin: 0 0 22px;
-    color: var(--soft, #5d574e);
-    font-size: 1rem;
-}
-
 .teaser .signed-out__actions { justify-content: flex-start; }
-
-.teaser__list {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 18px;
-    margin: 28px 0 0;
-    padding: 24px 0 0;
-    border-top: 1px solid var(--line, #ece4d8);
-    list-style: none;
-}
-
-.teaser__list li {
-    color: var(--soft, #5d574e);
-    font-size: 0.86rem;
-    line-height: 1.45;
-}
-
-.teaser__list strong {
-    display: block;
-    margin-bottom: 5px;
-    color: var(--ink, #23201c);
-    font-size: 0.92rem;
-}
 
 .teaser__escape {
     margin: 22px 0 0;
@@ -175,7 +145,7 @@ body {
 
 @media (max-width: 720px) {
     .teaser { padding: 24px 18px; }
-    .teaser__list { grid-template-columns: 1fr; gap: 14px; }
+
 }
 
 /* A value that is present but has nothing to say. Distinct from .empty-note,
@@ -360,17 +330,7 @@ button:focus-visible {
     stroke-linecap: round;
 }
 
-
-
-
-
-
 /* ── teams grid ───────────────────────────────────────────────────── */
-
-
-
-
-
 
 /* ── team detail ──────────────────────────────────────────────────── */
 
@@ -574,7 +534,6 @@ button:focus-visible {
 }
 
 .roster__ppg.dim { font-weight: 500; color: var(--muted, #928a7d); }
-
 
 /* Free agents. A ranked list, but the point is the subtraction: these are the
    players nobody in this league has. */
@@ -899,79 +858,6 @@ button:focus-visible {
 .ledger-table th[data-key="seed"],
 .ledger__team { text-align: left; }
 
-/* ── what a column means ──────────────────────────────────────────── */
-/*
-   Half this table is derived and the headers carrying the derivation are
-   the ones nobody can guess — xW, All-play, Résumé. The dotted underline is
-   the part that matters as much as the bubble: without a mark on the label,
-   a reader has no reason to hover in the first place.
-
-   Hover is the obvious way in but not the only one. The label takes focus,
-   so the definition is a Tab away, and aria-describedby hands it to a
-   screen reader whether or not anything is pointed at. The phone hides this
-   whole row — there is no hover there — and the column chooser names the
-   column instead. */
-
-.col-hint {
-    position: relative;
-    display: inline-block;
-    /* currentColor, not a fixed grey: the active column's header is darker
-       than the rest, and a mark the reader cannot see is the same as no
-       mark at all — which is the state this whole block exists to fix. */
-    border-bottom: 1px dotted currentColor;
-    cursor: help;
-}
-
-.col-hint:focus-visible {
-    outline: 2px solid var(--sage, #5b7152);
-    outline-offset: 2px;
-}
-
-.col-hint__bubble {
-    position: absolute;
-    top: calc(100% + 7px);
-    left: 0;
-    z-index: 30;
-    width: max-content;
-    max-width: 260px;
-    padding: 9px 11px;
-    border: 1px solid var(--line, #ece4d8);
-    border-radius: 10px;
-    background: var(--card, #fffdf9);
-    box-shadow: 0 10px 24px rgba(47, 38, 28, 0.16);
-    color: var(--soft, #5d574e);
-    font-size: 12px;
-    font-weight: 500;
-    font-variant-numeric: normal;
-    line-height: 1.45;
-    text-align: left;
-    /* A sentence, inside a header styled as a small-caps label. Without
-       these three it inherits the label's treatment and the definition
-       arrives shouting, letter-spaced, and unwrappable. */
-    text-transform: none;
-    letter-spacing: normal;
-    white-space: normal;
-    /* Not `hidden`: aria-describedby has to be able to read it, and a
-       display:none bubble is not a description of anything. */
-    visibility: hidden;
-    opacity: 0;
-    transition: opacity .12s ease, visibility .12s;
-}
-
-.col-hint:hover .col-hint__bubble,
-.col-hint:focus-visible .col-hint__bubble,
-.col-hint:focus-within .col-hint__bubble {
-    visibility: visible;
-    opacity: 1;
-}
-
-/* The last columns sit at the right edge of a table that scrolls sideways,
-   so a left-anchored bubble would open into the clipped part of it. */
-.ledger-table th:nth-last-child(-n+3) .col-hint__bubble {
-    right: 0;
-    left: auto;
-}
-
 /* The chosen column is emphasised rather than isolated: on a wide screen
    the others are still worth reading. */
 .ledger-table th.is-active,
@@ -1142,12 +1028,6 @@ button:focus-visible {
 
 .chart__title { margin: 0 0 2px; font-size: 15px; }
 
-.chart__lede {
-    margin: 0 0 12px;
-    font-size: 12px;
-    color: var(--muted, #928a7d);
-}
-
 .chart-row {
     display: grid;
     grid-template-columns: 104px minmax(0, 1fr) 52px;
@@ -1191,7 +1071,6 @@ button:focus-visible {
     font-size: 10px;
     color: var(--muted, #928a7d);
 }
-
 
 /* ── the phone: one column at a time ───────────────────────────────── */
 
@@ -1448,7 +1327,6 @@ button:focus-visible {
     .board__head h2 { font-size: 22px; }
 }
 
-
 /* The column chooser is a switcher, not a set of buttons competing with the
    masthead. Same treatment as the season rule — until a phone, where it is
    the only control on the page and needs a thumb-sized target. */
@@ -1503,7 +1381,6 @@ button:focus-visible {
    The rest of the page lost its boxes to hairline rules; on a phone the
    scoreboard and the teams grid kept theirs, and a two-up grid of cards
    turned ten teams into a screen and a half of scrolling. */
-
 
 /* ── power rankings: the rosters ───────────────────────────────────────
    One row per team, in the same hairline language as the table. The
@@ -1576,25 +1453,6 @@ button:focus-visible {
 .power-row__stat--odds strong {
     font-weight: 600;
     color: var(--soft, #5d574e);
-}
-
-.power-row__stat .col-hint {
-    font-size: 11px;
-    color: var(--muted, #928a7d);
-}
-
-/* These sit at the right edge of the page, so their bubbles open inward. */
-.power-row__stat .col-hint__bubble {
-    right: 0;
-    left: auto;
-}
-
-/* The bottom rows of each column would open a downward bubble off the end
-   of the board. The page marks them, since which rows those are depends on
-   the league's size. */
-.power-row--low .col-hint__bubble {
-    top: auto;
-    bottom: calc(100% + 7px);
 }
 
 @media (max-width: 720px) {
@@ -1961,7 +1819,6 @@ button:focus-visible {
     font-size: 13.5px;
 }
 
-
 /* Power rankings: one column; a dot on the league's own points range and
    a ring for playoff odds. */
 .power-list,
@@ -1988,7 +1845,7 @@ button:focus-visible {
 .power-head__pts { display: flex; flex-direction: column; gap: 2px; padding-right: 44px; }
 .power-head__scale { display: flex; justify-content: space-between; font-weight: 600; font-variant-numeric: tabular-nums; }
 .power-head__odds { text-align: center; }
-.power-head .col-hint__bubble { left: auto; right: 0; }
+
 .power-row { padding: 0; }
 .power-row--mine { margin: 0 -10px; padding-left: 10px; padding-right: 10px; }
 
@@ -2028,7 +1885,7 @@ button:focus-visible {
     background: var(--surface, #f3eee4);
     font-size: 13px;
 }
-.power-bd__lede { margin: 0 0 10px; color: var(--soft, #5d574e); line-height: 1.45; }
+
 .power-bd__title {
     margin: 12px 0 4px;
     color: var(--clay, #b96a4b);

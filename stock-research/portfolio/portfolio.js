@@ -398,22 +398,22 @@
         }
         if (data.aliases.length) {
             const named = data.aliases.map((a) => `“${escapeHtml(a.name)}” as <strong>${escapeHtml(a.ticker)}</strong>`).join(', ');
-            items.push(`Counted ${named}: the same trades appear under both in different sources.`);
+            items.push(`Counted ${named}.`);
         }
         if (data.duplicates.count) {
             const pairs = data.duplicates.pairs.map((p) => `${countFormat.format(p.count)} from ${escapeHtml(p.duplicateSource)} repeating ${escapeHtml(p.keptSource)}`).join(', ');
-            items.push(`<strong>${plural(data.duplicates.count, 'trade')}</strong> appear twice across your sources (${pairs}), so each is counted once. <a href="#activity">They're tagged in Activity.</a>`);
+            items.push(`<strong>${plural(data.duplicates.count, 'duplicate trade')}</strong> (${pairs}). <a href="#activity">See Activity</a>`);
         }
         if (data.splits.tradesAdjusted) {
             const tickers = [...new Set(data.splits.applied.map((a) => a.ticker))];
             items.push(`Adjusted ${plural(data.splits.tradesAdjusted, 'trade')} for ${plural(data.splits.applied.length, 'stock split')} (${tickers.slice(0, 4).map(escapeHtml).join(', ')}${tickers.length > 4 ? '…' : ''}). <a href="#holdings">See splits</a>`);
         }
         if (t.estimatedPositions) {
-            items.push(`${plural(t.estimatedPositions, 'position')} ${t.estimatedPositions === 1 ? 'has' : 'have'} no market price, so ${t.estimatedPositions === 1 ? "it's" : "they're"} valued at your last trade.`);
+            items.push(`${plural(t.estimatedPositions, 'position')} with no market price.`);
         }
         const noBasis = data.positions.filter((p) => p.costBasis == null).length;
-        if (noBasis) items.push(`${plural(noBasis, 'position')} ${noBasis === 1 ? 'has' : 'have'} no cost basis, so ${noBasis === 1 ? 'its' : 'their'} gain isn't counted.`);
-        els.insights.innerHTML = items.length ? items.map((text) => `<li>${text}</li>`).join('') : '<li class="pf-muted">Nothing to note yet.</li>';
+        if (noBasis) items.push(`${plural(noBasis, 'position')} with no cost basis.`);
+        els.insights.innerHTML = items.length ? items.map((text) => `<li>${text}</li>`).join('') : '';
     }
 
     function priceCell(p) {
@@ -462,7 +462,7 @@
         const colors = swatches(data.positions);
         const top = data.positions.slice(0, TOP_HOLDINGS);
         els.topHoldingsSub.textContent = data.positions.length > TOP_HOLDINGS
-            ? `The largest ${TOP_HOLDINGS} of ${data.positions.length} open positions.`
+            ? `Top ${TOP_HOLDINGS} of ${data.positions.length}`
             : plural(data.positions.length, 'open position');
         els.allHoldingsLink.textContent = data.totals.closedPositions
             ? `All holdings and ${data.totals.closedPositions} closed`
@@ -480,8 +480,8 @@
     function renderHoldings(data) {
         const asOf = data.holdings.asOf;
         els.holdingsSub.textContent = asOf
-            ? `Holdings as of ${fmtDay(asOf)}${data.transactionCount ? ', plus later trades' : ''}. Cost is average cost across every account.`
-            : `Built from ${plural(data.transactionCount, 'trade')}, at average cost across every account.`;
+            ? `As of ${fmtDay(asOf)}${data.transactionCount ? ` · ${plural(data.transactionCount, 'trade')}` : ''}`
+            : plural(data.transactionCount, 'trade');
         const colors = swatches(data.positions);
         els.holdingsBody.innerHTML = data.positions.map((p, i) => `
             <tr data-ticker="${escapeHtml(p.ticker)}">
@@ -502,7 +502,7 @@
         const closed = data.closedPositions;
         els.closedCard.hidden = !closed.length;
         const realized = closed.reduce((sum, c) => sum + (c.realizedGain || 0), 0);
-        els.closedSub.innerHTML = `${plural(closed.length, 'position')} you've sold out of, newest first. <span class="${tone(realized)}">${fmtSigned(realized, true)}</span> realized between them.`;
+        els.closedSub.innerHTML = `${plural(closed.length, 'position')} · <span class="${tone(realized)}">${fmtSigned(realized, true)}</span> realized`;
         els.closedBody.innerHTML = closed.map((c) => `
             <tr data-ticker="${escapeHtml(c.ticker)}">
                 <td>${securityLink(c)}</td>
@@ -523,9 +523,9 @@
         const { applied, tradesAdjusted, alreadyAdjusted } = data.splits;
         $('splitsCard').hidden = !applied.length && !alreadyAdjusted;
         const parts = [];
-        if (tradesAdjusted) parts.push(`${plural(tradesAdjusted, 'trade')} from before a split ${tradesAdjusted === 1 ? 'is' : 'are'} counted in today's shares; the money paid doesn't change.`);
-        if (alreadyAdjusted) parts.push(`${plural(alreadyAdjusted, 'trade')} already matched the split-adjusted price, so ${alreadyAdjusted === 1 ? 'it was' : 'they were'} left as recorded.`);
-        $('splitsSub').textContent = parts.join(' ');
+        if (tradesAdjusted) parts.push(`${plural(tradesAdjusted, 'trade')} adjusted`);
+        if (alreadyAdjusted) parts.push(`${plural(alreadyAdjusted, 'trade')} already adjusted`);
+        $('splitsSub').textContent = parts.join(' · ');
         $('splitsTable').innerHTML = applied.length ? `
             <thead><tr><th scope="col">Security</th><th scope="col">Split</th><th scope="col" class="num">Date</th><th scope="col" class="num">Trades adjusted</th></tr></thead>
             <tbody>${applied.map((a) => `
@@ -650,8 +650,8 @@
         const reported = data.reportedRealized;
         const realized = data.realizedByTicker;
         $('realizedSub').innerHTML = reported.count
-            ? `Your file reported <strong class="${tone(reported.reported)}">${fmtSigned(reported.reported, true)}</strong> realized on ${plural(reported.count, 'sell')}; at average cost across all your accounts, the same sells come to <strong class="${tone(reported.computed)}">${fmtSigned(reported.computed, true)}</strong>. The two differ when the source matched lots differently (first in, first out) or saw only one account.`
-            : 'Gain on every security you have sold, at average cost.';
+            ? `File: <strong class="${tone(reported.reported)}">${fmtSigned(reported.reported, true)}</strong> on ${plural(reported.count, 'sell')} · average cost: <strong class="${tone(reported.computed)}">${fmtSigned(reported.computed, true)}</strong>`
+            : '';
         const shown = showAllRealized ? realized : realized.slice(0, REALIZED_SHOWN);
         $('realizedTable').innerHTML = `
             <thead><tr><th scope="col">Security</th><th scope="col" class="num">Realized</th><th scope="col" class="num">Sold</th></tr></thead>
@@ -726,7 +726,7 @@
         const dupes = lastData?.duplicates.count || 0;
         els.transactionsSub.textContent = lastData?.transactionCount
             ? `${filtered ? `${plural(data.total, 'row')} match · ` : ''}${plural(lastData.transactionCount, 'trade')} counted${dupes ? ` · ${countFormat.format(dupes)} duplicate${dupes === 1 ? '' : 's'} across sources not counted` : ''}${lastData.transactionsIgnored ? ` · ${countFormat.format(lastData.transactionsIgnored)} already in your holdings` : ''}`
-            : 'No trades yet. Upload a history or add one by hand.';
+            : 'No trades yet.';
         els.transactionsBody.innerHTML = data.rows.map((t) => {
             const realized = t.side === 'sell' && (t.realized != null || t.realizedReported != null)
                 ? `<span class="${tone(t.realized)}">${fmtSigned(t.realized, true)}</span>${t.realizedReported != null ? `<span class="pf-sub" title="As your file reported it">file: ${fmtSigned(t.realizedReported, true)}</span>` : ''}`
@@ -912,29 +912,18 @@
             return;
         }
         $('historyLegend').hidden = false;
-        const tradedInRange = lastData?.lastTrade && lastData.lastTrade > points[0].date;
         const { gain, pct } = rangeReturn(points);
         sub.innerHTML = `<span class="pf-history-change ${tone(gain)}">${fmtSigned(gain, true)}${pct == null ? '' : ` (${fmtPct(pct, true)})`}</span>`;
 
         const notes = [];
-        const asOf = history.data.asOf;
-        if (asOf && points[0].date < asOf) {
-            notes.push(`Before ${fmtDay(asOf)}, this assumes you held the holdings you uploaded, less any trades you've added since.`);
-        }
-        if (tradedInRange) {
-            notes.push('Buys and sells move the value line too, so the gain above leaves out money you put in or took out, and its percent is a time-weighted return.');
-        }
         const estimated = points.some((p) => p.estimated);
-        if (estimated) {
-            notes.push('Dashed stretches use your own trade prices where no market close was available (a position with no ticker, or history not loaded yet).');
-        }
         const backfilling = (history.data.backfilling || []).length;
         if (backfilling) {
-            notes.push(`Fetching older prices for ${plural(backfilling, 'symbol')}; the dashed stretches fill in with real closes as they arrive${history.data.retryAfter > 60 ? ' (the history source limits requests per hour, so this can take a while the first time)' : ''}.`);
+            notes.push(`Fetching older prices for ${plural(backfilling, 'symbol')}…`);
         } else if (pending) {
-            notes.push(`Still loading prices for ${plural(pending, 'symbol')}${history.data.retryAfter > 5 ? '; the price provider limits requests per minute, so a long history fills in over a few minutes the first time' : ''}.`);
+            notes.push(`Loading prices for ${plural(pending, 'symbol')}…`);
         }
-        if (history.data.sampleData) notes.push('Generated sample prices, not real history.');
+        if (history.data.sampleData) notes.push('Sample prices.');
         note.textContent = notes.join(' ');
         note.hidden = !notes.length;
         $('estimatedKey').hidden = !estimated;
@@ -1150,7 +1139,7 @@
         const points = pointsInRange(d.closes, holding.range);
         const sub = $('holdingSub');
         if (points.length < 2) {
-            sub.textContent = d.pending ? 'Loading price history…' : d.asset === 'other' ? 'No market price for this one; it’s valued at your last trade.' : 'No price history yet.';
+            sub.textContent = d.pending ? 'Loading price history…' : d.asset === 'other' ? 'No market price.' : 'No price history yet.';
             $('holdingLegend').hidden = true;
             $('holdingChart').innerHTML = '';
         } else {
@@ -1165,8 +1154,8 @@
             drawPriceChart(points, avg, trades);
         }
         const notes = [];
-        if (d.pending) notes.push('Older prices are still loading; the chart fills in as they arrive.');
-        if (d.sampleData) notes.push('Generated sample prices, not real history.');
+        if (d.pending) notes.push('Loading older prices…');
+        if (d.sampleData) notes.push('Sample prices.');
         $('holdingNote').textContent = notes.join(' ');
         $('holdingNote').hidden = !notes.length;
 
@@ -1174,10 +1163,10 @@
         $('holdingTiles').innerHTML = (d.open ? [
             gainTile('Value', fmtMoney(pos.marketValue, true), `${shareFormat.format(pos.shares)} shares`),
             gainTile('Unrealized', fmtSigned(pos.gain, true), pos.gainPct == null ? 'No cost basis' : `${fmtPct(pos.gainPct, true)} on ${fmtMoney(pos.costBasis, true)}`, tone(pos.gain)),
-            gainTile('Average cost', fmtMoney(pos.avgCost), 'A share, across every account'),
-            gainTile('Realized', fmtSigned(pos.realizedGain, true), 'From your sells', tone(pos.realizedGain)),
+            gainTile('Average cost', fmtMoney(pos.avgCost), 'Per share'),
+            gainTile('Realized', fmtSigned(pos.realizedGain, true), '', tone(pos.realizedGain)),
         ] : [
-            gainTile('Realized', fmtSigned(pos.realizedGain, true), 'At average cost', tone(pos.realizedGain)),
+            gainTile('Realized', fmtSigned(pos.realizedGain, true), '', tone(pos.realizedGain)),
             gainTile('Bought', fmtMoney(pos.bought, true), plural(pos.trades, 'trade')),
             gainTile('Sold', fmtMoney(pos.sold, true), `Last ${fmtDay(pos.lastTrade)}`),
             gainTile('Held', fmtMonth(pos.firstTrade), `to ${fmtMonth(pos.lastTrade)}`),
@@ -1202,22 +1191,22 @@
             factRow('First bought', fmtDay(pos.firstTrade)),
             factRow('Trades', countFormat.format(pos.trades)),
         ].join('');
-        $('holdingFactsSub').textContent = d.priceAsOf ? `Price moves from daily closes through ${fmtDay(d.priceAsOf)}.` : '';
+        $('holdingFactsSub').textContent = d.priceAsOf ? `Through ${fmtDay(d.priceAsOf)}` : '';
 
         const research = $('holdingResearch');
         research.hidden = d.asset !== 'stock';
         research.href = `/stock-research/?ticker=${encodeURIComponent(d.ticker)}`;
         const meta = [...new Set([c.sector, c.industry, c.headquarters, c.employees ? `${countFormat.format(c.employees)} employees` : null].filter(Boolean))];
         $('holdingAbout').innerHTML = d.asset !== 'stock'
-            ? `<p>${d.asset === 'crypto' ? `${escapeHtml(d.name || d.ticker)} is a cryptocurrency, priced in US dollars.` : 'A security without a ticker (an option, say), so there’s no market data for it.'}</p>`
+            ? `<p>${d.asset === 'crypto' ? 'Cryptocurrency' : 'No market data.'}</p>`
             : d.company
                 ? `${meta.length ? `<p class="pf-about__meta">${meta.map(escapeHtml).join(' · ')}</p>` : ''}
                    <p>${escapeHtml(c.description || 'No description on file.')}</p>
                    ${c.website ? `<p><a class="pf-link" href="${escapeHtml(c.website)}" rel="noopener" target="_blank">${escapeHtml(c.website.replace(/^https?:\/\//, '').replace(/\/$/, ''))}</a></p>` : ''}`
-                : '<p>Company details load once this stock has been looked up in Stock Research. Open the full research page to fetch them.</p>';
+                : '<p>No company details yet.</p>';
 
         // Trades, newest first.
-        $('holdingTradesSub').textContent = `${plural(d.trades.length, 'trade')}, in today’s shares where a split changed them.`;
+        $('holdingTradesSub').textContent = plural(d.trades.length, 'trade');
         $('holdingTrades').innerHTML = [...d.trades].reverse().map((t) => `
             <tr>
                 <td>${fmtDay(t.date)}</td>
@@ -1390,7 +1379,7 @@
         els.fileInput.value = '';
         els.pasteInput.value = '';
         els.replaceInput.checked = false;
-        els.fileName.textContent = 'A positions or transactions export from your broker works as is.';
+        els.fileName.textContent = '';
         pendingRetries = 0;
         render(result.portfolio);
         if (count) setUploadOpen(false);

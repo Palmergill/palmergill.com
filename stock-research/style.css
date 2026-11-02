@@ -216,7 +216,7 @@ header {
     font-size: 13px;
     line-height: 1.4;
 }
-.compare-hint { color: var(--muted); font-size: 12px; }
+
 .compare-form {
     display: flex;
     gap: 8px;
@@ -781,60 +781,6 @@ button .ripple {
     color: var(--accent-green);
 }
 
-/* Stock Tips */
-.stock-tips-container {
-    text-align: center;
-    margin: 20px 0;
-    min-height: 24px;
-}
-
-.stock-tip {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    font-size: 13px;
-    color: var(--text-muted);
-    opacity: 0;
-    transform: translateY(10px);
-    animation: tip-fade-in 0.5s ease forwards;
-}
-
-.stock-tip.fade-out {
-    animation: tip-fade-out 0.5s ease forwards;
-}
-
-.tip-icon {
-    font-size: 16px;
-}
-
-.tip-text {
-    max-width: 400px;
-    line-height: 1.4;
-}
-
-@keyframes tip-fade-in {
-    from {
-        opacity: 0;
-        transform: translateY(10px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
-@keyframes tip-fade-out {
-    from {
-        opacity: 1;
-        transform: translateY(0);
-    }
-    to {
-        opacity: 0;
-        transform: translateY(-10px);
-    }
-}
-
 /* Retry Countdown */
 .retry-countdown {
     font-size: 14px;
@@ -953,13 +899,6 @@ button .ripple {
     margin-bottom: 12px;
 }
 
-.empty-description {
-    font-size: 15px;
-    color: var(--text-secondary);
-    margin-bottom: 32px;
-    line-height: 1.6;
-}
-
 .trending-stocks {
     margin-bottom: 32px;
 }
@@ -1018,61 +957,8 @@ button .ripple {
     color: var(--text-muted);
 }
 
-/* Feature Callouts */
-.feature-callouts {
-    display: flex;
-    justify-content: center;
-    gap: 24px;
-    margin: 32px 0;
-    flex-wrap: wrap;
-}
-
-.feature-item {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 8px;
-    padding: 16px;
-    background: var(--card);
-    border-radius: 12px;
-    border: 1px solid var(--line);
-    transition: all 0.2s ease;
-    min-width: 80px;
-}
-
-.feature-item:hover {
-    background: rgba(91, 113, 82, 0.1);
-    border-color: rgba(91, 113, 82, 0.2);
-    transform: translateY(-2px);
-}
-
-.feature-icon {
-    font-size: 24px;
-}
-
-.feature-text {
-    font-size: 12px;
-    color: var(--text-muted);
-    font-weight: 500;
-}
-
 @media (max-width: 768px) {
-    .feature-callouts {
-        gap: 12px;
-    }
 
-    .feature-item {
-        padding: 12px;
-        min-width: 70px;
-    }
-
-    .feature-icon {
-        font-size: 20px;
-    }
-
-    .feature-text {
-        font-size: 11px;
-    }
 }
 
 /* Cards */
@@ -1736,10 +1622,8 @@ button,
         grid-template-columns: minmax(260px, 0.8fr) minmax(420px, 1.2fr);
         grid-template-areas:
             "art title"
-            "art description"
             "art compare"
             "trending trending"
-            "features features"
             "source source";
         align-items: center;
         column-gap: clamp(44px, 7vw, 88px);
@@ -1762,10 +1646,10 @@ button,
     }
 
     .empty-title { grid-area: title; margin-top: 0; font-size: 2rem; }
-    .empty-description { grid-area: description; max-width: 54ch; margin-bottom: 22px; }
+
     .compare-section { grid-area: compare; width: 100%; }
     .empty > .trending-stocks:not(.compare-section):not(.watchlist-section) { grid-area: trending; margin-top: 54px; }
-    .feature-callouts { grid-area: features; }
+
     .data-source { grid-area: source; text-align: center; }
 
     .trending-grid {
@@ -1782,38 +1666,6 @@ button,
 .compare-form input {
     background: var(--card);
 }
-
-.feature-callouts {
-    width: 100%;
-    gap: 10px;
-}
-
-.feature-item {
-    flex: 1 1 140px;
-    min-width: 0;
-    flex-direction: row;
-    justify-content: flex-start;
-    text-align: left;
-}
-
-.feature-icon {
-    display: grid;
-    width: 30px;
-    height: 30px;
-    flex: 0 0 30px;
-    place-items: center;
-    border-radius: 8px;
-    background: var(--sage-soft);
-    color: var(--sage-dim);
-    font-size: 0;
-    font-weight: 700;
-}
-
-.feature-icon::before { font-size: 11px; }
-.feature-item:nth-child(1) .feature-icon::before { content: "01"; }
-.feature-item:nth-child(2) .feature-icon::before { content: "02"; }
-.feature-item:nth-child(3) .feature-icon::before { content: "03"; }
-.feature-item:nth-child(4) .feature-icon::before { content: "04"; }
 
 .trending-stock:focus-visible,
 .compare-add-btn:focus-visible,
@@ -1834,14 +1686,6 @@ button,
         margin-bottom: 16px;
     }
 
-    .empty-description {
-        margin-bottom: 24px;
-    }
-
-    .feature-callouts {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-    }
 }
 
 /* Chart Background Gradients */
@@ -2675,7 +2519,7 @@ button,
 .fm-groups { display: flex; flex-direction: column; gap: 14px; padding-bottom: 32px; }
 .fm-glance .ov-glance-item { padding: 12px 0; }
 .fm-glance .ov-glance-item:nth-child(-n+2) { padding-top: 0; }
-.fm-hint { font-size: 11.5px; line-height: 1.35; color: var(--muted); margin-top: 2px; }
+
 #fundamentals .ec-card { margin-bottom: 14px; }
 @media (min-width: 720px) {
     .fm-glance { grid-template-columns: repeat(3, minmax(0, 1fr)); }

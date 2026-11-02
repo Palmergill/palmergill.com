@@ -106,7 +106,7 @@ body {
 .pf-drop input { position: absolute; opacity: 0; width: 1px; height: 1px; }
 .pf-drop__title { color: var(--ink); font-weight: 600; }
 .pf-drop__hint { font-size: 13px; color: var(--muted); }
-.pf-paste summary, .pf-help summary { cursor: pointer; font-size: 13px; color: var(--sage); font-weight: 600; }
+.pf-paste summary { cursor: pointer; font-size: 13px; color: var(--sage); font-weight: 600; }
 .pf-paste textarea {
     margin-top: 8px;
     width: 100%;
@@ -133,9 +133,6 @@ body {
     background: var(--card);
     min-width: 0;
 }
-.pf-help { margin-top: 14px; font-size: 13px; }
-.pf-help p { margin-top: 8px; }
-.pf-help code { background: var(--surface); padding: 1px 5px; border-radius: 4px; font-size: 12px; }
 
 /* Dashboard: the cards stack with the page's own rhythm. */
 #dashboard { display: flex; flex-direction: column; gap: 16px; }

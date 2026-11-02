@@ -71,5 +71,5 @@ test('a multi-broker trade history uploads through the file picker and fills eve
     await expect(page.locator('#accountsTable')).toContainText('Crypto Account');
 
     await page.getByRole('link', { name: 'Gains', exact: true }).click();
-    await expect(page.locator('#realizedSub')).toContainText('Your file reported +$135');
+    await expect(page.locator('#realizedSub')).toContainText('File: +$135');
 });

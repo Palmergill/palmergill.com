@@ -21,7 +21,6 @@
 
     const byId = (id) => document.getElementById(id);
     const els = {
-        draftLede: byId("draftLede"),
         statusLabel: byId("statusLabel"),
         statusValue: byId("statusValue"),
         statusSeason: byId("statusSeason"),
@@ -43,7 +42,6 @@
         boardFilters: byId("boardFilters"),
         pickRows: byId("pickRows"),
         callouts: byId("callouts"),
-        methodBody: byId("methodBody"),
     };
 
     class ForbiddenError extends Error {}
@@ -125,8 +123,7 @@
             if (!season.available) {
                 chip.disabled = true;
                 chip.classList.add("chip--disabled");
-                chip.title = "This season is private in ESPN's league settings.";
-            } else {
+                } else {
                 chip.addEventListener("click", () => selectSeason(season.season));
             }
             if (season.season === state.season) {
@@ -214,7 +211,7 @@
         const awards = recap.accolades || [];
         if (!awards.length) {
             els.awardsGrid.appendChild(
-                el("p", "empty-note", "No accolades yet — the board is still filling in.")
+                el("p", "empty-note", "No accolades yet.")
             );
             return;
         }
@@ -245,7 +242,7 @@
             el(
                 "span",
                 "component__blurb",
-                `${F.componentBlurb(key)} Worth ${Math.round(component.weight * 100)}%.`
+                `Worth ${Math.round(component.weight * 100)}%`
             )
         );
         return row;
@@ -333,7 +330,7 @@
         return card;
     }
 
-    const PENDING_NOTE = "This team's draft recap is written on the Tuesday after the draft.";
+    const PENDING_NOTE = "No recap yet.";
 
     function renderStoredNote(container, payload) {
         if (payload && payload.note_md) renderMarkdown(container, payload.note_md);
@@ -506,46 +503,6 @@
         }
     }
 
-    function renderMethod(recap) {
-        els.methodBody.replaceChildren();
-        const method = recap.method || {};
-
-        els.methodBody.appendChild(el("p", null, method.relative || ""));
-        els.methodBody.appendChild(el("p", null, method.adp_caveat || ""));
-        els.methodBody.appendChild(el("p", null, F.adpSourceNote(recap.adp_source)));
-
-        if (method.weights) {
-            const list = el("ul", "method__list");
-            Object.entries(method.weights).forEach(([key, weight]) => {
-                list.appendChild(
-                    el(
-                        "li",
-                        null,
-                        `${F.componentLabel(key)} — ${Math.round(weight * 100)}%. ${F.componentBlurb(key)}`
-                    )
-                );
-            });
-            els.methodBody.appendChild(list);
-        }
-
-        if (method.starting_slots && method.starting_slots.length) {
-            els.methodBody.appendChild(
-                el(
-                    "p",
-                    null,
-                    `Starting lineup: ${method.starting_slots.join(", ")}. Replacement level is read off this, not a generic baseline.`
-                )
-            );
-        }
-        if (method.replacement_points) {
-            const list = el("ul", "method__list");
-            Object.entries(method.replacement_points).forEach(([position, points]) => {
-                list.appendChild(el("li", null, `${position} replacement — ${F.formatPoints(points)} pts`));
-            });
-            els.methodBody.appendChild(list);
-        }
-    }
-
     // ── load ────────────────────────────────────────────────────────────
 
     function renderStatus(recap) {
@@ -554,7 +511,7 @@
         els.noticeBanner.hidden = recap.status !== "in_progress";
         if (recap.status === "in_progress") {
             els.noticeBanner.textContent =
-                "The draft is still running. Grades and accolades update as picks land.";
+                "Draft in progress.";
         }
     }
 
@@ -577,10 +534,7 @@
             if (!recap.picks || !recap.picks.length) {
                 els.emptyTitle.textContent =
                     recap.status === "in_progress" ? "Draft under way" : "No draft yet";
-                els.emptyBody.textContent =
-                    recap.status === "in_progress"
-                        ? "The draft room is open. This page fills in as picks land — check back in a few minutes."
-                        : "This page fills in on its own once the draft board has picks on it.";
+                els.emptyBody.textContent = "";
                 setView("empty");
                 return;
             }
@@ -590,7 +544,6 @@
             renderFilters(recap);
             renderPicks(recap);
             renderCallouts(recap);
-            renderMethod(recap);
             setView("draft");
         } catch (error) {
             handleFailure(error);

@@ -23,7 +23,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/shared/site-nav.css?v=19">
-    <link rel="stylesheet" href="style.css?v=12">
+    <link rel="stylesheet" href="style.css?v=13">
 </head>
 <body>
 <noscript>
@@ -57,7 +57,7 @@
             <button id="searchIconBtnMain" class="search-icon-btn" title="Search">Search</button>
         </header>
         <div id="demoBanner" class="demo-banner hidden" role="status">
-            Public demo mode uses generated sample stock data. Live market provider calls stay protected.
+            Sample data
         </div>
         
         <!-- Search Modal -->
@@ -96,13 +96,6 @@
                     </div>
                 </div>
                 
-                <!-- Rotating Stock Tips -->
-                <div class="stock-tips-container">
-                    <div class="stock-tip" id="stockTip">
-                        <span class="tip-icon">💡</span>
-                        <span class="tip-text">Did you know? The P/E ratio helps compare valuations across companies.</span>
-                    </div>
-                </div>
                 
                 <!-- Skeleton Header -->
                 <div class="card company-header skeleton">
@@ -190,12 +183,10 @@
                     </svg>
                 </div>
                 <h3 class="empty-title">Research any ticker</h3>
-                <p class="empty-description">Explore price history, fundamentals, and earnings for US stocks. Sign in for live market data; the public demo uses generated sample values.</p>
                 
                 <div id="compareSection" class="trending-stocks compare-section">
                     <div class="trending-label-row">
                         <span class="trending-label">Compare</span>
-                        <span class="compare-hint">Add up to 4 tickers</span>
                     </div>
                     <form id="compareForm" class="compare-form">
                         <input id="compareInput" type="text" maxlength="8" placeholder="Add ticker (e.g. NVDA)" autocomplete="off">
@@ -244,26 +235,8 @@
                 </div>
                 
                 <!-- Feature Callouts -->
-                <div class="feature-callouts">
-                    <div class="feature-item">
-                        <span class="feature-icon">📊</span>
-                        <span class="feature-text">Price History Charts</span>
-                    </div>
-                    <div class="feature-item">
-                        <span class="feature-icon">💰</span>
-                        <span class="feature-text">Financial Metrics</span>
-                    </div>
-                    <div class="feature-item">
-                        <span class="feature-icon">📈</span>
-                        <span class="feature-text">Earnings Data</span>
-                    </div>
-                    <div class="feature-item">
-                        <span class="feature-icon">⚡</span>
-                        <span class="feature-text">Price Comparisons</span>
-                    </div>
-                </div>
                 
-                <p class="data-source">Live data for signed-in users is provided by Polygon.io and Finnhub.</p>
+                <p class="data-source">Data: Polygon.io · Finnhub</p>
             </div>
 
             <div id="results" class="hidden">
@@ -325,10 +298,10 @@
     <script src="/shared/site-nav.js?v=22"></script>
     <script src="/shared/analytics.js?v=1"></script>
     <script src="/shared/api-base.js?v=1"></script>
-    <script src="overview.js?v=3"></script>
+    <script src="overview.js?v=4"></script>
     <script src="shelby.js?v=1"></script>
-    <script src="app.js?v=16"></script>
+    <script src="app.js?v=17"></script>
     <script src="watchlist.js?v=1"></script>
-    <script src="compare.js?v=3"></script>
+    <script src="compare.js?v=4"></script>
 </body>
 </html>

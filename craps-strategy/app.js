@@ -117,8 +117,8 @@
             : '';
 
         dom.strategySummary.innerHTML =
-            '<strong>' + escapeHtml(spec.name) + '.</strong> ' +
-            escapeHtml(spec.summary || '') + escapeHtml(oddsTxt + progTxt + cashOutTxt);
+            '<strong>' + escapeHtml(spec.name) + '.</strong>' +
+            escapeHtml(oddsTxt + progTxt + cashOutTxt);
 
         dom.betList.innerHTML = '';
         spec.bets.forEach((bet) => {

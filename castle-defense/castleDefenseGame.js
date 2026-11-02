@@ -48,7 +48,6 @@
             kind: "tower",
             name: "Archer",
             plural: "Archers",
-            blurb: "Long reach, one target at a time. Best against Brutes and the King.",
             base: { damage: 22, range: 2.3, rate: 2.0 },
             projectile: { kind: "arrow", speed: 11, homing: true }
         },
@@ -56,7 +55,6 @@
             kind: "tower",
             name: "Cannon",
             plural: "Cannons",
-            blurb: "Shells burst across a crowd, but fast zombies can outrun them.",
             base: { damage: 20, range: 1.7, rate: 0.5, splash: 0.75 },
             projectile: { kind: "shell", speed: 6, homing: false }
         },
@@ -64,7 +62,6 @@
             kind: "tower",
             name: "Frost",
             plural: "Frost towers",
-            blurb: "Barely hurts, but slows the pack so the others get more shots.",
             base: { damage: 4, range: 1.7, rate: 1.0, splash: 0.7, slow: 0.28, slowGrowth: 0.04, slowCap: 0.45, slowFor: 1.6 },
             projectile: { kind: "shard", speed: 9, homing: true }
         },
@@ -72,7 +69,6 @@
             kind: "tower",
             name: "Mage",
             plural: "Mages",
-            blurb: "Lightning jumps between zombies. Strong when they bunch up.",
             base: { damage: 23, range: 2.0, rate: 0.75, chains: 2, chainRange: 1.6 },
             projectile: null
         },
@@ -80,21 +76,18 @@
             kind: "trap",
             name: "Spikes",
             plural: "Spikes",
-            blurb: "Cuts every zombie that walks across its tile.",
             base: { dps: 16 }
         },
         tar: {
             kind: "trap",
             name: "Tar pit",
             plural: "Tar pits",
-            blurb: "Bogs down everything crossing it, and the slow lingers.",
             base: { dps: 4, slow: 0.5, slowGrowth: 0.02, slowCap: 0.6, slowFor: 1.3 }
         },
         mine: {
             kind: "trap",
             name: "Mine",
             plural: "Mines",
-            blurb: "A big blast when stepped on, then a few seconds to re-arm.",
             base: { damage: 55, splash: 0.9, rearm: 5 }
         }
     };

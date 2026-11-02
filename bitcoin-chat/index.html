@@ -40,7 +40,7 @@
                 </button>
                 <button type="button" id="chatToggle" class="term-button" aria-expanded="true" aria-controls="chatPanel">chat</button>
             </header>
-            <p id="demoNotice" class="demo-notice" hidden>Public demo mode uses sample Bitcoin data and local answers. Live node calls stay protected.</p>
+            <p id="demoNotice" class="demo-notice" hidden>Sample data</p>
 
             <section class="explorer-drawer" id="explorerDrawer" aria-label="Chain lookup" hidden>
                 <form id="explorerSearchForm" class="explorer-search">
@@ -85,30 +85,30 @@
                     </section>
 
                     <section class="metric-grid" aria-label="Live chain metrics">
-                        <button type="button" class="stat-tile" id="chainTile" data-prompt="What is a block, in simple terms?" title="Ask: what's a block?">
+                        <button type="button" class="stat-tile" id="chainTile" data-prompt="What is a block, in simple terms?">
                             <span class="tile-label">The chain right now</span>
                             <span class="tile-value mono" id="chainTileValue">—</span>
-                            <span class="tile-caption" id="chainTileCaption">blocks ever mined</span>
+                            <span class="tile-caption" id="chainTileCaption"></span>
                         </button>
-                        <button type="button" class="stat-tile" id="feeTile" data-prompt="Why do Bitcoin transaction fees change from day to day?" title="Ask: why do fees change?">
+                        <button type="button" class="stat-tile" id="feeTile" data-prompt="Why do Bitcoin transaction fees change from day to day?">
                             <span class="tile-label">Cost to send</span>
                             <span class="tile-value mono accent" id="feeTileValue">—</span>
-                            <span class="tile-caption" id="feeTileCaption">checking today's fees…</span>
+                            <span class="tile-caption" id="feeTileCaption"></span>
                         </button>
-                        <button type="button" class="stat-tile" id="mempoolTile" data-prompt="What is the mempool and why do transactions wait there?" title="Ask: what's the mempool?">
+                        <button type="button" class="stat-tile" id="mempoolTile" data-prompt="What is the mempool and why do transactions wait there?">
                             <span class="tile-label">Waiting room</span>
                             <span class="tile-value mono" id="mempoolTileValue">—</span>
-                            <span class="tile-caption" id="mempoolTileCaption">payments queued for the next blocks</span>
+                            <span class="tile-caption" id="mempoolTileCaption"></span>
                         </button>
-                        <button type="button" class="stat-tile" id="supplyTile" data-prompt="Why will there only ever be 21 million bitcoin, and what is the halving?" title="Ask: why only 21 million?">
+                        <button type="button" class="stat-tile" id="supplyTile" data-prompt="Why will there only ever be 21 million bitcoin, and what is the halving?">
                             <span class="tile-label">Supply released</span>
                             <span class="tile-value mono" id="supplyTileValue">—</span>
-                            <span class="tile-caption" id="supplyTileCaption">of all 21M bitcoin already exist</span>
+                            <span class="tile-caption" id="supplyTileCaption"></span>
                         </button>
-                        <button type="button" class="stat-tile" id="difficultyTile" data-prompt="What is the Bitcoin difficulty adjustment and why does it exist?" title="Ask: what's the difficulty adjustment?">
+                        <button type="button" class="stat-tile" id="difficultyTile" data-prompt="What is the Bitcoin difficulty adjustment and why does it exist?">
                             <span class="tile-label">Next difficulty change</span>
                             <span class="tile-value mono" id="difficultyTileValue">—</span>
-                            <span class="tile-caption" id="difficultyTileCaption">the network self-tunes every 2,016 blocks</span>
+                            <span class="tile-caption" id="difficultyTileCaption"></span>
                         </button>
                     </section>
 
@@ -146,6 +146,6 @@
     <script src="/shared/site-nav.js?v=22"></script>
     <script src="/shared/analytics.js?v=1"></script>
     <script src="/shared/api-base.js?v=1"></script>
-    <script src="app.js?v=10"></script>
+    <script src="app.js?v=11"></script>
 </body>
 </html>

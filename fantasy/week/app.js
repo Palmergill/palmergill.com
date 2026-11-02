@@ -45,9 +45,7 @@
         gradesNote: byId("gradesNote"),
         tableNote: byId("tableNote"),
         teamRows: byId("teamRows"),
-        lineupNote: byId("lineupNote"),
         callouts: byId("callouts"),
-        methodBody: byId("methodBody"),
     };
 
     class ForbiddenError extends Error {}
@@ -149,8 +147,7 @@
             if (!season.available) {
                 chip.disabled = true;
                 chip.classList.add("chip--disabled");
-                chip.title = "This season is private in ESPN's league settings.";
-            } else {
+                } else {
                 chip.addEventListener("click", () => selectSeason(season.season));
             }
             if (season.season === state.season) {
@@ -308,7 +305,7 @@
         const awards = recap.accolades || [];
         if (!awards.length) {
             els.awardsGrid.appendChild(
-                el("p", "empty-note", "No accolades yet — the week is still filling in.")
+                el("p", "empty-note", "No accolades yet.")
             );
             els.accoladesNote.textContent = "";
             return;
@@ -340,7 +337,7 @@
             el(
                 "span",
                 "component__blurb",
-                `${F.componentBlurb(key)} Worth ${Math.round(component.weight * 100)}%.`
+                `Worth ${Math.round(component.weight * 100)}%`
             )
         );
         return row;
@@ -463,7 +460,7 @@
         return params;
     }
 
-    const PENDING_NOTE = "The recap for this week is written on Tuesday morning.";
+    const PENDING_NOTE = "No recap yet.";
 
     function renderStoredNote(container, payload) {
         if (payload && payload.note_md) renderMarkdown(container, payload.note_md);
@@ -520,7 +517,6 @@
             els.teamRows.appendChild(tr);
         });
         els.tableNote.textContent = `${rows.length} teams`;
-        els.lineupNote.textContent = F.lineupNote(recap.lineups);
     }
 
     function bindSorting() {
@@ -607,41 +603,6 @@
         }
     }
 
-    function renderMethod(recap) {
-        els.methodBody.replaceChildren();
-        const method = recap.method || {};
-
-        els.methodBody.appendChild(el("p", null, method.relative || ""));
-
-        if (method.weights) {
-            const list = el("ul", "method__list");
-            Object.entries(method.weights).forEach(([key, weight]) => {
-                const blurb = (method.components || {})[key] || F.componentBlurb(key);
-                list.appendChild(
-                    el("li", null, `${F.componentLabel(key)} — ${Math.round(weight * 100)}%. ${blurb}`)
-                );
-            });
-            els.methodBody.appendChild(list);
-        }
-
-        els.methodBody.appendChild(el("p", null, method.lineup_caveat || ""));
-        if (!method.lineup_available && method.lineup_reason) {
-            els.methodBody.appendChild(
-                el("p", null, F.LINEUP_REASONS[method.lineup_reason] || "")
-            );
-        }
-        els.methodBody.appendChild(el("p", null, method.projection_caveat || ""));
-        if (method.roster_as_of) {
-            els.methodBody.appendChild(
-                el(
-                    "p",
-                    null,
-                    `Rosters last collected ${new Date(method.roster_as_of).toLocaleString()}.`
-                )
-            );
-        }
-    }
-
     // ── load ────────────────────────────────────────────────────────────
 
     function renderStatus(recap) {
@@ -650,7 +611,7 @@
         els.noticeBanner.hidden = recap.status !== "in_progress";
         if (recap.status === "in_progress") {
             els.noticeBanner.textContent =
-                "Games are still being played. Grades and accolades update as results land.";
+                "Games in progress.";
         }
     }
 
@@ -678,10 +639,7 @@
             if (!recap.grades || !recap.grades.length) {
                 els.emptyTitle.textContent =
                     recap.status === "in_progress" ? "Week under way" : "No week to recap yet";
-                els.emptyBody.textContent =
-                    recap.status === "in_progress"
-                        ? "Games are being played. This page fills in as results land — check back after the games."
-                        : "This page fills in on its own once a week has been played.";
+                els.emptyBody.textContent = "";
                 setView("empty");
                 return;
             }
@@ -691,7 +649,6 @@
             renderGrades(recap);
             renderTable(recap);
             renderCallouts(recap);
-            renderMethod(recap);
             setView("week");
         } catch (error) {
             handleFailure(error);

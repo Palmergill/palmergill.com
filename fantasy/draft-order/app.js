@@ -86,7 +86,6 @@
         botRoomCard: byId("botRoomCard"),
         botRoomKicker: byId("botRoomKicker"),
         botRoomTitle: byId("botRoomTitle"),
-        botRoomCopy: byId("botRoomCopy"),
         roomCode: byId("roomCode"),
         copyCodeButton: byId("copyCodeButton"),
         copyLinkButton: byId("copyLinkButton"),
@@ -134,7 +133,6 @@
         hashMatchBadge: byId("hashMatchBadge"),
         masterSeed: byId("masterSeed"),
         publishedHash: byId("publishedHash"),
-        algorithmCopy: byId("algorithmCopy"),
         verificationPlayers: byId("verificationPlayers"),
     };
 
@@ -609,9 +607,6 @@
         if (botTable) {
             els.botRoomKicker.textContent = isTest ? "Production test room" : "Bot table";
             els.botRoomTitle.textContent = "Bot managers are staged.";
-            els.botRoomCopy.textContent = isTest
-                ? "This room cannot be joined or used for a real draft. Start it to test turns, scoring, results, and verification end to end."
-                : "Nobody else can join this room. Start it whenever you’re ready — the bots take their turns on their own, and the result proves itself like any draft.";
         }
         els.roomCode.textContent = room.joinCode || "—";
         els.rosterCount.textContent = room.players.length;
@@ -660,11 +655,9 @@
         const duration = F.gameLengthCopy(room.players.length, room.roundsPerPlayer);
         els.startHelp.textContent = room.isHost
             ? (room.canStart
-                ? (botTable
-                    ? `${duration} Bots play automatically. Everyone finishes each round before the standings leader starts the next one. Round ${room.roundsPerPlayer} pays double.`
-                    : `${duration} Everyone finishes Round 1 in the seeded order. The standings leader starts each following round, and the sealed Round ${room.roundsPerPlayer} pays double.`)
-                : `${duration} One more manager must join before you can start.`)
-            : `${duration} Waiting for the host to lock the roster and start.`;
+                ? duration
+                : `${duration} · Waiting for one more manager`)
+            : `${duration} · Waiting for the host`;
     }
 
     function renderCards(cards, concealedCount, scope) {
@@ -860,7 +853,7 @@
             return;
         }
         if (state.botPaused && hasBots(room) && room.isHost) {
-            els.turnMessage.textContent = "Bots are paused. Resume them when you’re ready.";
+            els.turnMessage.textContent = "Bots paused.";
             return;
         }
         if (room.canRunBot) {
@@ -869,13 +862,11 @@
         }
         if (!room.canPlay) {
             els.turnMessage.textContent = concealed
-                ? `${room.currentPlayer?.displayName || "The current player"} has pulled ${round.cardCount || 0} card${round.cardCount === 1 ? "" : "s"}. Values and score stay sealed for the reveal.`
-                : `Watching ${room.currentPlayer?.displayName || "the current player"} live — every card and point appears here.`;
+                ? `${room.currentPlayer?.displayName || "The current player"} has pulled ${round.cardCount || 0} card${round.cardCount === 1 ? "" : "s"}.`
+                : `Watching ${room.currentPlayer?.displayName || "the current player"}`;
             return;
         }
-        els.turnMessage.textContent = round.cards.length
-            ? "Bank the pot or press your luck."
-            : "Your turn. The first flip can’t bust.";
+        els.turnMessage.textContent = "Your turn.";
     }
 
     function renderLeaderboard(room) {
@@ -946,11 +937,7 @@
         if (!serverRevealed) {
             els.resultKicker.textContent = "Final round complete · scores sealed";
             els.resultTitle.textContent = "The final table is locked.";
-            els.resultCopy.textContent = room.canReveal
-                ? (botTable
-                    ? "Every final-round score is hidden, the bots’ and yours. Turn the table over."
-                    : "Every final-round score is hidden. Reveal the final draft order when everyone is ready.")
-                : "Every final-round score is hidden. Waiting for the host to begin the reveal.";
+            els.resultCopy.textContent = room.canReveal ? "" : "Waiting for the host.";
             els.revealButton.textContent = "Reveal final draft order";
             els.revealButton.hidden = !room.canReveal;
             els.revealButton.disabled = state.actionBusy;
@@ -964,10 +951,10 @@
         els.resultKicker.textContent = isPractice ? "Practice complete · seed revealed" : "Scores revealed · seed unlocked";
         els.resultTitle.textContent = isPractice ? "Five practice rounds complete." : "The draft order is ready.";
         els.resultCopy.textContent = isPractice
-            ? `You scored ${room.draftOrder?.[0]?.score || 0} points. Run it again whenever you want another warm-up.`
+            ? `You scored ${room.draftOrder?.[0]?.score || 0} points.`
             : botTable && mine
-                ? `You scored ${mine.score} points — pick #${mine.pick} of ${room.draftOrder.length}. Your highest score is on the draft control screen.`
-                : "Revealing from the last pick to the first, followed by the proof behind every card.";
+                ? `You scored ${mine.score} points — pick #${mine.pick} of ${room.draftOrder.length}.`
+                : "";
         els.revealButton.hidden = true;
         if (isPractice) state.resultsRevealed = true;
         els.resultActions.hidden = !state.resultsRevealed;
@@ -1194,34 +1181,20 @@
 
     async function renderVerification(proof) {
         els.proofTitle.textContent = "Checking the commitment…";
-        els.proofSummary.textContent = "Your browser is reproducing the turn order, decks, draws, scores, and final picks.";
+        els.proofSummary.textContent = "";
         els.hashMatchBadge.textContent = "Checking locally…";
         els.hashMatchBadge.classList.remove("is-failed");
         els.proofErrors.innerHTML = "";
         els.proofErrors.hidden = true;
         els.masterSeed.textContent = proof.masterSeed;
         els.publishedHash.textContent = proof.publishedSeedHash;
-        els.algorithmCopy.innerHTML = "";
-        [
-            proof.algorithm.commitment,
-            proof.algorithm.canonicalDeck,
-            proof.algorithm.derivation,
-            proof.algorithm.shuffle,
-            proof.algorithm.scoring,
-            `Contexts: ${proof.algorithm.contexts.turnOrder}; ${proof.algorithm.contexts.playerDeck}.`,
-            `Ties: ${proof.algorithm.tieBreakRule}`,
-        ].filter(Boolean).forEach((copy) => {
-            const paragraph = document.createElement("p");
-            paragraph.textContent = copy;
-            els.algorithmCopy.appendChild(paragraph);
-        });
 
         const verification = await V.verifyProof(proof, window.crypto);
         els.proofTitle.textContent = verification.ok
             ? "The full result checks out."
             : "This proof does not match.";
         els.proofSummary.textContent = verification.ok
-            ? "This browser independently reproduced the seed commitment, initial turn order, every deck and draw, all scores and tiebreaks, and the final draft order."
+            ? ""
             : "At least one published value could not be reproduced from the revealed seed. Do not use this draft order until the mismatch is resolved.";
         els.hashMatchBadge.textContent = verification.ok ? "✓ Verified in this browser" : "Verification failed";
         els.hashMatchBadge.classList.toggle("is-failed", !verification.ok);
@@ -1289,16 +1262,7 @@
             });
             const decks = document.createElement("div");
             decks.className = "verification-decks";
-            const deckPrompt = document.createElement("p");
-            deckPrompt.className = "deck-prompt";
-            deckPrompt.textContent = "Open this manager to render the full shuffled decks.";
-            decks.appendChild(deckPrompt);
-            const legend = document.createElement("p");
-            legend.className = "deck-legend";
-            legend.textContent = player.decks
-                ? "Each round starts at index 0. Highlighted cards were drawn from that round’s fresh deck."
-                : "Highlighted cards were drawn. Indexing starts at 0.";
-            body.append(meta, rounds, decks, legend);
+            body.append(meta, rounds, decks);
             details.append(summary, body);
             // A maximum room proves 80 full decks. Build those card grids only
             // when somebody asks to inspect this manager, not while the proof

@@ -10,8 +10,8 @@
        .table-stage  = the table + its HUD (flexes to fill)
        .your-section = the dock: hole cards, stack, action controls
 
-   Copy is deliberately sparse. Anything that needs explaining carries a
-   data-tip attribute and explains itself on hover/focus (see "Tooltips").
+   Copy is deliberately sparse. Status that can't sit on screen (whose turn
+   it is, why Raise is off) rides a data-tip on hover/focus (see "Tooltips").
    =========================================================================== */
 
 :root {
@@ -84,7 +84,7 @@ select {
 }
 
 /* ── Tooltips ────────────────────────────────────────────────────────────
-   The whole UI leans on these instead of on-screen copy. Pointer devices
+   Status only, never explanation. Pointer devices
    only: on touch there is no hover state to reveal them, and a sticky
    bubble after a tap is worse than nothing. Keyboard users get them via
    :focus-visible. */

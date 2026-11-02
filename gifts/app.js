@@ -33,7 +33,6 @@
         boardActions: byId("boardActions"),
         board: byId("board"),
         graph: byId("graph"),
-        graphLegend: byId("graphLegend"),
         tabs: byId("tabs"),
         boardTab: byId("boardTab"),
         wishlistsTab: byId("wishlistsTab"),
@@ -401,7 +400,6 @@
         els.graphViewButton.setAttribute("aria-pressed", String(graph));
         els.board.hidden = graph;
         els.graph.hidden = !graph;
-        els.graphLegend.hidden = !graph;
         if (graph) {
             renderGraph();
             return;
@@ -579,7 +577,7 @@
         if (!all.length) {
             empty = el("p", {
                 class: "column__empty",
-                text: isMe ? "Found something you like? Add it here." : "No ideas yet.",
+                text: isMe ? "Nothing yet." : "No ideas yet.",
             });
         } else if (!visible.length) {
             empty = el("p", { class: "column__empty", text: `${hiddenCount} given, hidden.` });
@@ -663,7 +661,6 @@
     function renderAddPerson() {
         return el("section", { class: "add-person", "aria-labelledby": "addPersonHeading" }, [
             el("h2", { id: "addPersonHeading", text: "Add a person" }),
-            el("p", { text: "Ideas you file under someone are only ever visible to you." }),
             el("form", { onsubmit: addPerson }, [
                 el("label", { class: "sr-only", for: "addPersonInput", text: "Name" }),
                 el("input", {
@@ -672,7 +669,7 @@
                     name: "name",
                     maxlength: "80",
                     autocomplete: "off",
-                    placeholder: "Name, e.g. Mom",
+                    placeholder: "Name",
                 }),
             ]),
         ]);
@@ -1060,7 +1057,7 @@
         if (result.status === "disabled") {
             els.imageHint.textContent = "Link previews are turned off here.";
         } else if (!result.imageUrl && !keepImage) {
-            els.imageHint.textContent = "That shop didn't share a picture. You can paste one below.";
+            els.imageHint.textContent = "No picture found.";
             els.imageOverride.open = true;
         }
         renderEditorPreview();
@@ -1242,12 +1239,10 @@
         const person = state.people.find((p) => p.linkedUsername === data.username) || null;
         els.wishlistTitle.textContent = isMe ? "Your wishlist" : `${data.displayName}'s wishlist`;
 
-        let action;
-        if (isMe) {
-            action = el("p", { class: "wishlist-head__note", text: "This is how other members see your wishlist." });
-        } else if (person) {
+        let action = null;
+        if (person && !isMe) {
             action = el("p", { class: "wishlist-head__note", text: `Linked to ${person.name} on your board.` });
-        } else {
+        } else if (!isMe) {
             action = el("button", {
                 type: "button",
                 class: "button",
@@ -1255,7 +1250,7 @@
                 onclick: () => addLinkedPerson(data),
             });
         }
-        els.wishlistActions.replaceChildren(action);
+        els.wishlistActions.replaceChildren(...(action ? [action] : []));
 
         const ideas = person ? itemsIn(String(person.id)) : [];
         els.wishList.replaceChildren(...data.items.map((wish) => {

@@ -275,8 +275,6 @@ button:focus-visible {
     color: var(--muted, #928a7d);
 }
 
-
-
 /* ── tables ───────────────────────────────────────────────────────── */
 
 /* The pick table is the widest thing on the page; it scrolls inside its own
@@ -623,32 +621,6 @@ button:focus-visible {
 .callout h3 { margin: 0 0 8px; font-size: 15px; }
 .callout p { margin: 0; font-size: 14px; color: var(--soft, #5d574e); }
 .callout__note { margin-top: 8px !important; font-size: 12px !important; }
-
-.method summary {
-    cursor: pointer;
-    list-style: none;
-}
-
-.method summary h2 {
-    display: inline;
-    font-size: 18px;
-}
-
-.method summary::-webkit-details-marker { display: none; }
-
-.method__body {
-    margin-top: 14px;
-    font-size: 14px;
-    color: var(--soft, #5d574e);
-}
-
-.method__body p { margin: 0 0 10px; }
-
-.method__list {
-    margin: 0 0 12px;
-    padding-left: 20px;
-    font-size: 13px;
-}
 
 @media (max-width: 640px) {
     .awards,

@@ -98,10 +98,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const closeSearchModal = document.getElementById('closeSearchModal');
     const demoBanner = document.getElementById('demoBanner');
 
-    function setDemoMode(isDemo, warning) {
+    function setDemoMode(isDemo) {
         if (!demoBanner) return;
         if (isDemo) {
-            demoBanner.textContent = warning || 'Public demo mode uses generated sample stock data. Live market provider calls stay protected.';
+            demoBanner.textContent = 'Sample data';
             demoBanner.classList.remove('hidden');
         } else {
             demoBanner.classList.add('hidden');
@@ -414,58 +414,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
     
-    // Stock tips for loading state
-    const stockTips = [
-        { icon: '💡', text: 'The P/E ratio helps compare valuations across companies.' },
-        { icon: '📈', text: 'Revenue growth shows if a business is expanding over time.' },
-        { icon: '💰', text: 'Free Cash Flow is more reliable than net income for analysis.' },
-        { icon: '⚖️', text: 'Debt-to-Equity ratio shows financial risk and flexibility.' },
-        { icon: '🎯', text: 'ROE above 15% often signals a competitive advantage.' },
-        { icon: '📊', text: 'EPS surprises drive stock price movements on earnings day.' },
-        { icon: '🔍', text: 'Compare P/E ratios to industry averages for context.' },
-        { icon: '📉', text: '52-week range shows where current price sits historically.' }
-    ];
-    
-    let tipInterval = null;
-    let currentTipIndex = 0;
-    
-    function startStockTips() {
-        const tipContainer = document.getElementById('stockTip');
-        if (!tipContainer) return;
-        
-        // Clear any existing interval
-        if (tipInterval) clearInterval(tipInterval);
-        
-        currentTipIndex = 0;
-        updateTip(tipContainer, 0);
-        
-        tipInterval = setInterval(() => {
-            currentTipIndex = (currentTipIndex + 1) % stockTips.length;
-            
-            // Fade out
-            tipContainer.classList.add('fade-out');
-            
-            setTimeout(() => {
-                updateTip(tipContainer, currentTipIndex);
-                tipContainer.classList.remove('fade-out');
-            }, 500);
-        }, 4000);
-    }
-    
-    function stopStockTips() {
-        if (tipInterval) {
-            clearInterval(tipInterval);
-            tipInterval = null;
-        }
-    }
-    
-    function updateTip(container, index) {
-        const tip = stockTips[index];
-        const iconSpan = container.querySelector('.tip-icon');
-        const textSpan = container.querySelector('.tip-text');
-        if (iconSpan) iconSpan.textContent = tip.icon;
-        if (textSpan) textSpan.textContent = tip.text;
-    }
 
     async function loadStock(ticker, forceRefresh = false, attempt = 1) {
         // Every entry point (Enter on a suggestion, ?ticker=) reaches here.
@@ -491,9 +439,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const btnSpinner = document.querySelector('#searchBtn .btn-spinner');
         if (btnSpinner) btnSpinner.classList.remove('hidden');
         searchBtn.classList.add('loading');
-        
-        // Start rotating stock tips
-        startStockTips();
         
         // Update progress bar
         updateLoadingProgress(1);
@@ -524,7 +469,7 @@ document.addEventListener('DOMContentLoaded', () => {
             
             const data = await response.json();
             console.log('Received data:', data);
-            setDemoMode(Boolean(data._demo), data._warning);
+            setDemoMode(Boolean(data._demo));
             
             // Validate data
             if (!data || !data.summary) {
@@ -628,9 +573,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const btnSpinner = document.querySelector('#searchBtn .btn-spinner');
             if (btnSpinner) btnSpinner.classList.add('hidden');
             if (searchBtn) searchBtn.classList.remove('loading');
-            
-            // Stop stock tips
-            stopStockTips();
         }
     }
 
@@ -644,7 +586,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
         
-        setDemoMode(Boolean(data._demo), data._warning);
+        setDemoMode(Boolean(data._demo));
 
         // Update header to show stock info instead of logo
         const headerLogo = document.getElementById('headerLogo');

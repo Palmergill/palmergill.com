@@ -148,14 +148,6 @@ h1 {
     box-shadow: var(--focus-ring);
 }
 
-.field-hint {
-    /* Sit closer to the input it describes than to the next field's label. */
-    margin: -2px 0 0;
-    color: var(--muted);
-    font-size: 0.78rem;
-    line-height: 1.45;
-}
-
 .login-alt {
     margin: -4px 0 0;
     color: var(--soft);

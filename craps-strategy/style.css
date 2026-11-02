@@ -41,8 +41,6 @@ h1 {
     line-height: 1.05;
     letter-spacing: -0.01em;
 }
-.lede { color: var(--muted); max-width: 60ch; margin-top: 0.75rem; }
-.lede strong { color: var(--cream); }
 
 /* ---- Panels ---- */
 .panel {
@@ -71,7 +69,6 @@ h1 {
     text-transform: uppercase;
     color: var(--quiet);
 }
-.hint { text-transform: none; letter-spacing: 0; color: var(--quiet); }
 textarea, input, select {
     background: rgba(4, 14, 9, 0.8);
     border: 1px solid rgba(var(--gold-rgb), 0.22);

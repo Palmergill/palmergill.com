@@ -491,12 +491,6 @@ body {
     font-size: 0.95rem;
 }
 
-.add-person p {
-    margin: 0 0 10px;
-    color: var(--muted);
-    font-size: 0.8rem;
-}
-
 /* ── editor dialog ───────────────────────────────────────────────────────── */
 
 .editor {
@@ -809,13 +803,6 @@ body {
 .graph__person:focus-visible .graph__label,
 .graph__item:focus-visible .graph__label,
 .graph__item:hover .graph__label { font-weight: 700; }
-
-.graph__legend {
-    margin: 8px 4px 0;
-    color: var(--muted);
-    font-size: 0.8rem;
-    text-align: center;
-}
 
 /* ── linked wishlist inside a column ─────────────────────────────────────── */
 

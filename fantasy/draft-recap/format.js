@@ -16,14 +16,6 @@
         construction: "Roster build",
     };
 
-    // What each sub-score is actually claiming, in the manager's own terms.
-    const COMPONENT_BLURBS = {
-        adp_value: "How much later than ADP this roster was assembled.",
-        starters: "Points above replacement in the best legal starting lineup.",
-        bench: "Surplus value sitting behind the starters.",
-        construction: "Whether the roster can field a legal, unstacked lineup.",
-    };
-
     const STATUS_LABELS = {
         not_drafted: "Not drafted yet",
         in_progress: "Draft in progress",
@@ -86,10 +78,6 @@
         return COMPONENT_LABELS[key] || key;
     }
 
-    function componentBlurb(key) {
-        return COMPONENT_BLURBS[key] || "";
-    }
-
     // A z-score maps onto a 0-100 bar. Three sigma each way covers everything
     // a ten-team league produces, and clamping keeps one outlier from
     // flattening every other bar on the card.
@@ -102,26 +90,6 @@
     function roundLabel(pick) {
         if (!pick || !pick.round) return `Pick ${pick && pick.overall_pick}`;
         return `${pick.round}.${String(pick.round_pick || 0).padStart(2, "0")}`;
-    }
-
-    // The recap has to be able to say which ADP it graded against, including
-    // the uncomfortable case where the only snapshot postdates the draft.
-    function adpSourceNote(source) {
-        if (!source) return "No ADP board was collected, so picks are ungraded against ADP.";
-        const parts = [];
-        if (source.total_drafts) {
-            parts.push(`${source.total_drafts.toLocaleString()} drafts`);
-        }
-        if (source.start_date && source.end_date) {
-            parts.push(`${source.start_date} to ${source.end_date}`);
-        }
-        if (source.teams) parts.push(`${source.teams}-team`);
-        const label = source.format === "2qb" ? "2QB" : "half PPR";
-        const sample = parts.length ? ` — ${parts.join(", ")}` : "";
-        const timing = source.captured_before_draft
-            ? ""
-            : " Collected after the draft, so it may have moved since.";
-        return `${label} ADP from Fantasy Football Calculator${sample}.${timing}`;
     }
 
     function sortPicks(picks, key, direction) {
@@ -169,10 +137,8 @@
 
     return {
         COMPONENT_LABELS,
-        adpSourceNote,
         awardsForTeam,
         componentBarWidth,
-        componentBlurb,
         componentLabel,
         formatAdp,
         formatDelta,
