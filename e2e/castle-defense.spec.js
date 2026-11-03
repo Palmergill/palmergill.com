@@ -90,7 +90,7 @@ test('share copies the result and says so', async ({ page, context }) => {
     const copied = await page.evaluate(() => navigator.clipboard.readText());
     // One Spikes trap is nowhere near day 1's top tier.
     expect(copied).toMatch(
-        /^Castle Defense #1 · \d+ kills\n.+ · tier [1-4] of 5\n\d+% of the best found \([\d,]+\)\nFell on wave \d+ · 1 of 13 pieces\n(MVP: Spikes, level \d+, \d+ kills\n)?https:\/\/palmergill\.com\/castle-defense\/$/
+        /^Castle Defense #1 · \d+ kills\n.+ · tier [1-4] of 5\n\d+% of the best found \([\d,]+\)\nFell on wave \d+\n(MVP: Spikes, level \d+, \d+ kills\n)?https:\/\/palmergill\.com\/castle-defense\/$/
     );
     await expect(page.locator('.cd-final__tier')).toContainText(/Tier [1-4] of 5 · \d+ more for /);
 });

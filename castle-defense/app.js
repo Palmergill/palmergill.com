@@ -1138,8 +1138,7 @@
                 ? `Matched the best found (${bestFound.toLocaleString()})`
                 : `${Math.floor((kills / bestFound) * 100)}% of the best found (${bestFound.toLocaleString()})`);
         }
-        const pieces = Object.values(map.allotment).reduce((n, c) => n + c, 0);
-        lines.push(`Fell on wave ${wave} · ${state.defenses.length} of ${pieces} pieces`);
+        lines.push(`Fell on wave ${wave}`);
         const mvp = state.defenses.slice().sort((a, b) => b.kills - a.kills)[0];
         if (mvp && mvp.kills) lines.push(`MVP: ${G.DEFENSES[mvp.type].name}, level ${mvp.level}, ${mvp.kills.toLocaleString()} kills`);
         lines.push("https://palmergill.com/castle-defense/");
@@ -1549,7 +1548,7 @@
         "Each day's tiers are worked out on the server, and the day's <b>best found</b> score sits above them.",
         "A new <b>📜 Rules</b> window covers every defense, zombie and scoring rule.",
         "Smaller shop cards.",
-        "The share message is plain text: your tier, place, how close you came to the best found, the wave you fell on, pieces used and your MVP.",
+        "The share message is plain text: your tier, place, how close you came to the best found, the wave you fell on and your MVP.",
         "The rules changed, so runs posted before the patch are off today's board."
     ];
 
