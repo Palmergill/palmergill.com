@@ -6,8 +6,15 @@ same engine the page runs (castle-defense/castleDefenseGame.js, inside an
 embedded V8) and stores what that replay earns. The engine is deterministic
 — seeded map and horde, fixed time step — so the replay matches the run the
 player watched.
+
+Each day's tiers are worked out here too, in the background: hundreds of
+trial layouts of the day's allotment set the cut-offs, and a hill climb from
+the best of them finds the day's best known layout (see
+castle-defense/castleDefenseTrials.js). Tomorrow's are done before the map
+turns over, and any other day is done the first time someone asks for it.
 """
 import json
+import logging
 import os
 import threading
 from datetime import date, datetime, timedelta, timezone
@@ -16,9 +23,12 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from fastapi import HTTPException
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.database import CastleDefenseScore, utc_now
+from app.database import CastleDefenseScore, CastleDefenseTiers, SessionLocal, utc_now
+
+logger = logging.getLogger(__name__)
 
 BOARD_SIZE = 50
 # Replays cost real CPU (about 0.1s each), so cap how often one account posts.
@@ -33,14 +43,19 @@ _ENGINE_CANDIDATES = (
 )
 
 
-@lru_cache(maxsize=1)
-def engine_source() -> str:
+@lru_cache(maxsize=None)
+def _source(name: str) -> str:
     override = os.getenv("CASTLE_DEFENSE_ENGINE")
-    paths = [Path(override)] if override else list(_ENGINE_CANDIDATES)
+    dirs = [Path(override).parent] if override else [p.parent for p in _ENGINE_CANDIDATES]
+    paths = [d / name for d in dirs]
     for path in paths:
         if path.is_file():
             return path.read_text(encoding="utf-8")
-    raise RuntimeError("castleDefenseGame.js not found; looked in " + ", ".join(str(p) for p in paths))
+    raise RuntimeError(f"{name} not found; looked in " + ", ".join(str(p) for p in paths))
+
+
+def engine_source() -> str:
+    return _source("castleDefenseGame.js")
 
 
 # FastAPI runs these requests on a thread pool, and two V8 contexts starting
@@ -56,6 +71,7 @@ def _eval(expression: str) -> str:
         ctx = MiniRacer()
         try:
             ctx.eval(engine_source())
+            ctx.eval(_source("castleDefenseTrials.js"))
             return ctx.eval(expression)
         finally:
             # Without an explicit close the V8 thread keeps the process alive.
@@ -71,6 +87,115 @@ def current_rules() -> int:
 def replay(day: str, layout: List[Dict[str, Any]]) -> Dict[str, Any]:
     """Run `layout` on `day`'s map to the end and return the engine's result."""
     return json.loads(_eval(f"JSON.stringify(CastleDefenseGame.replay({json.dumps(day)}, {json.dumps(layout)}))"))
+
+
+# ── daily tiers ──────────────────────────────────────────────────────────────
+
+# A day's work: TRIALS trial layouts, then CLIMB_STEPS steps of the search.
+# About a minute of CPU, in chunks of CHUNK replays (a second or so each), so
+# posted runs waiting on the engine lock never wait long.
+TRIALS = int(os.getenv("CASTLE_DEFENSE_TRIALS", "300"))
+CLIMB_STEPS = int(os.getenv("CASTLE_DEFENSE_CLIMB_STEPS", "400"))
+CHUNK = 12
+# Day #1; nothing before it has a map worth working out.
+EPOCH = "2026-10-18"
+
+_tier_lock = threading.Lock()
+_tier_queue: List[str] = []
+_tier_worker: Optional[threading.Thread] = None
+
+
+def _trials_call(fn: str, *args: Any) -> Any:
+    params = ", ".join(json.dumps(a) for a in args)
+    return json.loads(_eval(f"JSON.stringify(CastleDefenseTrials.{fn}({params}))"))
+
+
+def _tiers_row(db: Session, day: str) -> Optional[CastleDefenseTiers]:
+    return db.query(CastleDefenseTiers).filter_by(day=day, rules=current_rules()).first()
+
+
+def work_out_tiers(day: str) -> None:
+    """Play the day's trials and search, and store its tiers and best layout."""
+    db = SessionLocal()
+    try:
+        if _tiers_row(db, day):
+            return
+        kills: List[int] = []
+        best = None
+        for start in range(0, TRIALS, CHUNK):
+            chunk = _trials_call("runTrials", day, start, min(CHUNK, TRIALS - start))
+            kills += chunk["kills"]
+            if best is None or chunk["best"]["kills"] > best["kills"]:
+                best = chunk["best"]
+        for start in range(0, CLIMB_STEPS, CHUNK):
+            best = _trials_call("climb", day, best, start, min(CHUNK, CLIMB_STEPS - start))
+        cuts = _trials_call("tierCuts", kills)
+        db.add(CastleDefenseTiers(
+            day=day, rules=current_rules(), cuts=json.dumps(cuts),
+            best_kills=int(best["kills"]), best_layout=json.dumps(best["layout"]),
+        ))
+        try:
+            db.commit()
+        except IntegrityError:
+            db.rollback()
+        logger.info("Castle Defense tiers for %s: %s, best found %s", day, cuts, best["kills"])
+    finally:
+        db.close()
+
+
+def _work_tier_queue() -> None:
+    global _tier_worker
+    while True:
+        with _tier_lock:
+            if not _tier_queue:
+                _tier_worker = None
+                return
+            day = _tier_queue[0]
+        try:
+            work_out_tiers(day)
+        except Exception:
+            logger.exception("Castle Defense tiers for %s failed", day)
+        with _tier_lock:
+            _tier_queue.remove(day)
+
+
+def queue_tiers(days: List[str], first: bool = False) -> None:
+    """Have the background worker work out these days' tiers, one at a time.
+    Days outside day #1 to tomorrow are left alone, so nobody can queue up
+    years of future maps."""
+    global _tier_worker
+    last = max(postable_days())
+    days = [d for d in days if EPOCH <= d <= last]
+    with _tier_lock:
+        for day in days:
+            if day in _tier_queue:
+                continue
+            # The day being worked on stays at the front.
+            if first and _tier_queue:
+                _tier_queue.insert(1, day)
+            else:
+                _tier_queue.append(day)
+        if _tier_queue and _tier_worker is None:
+            _tier_worker = threading.Thread(target=_work_tier_queue, name="castle-defense-tiers", daemon=True)
+            _tier_worker.start()
+
+
+def queue_upcoming_tiers() -> None:
+    """Every day anyone can be playing now, tomorrow's included."""
+    queue_tiers(sorted(postable_days()))
+
+
+def tiers(db: Session, day: str) -> Dict[str, Any]:
+    """A day's tier cut-offs and best found score, or ready: False while
+    they're still being worked out. The best found is the search's best or
+    the day's top run, whichever is higher."""
+    row = _tiers_row(db, day)
+    if row is None:
+        queue_tiers([day], first=True)
+        return {"day": day, "ready": False}
+    top = _board_query(db, day).first()
+    best = max(row.best_kills, top.kills if top else 0)
+    return {"day": day, "ready": True, "cuts": json.loads(row.cuts), "best": best}
 
 
 def postable_days(now: Optional[datetime] = None) -> set:

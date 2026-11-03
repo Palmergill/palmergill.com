@@ -1229,6 +1229,29 @@ class CastleDefenseScore(Base):
     updated_at = Column(DateTime, default=utc_now, onupdate=utc_now, nullable=False)
 
 
+class CastleDefenseTiers(Base):
+    """One day's Castle Defense tiers and the best layout found for it.
+
+    Worked out by the server itself (services/castle_defense.py): hundreds of
+    trial layouts of the day's allotment set the tier cut-offs, then a search
+    from the best of them looks for a stronger layout. One row per day and
+    rules, so a rules change gets fresh tiers.
+    """
+
+    __tablename__ = "castle_defense_tiers"
+    __table_args__ = (UniqueConstraint("day", "rules", name="uq_castle_defense_tiers_day_rules"),)
+
+    id = Column(Integer, primary_key=True, index=True)
+    day = Column(String(10), nullable=False)
+    rules = Column(Integer, nullable=False)
+    # JSON list of the kills tiers 2–5 need.
+    cuts = Column(Text, nullable=False)
+    best_kills = Column(Integer, nullable=False)
+    # JSON list of {type, x, y}: the layout that earned `best_kills`.
+    best_layout = Column(Text, nullable=False)
+    created_at = Column(DateTime, default=utc_now, nullable=False)
+
+
 class PortfolioHolding(Base):
     """One position from a member's uploaded holdings snapshot.
 

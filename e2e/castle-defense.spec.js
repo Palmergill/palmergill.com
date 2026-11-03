@@ -2,12 +2,15 @@
 const { test, expect, signUp } = require('./helpers');
 
 // Day 1's map, pinned so the road and grass tiles below never move.
-// Column 5 runs down from the top as road; (6, 3) and (2, 6) are grass.
-// Its allotment: 2 Archers, 3 Cannons, 3 Frost, 1 Mage, 1 Spikes, 1 Tar pit, no Mines.
+// Column 5 runs down from the top as road; (6, 3), (3, 4) and (2, 6) are grass.
+// Its allotment: 2 Archers, 3 Cannons, 3 Frost, 1 Mage, 1 Flamethrower, 1 Spikes,
+// no Tar pits, 2 Mines.
 const DAY_ONE = '/castle-defense/?date=2026-10-18';
 
 // Click the centre of a board tile; the board is an 8 × 8 grid.
 async function clickTile(page, x, y) {
+    // Picking a piece low in the sidebar can scroll the board out of view.
+    await page.locator('#board').scrollIntoViewIfNeeded();
     const box = await page.locator('#board').boundingBox();
     await page.mouse.click(box.x + ((x + 0.5) / 8) * box.width, box.y + ((y + 0.5) / 8) * box.height);
 }
@@ -18,22 +21,30 @@ test("place the day's allotment, then start the run", async ({ page }) => {
     await expect(page.locator('#overlay')).toBeHidden();
     const count = page.locator('#pieceCount');
     const play = page.locator('#playButton');
-    await expect(count).toHaveText('11 to place');
-    // The kill count reads against the next tier, starting from the bottom one.
-    await expect(page.locator('#nextValue')).toHaveText(/^\d+$/);
+    await expect(count).toHaveText('13 to place');
+    // The kill count reads against the next tier, starting from the bottom
+    // one. The server works the day's tiers out first, which takes a moment.
+    await expect(page.locator('#nextValue')).toHaveText(/^\d+$/, { timeout: 60_000 });
     await expect(page.locator('#tierName')).toHaveText('Are you undead??');
-    await expect(page.locator('#tiers li')).toHaveCount(5);
+    // The five tiers, under the day's best found score.
+    await expect(page.locator('#tiers li')).toHaveCount(6);
+    await expect(page.locator('#tiers li').first()).toHaveText(/^Best found\s*[\d,]+$/);
     await expect(play).toBeDisabled();
-    await expect(page.getByRole('button', { name: /Mine/ })).toBeDisabled();
-    await expect(page.getByRole('button', { name: /Mine/ })).toContainText('None today');
+    await expect(page.getByRole('button', { name: /Tar pit/ })).toBeDisabled();
+    await expect(page.getByRole('button', { name: /Tar pit/ })).toContainText('None today');
 
     // Towers belong on the grass, traps on the road.
     await page.getByRole('button', { name: /Archer/ }).click();
     await clickTile(page, 5, 1);
     await expect(page.locator('#toast')).toHaveText(/Towers go on the grass/);
     await clickTile(page, 6, 3);
-    await expect(count).toHaveText('10 to place');
+    await expect(count).toHaveText('12 to place');
     await expect(page.getByRole('button', { name: /Archer/ })).toContainText('1 of 2 left');
+
+    await page.getByRole('button', { name: /Flamethrower/ }).click();
+    await clickTile(page, 3, 4);
+    await expect(count).toHaveText('11 to place');
+    await expect(page.getByRole('button', { name: /Flamethrower/ })).toContainText('0 of 1 left');
 
     await page.getByRole('button', { name: /Spikes/ }).click();
     await clickTile(page, 2, 6);
@@ -44,7 +55,7 @@ test("place the day's allotment, then start the run", async ({ page }) => {
     // That was the only Spikes; picking it up gives it back.
     await clickTile(page, 5, 1);
     await expect(page.getByRole('button', { name: /Spikes/ })).toContainText('1 of 1 left');
-    await expect(count).toHaveText('10 to place');
+    await expect(count).toHaveText('11 to place');
 
     // You don't have to place everything.
     await expect(play).toBeEnabled();
@@ -57,6 +68,8 @@ test("place the day's allotment, then start the run", async ({ page }) => {
 test('share copies the result and says so', async ({ page, context }) => {
     await context.grantPermissions(['clipboard-read', 'clipboard-write']);
     await page.goto(DAY_ONE);
+    // The share names your tier, so let the day's tiers arrive first.
+    await expect(page.locator('#tiers li')).toHaveCount(6, { timeout: 60_000 });
     await page.getByRole('button', { name: /Spikes/ }).click();
     await clickTile(page, 5, 1);
     await page.locator('#playButton').click();

@@ -37,6 +37,9 @@ module.exports = defineConfig({
             APP_AUTH_RATE_LIMIT_MAX_ATTEMPTS: '1000',
             ANALYTICS_RATE_LIMIT_MAX_EVENTS: '100000',
             DAILY_SIGNUP_LIMIT: '100000',
+            // Castle Defense tiers in seconds rather than a minute a day.
+            CASTLE_DEFENSE_TRIALS: '24',
+            CASTLE_DEFENSE_CLIMB_STEPS: '12',
         },
     },
 });

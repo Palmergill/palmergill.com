@@ -12,7 +12,7 @@ from fastapi.testclient import TestClient
 from py_mini_racer import MiniRacer
 
 from app import accounts
-from app.database import CastleDefenseScore, SessionLocal
+from app.database import CastleDefenseScore, CastleDefenseTiers, SessionLocal
 from app.main import ROLE_MEMBER, SESSION_COOKIE_NAME, app, create_app_session_token
 from app.services import castle_defense
 
@@ -183,20 +183,58 @@ def test_scores_from_older_rules_are_left_off_and_then_replaced():
 # ── daily tiers ─────────────────────────────────────────────────────────────
 
 
-def test_daily_tiers_are_current_and_run_well_ahead():
-    """castle-defense/tiers.json is made offline, so it can go stale: after a
-    balance change (its rules no longer match the engine's), or as its last
-    day comes near. Rerun scripts/castle-defense-tiers.mjs when this fails."""
-    path = next(p.parent / "tiers.json" for p in castle_defense._ENGINE_CANDIDATES if (p.parent / "tiers.json").is_file())
-    tiers = json.loads(path.read_text(encoding="utf-8"))
-    assert tiers["rules"] == castle_defense.current_rules(), "tiers were set under other rules"
-    today = datetime.now(timezone.utc).date()
-    for offset in range(-1, 60):
-        day = (today + timedelta(days=offset)).isoformat()
-        cut = tiers["days"].get(day)
-        assert cut, f"no tiers for {day}"
-        # Tiers 2–5, each needing more kills than the one below.
-        assert len(cut) == 4 and all(a < b for a, b in zip([0] + cut, cut)), f"{day}: {cut}"
+def _clear_tiers():
+    db = SessionLocal()
+    try:
+        db.query(CastleDefenseTiers).delete()
+        db.commit()
+    finally:
+        db.close()
+
+
+def test_tiers_are_worked_out_on_the_server(monkeypatch):
+    """A day nobody has asked about is queued, worked out in the background,
+    and then served: four rising cut-offs and a best found at least as high
+    as the top one needs."""
+    _clear_tiers()
+    monkeypatch.setattr(castle_defense, "TRIALS", 12)
+    monkeypatch.setattr(castle_defense, "CLIMB_STEPS", 6)
+    client = TestClient(app)
+    first = client.get(f"/api/castle-defense/tiers?day={TODAY}").json()
+    assert first == {"day": TODAY, "ready": False}
+    worker = castle_defense._tier_worker
+    if worker:
+        worker.join(timeout=120)
+    body = client.get(f"/api/castle-defense/tiers?day={TODAY}").json()
+    assert body["ready"]
+    cuts = body["cuts"]
+    assert len(cuts) == 4 and all(a < b for a, b in zip([0] + cuts, cuts)), cuts
+    assert body["best"] >= cuts[3] - 1
+
+    # The best found layout is a real one: replaying it scores what was stored.
+    db = SessionLocal()
+    try:
+        row = db.query(CastleDefenseTiers).filter_by(day=TODAY).one()
+        assert castle_defense.replay(TODAY, json.loads(row.best_layout))["kills"] == row.best_kills
+    finally:
+        db.close()
+
+    # A run past the best found becomes the best found.
+    db = SessionLocal()
+    try:
+        db.add(_score(TODAY, "zed", body["best"] + 50))
+        db.commit()
+    finally:
+        db.close()
+    assert client.get(f"/api/castle-defense/tiers?day={TODAY}").json()["best"] == body["best"] + 50
+
+
+def test_tiers_are_never_worked_out_far_ahead():
+    _clear_tiers()
+    far = (datetime.now(timezone.utc).date() + timedelta(days=30)).isoformat()
+    body = TestClient(app).get(f"/api/castle-defense/tiers?day={far}").json()
+    assert body == {"day": far, "ready": False}
+    assert far not in castle_defense._tier_queue
 
 
 # ── all time ────────────────────────────────────────────────────────────────

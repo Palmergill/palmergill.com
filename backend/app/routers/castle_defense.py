@@ -18,7 +18,7 @@ from app.services import castle_defense
 router = APIRouter(prefix="/api/castle-defense", tags=["castle-defense"])
 
 DAY_PATTERN = r"^\d{4}-\d{2}-\d{2}$"
-TYPE_PATTERN = "^(archer|cannon|frost|mage|spikes|tar|mine)$"
+TYPE_PATTERN = "^(archer|cannon|frost|mage|flame|spikes|tar|mine)$"
 
 
 class Placement(BaseModel):
@@ -52,6 +52,11 @@ def get_leaderboard(
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     return castle_defense.leaderboard(db, castle_defense.validate_day(day), _username(request))
+
+
+@router.get("/tiers")
+def get_tiers(day: str = Query(..., pattern=DAY_PATTERN), db: Session = Depends(get_db)) -> Dict[str, Any]:
+    return castle_defense.tiers(db, castle_defense.validate_day(day))
 
 
 @router.get("/all-time")

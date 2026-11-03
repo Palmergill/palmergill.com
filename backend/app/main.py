@@ -35,6 +35,7 @@ from app.routers import (
     castle_defense,
 )
 from app.routers.analytics import cleanup_old_analytics, record_analytics_event
+from app.services import castle_defense as castle_defense_service
 import os
 from sqlalchemy import text
 
@@ -59,11 +60,13 @@ async def lifespan(app: FastAPI):
     analytics_cleanup_task = asyncio.create_task(_periodic_retention_cleanup())
     analytics_writer_task = asyncio.create_task(_analytics_writer())
     rate_limit_sweep_task = asyncio.create_task(_periodic_rate_limit_sweep())
+    castle_defense_tiers_task = asyncio.create_task(_periodic_castle_defense_tiers())
     background_tasks = [
         cleanup_task,
         analytics_cleanup_task,
         analytics_writer_task,
         rate_limit_sweep_task,
+        castle_defense_tiers_task,
     ]
     # E2E runs set this so a fresh test database never reaches out to ESPN,
     # Sleeper and friends on boot.
@@ -168,6 +171,14 @@ async def _periodic_rate_limit_sweep(interval: int = 10 * 60) -> None:
         removed = await _run_with_timeout("rate limit sweep", _sweep)
         if removed:
             logger.info("Rate limit sweep evicted %d stale key(s)", removed)
+
+
+async def _periodic_castle_defense_tiers(interval: int = 60 * 60) -> None:
+    """Keep the Castle Defense tiers for every playable day, tomorrow's
+    included, worked out ahead of time. The work runs on its own thread."""
+    while True:
+        castle_defense_service.queue_upcoming_tiers()
+        await asyncio.sleep(interval)
 
 
 async def _periodic_retention_cleanup(interval: int = 6 * 60 * 60) -> None:

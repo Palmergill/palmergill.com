@@ -4,7 +4,7 @@
     const G = window.CastleDefenseGame;
     const STEP = G.STEP;
     const TYPES = [...G.TOWER_TYPES, ...G.TRAP_TYPES];
-    const SHARE_ICON = { archer: "🏹", cannon: "💣", frost: "❄️", mage: "🔮", spikes: "🔱", tar: "🛢️", mine: "💥" };
+    const SHARE_ICON = { archer: "🏹", cannon: "💣", frost: "❄️", mage: "🔮", flame: "🔥", spikes: "🔱", tar: "🛢️", mine: "💥" };
 
     const $ = (id) => document.getElementById(id);
     const canvas = $("board");
@@ -17,7 +17,7 @@
     const today = G.localDateString();
     const date = /^\d{4}-\d{2}-\d{2}$/.test(requested || "") && !Number.isNaN(Date.parse(requested)) ? requested : today;
     const map = G.dailyMap(date);
-    const storeKey = `castle-defense:v4:${date}`;
+    const storeKey = `castle-defense:v5:${date}`;
 
     let record = readRecord();
     let state = G.createGame(map);
@@ -30,10 +30,12 @@
     let lastFrame = 0;
     let acc = 0;
     let toastTimer = 0;
-    // Today's tier cut-offs, from tiers.json: [0, tier 2, … tier 5] once it
-    // loads, or null if there are none for today.
+    // Today's tier cut-offs, from the server: [0, tier 2, … tier 5] once
+    // they load, or null if there are none yet. bestFound is the day's best
+    // known score.
     const TIER_NAMES = ["Are you undead??", "Zombie food", "Novice hunter", "Zombie slayer", "Zombie King"];
     let cuts = null;
+    let bestFound = null;
     let shownTier = 0;
 
     // ---------- storage ----------
@@ -215,6 +217,8 @@
                     writeRecord();
                 }
                 res.board = await loadBoard();
+                // A run past the best found becomes the new best found.
+                if (cuts && res.kills > bestFound) loadTiers();
                 return res;
             })
             .catch((err) => {
@@ -231,24 +235,29 @@
     }
 
     // ---------- daily tiers ----------
-    // Each day's tiers are set offline (scripts/castle-defense-tiers.mjs) by
-    // playing hundreds of trial layouts of the day's allotment: tier 2 beats
-    // 40% of them, tier 3 60%, tier 4 80% and tier 5 90%. Tiers made under
-    // other rules don't count.
-    async function loadTiers() {
+    // The server works each day's tiers out from hundreds of trial layouts
+    // of the day's allotment: tier 2 beats 40% of them, tier 3 60%, tier 4
+    // 80% and tier 5 90%. The best found is the best layout its search
+    // turned up, or the day's top run if that's higher. A day nobody has
+    // asked about yet takes a minute or so, so keep asking until it's ready.
+    async function loadTiers(attempt = 0) {
+        let data;
         try {
-            const res = await fetch("./tiers.json?v=1");
-            const data = await res.json();
-            const day = data.days[date];
-            if (!day || data.rules !== G.RULES) return;
-            cuts = [0, ...day];
-            $("tiers").innerHTML = TIER_NAMES.map((name, i) => `<li data-tier="${i}"><span>${escapeHtml(name)}</span><span>${i ? `${cuts[i].toLocaleString()}+` : "any"}</span></li>`).reverse().join("");
-            $("tiersPanel").hidden = false;
-            $("tierName").hidden = false;
-            lastHud = "";
+            data = await api(`/tiers?day=${date}`);
         } catch {
-            /* no tiers today: the page plays the same without them */
+            return; /* no tiers: the page plays the same without them */
         }
+        if (!data.ready) {
+            if (attempt < 30) setTimeout(() => loadTiers(attempt + 1), attempt < 10 ? 3000 : 15000);
+            return;
+        }
+        cuts = [0, ...data.cuts];
+        bestFound = data.best;
+        const best = `<li class="cd-tiers__best" data-best="1"><span>Best found</span><span>${bestFound.toLocaleString()}</span></li>`;
+        $("tiers").innerHTML = best + TIER_NAMES.map((name, i) => `<li data-tier="${i}"><span>${escapeHtml(name)}</span><span>${i ? `${cuts[i].toLocaleString()}+` : "any"}</span></li>`).reverse().join("");
+        $("tiersPanel").hidden = false;
+        $("tierName").hidden = false;
+        lastHud = "";
     }
 
     // 0 (worst) to 4 (best).
@@ -563,6 +572,22 @@
             const pulse = 0.09 + Math.sin(time * 5) * 0.02;
             circle(c, cx + 0.2, cy - 0.2, pulse + 0.06, "rgba(200, 170, 255, 0.35)");
             circle(c, cx + 0.2, cy - 0.2, pulse, "#d8c2ff", "#8e6cd1", 0.03);
+        } else if (type === "flame") {
+            circle(c, cx, cy, 0.3, "#8a3b22", "#5a2414", 0.05);
+            c.save();
+            c.translate(cx, cy);
+            c.rotate(angle);
+            roundRect(c, -0.02, -0.07, 0.36, 0.14, 0.04);
+            c.fillStyle = "#3a3330";
+            c.fill();
+            roundRect(c, 0.3, -0.1, 0.08, 0.2, 0.03);
+            c.fillStyle = "#c9a24a";
+            c.fill();
+            c.restore();
+            const flicker = 0.12 + Math.sin(time * 9) * 0.02;
+            circle(c, cx, cy, flicker + 0.04, "rgba(255, 150, 50, 0.45)");
+            circle(c, cx, cy, flicker, "#ffb347", "#d9601f", 0.03);
+            circle(c, cx, cy, flicker * 0.45, "#fff0b0");
         }
         c.restore();
     }
@@ -697,7 +722,14 @@
             ctx.stroke();
         }
 
-        if (z.slowUntil > state.time) circle(ctx, x, y, r + 0.04, null, "rgba(150, 215, 255, 0.9)", 0.035);
+        if (G.isSlowed(state, z)) circle(ctx, x, y, r + 0.04, null, "rgba(150, 215, 255, 0.9)", 0.035);
+        if (z.burnUntil > state.time) {
+            for (let i = 0; i < 3; i++) {
+                const t = (state.time * 2.2 + i / 3 + z.id * 0.37) % 1;
+                const fx = x + Math.sin(i * 2.4 + z.id) * r * 0.6;
+                circle(ctx, fx, y - r * 0.2 - t * r * 1.4, r * (0.32 - t * 0.2), `rgba(255, ${150 + Math.round(t * 80)}, 60, ${0.85 * (1 - t)})`);
+            }
+        }
         if (z.hitFlash > 0) circle(ctx, x, y, r, `rgba(255,255,255,${z.hitFlash * 4})`);
 
         if (z.hp < z.maxHp) {
@@ -757,6 +789,25 @@
             circle(ctx, e.x, e.y, e.r * 0.35 * (1 - t), `rgba(255, 240, 180, ${0.8 * (1 - t)})`);
         } else if (e.kind === "frost") {
             circle(ctx, e.x, e.y, e.r * (0.4 + t * 0.6), `rgba(190, 235, 255, ${0.35 * (1 - t)})`, `rgba(220, 245, 255, ${0.9 * (1 - t)})`, 0.03);
+        } else if (e.kind === "flame") {
+            // A spray from the nozzle that widens into a fireball on the target.
+            const a = 1 - t;
+            const ang = Math.atan2(e.ty - e.y, e.tx - e.x);
+            const len = Math.hypot(e.tx - e.x, e.ty - e.y);
+            ctx.save();
+            ctx.translate(e.x, e.y);
+            ctx.rotate(ang);
+            ctx.fillStyle = `rgba(255, 140, 50, ${0.55 * a})`;
+            ctx.beginPath();
+            ctx.moveTo(0.3, -0.05);
+            ctx.lineTo(len, -e.r * 0.7);
+            ctx.lineTo(len, e.r * 0.7);
+            ctx.lineTo(0.3, 0.05);
+            ctx.closePath();
+            ctx.fill();
+            ctx.restore();
+            circle(ctx, e.tx, e.ty, e.r * (0.5 + t * 0.5), `rgba(255, 120, 40, ${0.45 * a})`);
+            circle(ctx, e.tx, e.ty, e.r * 0.3 * a, `rgba(255, 230, 150, ${0.8 * a})`);
         } else if (e.kind === "bolt") {
             ctx.save();
             ctx.lineJoin = "round";
@@ -1217,7 +1268,7 @@
     let lastHud = "";
     function updateUi() {
         updatePanel();
-        const hud = `${state.hp}|${state.wave}|${state.kills}|${state.phase}|${state.defenses.length}|${record.best}|${cuts}`;
+        const hud = `${state.hp}|${state.wave}|${state.kills}|${state.phase}|${state.defenses.length}|${record.best}|${cuts}|${bestFound}`;
         if (hud === lastHud) return;
         lastHud = hud;
         if (cuts) updateTier();
@@ -1250,12 +1301,18 @@
     function updateTier() {
         const tier = tierOf(state.kills);
         $("tierName").textContent = TIER_NAMES[tier];
-        $("nextOf").hidden = tier === 4;
-        if (tier < 4) $("nextValue").textContent = cuts[tier + 1].toLocaleString();
-        $("scoreLabel").textContent = tier < 4 ? "Kills · next tier" : "Kills";
+        // In the top tier, the best found is the next mark to beat.
+        const next = tier < 4 ? cuts[tier + 1] : state.kills < bestFound ? bestFound : null;
+        $("nextOf").hidden = next == null;
+        if (next != null) $("nextValue").textContent = next.toLocaleString();
+        $("scoreLabel").textContent = tier < 4 ? "Kills · next tier" : next != null ? "Kills · best found" : "Kills";
         $("scoreStat").classList.toggle("is-top", tier === 4);
         document.querySelectorAll("#tiers li").forEach((li) => {
             const i = Number(li.dataset.tier);
+            if (li.dataset.best) {
+                li.classList.toggle("is-reached", state.phase !== "setup" && state.kills >= bestFound);
+                return;
+            }
             li.classList.toggle("is-reached", state.phase !== "setup" && i <= tier);
             li.classList.toggle("is-current", state.phase !== "setup" && i === tier);
         });

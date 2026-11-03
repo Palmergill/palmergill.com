@@ -17,8 +17,9 @@
 })(typeof self !== "undefined" ? self : this, function () {
     const SIZE = 8;
     // Bumped whenever a change makes old scores incomparable; the leaderboard
-    // only ranks runs played under the current rules. 1 was the gold budget.
-    const RULES = 2;
+    // only ranks runs played under the current rules. 1 was the gold budget,
+    // 2 the seven defenses before the Flamethrower.
+    const RULES = 3;
     const MAX_EACH = 3;
     // Limits on a day's allotment, checked by simulation (see dailyAllotment).
     const ALLOT_MIN_TOWERS = 3;
@@ -70,6 +71,15 @@
             name: "Mage",
             plural: "Mages",
             base: { damage: 23, range: 2.0, rate: 0.75, chains: 2, chainRange: 1.6 },
+            projectile: null
+        },
+        // Sprays everything near its target and sets it alight. Burning
+        // zombies take damage over time but run faster while they burn.
+        flame: {
+            kind: "tower",
+            name: "Flamethrower",
+            plural: "Flamethrowers",
+            base: { damage: 4, range: 1.3, rate: 3.0, splash: 0.55, burn: 6, burnFor: 2.0, haste: 0.3 },
             projectile: null
         },
         spikes: {
@@ -397,6 +407,11 @@
             s.slow = Math.min(b.slowCap, +(b.slow + b.slowGrowth * up).toFixed(2));
             s.slowFor = +(b.slowFor + 0.1 * up).toFixed(2);
         }
+        if (b.burn != null) {
+            s.burn = grow(b.burn);
+            s.burnFor = +(b.burnFor + 0.1 * up).toFixed(2);
+            s.haste = b.haste;
+        }
         if (b.chains != null) {
             s.chains = b.chains + Math.floor(level / 2);
             s.chainRange = b.chainRange;
@@ -499,8 +514,12 @@
             // Sideways offset from the road's centre line, so a crowd walks
             // abreast instead of stacking into one blob.
             lane: (mulberry32(id * 7919 + state.map.seed)() - 0.5) * 0.36,
-            slowUntil: 0,
-            slowAmt: 0,
+            // One slow per source, keyed "frost" or "tar".
+            slows: {},
+            burnUntil: 0,
+            burnDps: 0,
+            burnBy: 0,
+            haste: 0,
             hitFlash: 0,
             hitBy: new Set(),
             gone: false,
@@ -532,10 +551,11 @@
 
     // Every defense that hurt a zombie shares the credit: the killing blow
     // earns KILL_XP, every other one that hit it earns ASSIST_XP.
-    function damageZombie(state, z, amount, d) {
+    // A burn ticks every step, so it doesn't flash the zombie white.
+    function damageZombie(state, z, amount, d, flash = true) {
         if (z.gone) return;
         z.hp -= amount;
-        z.hitFlash = 0.12;
+        if (flash) z.hitFlash = 0.12;
         z.hitBy.add(d.id);
         if (z.hp > 0) return;
         z.gone = true;
@@ -554,9 +574,38 @@
         if (z.type === "king") state.events.push({ type: "king-down" });
     }
 
-    function slowZombie(state, z, amount, duration) {
-        if (amount >= z.slowAmt || z.slowUntil < state.time) z.slowAmt = amount;
-        z.slowUntil = Math.max(z.slowUntil, state.time + duration);
+    // A source's slows don't stack with each other — the stronger one wins
+    // and the longer one sets how long it lasts — but Frost, Tar and a
+    // burn's haste all multiply together.
+    function slowZombie(state, z, source, amount, duration) {
+        const cur = z.slows[source];
+        if (!cur || cur.until < state.time) {
+            z.slows[source] = { amt: amount, until: state.time + duration };
+            return;
+        }
+        if (amount >= cur.amt) cur.amt = amount;
+        cur.until = Math.max(cur.until, state.time + duration);
+    }
+
+    function isSlowed(state, z) {
+        return Object.values(z.slows).some((sl) => sl.until > state.time);
+    }
+
+    function speedFactor(state, z) {
+        let f = z.burnUntil > state.time ? 1 + z.haste : 1;
+        for (const sl of Object.values(z.slows)) if (sl.until > state.time) f *= 1 - sl.amt;
+        return f;
+    }
+
+    // Like slows, burns don't stack: the hotter one wins and the longer one
+    // sets how long it lasts. The burn's damage is credited to its tower.
+    function burnZombie(state, z, s, tower) {
+        if (s.burn >= z.burnDps || z.burnUntil < state.time) {
+            z.burnDps = s.burn;
+            z.burnBy = tower.id;
+            z.haste = s.haste;
+        }
+        z.burnUntil = Math.max(z.burnUntil, state.time + s.burnFor);
     }
 
     function live(state) {
@@ -614,6 +663,14 @@
             state.effects.push({ kind: "bolt", points, ttl: 0.18, life: 0.18 });
             return;
         }
+        if (tower.type === "flame") {
+            splashAt(state, target.x, target.y, s.splash, (z) => {
+                burnZombie(state, z, s, tower);
+                damageZombie(state, z, s.damage, tower);
+            });
+            state.effects.push({ kind: "flame", x: cx, y: cy, tx: target.x, ty: target.y, r: s.splash, ttl: 0.3, life: 0.3 });
+            return;
+        }
         const proj = DEFENSES[tower.type].projectile;
         state.projectiles.push({
             kind: proj.kind,
@@ -647,7 +704,7 @@
             return;
         }
         splashAt(state, p.x, p.y, p.splash, (z) => {
-            slowZombie(state, z, p.slow, p.slowFor);
+            slowZombie(state, z, "frost", p.slow, p.slowFor);
             damageZombie(state, z, p.damage, owner);
         });
         state.effects.push({ kind: "frost", x: p.x, y: p.y, r: p.splash, ttl: 0.4, life: 0.4 });
@@ -667,7 +724,7 @@
             return;
         }
         for (const z of here) {
-            if (trap.type === "tar") slowZombie(state, z, s.slow, s.slowFor);
+            if (trap.type === "tar") slowZombie(state, z, "tar", s.slow, s.slowFor);
             damageZombie(state, z, s.dps * dt, trap);
         }
         trap.active = here.length > 0;
@@ -690,8 +747,13 @@
 
         for (const z of state.zombies) {
             if (z.gone) continue;
-            const slowed = z.slowUntil > state.time ? 1 - z.slowAmt : 1;
-            z.dist += z.speed * slowed * dt;
+            const burning = z.burnUntil > state.time;
+            if (burning) {
+                const by = findDefense(state, z.burnBy);
+                if (by) damageZombie(state, z, z.burnDps * dt, by, false);
+                if (z.gone) continue;
+            }
+            z.dist += z.speed * speedFactor(state, z) * dt;
             z.hitFlash = Math.max(0, z.hitFlash - dt);
             placeZombie(state.map, z);
             if (z.dist >= state.map.length) {
@@ -800,6 +862,7 @@
         drainEvents,
         findDefense,
         isGrass,
+        isSlowed,
         isRoad,
         localDateString,
         place,
