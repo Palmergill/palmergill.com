@@ -4,6 +4,7 @@
     const G = window.CastleDefenseGame;
     const STEP = G.STEP;
     const TYPES = [...G.TOWER_TYPES, ...G.TRAP_TYPES];
+    const SHARE_ICON = { archer: "🏹", cannon: "💣", frost: "❄️", mage: "🔮", flame: "🔥", spikes: "🔱", tar: "🛢️", mine: "💥" };
 
     const $ = (id) => document.getElementById(id);
     const canvas = $("board");
@@ -1128,22 +1129,24 @@
     // Plain text, one fact a line: the score, how it stacks up (tier, place,
     // best found), then how the run went.
     function shareText(kills, wave) {
-        const lines = [`Castle Defense #${map.day} · ${kills.toLocaleString()} kills`];
-        if (cuts) lines.push(`${TIER_NAMES[tierOf(kills)]} · tier ${tierOf(kills) + 1} of 5`);
+        const lines = [`🧟 Castle Defense #${map.day} · ${kills.toLocaleString()} kills`];
+        if (cuts) lines.push(`🏅 ${TIER_NAMES[tierOf(kills)]} · tier ${tierOf(kills) + 1} of 5`);
         if (placement && placement.best) {
-            lines.push(`${placeText(placement.best, placement.players)}${placement.improved ? "" : " (my best today)"}`);
+            const medal = { 1: " 🥇", 2: " 🥈", 3: " 🥉" }[placement.best.rank] || "";
+            lines.push(`🏆 ${placeText(placement.best, placement.players)}${medal}${placement.improved ? "" : " (my best today)"}`);
         }
         if (bestFound) {
             lines.push(kills >= bestFound
-                ? `Matched the best found (${bestFound.toLocaleString()})`
-                : `${Math.floor((kills / bestFound) * 100)}% of the best found (${bestFound.toLocaleString()})`);
+                ? `🎯 Matched the best found (${bestFound.toLocaleString()})`
+                : `🎯 ${Math.floor((kills / bestFound) * 100)}% of the best found (${bestFound.toLocaleString()})`);
         }
-        lines.push(`Fell on wave ${wave}`);
+        lines.push(`🏰 Fell on wave ${wave}`);
         const mvp = state.defenses.slice().sort((a, b) => b.kills - a.kills)[0];
-        if (mvp && mvp.kills) lines.push(`MVP: ${G.DEFENSES[mvp.type].name}, level ${mvp.level}, ${mvp.kills.toLocaleString()} kills`);
+        if (mvp && mvp.kills) lines.push(`${SHARE_ICON[mvp.type]} MVP: ${G.DEFENSES[mvp.type].name}, level ${mvp.level}, ${mvp.kills.toLocaleString()} kills`);
         lines.push("https://palmergill.com/castle-defense/");
         return lines.join("\n");
     }
+
 
     async function copyText(str) {
         try {
