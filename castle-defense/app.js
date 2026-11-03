@@ -4,7 +4,6 @@
     const G = window.CastleDefenseGame;
     const STEP = G.STEP;
     const TYPES = [...G.TOWER_TYPES, ...G.TRAP_TYPES];
-    const SHARE_ICON = { archer: "🏹", cannon: "💣", frost: "❄️", mage: "🔮", flame: "🔥", spikes: "🔱", tar: "🛢️", mine: "💥" };
 
     const $ = (id) => document.getElementById(id);
     const canvas = $("board");
@@ -1126,21 +1125,24 @@
         return h ? `${h}h ${m}m` : `${m}m`;
     }
 
-    function buildSummary() {
-        const counts = {};
-        state.defenses.forEach((d) => { counts[d.type] = (counts[d.type] || 0) + 1; });
-        return TYPES.filter((t) => counts[t]).map((t) => `${SHARE_ICON[t]}${counts[t] > 1 ? `×${counts[t]}` : ""}`).join(" ");
-    }
-
+    // Plain text, one fact a line: the score, how it stacks up (tier, place,
+    // best found), then how the run went.
     function shareText(kills, wave) {
-        const lines = [`Castle Defense #${map.day} — ${kills.toLocaleString()} zombies`];
+        const lines = [`Castle Defense #${map.day} · ${kills.toLocaleString()} kills`];
+        if (cuts) lines.push(`${TIER_NAMES[tierOf(kills)]} · tier ${tierOf(kills) + 1} of 5`);
         if (placement && placement.best) {
-            const medal = { 1: " 🥇", 2: " 🥈", 3: " 🥉" }[placement.best.rank] || "";
-            const which = placement.improved ? "" : " (my best today)";
-            lines.push(`🏆 ${placeText(placement.best, placement.players)}${medal}${which}`);
+            lines.push(`${placeText(placement.best, placement.players)}${placement.improved ? "" : " (my best today)"}`);
         }
-        if (cuts) lines.push(`🏅 ${TIER_NAMES[tierOf(kills)]} (${tierOf(kills) + 1}/5)`);
-        lines.push(`🏰 Fell on wave ${wave}`, buildSummary(), "https://palmergill.com/castle-defense/");
+        if (bestFound) {
+            lines.push(kills >= bestFound
+                ? `Matched the best found (${bestFound.toLocaleString()})`
+                : `${Math.floor((kills / bestFound) * 100)}% of the best found (${bestFound.toLocaleString()})`);
+        }
+        const pieces = Object.values(map.allotment).reduce((n, c) => n + c, 0);
+        lines.push(`Fell on wave ${wave} · ${state.defenses.length} of ${pieces} pieces`);
+        const mvp = state.defenses.slice().sort((a, b) => b.kills - a.kills)[0];
+        if (mvp && mvp.kills) lines.push(`MVP: ${G.DEFENSES[mvp.type].name}, level ${mvp.level}, ${mvp.kills.toLocaleString()} kills`);
+        lines.push("https://palmergill.com/castle-defense/");
         return lines.join("\n");
     }
 
