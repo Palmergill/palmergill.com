@@ -7,6 +7,11 @@ const { test, expect, signUp } = require('./helpers');
 // no Tar pits, 2 Mines.
 const DAY_ONE = '/castle-defense/?date=2026-10-18';
 
+// The patch notes have been seen, so they don't cover the board.
+test.beforeEach(async ({ page }) => {
+    await page.addInitScript(() => localStorage.setItem('castle-defense:patch', '1.0'));
+});
+
 // Click the centre of a board tile; the board is an 8 × 8 grid.
 async function clickTile(page, x, y) {
     // Picking a piece low in the sidebar can scroll the board out of view.

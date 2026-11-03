@@ -1539,6 +1539,38 @@
         }
     });
 
+    // ---------- patch notes ----------
+    // Shown once per patch, the first time the game loads after it ships.
+    const PATCH = "1.0";
+    const PATCH_NOTES = [
+        "New tower: the <b>Flamethrower</b>. Short range and splash damage, with a burn that hurts over time but speeds zombies up.",
+        "Frost, Tar and burns now stack with each other. Two of the same kind still count once.",
+        "Every day's pieces were reshuffled to make room for the Flamethrower.",
+        "Each day's tiers are worked out on the server, and the day's <b>best found</b> score sits above them.",
+        "A new <b>📜 Rules</b> window covers every defense, zombie and scoring rule.",
+        "Smaller shop cards.",
+        "The share message is plain text: your tier, place, how close you came to the best found, the wave you fell on, pieces used and your MVP.",
+        "The rules changed, so runs posted before the patch are off today's board."
+    ];
+
+    function showPatchNotes() {
+        try {
+            if (localStorage.getItem("castle-defense:patch") === PATCH) return;
+            localStorage.setItem("castle-defense:patch", PATCH);
+        } catch {
+            return;
+        }
+        showOverlay({
+            eyebrow: "Castle Defense",
+            title: `Patch ${PATCH}`,
+            body: `<ul class="cd-howto cd-patch">${PATCH_NOTES.map((note) => `<li>${note}</li>`).join("")}</ul>`,
+            actions: [
+                { label: "Rules", onClick: () => showRules() },
+                { label: "Play", primary: true, onClick: hideOverlay }
+            ]
+        });
+    }
+
     // ---------- boot ----------
     function describeHorde() {
         const lean = { walker: "Walkers", runner: "Runners", brute: "Brutes" }[map.lean];
@@ -1554,6 +1586,7 @@
     applyLayout(state, record.layout);
     refreshPanel();
     loadBoard();
+    showPatchNotes();
     // A run finished while signed out posts itself once you're signed in.
     // The nav publishes window.SiteSession on DOMContentLoaded, which is
     // after this script runs, so wait for it.
