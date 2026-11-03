@@ -1546,9 +1546,7 @@
         "Frost, Tar and burns now stack with each other. Two of the same kind still count once: two Frost towers don't double the slow, but Frost and Tar do stack.",
         'Each day a "Best Found" score is calculated by repeated trial and error by the server.',
         "A new <b>📜 Rules</b> window covers every defense, zombie and scoring rule.",
-        "Smaller shop cards.",
-        "The share message is plain text: your tier, place, how close you came to the best found, the wave you fell on and your MVP.",
-        "The rules changed, so runs posted before the patch are off today's board."
+        "Smaller shop cards."
     ];
 
     function showPatchNotes() {
