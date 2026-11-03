@@ -1544,7 +1544,6 @@
     const PATCH_NOTES = [
         "New tower: the <b>Flamethrower</b>. Short range and splash damage, with a burn that hurts over time but speeds zombies up.",
         "Frost, Tar and burns now stack with each other. Two of the same kind still count once: two Frost towers don't double the slow, but Frost and Tar do stack.",
-        "Every day's pieces were reshuffled to make room for the Flamethrower.",
         "Each day's tiers are worked out on the server, and the day's <b>best found</b> score sits above them.",
         "A new <b>📜 Rules</b> window covers every defense, zombie and scoring rule.",
         "Smaller shop cards.",
