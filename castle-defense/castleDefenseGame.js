@@ -844,6 +844,7 @@
         RULES,
         MAX_EACH,
         START_HP,
+        WAVE_BREAK,
         KING_EVERY,
         STEP,
         MAX_LEVEL,

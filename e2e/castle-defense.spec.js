@@ -176,3 +176,23 @@ test('a signed-in run shows up on the all-time board', async ({ page }) => {
     await expect(mine).toContainText('(you)');
     await expect(mine).toContainText(/🥇 \d+ 🥈 \d+ 🥉 \d+/);
 });
+
+test('the rules open from the header and cover every defense', async ({ page }) => {
+    await page.goto('/castle-defense/');
+    await page.getByRole('button', { name: /Rules/ }).click();
+    const card = page.getByRole('dialog');
+    await expect(card.getByRole('heading', { name: 'Rules' })).toBeVisible();
+    await expect(card.getByRole('button', { name: 'How to play' })).toHaveAttribute('aria-pressed', 'true');
+
+    await card.getByRole('button', { name: 'Defenses' }).click();
+    for (const name of ['Archer', 'Cannon', 'Frost', 'Mage', 'Flamethrower', 'Spikes', 'Tar pit', 'Mine']) {
+        await expect(card.getByRole('heading', { name, exact: true })).toBeVisible();
+    }
+    await card.getByRole('button', { name: 'Zombies' }).click();
+    await expect(card.locator('table')).toContainText('Zombie King');
+    await card.getByRole('button', { name: 'Scoring' }).click();
+    await expect(card.getByRole('heading', { name: 'Leaderboard' })).toBeVisible();
+
+    await card.getByRole('button', { name: 'Close' }).click();
+    await expect(card).toBeHidden();
+});

@@ -201,6 +201,141 @@
         else note.innerHTML = `${players}${join}`;
     }
 
+    // ---------- rules ----------
+    // Every number comes from the engine, so the rules can't drift from the
+    // game they describe.
+    const RULE_TABS = [["play", "How to play"], ["defenses", "Defenses"], ["zombies", "Zombies"], ["scoring", "Scoring"]];
+
+    const DEFENSE_RULES = {
+        archer: "Quick single shots at long range. Arrows home in on their target.",
+        cannon: "Slow shells that burst on landing and hit everything in the blast. A shell flies to where its target stood when it fired, so fast zombies can outrun it.",
+        frost: "Icy shards that chip at everything in a small burst and slow it down.",
+        mage: "Lightning that strikes one zombie and jumps to the nearest ones, losing 20% of its damage each jump. Every second level adds a jump.",
+        flame: "A short spray that hits everything around its target and sets it alight. Burning zombies take damage every second, but run faster while they burn.",
+        spikes: "Hurts everything standing on it, every moment it stands there.",
+        tar: "Slows everything that wades through and hurts it a little.",
+        mine: "Blows up when a zombie steps on it, hitting everything nearby, then takes a few seconds to re-arm."
+    };
+
+    const pct = (v) => `${Math.round(v * 100)}%`;
+    const num = (v) => (Math.round(v * 100) / 100).toLocaleString();
+    const tiles = (v) => `${num(v)} ${v === 1 ? "tile" : "tiles"}`;
+
+    // A defense's numbers at level 1 and level 10.
+    function defenseStats(type) {
+        const a = G.stats(type, 1);
+        const b = G.stats(type, G.MAX_LEVEL);
+        const row = (label, fmt, key) => (a[key] == null ? "" : `<tr><th>${label}</th><td>${fmt(a[key])}</td><td>${fmt(b[key])}</td></tr>`);
+        return `<table class="cd-rules__stats"><thead><tr><th></th><th>Lv 1</th><th>Lv ${G.MAX_LEVEL}</th></tr></thead><tbody>
+            ${row("Damage", num, "damage")}
+            ${row("Damage / sec", num, "dps")}
+            ${row("Range", tiles, "range")}
+            ${row("Attacks / sec", num, "rate")}
+            ${row("Blast radius", tiles, "splash")}
+            ${row("Jumps", num, "chains")}
+            ${row("Slow", pct, "slow")}
+            ${row("Slow lasts", (v) => `${num(v)}s`, "slowFor")}
+            ${row("Burn / sec", num, "burn")}
+            ${row("Burn lasts", (v) => `${num(v)}s`, "burnFor")}
+            ${row("Burning speed", (v) => `+${pct(v)}`, "haste")}
+            ${row("Re-arms in", (v) => `${num(v)}s`, "rearm")}
+        </tbody></table>`;
+    }
+
+    function rulesBody(tab) {
+        if (tab === "play") {
+            return `
+                <h3>The daily puzzle</h3>
+                <ul class="cd-howto">
+                    <li>Everyone gets the same map, the same horde and the same pieces each day. A new day brings a new puzzle at local midnight.</li>
+                    <li>The day gives you 0–${G.MAX_EACH} of each tower and trap. You don't have to place them all.</li>
+                    <li>Towers go on grass. Traps go on the road.</li>
+                    <li>Until you press Play, click anything you've placed to pick it back up.</li>
+                    <li>Once the run starts, nothing can be moved, added or sold. Change the speed if you like and watch.</li>
+                </ul>
+                <h3>The run</h3>
+                <ul class="cd-howto">
+                    <li>Zombies walk the road to your castle, which has ${G.START_HP} HP. Each one that reaches it takes HP off.</li>
+                    <li>The horde never ends. A new wave starts ${G.WAVE_BREAK} seconds after the last zombie of the previous one appears, cleared or not.</li>
+                    <li>The run ends when the castle falls. Your score is how many zombies died first.</li>
+                </ul>
+                <h3>Targeting</h3>
+                <ul class="cd-howto">
+                    <li>A tower attacks the zombie in range that is furthest along the road.</li>
+                    <li>Range is measured from the centre of the tower's tile.</li>
+                </ul>`;
+        }
+        if (tab === "defenses") {
+            const card = (type) => `
+                <section class="cd-rules__defense">
+                    <div class="cd-rules__head"><span data-icon="${type}"></span><h3>${G.DEFENSES[type].name}</h3></div>
+                    <p>${DEFENSE_RULES[type]}</p>
+                    ${defenseStats(type)}
+                </section>`;
+            return `
+                <h3 class="cd-rules__group">Towers</h3>${G.TOWER_TYPES.map(card).join("")}
+                <h3 class="cd-rules__group">Traps</h3>${G.TRAP_TYPES.map(card).join("")}
+                <h3>Slows and burns</h3>
+                <ul class="cd-howto">
+                    <li>Frost, Tar and burning each work on their own. They multiply together: a zombie slowed ${pct(G.stats("frost", 1).slow)} by Frost while wading through Tar (${pct(G.stats("tar", 1).slow)}) moves at ${pct((1 - G.stats("frost", 1).slow) * (1 - G.stats("tar", 1).slow))} speed.</li>
+                    <li>The same source never stacks with itself. Two Frost towers hitting one zombie slow it once: the stronger slow wins, and the longer timer sets how long it lasts.</li>
+                    <li>Burns work the same way. The hottest burn wins, and the longest timer sets how long it lasts.</li>
+                </ul>
+                <h3>Levels</h3>
+                <ul class="cd-howto">
+                    <li>Every defense levels up on its own during the run, up to level ${G.MAX_LEVEL}.</li>
+                    <li>The defense that lands the killing blow earns ${G.KILL_XP} XP. Every other defense that hurt that zombie earns ${G.ASSIST_XP} XP for the assist.</li>
+                    <li>Levels need ${G.LEVEL_XP.map((x) => x.toLocaleString()).join(", ")} XP in total.</li>
+                    <li>Each level adds ${pct(0.45)} of the level-1 damage, plus a little range, attack speed and blast radius. Slows and burns get stronger and last longer, and Mines re-arm faster.</li>
+                </ul>`;
+        }
+        if (tab === "zombies") {
+            const rows = Object.entries(G.ZOMBIES).map(([, z]) => `<tr><th>${z.name}</th><td>${z.hp.toLocaleString()}</td><td>${num(z.speed)}</td><td>${z.damage}</td></tr>`).join("");
+            return `
+                <table class="cd-rules__stats cd-rules__stats--zombies"><thead><tr><th></th><th>HP</th><th>Tiles / sec</th><th>Castle damage</th></tr></thead><tbody>${rows}</tbody></table>
+                <ul class="cd-howto">
+                    <li>Wave <i>n</i> brings 5 + 2<i>n</i> zombies.</li>
+                    <li>Zombies get 28% more HP with every wave. The HP above is wave 1.</li>
+                    <li>Runners join from wave 2 and Brutes from wave 4. Each day leans toward one kind, but every day's waves carry about the same total HP.</li>
+                    <li>A Zombie King comes at the end of every ${G.KING_EVERY}th wave.</li>
+                </ul>`;
+        }
+        return `
+            <h3>Tiers</h3>
+            <ul class="cd-howto">
+                <li>Each day's tiers come from 300 trial layouts of that day's pieces.</li>
+                <li>${escapeHtml(TIER_NAMES[1])} beats 40% of them, ${escapeHtml(TIER_NAMES[2])} 60%, ${escapeHtml(TIER_NAMES[3])} 80% and ${escapeHtml(TIER_NAMES[4])} 90%.</li>
+                <li>Best found is the highest score known for the day. It comes from a search for the strongest layout, or from a player's run if that scored higher.</li>
+            </ul>
+            <h3>Leaderboard</h3>
+            <ul class="cd-howto">
+                <li>Sign in to put runs on today's board. Only your best run of the day counts, and you can play as often as you like.</li>
+                <li>The server replays your layout to score it, so every score on the board is real.</li>
+                <li>Tied scores share a place.</li>
+                <li>Older days can be replayed for practice, but only today's map is ranked.</li>
+                <li>The all-time board gives a 🥇, 🥈 or 🥉 for finishing a day 1st, 2nd or 3rd. Players rank by golds, then silvers, then bronzes.</li>
+            </ul>`;
+    }
+
+    function showRules(tab = "play") {
+        const chip = ([value, label]) => `<button class="cd-chip" type="button" data-rules="${value}" aria-pressed="${value === tab}">${label}</button>`;
+        showOverlay({
+            eyebrow: "Castle Defense",
+            title: "Rules",
+            wide: true,
+            body: `
+                <div class="cd-board-tabs cd-rules__tabs" role="group" aria-label="Rules">${RULE_TABS.map(chip).join("")}</div>
+                <div class="cd-rules">${rulesBody(tab)}</div>`,
+            actions: [{ label: "Close", primary: true, onClick: hideOverlay }]
+        });
+        document.querySelectorAll("[data-icon]").forEach((el) => el.append(iconCanvas(el.dataset.icon, 32)));
+        document.querySelectorAll("[data-rules]").forEach((btn) => {
+            btn.addEventListener("click", () => {
+                if (btn.dataset.rules !== tab) showRules(btn.dataset.rules);
+            });
+        });
+    }
+
     function signInHref() {
         return `/login/?next=${encodeURIComponent("/castle-defense/")}`;
     }
@@ -950,7 +1085,8 @@
     }
 
     // ---------- overlay ----------
-    function showOverlay({ eyebrow, title, body, actions }) {
+    function showOverlay({ eyebrow, title, body, actions, wide = false }) {
+        overlay.querySelector(".cd-overlay__card").classList.toggle("cd-overlay__card--wide", wide);
         $("overlayEyebrow").textContent = eyebrow;
         $("overlayTitle").textContent = title;
         $("overlayBody").innerHTML = body;
@@ -1362,6 +1498,7 @@
 
     $("playButton").addEventListener("click", startOrRetry);
     $("leaderboardButton").addEventListener("click", () => showLeaderboard());
+    $("rulesButton").addEventListener("click", () => showRules());
 
     function startOrRetry() {
         if (state.phase === "over") {

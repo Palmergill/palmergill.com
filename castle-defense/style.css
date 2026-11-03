@@ -346,6 +346,32 @@ button { font: inherit; color: inherit; }
 .cd-overlay__actions .cd-btn { flex: 1 1 auto; }
 
 .cd-howto { margin: 0 0 4px; padding-left: 20px; color: var(--soft); font-size: 0.9rem; }
+
+/* ---- rules ---- */
+.cd-overlay__card--wide { width: min(100%, 600px); }
+.cd-rules__tabs { flex-wrap: wrap; }
+.cd-rules h3 { margin: 16px 0 6px; font-size: 1rem; font-weight: 700; }
+.cd-rules > h3:first-child { margin-top: 4px; }
+.cd-rules h3.cd-rules__group {
+    margin: 18px 0 8px;
+    color: var(--soft);
+    font-size: 0.74rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+.cd-rules > h3.cd-rules__group:first-child { margin-top: 4px; }
+.cd-rules__defense { padding: 12px 0; border-top: 1px solid var(--line); }
+.cd-rules__head { display: flex; align-items: center; gap: 10px; }
+.cd-rules__head h3 { margin: 0; }
+.cd-rules__head canvas { display: block; width: 32px; height: 32px; }
+.cd-rules__defense p { margin: 6px 0 8px; }
+.cd-rules__stats { width: 100%; border-collapse: collapse; font-size: 0.84rem; font-variant-numeric: tabular-nums; }
+.cd-rules__stats th, .cd-rules__stats td { padding: 3px 6px; text-align: right; }
+.cd-rules__stats th:first-child { text-align: left; font-weight: 600; color: var(--soft); }
+.cd-rules__stats thead th { color: var(--soft); font-size: 0.74rem; font-weight: 700; }
+.cd-rules__stats tbody tr:nth-child(odd) { background: rgba(0, 0, 0, 0.03); }
+.cd-rules__stats--zombies { margin-bottom: 12px; }
+.cd-rules__stats--zombies tbody th { color: inherit; }
 .cd-howto li + li { margin-top: 4px; }
 
 .cd-final {
