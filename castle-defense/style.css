@@ -53,7 +53,7 @@ button { font: inherit; color: inherit; }
     letter-spacing: -0.03em;
     line-height: 1;
 }
-.cd-head__side { display: grid; gap: 10px; justify-items: start; min-width: 0; }
+.cd-head__side { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; min-width: 0; }
 .cd-board-tabs { display: flex; gap: 6px; margin-bottom: 12px; }
 .cd-board--full { max-height: min(52vh, 460px); overflow-y: auto; margin: 0; }
 .cd-medals { white-space: nowrap; font-variant-numeric: tabular-nums; }
@@ -423,6 +423,7 @@ button { font: inherit; color: inherit; }
 @media (max-width: 640px) {
     .cd-shell { padding-top: 18px; }
     .cd-head { grid-template-columns: minmax(0, 1fr); }
+    .cd-head__side { justify-content: flex-start; }
     .cd-hud { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
     .cd-stat { padding: 8px 10px; }
     .cd-stat--hp { grid-column: 1 / -1; }
@@ -448,7 +449,13 @@ button { font: inherit; color: inherit; }
     font-size: 0.82rem;
     font-weight: 800;
 }
-#shopTowers { margin-bottom: 12px; }
+#shopTowers { margin-bottom: 10px; }
+/* The shop is name and count only, so two small cards to a row. */
+.cd-towers--shop { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.cd-towers--shop .cd-tower { grid-template-columns: 30px minmax(0, 1fr); gap: 0 8px; padding: 6px 9px; }
+.cd-towers--shop .cd-tower canvas { width: 30px; height: 30px; }
+.cd-towers--shop .cd-tower__name { overflow: hidden; font-size: 0.86rem; text-overflow: ellipsis; white-space: nowrap; }
+.cd-towers--shop .cd-tower__state { grid-row: 2; grid-column: 2; font-size: 0.72rem; text-align: left; }
 .cd-tower.is-poor { opacity: 0.5; }
 .cd-tower__cost { color: var(--gold); }
 .cd-tower__count { color: var(--sage); }
