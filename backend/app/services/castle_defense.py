@@ -32,7 +32,7 @@ logger = logging.getLogger(__name__)
 
 BOARD_SIZE = 50
 # Replays cost real CPU (about 0.1s each), so cap how often one account posts.
-MAX_RUNS_PER_DAY = 60
+MAX_RUNS_PER_DAY = 100
 
 _BACKEND_DIR = Path(__file__).resolve().parents[2]
 _ENGINE_CANDIDATES = (
