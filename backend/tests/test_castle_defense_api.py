@@ -160,6 +160,10 @@ def test_best_run_counts_and_places_are_shared_on_ties():
     assert [(e["name"], e["rank"]) for e in board["entries"]] == [("Alice", 1), ("Bob", 2), ("Cara", 2)]
     assert board["you"]["name"] == "Bob" and board["you"]["rank"] == 2
     assert [e["you"] for e in board["entries"]] == [False, True, False]
+    # Only your own best layout comes back, so any device can load it.
+    assert board["you"]["layout"] == weak
+    assert all("layout" not in e for e in board["entries"])
+    assert alice.get(f"/api/castle-defense/leaderboard?day={TODAY}").json()["you"]["layout"] == strong
 
 
 def test_scores_from_older_rules_are_left_off_and_then_replaced():

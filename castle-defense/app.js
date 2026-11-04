@@ -41,9 +41,9 @@
     // ---------- storage ----------
     function readRecord() {
         try {
-            return { best: null, runs: 0, layout: null, pending: null, ...JSON.parse(localStorage.getItem(storeKey) || "{}") };
+            return { best: null, bestLayout: null, runs: 0, layout: null, pending: null, ...JSON.parse(localStorage.getItem(storeKey) || "{}") };
         } catch {
-            return { best: null, runs: 0, layout: null, pending: null };
+            return { best: null, bestLayout: null, runs: 0, layout: null, pending: null };
         }
     }
 
@@ -67,6 +67,27 @@
     function saveLayout() {
         record.layout = layoutOf(state);
         writeRecord();
+    }
+
+    // The layout behind today's best, from this browser or your account,
+    // whichever scored higher.
+    function keepBestLayout(kills, layout) {
+        if (!layout || !layout.length || (record.bestLayout && record.bestLayout.kills >= kills)) return;
+        record.bestLayout = { kills, layout };
+        if (record.best == null || kills > record.best) record.best = kills;
+        writeRecord();
+        refreshPanel();
+    }
+
+    function loadBestLayout() {
+        if (state.phase !== "setup" || !record.bestLayout) return;
+        state = G.createGame(map);
+        shownTier = 0;
+        applyLayout(state, record.bestLayout.layout);
+        selectedType = null;
+        saveLayout();
+        refreshPanel();
+        toast(`Loaded your best layout (${record.bestLayout.kills.toLocaleString()})`);
     }
 
     // ---------- leaderboard ----------
@@ -127,6 +148,7 @@
         try {
             const board = await api(`/leaderboard?day=${date}`);
             renderBoard(board);
+            if (board.you) keepBestLayout(board.you.kills, board.you.layout);
             return board;
         } catch {
             note.textContent = "The leaderboard couldn't be loaded right now.";
@@ -1229,6 +1251,7 @@
         record.runs += 1;
         if (isBest) record.best = kills;
         writeRecord();
+        keepBestLayout(kills, layoutOf(state));
 
         const badge = isBest
             ? `<span class="cd-final__best">${record.runs > 1 ? "New best today" : "Today's score"}</span>`
@@ -1360,6 +1383,14 @@
         const count = $("pieceCount");
         count.textContent = setup ? `${left} to place` : `${state.defenses.length} built`;
         count.classList.toggle("is-out", setup && left === 0);
+
+        const best = $("bestLayoutButton");
+        best.hidden = !setup || !record.bestLayout;
+        if (setup && record.bestLayout) {
+            const key = (layout) => layout.map((d) => `${d.type}@${d.x},${d.y}`).sort().join(",");
+            best.disabled = key(layoutOf(state)) === key(record.bestLayout.layout);
+            $("bestLayoutKills").textContent = record.bestLayout.kills.toLocaleString();
+        }
 
         if (setup) {
             TYPES.forEach((type) => {
@@ -1503,6 +1534,7 @@
     $("playButton").addEventListener("click", startOrRetry);
     $("leaderboardButton").addEventListener("click", () => showLeaderboard());
     $("rulesButton").addEventListener("click", () => showRules());
+    $("bestLayoutButton").addEventListener("click", loadBestLayout);
 
     function startOrRetry() {
         if (state.phase === "over") {

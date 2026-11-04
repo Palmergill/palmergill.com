@@ -242,6 +242,8 @@ button { font: inherit; color: inherit; }
     border-color: var(--sage);
     color: var(--sage-dim);
 }
+.cd-chip:disabled { opacity: 0.55; cursor: default; }
+#bestLayoutButton { margin-left: auto; }
 
 /* ---- side panels ---- */
 .cd-side { display: grid; gap: 12px; min-width: 0; }

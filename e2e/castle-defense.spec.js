@@ -95,6 +95,29 @@ test('share copies the result and says so', async ({ page, context }) => {
     await expect(page.locator('.cd-final__tier')).toContainText(/Tier [1-4] of 5 · \d+ more for /);
 });
 
+test('your best layout comes back after you change it', async ({ page }) => {
+    await page.goto(DAY_ONE);
+    const best = page.locator('#bestLayoutButton');
+    await expect(best).toBeHidden();
+    await page.getByRole('button', { name: /Spikes/ }).click();
+    await clickTile(page, 5, 1);
+    await page.locator('#playButton').click();
+    await page.getByRole('button', { name: '4×' }).click();
+    await page.getByRole('dialog').getByRole('button', { name: 'Try again' }).click({ timeout: 90_000 });
+
+    // Already on the board you scored with.
+    await expect(best).toBeVisible();
+    await expect(best).toBeDisabled();
+    await expect(best).toHaveText(/Best layout · \d+/);
+
+    await clickTile(page, 5, 1);
+    await expect(page.locator('#pieceCount')).toHaveText('13 to place');
+    await best.click();
+    await expect(page.locator('#toast')).toHaveText(/Loaded your best layout/);
+    await expect(page.locator('#pieceCount')).toHaveText('12 to place');
+    await expect(best).toBeDisabled();
+});
+
 // ── today's leaderboard ─────────────────────────────────────────────────────
 
 // A run that ends in seconds whatever today's allotment is: one tower on the

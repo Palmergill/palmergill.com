@@ -259,7 +259,8 @@ def leaderboard(db: Session, day: str, username: Optional[str] = None) -> Dict[s
     if username:
         mine = _day(db, day).filter(CastleDefenseScore.username == username).first()
         if mine:
-            you = entry(mine, rank_of(db, mine), username)
+            # Your own best layout comes back to you, so any device can load it.
+            you = {**entry(mine, rank_of(db, mine), username), "layout": json.loads(mine.layout)}
     return {"day": day, "players": player_count(db, day), "entries": entries, "you": you}
 
 
