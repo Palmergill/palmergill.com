@@ -79,6 +79,15 @@
         refreshPanel();
     }
 
+    function clearBoard() {
+        if (state.phase !== "setup" || !state.defenses.length) return;
+        state = G.createGame(map);
+        shownTier = 0;
+        selectedType = null;
+        saveLayout();
+        refreshPanel();
+    }
+
     function loadBestLayout() {
         if (state.phase !== "setup" || !record.bestLayout) return;
         state = G.createGame(map);
@@ -1384,6 +1393,9 @@
         count.textContent = setup ? `${left} to place` : `${state.defenses.length} built`;
         count.classList.toggle("is-out", setup && left === 0);
 
+        const clear = $("clearButton");
+        clear.hidden = !setup;
+        clear.disabled = !state.defenses.length;
         const best = $("bestLayoutButton");
         best.hidden = !setup || !record.bestLayout;
         if (setup && record.bestLayout) {
@@ -1535,6 +1547,7 @@
     $("leaderboardButton").addEventListener("click", () => showLeaderboard());
     $("rulesButton").addEventListener("click", () => showRules());
     $("bestLayoutButton").addEventListener("click", loadBestLayout);
+    $("clearButton").addEventListener("click", clearBoard);
 
     function startOrRetry() {
         if (state.phase === "over") {

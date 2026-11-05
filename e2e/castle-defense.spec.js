@@ -62,6 +62,16 @@ test("place the day's allotment, then start the run", async ({ page }) => {
     await expect(page.getByRole('button', { name: /Spikes/ })).toContainText('1 of 1 left');
     await expect(count).toHaveText('11 to place');
 
+    // Reset clears the board.
+    await page.getByRole('button', { name: 'Reset' }).click();
+    await expect(count).toHaveText('13 to place');
+    await expect(play).toBeDisabled();
+    await expect(page.getByRole('button', { name: 'Reset' })).toBeDisabled();
+    await page.getByRole('button', { name: /Archer/ }).click();
+    await clickTile(page, 6, 3);
+    await page.getByRole('button', { name: /Flamethrower/ }).click();
+    await clickTile(page, 3, 4);
+
     // You don't have to place everything.
     await expect(play).toBeEnabled();
     await play.click();
