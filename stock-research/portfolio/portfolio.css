@@ -178,6 +178,7 @@ body {
 .pf-bars__fill { height: 100%; background: var(--series-1); border-radius: 999px; }
 
 .pf-insights { list-style: none; display: flex; flex-direction: column; gap: 10px; font-size: 14px; }
+.pf-insights:empty::after { content: "Nothing to flag."; color: var(--muted); }
 .pf-insights li { padding-left: 14px; position: relative; }
 .pf-insights li::before { content: ""; position: absolute; left: 0; top: 9px; width: 5px; height: 5px; border-radius: 50%; background: var(--line-strong); }
 .pf-insights strong { color: var(--ink); }
@@ -354,22 +355,13 @@ body {
 .pf-about__meta { font-size: 13px; color: var(--muted); }
 
 /* Gains tiles. */
-.pf-tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
-@media (max-width: 720px) { .pf-tiles { grid-template-columns: repeat(2, 1fr); } }
+.pf-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+.pf-tiles--flat { grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
+@media (max-width: 440px) { .pf-tiles--flat { grid-template-columns: repeat(2, 1fr); } }
 .pf-tile { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px; }
 .pf-tile__label { font-size: 12px; color: var(--muted); font-weight: 600; }
 .pf-tile__value { font-size: 22px; color: var(--ink); font-weight: 700; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
 .pf-tile__sub { font-size: 12px; color: var(--soft); font-variant-numeric: tabular-nums; }
-
-/* Realized by year: bars up for gains, down for losses, from one zero line. */
-.pf-yearbars { display: flex; gap: 6px; height: 120px; align-items: stretch; margin-bottom: 16px; }
-.pf-yearbar { flex: 1 1 0; display: flex; flex-direction: column; align-items: center; min-width: 0; }
-.pf-yearbar__plot { position: relative; flex: 1; width: 100%; border-bottom: 0; }
-.pf-yearbar__plot::after { content: ""; position: absolute; left: 0; right: 0; top: var(--zero, 50%); border-top: 1px solid var(--line-strong); }
-.pf-yearbar__bar { position: absolute; left: 18%; right: 18%; border-radius: 4px; min-height: 1px; }
-.pf-yearbar__bar--gain { background: var(--gain); border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
-.pf-yearbar__bar--loss { background: var(--loss); border-top-left-radius: 0; border-top-right-radius: 0; }
-.pf-yearbar__label { font-size: 11px; color: var(--muted); margin-top: 4px; font-variant-numeric: tabular-nums; }
 
 /* Activity: filters and the pager. */
 .pf-filters { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
@@ -402,3 +394,144 @@ body {
 @media (max-width: 860px) {
     .pf-hide-md { display: none; }
 }
+
+/* Header: an eye for privacy, a menu for the occasional actions. */
+.pf-icon-button {
+    width: 36px; height: 36px; display: inline-flex; align-items: center; justify-content: center;
+    border: 1px solid var(--line-strong); border-radius: 999px; background: var(--card); color: var(--soft);
+    cursor: pointer; padding: 0;
+}
+.pf-icon-button:hover { background: var(--sage-soft); color: var(--sage); }
+.pf-icon-button:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.pf-icon-button[aria-pressed="true"] { background: var(--sage-soft); color: var(--sage); border-color: #cfddc6; }
+.pf-icon-button svg { width: 18px; height: 18px; fill: currentColor; }
+.pf-icon-button svg.pf-stroke { fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.pf-head__actions { align-items: center; }
+.pf-menu { position: relative; }
+.pf-menu__list {
+    position: absolute; right: 0; top: calc(100% + 6px); z-index: 40; min-width: 220px;
+    background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 6px;
+    box-shadow: 0 12px 32px rgba(60, 50, 35, 0.16); display: flex; flex-direction: column;
+}
+.pf-menu__list[hidden] { display: none; }
+.pf-menu__list button {
+    text-align: left; background: none; border: 0; font: inherit; font-size: 14px; color: var(--ink);
+    padding: 8px 10px; border-radius: 8px; cursor: pointer;
+}
+.pf-menu__list button:hover, .pf-menu__list button:focus-visible { background: var(--surface); outline: none; }
+.pf-menu__list button:disabled { color: var(--muted); cursor: progress; }
+
+/* Loading: the page's shape while the numbers arrive. */
+.pf-skeleton { display: flex; flex-direction: column; gap: 16px; }
+.pf-skeleton[hidden] { display: none; }
+.pf-skeleton__tabs { height: 38px; border-bottom: 1px solid var(--line); }
+.pf-skeleton__card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 22px; display: flex; flex-direction: column; gap: 12px; }
+.pf-skeleton__card span, .pf-skeleton__tabs {
+    background: linear-gradient(90deg, var(--surface) 0%, #f8f4ec 50%, var(--surface) 100%);
+    background-size: 200% 100%; animation: pf-shimmer 1.4s ease-in-out infinite; border-radius: 8px;
+}
+.pf-skeleton__tabs { border-bottom: 0; width: 60%; height: 28px; }
+.pf-skeleton__card span { height: 14px; }
+.pf-skeleton__card span:nth-child(2) { width: 70%; }
+.pf-skeleton__card span:nth-child(3) { width: 45%; }
+.pf-skeleton__card--hero span:first-child { width: 90px; height: 12px; }
+.pf-skeleton__card--hero span:nth-child(2) { width: 200px; height: 40px; }
+.pf-skeleton__card--hero span:nth-child(3) { width: 100%; height: 200px; }
+@keyframes pf-shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+@media (prefers-reduced-motion: reduce) { .pf-skeleton__card span, .pf-skeleton__tabs { animation: none; } }
+
+/* Hero metrics: the figures a statement leads with, under the total. */
+.pf-metrics { display: flex; flex-wrap: wrap; gap: 8px 28px; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); }
+.pf-metrics:empty { display: none; }
+.pf-metrics div { display: flex; flex-direction: column; gap: 2px; }
+.pf-metrics dt { font-size: 12px; color: var(--muted); font-weight: 600; }
+.pf-metrics dd { font-size: 15px; color: var(--ink); font-weight: 700; font-variant-numeric: tabular-nums; }
+.pf-metrics dd .pf-sub { display: inline; margin-left: 4px; font-weight: 600; }
+.pf-metrics + .pf-chart { margin-top: 14px; }
+.pf-bench { color: var(--muted); font-weight: 500; }
+.pf-bench strong { font-weight: 600; }
+.pf-key--bench { border-top: 2px dashed var(--series-2); }
+.pf-chart__bench { fill: none; stroke: var(--series-2); stroke-width: 1.5; stroke-dasharray: 5 4; stroke-linejoin: round; }
+
+/* Tiles that sit inside a card. */
+.pf-tiles--flat .pf-tile { border: 0; background: var(--surface); }
+.pf-tile--warn { border-color: #e8cf9a; background: #fdf6e7; }
+.pf-tile__value .pf-tile__tag { font-size: 13px; font-weight: 600; color: var(--soft); margin-left: 6px; letter-spacing: 0; }
+.pf-tile__value .pf-tile__tag.is-gain { color: var(--gain); }
+.pf-tile__value .pf-tile__tag.is-loss { color: var(--loss); }
+.pf-tiles[hidden] { display: none; }
+.pf-flag { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--series-3); margin-right: 6px; vertical-align: 2px; }
+
+/* Allocation donut. */
+.pf-ranges--small button { font-size: 11px; padding: 3px 9px; }
+.pf-donut { display: grid; grid-template-columns: 150px 1fr; gap: 18px; align-items: center; }
+.pf-donut__chart { width: 150px; height: 150px; position: relative; }
+.pf-donut__chart svg { width: 100%; height: 100%; display: block; }
+.pf-donut__chart path { cursor: default; }
+.pf-donut__chart path:hover { filter: brightness(1.08); }
+.pf-donut__center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; pointer-events: none; }
+.pf-donut__center strong { font-size: 18px; color: var(--ink); font-variant-numeric: tabular-nums; }
+.pf-donut__center span { font-size: 11px; color: var(--muted); }
+.pf-donut__legend { list-style: none; display: flex; flex-direction: column; gap: 7px; font-size: 13px; min-width: 0; }
+.pf-donut__legend li { display: grid; grid-template-columns: 10px 1fr auto; gap: 8px; align-items: center; color: var(--ink); }
+.pf-donut__legend .pf-swatch { width: 10px; height: 10px; }
+.pf-donut__legend span:nth-child(2) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pf-donut__legend span:last-child { color: var(--soft); font-variant-numeric: tabular-nums; text-align: right; }
+@media (max-width: 420px) { .pf-donut { grid-template-columns: 1fr; justify-items: center; } .pf-donut__legend { width: 100%; } }
+
+/* Sortable headers and a totals row. */
+.pf-table th[data-sort] button {
+    background: none; border: 0; padding: 0; font: inherit; color: inherit; cursor: pointer;
+    display: inline-flex; gap: 4px; align-items: center;
+}
+.pf-table th[data-sort] button::after { content: "↕"; opacity: 0; font-size: 10px; }
+.pf-table th[data-sort]:hover button::after { opacity: 0.5; }
+.pf-table th[aria-sort="ascending"] button::after { content: "↑"; opacity: 1; }
+.pf-table th[aria-sort="descending"] button::after { content: "↓"; opacity: 1; }
+.pf-table th[aria-sort] { color: var(--ink); }
+.pf-table th[data-sort] button:focus-visible { outline: none; box-shadow: var(--focus-ring); border-radius: 4px; }
+.pf-table tfoot td { border-top: 1px solid var(--line-strong); border-bottom: 0; font-weight: 700; padding-top: 12px; }
+.pf-table tbody tr:last-child td { border-bottom: 0; }
+.pf-table td .pf-sub { margin-top: 2px; }
+@media (min-width: 861px) {
+    .pf-table-wrap--sticky { overflow: visible; }
+    .pf-table--sticky thead th { position: sticky; top: var(--site-nav-height, 52px); background: var(--card); z-index: 2; padding-top: 8px; }
+}
+
+/* Realized by year, as an SVG bar chart with a labelled zero line. */
+.pf-yearchart { height: 150px; margin-bottom: 14px; }
+.pf-yearchart svg { width: 100%; height: 100%; display: block; overflow: visible; }
+.pf-yearchart .pf-bar--gain { fill: var(--gain); }
+.pf-yearchart .pf-bar--loss { fill: var(--loss); }
+.pf-yearchart .pf-zero { stroke: var(--line-strong); stroke-width: 1; }
+.pf-yearchart .pf-bar-label { font-size: 11px; font-weight: 600; fill: var(--ink); font-variant-numeric: tabular-nums; }
+.pf-yearchart[hidden] { display: none; }
+
+/* Monthly returns heat table. */
+.pf-heat td, .pf-heat th { text-align: center; padding: 6px 4px; font-size: 12px; }
+.pf-heat th:first-child, .pf-heat td:first-child { text-align: left; font-weight: 700; color: var(--ink); }
+.pf-heat td.pf-heat__cell { border-radius: 6px; border: 2px solid var(--card); font-weight: 600; min-width: 46px; }
+.pf-heat td.pf-heat__total { font-weight: 700; }
+.pf-heat tr td { border-bottom: 0; }
+
+/* Watchlist and its alerts. */
+.pf-add--inline { margin-bottom: 14px; }
+.pf-alert { display: inline-block; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 999px; }
+.pf-alert--above { background: #e1efe5; color: #1f6a3f; }
+.pf-alert--below { background: #f8e4df; color: #8a2f22; }
+.pf-side--dividend { background: #e6eef6; color: #2f5a86; }
+.pf-term { display: inline-block; font-size: 12px; font-weight: 600; padding: 1px 8px; border-radius: 999px; background: var(--surface); color: var(--soft); }
+.pf-term--long { background: #e1efe5; color: #1f6a3f; }
+.pf-term--short { background: #fdf0d9; color: #8a5a10; }
+
+/* 52-week range: low to high, today marked. */
+.pf-range52 { margin-bottom: 14px; }
+.pf-range52[hidden] { display: none; }
+.pf-range52__track { position: relative; height: 6px; background: var(--surface); border-radius: 999px; margin: 6px 0; }
+.pf-range52__fill { position: absolute; top: 0; bottom: 0; left: 0; background: linear-gradient(90deg, #f0d9d3, #d6e8db); border-radius: 999px; width: 100%; }
+.pf-range52__mark { position: absolute; top: 50%; width: 12px; height: 12px; border-radius: 50%; background: var(--ink); border: 2px solid var(--card); transform: translate(-50%, -50%); }
+.pf-range52__ends { display: flex; justify-content: space-between; font-size: 12px; color: var(--soft); font-variant-numeric: tabular-nums; }
+.pf-range52__label { font-size: 12px; color: var(--muted); font-weight: 600; }
+
+.pf-banner { transition: opacity 0.4s; }
+.pf-banner.is-fading { opacity: 0; }

@@ -1286,7 +1286,7 @@ class PortfolioTransaction(Base):
     id = Column(Integer, primary_key=True, index=True)
     username = Column(String, nullable=False)
     ticker = Column(String, nullable=False)
-    side = Column(String, nullable=False)  # buy | sell
+    side = Column(String, nullable=False)  # buy | sell | dividend (shares and price 0, amount paid)
     shares = Column(Float, nullable=False)
     price = Column(Float, nullable=False)
     fees = Column(Float, nullable=False, default=0.0)
@@ -1303,6 +1303,20 @@ class PortfolioTransaction(Base):
     # source computed itself (kept beside the page's own average-cost figure).
     amount = Column(Float, nullable=True)
     realized_reported = Column(Float, nullable=True)
+    created_at = Column(DateTime, default=utc_now, nullable=False)
+
+
+class PortfolioWatch(Base):
+    """A ticker a member is watching, with optional price alerts."""
+
+    __tablename__ = "portfolio_watchlist"
+    __table_args__ = (UniqueConstraint("username", "ticker", name="uq_portfolio_watch"),)
+
+    id = Column(Integer, primary_key=True, index=True)
+    username = Column(String, nullable=False, index=True)
+    ticker = Column(String, nullable=False)
+    alert_above = Column(Float, nullable=True)
+    alert_below = Column(Float, nullable=True)
     created_at = Column(DateTime, default=utc_now, nullable=False)
 
 

@@ -13,7 +13,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/shared/site-nav.css?v=19">
-    <link rel="stylesheet" href="portfolio.css?v=15">
+    <link rel="stylesheet" href="portfolio.css?v=16">
 </head>
 <body>
 <noscript>
@@ -26,8 +26,17 @@
                 <h1>My Portfolio</h1>
             </div>
             <div class="pf-head__actions" id="headActions" hidden>
-                <button type="button" class="pf-button pf-button--quiet" id="privacyToggle" aria-pressed="false">Hide amounts</button>
-                <button type="button" class="pf-button pf-button--quiet" id="refreshButton">Refresh prices</button>
+                <button type="button" class="pf-icon-button" id="privacyToggle" aria-pressed="false" aria-label="Hide amounts" title="Hide amounts"></button>
+                <div class="pf-menu">
+                    <button type="button" class="pf-icon-button" id="moreToggle" aria-haspopup="true" aria-expanded="false" aria-controls="moreMenu" aria-label="More actions" title="More actions">
+                        <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="4" cy="10" r="1.6"/><circle cx="10" cy="10" r="1.6"/><circle cx="16" cy="10" r="1.6"/></svg>
+                    </button>
+                    <div class="pf-menu__list" id="moreMenu" role="menu" hidden>
+                        <button type="button" role="menuitem" id="refreshButton">Refresh prices</button>
+                        <button type="button" role="menuitem" data-export="positions">Export positions (CSV)</button>
+                        <button type="button" role="menuitem" data-export="realized">Export realized gains (CSV)</button>
+                    </div>
+                </div>
                 <button type="button" class="pf-button" id="uploadToggle" aria-expanded="false" aria-controls="uploadPanel">Upload</button>
             </div>
         </header>
@@ -35,7 +44,11 @@
         <p id="errorBanner" class="pf-banner pf-banner--error" role="alert" hidden></p>
         <p id="noticeBanner" class="pf-banner" role="status" hidden></p>
 
-        <section id="loadingView" class="pf-empty"><p>Loading your portfolio…</p></section>
+        <section id="loadingView" class="pf-skeleton" aria-busy="true" aria-label="Loading your portfolio">
+            <div class="pf-skeleton__tabs"></div>
+            <div class="pf-skeleton__card pf-skeleton__card--hero"><span></span><span></span><span></span></div>
+            <div class="pf-skeleton__card"><span></span><span></span><span></span><span></span></div>
+        </section>
 
         <!-- Shown when the API returns 403: not signed in. -->
         <section id="signedOutView" class="pf-card pf-signed-out" hidden>
@@ -83,9 +96,12 @@
             <nav class="pf-tabs" id="tabs" aria-label="Portfolio sections">
                 <a href="#overview" data-tab="overview">Overview</a>
                 <a href="#holdings" data-tab="holdings">Holdings</a>
+                <a href="#gains" data-tab="gains">Performance</a>
+                <a href="#income" data-tab="income">Income</a>
+                <a href="#taxes" data-tab="taxes">Taxes</a>
+                <a href="#watchlist" data-tab="watchlist">Watchlist</a>
                 <a href="#activity" data-tab="activity">Activity</a>
                 <a href="#accounts" data-tab="accounts">Accounts</a>
-                <a href="#gains" data-tab="gains">Gains</a>
             </nav>
 
             <!-- Overview: the headline, the line that got there, the top holdings. -->
@@ -100,10 +116,12 @@
                         </div>
                         <div class="pf-ranges" id="historyRanges" role="group" aria-label="Time range"></div>
                     </div>
+                    <dl class="pf-metrics" id="heroMetrics"></dl>
                     <div class="pf-chart" id="historyChart"></div>
                     <ul class="pf-chart-legend" id="historyLegend" hidden>
                         <li><span class="pf-key pf-key--value"></span>Value</li>
                         <li><button type="button" class="pf-legend-toggle" data-cost-toggle aria-pressed="true"><span class="pf-key pf-key--invested"></span>Invested (cost basis)</button></li>
+                        <li id="benchmarkKey" hidden><button type="button" class="pf-legend-toggle" data-bench-toggle aria-pressed="true"><span class="pf-key pf-key--bench"></span>S&amp;P 500</button></li>
                         <li id="estimatedKey" hidden><span class="pf-key pf-key--estimated"></span>Estimated</li>
                     </ul>
                     <p class="pf-note" id="historyNote" hidden></p>
@@ -134,18 +152,27 @@
                     </div>
                 </section>
 
+                <div class="pf-tiles" id="glanceTiles"></div>
+
                 <div class="pf-grid" id="insightGrid">
-                    <section class="pf-card">
+                    <section class="pf-card" id="sectorCard">
+                        <div class="pf-card__head pf-card__head--row">
+                            <h2 class="pf-card__title">Allocation</h2>
+                            <div class="pf-ranges pf-ranges--small" id="allocationModes" role="group" aria-label="Group by">
+                                <button type="button" data-mode="sector" aria-pressed="true">Sector</button>
+                                <button type="button" data-mode="holding" aria-pressed="false">Holding</button>
+                            </div>
+                        </div>
+                        <div class="pf-donut">
+                            <div class="pf-donut__chart" id="allocationDonut" role="img"></div>
+                            <ul class="pf-donut__legend" id="sectorBars"></ul>
+                        </div>
+                    </section>
+                    <section class="pf-card" id="noticesCard">
                         <div class="pf-card__head">
-                            <h2 class="pf-card__title">At a glance</h2>
+                            <h2 class="pf-card__title">Portfolio notes</h2>
                         </div>
                         <ul class="pf-insights" id="insights"></ul>
-                    </section>
-                    <section class="pf-card" id="sectorCard">
-                        <div class="pf-card__head">
-                            <h2 class="pf-card__title">By sector</h2>
-                        </div>
-                        <ul class="pf-bars" id="sectorBars"></ul>
                     </section>
                 </div>
             </div>
@@ -157,23 +184,24 @@
                         <h2 class="pf-card__title">Open positions</h2>
                         <p class="pf-card__sub" id="holdingsSub"></p>
                     </div>
-                    <div class="pf-table-wrap">
-                        <table class="pf-table" id="holdingsTable">
+                    <div class="pf-table-wrap pf-table-wrap--sticky">
+                        <table class="pf-table pf-table--sticky" id="holdingsTable">
                             <thead>
                                 <tr>
-                                    <th scope="col">Security</th>
-                                    <th scope="col" class="num pf-hide-sm">Weight</th>
-                                    <th scope="col" class="num">Value</th>
-                                    <th scope="col" class="num">Day</th>
-                                    <th scope="col" class="num pf-hide-sm">Shares</th>
-                                    <th scope="col" class="num pf-hide-sm">Price</th>
-                                    <th scope="col" class="num pf-hide-sm">Cost</th>
-                                    <th scope="col" class="num">Gain</th>
-                                    <th scope="col" class="num pf-hide-md">Realized</th>
-                                    <th scope="col" class="num pf-hide-md">Since</th>
+                                    <th scope="col" data-sort="ticker"><button type="button">Security</button></th>
+                                    <th scope="col" class="num pf-hide-sm" data-sort="weight"><button type="button">Weight</button></th>
+                                    <th scope="col" class="num" data-sort="marketValue"><button type="button">Value</button></th>
+                                    <th scope="col" class="num" data-sort="dayChangePct"><button type="button">Day</button></th>
+                                    <th scope="col" class="num pf-hide-sm" data-sort="shares"><button type="button">Shares</button></th>
+                                    <th scope="col" class="num pf-hide-sm" data-sort="price"><button type="button">Price</button></th>
+                                    <th scope="col" class="num pf-hide-sm" data-sort="costBasis"><button type="button">Cost</button></th>
+                                    <th scope="col" class="num" data-sort="gainPct"><button type="button">Gain</button></th>
+                                    <th scope="col" class="num pf-hide-md" data-sort="realizedGain"><button type="button">Realized</button></th>
+                                    <th scope="col" class="num pf-hide-md" data-sort="firstTrade"><button type="button">Since</button></th>
                                 </tr>
                             </thead>
                             <tbody></tbody>
+                            <tfoot id="holdingsTotals"></tfoot>
                         </table>
                     </div>
                 </section>
@@ -232,7 +260,7 @@
                     </form>
                     <form class="pf-filters" id="filters" role="search">
                         <input type="search" id="filterQuery" placeholder="Search ticker or note" aria-label="Search trades" autocomplete="off">
-                        <select id="filterSide" aria-label="Side"><option value="">Buys and sells</option><option value="buy">Buys</option><option value="sell">Sells</option></select>
+                        <select id="filterSide" aria-label="Side"><option value="">All activity</option><option value="buy">Buys</option><option value="sell">Sells</option><option value="dividend">Dividends</option></select>
                         <select id="filterYear" aria-label="Year"><option value="">All years</option></select>
                         <select id="filterAccount" aria-label="Account"><option value="">All accounts</option></select>
                         <select id="filterSource" aria-label="Source"><option value="">All sources</option></select>
@@ -284,14 +312,27 @@
                 </section>
             </div>
 
-            <!-- Gains: realized by year and by security, and the totals. -->
+            <!-- Performance: returns and risk from the value history, then gains. -->
             <div class="pf-panel" data-panel="gains" hidden>
+                <section class="pf-card">
+                    <div class="pf-card__head">
+                        <h2 class="pf-card__title">Returns</h2>
+                        <p class="pf-card__sub" id="perfSub"></p>
+                    </div>
+                    <div class="pf-tiles pf-tiles--flat" id="perfTiles"></div>
+                </section>
+                <section class="pf-card" id="monthlyCard" hidden>
+                    <div class="pf-card__head">
+                        <h2 class="pf-card__title">Monthly returns</h2>
+                    </div>
+                    <div class="pf-table-wrap"><table class="pf-table pf-heat" id="monthlyTable"></table></div>
+                </section>
                 <div class="pf-tiles" id="gainTiles"></div>
                 <section class="pf-card">
                     <div class="pf-card__head">
-                        <h2 class="pf-card__title">By year</h2>
+                        <h2 class="pf-card__title">Realized by year</h2>
                     </div>
-                    <div class="pf-yearbars" id="yearBars" role="img"></div>
+                    <div class="pf-yearchart" id="yearBars" role="img"></div>
                     <div class="pf-table-wrap"><table class="pf-table" id="yearsTable"></table></div>
                 </section>
                 <section class="pf-card">
@@ -301,6 +342,61 @@
                     </div>
                     <div class="pf-table-wrap"><table class="pf-table" id="realizedTable"></table></div>
                     <button type="button" class="pf-more" id="realizedToggle" hidden></button>
+                </section>
+            </div>
+
+            <!-- Income: dividends received. -->
+            <div class="pf-panel" data-panel="income" hidden>
+                <div class="pf-tiles" id="incomeTiles"></div>
+                <div class="pf-grid" id="incomeGrid">
+                    <section class="pf-card">
+                        <div class="pf-card__head">
+                            <h2 class="pf-card__title">By security</h2>
+                        </div>
+                        <div class="pf-table-wrap"><table class="pf-table" id="incomeByTicker"></table></div>
+                    </section>
+                    <section class="pf-card">
+                        <div class="pf-card__head">
+                            <h2 class="pf-card__title">Recent payments</h2>
+                        </div>
+                        <div class="pf-table-wrap"><table class="pf-table" id="incomeRecent"></table></div>
+                    </section>
+                </div>
+            </div>
+
+            <!-- Taxes: unrealized gains by holding period, lot by lot. -->
+            <div class="pf-panel" data-panel="taxes" hidden>
+                <div class="pf-tiles" id="taxTiles"></div>
+                <section class="pf-card" id="harvestCard" hidden>
+                    <div class="pf-card__head">
+                        <h2 class="pf-card__title">Lots at a loss</h2>
+                        <p class="pf-card__sub" id="harvestSub"></p>
+                    </div>
+                    <div class="pf-table-wrap"><table class="pf-table" id="harvestTable"></table></div>
+                </section>
+                <section class="pf-card">
+                    <div class="pf-card__head">
+                        <h2 class="pf-card__title">Tax lots</h2>
+                        <p class="pf-card__sub" id="lotsSub"></p>
+                    </div>
+                    <div class="pf-table-wrap"><table class="pf-table" id="lotsTable"></table></div>
+                </section>
+            </div>
+
+            <!-- Watchlist: tickers to keep an eye on, with price alerts. -->
+            <div class="pf-panel" data-panel="watchlist" hidden>
+                <section class="pf-card">
+                    <div class="pf-card__head">
+                        <h2 class="pf-card__title">Watchlist</h2>
+                        <p class="pf-card__sub" id="watchSub"></p>
+                    </div>
+                    <form class="pf-add pf-add--inline" id="watchForm">
+                        <label class="pf-field">Ticker <input id="watchTicker" required maxlength="12" autocomplete="off" placeholder="TSLA"></label>
+                        <label class="pf-field">Alert above <input id="watchAbove" type="number" step="any" min="0" placeholder="$"></label>
+                        <label class="pf-field">Alert below <input id="watchBelow" type="number" step="any" min="0" placeholder="$"></label>
+                        <button type="submit" class="pf-button">Watch</button>
+                    </form>
+                    <div class="pf-table-wrap"><table class="pf-table" id="watchTable"></table></div>
                 </section>
             </div>
 
@@ -331,6 +427,7 @@
                             <h2 class="pf-card__title">Key data</h2>
                             <p class="pf-card__sub" id="holdingFactsSub"></p>
                         </div>
+                        <div class="pf-range52" id="holdingRange" hidden></div>
                         <dl class="pf-facts" id="holdingFacts"></dl>
                     </section>
                     <section class="pf-card">
@@ -341,6 +438,12 @@
                         <div class="pf-about" id="holdingAbout"></div>
                     </section>
                 </div>
+                <section class="pf-card" id="holdingLotsCard" hidden>
+                    <div class="pf-card__head">
+                        <h2 class="pf-card__title">Tax lots</h2>
+                    </div>
+                    <div class="pf-table-wrap"><table class="pf-table" id="holdingLots"></table></div>
+                </section>
                 <section class="pf-card">
                     <div class="pf-card__head">
                         <h2 class="pf-card__title">Your trades</h2>
@@ -375,6 +478,6 @@
     <script src="/shared/api-base.js?v=1"></script>
     <script src="/shared/site-nav.js?v=22"></script>
     <script src="/shared/analytics.js?v=1"></script>
-    <script src="portfolio.js?v=26"></script>
+    <script src="portfolio.js?v=27"></script>
 </body>
 </html>

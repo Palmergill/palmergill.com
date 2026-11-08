@@ -31,7 +31,7 @@ from sqlalchemy.orm import Session
 
 from app import accounts
 from app.database import (
-    PortfolioHolding, PortfolioTransaction, PriceBackfill, PriceClose, PriceCoverage, SplitCheck, StockSplit,
+    PortfolioHolding, PortfolioTransaction, PortfolioWatch, PriceBackfill, PriceClose, PriceCoverage, SplitCheck, StockSplit,
     StockSummary,
 )
 from app.services.polygon_client import PolygonPlanLimited, PolygonRateLimited
@@ -153,6 +153,8 @@ def parse_side(value: Optional[str]) -> Optional[str]:
         return "sell"
     if "buy" in text or "bought" in text or "reinvest" in text or "purchase" in text:
         return "buy"
+    if "dividend" in text or text.strip() in {"div", "cash div", "qualified div"}:
+        return "dividend"
     return None
 
 
@@ -257,10 +259,25 @@ def parse_csv(text: str, kind: str = "auto") -> Dict[str, Any]:
             skipped.append({"line": line, "reason": reason})
             continue
         shares = parse_number(cell(row, "shares"))
+        side = parse_side(cell(row, "side")) if "side" in columns else None
+        if side == "dividend":
+            # Cash paid out, kept by its amount: no shares change hands.
+            paid = parse_number(cell(row, "amount"))
+            trade_date = parse_date(cell(row, "date"))
+            if not paid or not trade_date:
+                skipped.append({"line": line, "reason": "a dividend with no amount or date"})
+                continue
+            parsed.append({
+                "ticker": ticker, "asset": asset, "side": "dividend", "shares": 0.0, "price": 0.0, "fees": 0.0,
+                "trade_date": trade_date, "amount": abs(paid), "account": account, "source": source,
+                "notes": text_cell(row, "notes", 500), "realized_reported": None,
+            })
+            continue
         if shares is None or abs(shares) < EPSILON:
             skipped.append({"line": line, "reason": "no share count"})
             continue
-        side = parse_side(cell(row, "side")) if "side" in columns else ("sell" if shares < 0 else "buy")
+        if "side" not in columns:
+            side = "sell" if shares < 0 else "buy"
         if not side:
             skipped.append({"line": line, "reason": f"'{(cell(row, 'side') or '').strip()[:30]}' isn't a buy or sell"})
             continue
@@ -355,10 +372,17 @@ def add_transactions(
         query.delete()
         existing = []
 
-    seen = {_trade_key(t.ticker, t.side, t.shares, t.price, t.trade_date, t.account) for t in existing}
+    # A dividend has no price; its amount tells two apart.
+    seen = {
+        _trade_key(t.ticker, t.side, t.shares, t.amount if t.side == "dividend" else t.price, t.trade_date, t.account)
+        for t in existing
+    }
     fresh = rows if not upload else [
         r for r in rows
-        if _trade_key(r["ticker"], r["side"], r["shares"], r["price"], r["trade_date"], r.get("account")) not in seen
+        if _trade_key(
+            r["ticker"], r["side"], r["shares"], r.get("amount") if r["side"] == "dividend" else r["price"],
+            r["trade_date"], r.get("account"),
+        ) not in seen
     ]
     if len(existing) + len(fresh) > MAX_TRANSACTIONS:
         db.rollback()
@@ -689,6 +713,31 @@ def ensure_closes(db: Session, wants: Dict[str, Tuple[date, date]], budget: _Bud
     return status
 
 
+# The provider's sector is its SIC code's division ("Manufacturing" for an
+# oil major); for the common names, the familiar sector instead.
+KNOWN_SECTORS = {
+    **dict.fromkeys(("AAPL", "MSFT", "NVDA", "AMD", "AVGO", "ORCL", "CRM", "ADBE", "INTC", "CSCO", "QCOM", "TXN",
+                     "IBM", "NOW", "PLTR", "MU", "AMAT", "SHOP", "SNOW", "UBER", "TSM", "ASML"), "Technology"),
+    **dict.fromkeys(("GOOGL", "GOOG", "META", "NFLX", "DIS", "T", "VZ", "TMUS", "SPOT", "RDDT"), "Communication Services"),
+    **dict.fromkeys(("AMZN", "TSLA", "HD", "MCD", "NKE", "SBUX", "LOW", "BKNG", "NIO", "RIVN", "GM", "F", "CMG"), "Consumer Discretionary"),
+    **dict.fromkeys(("WMT", "COST", "PG", "KO", "PEP", "PM", "MO", "CL", "TGT"), "Consumer Staples"),
+    **dict.fromkeys(("XOM", "CVX", "COP", "OXY", "SLB", "EOG", "BP", "SHEL"), "Energy"),
+    **dict.fromkeys(("JPM", "BAC", "WFC", "GS", "MS", "C", "V", "MA", "AXP", "BRK.B", "BRK.A", "SCHW", "PYPL", "SOFI",
+                     "HOOD", "COIN", "BLK"), "Financials"),
+    **dict.fromkeys(("UNH", "JNJ", "LLY", "PFE", "MRK", "ABBV", "TMO", "ABT", "NVO", "AMGN", "CVS", "ISRG"), "Health Care"),
+    **dict.fromkeys(("BA", "CAT", "GE", "HON", "UPS", "LMT", "RTX", "DE", "UNP"), "Industrials"),
+    **dict.fromkeys(("NEE", "DUK", "SO"), "Utilities"),
+    **dict.fromkeys(("AMT", "PLD", "O", "SPG"), "Real Estate"),
+    **dict.fromkeys(("LIN", "NEM", "FCX"), "Materials"),
+    **dict.fromkeys(("SPY", "VOO", "IVV", "VTI", "QQQ", "DIA", "IWM", "SCHD", "VT", "VXUS", "VEA", "VWO", "VUG", "VTV",
+                     "SCHB", "SCHX", "ITOT", "RSP", "QQQM", "SPLG"), "Funds"),
+    **dict.fromkeys(("IBIT", "FBTC", "GBTC", "BITO", "ETHA", "MSTR"), "Crypto"),
+    **dict.fromkeys(("BND", "AGG", "TLT", "SHY", "IEF", "BIL", "SGOV", "TIP"), "Bonds"),
+    **dict.fromkeys(("GLD", "IAU", "SLV"), "Commodities"),
+}
+UNCLASSIFIED = "Unclassified"
+
+
 def _company(db: Session, tickers: List[str], budget: _Budget) -> Dict[str, Dict[str, Optional[str]]]:
     """Name and sector: the stock pages' cache if it has them, else one
     details call each, with whatever budget the prices left over."""
@@ -752,6 +801,8 @@ def quotes(db: Session, positions: Dict[str, Dict[str, Any]]) -> Dict[str, Dict[
             info = {"name": None, "sector": "Other holdings"}
         else:
             info = company.get(ticker, {"name": None, "sector": None})
+            if ticker in KNOWN_SECTORS:
+                info = {**info, "sector": KNOWN_SECTORS[ticker]}
 
         if price is not None:
             state = "sample" if stock_data_client._use_mock() else ("live" if day >= stale_before else "stale")
@@ -972,6 +1023,9 @@ def load_adjusted(db: Session, username: str, budget: Optional[_Budget] = None) 
     for tx in stored:
         if tx.ticker in aliases:
             tx.ticker, tx.asset = aliases[tx.ticker], "stock"
+    # Dividends are cash, not shares: kept apart from the trades.
+    dividends = [t for t in stored if t.side == "dividend"]
+    stored = [t for t in stored if t.side != "dividend"]
     duplicates = find_duplicates(stored)
     transactions = [t for t in stored if t.id not in duplicates]
     stocks = sorted({t.ticker for t in transactions if (t.asset or "stock") == "stock"} | {h.ticker for h in holdings})
@@ -1039,6 +1093,7 @@ def load_adjusted(db: Session, username: str, budget: Optional[_Budget] = None) 
         key = (_label(dup.source, "No source"), _label(kept.source, "No source"))
         pair_counts[key] = pair_counts.get(key, 0) + 1
     info = {
+        "dividends": sorted(dividends, key=lambda t: (t.trade_date, t.id)),
         "applied": sorted(applied.values(), key=lambda a: a["date"], reverse=True),
         "tradesAdjusted": sum(1 for t in adjusted_trades if t.split_factor != 1.0),
         "alreadyAdjusted": already,
@@ -1118,6 +1173,88 @@ def _day_change(shares: float, price: float, prev_close: float, trades: List[Any
     return change, start_shares * prev_close + bought
 
 
+# Tax lots: brokers sell the oldest shares first unless told otherwise, so the
+# lots are first-in, first-out, beside the average cost the rest of the page
+# uses. A lot held more than a year is long-term.
+LONG_TERM_DAYS = 365
+
+
+def tax_lots(holdings: List[Any], transactions: List[Any]) -> Dict[str, List[Dict[str, Any]]]:
+    """Each open position's remaining lots, oldest first: shares, the day
+    bought (None for a snapshot, which gives no dates) and cost a share."""
+    as_of = holdings[0].as_of if holdings else None
+    lots: Dict[str, List[Dict[str, Any]]] = {}
+    for h in holdings:
+        lots[h.ticker] = [{
+            "shares": h.shares, "date": None,
+            "cost": (h.cost_basis / h.shares) if h.cost_basis is not None and h.shares else None,
+        }]
+    for tx in sorted(transactions, key=lambda t: (t.trade_date, t.id)):
+        if as_of and tx.trade_date <= as_of:
+            continue
+        queue = lots.setdefault(tx.ticker, [])
+        if tx.side == "buy":
+            queue.append({"shares": tx.shares, "date": tx.trade_date, "cost": tx.price + (tx.fees or 0.0) / tx.shares})
+            continue
+        left = tx.shares
+        while left > EPSILON and queue:
+            take = min(left, queue[0]["shares"])
+            queue[0]["shares"] -= take
+            left -= take
+            if queue[0]["shares"] < DUST_SHARES:
+                queue.pop(0)
+    return {t: q for t, q in lots.items() if q}
+
+
+def _tax_summary(lots: Dict[str, List[Dict[str, Any]]], prices: Dict[str, Optional[float]], today: date) -> Dict[str, Any]:
+    rows = []
+    totals = {"short": 0.0, "long": 0.0, "unknown": 0.0}
+    for ticker, queue in lots.items():
+        price = prices.get(ticker)
+        if price is None:
+            continue
+        for lot in queue:
+            if lot["cost"] is None:
+                continue
+            gain = lot["shares"] * (price - lot["cost"])
+            if lot["date"] is None:
+                term, long_on = "unknown", None
+            else:
+                long_on = lot["date"] + timedelta(days=LONG_TERM_DAYS + 1)
+                term = "long" if today >= long_on else "short"
+            totals[term] += gain
+            rows.append({
+                "ticker": ticker, "shares": lot["shares"], "date": lot["date"].isoformat() if lot["date"] else None,
+                "cost": lot["cost"], "price": price, "value": lot["shares"] * price, "gain": gain,
+                "gainPct": _ratio(price - lot["cost"], lot["cost"]), "term": term,
+                "longTermOn": long_on.isoformat() if long_on and term == "short" else None,
+            })
+    rows.sort(key=lambda r: (r["ticker"], r["date"] or ""))
+    return {"lots": rows, **totals}
+
+
+def _dividend_summary(dividends: List[Any], total_value: float, today: date) -> Dict[str, Any]:
+    year_ago = today - timedelta(days=365)
+    trailing = sum(d.amount or 0.0 for d in dividends if d.trade_date > year_ago)
+    by_ticker: Dict[str, float] = {}
+    by_year: Dict[int, float] = {}
+    for d in dividends:
+        by_ticker[d.ticker] = by_ticker.get(d.ticker, 0.0) + (d.amount or 0.0)
+        by_year[d.trade_date.year] = by_year.get(d.trade_date.year, 0.0) + (d.amount or 0.0)
+    return {
+        "total": sum(by_ticker.values()),
+        "trailing12m": trailing,
+        "yield": _ratio(trailing, total_value),
+        "count": len(dividends),
+        "byTicker": sorted(({"ticker": t, "amount": a} for t, a in by_ticker.items()), key=lambda r: -r["amount"]),
+        "byYear": {str(y): a for y, a in by_year.items()},
+        "recent": [
+            {"ticker": d.ticker, "date": d.trade_date.isoformat(), "amount": d.amount}
+            for d in sorted(dividends, key=lambda d: d.trade_date, reverse=True)[:12]
+        ],
+    }
+
+
 def breakdown(db: Session, username: str) -> Dict[str, Any]:
     holdings, transactions, split_info = load_adjusted(db, username, _Budget(SPLIT_CALLS_PER_REQUEST))
     positions, meta = build_positions(holdings, transactions)
@@ -1125,6 +1262,7 @@ def breakdown(db: Session, username: str) -> Dict[str, Any]:
     prices = quotes(db, open_positions)
 
     rows: List[Dict[str, Any]] = []
+    day_bases: Dict[str, float] = {}
     for ticker, position in open_positions.items():
         quote = prices[ticker]
         value = position["shares"] * quote["price"] if quote["price"] is not None else None
@@ -1134,6 +1272,7 @@ def breakdown(db: Session, username: str) -> Dict[str, Any]:
                 t for t in transactions if t.ticker == ticker and t.trade_date == quote["day"]
             ])
             day_change_pct = _ratio(day_change, base)
+            day_bases[ticker] = base
         cost = position["cost"]
         gain = value - cost if value is not None and cost is not None else None
         rows.append({
@@ -1186,7 +1325,7 @@ def breakdown(db: Session, username: str) -> Dict[str, Any]:
     for row in rows:
         if row["marketValue"] is None:
             continue
-        entry = sectors.setdefault(row["sector"] or "Other", {"marketValue": 0.0, "count": 0})
+        entry = sectors.setdefault(row["sector"] or UNCLASSIFIED, {"marketValue": 0.0, "count": 0})
         entry["marketValue"] += row["marketValue"]
         entry["count"] += 1
     sector_rows = sorted(
@@ -1195,10 +1334,19 @@ def breakdown(db: Session, username: str) -> Dict[str, Any]:
     )
 
     reported = [t for t in transactions if t.realized_reported is not None]
+    today = utc_today()
+    dividends = _dividend_summary(split_info["dividends"], total_value, today)
     years = [
-        {"year": year, **stats, "net": stats["bought"] - stats["sold"]}
+        {"year": year, **stats, "net": stats["bought"] - stats["sold"], "dividends": dividends["byYear"].get(str(year), 0.0)}
         for year, stats in sorted(meta["by_year"].items(), reverse=True)
     ]
+    dividend_by_ticker = {d["ticker"]: d["amount"] for d in dividends["byTicker"]}
+    for row in rows:
+        row["dividends"] = dividend_by_ticker.get(row["ticker"])
+    taxes = _tax_summary(tax_lots(holdings, transactions), {r["ticker"]: r["price"] for r in rows}, today)
+    day_rows = [r for r in rows if r["dayChange"] is not None]
+    day_total = sum(r["dayChange"] for r in day_rows)
+    day_base = sum(day_bases.get(r["ticker"], 0.0) for r in day_rows)
     realized_by_ticker = sorted(
         ({"ticker": t, "realizedGain": p["realized"], "sold": p["sold"]} for t, p in positions.items() if p["realizedCounted"]),
         key=lambda r: -abs(r["realizedGain"] or 0),
@@ -1221,7 +1369,11 @@ def breakdown(db: Session, username: str) -> Dict[str, Any]:
             "invested": sum(t.shares * t.price for t in transactions if t.side == "buy"),
             "withdrawn": sum(t.shares * t.price for t in transactions if t.side == "sell"),
             "fees": sum(t.fees or 0.0 for t in transactions),
+            "dayChange": day_total if day_rows else None,
+            "dayChangePct": _ratio(day_total, day_base) if day_rows else None,
         },
+        "dividends": dividends,
+        "taxes": taxes,
         "retryAfter": retry_after_seconds(),
         "positions": rows,
         "closedPositions": closed,
@@ -1244,7 +1396,7 @@ def breakdown(db: Session, username: str) -> Dict[str, Any]:
             # The page's own figure for the same sells, to set beside it.
             "computed": sum(meta["realized_by_tx"].get(t.id, 0.0) for t in reported) if reported else None,
         },
-        "splits": {k: v for k, v in split_info.items() if k not in ("duplicates", "duplicatePairs", "aliases")},
+        "splits": {k: v for k, v in split_info.items() if k not in ("duplicates", "duplicatePairs", "aliases", "dividends")},
         "aliases": split_info["aliases"],
         "duplicates": {"count": len(split_info["duplicates"]), "pairs": split_info["duplicatePairs"]},
         "facets": {
@@ -1278,7 +1430,7 @@ def list_transactions(
     if q:
         like = f"%{q.strip()}%"
         query = query.filter(or_(PortfolioTransaction.ticker.ilike(like), PortfolioTransaction.notes.ilike(like)))
-    if side in ("buy", "sell"):
+    if side in ("buy", "sell", "dividend"):
         query = query.filter(PortfolioTransaction.side == side)
     for field, value, fallback in (("account", account, "No account"), ("source", source, "No source")):
         if value:
@@ -1355,7 +1507,7 @@ def holding_detail(db: Session, username: str, ticker: str) -> Dict[str, Any]:
     """One security the caller holds or has held: its daily closes back past
     the first trade, the trades on it, the position, and what the stock
     pages know about the company."""
-    holdings, transactions, _ = load_adjusted(db, username, _Budget(SPLIT_CALLS_PER_REQUEST))
+    holdings, transactions, info = load_adjusted(db, username, _Budget(SPLIT_CALLS_PER_REQUEST))
     positions, meta = build_positions(holdings, transactions)
     ticker = ticker.strip().upper()
     position = positions.get(ticker)
@@ -1364,7 +1516,8 @@ def holding_detail(db: Session, username: str, ticker: str) -> Dict[str, Any]:
 
     today = utc_today()
     symbol = market_symbol(ticker, position["asset"])
-    start = min(position["first"] or today, today - timedelta(days=365))
+    # A week past a year, so "1 year" has a close on or before its start.
+    start = min(position["first"] or today, today - timedelta(days=372))
     status, backfilling = "ready", []
     if symbol:
         status = ensure_closes(db, {symbol: (start, today)}, _Budget(CALLS_PER_REQUEST)).get(symbol, "ready")
@@ -1433,6 +1586,13 @@ def holding_detail(db: Session, username: str, ticker: str) -> Dict[str, Any]:
             for t in trades
         ],
         "company": facts,
+        "dividends": [
+            {"date": d.trade_date.isoformat(), "amount": d.amount}
+            for d in reversed(info["dividends"]) if d.ticker == ticker
+        ],
+        "lots": _tax_summary(
+            {ticker: tax_lots(holdings, transactions).get(ticker, [])}, {ticker: price}, today,
+        )["lots"] if is_open else [],
         "pending": status == "pending" or bool(backfilling),
         "retryAfter": retry_after_seconds() if status == "pending" else (min(backfill_retry_after() or 2, 120) if backfilling else None),
         "sampleData": stock_data_client._use_mock(),
@@ -1535,8 +1695,12 @@ HISTORY_MAX_POINTS = 4_000
 ESTIMATE_SHARE = 0.02
 
 
+# The benchmark the chart compares against: the S&P 500, through its ETF.
+BENCHMARK = "SPY"
+
+
 def value_history(db: Session, username: str) -> Dict[str, Any]:
-    holdings, transactions, _ = load_adjusted(db, username)
+    holdings, transactions, info = load_adjusted(db, username)
     today = utc_today()
     as_of = holdings[0].as_of if holdings else None
     first_trade = transactions[0].trade_date if transactions else None
@@ -1571,8 +1735,11 @@ def value_history(db: Session, username: str) -> Dict[str, Any]:
         begin = max(start, min(dates)) if dates and ticker not in {h.ticker for h in holdings} else start
         end = today if positions.get(ticker, {}).get("shares", 0) > EPSILON else (max(dates) if dates else today)
         wants[symbol] = (begin, end)
-    # Recently held symbols first, so the recent end of the chart fills first.
+    # Recently held symbols first, so the recent end of the chart fills first;
+    # the benchmark last, so it never holds up the portfolio's own prices.
     wants = dict(sorted(wants.items(), key=lambda kv: kv[1][1], reverse=True))
+    if BENCHMARK not in wants:
+        wants[BENCHMARK] = (start, today)
     status = ensure_closes(db, wants, _Budget(CALLS_PER_REQUEST))
     pending = [s for s, state in status.items() if state == "pending"]
     # Older days only once the main provider has said what it has.
@@ -1588,6 +1755,13 @@ def value_history(db: Session, username: str) -> Dict[str, Any]:
     ):
         closes.setdefault(symbol, []).append((day, close))
     base["missing"] = sorted(t for t, a in assets.items() if (s := market_symbol(t, a)) and s not in pending and not closes.get(s))
+    benchmark = closes.get(BENCHMARK, [])
+    if BENCHMARK not in {market_symbol(t, a) for t, a in assets.items()}:
+        closes.pop(BENCHMARK, None)
+    pending = [s for s in pending if s != BENCHMARK]
+    dividends = [d for d in info["dividends"] if d.trade_date >= start]
+    d_index = b_index = 0
+    bench_close: Optional[float] = None
 
     # Replay state: shares, cost (None = unknown) and last trade price.
     shares: Dict[str, float] = {}
@@ -1632,6 +1806,13 @@ def value_history(db: Session, username: str) -> Dict[str, Any]:
                         cost[tx.ticker] = basis - basis / held_now * sold
                     shares[tx.ticker] = held_now - tx.shares
                 last_trade[tx.ticker] = tx.price
+            # A dividend is money paid out: a gain, then a withdrawal.
+            while d_index < len(dividends) and dividends[d_index].trade_date <= day:
+                flow -= dividends[d_index].amount or 0.0
+                d_index += 1
+            while b_index < len(benchmark) and benchmark[b_index][0] <= day:
+                bench_close = benchmark[b_index][1]
+                b_index += 1
             if as_of and day >= as_of and not snapshot_applied:
                 # The snapshot's day is where its cost basis is known: after
                 # that day's trades, which it already includes.
@@ -1666,9 +1847,11 @@ def value_history(db: Session, username: str) -> Dict[str, Any]:
                     "invested": round(invested, 2) if invested is not None else None,
                     "estimated": value > 0 and estimated / value > ESTIMATE_SHARE,
                     "flow": round(flow, 2),
+                    "benchmark": round(bench_close, 4) if bench_close is not None else None,
                 })
         day += timedelta(days=1)
 
+    backfilling = [s for s in backfilling if s != BENCHMARK]
     waiting = pending + backfilling
     retry = None
     if waiting:
@@ -1679,3 +1862,123 @@ def value_history(db: Session, username: str) -> Dict[str, Any]:
         **base, "points": points, "pending": waiting, "backfilling": backfilling,
         "complete": not waiting, "retryAfter": retry,
     }
+
+
+# ── watchlist ───────────────────────────────────────────────────────────────
+
+MAX_WATCHED = 50
+
+
+def _watch_rows(db: Session, username: str) -> List[PortfolioWatch]:
+    return db.query(PortfolioWatch).filter(PortfolioWatch.username == username).order_by(PortfolioWatch.ticker).all()
+
+
+def watchlist(db: Session, username: str) -> Dict[str, Any]:
+    """Watched tickers with their latest close, day change and any alert
+    the price has crossed."""
+    rows = _watch_rows(db, username)
+    today = utc_today()
+    positions = {
+        r.ticker: {"asset": "stock", "first": today - timedelta(days=30), "lastPrice": None, "lastTradeDate": None}
+        for r in rows
+    }
+    prices = quotes(db, positions) if positions else {}
+    items = []
+    for r in rows:
+        q = prices.get(r.ticker, {})
+        price, prev = q.get("price"), q.get("prevClose")
+        triggered = None
+        if price is not None and r.alert_above is not None and price >= r.alert_above:
+            triggered = "above"
+        elif price is not None and r.alert_below is not None and price <= r.alert_below:
+            triggered = "below"
+        items.append({
+            "ticker": r.ticker, "name": q.get("name"), "price": price, "priceStatus": q.get("status"),
+            "priceAsOf": q.get("asOf"),
+            "dayChangePct": _ratio(price - prev, prev) if price is not None and prev else None,
+            "alertAbove": r.alert_above, "alertBelow": r.alert_below, "triggered": triggered,
+        })
+    return {"items": items, "retryAfter": retry_after_seconds()}
+
+
+def watch(db: Session, username: str, ticker: str, above: Optional[float], below: Optional[float]) -> Dict[str, Any]:
+    symbol, reason = clean_ticker(ticker)
+    if not symbol:
+        raise HTTPException(status_code=422, detail=f"Ticker: {reason}.")
+    row = db.query(PortfolioWatch).filter(PortfolioWatch.username == username, PortfolioWatch.ticker == symbol).first()
+    if row is None:
+        if db.query(PortfolioWatch).filter(PortfolioWatch.username == username).count() >= MAX_WATCHED:
+            raise HTTPException(status_code=422, detail=f"A watchlist holds up to {MAX_WATCHED} tickers.")
+        row = PortfolioWatch(username=username, ticker=symbol)
+        db.add(row)
+    row.alert_above, row.alert_below = above, below
+    db.commit()
+    return watchlist(db, username)
+
+
+def unwatch(db: Session, username: str, ticker: str) -> Dict[str, Any]:
+    deleted = (
+        db.query(PortfolioWatch)
+        .filter(PortfolioWatch.username == username, PortfolioWatch.ticker == ticker.strip().upper())
+        .delete()
+    )
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Not on your watchlist.")
+    db.commit()
+    return watchlist(db, username)
+
+
+# ── export ──────────────────────────────────────────────────────────────────
+
+
+def export_csv(db: Session, username: str, kind: str) -> str:
+    """Positions (with their tax lots' terms) or realized gains, as CSV."""
+    out = io.StringIO()
+    writer = csv.writer(out)
+    if kind == "positions":
+        data = breakdown(db, username)
+        writer.writerow(["Symbol", "Name", "Shares", "Price", "Market value", "Cost basis", "Average cost",
+                         "Unrealized gain", "Unrealized %", "Weight", "Sector", "Dividends received"])
+        for p in data["positions"]:
+            writer.writerow([
+                p["ticker"], p["name"] or "", _csv_number(p["shares"], 6), _csv_number(p["price"]),
+                _csv_number(p["marketValue"]), _csv_number(p["costBasis"]), _csv_number(p["avgCost"]),
+                _csv_number(p["gain"]), _csv_number(p["gainPct"] * 100 if p["gainPct"] is not None else None),
+                _csv_number(p["weight"] * 100 if p["weight"] is not None else None), p["sector"] or "",
+                _csv_number(p.get("dividends")),
+            ])
+        return out.getvalue()
+
+    holdings, transactions, _ = load_adjusted(db, username)
+    _, meta = build_positions(holdings, transactions)
+    lots: Dict[str, List[List[Any]]] = {}
+    as_of = meta["as_of"]
+    writer.writerow(["Date sold", "Symbol", "Shares", "Sale price", "Proceeds", "Fees", "Realized gain",
+                     "Term", "Account"])
+    for tx in sorted(transactions, key=lambda t: (t.trade_date, t.id)):
+        if as_of and tx.trade_date <= as_of:
+            continue
+        queue = lots.setdefault(tx.ticker, [])
+        if tx.side == "buy":
+            queue.append([tx.shares, tx.trade_date])
+            continue
+        # Term from the oldest lots the sale used, first-in, first-out.
+        left, oldest = tx.shares, None
+        while left > EPSILON and queue:
+            take = min(left, queue[0][0])
+            oldest = oldest or queue[0][1]
+            queue[0][0] -= take
+            left -= take
+            if queue[0][0] < DUST_SHARES:
+                queue.pop(0)
+        term = "" if oldest is None else ("Long" if (tx.trade_date - oldest).days > LONG_TERM_DAYS else "Short")
+        writer.writerow([
+            tx.trade_date.isoformat(), tx.ticker, _csv_number(tx.shares, 6), _csv_number(tx.price),
+            _csv_number(tx.shares * tx.price), _csv_number(tx.fees or 0.0),
+            _csv_number(meta["realized_by_tx"].get(tx.id)), term, tx.account or "",
+        ])
+    return out.getvalue()
+
+
+def _csv_number(value: Optional[float], digits: int = 2) -> str:
+    return "" if value is None else f"{value:.{digits}f}"

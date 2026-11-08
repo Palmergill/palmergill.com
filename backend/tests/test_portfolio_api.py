@@ -73,6 +73,10 @@ def _buy(client, ticker="AAPL", shares=10, price=150.0, day="2026-01-05", side="
     ("delete", "/api/stocks/portfolio/transactions/1"),
     ("delete", "/api/stocks/portfolio/holdings"),
     ("delete", "/api/stocks/portfolio"),
+    ("get", "/api/stocks/portfolio/watchlist"),
+    ("post", "/api/stocks/portfolio/watchlist"),
+    ("delete", "/api/stocks/portfolio/watchlist/AAPL"),
+    ("get", "/api/stocks/portfolio/export?kind=positions"),
 ])
 def test_anonymous_callers_get_a_json_403(method, path):
     response = getattr(TestClient(app), method)(path)
@@ -199,10 +203,12 @@ def test_brokerage_history_export_auto_detects_as_transactions():
         "ticker": "MSFT", "asset": "stock", "side": "buy", "shares": 3.0, "price": 410.0, "fees": 1.0,
         "trade_date": date(2026, 10, 1), "amount": 1231.0, "notes": "MICROSOFT CORP",
     }
-    assert rows["AAPL"]["side"] == "sell"
+    aapl = [r for r in parsed["rows"] if r["ticker"] == "AAPL"]
+    assert [r["side"] for r in aapl] == ["sell", "dividend"]
+    assert aapl[1]["amount"] == pytest.approx(5.0) and aapl[1]["shares"] == 0.0
     # Price from the amount when the export leaves it blank.
     assert rows["VTI"]["price"] == pytest.approx(280.0)
-    assert len(parsed["skipped"]) == 1  # the dividend has no share count
+    assert parsed["skipped"] == []
 
 
 def test_a_file_without_the_needed_columns_is_a_clear_422():
@@ -220,6 +226,8 @@ def _flat_history(monkeypatch, closes, calls=None):
     from datetime import timedelta
 
     def fake(ticker, start, end):
+        if ticker not in closes:
+            return []  # the benchmark, unless a test prices it
         if calls is not None:
             calls.append(ticker)
         days = (end - start).days + 1
@@ -274,6 +282,7 @@ def test_history_follows_trades_from_the_first_one(monkeypatch):
     assert body["complete"] is True
     assert body["points"][0] == {
         "date": first.isoformat(), "value": 20.0, "invested": 20.0, "estimated": False, "flow": 20.0,
+        "benchmark": None,
     }
     assert body["points"][-1]["value"] == 50.0
 
@@ -663,12 +672,13 @@ def test_old_days_come_from_the_backfill_and_recent_ones_from_polygon(_backfill)
     assert points[0]["date"] == "2020-03-02"
     assert points[0] == {
         "date": "2020-03-02", "value": 20.0, "invested": 20.0, "estimated": False, "flow": 20.0,
+        "benchmark": 10.0,
     }
     # The last weeks are Polygon's closes, not Tiingo's for the same days.
     assert points[-1]["value"] == 40.0
     assert not any(p["estimated"] for p in points)
     client.get("/api/stocks/portfolio/history")
-    assert _backfill == ["MSFT"]  # asked once, stored
+    assert _backfill == ["MSFT", "SPY"]  # asked once each, stored; the benchmark too
 
 
 def test_a_spent_tiingo_allowance_pauses_the_backfill(_backfill, monkeypatch):
@@ -760,3 +770,104 @@ def test_a_closed_holding_still_has_its_page(monkeypatch):
     assert body["open"] is False
     assert body["position"]["realizedGain"] == pytest.approx(100.0)
     assert body["position"]["marketValue"] is None
+
+
+# ── dividends, tax lots, sectors, watchlist, export ─────────────────────────
+
+DIVIDEND_HISTORY = """Date,Action,Symbol,Quantity,Price,Amount
+{buy},Buy,AAPL,10,150,-1500
+{div1},Qualified Dividend,AAPL,,,$2.50
+{div2},Cash Dividend,AAPL,,,$2.50
+"""
+
+
+def _dividend_client():
+    from datetime import timedelta
+
+    today = portfolio.utc_today()
+    client = _member_client()
+    csv_text = DIVIDEND_HISTORY.format(
+        buy=(today - timedelta(days=500)).isoformat(),
+        div1=(today - timedelta(days=400)).isoformat(),
+        div2=(today - timedelta(days=30)).isoformat(),
+    )
+    body = client.post("/api/stocks/portfolio/import", json={"csv": csv_text}).json()
+    return client, body, csv_text
+
+
+def test_dividends_are_income_not_shares():
+    client, body, csv_text = _dividend_client()
+    data = body["portfolio"]
+    aapl = data["positions"][0]
+    assert aapl["shares"] == 10 and aapl["costBasis"] == pytest.approx(1500.0)
+    assert aapl["dividends"] == pytest.approx(5.0)
+    assert data["dividends"]["total"] == pytest.approx(5.0)
+    assert data["dividends"]["trailing12m"] == pytest.approx(2.5)
+    assert data["dividends"]["yield"] == pytest.approx(2.5 / 2000.0)
+    assert data["totals"]["withdrawn"] == 0
+    rows = client.get("/api/stocks/portfolio/transactions", params={"side": "dividend"}).json()["rows"]
+    assert [r["amount"] for r in rows] == [2.5, 2.5]
+    # The same file again adds nothing.
+    again = client.post("/api/stocks/portfolio/import", json={"csv": csv_text}).json()
+    assert again["imported"]["count"] == 0
+
+
+def test_a_dividend_is_money_out_of_the_value_history(monkeypatch):
+    _flat_history(monkeypatch, {"AAPL": 150.0})
+    client, _, _ = _dividend_client()
+    points = client.get("/api/stocks/portfolio/history").json()["points"]
+    assert sum(p["flow"] for p in points) == pytest.approx(1500.0 - 5.0)
+
+
+def test_tax_lots_are_first_in_first_out_with_their_terms():
+    from datetime import timedelta
+
+    today = portfolio.utc_today()
+    client = _member_client()
+    _buy(client, shares=10, price=100.0, day=(today - timedelta(days=500)).isoformat())
+    _buy(client, shares=10, price=250.0, day=(today - timedelta(days=100)).isoformat())
+    body = _buy(client, shares=4, price=210.0, day=(today - timedelta(days=50)).isoformat(), side="sell")
+    taxes = body["taxes"]
+    assert [(lot["shares"], lot["term"]) for lot in taxes["lots"]] == [(6, "long"), (10, "short")]
+    assert taxes["long"] == pytest.approx(6 * (200 - 100))
+    assert taxes["short"] == pytest.approx(10 * (200 - 250))
+    assert taxes["lots"][1]["longTermOn"] == (today - timedelta(days=100) + timedelta(days=366)).isoformat()
+
+
+def test_familiar_sectors_and_unclassified(monkeypatch):
+    monkeypatch.setattr(portfolio, "quotes", REAL_QUOTES)
+    monkeypatch.setattr(portfolio, "_company", lambda db, tickers, budget: {t: {"name": t, "sector": "Manufacturing"} for t in tickers})
+    _flat_history(monkeypatch, {"XOM": 100.0, "ZZZZ": 10.0})
+    client = _member_client()
+    _buy(client, "XOM", shares=1, price=90.0)
+    body = _buy(client, "ZZZZ", shares=1, price=9.0)
+    sectors = {p["ticker"]: p["sector"] for p in body["positions"]}
+    assert sectors == {"XOM": "Energy", "ZZZZ": "Manufacturing"}
+
+
+def test_the_watchlist_is_per_member_and_flags_crossed_alerts():
+    client = _member_client()
+    body = client.post("/api/stocks/portfolio/watchlist", json={"ticker": "nvda", "alert_above": 90}).json()
+    assert [(i["ticker"], i["triggered"]) for i in body["items"]] == [("NVDA", "above")]
+    body = client.post("/api/stocks/portfolio/watchlist", json={"ticker": "MSFT", "alert_below": 300}).json()
+    assert [(i["ticker"], i["triggered"]) for i in body["items"]] == [("MSFT", None), ("NVDA", "above")]
+    assert _member_client().get("/api/stocks/portfolio/watchlist").json()["items"] == []
+    assert _member_client().delete("/api/stocks/portfolio/watchlist/NVDA").status_code == 404
+    body = client.delete("/api/stocks/portfolio/watchlist/NVDA").json()
+    assert [i["ticker"] for i in body["items"]] == ["MSFT"]
+    assert client.post("/api/stocks/portfolio/watchlist", json={"ticker": "CASH"}).status_code == 422
+
+
+def test_exports_are_csv_of_positions_and_realized_gains():
+    from datetime import timedelta
+
+    today = portfolio.utc_today()
+    client = _member_client()
+    _buy(client, shares=10, price=100.0, day=(today - timedelta(days=500)).isoformat())
+    _buy(client, shares=4, price=180.0, day=(today - timedelta(days=10)).isoformat(), side="sell")
+    positions = client.get("/api/stocks/portfolio/export", params={"kind": "positions"})
+    assert positions.headers["content-type"].startswith("text/csv")
+    lines = positions.text.strip().splitlines()
+    assert lines[0].startswith("Symbol,Name,Shares") and lines[1].startswith("AAPL,AAPL,6.000000,200.00,1200.00")
+    realized = client.get("/api/stocks/portfolio/export", params={"kind": "realized"}).text.strip().splitlines()
+    assert realized[1].split(",")[1:] == ["AAPL", "4.000000", "180.00", "720.00", "0.00", "320.00", "Long", ""]

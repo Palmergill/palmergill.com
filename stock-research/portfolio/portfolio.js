@@ -2,8 +2,8 @@
 // Every byte comes from /api/stocks/portfolio, which answers anonymous
 // callers with a JSON 403; the page turns that into its sign-in panel.
 //
-// Five tabs (#overview, #holdings, #activity, #accounts, #gains) share one
-// breakdown from the server. The trade list is the exception: a history can
+// The tabs share one breakdown from the server; the Watchlist tab has its own
+// endpoint, and Performance also reads the value history. The trade list is the exception: a history can
 // run to thousands of trades, so the Activity tab asks for one filtered page
 // at a time.
 (function () {
@@ -17,7 +17,10 @@
     const TOP_HOLDINGS = 10;
     const TRADES_PER_PAGE = 50;
     const REALIZED_SHOWN = 12;
-    const TABS = ['overview', 'holdings', 'activity', 'accounts', 'gains'];
+    const TABS = ['overview', 'holdings', 'gains', 'income', 'taxes', 'watchlist', 'activity', 'accounts'];
+    // A position past this share of the portfolio is flagged.
+    const CONCENTRATED = 0.25;
+    const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
     // A year of trades, dated relative to today, so the sample has a value
     // line that starts small and builds up rather than one flat snapshot.
@@ -38,16 +41,25 @@
         [60, 'Buy', 'NVDA', 20, 170],
         [30, 'Buy', 'GOOGL', 10, 245],
     ];
+    // [days ago, ticker, amount]
+    const SAMPLE_DIVIDENDS = [
+        [280, 'AAPL', 5.0], [190, 'AAPL', 8.75], [100, 'AAPL', 8.75], [10, 'AAPL', 8.75],
+        [250, 'JPM', 18.75], [160, 'JPM', 18.75], [70, 'JPM', 15.0],
+        [260, 'MSFT', 6.64], [170, 'MSFT', 6.64], [80, 'MSFT', 11.62],
+        [110, 'XOM', 29.7], [20, 'XOM', 29.7],
+    ];
 
     function sampleCsv() {
-        const rows = SAMPLE_TRADES.map(([daysAgo, action, ticker, shares, price]) => {
+        const dayAgo = (daysAgo) => {
             const day = new Date();
             day.setDate(day.getDate() - daysAgo);
             // Markets are shut at weekends; move back to the Friday.
             while (day.getDay() === 0 || day.getDay() === 6) day.setDate(day.getDate() - 1);
-            return `${isoDay(day)},${action},${ticker},${shares},${price},Sample`;
-        });
-        return ['Date,Action,Symbol,Quantity,Price,Source', ...rows].join('\n');
+            return isoDay(day);
+        };
+        const rows = SAMPLE_TRADES.map(([daysAgo, action, ticker, shares, price]) => `${dayAgo(daysAgo)},${action},${ticker},${shares},${price},,Sample`);
+        const dividends = SAMPLE_DIVIDENDS.map(([daysAgo, ticker, amount]) => `${dayAgo(daysAgo)},Qualified Dividend,${ticker},,,${amount},Sample`);
+        return ['Date,Action,Symbol,Quantity,Price,Amount,Source', ...rows, ...dividends].join('\n');
     }
 
     const $ = (id) => document.getElementById(id);
@@ -171,6 +183,7 @@
         return isoDay(new Date());
     }
     const ASSET_TAGS = { crypto: 'Crypto', other: 'No ticker' };
+    const SIDE_LABELS = { buy: 'Buy', sell: 'Sell', dividend: 'Dividend' };
     function holdingHref(ticker) {
         return `#holding/${encodeURIComponent(ticker)}`;
     }
@@ -204,9 +217,17 @@
         els.errorBanner.textContent = message;
         els.errorBanner.hidden = !message;
     }
+    let noticeTimer = null;
     function showNotice(message) {
+        clearTimeout(noticeTimer);
+        els.noticeBanner.classList.remove('is-fading');
         els.noticeBanner.textContent = message;
         els.noticeBanner.hidden = !message;
+        if (!message) return;
+        noticeTimer = setTimeout(() => {
+            els.noticeBanner.classList.add('is-fading');
+            noticeTimer = setTimeout(() => { els.noticeBanner.hidden = true; }, 400);
+        }, 6000);
     }
 
     async function run(work) {
@@ -252,6 +273,8 @@
         });
         // The chart measures its box, so draw it once its tab is showing.
         if (tab === 'overview' && history.data) renderHistory();
+        if (tab === 'gains' && lastData) renderGainCharts();
+        if (tab === 'watchlist') loadWatchlist();
         if (tab === 'activity' && lastData) loadTrades();
         if (tab === 'holding') {
             const back = $('holdingBack');
@@ -301,8 +324,10 @@
         if (empty) return;
 
         renderHero(data);
+        renderMetrics(data);
         renderAllocation(data);
         renderTopHoldings(data);
+        renderGlance(data);
         renderSectors(data);
         renderInsights(data);
         renderHoldings(data);
@@ -311,6 +336,8 @@
         renderFilters(data);
         renderAccounts(data);
         renderGains(data);
+        renderIncome(data);
+        renderTaxes(data);
         maybeLoadHistory(data);
         els.clearHoldingsButton.hidden = !data.holdings.count;
         showTab();
@@ -322,6 +349,52 @@
         $('heroLabel').textContent = privacy ? 'Return' : 'Total value';
         els.heroValue.className = 'pf-hero__value';
         els.heroValue.textContent = privacy ? '—' : fmtMoney(data.totals.marketValue, true);
+    }
+
+    function metric(label, value, valueClass = '') {
+        return `<div><dt>${label}</dt><dd class="${valueClass}">${value}</dd></div>`;
+    }
+
+    // The statement's lead figures, under the total.
+    function renderMetrics(data) {
+        const t = data.totals;
+        const items = [];
+        const withPct = (amount, pct) => (privacy ? fmtPct(pct, true) : `${fmtSigned(amount, true)}<span class="pf-sub">${fmtPct(pct, true)}</span>`);
+        if (t.dayChange != null) items.push(metric('Today', withPct(t.dayChange, t.dayChangePct), tone(t.dayChange)));
+        if (t.gain != null) items.push(metric('Unrealized', withPct(t.gain, t.gainPct), tone(t.gain)));
+        if (!privacy && (t.gain != null || t.realizedGain != null)) {
+            const total = (t.gain || 0) + (t.realizedGain || 0);
+            items.push(metric('Total gain', fmtSigned(total, true), tone(total)));
+        }
+        if (!privacy && t.costBasis) items.push(metric('Cost basis', fmtMoney(t.costBasis, true)));
+        const d = data.dividends;
+        if (d.count) {
+            items.push(metric('Income, 12 mo', privacy ? `${fmtPct(d.yield)} yield` : `${fmtMoney(d.trailing12m, true)}<span class="pf-sub">${fmtPct(d.yield)}</span>`));
+        }
+        $('heroMetrics').innerHTML = items.join('');
+    }
+
+    // Four figures that sum the portfolio up.
+    function renderGlance(data) {
+        const priced = data.positions.filter((p) => p.weight != null);
+        const withGain = data.positions.filter((p) => p.gainPct != null);
+        const tag = (text, cls = '') => `<span class="pf-tile__tag ${cls}">${text}</span>`;
+        const tiles = [];
+        if (priced.length) {
+            const top = priced[0];
+            const heavy = top.weight > CONCENTRATED;
+            tiles.push(gainTile('Largest position', `${escapeHtml(top.ticker)}${tag(fmtPct(top.weight))}`, heavy ? 'Concentrated' : '', '', heavy ? 'pf-tile--warn' : ''));
+            const n = Math.min(5, priced.length);
+            tiles.push(gainTile(`Top ${n} holdings`, fmtPct(priced.slice(0, n).reduce((sum, p) => sum + p.weight, 0)), `of ${plural(priced.length, 'position')}`));
+        }
+        if (withGain.length > 1) {
+            const best = withGain.reduce((a, b) => (b.gainPct > a.gainPct ? b : a));
+            const worst = withGain.reduce((a, b) => (b.gainPct < a.gainPct ? b : a));
+            tiles.push(gainTile('Best performer', `${escapeHtml(best.ticker)}${tag(fmtPct(best.gainPct, true), tone(best.gain))}`, ''));
+            tiles.push(gainTile('Weakest', `${escapeHtml(worst.ticker)}${tag(fmtPct(worst.gainPct, true), tone(worst.gain))}`, ''));
+        }
+        $('glanceTiles').innerHTML = tiles.join('');
+        $('glanceTiles').hidden = !tiles.length;
     }
 
     function allocationSlices(positions) {
@@ -372,46 +445,77 @@
     }
 
     function knownSectors(data) {
-        return data.sectors.filter((s) => s.sector !== 'Other');
+        return data.sectors.filter((s) => s.sector !== 'Unclassified');
+    }
+
+    // Allocation as a donut, by sector or by holding; the five largest get
+    // their own colour and the rest share the neutral one.
+    let allocationMode = 'sector';
+    function allocationGroups(data) {
+        if (allocationMode === 'holding') return allocationSlices(data.positions);
+        const sectors = data.sectors.filter((s) => s.marketValue > 0);
+        const named = sectors.filter((s) => s.sector !== 'Unclassified');
+        const groups = named.slice(0, SERIES.length).map((s, i) => ({
+            label: s.sector, value: s.marketValue, weight: s.weight, color: SERIES[i],
+        }));
+        const rest = sectors.filter((s) => !groups.some((g) => g.label === s.sector));
+        if (rest.length) {
+            groups.push({
+                label: rest.length === 1 ? rest[0].sector : `Other (${rest.length})`,
+                value: rest.reduce((sum, s) => sum + s.marketValue, 0),
+                weight: rest.reduce((sum, s) => sum + (s.weight || 0), 0),
+                color: OTHER,
+            });
+        }
+        return groups;
     }
 
     function renderSectors(data) {
-        const known = knownSectors(data).length > 0;
-        els.sectorCard.hidden = !known;
-        els.insightGrid.classList.toggle('pf-grid--single', !known);
-        if (!known) return;
-        const max = Math.max(...data.sectors.map((s) => s.weight || 0)) || 1;
-        els.sectorBars.innerHTML = data.sectors.map((s) => `
-            <li>
-                <div class="pf-bars__label"><span>${escapeHtml(s.sector)}</span><span>${fmtPct(s.weight)}${privacy ? '' : ` · ${fmtMoney(s.marketValue, true)}`}</span></div>
-                <div class="pf-bars__track"><div class="pf-bars__fill" style="width:${((s.weight || 0) / max) * 100}%"></div></div>
-            </li>`).join('');
+        if (!knownSectors(data).length) allocationMode = 'holding';
+        $('allocationModes').querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.mode === allocationMode)));
+        const groups = allocationGroups(data);
+        els.sectorCard.hidden = !groups.length;
+        const host = $('allocationDonut');
+        const r = 40;
+        const circumference = 2 * Math.PI * r;
+        const gap = groups.length > 1 ? 0.8 : 0;
+        let offset = 0;
+        const arcs = groups.map((g, i) => {
+            const length = (g.weight || 0) * circumference;
+            const arc = `<circle data-i="${i}" cx="50" cy="50" r="${r}" fill="none" stroke="${g.color}" stroke-width="16"
+                stroke-dasharray="${Math.max(0, length - gap)} ${circumference}" stroke-dashoffset="${-offset}" transform="rotate(-90 50 50)"/>`;
+            offset += length;
+            return arc;
+        }).join('');
+        const label = allocationMode === 'sector' ? 'sectors' : 'holdings';
+        const count = allocationMode === 'sector' ? data.sectors.length : data.positions.length;
+        host.innerHTML = `<svg viewBox="0 0 100 100">${arcs}</svg><div class="pf-donut__center"><strong>${countFormat.format(count)}</strong><span>${label}</span></div>`;
+        host.setAttribute('aria-label', groups.map((g) => `${g.label} ${fmtPct(g.weight)}`).join(', '));
+        host.querySelectorAll('circle').forEach((arc) => {
+            const g = groups[Number(arc.dataset.i)];
+            const text = privacy ? `${g.label} · ${fmtPct(g.weight)}` : `${g.label} · ${fmtMoney(g.value, true)} · ${fmtPct(g.weight)}`;
+            arc.addEventListener('mousemove', (event) => showTip(event, text));
+            arc.addEventListener('mouseleave', hideTip);
+        });
+        els.sectorBars.innerHTML = groups.map((g) => `
+            <li><span class="pf-swatch" style="background:${g.color}"></span><span>${escapeHtml(g.label)}</span><span>${fmtPct(g.weight)}${privacy ? '' : ` · ${fmtMoney(g.value, true)}`}</span></li>`).join('');
     }
+    $('allocationModes').addEventListener('click', (event) => {
+        const button = event.target.closest('button[data-mode]');
+        if (!button || !lastData) return;
+        allocationMode = button.dataset.mode;
+        renderSectors(lastData);
+    });
 
     function renderInsights(data) {
         const items = [];
         const t = data.totals;
-        const priced = data.positions.filter((p) => p.weight != null);
         if (data.firstTrade) {
             items.push(`<strong>${plural(data.transactionCount, 'trade')}</strong> since ${fmtMonth(data.firstTrade)}, across <strong>${plural(data.accounts.length, 'account')}</strong>.`);
         }
-        if (priced.length) {
-            const top = priced[0];
-            items.push(`<strong>${escapeHtml(top.ticker)}</strong> is your largest position at <strong>${fmtPct(top.weight)}</strong> of the portfolio.`);
-            if (priced.length > 5) {
-                const topFive = priced.slice(0, 5).reduce((sum, p) => sum + p.weight, 0);
-                items.push(`Your top five holdings make up <strong>${fmtPct(topFive)}</strong>.`);
-            }
-        }
-        const sectors = knownSectors(data);
-        if (sectors.length > 1) {
-            items.push(`<strong>${escapeHtml(sectors[0].sector)}</strong> is your heaviest sector, <strong>${fmtPct(sectors[0].weight)}</strong> of the total.`);
-        }
-        const withGain = data.positions.filter((p) => p.gainPct != null);
-        if (withGain.length > 1) {
-            const best = withGain.reduce((a, b) => (b.gainPct > a.gainPct ? b : a));
-            const worst = withGain.reduce((a, b) => (b.gainPct < a.gainPct ? b : a));
-            items.push(`Best performer: <strong>${escapeHtml(best.ticker)}</strong> <span class="${tone(best.gain)}">${fmtPct(best.gainPct, true)}</span>. Weakest: <strong>${escapeHtml(worst.ticker)}</strong> <span class="${tone(worst.gain)}">${fmtPct(worst.gainPct, true)}</span>.`);
+        const heavy = data.positions.filter((p) => p.weight > CONCENTRATED);
+        if (heavy.length) {
+            items.push(`${heavy.map((p) => `<strong>${escapeHtml(p.ticker)}</strong> ${fmtPct(p.weight)}`).join(', ')} of the portfolio.`);
         }
         if (data.aliases.length) {
             const named = data.aliases.map((a) => `“${escapeHtml(a.name)}” as <strong>${escapeHtml(a.ticker)}</strong>`).join(', ');
@@ -431,6 +535,8 @@
         const noBasis = data.positions.filter((p) => p.costBasis == null).length;
         if (noBasis) items.push(`${plural(noBasis, 'position')} with no cost basis.`);
         els.insights.innerHTML = items.length ? items.map((text) => `<li>${text}</li>`).join('') : '';
+        $('noticesCard').hidden = !items.length;
+        els.insightGrid.classList.toggle('pf-grid--single', !items.length || els.sectorCard.hidden);
     }
 
     function priceCell(p) {
@@ -491,11 +597,39 @@
         els.topHoldingsBody.innerHTML = top.map((p, i) => `
             <tr data-ticker="${escapeHtml(p.ticker)}">
                 <td>${securityCell(p, colors[i])}</td>
-                <td class="num pf-strong">${p.weight == null ? '—' : fmtPct(p.weight)}</td>
+                ${weightCell(p)}
                 <td class="num pf-strong">${fmtMoney(p.marketValue, true)}</td>
                 ${dayPill(p)}
                 ${gainCell(p, 'pf-hide-sm')}
             </tr>`).join('') || '<tr><td colspan="5" class="pf-muted">No open positions.</td></tr>';
+    }
+
+    // The holdings table's sort: none (by value, as served) until a header is
+    // clicked; text sorts A to Z first, numbers largest first.
+    const sort = { key: null, dir: -1 };
+    function sortedPositions(list) {
+        if (!sort.key) return list;
+        return [...list].sort((a, b) => {
+            const av = a[sort.key];
+            const bv = b[sort.key];
+            if (av == null && bv == null) return 0;
+            if (av == null) return 1;
+            if (bv == null) return -1;
+            return (typeof av === 'string' ? av.localeCompare(bv) : av - bv) * sort.dir;
+        });
+    }
+    document.querySelector('#holdingsTable thead').addEventListener('click', (event) => {
+        const th = event.target.closest('th[data-sort]');
+        if (!th || !lastData) return;
+        const key = th.dataset.sort;
+        const text = key === 'ticker' || key === 'firstTrade';
+        if (sort.key === key) sort.dir = -sort.dir;
+        else { sort.key = key; sort.dir = text ? 1 : -1; }
+        renderHoldings(lastData);
+    });
+    function weightCell(p, extra = '') {
+        const flag = p.weight > CONCENTRATED ? '<span class="pf-flag" title="Over 25% of the portfolio"></span>' : '';
+        return `<td class="num pf-strong ${extra}">${flag}${p.weight == null ? '—' : fmtPct(p.weight)}</td>`;
     }
 
     function renderHoldings(data) {
@@ -504,10 +638,15 @@
             ? `As of ${fmtDay(asOf)}${data.transactionCount ? ` · ${plural(data.transactionCount, 'trade')}` : ''}`
             : plural(data.transactionCount, 'trade');
         const colors = swatches(data.positions);
-        els.holdingsBody.innerHTML = data.positions.map((p, i) => `
+        const colorOf = new Map(data.positions.map((p, i) => [p.ticker, colors[i]]));
+        document.querySelectorAll('#holdingsTable th[data-sort]').forEach((th) => {
+            if (th.dataset.sort === sort.key) th.setAttribute('aria-sort', sort.dir > 0 ? 'ascending' : 'descending');
+            else th.removeAttribute('aria-sort');
+        });
+        els.holdingsBody.innerHTML = sortedPositions(data.positions).map((p) => `
             <tr data-ticker="${escapeHtml(p.ticker)}">
-                <td>${securityCell(p, colors[i])}</td>
-                <td class="num pf-strong pf-hide-sm">${p.weight == null ? '—' : fmtPct(p.weight)}</td>
+                <td>${securityCell(p, colorOf.get(p.ticker))}</td>
+                ${weightCell(p, 'pf-hide-sm')}
                 <td class="num pf-strong">${fmtMoney(p.marketValue, true)}</td>
                 ${dayCell(p)}
                 <td class="num pf-hide-sm">${fmtShares(p.shares)}</td>
@@ -517,6 +656,22 @@
                 <td class="num pf-hide-md ${tone(p.realizedGain)}">${fmtSigned(p.realizedGain, true)}</td>
                 <td class="num pf-hide-md">${fmtMonth(p.firstTrade)}<span class="pf-sub">${plural(p.trades, 'trade')}</span></td>
             </tr>`).join('') || '<tr><td colspan="10" class="pf-muted">No open positions.</td></tr>';
+
+        const t = data.totals;
+        const realized = data.positions.reduce((sum, p) => sum + (p.realizedGain || 0), 0);
+        $('holdingsTotals').innerHTML = data.positions.length > 1 ? `
+            <tr>
+                <td>Total</td>
+                <td class="num pf-hide-sm">100%</td>
+                <td class="num">${fmtMoney(t.marketValue, true)}</td>
+                ${dayCell(t)}
+                <td class="pf-hide-sm"></td>
+                <td class="pf-hide-sm"></td>
+                <td class="num pf-hide-sm">${fmtMoney(t.costBasis, true)}</td>
+                ${gainCell(t)}
+                <td class="num pf-hide-md ${tone(realized)}">${data.positions.some((p) => p.realizedGain != null) ? fmtSigned(realized, true) : ''}</td>
+                <td class="pf-hide-md"></td>
+            </tr>` : '';
     }
 
     function renderClosed(data) {
@@ -605,8 +760,8 @@
 
     // ── gains ──────────────────────────────────────────────────────────────
 
-    function gainTile(label, value, sub, valueClass = '') {
-        return `<div class="pf-tile">
+    function gainTile(label, value, sub, valueClass = '', tileClass = '') {
+        return `<div class="pf-tile ${tileClass}">
             <div class="pf-tile__label">${label}</div>
             <div class="pf-tile__value ${valueClass}">${value}</div>
             <div class="pf-tile__sub">${sub}</div>
@@ -622,31 +777,12 @@
             privacy
                 ? gainTile('Unrealized', fmtPct(t.gainPct, true), 'On open positions', tone(t.gain))
                 : gainTile('Unrealized', fmtSigned(t.gain, true), t.gainPct == null ? 'On open positions' : `${fmtPct(t.gainPct, true)} on ${fmtMoney(t.costBasis, true)} cost`, tone(t.gain)),
-            gainTile('Realized', fmtSigned(t.realizedGain, true), 'From every sell, at average cost', tone(t.realizedGain)),
-            gainTile('Total gain', fmtSigned(total, true), 'Unrealized plus realized', tone(total)),
+            gainTile('Realized', fmtSigned(t.realizedGain, true), '', tone(t.realizedGain)),
+            gainTile('Total gain', fmtSigned(total, true), '', tone(total)),
             gainTile('Fees paid', fmtMoney(t.fees, true), privacy ? '' : `${fmtMoney(t.invested, true)} bought · ${fmtMoney(t.withdrawn, true)} sold`),
         ].join('');
 
-        // Realized gain by year: one bar each, up for gains and down for losses
-        // from a shared zero line.
-        // The zero line sits where the data puts it: at the foot when every
-        // year is a gain, part way up when some are losses.
-        const years = [...data.years].reverse();
-        const up = Math.max(0, ...years.map((y) => y.realized));
-        const down = Math.max(0, ...years.map((y) => -y.realized));
-        const range = up + down || 1;
-        const zero = (up / range) * 100; // % from the top
-        $('yearBars').style.setProperty('--zero', `${zero}%`);
-        $('yearBars').setAttribute('aria-label', years.map((y) => `${y.year}: ${fmtSigned(y.realized, true)} realized`).join(', '));
-        $('yearBars').innerHTML = years.map((y) => {
-            const size = (Math.abs(y.realized) / range) * 100;
-            const cls = y.realized >= 0 ? 'pf-yearbar__bar--gain' : 'pf-yearbar__bar--loss';
-            const pos = y.realized >= 0 ? `bottom:${100 - zero}%;height:${size}%` : `top:${zero}%;height:${size}%`;
-            return `<div class="pf-yearbar" title="${y.year}: ${fmtSigned(y.realized, true)} realized">
-                <div class="pf-yearbar__plot"><span class="pf-yearbar__bar ${cls}" style="${pos}"></span></div>
-                <span class="pf-yearbar__label">${String(y.year).slice(2)}</span>
-            </div>`;
-        }).join('');
+        if (currentTab() === 'gains') renderGainCharts();
 
         $('yearsTable').innerHTML = `
             <thead><tr>
@@ -656,6 +792,7 @@
                 <th scope="col" class="num pf-hide-sm">Bought</th>
                 <th scope="col" class="num pf-hide-sm">Sold</th>
                 <th scope="col" class="num">Net in</th>
+                ${data.dividends.count ? '<th scope="col" class="num pf-hide-sm">Income</th>' : ''}
                 <th scope="col" class="num pf-hide-md">Fees</th>
             </tr></thead>
             <tbody>${data.years.map((y) => `
@@ -666,6 +803,7 @@
                     <td class="num pf-hide-sm">${fmtMoney(y.bought, true)}</td>
                     <td class="num pf-hide-sm">${fmtMoney(y.sold, true)}</td>
                     <td class="num">${fmtSigned(y.net, true)}</td>
+                    ${data.dividends.count ? `<td class="num pf-hide-sm">${fmtMoney(y.dividends, true)}</td>` : ''}
                     <td class="num pf-hide-md">${fmtMoney(y.fees, true)}</td>
                 </tr>`).join('')}
             </tbody>`;
@@ -760,8 +898,9 @@
                     ? `<span class="pf-tag" title="The same trade as the ${escapeHtml(t.duplicateOf.source || 'other')} row on ${fmtDay(t.duplicateOf.date)}, so it's counted once">duplicate</span>`
                     : t.counted ? '' : '<span class="pf-tag" title="On or before your holdings date, so it is already in them">in holdings</span>'}</td>
                 <td>${t.aliasOf ? `${securityLink({ ticker: t.aliasOf, asset: 'stock' })}<span class="pf-tag" title="Filed as “${escapeHtml(t.ticker)}” in this source">${escapeHtml(t.ticker)}</span>` : securityLink(t)}${t.notes ? `<span class="pf-name pf-note-cell" title="${escapeHtml(t.notes)}">${escapeHtml(t.notes)}</span>` : ''}</td>
-                <td><span class="pf-side pf-side--${t.side}">${t.side === 'buy' ? 'Buy' : 'Sell'}</span></td>
-                ${t.splitFactor !== 1
+                <td><span class="pf-side pf-side--${t.side}">${SIDE_LABELS[t.side] || t.side}</span></td>
+                ${t.side === 'dividend' ? `<td class="num pf-muted">—</td>
+                <td class="num pf-hide-sm pf-muted">—</td>` : t.splitFactor !== 1
                     ? `<td class="num" title="Adjusted for stock splits since the trade">${fmtShares(t.adjustedShares)}<span class="pf-sub">${fmtShares(t.shares)} as traded</span></td>
                 <td class="num pf-hide-sm">${fmtPrice(t.adjustedPrice)}<span class="pf-sub">${fmtPrice(t.price)} as traded</span></td>`
                     : `<td class="num">${fmtShares(t.shares)}</td>
@@ -816,6 +955,302 @@
     const monthYear = new Intl.DateTimeFormat('en-US', { month: 'short', year: '2-digit', timeZone: 'UTC' });
     const yearOnly = new Intl.DateTimeFormat('en-US', { year: 'numeric', timeZone: 'UTC' });
 
+    // Realized gain by year: a bar each from one labelled zero line.
+    function drawYearChart(years) {
+        const host = $('yearBars');
+        host.innerHTML = '';
+        host.hidden = !years.length;
+        const width = host.clientWidth;
+        if (!years.length || !width) return;
+        const height = 150;
+        // Room above and below the bars for their labels, then the years.
+        const pad = { top: 20, bottom: 40 };
+        const innerH = height - pad.top - pad.bottom;
+        const up = Math.max(0, ...years.map((y) => y.realized));
+        const down = Math.max(0, ...years.map((y) => -y.realized));
+        const range = up + down || 1;
+        const zero = pad.top + (up / range) * innerH;
+        const slot = width / years.length;
+        const barW = Math.min(56, slot * 0.55);
+        const root = svg('svg', { viewBox: `0 0 ${width} ${height}`, 'aria-label': years.map((y) => `${y.year}: ${fmtSigned(y.realized, true)}`).join(', ') });
+        years.forEach((y, i) => {
+            const cx = slot * i + slot / 2;
+            const h = (Math.abs(y.realized) / range) * innerH;
+            const top = y.realized >= 0 ? zero - h : zero;
+            root.appendChild(svg('rect', { class: y.realized >= 0 ? 'pf-bar--gain' : 'pf-bar--loss', x: cx - barW / 2, y: top, width: barW, height: Math.max(h, 1), rx: 3 }));
+            if (!privacy && y.realized) {
+                const label = svg('text', { class: 'pf-bar-label', x: cx, y: y.realized >= 0 ? top - 6 : top + h + 14, 'text-anchor': 'middle' });
+                label.textContent = compactMoney(y.realized).replace('$-', '−$');
+                root.appendChild(label);
+            }
+            const year = svg('text', { class: 'pf-chart__axis', x: cx, y: height - 4, 'text-anchor': 'middle' });
+            year.textContent = y.year;
+            root.appendChild(year);
+        });
+        root.appendChild(svg('line', { class: 'pf-zero', x1: 0, x2: width, y1: zero, y2: zero }));
+        host.appendChild(root);
+    }
+
+    // The Performance tab's charts measure their boxes: drawn when shown.
+    function renderGainCharts() {
+        if (!lastData) return;
+        drawYearChart([...lastData.years].reverse());
+        renderPerformance();
+    }
+
+    // Each day's return on what was invested that day (see rangeReturn).
+    function dailyReturns(points) {
+        const out = [];
+        for (let i = 1; i < points.length; i += 1) {
+            const flow = points[i].flow || 0;
+            const base = points[i - 1].value + Math.max(flow, 0);
+            if (base > 0) out.push({ date: points[i].date, r: (points[i].value - points[i - 1].value - flow) / base });
+        }
+        return out;
+    }
+
+    function renderPerformance() {
+        const points = history.data?.points || [];
+        const tiles = $('perfTiles');
+        const returns = dailyReturns(points);
+        if (returns.length < 5) {
+            $('perfSub').textContent = history.data ? 'Not enough history yet.' : 'Loading price history…';
+            tiles.innerHTML = '';
+            $('monthlyCard').hidden = true;
+            return;
+        }
+        let growth = 1;
+        let peak = 1;
+        let drawdown = 0;
+        let trough = null;
+        const months = new Map();
+        returns.forEach(({ date, r }) => {
+            growth *= 1 + r;
+            peak = Math.max(peak, growth);
+            if (growth / peak - 1 < drawdown) { drawdown = growth / peak - 1; trough = date; }
+            const key = date.slice(0, 7);
+            months.set(key, (months.get(key) ?? 1) * (1 + r));
+        });
+        const total = growth - 1;
+        const first = points[0].date;
+        const last = points[points.length - 1].date;
+        const years = (new Date(last) - new Date(first)) / (365.25 * 86400000);
+        const mean = returns.reduce((sum, d) => sum + d.r, 0) / returns.length;
+        const variance = returns.reduce((sum, d) => sum + (d.r - mean) ** 2, 0) / (returns.length - 1);
+        const volatility = Math.sqrt(variance * 252);
+        const bench = points.filter((p) => p.benchmark != null);
+        const benchTotal = bench.length > 1 ? bench[bench.length - 1].benchmark / bench[0].benchmark - 1 : null;
+        const monthly = [...months.entries()].map(([key, g]) => ({ key, r: g - 1 }));
+        const best = monthly.reduce((a, b) => (b.r > a.r ? b : a));
+        const worst = monthly.reduce((a, b) => (b.r < a.r ? b : a));
+        const monthName = (key) => `${MONTHS[Number(key.slice(5)) - 1]} ${key.slice(0, 4)}`;
+
+        $('perfSub').textContent = `${fmtDay(first)} – ${fmtDay(last)}`;
+        const items = [gainTile('Total return', fmtPct(total, true), `Since ${fmtMonth(first)}`, tone(total))];
+        if (years >= 1) {
+            const annual = growth ** (1 / years) - 1;
+            items.push(gainTile('Annualized', fmtPct(annual, true), `${years.toFixed(1)} years`, tone(annual)));
+        }
+        if (benchTotal != null) {
+            const diff = total - benchTotal;
+            items.push(gainTile('vs S&amp;P 500', fmtPct(diff, true), `S&amp;P 500 ${fmtPct(benchTotal, true)}`, tone(diff)));
+        }
+        items.push(
+            gainTile('Max drawdown', fmtPct(drawdown, true), trough ? `Low on ${fmtDay(trough)}` : '', tone(drawdown)),
+            gainTile('Volatility', fmtPct(volatility), 'Annualized'),
+            gainTile('Best month', fmtPct(best.r, true), monthName(best.key), tone(best.r)),
+            gainTile('Worst month', fmtPct(worst.r, true), monthName(worst.key), tone(worst.r)),
+        );
+        tiles.innerHTML = items.join('');
+
+        // Months as a heat table, newest year first.
+        const byYear = new Map();
+        monthly.forEach(({ key, r }) => {
+            const year = key.slice(0, 4);
+            if (!byYear.has(year)) byYear.set(year, new Array(12).fill(null));
+            byYear.get(year)[Number(key.slice(5)) - 1] = r;
+        });
+        const shade = (r) => {
+            if (r == null) return '';
+            const strength = Math.min(1, Math.abs(r) / 0.08) * 0.42 + 0.06;
+            return `background: rgba(${r >= 0 ? '46, 125, 79' : '193, 79, 63'}, ${strength.toFixed(2)})`;
+        };
+        $('monthlyCard').hidden = false;
+        $('monthlyTable').innerHTML = `
+            <thead><tr><th scope="col">Year</th>${MONTHS.map((m) => `<th scope="col">${m}</th>`).join('')}<th scope="col">Year</th></tr></thead>
+            <tbody>${[...byYear.entries()].reverse().map(([year, cells]) => {
+                const yearReturn = cells.reduce((g, r) => (r == null ? g : g * (1 + r)), 1) - 1;
+                return `<tr><td>${year}</td>${cells.map((r) => (r == null ? '<td></td>'
+                    : `<td class="pf-heat__cell" style="${shade(r)}">${fmtPct(r, true)}</td>`)).join('')}<td class="pf-heat__total ${tone(yearReturn)}">${fmtPct(yearReturn, true)}</td></tr>`;
+            }).join('')}</tbody>`;
+    }
+
+    // ── income ─────────────────────────────────────────────────────────────
+
+    function renderIncome(data) {
+        const d = data.dividends;
+        els.tabs.querySelector('[data-tab="income"]').hidden = !d.count;
+        $('incomeTiles').innerHTML = [
+            gainTile('Last 12 months', fmtMoney(d.trailing12m, true), ''),
+            gainTile('Trailing yield', fmtPct(d.yield), ''),
+            gainTile('All time', fmtMoney(d.total, true), ''),
+            gainTile('Payments', countFormat.format(d.count), d.recent.length ? `Last ${fmtDay(d.recent[0].date)}` : ''),
+        ].join('');
+        const value = new Map(data.positions.map((p) => [p.ticker, p.costBasis]));
+        $('incomeByTicker').innerHTML = `
+            <thead><tr><th scope="col">Security</th><th scope="col" class="num">Received</th><th scope="col" class="num">Share</th><th scope="col" class="num pf-hide-sm">On cost</th></tr></thead>
+            <tbody>${d.byTicker.map((r) => `
+                <tr data-ticker="${escapeHtml(r.ticker)}">
+                    <td>${securityLink({ ticker: r.ticker, asset: 'stock' })}</td>
+                    <td class="num pf-strong">${fmtMoney(r.amount)}</td>
+                    <td class="num">${fmtPct(r.amount / (d.total || 1))}</td>
+                    <td class="num pf-hide-sm">${value.get(r.ticker) ? fmtPct(r.amount / value.get(r.ticker)) : '—'}</td>
+                </tr>`).join('') || '<tr><td colspan="4" class="pf-muted">No dividends yet.</td></tr>'}
+            </tbody>`;
+        $('incomeRecent').innerHTML = `
+            <thead><tr><th scope="col">Date</th><th scope="col">Security</th><th scope="col" class="num">Amount</th></tr></thead>
+            <tbody>${d.recent.map((r) => `
+                <tr><td>${fmtDay(r.date)}</td><td>${securityLink({ ticker: r.ticker, asset: 'stock' })}</td><td class="num pf-strong">${fmtMoney(r.amount)}</td></tr>`).join('')
+                || '<tr><td colspan="3" class="pf-muted">No dividends yet.</td></tr>'}
+            </tbody>`;
+    }
+
+    // ── taxes ──────────────────────────────────────────────────────────────
+
+    function termPill(lot) {
+        if (lot.term === 'unknown') return '<span class="pf-term">Unknown</span>';
+        return `<span class="pf-term pf-term--${lot.term}">${lot.term === 'long' ? 'Long' : 'Short'}</span>`;
+    }
+    function lotRow(lot, withTicker = true) {
+        return `<tr${withTicker ? ` data-ticker="${escapeHtml(lot.ticker)}"` : ''}>
+            ${withTicker ? `<td>${securityLink({ ticker: lot.ticker, asset: 'stock' })}</td>` : ''}
+            <td>${lot.date ? fmtDay(lot.date) : '—'}</td>
+            <td class="num">${fmtShares(lot.shares)}</td>
+            <td class="num pf-hide-sm">${fmtPrice(lot.cost)}</td>
+            <td class="num pf-hide-sm">${fmtMoney(lot.value, true)}</td>
+            ${gainCell(lot)}
+            <td>${termPill(lot)}</td>
+            <td class="num pf-hide-sm">${lot.longTermOn ? fmtDay(lot.longTermOn) : ''}</td>
+        </tr>`;
+    }
+    function lotHead(withTicker = true) {
+        return `<thead><tr>${withTicker ? '<th scope="col">Security</th>' : ''}<th scope="col">Acquired</th><th scope="col" class="num">Shares</th>
+            <th scope="col" class="num pf-hide-sm">Cost/sh</th><th scope="col" class="num pf-hide-sm">Value</th><th scope="col" class="num">Gain</th>
+            <th scope="col">Term</th><th scope="col" class="num pf-hide-sm">Long-term on</th></tr></thead>`;
+    }
+
+    function renderTaxes(data) {
+        const tx = data.taxes;
+        const year = new Date().getFullYear();
+        const thisYear = data.years.find((y) => y.year === year);
+        const losses = tx.lots.filter((l) => l.gain < 0).sort((a, b) => a.gain - b.gain);
+        const lossTotal = losses.reduce((sum, l) => sum + l.gain, 0);
+        $('taxTiles').innerHTML = [
+            gainTile('Short-term unrealized', fmtSigned(tx.short, true), '', tone(tx.short)),
+            gainTile('Long-term unrealized', fmtSigned(tx.long, true), '', tone(tx.long)),
+            gainTile(`Realized in ${year}`, fmtSigned(thisYear ? thisYear.realized : 0, true), '', tone(thisYear?.realized)),
+            gainTile('Unrealized losses', fmtSigned(lossTotal, true), plural(losses.length, 'lot'), tone(lossTotal)),
+        ].join('');
+        $('harvestCard').hidden = !losses.length;
+        $('harvestSub').textContent = losses.length ? plural(losses.length, 'lot') : '';
+        $('harvestTable').innerHTML = `${lotHead()}<tbody>${losses.map((l) => lotRow(l)).join('')}</tbody>`;
+        $('lotsSub').textContent = tx.lots.length ? plural(tx.lots.length, 'lot') : '';
+        $('lotsTable').innerHTML = `${lotHead()}<tbody>${tx.lots.map((l) => lotRow(l)).join('') || '<tr><td colspan="8" class="pf-muted">No open lots.</td></tr>'}</tbody>`;
+    }
+
+    // ── watchlist ──────────────────────────────────────────────────────────
+
+    const watch = { data: null, timer: null };
+    async function loadWatchlist() {
+        clearTimeout(watch.timer);
+        const data = await run(() => api('/watchlist'));
+        if (!data) return;
+        watch.data = data;
+        renderWatchlist();
+        if (data.items.some((i) => i.priceStatus === 'pending') && currentTab() === 'watchlist') {
+            watch.timer = setTimeout(loadWatchlist, (data.retryAfter || 5) * 1000);
+        }
+    }
+    function alertText(item) {
+        const parts = [];
+        if (item.alertAbove != null) parts.push(`<span class="${item.triggered === 'above' ? 'pf-alert pf-alert--above' : ''}">Above ${fmtPrice(item.alertAbove)}</span>`);
+        if (item.alertBelow != null) parts.push(`<span class="${item.triggered === 'below' ? 'pf-alert pf-alert--below' : ''}">Below ${fmtPrice(item.alertBelow)}</span>`);
+        return parts.join(' · ') || '<span class="pf-muted">—</span>';
+    }
+    function renderWatchlist() {
+        const items = watch.data?.items || [];
+        const hits = items.filter((i) => i.triggered).length;
+        $('watchSub').textContent = items.length
+            ? `${plural(items.length, 'ticker')}${hits ? ` · ${plural(hits, 'alert')} hit` : ''}`
+            : 'No tickers yet.';
+        $('watchTable').innerHTML = items.length ? `
+            <thead><tr><th scope="col">Ticker</th><th scope="col" class="num">Price</th><th scope="col" class="num">Day</th><th scope="col">Alerts</th><th scope="col"><span class="visually-hidden">Remove</span></th></tr></thead>
+            <tbody>${items.map((i) => `
+                <tr>
+                    <td><a class="pf-ticker" href="/stock-research/?ticker=${encodeURIComponent(i.ticker)}">${escapeHtml(i.ticker)}</a>${i.name && i.name !== i.ticker ? `<span class="pf-name">${escapeHtml(i.name)}</span>` : ''}</td>
+                    <td class="num pf-strong">${i.price != null ? fmtPrice(i.price) : `<span class="pf-muted">${i.priceStatus === 'pending' ? 'Loading…' : 'Unavailable'}</span>`}</td>
+                    <td class="num ${tone(i.dayChangePct)}">${i.dayChangePct != null ? fmtPct(i.dayChangePct, true) : '—'}</td>
+                    <td>${alertText(i)}</td>
+                    <td class="num"><button type="button" class="pf-remove" data-watch="${escapeHtml(i.ticker)}" aria-label="Stop watching ${escapeHtml(i.ticker)}">×</button></td>
+                </tr>`).join('')}
+            </tbody>` : '';
+    }
+    $('watchForm').addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const number = (id) => ($(id).value === '' ? null : Number($(id).value));
+        const data = await run(() => api('/watchlist', {
+            method: 'POST',
+            body: { ticker: $('watchTicker').value.trim(), alert_above: number('watchAbove'), alert_below: number('watchBelow') },
+        }));
+        if (!data) return;
+        $('watchForm').reset();
+        watch.data = data;
+        renderWatchlist();
+    });
+    $('watchTable').addEventListener('click', async (event) => {
+        const button = event.target.closest('[data-watch]');
+        if (!button) return;
+        const data = await run(() => api(`/watchlist/${encodeURIComponent(button.dataset.watch)}`, { method: 'DELETE' }));
+        if (data) { watch.data = data; renderWatchlist(); }
+    });
+
+    // ── header menu and exports ────────────────────────────────────────────
+
+    function setMenuOpen(open) {
+        $('moreMenu').hidden = !open;
+        $('moreToggle').setAttribute('aria-expanded', String(open));
+    }
+    $('moreToggle').addEventListener('click', (event) => {
+        event.stopPropagation();
+        setMenuOpen($('moreMenu').hidden);
+    });
+    document.addEventListener('click', (event) => {
+        if (!event.target.closest('.pf-menu')) setMenuOpen(false);
+    });
+    document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && !$('moreMenu').hidden) { setMenuOpen(false); $('moreToggle').focus(); }
+    });
+    $('moreMenu').addEventListener('click', async (event) => {
+        const item = event.target.closest('button');
+        if (!item) return;
+        setMenuOpen(false);
+        if (item.dataset.export) await exportCsv(item.dataset.export);
+    });
+    async function exportCsv(kind) {
+        showError('');
+        const response = await fetch(`${API_BASE}/api/stocks/portfolio/export?kind=${kind}`, { credentials: 'same-origin' });
+        if (response.status === 403) { showSignedOut(); return; }
+        if (!response.ok) { showError(`Export failed (${response.status}).`); return; }
+        const url = URL.createObjectURL(await response.blob());
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = kind === 'positions' ? 'portfolio-positions.csv' : 'portfolio-realized-gains.csv';
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }
+
     const history = { data: null, range: '1Y', signature: null, retries: 0, timer: null };
 
     // Whether the cost lines (invested, average cost) are drawn; remembered
@@ -835,10 +1270,15 @@
         if (currentTab() === 'holding' && holding.data) renderHolding();
     });
 
+    const EYE = '<svg class="pf-stroke" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>';
+    const EYE_OFF = '<svg class="pf-stroke" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3l18 18"/><path d="M10.6 5.1A10.4 10.4 0 0 1 12 5c6.4 0 10 7 10 7a17.6 17.6 0 0 1-3.2 4.1M6.6 6.6C3.9 8.4 2 12 2 12s3.6 7 10 7a9.7 9.7 0 0 0 5.4-1.6"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>';
     function syncPrivacyToggle() {
         const button = $('privacyToggle');
+        const label = privacy ? 'Show amounts' : 'Hide amounts';
         button.setAttribute('aria-pressed', String(privacy));
-        button.textContent = privacy ? 'Show amounts' : 'Hide amounts';
+        button.setAttribute('aria-label', label);
+        button.title = label;
+        button.innerHTML = privacy ? EYE_OFF : EYE;
     }
     syncPrivacyToggle();
     $('privacyToggle').addEventListener('click', () => {
@@ -848,6 +1288,19 @@
         if (lastData) render(lastData);
         if (history.data) renderHistory();
         if (holding.data) renderHolding();
+        if (watch.data) renderWatchlist();
+    });
+
+    // Whether the S&P 500 line is drawn; remembered per browser.
+    let showBench = true;
+    try { showBench = localStorage.getItem('pf.showBench') !== 'false'; } catch { /* storage blocked */ }
+    document.querySelectorAll('[data-bench-toggle]').forEach((b) => b.setAttribute('aria-pressed', String(showBench)));
+    document.addEventListener('click', (event) => {
+        if (!event.target.closest('[data-bench-toggle]')) return;
+        showBench = !showBench;
+        try { localStorage.setItem('pf.showBench', String(showBench)); } catch { /* storage blocked */ }
+        document.querySelectorAll('[data-bench-toggle]').forEach((b) => b.setAttribute('aria-pressed', String(showBench)));
+        if (history.data) renderHistory();
     });
 
     // Reload the history only when what it's built from changed, not when the
@@ -878,6 +1331,7 @@
         history.data = data;
         // Draw what's in while the rest loads: missing prices show as estimates.
         if (currentTab() === 'overview') renderHistory();
+        if (currentTab() === 'gains') renderPerformance();
         if (!data.complete && history.retries < MAX_HISTORY_RETRIES) {
             history.retries += 1;
             history.timer = setTimeout(loadHistory, (data.retryAfter || 3) * 1000);
@@ -958,6 +1412,12 @@
         } else {
             sub.innerHTML = `<span class="pf-history-change ${tone(gain)}">${fmtSigned(gain, true)}${pct == null ? '' : ` (${fmtPct(pct, true)})`}</span>`;
         }
+        const bench = points.filter((p) => p.benchmark != null);
+        $('benchmarkKey').hidden = bench.length < 2;
+        if (bench.length > 1) {
+            const benchPct = bench[bench.length - 1].benchmark / bench[0].benchmark - 1;
+            sub.insertAdjacentHTML('beforeend', ` <span class="pf-bench"><span class="pf-dot">·</span>S&amp;P 500 <strong class="${tone(benchPct)}">${fmtPct(benchPct, true)}</strong></span>`);
+        }
 
         const notes = [];
         const estimated = points.some((p) => p.estimated);
@@ -1033,6 +1493,20 @@
         }
     }
 
+    // What the same money would be worth in the S&P 500: the range's opening
+    // value bought the index, and every deposit or withdrawal after it bought
+    // or sold the index that day.
+    function benchmarkValues(points) {
+        let units = null;
+        const out = points.map((p) => {
+            if (p.benchmark == null) return null;
+            if (units == null) units = p.value / p.benchmark;
+            else units += (p.flow || 0) / p.benchmark;
+            return units * p.benchmark;
+        });
+        return out.filter((v) => v != null).length > 1 ? out : null;
+    }
+
     function drawChart(points) {
         const host = $('historyChart');
         host.innerHTML = '';
@@ -1047,7 +1521,12 @@
         const innerW = width - pad.left - pad.right;
         const innerH = height - pad.top - pad.bottom;
 
-        const values = points.flatMap((p) => (showCost && p.invested != null ? [p.value, p.invested] : [p.value]));
+        const bench = showBench ? benchmarkValues(points) : null;
+        const values = points.flatMap((p, i) => [
+            p.value,
+            ...(showCost && p.invested != null ? [p.invested] : []),
+            ...(bench && bench[i] != null ? [bench[i]] : []),
+        ]);
         let lo = Math.min(...values);
         let hi = Math.max(...values);
         const margin = (hi - lo) * 0.08 || hi * 0.05 || 1;
@@ -1079,6 +1558,11 @@
         runs(points, (p) => showCost && p.invested != null).forEach((indices) => {
             root.appendChild(svg('path', { class: 'pf-chart__invested', d: path(indices, 'invested') }));
         });
+        if (bench) {
+            const benchLine = points.map((_, i) => i).filter((i) => bench[i] != null)
+                .map((i, k) => `${k ? 'L' : 'M'}${x(i).toFixed(1)},${y(bench[i]).toFixed(1)}`).join('');
+            root.appendChild(svg('path', { class: 'pf-chart__bench', d: benchLine }));
+        }
         runs(points, (p) => !p.estimated).forEach((indices) => {
             root.appendChild(svg('path', { class: 'pf-chart__line', d: path(indices, 'value') }));
         });
@@ -1174,6 +1658,12 @@
         return fmtPrice(value, true);
     }
 
+    function dividendTile(d) {
+        if (!d.dividends?.length) return [];
+        const total = d.dividends.reduce((sum, x) => sum + x.amount, 0);
+        return [gainTile('Dividends', fmtMoney(total, true), plural(d.dividends.length, 'payment'))];
+    }
+
     function renderHolding() {
         const d = holding.data;
         const pos = d.position;
@@ -1214,6 +1704,7 @@
                 : gainTile('Unrealized', fmtSigned(pos.gain, true), pos.gainPct == null ? 'No cost basis' : `${fmtPct(pos.gainPct, true)} on ${fmtMoney(pos.costBasis, true)}`, tone(pos.gain)),
             gainTile('Average cost', fmtPrice(pos.avgCost), 'Per share'),
             gainTile('Realized', fmtSigned(pos.realizedGain, true), '', tone(pos.realizedGain)),
+            ...dividendTile(d),
         ] : [
             gainTile('Realized', fmtSigned(pos.realizedGain, true), '', tone(pos.realizedGain)),
             gainTile('Bought', fmtMoney(pos.bought, true), plural(pos.trades, 'trade')),
@@ -1229,7 +1720,7 @@
             factRow('1 month', pctFact(perf['1M'])),
             factRow('Year to date', pctFact(perf.YTD)),
             factRow('1 year', pctFact(perf['1Y'])),
-            factRow('52-week range', perf.low52w != null ? `${fmtPrice(perf.low52w)} – ${fmtPrice(perf.high52w)}` : null),
+
             factRow('Market cap', bigMoney(c.market_cap)),
             factRow('P/E', c.pe_ratio != null ? c.pe_ratio.toFixed(1) : null),
             factRow('Beta', c.beta != null ? c.beta.toFixed(2) : null),
@@ -1241,6 +1732,17 @@
             factRow('Trades', countFormat.format(pos.trades)),
         ].join('');
         $('holdingFactsSub').textContent = d.priceAsOf ? `Through ${fmtDay(d.priceAsOf)}` : '';
+        const range = $('holdingRange');
+        range.hidden = perf.low52w == null || d.price == null || perf.high52w <= perf.low52w;
+        if (!range.hidden) {
+            const at = Math.min(100, Math.max(0, ((d.price - perf.low52w) / (perf.high52w - perf.low52w)) * 100));
+            range.innerHTML = `<div class="pf-range52__label">52-week range</div>
+                <div class="pf-range52__track"><div class="pf-range52__fill"></div><span class="pf-range52__mark" style="left:${at}%"></span></div>
+                <div class="pf-range52__ends"><span>${fmtPrice(perf.low52w)}</span><span>${fmtPrice(perf.high52w)}</span></div>`;
+        }
+        const lots = d.lots || [];
+        $('holdingLotsCard').hidden = !lots.length;
+        $('holdingLots').innerHTML = `${lotHead(false)}<tbody>${lots.map((l) => lotRow(l, false)).join('')}</tbody>`;
 
         const research = $('holdingResearch');
         research.hidden = d.asset !== 'stock';

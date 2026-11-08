@@ -12,7 +12,7 @@ would otherwise answer ``GET /api/stocks/portfolio``.
 from datetime import date
 from typing import Any, Dict, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request, Response
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -83,7 +83,7 @@ def read_transactions(
     offset: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=portfolio.TRADE_PAGE_MAX),
     q: str = Query("", max_length=60),
-    side: str = Query("", pattern="^(|buy|sell)$"),
+    side: str = Query("", pattern="^(|buy|sell|dividend)$"),
     account: str = Query("", max_length=120),
     source: str = Query("", max_length=120),
     year: Optional[int] = Query(None, ge=1900, le=2200),
@@ -146,3 +146,41 @@ def clear_holdings(username: str = Depends(caller), db: Session = Depends(get_db
 def clear_portfolio(username: str = Depends(caller), db: Session = Depends(get_db)) -> Dict[str, Any]:
     portfolio.clear(db, username)
     return portfolio.breakdown(db, username)
+
+
+class WatchRequest(BaseModel):
+    ticker: str = Field(..., min_length=1, max_length=12)
+    alert_above: Optional[float] = Field(None, gt=0, le=1e7)
+    alert_below: Optional[float] = Field(None, gt=0, le=1e7)
+
+
+@router.get("/watchlist")
+def read_watchlist(username: str = Depends(caller), db: Session = Depends(get_db)) -> Dict[str, Any]:
+    return portfolio.watchlist(db, username)
+
+
+@router.post("/watchlist")
+def add_watch(body: WatchRequest, username: str = Depends(caller), db: Session = Depends(get_db)) -> Dict[str, Any]:
+    return portfolio.watch(db, username, body.ticker, body.alert_above, body.alert_below)
+
+
+@router.delete("/watchlist/{ticker}")
+def remove_watch(
+    ticker: str = Path(..., min_length=1, max_length=12),
+    username: str = Depends(caller),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    return portfolio.unwatch(db, username, ticker)
+
+
+@router.get("/export")
+def export(
+    kind: str = Query(..., pattern="^(positions|realized)$"),
+    username: str = Depends(caller),
+    db: Session = Depends(get_db),
+) -> Response:
+    name = "portfolio-positions.csv" if kind == "positions" else "portfolio-realized-gains.csv"
+    return Response(
+        portfolio.export_csv(db, username, kind), media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{name}"', "Cache-Control": "no-store"},
+    )
