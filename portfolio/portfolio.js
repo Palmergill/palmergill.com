@@ -1380,17 +1380,19 @@
 
     // Just enough axis to read the chart by: the low, middle and high value on
     // the right, and the first, middle and last date along the bottom.
-    function sparseAxes(root, points, { lo, hi, x, y, width, height, pad }) {
+    // `label` formats a value; the portfolio's dollar labels drop out in
+    // privacy mode, a stock's own prices don't.
+    function sparseAxes(root, points, { lo, hi, x, y, width, height, pad, label: format = privacy ? null : compactMoney }) {
         // Rounded to two figures of the chart's span, so they read cleanly.
         const step = 10 ** (Math.floor(Math.log10(hi - lo || 1)) - 1);
         const round = (v) => Math.round(v / step) * step;
         const top = round(hi - (hi - lo) * 0.06);
         const bottom = round(lo + (hi - lo) * 0.06);
-        if (!privacy) {
+        if (format) {
             [bottom, round((bottom + top) / 2), top].forEach((v) => {
                 root.appendChild(svg('line', { class: 'pf-chart__guide', x1: pad.left, x2: width - pad.right, y1: y(v), y2: y(v) }));
                 const label = svg('text', { class: 'pf-chart__axis', x: width - pad.right + 8, y: y(v) + 4 });
-                label.textContent = compactMoney(v);
+                label.textContent = format(v);
                 root.appendChild(label);
             });
         }
@@ -1450,13 +1452,10 @@
 
     // A chart is drawn to its box, so a box that changes size redraws it.
     function redrawOnResize(id, redraw) {
-        let last = null;
         new ResizeObserver(([entry]) => {
-            const size = `${Math.round(entry.contentRect.width)}x${Math.round(entry.contentRect.height)}`;
-            if (size !== last && entry.contentRect.width) {
-                if (last !== null) redraw();
-                last = size;
-            }
+            const drawn = entry.target.querySelector('svg')?.viewBox.baseVal;
+            const { width, height } = entry.contentRect;
+            if (drawn && width && (Math.abs(drawn.width - width) > 1 || Math.abs(drawn.height - height) > 1)) redraw();
         }).observe($(id));
     }
 
@@ -1719,7 +1718,7 @@
         const width = host.clientWidth;
         const height = host.clientHeight;
         if (!width) return;
-        const pad = { top: 10, right: 4, bottom: 10, left: 4 };
+        const pad = { top: 10, right: 46, bottom: 22, left: 4 };
         const innerW = width - pad.left - pad.right;
         const innerH = height - pad.top - pad.bottom;
 
@@ -1740,6 +1739,10 @@
         };
 
         const root = svg('svg', { viewBox: `0 0 ${width} ${height}`, role: 'img', 'aria-label': `Daily closing price from ${points[0].date} to ${points[points.length - 1].date}` });
+        sparseAxes(root, points, {
+            lo, hi, x, y, width, height, pad,
+            label: (v) => (hi - lo < 20 ? `$${v.toFixed(2)}` : compactMoney(v)),
+        });
         const line = points.map((p, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(p.close).toFixed(1)}`).join('');
         if (cost != null) {
             root.appendChild(svg('line', { class: 'pf-chart__avg', x1: pad.left, x2: width - pad.right, y1: y(cost), y2: y(cost) }));
