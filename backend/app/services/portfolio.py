@@ -1258,11 +1258,31 @@ def _dividend_summary(dividends: List[Any], total_value: float, today: date) -> 
     }
 
 
+SPARK_DAYS = 30
+
+
+def _sparklines(db: Session, symbols: Dict[str, str]) -> Dict[str, List[float]]:
+    """Each position's closes over the last month, from what's stored: the
+    tables' small lines cost no provider calls."""
+    if not symbols:
+        return {}
+    since = utc_today() - timedelta(days=SPARK_DAYS)
+    by_symbol: Dict[str, List[float]] = {}
+    for symbol, close in (
+        db.query(PriceClose.ticker, PriceClose.close)
+        .filter(PriceClose.ticker.in_(list(set(symbols.values()))), PriceClose.day >= since)
+        .order_by(PriceClose.ticker, PriceClose.day)
+    ):
+        by_symbol.setdefault(symbol, []).append(round(close, 4))
+    return {ticker: by_symbol.get(symbol, []) for ticker, symbol in symbols.items()}
+
+
 def breakdown(db: Session, username: str) -> Dict[str, Any]:
     holdings, transactions, split_info = load_adjusted(db, username, _Budget(SPLIT_CALLS_PER_REQUEST))
     positions, meta = build_positions(holdings, transactions)
     open_positions = {t: p for t, p in positions.items() if p["shares"] > EPSILON}
     prices = quotes(db, open_positions)
+    sparks = _sparklines(db, {t: s for t, p in open_positions.items() if (s := market_symbol(t, p["asset"]))})
 
     rows: List[Dict[str, Any]] = []
     day_bases: Dict[str, float] = {}
@@ -1299,6 +1319,7 @@ def breakdown(db: Session, username: str) -> Dict[str, Any]:
             "firstTrade": position["first"].isoformat() if position["first"] else None,
             "trades": position["trades"],
             "weight": None,
+            "spark": sparks.get(ticker, []),
         })
 
     total_value = sum(r["marketValue"] for r in rows if r["marketValue"] is not None)

@@ -494,6 +494,17 @@
         return `<td class="num ${extra} ${tone(p.gain)}">${fmtSigned(p.gain, true)}${p.gainPct != null ? `<span class="pf-sub ${tone(p.gain)}">${fmtPct(p.gainPct, true)}</span>` : ''}</td>`;
     }
 
+    // The last month of closes as a small line, green if it ended higher.
+    function sparkCell(p, extra = '') {
+        const closes = p.spark || [];
+        if (closes.length < 2) return `<td class="num ${extra}"></td>`;
+        const lo = Math.min(...closes);
+        const span = Math.max(...closes) - lo || 1;
+        const d = closes.map((c, i) => `${i ? 'L' : 'M'}${((i / (closes.length - 1)) * 72).toFixed(1)},${(22 - ((c - lo) / span) * 20).toFixed(1)}`).join('');
+        const up = closes[closes.length - 1] >= closes[0];
+        return `<td class="num ${extra}"><svg class="pf-spark ${up ? 'is-up' : 'is-down'}" viewBox="0 0 72 24" aria-hidden="true"><path d="${d}"/></svg></td>`;
+    }
+
     // The latest day's move, against the close before it.
     function dayCell(p) {
         if (p.dayChange == null) return '<td class="num pf-muted">—</td>';
@@ -524,7 +535,8 @@
                 <td class="num pf-strong">${fmtMoney(p.marketValue, true)}</td>
                 ${dayPill(p)}
                 ${gainCell(p, 'pf-hide-sm')}
-            </tr>`).join('') || '<tr><td colspan="5" class="pf-muted">No open positions.</td></tr>';
+                ${sparkCell(p, 'pf-hide-md')}
+            </tr>`).join('') || '<tr><td colspan="6" class="pf-muted">No open positions.</td></tr>';
     }
 
     // The holdings table's sort: none (by value, as served) until a header is
@@ -570,13 +582,14 @@
                 ${weightCell(p, 'pf-hide-sm')}
                 <td class="num pf-strong">${fmtMoney(p.marketValue, true)}</td>
                 ${dayCell(p)}
+                ${sparkCell(p, 'pf-hide-md')}
                 <td class="num pf-hide-sm">${fmtShares(p.shares)}</td>
                 <td class="num pf-hide-sm">${priceCell(p)}</td>
                 <td class="num pf-hide-sm">${fmtMoney(p.costBasis, true)}${p.avgCost != null ? `<span class="pf-sub">${fmtPrice(p.avgCost)}/sh</span>` : ''}</td>
                 ${gainCell(p)}
                 <td class="num pf-hide-md ${tone(p.realizedGain)}">${fmtSigned(p.realizedGain, true)}</td>
                 <td class="num pf-hide-md">${fmtMonth(p.firstTrade)}<span class="pf-sub">${plural(p.trades, 'trade')}</span></td>
-            </tr>`).join('') || '<tr><td colspan="10" class="pf-muted">No open positions.</td></tr>';
+            </tr>`).join('') || '<tr><td colspan="11" class="pf-muted">No open positions.</td></tr>';
 
         const t = data.totals;
         const realized = data.positions.reduce((sum, p) => sum + (p.realizedGain || 0), 0);
@@ -586,6 +599,7 @@
                 <td class="num pf-hide-sm">100%</td>
                 <td class="num">${fmtMoney(t.marketValue, true)}</td>
                 ${dayCell(t)}
+                <td class="pf-hide-md"></td>
                 <td class="pf-hide-sm"></td>
                 <td class="pf-hide-sm"></td>
                 <td class="num pf-hide-sm">${fmtMoney(t.costBasis, true)}</td>
@@ -994,7 +1008,7 @@
         const shade = (r) => {
             if (r == null) return '';
             const strength = Math.min(1, Math.abs(r) / 0.1) * 0.24 + 0.04;
-            return `background: rgba(${r >= 0 ? '15, 123, 79' : '179, 38, 30'}, ${strength.toFixed(2)})`;
+            return `background: rgba(${r >= 0 ? '31, 122, 77' : '166, 61, 47'}, ${strength.toFixed(2)})`;
         };
         $('monthlyCard').hidden = false;
         $('monthlyTable').innerHTML = `
@@ -1327,6 +1341,8 @@
         }
         $('historyLegend').hidden = false;
         const { gain, pct } = rangeReturn(points);
+        // The line, its dot and the range buttons go red when the range is down.
+        $('historyCard').classList.toggle('is-down', (pct ?? gain) < 0);
         if (privacy) {
             els.heroValue.className = `pf-hero__value ${tone(pct)}`;
             els.heroValue.textContent = fmtPct(pct, true);
@@ -1362,16 +1378,6 @@
         return node;
     }
 
-    function niceTicks(min, max, count) {
-        const span = max - min || Math.abs(max) || 1;
-        const raw = span / count;
-        const magnitude = 10 ** Math.floor(Math.log10(raw));
-        const step = [1, 2, 2.5, 5, 10].map((m) => m * magnitude).find((s) => s >= raw);
-        const ticks = [];
-        for (let v = Math.ceil(min / step) * step; v <= max + step * 1e-9; v += step) ticks.push(v);
-        return ticks;
-    }
-
     function compactMoney(value) {
         const abs = Math.abs(value);
         if (abs >= 1e6) return `$${(value / 1e6).toFixed(abs >= 1e7 ? 0 : 1)}M`;
@@ -1400,21 +1406,6 @@
     }
 
     // About one date label per 110px, never crowding the ends.
-    function dateLabels(root, points, x, innerW, height) {
-        const span = (new Date(points[points.length - 1].date) - new Date(points[0].date)) / 86400000;
-        const fmt = span > 1500 ? yearOnly : span > 200 ? monthYear : shortDate;
-        const labelCount = Math.max(2, Math.min(points.length, Math.floor(innerW / 110)));
-        for (let k = 0; k < labelCount; k += 1) {
-            const i = Math.round((k / (labelCount - 1)) * (points.length - 1));
-            const label = svg('text', {
-                class: 'pf-chart__axis', x: x(i), y: height - 6,
-                'text-anchor': k === 0 ? 'start' : k === labelCount - 1 ? 'end' : 'middle',
-            });
-            label.textContent = fmt.format(new Date(`${points[i].date}T00:00:00Z`));
-            root.appendChild(label);
-        }
-    }
-
     // What the same money would be worth in the S&P 500: the range's opening
     // value bought the index, and every deposit or withdrawal after it bought
     // or sold the index that day.
@@ -1451,7 +1442,7 @@
         const width = host.clientWidth;
         const height = host.clientHeight;
         if (!width) return; // hidden tab: drawn when it's shown
-        const pad = { top: 10, right: 52, bottom: 24, left: 2 };
+        const pad = { top: 10, right: 4, bottom: 10, left: 4 };
         const innerW = width - pad.left - pad.right;
         const innerH = height - pad.top - pad.bottom;
 
@@ -1463,26 +1454,16 @@
         ]);
         let lo = Math.min(...values);
         let hi = Math.max(...values);
-        const margin = (hi - lo) * 0.08 || hi * 0.05 || 1;
+        // A little room above and below the line, and no axis to round to.
+        const margin = (hi - lo) * 0.06 || hi * 0.03 || 1;
         lo = Math.max(0, lo - margin);
         hi += margin;
-        const ticks = niceTicks(lo, hi, 4);
-        lo = Math.min(lo, ticks[0]);
-        hi = Math.max(hi, ticks[ticks.length - 1]);
 
         const x = (i) => pad.left + (i / (points.length - 1)) * innerW;
         const y = (v) => pad.top + (1 - (v - lo) / (hi - lo)) * innerH;
         const path = (indices, key) => indices.map((i, k) => `${k ? 'L' : 'M'}${x(i).toFixed(1)},${y(points[i][key]).toFixed(1)}`).join('');
 
         const root = svg('svg', { viewBox: `0 0 ${width} ${height}`, role: 'img', 'aria-label': `Portfolio value and amount invested from ${points[0].date} to ${points[points.length - 1].date}` });
-        ticks.forEach((t) => {
-            root.appendChild(svg('line', { class: 'pf-chart__grid', x1: pad.left, x2: width - pad.right, y1: y(t), y2: y(t) }));
-            const label = svg('text', { class: 'pf-chart__axis', x: width - pad.right + 8, y: y(t) + 4, 'text-anchor': 'start' });
-            label.textContent = privacy ? '' : compactMoney(t);
-            root.appendChild(label);
-        });
-
-        dateLabels(root, points, x, innerW, height);
         // Private, the tooltip gives the return from the range's start.
         const returns = privacy ? points.map((_, i) => rangeReturn(points.slice(0, i + 1)).pct) : null;
 
@@ -1613,6 +1594,7 @@
         } else {
             const first = points[0].close;
             const change = points[points.length - 1].close - first;
+            $('holdingChart').closest('.pf-hero').classList.toggle('is-down', change < 0);
             sub.innerHTML = `<span class="pf-history-change ${tone(change)}">${privacy ? fmtPct(change / first, true) : `${fmtSigned(change)} (${fmtPct(change / first, true)})`}</span>`;
             const avg = d.open ? pos.avgCost : null;
             const trades = d.trades.filter((t) => t.date >= points[0].date);
@@ -1707,7 +1689,7 @@
         const width = host.clientWidth;
         const height = host.clientHeight;
         if (!width) return;
-        const pad = { top: 10, right: 58, bottom: 24, left: 2 };
+        const pad = { top: 10, right: 4, bottom: 10, left: 4 };
         const innerW = width - pad.left - pad.right;
         const innerH = height - pad.top - pad.bottom;
 
@@ -1715,12 +1697,10 @@
         const values = points.map((p) => p.close).concat(cost != null ? [cost] : [], trades.map((t) => t.price).filter((v) => v > 0));
         let lo = Math.min(...values);
         let hi = Math.max(...values);
-        const margin = (hi - lo) * 0.08 || hi * 0.05 || 1;
+        // A little room above and below the line, and no axis to round to.
+        const margin = (hi - lo) * 0.06 || hi * 0.03 || 1;
         lo = Math.max(0, lo - margin);
         hi += margin;
-        const ticks = niceTicks(lo, hi, 4);
-        lo = Math.min(lo, ticks[0]);
-        hi = Math.max(hi, ticks[ticks.length - 1]);
         const x = (i) => pad.left + (i / (points.length - 1)) * innerW;
         const y = (v) => pad.top + (1 - (v - lo) / (hi - lo)) * innerH;
         // A trade sits on the first close on or after its date.
@@ -1730,13 +1710,6 @@
         };
 
         const root = svg('svg', { viewBox: `0 0 ${width} ${height}`, role: 'img', 'aria-label': `Daily closing price from ${points[0].date} to ${points[points.length - 1].date}` });
-        ticks.forEach((t) => {
-            root.appendChild(svg('line', { class: 'pf-chart__grid', x1: pad.left, x2: width - pad.right, y1: y(t), y2: y(t) }));
-            const label = svg('text', { class: 'pf-chart__axis', x: width - pad.right + 8, y: y(t) + 4, 'text-anchor': 'start' });
-            label.textContent = hi - lo < 20 ? `$${t.toFixed(2)}` : compactMoney(t);
-            root.appendChild(label);
-        });
-        dateLabels(root, points, x, innerW, height);
         const line = points.map((p, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(p.close).toFixed(1)}`).join('');
         if (cost != null) {
             root.appendChild(svg('line', { class: 'pf-chart__avg', x1: pad.left, x2: width - pad.right, y1: y(cost), y2: y(cost) }));

@@ -5,15 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Portfolio — Palmer Gill</title>
     <meta name="description" content="Upload your holdings or trades and see your portfolio broken down by position, sector, and gain.">
-    <meta name="theme-color" content="#ffffff">
+    <meta name="theme-color" content="#0f2f27">
     <!-- A private page behind a sign-in makes a poor search result. -->
     <meta name="robots" content="noindex, nofollow">
     <link rel="icon" type="image/png" href="/assets/palmer-gill-logo-small.png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="app-shell.css?v=4">
-    <link rel="stylesheet" href="portfolio.css?v=20">
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400&family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="app-shell.css?v=5">
+    <link rel="stylesheet" href="portfolio.css?v=21">
 </head>
 <body class="app">
 <noscript>
@@ -107,9 +107,9 @@
                                 <!-- The change over the chosen range, and nothing else. -->
                                 <p class="pf-hero__stats" id="historySub">Loading price history…</p>
                             </div>
-                            <div class="pf-ranges" id="historyRanges" role="group" aria-label="Time range"></div>
                         </div>
                         <div class="pf-chart" id="historyChart"></div>
+                        <div class="pf-ranges" id="historyRanges" role="group" aria-label="Time range"></div>
                         <ul class="pf-chart-legend" id="historyLegend" hidden>
                             <li><span class="pf-key pf-key--value"></span>Value</li>
                             <li><button type="button" class="pf-legend-toggle" data-cost-toggle aria-pressed="true"><span class="pf-key pf-key--invested"></span>Invested (cost basis)</button></li>
@@ -150,6 +150,7 @@
                                         <th scope="col" class="num">Value</th>
                                         <th scope="col" class="num">Day</th>
                                         <th scope="col" class="num pf-hide-sm">Gain</th>
+                                        <th scope="col" class="num pf-hide-md">30 days</th>
                                     </tr>
                                 </thead>
                                 <tbody></tbody>
@@ -186,6 +187,7 @@
                                     <th scope="col" class="num pf-hide-sm" data-sort="weight"><button type="button">Weight</button></th>
                                     <th scope="col" class="num" data-sort="marketValue"><button type="button">Value</button></th>
                                     <th scope="col" class="num" data-sort="dayChangePct"><button type="button">Day</button></th>
+                                    <th scope="col" class="num pf-hide-md">30 days</th>
                                     <th scope="col" class="num pf-hide-sm" data-sort="shares"><button type="button">Shares</button></th>
                                     <th scope="col" class="num pf-hide-sm" data-sort="price"><button type="button">Price</button></th>
                                     <th scope="col" class="num pf-hide-sm" data-sort="costBasis"><button type="button">Cost</button></th>
@@ -404,9 +406,9 @@
                             <p class="pf-hero__value" id="holdingPrice">—</p>
                             <p class="pf-hero__stats" id="holdingSub">Loading…</p>
                         </div>
-                        <div class="pf-ranges" id="holdingRanges" role="group" aria-label="Time range"></div>
                     </div>
                     <div class="pf-chart" id="holdingChart"></div>
+                    <div class="pf-ranges" id="holdingRanges" role="group" aria-label="Time range"></div>
                     <ul class="pf-chart-legend" id="holdingLegend" hidden>
                         <li><span class="pf-key"></span>Daily close</li>
                         <li id="avgCostKey"><button type="button" class="pf-legend-toggle" data-cost-toggle aria-pressed="true"><span class="pf-key pf-key--avg"></span>Your average cost</button></li>
@@ -468,6 +470,6 @@
     <script src="/shared/api-base.js?v=1"></script>
     <script src="/shared/analytics.js?v=1"></script>
     <script src="app-shell.js?v=4"></script>
-    <script src="portfolio.js?v=32"></script>
+    <script src="portfolio.js?v=33"></script>
 </body>
 </html>

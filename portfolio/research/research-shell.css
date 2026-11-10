@@ -15,7 +15,7 @@ body.app { font-family: var(--font); }
 
 .rp {
     display: flex; flex-wrap: wrap; align-items: center; gap: 6px 32px; margin: 0 0 12px; padding: 10px 18px;
-    background: var(--card); border: 1px solid var(--line); border-left: 2px solid var(--accent); border-radius: 4px; color: var(--muted); text-decoration: none; font-size: 12px;
+    background: var(--card); border: 1px solid var(--line); border-left: 2px solid var(--gold); border-radius: 2px; color: var(--muted); text-decoration: none; font-size: 12px;
 }
 .rp[hidden] { display: none; }
 .rp__title { color: var(--ink); font-weight: 600; font-size: 13px; }
@@ -50,3 +50,8 @@ body.app #empty .trending-stock:hover { background: var(--surface); border-color
     .container > header { position: static; }
     .rp__go { margin-left: 0; }
 }
+
+/* The bank's serif for the headline figures. */
+.header-ticker-large, .header-price-large, .ov-card h3, .card h3, .rp strong { font-family: var(--serif); font-weight: 500; }
+.header-price-large { color: var(--forest); }
+.rp strong { font-size: 16px; color: var(--forest); }

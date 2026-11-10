@@ -881,3 +881,15 @@ def test_the_position_brief_is_shares_and_average_cost_of_open_positions():
     _buy(client, "MSFT", shares=2, price=350.0, day="2026-02-02", side="sell")
     assert client.get("/api/stocks/portfolio/positions").json()["positions"] == {"AAPL": {"shares": 10, "avgCost": 100.0}}
     assert _member_client().get("/api/stocks/portfolio/positions").json()["positions"] == {}
+
+
+def test_each_position_carries_its_last_month_of_closes(monkeypatch):
+    from datetime import timedelta
+
+    _flat_history(monkeypatch, {"AAPL": 200.0})
+    client = _member_client()
+    today = portfolio.utc_today()
+    _buy(client, shares=1, price=150.0, day=(today - timedelta(days=90)).isoformat())
+    client.get("/api/stocks/portfolio/history")
+    spark = client.get("/api/stocks/portfolio").json()["positions"][0]["spark"]
+    assert 15 <= len(spark) <= 23 and set(spark) == {200.0}
