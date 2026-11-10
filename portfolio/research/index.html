@@ -23,8 +23,8 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400&family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="../app-shell.css?v=5">
-    <link rel="stylesheet" href="style.css?v=17">
-    <link rel="stylesheet" href="research-shell.css?v=6">
+    <link rel="stylesheet" href="style.css?v=18">
+    <link rel="stylesheet" href="research-shell.css?v=7">
 </head>
 <body class="app">
 <noscript>
@@ -34,6 +34,9 @@
     <header class="app-top">
         <h1 class="app-top__title">Research</h1>
         <div class="app-search" id="appSearch"></div>
+        <div class="pf-head__actions" id="headActions" hidden>
+            <button type="button" class="pf-icon-button" id="privacyToggle" aria-pressed="false" aria-label="Hide amounts" title="Hide amounts"></button>
+        </div>
     </header>
     <div class="container app-main">
         <header>
@@ -208,36 +211,6 @@
                     <div id="watchlistGrid" class="trending-grid"></div>
                 </div>
 
-                <div class="trending-stocks">
-                    <span class="trending-label">Trending Now</span>
-                    <div class="trending-grid">
-                        <button class="trending-stock" data-ticker="TSLA">
-                            <span class="trending-ticker">TSLA</span>
-                            <span class="trending-name">Tesla</span>
-                        </button>
-                        <button class="trending-stock" data-ticker="AAPL">
-                            <span class="trending-ticker">AAPL</span>
-                            <span class="trending-name">Apple</span>
-                        </button>
-                        <button class="trending-stock" data-ticker="NVDA">
-                            <span class="trending-ticker">NVDA</span>
-                            <span class="trending-name">NVIDIA</span>
-                        </button>
-                        <button class="trending-stock" data-ticker="MSFT">
-                            <span class="trending-ticker">MSFT</span>
-                            <span class="trending-name">Microsoft</span>
-                        </button>
-                        <button class="trending-stock" data-ticker="AMZN">
-                            <span class="trending-ticker">AMZN</span>
-                            <span class="trending-name">Amazon</span>
-                        </button>
-                        <button class="trending-stock" data-ticker="GOOGL">
-                            <span class="trending-ticker">GOOGL</span>
-                            <span class="trending-name">Alphabet</span>
-                        </button>
-                    </div>
-                </div>
-                
                 <!-- Feature Callouts -->
                 
                 <p class="data-source">Data: Polygon.io · Finnhub</p>
@@ -301,12 +274,12 @@
 
     <script src="/shared/analytics.js?v=1"></script>
     <script src="/shared/api-base.js?v=1"></script>
-    <script src="overview.js?v=6"></script>
+    <script src="overview.js?v=9"></script>
     <script src="shelby.js?v=3"></script>
-    <script src="app.js?v=19"></script>
+    <script src="app.js?v=20"></script>
     <script src="../app-shell.js?v=4"></script>
-    <script src="watchlist.js?v=2"></script>
-    <script src="research-position.js?v=3"></script>
+    <script src="watchlist.js?v=3"></script>
+    <script src="research-position.js?v=4"></script>
     <script src="compare.js?v=6"></script>
 </body>
 </html>

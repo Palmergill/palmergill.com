@@ -365,3 +365,39 @@
 .pf-button--quiet { background: var(--card); color: var(--forest); border-color: var(--line-strong); }
 .pf-button--quiet:hover { background: var(--surface); border-color: var(--line-strong); }
 .pf-flag { background: var(--gold); }
+
+/* Today's "Coming up": the next earnings and ex-dividend dates. */
+.pf-upcoming { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--line); }
+.pf-upcoming[hidden] { display: none; }
+.pf-upcoming__title { margin: 0 0 6px; color: var(--gold); text-transform: uppercase; letter-spacing: 0.12em; font-size: 11px; font-weight: 500; }
+.pf-upcoming__list { list-style: none; margin: 0; padding: 0; }
+.pf-upcoming__list li { display: grid; grid-template-columns: 52px 56px 1fr; align-items: baseline; gap: 6px; padding: 6px 0; border-bottom: 1px solid var(--line); font-size: 12.5px; }
+.pf-upcoming__list li:last-child { border-bottom: 0; }
+.pf-upcoming__date { color: var(--muted); font-variant-numeric: tabular-nums; }
+.pf-upcoming__what { color: var(--soft); text-align: right; font-variant-numeric: tabular-nums; }
+
+/* Contribution: a bar each side of a centre line, gains right, losses left. */
+.pf-contrib { list-style: none; margin: 0; padding: 0; }
+.pf-contrib li { display: grid; grid-template-columns: 64px minmax(0, 1fr) 96px; align-items: center; gap: 12px; padding: 7px 0; border-bottom: 1px solid var(--line); font-size: 13px; }
+.pf-contrib li:last-child { border-bottom: 0; }
+.pf-contrib__bar { position: relative; height: 10px; }
+.pf-contrib__bar::before { content: ''; position: absolute; left: 50%; top: -4px; bottom: -4px; width: 1px; background: var(--line-strong); }
+.pf-contrib__bar i { position: absolute; top: 0; bottom: 0; }
+.pf-contrib__bar i.is-gain { left: 50%; background: var(--gain); }
+.pf-contrib__bar i.is-loss { right: 50%; background: var(--loss); }
+.pf-contrib__value { text-align: right; font-weight: 500; font-variant-numeric: tabular-nums; }
+.pf-contrib__none { color: var(--muted); display: block !important; }
+
+/* Income by month: received in forest, projected in gold. */
+.pf-incomechart { height: 170px; }
+.pf-incomechart svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.pf-incomechart .pf-zero { stroke: var(--line-strong); stroke-width: 1; }
+.pf-bar--received { fill: var(--forest); }
+.pf-bar--projected { fill: var(--gold-soft); stroke: var(--gold); stroke-width: 1; }
+.pf-incomebar__hit { fill: transparent; }
+.pf-incomebar:hover .pf-bar--received { fill: var(--gain); }
+.pf-key { display: inline-block; width: 10px; height: 10px; margin-right: 6px; vertical-align: -1px; }
+.pf-key--received { background: var(--forest); }
+.pf-key--projected { background: var(--gold-soft); border: 1px solid var(--gold); }
+.pf-card__head .pf-chart-legend { margin-top: 4px; }
+.pf-chart-legend .pf-key { margin-right: 0; }

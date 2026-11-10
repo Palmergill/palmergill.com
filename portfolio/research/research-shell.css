@@ -1,6 +1,6 @@
 /* Research inside the Portfolio app: its own page styles, seated in the frame. */
 body.app { font-family: var(--font); }
-.container.app-main { max-width: 1120px; padding: 16px 24px 64px; }
+.container.app-main { max-width: 1280px; padding: 20px 28px 64px; }
 
 .container > header {
     position: sticky; top: var(--top-h); z-index: 40; margin: 0 0 12px;
@@ -55,3 +55,64 @@ body.app #empty .trending-stock:hover { background: var(--surface); border-color
 .header-ticker-large, .header-price-large, .ov-card h3, .card h3, .rp strong { font-family: var(--serif); font-weight: 500; }
 .header-price-large { color: var(--forest); }
 .rp strong { font-size: 16px; color: var(--forest); }
+
+/* The Private Bank look, as on the tracker: flat ivory cards, serif titles. */
+.ov-card, .card, .ov-tile { border-radius: 2px; }
+.ov-card { padding: 16px 20px 20px; }
+.ov-card-title, .ov-section-title, .ov-card h3 { color: var(--forest); font-family: var(--serif); font-size: 19px; font-weight: 500; letter-spacing: 0; }
+.ov-card-sub { color: var(--muted); font-size: 12px; }
+.ov-tile-label { color: var(--muted); font-weight: 500; }
+.ov-tile-value, .ec-stat-value, .ov-margin-value, .ov-v { font-family: var(--serif); font-weight: 500; color: var(--forest); }
+
+/* The headline chart: Robinhood-style, like the tracker's. */
+.ov-hero { --trend: var(--chart-up); background: var(--card); border: 1px solid var(--line); border-radius: 2px; padding: 18px 20px 12px; }
+.ov-hero.is-down { --trend: var(--chart-down); }
+.ov-hero-meta { color: var(--gold); text-transform: uppercase; letter-spacing: 0.12em; font-size: 11px; font-weight: 500; }
+.ov-price { font-family: var(--serif); font-weight: 500; font-size: 48px; letter-spacing: -0.01em; color: var(--forest); }
+.ov-delta { font-weight: 600; font-size: 13px; }
+.ov-delta.is-up .ov-delta-arrow, .ov-delta.is-up .ov-delta-value,
+.ov-delta.is-down .ov-delta-arrow, .ov-delta.is-down .ov-delta-value { color: var(--trend); }
+.ov-chart { margin: 14px 0 0; min-height: 0; }
+.ov-price-svg, .ov-price-svg.is-down { --series: var(--trend); }
+.ov-line { stroke-width: 2.5; }
+.ov-guide { stroke: var(--line-strong); stroke-width: 1; stroke-dasharray: 1 3; }
+.ov-axis { fill: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+.ov-chart-dates { padding-left: 4px; margin-top: 4px; }
+.ov-scrub-date { font-weight: 400; color: var(--muted); }
+.ov-scrub-date.is-scrubbing { font-weight: 600; color: var(--ink); }
+.ov-ranges { display: flex; gap: 6px; margin-top: 10px; padding: 0 0 8px; background: none; border-radius: 0; border-bottom: 1px solid var(--line); }
+.ov-range-btn { min-height: 0; padding: 4px 8px; border-radius: 0; border-bottom: 2px solid transparent; color: var(--trend); font-size: 12.5px; font-weight: 600; }
+.ov-range-btn:hover { background: var(--surface); }
+.ov-range-btn[aria-pressed="true"] { background: none; box-shadow: none; color: var(--trend); border-bottom-color: var(--trend); }
+
+/* Research home tiles: ticker and price, name and change, a month's line. */
+body.app #empty .trending-grid { grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); }
+body.app #empty .rt { display: flex; flex-direction: column; gap: 2px; padding: 10px 12px 8px; cursor: pointer; font: inherit; color: var(--ink); }
+.rt__top, .rt__sub { display: flex; justify-content: space-between; gap: 8px; width: 100%; font-variant-numeric: tabular-nums; }
+.rt__top { font-weight: 600; font-size: 13px; }
+.rt__top span:last-child { font-family: var(--serif); font-weight: 500; font-size: 14px; color: var(--forest); }
+.rt__sub { color: var(--muted); font-size: 11.5px; }
+.rt__sub span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rt__sub .is-positive { color: var(--gain); font-weight: 500; }
+.rt__sub .is-negative { color: var(--loss); font-weight: 500; }
+.rt__spark { display: block; width: 100%; height: 24px; margin-top: 6px; }
+.rt__spark polyline { fill: none; stroke-width: 1.5; stroke-linejoin: round; }
+.rt__spark.is-up polyline { stroke: var(--chart-up); }
+.rt__spark.is-down polyline { stroke: var(--chart-down); }
+body.app #empty .trending-label { font-family: var(--serif); font-size: 19px; font-weight: 500; color: var(--forest); }
+body.app #empty > .trending-stocks { border-radius: 2px; }
+.compare-form input { text-transform: none; background: var(--card); border-radius: 2px; }
+.compare-add-btn { border-radius: 2px; background: var(--forest); color: #fff; border: 0; }
+
+/* The privacy switch, styled as on the tracker. */
+.pf-head__actions { display: flex; align-items: center; gap: 8px; flex: none; }
+.pf-head__actions[hidden] { display: none; }
+.pf-icon-button {
+    width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; padding: 0;
+    color: var(--soft); background: var(--card); border: 1px solid var(--line-strong); border-radius: 2px; cursor: pointer;
+}
+.pf-icon-button:hover { background: var(--surface); color: var(--ink); }
+.pf-icon-button:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.pf-icon-button[aria-pressed="true"] { background: var(--forest); color: var(--gold-soft); border-color: var(--forest); }
+.pf-icon-button svg { width: 16px; height: 16px; fill: currentColor; }
+.pf-icon-button svg.pf-stroke { fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }

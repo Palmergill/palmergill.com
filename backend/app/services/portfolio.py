@@ -1258,23 +1258,67 @@ def _dividend_summary(dividends: List[Any], total_value: float, today: date) -> 
     }
 
 
+def _month_key(day: date, ahead: int = 0) -> str:
+    index = day.year * 12 + day.month - 1 + ahead
+    return f"{index // 12:04d}-{index % 12 + 1:02d}"
+
+
+def _income_calendar(dividends: List[Any], transactions: List[Any], shares_now: Dict[str, float], today: date) -> Dict[str, Any]:
+    """Dividends received in each of the last twelve months, and the next
+    twelve projected: each payment of the past year again a year on, per
+    share, on the shares held now."""
+    received = {_month_key(today, -i): 0.0 for i in range(11, -1, -1)}
+    for d in dividends:
+        key = _month_key(d.trade_date)
+        if key in received:
+            received[key] += d.amount or 0.0
+    projected = {_month_key(today, i): 0.0 for i in range(0, 12)}
+    year_ago = today - timedelta(days=365)
+    for d in dividends:
+        held = shares_now.get(d.ticker, 0.0)
+        if d.trade_date <= year_ago or held <= EPSILON or not d.amount:
+            continue
+        # Shares on the payment's day: today's, less what's been bought since.
+        bought_since = sum(
+            (t.shares if t.side == "buy" else -t.shares)
+            for t in transactions if t.ticker == d.ticker and t.trade_date > d.trade_date
+        )
+        then = held - bought_since
+        if then <= EPSILON:
+            continue
+        key = _month_key(d.trade_date, 12)
+        if key in projected:
+            projected[key] += d.amount / then * held
+    return {
+        "received": [{"month": k, "amount": round(v, 2)} for k, v in received.items()],
+        "projected": [{"month": k, "amount": round(v, 2)} for k, v in projected.items()],
+        "projectedTotal": round(sum(projected.values()), 2),
+    }
+
+
 SPARK_DAYS = 30
+
+
+def _stored_closes(db: Session, symbols: Dict[str, str]) -> Dict[str, List[Tuple[date, float]]]:
+    """Each ticker's stored closes over the last month, oldest first; no
+    provider calls."""
+    if not symbols:
+        return {}
+    since = utc_today() - timedelta(days=SPARK_DAYS)
+    by_symbol: Dict[str, List[Tuple[date, float]]] = {}
+    for symbol, day, close in (
+        db.query(PriceClose.ticker, PriceClose.day, PriceClose.close)
+        .filter(PriceClose.ticker.in_(list(set(symbols.values()))), PriceClose.day >= since)
+        .order_by(PriceClose.ticker, PriceClose.day)
+    ):
+        by_symbol.setdefault(symbol, []).append((day, close))
+    return {ticker: by_symbol.get(symbol, []) for ticker, symbol in symbols.items()}
 
 
 def _sparklines(db: Session, symbols: Dict[str, str]) -> Dict[str, List[float]]:
     """Each position's closes over the last month, from what's stored: the
     tables' small lines cost no provider calls."""
-    if not symbols:
-        return {}
-    since = utc_today() - timedelta(days=SPARK_DAYS)
-    by_symbol: Dict[str, List[float]] = {}
-    for symbol, close in (
-        db.query(PriceClose.ticker, PriceClose.close)
-        .filter(PriceClose.ticker.in_(list(set(symbols.values()))), PriceClose.day >= since)
-        .order_by(PriceClose.ticker, PriceClose.day)
-    ):
-        by_symbol.setdefault(symbol, []).append(round(close, 4))
-    return {ticker: by_symbol.get(symbol, []) for ticker, symbol in symbols.items()}
+    return {t: [round(c, 4) for _, c in rows] for t, rows in _stored_closes(db, symbols).items()}
 
 
 def breakdown(db: Session, username: str) -> Dict[str, Any]:
@@ -1360,6 +1404,9 @@ def breakdown(db: Session, username: str) -> Dict[str, Any]:
     reported = [t for t in transactions if t.realized_reported is not None]
     today = utc_today()
     dividends = _dividend_summary(split_info["dividends"], total_value, today)
+    dividends.update(_income_calendar(
+        split_info["dividends"], transactions, {t: p["shares"] for t, p in open_positions.items()}, today,
+    ))
     years = [
         {"year": year, **stats, "net": stats["bought"] - stats["sold"], "dividends": dividends["byYear"].get(str(year), 0.0)}
         for year, stats in sorted(meta["by_year"].items(), reverse=True)
@@ -1805,6 +1852,15 @@ def value_history(db: Session, username: str) -> Dict[str, Any]:
 
     cursor = {symbol: 0 for symbol in closes}
     current: Dict[str, Tuple[date, float]] = {}
+    # Each holding's share of the gain over the standard ranges: its value
+    # and the money put into it, marked where each range starts.
+    range_starts = {
+        "1M": today - timedelta(days=30), "3M": today - timedelta(days=91),
+        "YTD": date(today.year, 1, 1), "1Y": today - timedelta(days=365),
+    }
+    tick_flow: Dict[str, float] = {}
+    tick_value: Dict[str, float] = {}
+    marks: Dict[str, Tuple[Dict[str, float], Dict[str, float]]] = {}
     points = []
     snapshot_applied = False
     t_index = 0
@@ -1818,7 +1874,9 @@ def value_history(db: Session, username: str) -> Dict[str, Any]:
                 tx = trades[t_index]
                 t_index += 1
                 fees = tx.fees or 0.0
-                flow += tx.shares * tx.price + fees if tx.side == "buy" else -(tx.shares * tx.price - fees)
+                moved = tx.shares * tx.price + fees if tx.side == "buy" else -(tx.shares * tx.price - fees)
+                flow += moved
+                tick_flow[tx.ticker] = tick_flow.get(tx.ticker, 0.0) + moved
                 held_now = shares.get(tx.ticker, 0.0)
                 basis = cost.get(tx.ticker, 0.0) if tx.ticker in cost else 0.0
                 if tx.side == "buy":
@@ -1832,7 +1890,9 @@ def value_history(db: Session, username: str) -> Dict[str, Any]:
                 last_trade[tx.ticker] = tx.price
             # A dividend is money paid out: a gain, then a withdrawal.
             while d_index < len(dividends) and dividends[d_index].trade_date <= day:
-                flow -= dividends[d_index].amount or 0.0
+                paid = dividends[d_index].amount or 0.0
+                flow -= paid
+                tick_flow[dividends[d_index].ticker] = tick_flow.get(dividends[d_index].ticker, 0.0) - paid
                 d_index += 1
             while b_index < len(benchmark) and benchmark[b_index][0] <= day:
                 bench_close = benchmark[b_index][1]
@@ -1851,19 +1911,33 @@ def value_history(db: Session, username: str) -> Dict[str, Any]:
 
             value = estimated = 0.0
             invested: Optional[float] = 0.0
+            tick_value = {}
             for ticker, count in shares.items():
                 if count < DUST_SHARES:
                     continue
                 symbol = market_symbol(ticker, assets.get(ticker, "stock"))
                 close = current.get(symbol) if symbol else None
                 if close and (day - close[0]).days <= STALE_AFTER_DAYS + 2:
-                    value += count * close[1]
+                    worth = count * close[1]
                 else:
-                    mark = count * last_trade.get(ticker, 0.0)
-                    value += mark
-                    estimated += mark
+                    worth = count * last_trade.get(ticker, 0.0)
+                    estimated += worth
+                value += worth
+                tick_value[ticker] = worth
                 basis = cost.get(ticker)
                 invested = None if invested is None or basis is None else invested + basis
+            if value > 0 and not points:
+                # Ranges reaching back past the first point count from it, or
+                # from nothing when every trade is known.
+                baseline = (dict(tick_value), dict(tick_flow)) if as_of else ({}, {})
+                marks["ALL"] = baseline
+                for key, begin in range_starts.items():
+                    if begin <= day:
+                        marks[key] = baseline
+            elif points:
+                for key, begin in range_starts.items():
+                    if key not in marks and begin <= day:
+                        marks[key] = (dict(tick_value), dict(tick_flow))
             if value > 0 or points:
                 points.append({
                     "date": day.isoformat(),
@@ -1875,6 +1949,17 @@ def value_history(db: Session, username: str) -> Dict[str, Any]:
                 })
         day += timedelta(days=1)
 
+    attribution = {}
+    for key, (start_value, start_flow) in marks.items():
+        rows = []
+        for ticker in set(tick_value) | set(start_value) | set(tick_flow):
+            gain = tick_value.get(ticker, 0.0) - start_value.get(ticker, 0.0) - (tick_flow.get(ticker, 0.0) - start_flow.get(ticker, 0.0))
+            if abs(gain) >= 0.005:
+                rows.append({"ticker": ticker, "gain": round(gain, 2)})
+        rows.sort(key=lambda r: -r["gain"])
+        net_in = sum(tick_flow.values()) - sum(start_flow.values())
+        attribution[key] = {"capital": round(sum(start_value.values()) + max(net_in, 0.0), 2), "rows": rows}
+
     backfilling = [s for s in backfilling if s != BENCHMARK]
     waiting = pending + backfilling
     retry = None
@@ -1884,7 +1969,7 @@ def value_history(db: Session, username: str) -> Dict[str, Any]:
         retry = max(retry_after_seconds() if pending else 2, min(backfill_retry_after() or 2, 120) if backfilling else 2)
     return {
         **base, "points": points, "pending": waiting, "backfilling": backfilling,
-        "complete": not waiting, "retryAfter": retry,
+        "complete": not waiting, "retryAfter": retry, "attribution": attribution,
     }
 
 
@@ -1893,10 +1978,108 @@ def position_brief(db: Session, username: str) -> Dict[str, Any]:
     the research page needs to show your position in the stock on screen."""
     holdings, transactions, _ = load_adjusted(db, username)
     positions, _ = build_positions(holdings, transactions)
-    return {"positions": {
-        ticker: {"shares": p["shares"], "avgCost": _ratio(p["cost"], p["shares"])}
-        for ticker, p in positions.items() if p["shares"] > EPSILON
-    }}
+    open_positions = {t: p for t, p in positions.items() if p["shares"] > EPSILON}
+    stored = _stored_closes(db, {t: s for t, p in open_positions.items() if (s := market_symbol(t, p["asset"]))})
+    brief = {}
+    for ticker, p in open_positions.items():
+        closes = stored.get(ticker) or []
+        price = closes[-1][1] if closes else None
+        prev = closes[-2][1] if len(closes) > 1 else None
+        brief[ticker] = {
+            "shares": p["shares"], "avgCost": _ratio(p["cost"], p["shares"]),
+            # The tracker's own latest close, so research shows the same value.
+            "price": price, "priceAsOf": closes[-1][0].isoformat() if closes else None,
+            "dayChangePct": _ratio(price - prev, prev) if price is not None and prev else None,
+            "spark": [round(c, 4) for _, c in closes],
+        }
+    return {"positions": brief}
+
+
+# ── upcoming events ─────────────────────────────────────────────────────────
+
+UPCOMING_DAYS = 45
+_calendar_cache: Dict[Any, Tuple[datetime, Dict[str, List[Dict[str, Any]]]]] = {}
+
+
+def _calendar(key: Any, fetch) -> Dict[str, List[Dict[str, Any]]]:
+    """A market-wide calendar by ticker, kept for half a day: it is the same
+    for every account and changes slowly. A failed fetch is retried in an
+    hour rather than on every page load."""
+    now = _naive_now()
+    hit = _calendar_cache.get(key)
+    if hit and hit[0] > now:
+        return hit[1]
+    try:
+        data, keep = fetch(), timedelta(hours=12)
+    except Exception as exc:  # noqa: BLE001 - events are extras
+        logger.warning("Calendar %s unavailable: %s", key[0], exc)
+        data, keep = {}, timedelta(hours=1)
+    _calendar_cache[key] = (now + keep, data)
+    return data
+
+
+def _earnings_by_ticker(start: date, end: date) -> Dict[str, List[Dict[str, Any]]]:
+    finnhub = stock_data_client.finnhub
+    if not finnhub.is_configured():
+        return {}
+    out: Dict[str, List[Dict[str, Any]]] = {}
+    for row in finnhub.get_earnings_calendar(start, end):
+        if row.get("symbol") and row.get("date"):
+            out.setdefault(row["symbol"].upper(), []).append({"date": row["date"], "hour": row.get("hour") or None})
+    return out
+
+
+def _dividends_by_ticker(start: date, end: date) -> Dict[str, List[Dict[str, Any]]]:
+    out: Dict[str, List[Dict[str, Any]]] = {}
+    for row in stock_data_client.polygon.get_dividend_calendar(start, end):
+        if row.get("ticker") and row.get("ex_dividend_date"):
+            out.setdefault(row["ticker"].upper(), []).append({
+                "date": row["ex_dividend_date"], "payDate": row.get("pay_date"),
+                "amount": row.get("cash_amount"),
+            })
+    return out
+
+
+def _mock_events(tickers: List[str], today: date) -> List[Dict[str, Any]]:
+    """Sample events for sample data: an earnings date for some holdings and
+    an ex-dividend date for others, the same on every load."""
+    events = []
+    for ticker in tickers:
+        seed = sum(map(ord, ticker))
+        if seed % 3:
+            events.append({"ticker": ticker, "kind": "earnings", "date": (today + timedelta(days=seed % 40 + 2)).isoformat(), "hour": "amc" if seed % 2 else "bmo"})
+        if seed % 2 == 0:
+            events.append({"ticker": ticker, "kind": "dividend", "date": (today + timedelta(days=seed % 30 + 4)).isoformat(), "amount": round(0.2 + seed % 7 * 0.11, 2)})
+    return events
+
+
+def upcoming(db: Session, username: str) -> Dict[str, Any]:
+    """Open stock positions' earnings reports and ex-dividend dates over the
+    next few weeks, soonest first."""
+    holdings, transactions, _ = load_adjusted(db, username)
+    positions, _ = build_positions(holdings, transactions)
+    held = {
+        t: p for t, p in positions.items()
+        if p["shares"] > EPSILON and (s := market_symbol(t, p["asset"])) and not s.startswith("X:")
+    }
+    today = utc_today()
+    end = today + timedelta(days=UPCOMING_DAYS)
+    if not held:
+        return {"events": []}
+    if stock_data_client._use_mock():
+        events = _mock_events(sorted(held), today)
+    else:
+        earnings = _calendar(("earnings", today), lambda: _earnings_by_ticker(today, end))
+        dividends = _calendar(("dividends", today), lambda: _dividends_by_ticker(today, end))
+        events = []
+        for ticker in held:
+            events += [{"ticker": ticker, "kind": "earnings", **e} for e in earnings.get(ticker, [])]
+            events += [{"ticker": ticker, "kind": "dividend", **d} for d in dividends.get(ticker, [])]
+    for e in events:
+        if e["kind"] == "dividend" and e.get("amount") is not None:
+            e["total"] = round(e["amount"] * held[e["ticker"]]["shares"], 2)
+    events.sort(key=lambda e: (e["date"], e["ticker"], e["kind"]))
+    return {"events": [e for e in events if today.isoformat() <= e["date"] <= end.isoformat()]}
 
 
 # ── watchlist ───────────────────────────────────────────────────────────────
@@ -1918,6 +2101,7 @@ def watchlist(db: Session, username: str) -> Dict[str, Any]:
         for r in rows
     }
     prices = quotes(db, positions) if positions else {}
+    sparks = _sparklines(db, {r.ticker: r.ticker for r in rows})
     items = []
     for r in rows:
         q = prices.get(r.ticker, {})
@@ -1932,6 +2116,7 @@ def watchlist(db: Session, username: str) -> Dict[str, Any]:
             "priceAsOf": q.get("asOf"),
             "dayChangePct": _ratio(price - prev, prev) if price is not None and prev else None,
             "alertAbove": r.alert_above, "alertBelow": r.alert_below, "triggered": triggered,
+            "spark": sparks.get(r.ticker, []),
         })
     return {"items": items, "retryAfter": retry_after_seconds()}
 

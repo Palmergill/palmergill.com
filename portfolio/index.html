@@ -13,7 +13,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400&family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="app-shell.css?v=5">
-    <link rel="stylesheet" href="portfolio.css?v=22">
+    <link rel="stylesheet" href="portfolio.css?v=23">
 </head>
 <body class="app">
 <noscript>
@@ -126,6 +126,10 @@
                             </div>
                             <div id="todayChange"></div>
                             <table class="pf-table pf-movers"><tbody id="moversBody"></tbody></table>
+                            <div class="pf-upcoming" id="upcoming" hidden>
+                                <h3 class="pf-upcoming__title">Coming up</h3>
+                                <ul class="pf-upcoming__list" id="upcomingList"></ul>
+                            </div>
                         </section>
                     </div>
                 </div>
@@ -323,6 +327,19 @@
                     </div>
                     <div class="pf-table-wrap"><table class="pf-table pf-heat" id="monthlyTable"></table></div>
                 </section>
+                <section class="pf-card" id="contribCard" hidden>
+                    <div class="pf-card__head pf-card__head--row">
+                        <h2 class="pf-card__title">Contribution</h2>
+                        <div class="pf-ranges" id="contribRanges" role="group" aria-label="Contribution period">
+                            <button type="button" data-contrib="1M" aria-pressed="false">1M</button>
+                            <button type="button" data-contrib="3M" aria-pressed="false">3M</button>
+                            <button type="button" data-contrib="YTD" aria-pressed="false">YTD</button>
+                            <button type="button" data-contrib="1Y" aria-pressed="false">1Y</button>
+                            <button type="button" data-contrib="ALL" aria-pressed="true">All</button>
+                        </div>
+                    </div>
+                    <ul class="pf-contrib" id="contribList"></ul>
+                </section>
                 <div class="pf-tiles" id="gainTiles"></div>
                 <section class="pf-card">
                     <div class="pf-card__head">
@@ -344,6 +361,16 @@
             <!-- Income: dividends received. -->
             <div class="pf-panel" data-panel="income" hidden>
                 <div class="pf-tiles" id="incomeTiles"></div>
+                <section class="pf-card" id="incomeChartCard">
+                    <div class="pf-card__head pf-card__head--row">
+                        <h2 class="pf-card__title">By month</h2>
+                        <ul class="pf-chart-legend">
+                            <li><span class="pf-key pf-key--received"></span>Received</li>
+                            <li><span class="pf-key pf-key--projected"></span>Projected</li>
+                        </ul>
+                    </div>
+                    <div class="pf-incomechart" id="incomeBars"></div>
+                </section>
                 <div class="pf-grid" id="incomeGrid">
                     <section class="pf-card">
                         <div class="pf-card__head">
@@ -470,6 +497,6 @@
     <script src="/shared/api-base.js?v=1"></script>
     <script src="/shared/analytics.js?v=1"></script>
     <script src="app-shell.js?v=4"></script>
-    <script src="portfolio.js?v=35"></script>
+    <script src="portfolio.js?v=36"></script>
 </body>
 </html>

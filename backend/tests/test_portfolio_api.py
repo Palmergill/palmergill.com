@@ -74,6 +74,7 @@ def _buy(client, ticker="AAPL", shares=10, price=150.0, day="2026-01-05", side="
     ("delete", "/api/stocks/portfolio/holdings"),
     ("delete", "/api/stocks/portfolio"),
     ("get", "/api/stocks/portfolio/positions"),
+    ("get", "/api/stocks/portfolio/upcoming"),
     ("get", "/api/stocks/portfolio/watchlist"),
     ("post", "/api/stocks/portfolio/watchlist"),
     ("delete", "/api/stocks/portfolio/watchlist/AAPL"),
@@ -879,8 +880,21 @@ def test_the_position_brief_is_shares_and_average_cost_of_open_positions():
     _buy(client, "AAPL", shares=10, price=100.0)
     _buy(client, "MSFT", shares=2, price=300.0)
     _buy(client, "MSFT", shares=2, price=350.0, day="2026-02-02", side="sell")
-    assert client.get("/api/stocks/portfolio/positions").json()["positions"] == {"AAPL": {"shares": 10, "avgCost": 100.0}}
+    brief = client.get("/api/stocks/portfolio/positions").json()["positions"]
+    assert list(brief) == ["AAPL"]
+    assert {k: brief["AAPL"][k] for k in ("shares", "avgCost", "price")} == {"shares": 10, "avgCost": 100.0, "price": None}
     assert _member_client().get("/api/stocks/portfolio/positions").json()["positions"] == {}
+
+
+def test_the_position_brief_carries_the_trackers_stored_price(monkeypatch):
+    from datetime import timedelta
+
+    _flat_history(monkeypatch, {"AAPL": 200.0})
+    client = _member_client()
+    _buy(client, shares=1, price=150.0, day=(portfolio.utc_today() - timedelta(days=90)).isoformat())
+    client.get("/api/stocks/portfolio/history")
+    aapl = client.get("/api/stocks/portfolio/positions").json()["positions"]["AAPL"]
+    assert aapl["price"] == 200.0 and aapl["dayChangePct"] == 0 and aapl["priceAsOf"] and set(aapl["spark"]) == {200.0}
 
 
 def test_each_position_carries_its_last_month_of_closes(monkeypatch):
@@ -893,3 +907,81 @@ def test_each_position_carries_its_last_month_of_closes(monkeypatch):
     client.get("/api/stocks/portfolio/history")
     spark = client.get("/api/stocks/portfolio").json()["positions"][0]["spark"]
     assert 15 <= len(spark) <= 23 and set(spark) == {200.0}
+
+
+def test_upcoming_lists_held_stocks_earnings_and_ex_dividend_dates_soonest_first(monkeypatch):
+    from datetime import timedelta
+
+    today = portfolio.utc_today()
+    soon, later, past = (today + timedelta(days=d) for d in (3, 20, -2))
+    monkeypatch.setattr(portfolio.stock_data_client, "_use_mock", lambda: False)
+    monkeypatch.setattr(portfolio, "_calendar_cache", {})
+    monkeypatch.setattr(portfolio, "_earnings_by_ticker", lambda start, end: {
+        "AAPL": [{"date": later.isoformat(), "hour": "amc"}], "TSLA": [{"date": soon.isoformat(), "hour": "bmo"}],
+    })
+    monkeypatch.setattr(portfolio, "_dividends_by_ticker", lambda start, end: {
+        "AAPL": [{"date": soon.isoformat(), "payDate": later.isoformat(), "amount": 0.25},
+                 {"date": past.isoformat(), "payDate": None, "amount": 0.25}],
+    })
+    _flat_history(monkeypatch, {"AAPL": 200.0})
+    client = _member_client()
+    _buy(client, shares=10, price=150.0)
+    events = client.get("/api/stocks/portfolio/upcoming").json()["events"]
+    assert [(e["ticker"], e["kind"], e["date"]) for e in events] == [
+        ("AAPL", "dividend", soon.isoformat()), ("AAPL", "earnings", later.isoformat()),
+    ]
+    assert events[0]["total"] == 2.5 and events[1]["hour"] == "amc"
+
+
+def test_a_failed_calendar_leaves_the_other_and_is_not_asked_again_at_once(monkeypatch):
+    from datetime import timedelta
+
+    calls = []
+
+    def broken(start, end):
+        calls.append(1)
+        raise RuntimeError("down")
+
+    soon = (portfolio.utc_today() + timedelta(days=5)).isoformat()
+    monkeypatch.setattr(portfolio.stock_data_client, "_use_mock", lambda: False)
+    monkeypatch.setattr(portfolio, "_calendar_cache", {})
+    monkeypatch.setattr(portfolio, "_earnings_by_ticker", broken)
+    monkeypatch.setattr(portfolio, "_dividends_by_ticker", lambda start, end: {"AAPL": [{"date": soon, "amount": None}]})
+    _flat_history(monkeypatch, {"AAPL": 200.0})
+    client = _member_client()
+    _buy(client, shares=1, price=150.0)
+    for _ in range(2):
+        events = client.get("/api/stocks/portfolio/upcoming").json()["events"]
+        assert [(e["kind"], e["date"]) for e in events] == [("dividend", soon)] and "total" not in events[0]
+    assert len(calls) == 1
+
+
+def test_history_splits_each_ranges_gain_by_holding(monkeypatch):
+    from datetime import timedelta
+
+    _flat_history(monkeypatch, {"AAPL": 200.0, "MSFT": 100.0})
+    client = _member_client()
+    today = portfolio.utc_today()
+    _buy(client, "AAPL", shares=10, price=150.0, day=(today - timedelta(days=120)).isoformat())
+    _buy(client, "MSFT", shares=5, price=120.0, day=(today - timedelta(days=120)).isoformat())
+    attribution = client.get("/api/stocks/portfolio/history").json()["attribution"]
+    assert attribution["ALL"]["rows"] == [{"ticker": "AAPL", "gain": 500.0}, {"ticker": "MSFT", "gain": -100.0}]
+    assert attribution["1Y"] == attribution["ALL"] and attribution["ALL"]["capital"] == 2100.0
+    assert attribution["1M"]["rows"] == []
+
+
+def test_income_by_month_and_the_next_twelve_projected_on_todays_shares():
+    from datetime import timedelta
+
+    client, body, _ = _dividend_client()
+    today = portfolio.utc_today()
+    paid = today - timedelta(days=30)
+    income = body["portfolio"]["dividends"]
+    received = {m["month"]: m["amount"] for m in income["received"]}
+    assert len(received) == 12 and received[paid.strftime("%Y-%m")] == 2.5 and sum(received.values()) == 2.5
+    # Ten more shares bought after the payment: it comes again a year on, doubled.
+    _buy(client, "AAPL", shares=10, price=200.0, day=(today - timedelta(days=10)).isoformat())
+    income = client.get("/api/stocks/portfolio").json()["dividends"]
+    projected = {m["month"]: m["amount"] for m in income["projected"]}
+    assert len(projected) == 12 and income["projectedTotal"] == 5.0
+    assert projected[(paid + timedelta(days=365)).strftime("%Y-%m")] == 5.0

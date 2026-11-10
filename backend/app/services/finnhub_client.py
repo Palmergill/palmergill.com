@@ -31,6 +31,17 @@ class FinnhubEstimatesClient:
     def is_configured(self) -> bool:
         return self.api_key is not None and self.api_key != ""
     
+    def get_earnings_calendar(self, start, end) -> List[Dict]:
+        """Every company reporting in [start, end], in one call; raises on
+        failure so callers can tell nothing from no reports."""
+        response = requests.get(
+            f"{self.BASE_URL}/calendar/earnings",
+            params={"from": start.isoformat(), "to": end.isoformat(), "token": self.api_key},
+            timeout=15,
+        )
+        response.raise_for_status()
+        return response.json().get("earningsCalendar") or []
+
     def get_earnings_estimates(self, ticker: str) -> Optional[List[Dict]]:
         """
         Get earnings estimates from Finnhub.

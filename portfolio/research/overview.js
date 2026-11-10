@@ -199,12 +199,13 @@
             const start = closes[0];
             const end = closes[closes.length - 1];
             const up = end >= start;
+            hero.classList.toggle('is-down', !up);
             const restLabel = RANGE_PHRASE[state.range];
             setReadout(end, start, restLabel);
 
             const W = Math.max(chartBox.clientWidth, 280);
-            const H = 200;
-            const pad = { top: 24, right: 8, bottom: 24, left: 8 };
+            const H = 220;
+            const pad = { top: 10, right: 50, bottom: 10, left: 4 };
             const lo = Math.min(...closes);
             const hi = Math.max(...closes);
             const span = hi - lo || 1;
@@ -215,35 +216,23 @@
             root.setAttribute('role', 'img');
             root.setAttribute('aria-label', `${state.data.ticker} price ${restLabel}: from ${money(start)} to ${money(end)}, low ${money(lo)}, high ${money(hi)}.`);
 
-            const gradId = `ovGrad${Math.random().toString(36).slice(2, 8)}`;
-            const defs = svg('defs');
-            const grad = svg('linearGradient', { id: gradId, x1: 0, y1: 0, x2: 0, y2: 1 });
-            grad.append(svg('stop', { offset: '0%', class: 'ov-grad-top' }), svg('stop', { offset: '100%', class: 'ov-grad-bottom' }));
-            defs.append(grad);
-            root.append(defs);
-
-            // Reference line at the range's opening price.
-            root.append(svg('line', { x1: pad.left, x2: W - pad.right, y1: y(start), y2: y(start), class: 'ov-ref-line' }));
+            // Three rounded prices on the right with faint guides, as on the
+            // tracker's charts.
+            const step = 10 ** (Math.floor(Math.log10(span)) - 1);
+            const round = (v) => Math.round(v / step) * step;
+            const top = round(hi - span * 0.06);
+            const bottom = round(lo + span * 0.06);
+            [bottom, round((bottom + top) / 2), top].forEach((v) => {
+                root.append(svg('line', { x1: pad.left, x2: W - pad.right, y1: y(v), y2: y(v), class: 'ov-guide' }));
+                const t = svg('text', { x: W - 2, y: y(v) + 4, 'text-anchor': 'end', class: 'ov-axis' });
+                t.textContent = span < 20 ? `$${v.toFixed(2)}` : compactMoney(v);
+                root.append(t);
+            });
 
             const pts = closes.map((v, i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`);
-            const linePath = `M${pts.join('L')}`;
-            const areaPath = `${linePath}L${x(closes.length - 1).toFixed(1)},${H - pad.bottom}L${pad.left},${H - pad.bottom}Z`;
-            root.append(svg('path', { d: areaPath, fill: `url(#${gradId})`, class: 'ov-area' }));
-            const line = svg('path', { d: linePath, class: 'ov-line', pathLength: 1 });
+            const line = svg('path', { d: `M${pts.join('L')}`, class: 'ov-line', pathLength: 1 });
             root.append(line);
             if (!reduceMotion) line.classList.add('is-drawing');
-
-            // Direct labels on the extremes only.
-            const hiIdx = closes.indexOf(hi);
-            const loIdx = closes.indexOf(lo);
-            const extremeLabel = (idx, value, above) => {
-                const px = x(idx);
-                const anchor = px < 48 ? 'start' : px > W - 48 ? 'end' : 'middle';
-                const t = svg('text', { x: px, y: above ? y(value) - 10 : y(value) + 18, 'text-anchor': anchor, class: 'ov-extreme' });
-                t.textContent = money(value);
-                return t;
-            };
-            root.append(extremeLabel(hiIdx, hi, true), extremeLabel(loIdx, lo, false));
 
             // End marker with a soft pulse.
             const ex = x(closes.length - 1);
@@ -259,7 +248,9 @@
             root.append(crossGroup);
 
             const dateRow = el('div', 'ov-chart-dates');
-            dateRow.append(el('span', null, shortDate(rows[0].date)), el('span', 'ov-scrub-date', ''), el('span', null, shortDate(rows[rows.length - 1].date)));
+            const midDate = shortDate(rows[Math.floor((rows.length - 1) / 2)].date);
+            dateRow.append(el('span', null, shortDate(rows[0].date)), el('span', 'ov-scrub-date', midDate), el('span', null, shortDate(rows[rows.length - 1].date)));
+            dateRow.style.paddingRight = `${pad.right}px`;
             const scrubDate = dateRow.querySelector('.ov-scrub-date');
 
             function scrubTo(clientX) {
@@ -275,13 +266,15 @@
                 root.classList.add('is-scrubbing');
                 setReadout(closes[i], start, `since ${shortDate(rows[0].date)}`);
                 scrubDate.textContent = longDate(rows[i].date);
+                scrubDate.classList.add('is-scrubbing');
             }
 
             function endScrub() {
                 crossGroup.setAttribute('visibility', 'hidden');
                 root.classList.remove('is-scrubbing');
                 setReadout(end, start, restLabel);
-                scrubDate.textContent = '';
+                scrubDate.textContent = midDate;
+                scrubDate.classList.remove('is-scrubbing');
             }
 
             root.addEventListener('pointerdown', (e) => scrubTo(e.clientX));
@@ -308,11 +301,7 @@
         if (low == null || high == null || current == null || high <= low) return;
 
         const pos = Math.max(0, Math.min(1, (current - low) / (high - low)));
-        const offHigh = ((high - current) / high) * 100;
-        const sub = offHigh < 1
-            ? 'Trading at its 52-week high'
-            : `${offHigh.toFixed(0)}% below its 52-week high`;
-        const section = card('52-week range', sub);
+        const section = card('52-week range');
 
         const meter = el('div', 'ov-meter');
         meter.setAttribute('role', 'img');
@@ -406,9 +395,7 @@
     function peTile(pe) {
         const tile = el('article', 'ov-tile ov-tile-pe');
         tile.append(el('h4', 'ov-tile-label', 'P/E ratio'), el('div', 'ov-tile-value', pe != null && pe > 0 ? pe.toFixed(1) : '—'));
-        let verdict = 'No positive earnings';
-        if (pe != null && pe > 0) verdict = pe < 15 ? 'Value territory' : pe <= 25 ? 'Near market average' : 'Priced for growth';
-        tile.append(el('div', 'ov-tile-caption', verdict));
+        tile.append(el('div', 'ov-tile-caption', 'Trailing 12 months'));
 
         const scaleMax = 50;
         const scale = el('div', 'ov-pe-scale');
@@ -433,7 +420,7 @@
         });
         scale.append(ticks);
         tile.append(scale);
-        tile.setAttribute('aria-label', `P/E ratio ${pe != null ? pe.toFixed(1) : 'unavailable'}: ${verdict}`);
+        tile.setAttribute('aria-label', `P/E ratio ${pe != null && pe > 0 ? pe.toFixed(1) : 'unavailable'}`);
         return tile;
     }
 
@@ -457,8 +444,7 @@
     function renderEarnings(root, series) {
         const rows = series.filter((q) => q.eps != null && q.est != null);
         if (rows.length < 2) return;
-        const beats = rows.filter((q) => q.eps >= q.est).length;
-        const section = card('Earnings vs. estimates', `Beat Wall Street estimates in ${beats} of the last ${rows.length} quarters`);
+        const section = card('Earnings vs. estimates');
 
         const legend = el('div', 'ov-legend');
         [['is-beat', 'Beat'], ['is-miss', 'Missed'], ['is-est', 'Estimate']].forEach(([cls, text]) => {
@@ -487,7 +473,7 @@
 
             const root = svg('svg', { viewBox: `0 0 ${W} ${H}`, width: W, height: H, class: 'ov-eps-svg' });
             root.setAttribute('role', 'img');
-            root.setAttribute('aria-label', `Earnings per share versus estimates. Beat in ${beats} of ${rows.length} quarters.`);
+            root.setAttribute('aria-label', `Earnings per share versus estimates over ${rows.length} quarters.`);
 
             ticks.forEach((v) => {
                 const gy = y(v);
@@ -667,7 +653,7 @@
         const pes = points.map((p) => p.pe);
         const stats = el('div', 'ec-stats');
         stats.append(
-            statBlock('Now', `${last.toFixed(1)}×`, last < 15 ? 'Value territory' : last <= 25 ? 'Near market average' : 'Priced for growth'),
+            statBlock('Now', `${last.toFixed(1)}×`),
             statBlock('Past-year range', `${Math.min(...pes).toFixed(0)}–${Math.max(...pes).toFixed(0)}×`, `${last >= first ? 'Up' : 'Down'} from ${first.toFixed(1)}× a year ago`)
         );
         const box = el('div', 'ec-chart');
@@ -919,15 +905,15 @@
     function renderMargins(root) {
         const { summary = {} } = state.data;
         const items = [
-            ['Gross margin', summary.gross_margin, 'Kept from each sales dollar after making the product'],
-            ['Operating margin', summary.operating_margin, 'Left after running the business'],
-            ['Net margin', summary.profit_margin, 'Left as profit after everything, including taxes']
+            ['Gross margin', summary.gross_margin],
+            ['Operating margin', summary.operating_margin],
+            ['Net margin', summary.profit_margin]
         ].filter(([, v]) => v != null);
         if (!items.length) return;
 
         const section = card('Profitability');
         const list = el('div', 'ov-margins');
-        items.forEach(([label, value, hint], i) => {
+        items.forEach(([label, value], i) => {
             const row = el('div', 'ov-margin');
             const top = el('div', 'ov-margin-top');
             top.append(el('span', 'ov-margin-label', label), el('span', 'ov-margin-value', `${value.toFixed(1)}%`));
@@ -936,7 +922,7 @@
             fill.style.setProperty('--w', `${Math.max(0, Math.min(100, value))}%`);
             fill.style.transitionDelay = `${i * 80}ms`;
             track.append(fill);
-            row.append(top, track, el('p', 'ov-margin-hint', hint));
+            row.append(top, track);
             list.append(row);
         });
         section.append(list);

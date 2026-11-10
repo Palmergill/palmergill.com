@@ -348,6 +348,7 @@
         renderHero(data);
         renderMetrics(data);
         renderToday(data);
+        renderUpcoming(data);
         renderTopHoldings(data);
         renderSectors(data);
         renderHoldings(data);
@@ -410,6 +411,40 @@
                 <td>${securityLink(p)}</td>
                 ${dayPill(p)}
             </tr>`).join('');
+    }
+
+    // Earnings and ex-dividend dates for what you hold: asked for again only
+    // when the set of holdings changes.
+    const upcoming = { key: null, events: [] };
+    const eventDay = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
+    const UPCOMING_ROWS = 6;
+    function renderUpcoming(data) {
+        const key = data.positions.map((p) => p.ticker).sort().join(',');
+        if (key !== upcoming.key) {
+            upcoming.key = key;
+            upcoming.events = [];
+            api('/upcoming').then((r) => {
+                if (upcoming.key !== key) return;
+                upcoming.events = r.events || [];
+                drawUpcoming();
+            }).catch(() => {});
+        }
+        drawUpcoming();
+    }
+    function drawUpcoming() {
+        const events = upcoming.events.slice(0, UPCOMING_ROWS);
+        $('upcoming').hidden = !events.length;
+        const what = (e) => {
+            if (e.kind === 'earnings') return `Earnings${e.hour === 'bmo' ? ' · before open' : e.hour === 'amc' ? ' · after close' : ''}`;
+            if (e.amount == null) return 'Ex-dividend';
+            return `Ex-dividend · ${privacy || e.total == null ? `${fmtPrice(e.amount)}/sh` : fmtMoney(e.total)}`;
+        };
+        $('upcomingList').innerHTML = events.map((e) => `
+            <li>
+                <span class="pf-upcoming__date">${eventDay.format(new Date(`${e.date}T00:00:00Z`))}</span>
+                <a class="pf-ticker" href="${holdingHref(e.ticker)}">${escapeHtml(e.ticker)}</a>
+                <span class="pf-upcoming__what">${escapeHtml(what(e))}</span>
+            </li>`).join('');
     }
 
     function allocationSlices(positions) {
@@ -569,9 +604,7 @@
 
     function renderHoldings(data) {
         const asOf = data.holdings.asOf;
-        els.holdingsSub.textContent = asOf
-            ? `As of ${fmtDay(asOf)}${data.transactionCount ? ` · ${plural(data.transactionCount, 'trade')}` : ''}`
-            : plural(data.transactionCount, 'trade');
+        els.holdingsSub.textContent = `${plural(data.positions.length, 'position')}${asOf ? ` · As of ${fmtDay(asOf)}` : ''}`;
         document.querySelectorAll('#holdingsTable th[data-sort]').forEach((th) => {
             if (th.dataset.sort === sort.key) th.setAttribute('aria-sort', sort.dir > 0 ? 'ascending' : 'descending');
             else th.removeAttribute('aria-sort');
@@ -894,9 +927,10 @@
     function drawYearChart(years) {
         const host = $('yearBars');
         host.innerHTML = '';
-        host.hidden = !years.length;
+        // A bar or two says no more than the table under it.
+        host.hidden = years.length < 3;
         const width = host.clientWidth;
-        if (!years.length || !width) return;
+        if (host.hidden || !width) return;
         const height = 150;
         // Room above and below the bars for their labels, then the years.
         const pad = { top: 20, bottom: 40 };
@@ -944,7 +978,40 @@
         return out;
     }
 
+    // Each holding's dollars of gain over a period, as a bar either side of
+    // zero; in privacy mode, as points of the period's return.
+    let contribRange = 'ALL';
+    function fmtPoints(points) {
+        const text = Math.abs(points).toFixed(1);
+        return `${Number(text) === 0 ? '' : points > 0 ? '+' : '−'}${text} pts`;
+    }
+    function renderContribution() {
+        const card = $('contribCard');
+        const period = history.data?.attribution?.[contribRange];
+        const rows = period?.rows || [];
+        card.hidden = !history.data?.attribution?.ALL?.rows?.length;
+        if (card.hidden) return;
+        document.querySelectorAll('[data-contrib]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.contrib === contribRange)));
+        const scale = Math.max(...rows.map((r) => Math.abs(r.gain)), 1);
+        const value = (gain) => (privacy
+            ? (period.capital ? fmtPoints(gain / period.capital * 100) : '—')
+            : fmtSigned(gain, true));
+        $('contribList').innerHTML = rows.length ? rows.map((r) => `
+            <li>
+                <a class="pf-ticker" href="${holdingHref(r.ticker)}">${escapeHtml(r.ticker)}</a>
+                <span class="pf-contrib__bar"><i class="${r.gain >= 0 ? 'is-gain' : 'is-loss'}" style="width:${(Math.abs(r.gain) / scale * 50).toFixed(1)}%"></i></span>
+                <span class="pf-contrib__value ${tone(r.gain)}">${value(r.gain)}</span>
+            </li>`).join('') : '<li class="pf-contrib__none">No change</li>';
+    }
+    document.addEventListener('click', (event) => {
+        const button = event.target.closest('[data-contrib]');
+        if (!button) return;
+        contribRange = button.dataset.contrib;
+        renderContribution();
+    });
+
     function renderPerformance() {
+        renderContribution();
         const points = history.data?.points || [];
         const tiles = $('perfTiles');
         const returns = dailyReturns(points);
@@ -1028,6 +1095,7 @@
         renderSubtabs(currentTab());
         $('incomeTiles').innerHTML = [
             gainTile('Last 12 months', fmtMoney(d.trailing12m, true), ''),
+            gainTile('Next 12 months', fmtMoney(d.projectedTotal, true), 'Projected'),
             gainTile('Trailing yield', fmtPct(d.yield), ''),
             gainTile('All time', fmtMoney(d.total, true), ''),
             gainTile('Payments', countFormat.format(d.count), d.recent.length ? `Last ${fmtDay(d.recent[0].date)}` : ''),
@@ -1043,6 +1111,7 @@
                     <td class="num pf-hide-sm">${value.get(r.ticker) ? fmtPct(r.amount / value.get(r.ticker)) : '—'}</td>
                 </tr>`).join('') || '<tr><td colspan="4" class="pf-muted">No dividends yet.</td></tr>'}
             </tbody>`;
+        drawIncomeChart();
         $('incomeRecent').innerHTML = `
             <thead><tr><th scope="col">Date</th><th scope="col">Security</th><th scope="col" class="num">Amount</th></tr></thead>
             <tbody>${d.recent.map((r) => `
@@ -1050,6 +1119,63 @@
                 || '<tr><td colspan="3" class="pf-muted">No dividends yet.</td></tr>'}
             </tbody>`;
     }
+
+    // The last twelve months received and the next twelve projected, a bar
+    // a month; this month carries both.
+    function drawIncomeChart() {
+        const host = $('incomeBars');
+        const d = lastData?.dividends;
+        const width = host.clientWidth;
+        host.innerHTML = '';
+        if (!d?.received || !width) return;
+        const months = new Map();
+        d.received.forEach((m) => months.set(m.month, { month: m.month, got: m.amount, due: 0 }));
+        d.projected.forEach((m) => {
+            const row = months.get(m.month) || { month: m.month, got: 0, due: 0 };
+            row.due = m.amount;
+            months.set(m.month, row);
+        });
+        const rows = [...months.values()].sort((a, b) => a.month.localeCompare(b.month));
+        const height = 170;
+        const pad = { top: 8, bottom: 22 };
+        const innerH = height - pad.top - pad.bottom;
+        const top = Math.max(...rows.map((r) => r.got + r.due), 0.01);
+        const slot = width / rows.length;
+        const barW = Math.max(4, Math.min(22, slot * 0.6));
+        const scaleY = (v) => (v / top) * innerH;
+        const base = pad.top + innerH;
+        const nowIndex = rows.findIndex((r) => r.month === d.received[d.received.length - 1].month);
+        const root = svg('svg', { viewBox: `0 0 ${width} ${height}`, role: 'img', 'aria-label': 'Dividends by month, received and projected' });
+        root.appendChild(svg('line', { class: 'pf-zero', x1: 0, x2: width, y1: base, y2: base }));
+        if (nowIndex >= 0) {
+            const x = slot * (nowIndex + 1);
+            root.appendChild(svg('line', { class: 'pf-chart__guide', x1: x, x2: x, y1: pad.top, y2: base }));
+        }
+        rows.forEach((r, i) => {
+            const cx = slot * i + slot / 2;
+            const got = scaleY(r.got);
+            const due = scaleY(r.due);
+            const group = svg('g', { class: 'pf-incomebar' });
+            group.appendChild(svg('rect', { class: 'pf-incomebar__hit', x: slot * i, y: pad.top, width: slot, height: innerH }));
+            if (got) group.appendChild(svg('rect', { class: 'pf-bar--received', x: cx - barW / 2, y: base - got, width: barW, height: got }));
+            if (due) group.appendChild(svg('rect', { class: 'pf-bar--projected', x: cx - barW / 2, y: base - got - due, width: barW, height: due }));
+            const [year, month] = r.month.split('-').map(Number);
+            const label = `${MONTHS[month - 1]} ${year}`;
+            const parts = [label];
+            if (r.got) parts.push(`${fmtMoney(r.got)} received`);
+            if (r.due) parts.push(`${fmtMoney(r.due)} projected`);
+            group.addEventListener('mousemove', (event) => showTip(event, parts.join(' · ')));
+            group.addEventListener('mouseleave', hideTip);
+            root.appendChild(group);
+            if ((rows.length - 1 - i) % 3 === 0) {
+                const text = svg('text', { class: 'pf-chart__axis', x: cx, y: height - 4, 'text-anchor': 'middle' });
+                text.textContent = month === 1 || i === 0 ? `${MONTHS[month - 1]} ’${String(year).slice(2)}` : MONTHS[month - 1];
+                root.appendChild(text);
+            }
+        });
+        host.appendChild(root);
+    }
+    new ResizeObserver(() => drawIncomeChart()).observe($('incomeBars'));
 
     // ── taxes ──────────────────────────────────────────────────────────────
 

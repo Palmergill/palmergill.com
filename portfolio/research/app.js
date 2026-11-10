@@ -615,8 +615,10 @@ document.addEventListener('DOMContentLoaded', () => {
         
         if (headerStockTicker) headerStockTicker.textContent = data.ticker || '';
         if (headerStockName) headerStockName.textContent = data.name || '';
-        if (headerStockPrice && summary.current_price) {
-            headerStockPrice.textContent = '$' + summary.current_price.toFixed(2);
+        const lastClose = (lastPriceHistory || []).map(d => d.close ?? d.price).filter(v => v != null).pop();
+        const headlinePrice = lastClose ?? summary.current_price;
+        if (headerStockPrice && headlinePrice) {
+            headerStockPrice.textContent = '$' + headlinePrice.toFixed(2);
         }
         let computedChangePercent = null;
         if (headerStockChange && lastPriceHistory && lastPriceHistory.length >= 2) {
@@ -638,7 +640,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (window.Watchlist && data.ticker) {
             window.Watchlist.touchSnapshot(data.ticker, {
                 name: data.name || summary.name || '',
-                price: summary.current_price ?? null,
+                price: headlinePrice ?? null,
                 changePercent: computedChangePercent
             });
             window.Watchlist.syncToggleButton();

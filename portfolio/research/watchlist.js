@@ -15,6 +15,7 @@
         server = (data.items || []).map((item) => ({
             ticker: item.ticker, name: item.name || '', price: item.price,
             changePercent: item.dayChangePct == null ? null : item.dayChangePct * 100,
+            spark: item.spark || [],
         }));
         render();
         syncToggleButton();
@@ -146,6 +147,49 @@
         return `${sign}${c.toFixed(2)}%`;
     }
 
+    // A research-home tile: ticker and price, name and day change, and the
+    // last month's closes when there are some. Shared with "Your holdings".
+    function tile({ ticker, name, price, changePercent, spark }) {
+        const btn = document.createElement('button');
+        btn.className = 'trending-stock rt';
+        btn.type = 'button';
+        btn.dataset.ticker = ticker;
+        const row = (cls, left, right, rightCls = '') => {
+            const line = document.createElement('span');
+            line.className = cls;
+            const a = document.createElement('span');
+            a.textContent = left;
+            const b = document.createElement('span');
+            b.textContent = right;
+            if (rightCls) b.className = rightCls;
+            line.append(a, b);
+            return line;
+        };
+        const tone = changePercent == null ? '' : changePercent >= 0 ? 'is-positive' : 'is-negative';
+        btn.append(
+            row('rt__top', ticker, price != null ? fmtPrice(price) : ''),
+            row('rt__sub', name || '', fmtChange(changePercent), tone),
+        );
+        const closes = (spark || []).filter((v) => Number.isFinite(v));
+        if (closes.length > 1) {
+            const lo = Math.min(...closes);
+            const span = Math.max(...closes) - lo || 1;
+            const points = closes.map((v, i) => `${((i / (closes.length - 1)) * 100).toFixed(1)},${(22 - ((v - lo) / span) * 20).toFixed(1)}`).join(' ');
+            const ns = 'http://www.w3.org/2000/svg';
+            const svg = document.createElementNS(ns, 'svg');
+            svg.setAttribute('viewBox', '0 0 100 24');
+            svg.setAttribute('preserveAspectRatio', 'none');
+            svg.setAttribute('aria-hidden', 'true');
+            svg.setAttribute('class', `rt__spark ${closes[closes.length - 1] >= closes[0] ? 'is-up' : 'is-down'}`);
+            const line = document.createElementNS(ns, 'polyline');
+            line.setAttribute('points', points);
+            line.setAttribute('vector-effect', 'non-scaling-stroke');
+            svg.append(line);
+            btn.append(svg);
+        }
+        return btn;
+    }
+
     function render() {
         const section = document.getElementById('watchlistSection');
         const grid = document.getElementById('watchlistGrid');
@@ -159,29 +203,7 @@
         section.hidden = false;
         const frag = document.createDocumentFragment();
         list.forEach((entry) => {
-            const btn = document.createElement('button');
-            btn.className = 'trending-stock';
-            btn.type = 'button';
-            btn.dataset.ticker = entry.ticker;
-
-            const ticker = document.createElement('span');
-            ticker.className = 'trending-ticker';
-            ticker.textContent = entry.ticker;
-
-            const name = document.createElement('span');
-            name.className = 'trending-name';
-            name.textContent = entry.name || (entry.price != null ? fmtPrice(entry.price) : 'Saved ticker');
-
-            btn.appendChild(ticker);
-            btn.appendChild(name);
-
-            const delta = fmtChange(entry.changePercent);
-            if (delta) {
-                const d = document.createElement('span');
-                d.className = 'watchlist-item-delta ' + (entry.changePercent >= 0 ? 'is-positive' : 'is-negative');
-                d.textContent = (entry.price != null ? fmtPrice(entry.price) + ' · ' : '') + delta;
-                btn.appendChild(d);
-            }
+            const btn = tile(entry);
 
             btn.addEventListener('click', () => {
                 const ti = document.getElementById('tickerInput');
@@ -246,6 +268,6 @@
     }
 
     window.Watchlist = {
-        add, remove, isSaved, touchSnapshot, syncToggleButton, render
+        add, remove, isSaved, touchSnapshot, syncToggleButton, render, tile
     };
 })();

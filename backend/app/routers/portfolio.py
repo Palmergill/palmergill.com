@@ -159,6 +159,11 @@ def read_positions(username: str = Depends(caller), db: Session = Depends(get_db
     return portfolio.position_brief(db, username)
 
 
+@router.get("/upcoming")
+def read_upcoming(username: str = Depends(caller), db: Session = Depends(get_db)) -> Dict[str, Any]:
+    return portfolio.upcoming(db, username)
+
+
 @router.get("/watchlist")
 def read_watchlist(username: str = Depends(caller), db: Session = Depends(get_db)) -> Dict[str, Any]:
     return portfolio.watchlist(db, username)

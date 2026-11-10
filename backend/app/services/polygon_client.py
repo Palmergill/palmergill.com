@@ -261,6 +261,28 @@ class PolygonClient:
             if r.get("c") is not None
         ]
 
+    def get_dividend_calendar(self, start, end, pages: int = 4) -> List[Dict]:
+        """Every declared dividend going ex in [start, end], across the
+        market: a few paged calls instead of one per ticker."""
+        url = f"{self.BASE_URL}/v3/reference/dividends"
+        params = {
+            "ex_dividend_date.gte": start.isoformat(), "ex_dividend_date.lte": end.isoformat(),
+            "limit": 1000, "apiKey": self.api_key,
+        }
+        rows: List[Dict] = []
+        for _ in range(pages):
+            response = requests.get(url, params=params, timeout=15)
+            if response.status_code == 429:
+                raise PolygonRateLimited("dividends")
+            response.raise_for_status()
+            body = response.json()
+            rows.extend(body.get("results") or [])
+            url = body.get("next_url")
+            if not url:
+                break
+            params = {"apiKey": self.api_key}
+        return rows
+
     def get_splits(self, ticker: str) -> List[tuple]:
         """(execution date, split_from, split_to) for every split, in one call."""
         response = requests.get(
