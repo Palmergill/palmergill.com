@@ -1,12 +1,51 @@
-// Stock watchlist: persisted list of saved tickers with the last seen price.
-// Renders into the empty-state panel and toggles the header "Save" button.
+// Stock watchlist: the signed-in account's list (the tracker's Watchlist),
+// or this browser's for anyone signed out; anything saved here before signing
+// in moves to the account. Renders into the empty-state panel and toggles the
+// header "Save" button.
 (function () {
     if (window.Watchlist) return;
 
     const STORAGE_KEY = 'stock-watchlist';
     const MAX = 16;
 
+    const SERVER_PATH = `${window.API_ORIGIN || ''}/api/stocks/portfolio/watchlist`;
+    let server = null; // the account's list, once it has answered
+
+    function fromServer(data) {
+        server = (data.items || []).map((item) => ({
+            ticker: item.ticker, name: item.name || '', price: item.price,
+            changePercent: item.dayChangePct == null ? null : item.dayChangePct * 100,
+        }));
+        render();
+        syncToggleButton();
+    }
+    async function call(method, path, body) {
+        const response = await fetch(`${SERVER_PATH}${path}`, {
+            method, credentials: 'include',
+            headers: body ? { 'Content-Type': 'application/json' } : {},
+            body: body ? JSON.stringify(body) : undefined,
+        });
+        return response.ok ? response.json() : null;
+    }
+    async function connect() {
+        if (!await window.AppSession) return;
+        let data = null;
+        try { data = await call('GET', ''); } catch { /* stays on this browser */ }
+        if (!data) return;
+        const held = new Set(data.items.map((item) => item.ticker));
+        for (const entry of readLocal()) {
+            if (held.has(entry.ticker)) continue;
+            try { data = await call('POST', '', { ticker: entry.ticker }) || data; } catch { return; }
+        }
+        write([]);
+        fromServer(data);
+    }
+
     function read() {
+        return server || readLocal();
+    }
+
+    function readLocal() {
         try {
             const raw = localStorage.getItem(STORAGE_KEY);
             if (!raw) return [];
@@ -30,6 +69,13 @@
         const t = ticker.toUpperCase();
         const list = read();
         const idx = findIndex(list, t);
+        if (server) {
+            if (idx >= 0) return; // saving again would clear its price alerts
+            server.unshift({ ticker: t, name: snapshot.name || '', price: snapshot.price ?? null, changePercent: snapshot.changePercent ?? null });
+            render();
+            call('POST', '', { ticker: t }).then((data) => { if (data) fromServer(data); }).catch(() => {});
+            return;
+        }
         const entry = {
             ticker: t,
             name: snapshot.name || (idx >= 0 ? list[idx].name : ''),
@@ -48,6 +94,11 @@
         const idx = findIndex(list, ticker);
         if (idx < 0) return;
         list.splice(idx, 1);
+        if (server) {
+            render();
+            call('DELETE', `/${encodeURIComponent(ticker.toUpperCase())}`).then((data) => { if (data) fromServer(data); }).catch(() => {});
+            return;
+        }
         write(list);
         render();
     }
@@ -62,7 +113,7 @@
         const idx = findIndex(list, ticker);
         if (idx < 0) return; // only update if already in watchlist
         list[idx] = { ...list[idx], ...snapshot, ticker: ticker.toUpperCase() };
-        write(list);
+        if (!server) write(list);
         render();
     }
 
@@ -172,6 +223,9 @@
         if (clear) {
             clear.addEventListener('click', () => {
                 if (!window.confirm('Clear your watchlist?')) return;
+                if (server) {
+                    server.splice(0).forEach((entry) => call('DELETE', `/${encodeURIComponent(entry.ticker)}`).catch(() => {}));
+                }
                 write([]);
                 render();
                 syncToggleButton();
@@ -182,6 +236,7 @@
         // already routes them through `loadStock`.
         render();
         syncToggleButton();
+        connect();
     }
 
     if (document.readyState === 'loading') {

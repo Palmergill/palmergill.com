@@ -3,37 +3,41 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Stock Research</title>
+    <title>Research — Portfolio</title>
     <meta name="description" content="Polished stock research app — fundamentals, charts, and news for any ticker. By Palmer Gill.">
-    <link rel="canonical" href="https://palmergill.com/stock-research/">
-    <meta name="theme-color" content="#faf6f0">
+    <link rel="canonical" href="https://palmergill.com/portfolio/research/">
+    <meta name="theme-color" content="#0e1217">
     <meta property="og:type" content="website">
-    <meta property="og:url" content="https://palmergill.com/stock-research/">
-    <meta property="og:title" content="Stock Research — Palmer Gill">
+    <meta property="og:url" content="https://palmergill.com/portfolio/research/">
+    <meta property="og:title" content="Research — Portfolio">
     <meta property="og:description" content="Polished stock research app — fundamentals, charts, and news for any ticker.">
     <meta property="og:image" content="https://palmergill.com/assets/palmer-gill-logo.png">
     <meta property="og:image:width" content="960">
     <meta property="og:image:height" content="960">
     <meta name="twitter:card" content="summary">
-    <meta name="twitter:title" content="Stock Research — Palmer Gill">
+    <meta name="twitter:title" content="Research — Portfolio">
     <meta name="twitter:description" content="Polished stock research app — fundamentals, charts, and news for any ticker.">
     <meta name="twitter:image" content="https://palmergill.com/assets/palmer-gill-logo.png">
     <link rel="icon" type="image/png" href="/assets/palmer-gill-logo-small.png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/shared/site-nav.css?v=19">
-    <link rel="stylesheet" href="style.css?v=13">
+    <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="../app-shell.css?v=2">
+    <link rel="stylesheet" href="style.css?v=15">
+    <link rel="stylesheet" href="research-shell.css?v=3">
 </head>
-<body>
+<body class="app">
 <noscript>
     <p class="site-noscript">This page builds its content with JavaScript, so it needs scripts enabled. <a href="/">Browse the other projects</a> in the meantime.</p>
 </noscript>
-    <div class="container">
+    <aside class="app-nav" id="appNav"></aside>
+    <header class="app-top">
+        <h1 class="app-top__title">Research</h1>
+        <div class="app-search" id="appSearch"></div>
+    </header>
+    <div class="container app-main">
         <header>
             <div class="header-content" id="headerLogo">
-                <h1>Stock Research</h1>
-                <a class="header-portfolio-link" href="portfolio/">My portfolio</a>
             </div>
             <div class="header-stock-content hidden" id="headerStockContent">
                 <div class="header-row-1">
@@ -295,13 +299,14 @@
         </main>
     </div>
 
-    <script src="/shared/site-nav.js?v=22"></script>
     <script src="/shared/analytics.js?v=1"></script>
     <script src="/shared/api-base.js?v=1"></script>
     <script src="overview.js?v=4"></script>
     <script src="shelby.js?v=1"></script>
     <script src="app.js?v=17"></script>
-    <script src="watchlist.js?v=1"></script>
+    <script src="../app-shell.js?v=2"></script>
+    <script src="watchlist.js?v=2"></script>
+    <script src="research-position.js?v=3"></script>
     <script src="compare.js?v=4"></script>
 </body>
 </html>

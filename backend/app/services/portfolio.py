@@ -389,7 +389,10 @@ def add_transactions(
         raise HTTPException(status_code=422, detail=f"A portfolio holds up to {MAX_TRANSACTIONS:,} transactions.")
     db.bulk_insert_mappings(PortfolioTransaction, [{"username": username, "asset": "stock", **row} for row in fresh])
     db.commit()
-    return {"added": len(fresh), "duplicates": len(rows) - len(fresh), "removedSample": removed_sample}
+    return {
+        "added": len(fresh), "duplicates": len(rows) - len(fresh), "removedSample": removed_sample,
+        "dividends": sum(1 for r in fresh if r["side"] == "dividend"),
+    }
 
 
 def delete_transaction(db: Session, username: str, transaction_id: int) -> None:
@@ -1862,6 +1865,17 @@ def value_history(db: Session, username: str) -> Dict[str, Any]:
         **base, "points": points, "pending": waiting, "backfilling": backfilling,
         "complete": not waiting, "retryAfter": retry,
     }
+
+
+def position_brief(db: Session, username: str) -> Dict[str, Any]:
+    """Open positions' shares and average cost, with no price lookups: what
+    the research page needs to show your position in the stock on screen."""
+    holdings, transactions, _ = load_adjusted(db, username)
+    positions, _ = build_positions(holdings, transactions)
+    return {"positions": {
+        ticker: {"shares": p["shares"], "avgCost": _ratio(p["cost"], p["shares"])}
+        for ticker, p in positions.items() if p["shares"] > EPSILON
+    }}
 
 
 # ── watchlist ───────────────────────────────────────────────────────────────

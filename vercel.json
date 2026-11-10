@@ -1,6 +1,26 @@
 {
   "redirects": [
     {
+      "source": "/stock-research/portfolio",
+      "destination": "/portfolio/",
+      "permanent": true
+    },
+    {
+      "source": "/stock-research/portfolio/:path*",
+      "destination": "/portfolio/:path*",
+      "permanent": true
+    },
+    {
+      "source": "/stock-research",
+      "destination": "/portfolio/research/",
+      "permanent": true
+    },
+    {
+      "source": "/stock-research/:path*",
+      "destination": "/portfolio/research/:path*",
+      "permanent": true
+    },
+    {
       "source": "/fantasy/league",
       "destination": "/fantasy/",
       "permanent": true
@@ -51,8 +71,8 @@
       "destination": "/poker/$1"
     },
     {
-      "source": "/stock-research/(.*)",
-      "destination": "/stock-research/$1"
+      "source": "/portfolio/(.*)",
+      "destination": "/portfolio/$1"
     },
     {
       "source": "/admin/(.*)",

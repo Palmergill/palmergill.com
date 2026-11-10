@@ -266,7 +266,7 @@ DEMO_PATH_PREFIXES = (
     "/api/stocks",
     "/api/bitcoin",
     "/api/fantasy",
-    "/stock-research",
+    "/portfolio",
     "/bitcoin-chat",
     "/fantasy",
     # Not demo data: every /api/gifts route is account-owned and returns a JSON
@@ -1267,7 +1267,7 @@ if local_site_root_enabled:
         "/assets": "assets",
         "/shared": "shared",
         "/about": "about",
-        "/stock-research": "stock-research",
+        "/portfolio": "portfolio",
         "/poker": "poker",
         "/craps": "craps",
         "/craps-strategy": "craps-strategy",
@@ -1286,6 +1286,13 @@ if local_site_root_enabled:
         directory = os.path.join(repo_root, folder)
         if os.path.exists(directory):
             app.mount(route, StaticFiles(directory=directory, html=True), name=folder)
+
+    # The app's old address, as vercel.json redirects it in production.
+    @app.get("/stock-research/{rest:path}", include_in_schema=False)
+    async def local_old_portfolio_path(rest: str, request: Request):
+        target = f"/portfolio/{rest[len('portfolio'):].lstrip('/')}" if rest.startswith("portfolio") else f"/portfolio/research/{rest}"
+        query = f"?{request.url.query}" if request.url.query else ""
+        return RedirectResponse(f"{target}{query}", status_code=308)
 
     # Some pages are plain files at the repo root rather than folders — the
     # Fourth & Fortune kickoff deck, for one — and production serves them as

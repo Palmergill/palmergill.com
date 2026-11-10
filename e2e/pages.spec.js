@@ -13,7 +13,7 @@ const PAGES = [
     ['/high-card-flush/', /High Card Flush/],
     ['/castle-defense/', /Castle Defense/],
     ['/bitcoin-chat/', /Bitcoin Dashboard/],
-    ['/stock-research/', /Stock Research/],
+    ['/portfolio/research/', /Research/],
     ['/fantasy/market/', /Implied Value/],
     ['/fantasy/draft-order/', /Fourth & Fortune/],
     ['/fourth-and-fortune-kickoff.html', /Fourth & Fortune/],

@@ -10,7 +10,7 @@ The active static site lives at the repo root:
 - `about/`
 - `docs/`
 - `login/`
-- `stock-research/`
+- `portfolio/`
 - `casino/`
 - `poker/`
 - `craps/`
@@ -39,7 +39,7 @@ Vercel middleware keeps `/` public and requires a session (or Basic Auth) for:
 - `/admin/*` — admin role only
 - `/api/*`, except `/api/poker/*`, `/api/craps/*`, `/api/stocks/*`, `/api/bitcoin/*`, `/api/fantasy/*`, and `/api/analytics/*`; `/api/admin/*` and `/api/fantasy/admin/*` are admin role only
 
-`/docs/*`, `/login/*`, `/signup/*`, `/stock-research/*`, `/bitcoin-chat/*`, `/fantasy/*`, `/poker/*`, `/craps/*`, `/craps-strategy/*`, `/blackjack/*`, `/high-card-flush/*`, `/api/poker/*`, `/api/craps/*`, `/api/stocks/*`, `/api/bitcoin/*`, `/api/fantasy/*`, and `/api/analytics/*` are public. Unauthenticated stock, Bitcoin, and fantasy API requests run in demo mode; any signed-in account unlocks the live provider-backed paths, but only the admin can trigger the fantasy admin refresh. Basic Auth remains supported for direct scripted admin access.
+`/docs/*`, `/login/*`, `/signup/*`, `/portfolio/*`, `/bitcoin-chat/*`, `/fantasy/*`, `/poker/*`, `/craps/*`, `/craps-strategy/*`, `/blackjack/*`, `/high-card-flush/*`, `/api/poker/*`, `/api/craps/*`, `/api/stocks/*`, `/api/bitcoin/*`, `/api/fantasy/*`, and `/api/analytics/*` are public. Unauthenticated stock, Bitcoin, and fantasy API requests run in demo mode; any signed-in account unlocks the live provider-backed paths, but only the admin can trigger the fantasy admin refresh. Basic Auth remains supported for direct scripted admin access.
 
 Configure these environment variables in Vercel:
 
@@ -94,7 +94,7 @@ POLYGON_API_KEY=<secret Polygon key>
 
 `USE_REAL_DATA` defaults to `true` in the app and Docker image; set it to `false` only for local development with synthetic stock data.
 
-The portfolio chart (`/stock-research/portfolio/`) reaches back to a member's first trade, further than the Polygon plan's roughly two years of daily bars. Set `TIINGO_API_KEY` (a free Tiingo account's key) and the older days are fetched from Tiingo once per symbol and stored; without it those days are estimated from the member's own trade prices.
+The portfolio chart (`/portfolio/`) reaches back to a member's first trade, further than the Polygon plan's roughly two years of daily bars. Set `TIINGO_API_KEY` (a free Tiingo account's key) and the older days are fetched from Tiingo once per symbol and stored; without it those days are estimated from the member's own trade prices.
 
 Bitcoin Dashboard uses mempool.space as the default live provider. Configure:
 
@@ -132,4 +132,4 @@ This runs the API and active static pages together at:
 http://127.0.0.1:8000
 ```
 
-`LOCAL_SITE_ROOT=true` currently mounts `assets/`, `shared/`, `about/`, `login/`, `stock-research/`, `poker/`, `craps/`, `craps-strategy/`, `blackjack/`, `high-card-flush/`, `bitcoin-chat/`, `fantasy/`, `casino/`, and `admin/` through FastAPI. The local `/docs` path is still FastAPI's generated API docs path; the static website docs page is served by production/static hosting at `/docs/`.
+`LOCAL_SITE_ROOT=true` currently mounts `assets/`, `shared/`, `about/`, `login/`, `portfolio/`, `poker/`, `craps/`, `craps-strategy/`, `blackjack/`, `high-card-flush/`, `bitcoin-chat/`, `fantasy/`, `casino/`, and `admin/` through FastAPI. The local `/docs` path is still FastAPI's generated API docs path; the static website docs page is served by production/static hosting at `/docs/`.

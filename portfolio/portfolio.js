@@ -17,6 +17,10 @@
     const TOP_HOLDINGS = 10;
     const TRADES_PER_PAGE = 50;
     const REALIZED_SHOWN = 12;
+    const PAGE_TITLES = {
+        overview: 'Overview', holdings: 'Holdings', gains: 'Performance', income: 'Income',
+        taxes: 'Taxes', watchlist: 'Watchlist', activity: 'Activity', accounts: 'Accounts',
+    };
     const TABS = ['overview', 'holdings', 'gains', 'income', 'taxes', 'watchlist', 'activity', 'accounts'];
     // A position past this share of the portfolio is flagged.
     const CONCENTRATED = 0.25;
@@ -264,8 +268,11 @@
     function showTab() {
         const tab = currentTab();
         if (tab !== 'holding') listTab = tab;
+        const shown = tab === 'holding' ? listTab : tab;
+        $('pageTitle').textContent = tab === 'holding' ? holdingTicker() : PAGE_TITLES[tab];
+        document.title = `${$('pageTitle').textContent} — Portfolio`;
         els.tabs.querySelectorAll('a[data-tab]').forEach((link) => {
-            if (link.dataset.tab === tab) link.setAttribute('aria-current', 'page');
+            if (link.dataset.tab === shown) link.setAttribute('aria-current', 'page');
             else link.removeAttribute('aria-current');
         });
         document.querySelectorAll('.pf-panel').forEach((panel) => {
@@ -325,6 +332,7 @@
 
         renderHero(data);
         renderMetrics(data);
+        renderToday(data);
         renderAllocation(data);
         renderTopHoldings(data);
         renderGlance(data);
@@ -360,7 +368,6 @@
         const t = data.totals;
         const items = [];
         const withPct = (amount, pct) => (privacy ? fmtPct(pct, true) : `${fmtSigned(amount, true)}<span class="pf-sub">${fmtPct(pct, true)}</span>`);
-        if (t.dayChange != null) items.push(metric('Today', withPct(t.dayChange, t.dayChangePct), tone(t.dayChange)));
         if (t.gain != null) items.push(metric('Unrealized', withPct(t.gain, t.gainPct), tone(t.gain)));
         if (!privacy && (t.gain != null || t.realizedGain != null)) {
             const total = (t.gain || 0) + (t.realizedGain || 0);
@@ -372,6 +379,25 @@
             items.push(metric('Income, 12 mo', privacy ? `${fmtPct(d.yield)} yield` : `${fmtMoney(d.trailing12m, true)}<span class="pf-sub">${fmtPct(d.yield)}</span>`));
         }
         $('heroMetrics').innerHTML = items.join('');
+    }
+
+    // The day's change and what moved it most.
+    function renderToday(data) {
+        const t = data.totals;
+        const movers = data.positions.filter((p) => p.dayChangePct != null)
+            .sort((a, b) => Math.abs(b.dayChangePct) - Math.abs(a.dayChangePct)).slice(0, 5);
+        $('todayCard').hidden = t.dayChange == null;
+        if (t.dayChange == null) return;
+        const asOf = data.positions.map((p) => p.priceAsOf).filter(Boolean).sort().pop();
+        $('todaySub').textContent = asOf ? `Close of ${fmtDay(asOf)}` : '';
+        $('todayChange').innerHTML = privacy
+            ? `<p class="pf-today ${tone(t.dayChange)}">${fmtPct(t.dayChangePct, true)}</p>`
+            : `<p class="pf-today ${tone(t.dayChange)}">${fmtSigned(t.dayChange, true)}</p><p class="pf-sub ${tone(t.dayChange)}">${fmtPct(t.dayChangePct, true)}</p>`;
+        $('moversBody').innerHTML = movers.map((p) => `
+            <tr data-ticker="${escapeHtml(p.ticker)}">
+                <td>${securityLink(p)}</td>
+                ${dayPill(p)}
+            </tr>`).join('');
     }
 
     // Four figures that sum the portfolio up.
@@ -536,7 +562,7 @@
         if (noBasis) items.push(`${plural(noBasis, 'position')} with no cost basis.`);
         els.insights.innerHTML = items.length ? items.map((text) => `<li>${text}</li>`).join('') : '';
         $('noticesCard').hidden = !items.length;
-        els.insightGrid.classList.toggle('pf-grid--single', !items.length || els.sectorCard.hidden);
+
     }
 
     function priceCell(p) {
@@ -1187,7 +1213,7 @@
             <thead><tr><th scope="col">Ticker</th><th scope="col" class="num">Price</th><th scope="col" class="num">Day</th><th scope="col">Alerts</th><th scope="col"><span class="visually-hidden">Remove</span></th></tr></thead>
             <tbody>${items.map((i) => `
                 <tr>
-                    <td><a class="pf-ticker" href="/stock-research/?ticker=${encodeURIComponent(i.ticker)}">${escapeHtml(i.ticker)}</a>${i.name && i.name !== i.ticker ? `<span class="pf-name">${escapeHtml(i.name)}</span>` : ''}</td>
+                    <td><a class="pf-ticker" href="/portfolio/research/?ticker=${encodeURIComponent(i.ticker)}">${escapeHtml(i.ticker)}</a>${i.name && i.name !== i.ticker ? `<span class="pf-name">${escapeHtml(i.name)}</span>` : ''}</td>
                     <td class="num pf-strong">${i.price != null ? fmtPrice(i.price) : `<span class="pf-muted">${i.priceStatus === 'pending' ? 'Loading…' : 'Unavailable'}</span>`}</td>
                     <td class="num ${tone(i.dayChangePct)}">${i.dayChangePct != null ? fmtPct(i.dayChangePct, true) : '—'}</td>
                     <td>${alertText(i)}</td>
@@ -1440,6 +1466,17 @@
         return node;
     }
 
+    // The wash under a chart's line, fading toward the axis.
+    function areaFill() {
+        const defs = svg('defs');
+        const gradient = svg('linearGradient', { id: 'pfArea', x1: 0, y1: 0, x2: 0, y2: 1 });
+        [[0, 0.16], [1, 0]].forEach(([offset, opacity]) => {
+            gradient.appendChild(svg('stop', { offset, 'stop-color': '#2f54eb', 'stop-opacity': opacity }));
+        });
+        defs.appendChild(gradient);
+        return defs;
+    }
+
     function niceTicks(min, max, count) {
         const span = max - min || Math.abs(max) || 1;
         const raw = span / count;
@@ -1554,7 +1591,8 @@
 
         const all = points.map((_, i) => i);
         const valueLine = path(all, 'value');
-        root.appendChild(svg('path', { class: 'pf-chart__area', d: `${valueLine}L${x(points.length - 1)},${y(lo)}L${x(0)},${y(lo)}Z` }));
+        root.appendChild(areaFill());
+        root.appendChild(svg('path', { fill: 'url(#pfArea)', d: `${valueLine}L${x(points.length - 1)},${y(lo)}L${x(0)},${y(lo)}Z` }));
         runs(points, (p) => showCost && p.invested != null).forEach((indices) => {
             root.appendChild(svg('path', { class: 'pf-chart__invested', d: path(indices, 'invested') }));
         });
@@ -1746,7 +1784,7 @@
 
         const research = $('holdingResearch');
         research.hidden = d.asset !== 'stock';
-        research.href = `/stock-research/?ticker=${encodeURIComponent(d.ticker)}`;
+        research.href = `/portfolio/research/?ticker=${encodeURIComponent(d.ticker)}`;
         const meta = [...new Set([c.sector, c.industry, c.headquarters, c.employees ? `${countFormat.format(c.employees)} employees` : null].filter(Boolean))];
         $('holdingAbout').innerHTML = d.asset !== 'stock'
             ? `<p>${d.asset === 'crypto' ? 'Cryptocurrency' : 'No market data.'}</p>`
@@ -1807,7 +1845,8 @@
         });
         dateLabels(root, points, x, innerW, height);
         const line = points.map((p, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(p.close).toFixed(1)}`).join('');
-        root.appendChild(svg('path', { class: 'pf-chart__area', d: `${line}L${x(points.length - 1)},${y(lo)}L${x(0)},${y(lo)}Z` }));
+        root.appendChild(areaFill());
+        root.appendChild(svg('path', { fill: 'url(#pfArea)', d: `${line}L${x(points.length - 1)},${y(lo)}L${x(0)},${y(lo)}Z` }));
         if (cost != null) {
             root.appendChild(svg('line', { class: 'pf-chart__avg', x1: pad.left, x2: width - pad.right, y1: y(cost), y2: y(cost) }));
         }
@@ -1917,8 +1956,10 @@
         els.uploadButton.textContent = 'Upload';
         if (!result) return;
 
-        const { kind, count, duplicates, removedSample } = result.imported;
-        const what = kind === 'holdings' ? plural(count, 'holding') : plural(count, 'trade');
+        const { kind, count, duplicates, removedSample, dividends = 0 } = result.imported;
+        const what = kind === 'holdings'
+            ? plural(count, 'holding')
+            : `${plural(count - dividends, 'trade')}${dividends ? ` and ${plural(dividends, 'dividend')}` : ''}`;
         const parts = [`Imported ${what}.`];
         if (duplicates) parts.push(`${plural(duplicates, 'row')} ${duplicates === 1 ? 'was' : 'were'} already saved.`);
         if (removedSample) parts.push(`Removed the ${countFormat.format(removedSample)} sample trades.`);

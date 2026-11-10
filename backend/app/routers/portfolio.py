@@ -154,6 +154,11 @@ class WatchRequest(BaseModel):
     alert_below: Optional[float] = Field(None, gt=0, le=1e7)
 
 
+@router.get("/positions")
+def read_positions(username: str = Depends(caller), db: Session = Depends(get_db)) -> Dict[str, Any]:
+    return portfolio.position_brief(db, username)
+
+
 @router.get("/watchlist")
 def read_watchlist(username: str = Depends(caller), db: Session = Depends(get_db)) -> Dict[str, Any]:
     return portfolio.watchlist(db, username)

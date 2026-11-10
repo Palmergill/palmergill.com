@@ -11,8 +11,8 @@
             icon: "user-round"
         },
         {
-            label: "Stock Research",
-            href: "/stock-research/",
+            label: "Portfolio",
+            href: "/portfolio/",
             icon: "chart-candlestick"
         },
         {

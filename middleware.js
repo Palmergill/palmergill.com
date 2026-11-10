@@ -18,7 +18,7 @@ const PUBLIC_PREFIXES = [
   '/craps-strategy',
   '/high-card-flush',
   '/api/poker',
-  '/stock-research',
+  '/portfolio',
   '/bitcoin-chat',
   '/api/stocks',
   '/api/bitcoin',
@@ -549,7 +549,7 @@ export default async function middleware(request) {
 
 export const config = {
   matcher: [
-    '/stock-research/:path*',
+    '/portfolio/:path*',
     '/bitcoin-chat/:path*',
     '/admin/:path*',
     '/api/:path*',

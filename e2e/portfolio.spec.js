@@ -6,7 +6,7 @@ test.describe('signed out', () => {
     test.use({ allowErrors: [/status of 403/] });
 
     test('anonymous visitors see a sign-in panel and no portfolio', async ({ page }) => {
-        await page.goto('/stock-research/portfolio/');
+        await page.goto('/portfolio/');
         await expect(page.getByRole('heading', { name: 'Sign in to see your portfolio' })).toBeVisible();
         await expect(page.locator('#dashboard')).toBeHidden();
     });
@@ -14,7 +14,7 @@ test.describe('signed out', () => {
 
 test('a member uploads holdings, sees the breakdown, and nobody else does', async ({ page, browser }) => {
     await signUp(page);
-    await page.goto('/stock-research/portfolio/');
+    await page.goto('/portfolio/');
     await page.getByText('Or paste CSV text').click();
     await page.getByPlaceholder(/Symbol,Quantity/).fill('Symbol,Quantity,Cost Basis\nAAPL,10,1500\nMSFT,4,1320\nSPAXX**,500,500');
     await page.getByRole('button', { name: 'Upload', exact: true }).click();
@@ -37,7 +37,7 @@ test('a member uploads holdings, sees the breakdown, and nobody else does', asyn
     // A second account sees its own empty portfolio, not this one.
     const other = await browser.newPage();
     await signUp(other);
-    await other.goto('/stock-research/portfolio/');
+    await other.goto('/portfolio/');
     await expect(other.getByRole('heading', { name: 'Add your portfolio' })).toBeVisible();
     await expect(other.locator('#dashboard')).toBeHidden();
     await other.close();
@@ -45,7 +45,7 @@ test('a member uploads holdings, sees the breakdown, and nobody else does', asyn
 
 test('a multi-broker trade history uploads through the file picker and fills every tab', async ({ page }) => {
     await signUp(page);
-    await page.goto('/stock-research/portfolio/');
+    await page.goto('/portfolio/');
     const csv = [
         'date,source,account,type,security,quantity,price,amount_usd,fees_usd,realized_gain_loss,notes',
         '2017-02-06,Uploaded CSV,Robinhood,buy,NVDA,10,25.00,250.00,0,,10 shares of NVDA purchased',

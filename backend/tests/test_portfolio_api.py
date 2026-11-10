@@ -73,6 +73,7 @@ def _buy(client, ticker="AAPL", shares=10, price=150.0, day="2026-01-05", side="
     ("delete", "/api/stocks/portfolio/transactions/1"),
     ("delete", "/api/stocks/portfolio/holdings"),
     ("delete", "/api/stocks/portfolio"),
+    ("get", "/api/stocks/portfolio/positions"),
     ("get", "/api/stocks/portfolio/watchlist"),
     ("post", "/api/stocks/portfolio/watchlist"),
     ("delete", "/api/stocks/portfolio/watchlist/AAPL"),
@@ -871,3 +872,12 @@ def test_exports_are_csv_of_positions_and_realized_gains():
     assert lines[0].startswith("Symbol,Name,Shares") and lines[1].startswith("AAPL,AAPL,6.000000,200.00,1200.00")
     realized = client.get("/api/stocks/portfolio/export", params={"kind": "realized"}).text.strip().splitlines()
     assert realized[1].split(",")[1:] == ["AAPL", "4.000000", "180.00", "720.00", "0.00", "320.00", "Long", ""]
+
+
+def test_the_position_brief_is_shares_and_average_cost_of_open_positions():
+    client = _member_client()
+    _buy(client, "AAPL", shares=10, price=100.0)
+    _buy(client, "MSFT", shares=2, price=300.0)
+    _buy(client, "MSFT", shares=2, price=350.0, day="2026-02-02", side="sell")
+    assert client.get("/api/stocks/portfolio/positions").json()["positions"] == {"AAPL": {"shares": 10, "avgCost": 100.0}}
+    assert _member_client().get("/api/stocks/portfolio/positions").json()["positions"] == {}
