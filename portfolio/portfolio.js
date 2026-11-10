@@ -1378,6 +1378,34 @@
         return node;
     }
 
+    // Just enough axis to read the chart by: the low, middle and high value on
+    // the right, and the first, middle and last date along the bottom.
+    function sparseAxes(root, points, { lo, hi, x, y, width, height, pad }) {
+        // Rounded to two figures of the chart's span, so they read cleanly.
+        const step = 10 ** (Math.floor(Math.log10(hi - lo || 1)) - 1);
+        const round = (v) => Math.round(v / step) * step;
+        const top = round(hi - (hi - lo) * 0.06);
+        const bottom = round(lo + (hi - lo) * 0.06);
+        if (!privacy) {
+            [bottom, round((bottom + top) / 2), top].forEach((v) => {
+                root.appendChild(svg('line', { class: 'pf-chart__guide', x1: pad.left, x2: width - pad.right, y1: y(v), y2: y(v) }));
+                const label = svg('text', { class: 'pf-chart__axis', x: width - pad.right + 8, y: y(v) + 4 });
+                label.textContent = compactMoney(v);
+                root.appendChild(label);
+            });
+        }
+        const first = new Date(`${points[0].date}T00:00:00Z`);
+        const last = new Date(`${points[points.length - 1].date}T00:00:00Z`);
+        const long = last - first > 200 * 86400000;
+        const fmt = new Intl.DateTimeFormat('en-US', long ? { month: 'short', year: 'numeric', timeZone: 'UTC' } : { month: 'short', day: 'numeric', timeZone: 'UTC' });
+        const mid = Math.floor((points.length - 1) / 2);
+        [[0, 'start'], [mid, 'middle'], [points.length - 1, 'end']].forEach(([i, anchor]) => {
+            const label = svg('text', { class: 'pf-chart__axis', x: x(i), y: height - 4, 'text-anchor': anchor });
+            label.textContent = fmt.format(new Date(`${points[i].date}T00:00:00Z`));
+            root.appendChild(label);
+        });
+    }
+
     function compactMoney(value) {
         const abs = Math.abs(value);
         if (abs >= 1e6) return `$${(value / 1e6).toFixed(abs >= 1e7 ? 0 : 1)}M`;
@@ -1442,7 +1470,8 @@
         const width = host.clientWidth;
         const height = host.clientHeight;
         if (!width) return; // hidden tab: drawn when it's shown
-        const pad = { top: 10, right: 4, bottom: 10, left: 4 };
+        // Room on the right for three value labels and below for three dates.
+        const pad = { top: 10, right: 46, bottom: 22, left: 4 };
         const innerW = width - pad.left - pad.right;
         const innerH = height - pad.top - pad.bottom;
 
@@ -1464,6 +1493,7 @@
         const path = (indices, key) => indices.map((i, k) => `${k ? 'L' : 'M'}${x(i).toFixed(1)},${y(points[i][key]).toFixed(1)}`).join('');
 
         const root = svg('svg', { viewBox: `0 0 ${width} ${height}`, role: 'img', 'aria-label': `Portfolio value and amount invested from ${points[0].date} to ${points[points.length - 1].date}` });
+        sparseAxes(root, points, { lo, hi, x, y, width, height, pad });
         // Private, the tooltip gives the return from the range's start.
         const returns = privacy ? points.map((_, i) => rangeReturn(points.slice(0, i + 1)).pct) : null;
 

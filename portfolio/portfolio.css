@@ -131,6 +131,7 @@
 .pf-chart svg { display: block; width: 100%; height: 100%; overflow: visible; }
 .pf-chart__grid { stroke: var(--line); stroke-width: 1; }
 .pf-chart__axis { fill: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+.pf-chart__guide { stroke: var(--line); stroke-width: 1; stroke-dasharray: 2 4; }
 .pf-chart__line { fill: none; stroke: var(--trend, var(--forest)); stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round; }
 .pf-chart__line--estimated { stroke-dasharray: 5 5; opacity: 0.75; }
 .pf-chart__invested { fill: none; stroke: #b9af98; stroke-width: 1.25; stroke-linejoin: round; }
