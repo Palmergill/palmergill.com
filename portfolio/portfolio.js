@@ -8,8 +8,8 @@
 // at a time.
 (function () {
     const API_BASE = window.API_ORIGIN || '';
-    const SERIES = ['var(--series-1)', 'var(--series-2)', 'var(--series-3)', 'var(--series-4)', 'var(--series-5)'];
-    const OTHER = 'var(--series-other)';
+    // Rows in the allocation list by holding; the rest fold into "Other".
+    const ALLOCATION_ROWS = 8;
     // Prices still loading on the server: it fetches a few per request, and
     // pauses when the provider's per-minute allowance runs out. Its
     // `retryAfter` says when to ask again.
@@ -94,7 +94,6 @@
         heroValue: $('heroValue'),
         insightGrid: $('insightGrid'),
         sectorCard: $('sectorCard'),
-        allocationBar: $('allocationBar'),
         sectorBars: $('sectorBars'),
         insights: $('insights'),
         topHoldingsSub: $('topHoldingsSub'),
@@ -333,7 +332,6 @@
         renderHero(data);
         renderMetrics(data);
         renderToday(data);
-        renderAllocation(data);
         renderTopHoldings(data);
         renderGlance(data);
         renderSectors(data);
@@ -425,16 +423,15 @@
 
     function allocationSlices(positions) {
         const priced = positions.filter((p) => p.marketValue != null && p.marketValue > 0);
-        const slices = priced.slice(0, SERIES.length).map((p, i) => ({
-            label: p.ticker, value: p.marketValue, weight: p.weight, color: SERIES[i],
+        const slices = priced.slice(0, ALLOCATION_ROWS).map((p) => ({
+            label: p.ticker, value: p.marketValue, weight: p.weight,
         }));
-        const rest = priced.slice(SERIES.length);
+        const rest = priced.slice(ALLOCATION_ROWS);
         if (rest.length) {
             slices.push({
                 label: `Other (${rest.length})`,
                 value: rest.reduce((sum, p) => sum + p.marketValue, 0),
                 weight: rest.reduce((sum, p) => sum + (p.weight || 0), 0),
-                color: OTHER,
             });
         }
         return slices;
@@ -455,45 +452,16 @@
     }
     function hideTip() { if (tip) tip.hidden = true; }
 
-    function renderAllocation(data) {
-        const slices = allocationSlices(data.positions);
-        els.allocationBar.hidden = !slices.length;
-        els.allocationBar.setAttribute('aria-label', slices.map((s) => `${s.label} ${fmtPct(s.weight)}`).join(', '));
-        els.allocationBar.innerHTML = slices.map((s, i) => (
-            `<div class="pf-stack__seg" data-i="${i}" style="flex:${s.weight} 1 0; background:${s.color}"></div>`
-        )).join('');
-        els.allocationBar.querySelectorAll('.pf-stack__seg').forEach((seg) => {
-            const s = slices[Number(seg.dataset.i)];
-            const text = privacy ? `${s.label} · ${fmtPct(s.weight)}` : `${s.label} · ${fmtMoney(s.value, true)} · ${fmtPct(s.weight)}`;
-            seg.addEventListener('mousemove', (event) => showTip(event, text));
-            seg.addEventListener('mouseleave', hideTip);
-        });
-    }
-
     function knownSectors(data) {
         return data.sectors.filter((s) => s.sector !== 'Unclassified');
     }
 
-    // Allocation as a donut, by sector or by holding; the five largest get
-    // their own colour and the rest share the neutral one.
+    // Allocation as ruled rows, by sector or by holding.
     let allocationMode = 'sector';
     function allocationGroups(data) {
         if (allocationMode === 'holding') return allocationSlices(data.positions);
-        const sectors = data.sectors.filter((s) => s.marketValue > 0);
-        const named = sectors.filter((s) => s.sector !== 'Unclassified');
-        const groups = named.slice(0, SERIES.length).map((s, i) => ({
-            label: s.sector, value: s.marketValue, weight: s.weight, color: SERIES[i],
-        }));
-        const rest = sectors.filter((s) => !groups.some((g) => g.label === s.sector));
-        if (rest.length) {
-            groups.push({
-                label: rest.length === 1 ? rest[0].sector : `Other (${rest.length})`,
-                value: rest.reduce((sum, s) => sum + s.marketValue, 0),
-                weight: rest.reduce((sum, s) => sum + (s.weight || 0), 0),
-                color: OTHER,
-            });
-        }
-        return groups;
+        return data.sectors.filter((s) => s.marketValue > 0)
+            .map((s) => ({ label: s.sector, value: s.marketValue, weight: s.weight }));
     }
 
     function renderSectors(data) {
@@ -501,30 +469,13 @@
         $('allocationModes').querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.mode === allocationMode)));
         const groups = allocationGroups(data);
         els.sectorCard.hidden = !groups.length;
-        const host = $('allocationDonut');
-        const r = 40;
-        const circumference = 2 * Math.PI * r;
-        const gap = groups.length > 1 ? 0.8 : 0;
-        let offset = 0;
-        const arcs = groups.map((g, i) => {
-            const length = (g.weight || 0) * circumference;
-            const arc = `<circle data-i="${i}" cx="50" cy="50" r="${r}" fill="none" stroke="${g.color}" stroke-width="16"
-                stroke-dasharray="${Math.max(0, length - gap)} ${circumference}" stroke-dashoffset="${-offset}" transform="rotate(-90 50 50)"/>`;
-            offset += length;
-            return arc;
-        }).join('');
-        const label = allocationMode === 'sector' ? 'sectors' : 'holdings';
-        const count = allocationMode === 'sector' ? data.sectors.length : data.positions.length;
-        host.innerHTML = `<svg viewBox="0 0 100 100">${arcs}</svg><div class="pf-donut__center"><strong>${countFormat.format(count)}</strong><span>${label}</span></div>`;
-        host.setAttribute('aria-label', groups.map((g) => `${g.label} ${fmtPct(g.weight)}`).join(', '));
-        host.querySelectorAll('circle').forEach((arc) => {
-            const g = groups[Number(arc.dataset.i)];
-            const text = privacy ? `${g.label} · ${fmtPct(g.weight)}` : `${g.label} · ${fmtMoney(g.value, true)} · ${fmtPct(g.weight)}`;
-            arc.addEventListener('mousemove', (event) => showTip(event, text));
-            arc.addEventListener('mouseleave', hideTip);
-        });
+        const largest = Math.max(...groups.map((g) => g.weight || 0)) || 1;
         els.sectorBars.innerHTML = groups.map((g) => `
-            <li><span class="pf-swatch" style="background:${g.color}"></span><span>${escapeHtml(g.label)}</span><span>${fmtPct(g.weight)}${privacy ? '' : ` · ${fmtMoney(g.value, true)}`}</span></li>`).join('');
+            <li>
+                <span>${escapeHtml(g.label)}</span>
+                <span class="pf-alloc__value">${fmtPct(g.weight)}${privacy ? '' : `<em>${fmtMoney(g.value, true)}</em>`}</span>
+                <div class="pf-alloc__bar"><i style="width:${((g.weight || 0) / largest) * 100}%"></i></div>
+            </li>`).join('');
     }
     $('allocationModes').addEventListener('click', (event) => {
         const button = event.target.closest('button[data-mode]');
@@ -575,20 +526,8 @@
         return `${fmtPrice(p.price)}${note}`;
     }
 
-    function swatches(positions) {
-        // Each row's swatch is its segment in the allocation bar.
-        let priced = 0;
-        return positions.map((p) => (p.marketValue > 0 ? (SERIES[priced++] || OTHER) : 'transparent'));
-    }
-
-    function securityCell(p, color) {
-        return `<span class="pf-ticker-cell">
-            <span class="pf-swatch" style="background:${color}"></span>
-            <span>
-                ${securityLink(p)}
-                ${p.name && p.name !== p.ticker ? `<span class="pf-name" title="${escapeHtml(p.name)}">${escapeHtml(p.name)}</span>` : ''}
-            </span>
-        </span>`;
+    function securityCell(p) {
+        return `${securityLink(p)}${p.name && p.name !== p.ticker ? `<span class="pf-name" title="${escapeHtml(p.name)}">${escapeHtml(p.name)}</span>` : ''}`;
     }
 
     function gainCell(p, extra = '') {
@@ -612,7 +551,6 @@
     }
 
     function renderTopHoldings(data) {
-        const colors = swatches(data.positions);
         const top = data.positions.slice(0, TOP_HOLDINGS);
         els.topHoldingsSub.textContent = data.positions.length > TOP_HOLDINGS
             ? `Top ${TOP_HOLDINGS} of ${data.positions.length}`
@@ -620,9 +558,9 @@
         els.allHoldingsLink.textContent = data.totals.closedPositions
             ? `All holdings and ${data.totals.closedPositions} closed`
             : 'All holdings';
-        els.topHoldingsBody.innerHTML = top.map((p, i) => `
+        els.topHoldingsBody.innerHTML = top.map((p) => `
             <tr data-ticker="${escapeHtml(p.ticker)}">
-                <td>${securityCell(p, colors[i])}</td>
+                <td>${securityCell(p)}</td>
                 ${weightCell(p)}
                 <td class="num pf-strong">${fmtMoney(p.marketValue, true)}</td>
                 ${dayPill(p)}
@@ -663,15 +601,13 @@
         els.holdingsSub.textContent = asOf
             ? `As of ${fmtDay(asOf)}${data.transactionCount ? ` · ${plural(data.transactionCount, 'trade')}` : ''}`
             : plural(data.transactionCount, 'trade');
-        const colors = swatches(data.positions);
-        const colorOf = new Map(data.positions.map((p, i) => [p.ticker, colors[i]]));
         document.querySelectorAll('#holdingsTable th[data-sort]').forEach((th) => {
             if (th.dataset.sort === sort.key) th.setAttribute('aria-sort', sort.dir > 0 ? 'ascending' : 'descending');
             else th.removeAttribute('aria-sort');
         });
         els.holdingsBody.innerHTML = sortedPositions(data.positions).map((p) => `
             <tr data-ticker="${escapeHtml(p.ticker)}">
-                <td>${securityCell(p, colorOf.get(p.ticker))}</td>
+                <td>${securityCell(p)}</td>
                 ${weightCell(p, 'pf-hide-sm')}
                 <td class="num pf-strong">${fmtMoney(p.marketValue, true)}</td>
                 ${dayCell(p)}
@@ -997,7 +933,7 @@
         const range = up + down || 1;
         const zero = pad.top + (up / range) * innerH;
         const slot = width / years.length;
-        const barW = Math.min(56, slot * 0.55);
+        const barW = Math.min(36, slot * 0.4);
         const root = svg('svg', { viewBox: `0 0 ${width} ${height}`, 'aria-label': years.map((y) => `${y.year}: ${fmtSigned(y.realized, true)}`).join(', ') });
         years.forEach((y, i) => {
             const cx = slot * i + slot / 2;
@@ -1098,8 +1034,8 @@
         });
         const shade = (r) => {
             if (r == null) return '';
-            const strength = Math.min(1, Math.abs(r) / 0.08) * 0.42 + 0.06;
-            return `background: rgba(${r >= 0 ? '46, 125, 79' : '193, 79, 63'}, ${strength.toFixed(2)})`;
+            const strength = Math.min(1, Math.abs(r) / 0.1) * 0.24 + 0.04;
+            return `background: rgba(${r >= 0 ? '15, 123, 79' : '179, 38, 30'}, ${strength.toFixed(2)})`;
         };
         $('monthlyCard').hidden = false;
         $('monthlyTable').innerHTML = `
@@ -1466,17 +1402,6 @@
         return node;
     }
 
-    // The wash under a chart's line, fading toward the axis.
-    function areaFill() {
-        const defs = svg('defs');
-        const gradient = svg('linearGradient', { id: 'pfArea', x1: 0, y1: 0, x2: 0, y2: 1 });
-        [[0, 0.16], [1, 0]].forEach(([offset, opacity]) => {
-            gradient.appendChild(svg('stop', { offset, 'stop-color': '#2f54eb', 'stop-opacity': opacity }));
-        });
-        defs.appendChild(gradient);
-        return defs;
-    }
-
     function niceTicks(min, max, count) {
         const span = max - min || Math.abs(max) || 1;
         const raw = span / count;
@@ -1544,6 +1469,18 @@
         return out.filter((v) => v != null).length > 1 ? out : null;
     }
 
+    // A chart is drawn to its box, so a box that changes size redraws it.
+    function redrawOnResize(id, redraw) {
+        let last = null;
+        new ResizeObserver(([entry]) => {
+            const size = `${Math.round(entry.contentRect.width)}x${Math.round(entry.contentRect.height)}`;
+            if (size !== last && entry.contentRect.width) {
+                if (last !== null) redraw();
+                last = size;
+            }
+        }).observe($(id));
+    }
+
     function drawChart(points) {
         const host = $('historyChart');
         host.innerHTML = '';
@@ -1554,7 +1491,7 @@
         const width = host.clientWidth;
         const height = host.clientHeight;
         if (!width) return; // hidden tab: drawn when it's shown
-        const pad = { top: 10, right: 8, bottom: 24, left: 48 };
+        const pad = { top: 10, right: 52, bottom: 24, left: 2 };
         const innerW = width - pad.left - pad.right;
         const innerH = height - pad.top - pad.bottom;
 
@@ -1580,7 +1517,7 @@
         const root = svg('svg', { viewBox: `0 0 ${width} ${height}`, role: 'img', 'aria-label': `Portfolio value and amount invested from ${points[0].date} to ${points[points.length - 1].date}` });
         ticks.forEach((t) => {
             root.appendChild(svg('line', { class: 'pf-chart__grid', x1: pad.left, x2: width - pad.right, y1: y(t), y2: y(t) }));
-            const label = svg('text', { class: 'pf-chart__axis', x: pad.left - 8, y: y(t) + 4, 'text-anchor': 'end' });
+            const label = svg('text', { class: 'pf-chart__axis', x: width - pad.right + 8, y: y(t) + 4, 'text-anchor': 'start' });
             label.textContent = privacy ? '' : compactMoney(t);
             root.appendChild(label);
         });
@@ -1589,10 +1526,6 @@
         // Private, the tooltip gives the return from the range's start.
         const returns = privacy ? points.map((_, i) => rangeReturn(points.slice(0, i + 1)).pct) : null;
 
-        const all = points.map((_, i) => i);
-        const valueLine = path(all, 'value');
-        root.appendChild(areaFill());
-        root.appendChild(svg('path', { fill: 'url(#pfArea)', d: `${valueLine}L${x(points.length - 1)},${y(lo)}L${x(0)},${y(lo)}Z` }));
         runs(points, (p) => showCost && p.invested != null).forEach((indices) => {
             root.appendChild(svg('path', { class: 'pf-chart__invested', d: path(indices, 'invested') }));
         });
@@ -1814,7 +1747,7 @@
         const width = host.clientWidth;
         const height = host.clientHeight;
         if (!width) return;
-        const pad = { top: 10, right: 8, bottom: 24, left: 52 };
+        const pad = { top: 10, right: 58, bottom: 24, left: 2 };
         const innerW = width - pad.left - pad.right;
         const innerH = height - pad.top - pad.bottom;
 
@@ -1839,14 +1772,12 @@
         const root = svg('svg', { viewBox: `0 0 ${width} ${height}`, role: 'img', 'aria-label': `Daily closing price from ${points[0].date} to ${points[points.length - 1].date}` });
         ticks.forEach((t) => {
             root.appendChild(svg('line', { class: 'pf-chart__grid', x1: pad.left, x2: width - pad.right, y1: y(t), y2: y(t) }));
-            const label = svg('text', { class: 'pf-chart__axis', x: pad.left - 8, y: y(t) + 4, 'text-anchor': 'end' });
+            const label = svg('text', { class: 'pf-chart__axis', x: width - pad.right + 8, y: y(t) + 4, 'text-anchor': 'start' });
             label.textContent = hi - lo < 20 ? `$${t.toFixed(2)}` : compactMoney(t);
             root.appendChild(label);
         });
         dateLabels(root, points, x, innerW, height);
         const line = points.map((p, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(p.close).toFixed(1)}`).join('');
-        root.appendChild(areaFill());
-        root.appendChild(svg('path', { fill: 'url(#pfArea)', d: `${line}L${x(points.length - 1)},${y(lo)}L${x(0)},${y(lo)}Z` }));
         if (cost != null) {
             root.appendChild(svg('line', { class: 'pf-chart__avg', x1: pad.left, x2: width - pad.right, y1: y(cost), y2: y(cost) }));
         }
@@ -2054,6 +1985,8 @@
         if (data) { showNotice('Your portfolio was deleted.'); render(data); }
     });
 
+    redrawOnResize('historyChart', () => { if (history.data && currentTab() === 'overview') renderHistory(); });
+    redrawOnResize('holdingChart', () => { if (holding.data && currentTab() === 'holding') renderHolding(); });
     $('addDate').value = today();
     els.asOfInput.value = today();
     syncKindOptions();

@@ -49,10 +49,7 @@
     function renderNav() {
         const nav = document.getElementById('appNav');
         nav.innerHTML = `
-            <a class="app-nav__brand" href="${ROOT}">
-                <svg viewBox="0 0 24 24" aria-hidden="true"><rect width="24" height="24" rx="6" fill="#2f54eb"/><path d="M5 16l4.5-5 3.5 3 6-7" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                Portfolio
-            </a>
+            <a class="app-nav__brand" href="${ROOT}">Portfolio</a>
             <nav class="app-nav__links" id="tabs" aria-label="Portfolio sections">
                 ${GROUPS.map(([name, items]) => `<p class="app-nav__group">${name}</p>${items.map(renderLink).join('')}`).join('')}
                 <button type="button" class="app-nav__more" id="navMore" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg><span>More</span></button>
