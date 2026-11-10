@@ -18,9 +18,16 @@
     const TRADES_PER_PAGE = 50;
     const REALIZED_SHOWN = 12;
     const PAGE_TITLES = {
-        overview: 'Overview', holdings: 'Holdings', gains: 'Performance', income: 'Income',
-        taxes: 'Taxes', watchlist: 'Watchlist', activity: 'Activity', accounts: 'Accounts',
+        overview: 'Overview', holdings: 'Holdings', gains: 'Analysis', income: 'Analysis',
+        taxes: 'Analysis', watchlist: 'Watchlist', activity: 'Activity', accounts: 'Activity',
     };
+    // Which section's nav item a tab lights up, and the sub-tabs it shares.
+    const SECTION_OF = { income: 'gains', taxes: 'gains', accounts: 'activity', watchlist: 'research' };
+    const SUBTABS = {
+        gains: [['gains', 'Performance'], ['income', 'Income'], ['taxes', 'Taxes']],
+        activity: [['activity', 'Trades'], ['accounts', 'Accounts']],
+    };
+    let hasIncome = false;
     const TABS = ['overview', 'holdings', 'gains', 'income', 'taxes', 'watchlist', 'activity', 'accounts'];
     // A position past this share of the portfolio is flagged.
     const CONCENTRATED = 0.25;
@@ -92,10 +99,8 @@
         dashboard: $('dashboard'),
         tabs: $('tabs'),
         heroValue: $('heroValue'),
-        insightGrid: $('insightGrid'),
         sectorCard: $('sectorCard'),
         sectorBars: $('sectorBars'),
-        insights: $('insights'),
         topHoldingsSub: $('topHoldingsSub'),
         topHoldingsBody: document.querySelector('#topHoldingsTable tbody'),
         allHoldingsLink: $('allHoldingsLink'),
@@ -267,7 +272,8 @@
     function showTab() {
         const tab = currentTab();
         if (tab !== 'holding') listTab = tab;
-        const shown = tab === 'holding' ? listTab : tab;
+        const shown = SECTION_OF[tab === 'holding' ? listTab : tab] || (tab === 'holding' ? listTab : tab);
+        renderSubtabs(tab);
         $('pageTitle').textContent = tab === 'holding' ? holdingTicker() : PAGE_TITLES[tab];
         document.title = `${$('pageTitle').textContent} — Portfolio`;
         els.tabs.querySelectorAll('a[data-tab]').forEach((link) => {
@@ -290,6 +296,16 @@
             loadHolding(holdingTicker());
         }
     }
+    function renderSubtabs(tab) {
+        const bar = $('subtabs');
+        const tabs = SUBTABS[SECTION_OF[tab] || tab];
+        bar.hidden = !tabs;
+        if (!tabs) return;
+        bar.innerHTML = tabs
+            .filter(([key]) => key !== 'income' || hasIncome)
+            .map(([key, label]) => `<a href="#${key}"${key === tab ? ' aria-current="page"' : ''}>${label}</a>`).join('');
+    }
+
     // Tapping anywhere on a security's row opens it.
     document.addEventListener('click', (event) => {
         const row = event.target.closest('tr[data-ticker]');
@@ -333,9 +349,7 @@
         renderMetrics(data);
         renderToday(data);
         renderTopHoldings(data);
-        renderGlance(data);
         renderSectors(data);
-        renderInsights(data);
         renderHoldings(data);
         renderClosed(data);
         renderSplits(data);
@@ -396,29 +410,6 @@
                 <td>${securityLink(p)}</td>
                 ${dayPill(p)}
             </tr>`).join('');
-    }
-
-    // Four figures that sum the portfolio up.
-    function renderGlance(data) {
-        const priced = data.positions.filter((p) => p.weight != null);
-        const withGain = data.positions.filter((p) => p.gainPct != null);
-        const tag = (text, cls = '') => `<span class="pf-tile__tag ${cls}">${text}</span>`;
-        const tiles = [];
-        if (priced.length) {
-            const top = priced[0];
-            const heavy = top.weight > CONCENTRATED;
-            tiles.push(gainTile('Largest position', `${escapeHtml(top.ticker)}${tag(fmtPct(top.weight))}`, heavy ? 'Concentrated' : '', '', heavy ? 'pf-tile--warn' : ''));
-            const n = Math.min(5, priced.length);
-            tiles.push(gainTile(`Top ${n} holdings`, fmtPct(priced.slice(0, n).reduce((sum, p) => sum + p.weight, 0)), `of ${plural(priced.length, 'position')}`));
-        }
-        if (withGain.length > 1) {
-            const best = withGain.reduce((a, b) => (b.gainPct > a.gainPct ? b : a));
-            const worst = withGain.reduce((a, b) => (b.gainPct < a.gainPct ? b : a));
-            tiles.push(gainTile('Best performer', `${escapeHtml(best.ticker)}${tag(fmtPct(best.gainPct, true), tone(best.gain))}`, ''));
-            tiles.push(gainTile('Weakest', `${escapeHtml(worst.ticker)}${tag(fmtPct(worst.gainPct, true), tone(worst.gain))}`, ''));
-        }
-        $('glanceTiles').innerHTML = tiles.join('');
-        $('glanceTiles').hidden = !tiles.length;
     }
 
     function allocationSlices(positions) {
@@ -483,38 +474,6 @@
         allocationMode = button.dataset.mode;
         renderSectors(lastData);
     });
-
-    function renderInsights(data) {
-        const items = [];
-        const t = data.totals;
-        if (data.firstTrade) {
-            items.push(`<strong>${plural(data.transactionCount, 'trade')}</strong> since ${fmtMonth(data.firstTrade)}, across <strong>${plural(data.accounts.length, 'account')}</strong>.`);
-        }
-        const heavy = data.positions.filter((p) => p.weight > CONCENTRATED);
-        if (heavy.length) {
-            items.push(`${heavy.map((p) => `<strong>${escapeHtml(p.ticker)}</strong> ${fmtPct(p.weight)}`).join(', ')} of the portfolio.`);
-        }
-        if (data.aliases.length) {
-            const named = data.aliases.map((a) => `“${escapeHtml(a.name)}” as <strong>${escapeHtml(a.ticker)}</strong>`).join(', ');
-            items.push(`Counted ${named}.`);
-        }
-        if (data.duplicates.count) {
-            const pairs = data.duplicates.pairs.map((p) => `${countFormat.format(p.count)} from ${escapeHtml(p.duplicateSource)} repeating ${escapeHtml(p.keptSource)}`).join(', ');
-            items.push(`<strong>${plural(data.duplicates.count, 'duplicate trade')}</strong> (${pairs}). <a href="#activity">See Activity</a>`);
-        }
-        if (data.splits.tradesAdjusted) {
-            const tickers = [...new Set(data.splits.applied.map((a) => a.ticker))];
-            items.push(`Adjusted ${plural(data.splits.tradesAdjusted, 'trade')} for ${plural(data.splits.applied.length, 'stock split')} (${tickers.slice(0, 4).map(escapeHtml).join(', ')}${tickers.length > 4 ? '…' : ''}). <a href="#holdings">See splits</a>`);
-        }
-        if (t.estimatedPositions) {
-            items.push(`${plural(t.estimatedPositions, 'position')} with no market price.`);
-        }
-        const noBasis = data.positions.filter((p) => p.costBasis == null).length;
-        if (noBasis) items.push(`${plural(noBasis, 'position')} with no cost basis.`);
-        els.insights.innerHTML = items.length ? items.map((text) => `<li>${text}</li>`).join('') : '';
-        $('noticesCard').hidden = !items.length;
-
-    }
 
     function priceCell(p) {
         if (p.price == null) {
@@ -1051,7 +1010,8 @@
 
     function renderIncome(data) {
         const d = data.dividends;
-        els.tabs.querySelector('[data-tab="income"]').hidden = !d.count;
+        hasIncome = d.count > 0;
+        renderSubtabs(currentTab());
         $('incomeTiles').innerHTML = [
             gainTile('Last 12 months', fmtMoney(d.trailing12m, true), ''),
             gainTile('Trailing yield', fmtPct(d.yield), ''),

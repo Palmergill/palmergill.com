@@ -70,14 +70,14 @@ test('a multi-broker trade history uploads through the file picker and fills eve
     await page.getByRole('link', { name: 'Accounts', exact: true }).click();
     await expect(page.locator('#accountsTable')).toContainText('Crypto Account');
 
-    await page.getByRole('link', { name: 'Performance', exact: true }).click();
+    await page.getByRole('link', { name: 'Analysis', exact: true }).click();
     await expect(page.locator('#realizedSub')).toContainText('File: +$135');
 
     // The NVDA left after the sell is one long-term lot.
     await page.getByRole('link', { name: 'Taxes', exact: true }).click();
     await expect(page.locator('#lotsTable tr[data-ticker="NVDA"]')).toContainText('Long');
 
-    await page.getByRole('link', { name: 'Watchlist', exact: true }).click();
+    await page.goto('/portfolio/#watchlist');
     await page.locator('#watchTicker').fill('tsla');
     await page.locator('#watchAbove').fill('500');
     await page.getByRole('button', { name: 'Watch', exact: true }).click();

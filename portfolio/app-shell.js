@@ -11,29 +11,16 @@
         overview: '<path d="M3 13h7V3H3zM14 21h7V11h-7zM14 7h7V3h-7zM3 21h7v-4H3z"/>',
         holdings: '<path d="M4 6h16M4 12h16M4 18h16"/>',
         gains: '<path d="M3 17l6-6 4 4 8-8"/><path d="M15 7h6v6"/>',
-        income: '<circle cx="12" cy="12" r="9"/><path d="M15 9.5c-.5-1.2-1.6-2-3-2-1.8 0-3 1-3 2.3 0 3.2 6 1.6 6 4.6 0 1.3-1.3 2.1-3 2.1-1.5 0-2.7-.8-3.1-2M12 5.5v13"/>',
-        taxes: '<path d="M7 3h10l3 3v15H4V3z"/><path d="M8 12h8M8 16h8M8 8h4"/>',
         research: '<circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/>',
-        watchlist: '<path d="M12 3l2.8 5.8 6.2.9-4.5 4.4 1.1 6.4L12 17.5l-5.6 3 1.1-6.4L3 9.7l6.2-.9z"/>',
         activity: '<path d="M7 4v16M7 20l-3-3M7 20l3-3M17 20V4M17 4l-3 3M17 4l3 3"/>',
-        accounts: '<path d="M3 10l9-6 9 6M5 10v9M19 10v9M9.5 10v9M14.5 10v9M3 21h18"/>',
     };
-    const GROUPS = [
-        ['Portfolio', [
-            { tab: 'overview', label: 'Overview', primary: true },
-            { tab: 'holdings', label: 'Holdings', primary: true },
-            { tab: 'gains', label: 'Performance' },
-            { tab: 'income', label: 'Income' },
-            { tab: 'taxes', label: 'Taxes' },
-        ]],
-        ['Markets', [
-            { icon: 'research', label: 'Research', href: RESEARCH, primary: true },
-            { tab: 'watchlist', label: 'Watchlist', primary: true },
-        ]],
-        ['Records', [
-            { tab: 'activity', label: 'Activity' },
-            { tab: 'accounts', label: 'Accounts' },
-        ]],
+    // Five sections; Analysis and Activity have their own sub-tabs.
+    const SECTIONS = [
+        { tab: 'overview', label: 'Overview' },
+        { tab: 'holdings', label: 'Holdings' },
+        { tab: 'gains', icon: 'gains', label: 'Analysis' },
+        { tab: 'research', icon: 'research', label: 'Research', href: RESEARCH },
+        { tab: 'activity', label: 'Activity' },
     ];
     const onResearch = window.location.pathname.startsWith(RESEARCH);
 
@@ -43,7 +30,7 @@
     function renderLink(item) {
         const href = item.href || `${ROOT}#${item.tab}`;
         const current = onResearch && item.href === RESEARCH ? ' aria-current="page"' : '';
-        return `<a href="${href}"${item.tab ? ` data-tab="${item.tab}"` : ''}${item.primary ? '' : ' data-secondary'}${current}>${icon(item.icon || item.tab)}<span>${item.label}</span></a>`;
+        return `<a href="${href}" data-tab="${item.tab}"${current}>${icon(item.icon || item.tab)}<span>${item.label}</span></a>`;
     }
 
     function renderNav() {
@@ -51,7 +38,7 @@
         nav.innerHTML = `
             <a class="app-nav__brand" href="${ROOT}">Portfolio</a>
             <nav class="app-nav__links" id="tabs" aria-label="Portfolio sections">
-                ${GROUPS.map(([name, items]) => `<p class="app-nav__group">${name}</p>${items.map(renderLink).join('')}`).join('')}
+                ${SECTIONS.map(renderLink).join('')}
                 <button type="button" class="app-nav__more" id="navMore" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg><span>More</span></button>
             </nav>
             <div class="app-nav__foot">

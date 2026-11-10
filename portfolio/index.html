@@ -12,8 +12,8 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="app-shell.css?v=3">
-    <link rel="stylesheet" href="portfolio.css?v=19">
+    <link rel="stylesheet" href="app-shell.css?v=4">
+    <link rel="stylesheet" href="portfolio.css?v=20">
 </head>
 <body class="app">
 <noscript>
@@ -94,6 +94,8 @@
         </section>
 
         <section id="dashboard" hidden>
+            <nav class="pf-subtabs" id="subtabs" aria-label="Section" hidden></nav>
+
             <!-- Overview: the headline, the line that got there, the top holdings. -->
             <div class="pf-panel" data-panel="overview">
                 <div class="pf-dash">
@@ -154,7 +156,7 @@
                             </table>
                         </div>
                     </section>
-                    <div class="pf-dash__rail" id="insightGrid">
+                    <div class="pf-dash__rail">
                         <section class="pf-card" id="sectorCard">
                             <div class="pf-card__head pf-card__head--row">
                                 <h2 class="pf-card__title">Allocation</h2>
@@ -165,16 +167,8 @@
                             </div>
                             <ul class="pf-alloc" id="sectorBars"></ul>
                         </section>
-                        <section class="pf-card" id="noticesCard">
-                            <div class="pf-card__head">
-                                <h2 class="pf-card__title">Notes</h2>
-                            </div>
-                            <ul class="pf-insights" id="insights"></ul>
-                        </section>
                     </div>
                 </div>
-
-                <div class="pf-tiles" id="glanceTiles"></div>
             </div>
 
             <!-- Holdings: every open position, then everything you've sold out of. -->
@@ -473,7 +467,7 @@
 
     <script src="/shared/api-base.js?v=1"></script>
     <script src="/shared/analytics.js?v=1"></script>
-    <script src="app-shell.js?v=3"></script>
-    <script src="portfolio.js?v=31"></script>
+    <script src="app-shell.js?v=4"></script>
+    <script src="portfolio.js?v=32"></script>
 </body>
 </html>
