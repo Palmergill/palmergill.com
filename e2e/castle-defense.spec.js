@@ -88,7 +88,7 @@ test('share copies the result and says so', async ({ page, context }) => {
     await page.getByRole('button', { name: /Spikes/ }).click();
     await clickTile(page, 5, 1);
     await page.locator('#playButton').click();
-    await page.getByRole('button', { name: '4×' }).click();
+    await page.getByRole('button', { name: '8×' }).click();
 
     // One trap can't hold for long; wait for the castle to fall.
     const share = page.getByRole('button', { name: 'Share result' });
@@ -112,7 +112,7 @@ test('your best layout comes back after you change it', async ({ page }) => {
     await page.getByRole('button', { name: /Spikes/ }).click();
     await clickTile(page, 5, 1);
     await page.locator('#playButton').click();
-    await page.getByRole('button', { name: '4×' }).click();
+    await page.getByRole('button', { name: '8×' }).click();
     await page.getByRole('dialog').getByRole('button', { name: 'Try again' }).click({ timeout: 90_000 });
 
     // Already on the board you scored with.
@@ -148,7 +148,7 @@ async function quickRun(page) {
     await page.getByRole('button', { name: new RegExp(piece.name) }).click();
     await clickTile(page, piece.x, piece.y);
     await page.locator('#playButton').click();
-    await page.getByRole('button', { name: '4×' }).click();
+    await page.getByRole('button', { name: '8×' }).click();
     await expect(page.getByRole('button', { name: 'Share result' })).toBeVisible({ timeout: 60_000 });
 }
 
