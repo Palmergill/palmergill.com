@@ -55,7 +55,7 @@ def _tiles(day: str):
     """`day`'s allotment, its grass tiles (best spots first) and road tiles, from the engine itself."""
     ctx = MiniRacer()
     try:
-        ctx.eval(castle_defense.engine_source())
+        ctx.eval(castle_defense.engine_source(day))
         raw = ctx.eval(
             "(() => { const G = CastleDefenseGame; const m = G.dailyMap(%s); const grass = [], road = [];"
             " const reach = (x, y) => { let n = 0; for (let d = 0; d < m.length; d += 0.2) {"
@@ -167,7 +167,7 @@ def test_best_run_counts_and_places_are_shared_on_ties():
 
 
 def test_scores_from_older_rules_are_left_off_and_then_replaced():
-    current = castle_defense.current_rules()
+    current = castle_defense.current_rules(TODAY)
     member = _member("Dana")
     db = SessionLocal()
     try:
@@ -247,12 +247,12 @@ def test_tiers_are_never_worked_out_far_ahead():
 def _score(day, username, kills, rules=None):
     return CastleDefenseScore(
         day=day, username=username, display_name=username.title(), kills=kills, wave=10,
-        layout="[]", runs=1, rules=rules if rules is not None else castle_defense.current_rules(),
+        layout="[]", runs=1, rules=rules if rules is not None else castle_defense.current_rules(day),
     )
 
 
 def test_all_time_is_a_medal_table():
-    rules = castle_defense.current_rules()
+    rules = castle_defense.current_rules("2026-10-22")
     days = {
         # Ann takes gold; Bo and Cy share 2nd, a silver each; Di is 4th.
         "2026-10-20": {"ann": 300, "bo": 250, "cy": 250, "di": 200},
@@ -283,3 +283,9 @@ def test_all_time_is_a_medal_table():
     }
     assert [e["name"] for e in board["entries"]][::3] == ["Ann", "Di"]
     assert board["days"] == 3 and board["players"] == 4
+
+
+def test_patch_two_starts_with_its_map():
+    # Throwaway with the two engines: days before Patch 2.0 keep their rules.
+    assert castle_defense.current_rules("2026-11-12") == 3
+    assert castle_defense.current_rules(castle_defense.PATCH2_DAY) == 4

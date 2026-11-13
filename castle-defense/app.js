@@ -293,7 +293,7 @@
                 </ul>
                 <h3>Targeting</h3>
                 <ul class="cd-howto">
-                    <li>A tower attacks the zombie in range that is furthest along the road. The Sniper instead shoots the one with the most HP left.</li>
+                    <li>A tower attacks the zombie in range that is furthest along the road.${G.DEFENSES.sniper ? " The Sniper instead shoots the one with the most HP left." : ""}</li>
                     <li>Range is measured from the centre of the tower's tile.</li>
                 </ul>`;
         }
@@ -316,8 +316,10 @@
                 <h3>Levels</h3>
                 <ul class="cd-howto">
                     <li>Every defense levels up on its own during the run, up to level ${G.MAX_LEVEL}.</li>
+                    ${G.XP_PER_HP ? `
                     <li>The defense that lands the killing blow earns 1 XP for every ${num(1 / G.XP_PER_HP)} HP the zombie started with, so tougher zombies, later waves and Zombie Kings are worth more.</li>
-                    <li>Every other defense that hurt that zombie earns ${pct(G.ASSIST_SHARE)} as much for the assist.</li>
+                    <li>Every other defense that hurt that zombie earns ${pct(G.ASSIST_SHARE)} as much for the assist.</li>` : `
+                    <li>The defense that lands the killing blow earns ${G.KILL_XP} XP. Every other defense that hurt that zombie earns ${G.ASSIST_XP} XP for the assist.</li>`}
                     <li>Levels need ${G.LEVEL_XP.map((x) => x.toLocaleString()).join(", ")} XP in total.</li>
                     <li>Each level adds ${pct(0.45)} of the level-1 damage, plus a little range, attack speed and blast radius. Slows and burns get stronger and last longer, and Mines re-arm faster.</li>
                 </ul>`;
@@ -1625,6 +1627,8 @@
     ];
 
     function showPatchNotes() {
+        // Throwaway: maps before Patch 2.0 still run the old engine.
+        if (G.RULES < 4) return;
         try {
             if (localStorage.getItem("castle-defense:patch") === PATCH) return;
             localStorage.setItem("castle-defense:patch", PATCH);

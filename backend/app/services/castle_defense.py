@@ -54,8 +54,19 @@ def _source(name: str) -> str:
     raise RuntimeError(f"{name} not found; looked in " + ", ".join(str(p) for p in paths))
 
 
-def engine_source() -> str:
-    return _source("castleDefenseGame.js")
+# Throwaway until old days stop mattering: Patch 2.0 starts with this map,
+# and every earlier day keeps the engine (and RULES) it was played under, so
+# today's board and tiers don't change mid-day. The page picks the same way
+# (castle-defense/index.html).
+PATCH2_DAY = "2026-11-13"
+
+
+def _engine_file(day: Optional[str] = None) -> str:
+    return "castleDefenseGameRules3.js" if day is not None and day < PATCH2_DAY else "castleDefenseGame.js"
+
+
+def engine_source(day: Optional[str] = None) -> str:
+    return _source(_engine_file(day))
 
 
 # FastAPI runs these requests on a thread pool, and two V8 contexts starting
@@ -64,13 +75,17 @@ def engine_source() -> str:
 _ENGINE_LOCK = threading.Lock()
 
 
-def _eval(expression: str) -> str:
+def _eval(expression: str, day: Optional[str] = None) -> str:
+    return _eval_in(_engine_file(day), expression)
+
+
+def _eval_in(engine_file: str, expression: str) -> str:
     from py_mini_racer import MiniRacer
 
     with _ENGINE_LOCK:
         ctx = MiniRacer()
         try:
-            ctx.eval(engine_source())
+            ctx.eval(_source(engine_file))
             ctx.eval(_source("castleDefenseTrials.js"))
             return ctx.eval(expression)
         finally:
@@ -78,15 +93,19 @@ def _eval(expression: str) -> str:
             ctx.close()
 
 
-@lru_cache(maxsize=1)
-def current_rules() -> int:
-    """The engine's own RULES number, so the server can't drift from it."""
-    return int(_eval("CastleDefenseGame.RULES"))
+def current_rules(day: Optional[str] = None) -> int:
+    """The engine's own RULES number for `day`, so the server can't drift from it."""
+    return _rules_of(_engine_file(day))
+
+
+@lru_cache(maxsize=None)
+def _rules_of(engine_file: str) -> int:
+    return int(_eval_in(engine_file, "CastleDefenseGame.RULES"))
 
 
 def replay(day: str, layout: List[Dict[str, Any]]) -> Dict[str, Any]:
     """Run `layout` on `day`'s map to the end and return the engine's result."""
-    return json.loads(_eval(f"JSON.stringify(CastleDefenseGame.replay({json.dumps(day)}, {json.dumps(layout)}))"))
+    return json.loads(_eval(f"JSON.stringify(CastleDefenseGame.replay({json.dumps(day)}, {json.dumps(layout)}))", day))
 
 
 # ── daily tiers ──────────────────────────────────────────────────────────────
@@ -105,13 +124,13 @@ _tier_queue: List[str] = []
 _tier_worker: Optional[threading.Thread] = None
 
 
-def _trials_call(fn: str, *args: Any) -> Any:
+def _trials_call(fn: str, *args: Any, day: str) -> Any:
     params = ", ".join(json.dumps(a) for a in args)
-    return json.loads(_eval(f"JSON.stringify(CastleDefenseTrials.{fn}({params}))"))
+    return json.loads(_eval(f"JSON.stringify(CastleDefenseTrials.{fn}({params}))", day))
 
 
 def _tiers_row(db: Session, day: str) -> Optional[CastleDefenseTiers]:
-    return db.query(CastleDefenseTiers).filter_by(day=day, rules=current_rules()).first()
+    return db.query(CastleDefenseTiers).filter_by(day=day, rules=current_rules(day)).first()
 
 
 def work_out_tiers(day: str) -> None:
@@ -123,15 +142,15 @@ def work_out_tiers(day: str) -> None:
         kills: List[int] = []
         best = None
         for start in range(0, TRIALS, CHUNK):
-            chunk = _trials_call("runTrials", day, start, min(CHUNK, TRIALS - start))
+            chunk = _trials_call("runTrials", day, start, min(CHUNK, TRIALS - start), day=day)
             kills += chunk["kills"]
             if best is None or chunk["best"]["kills"] > best["kills"]:
                 best = chunk["best"]
         for start in range(0, CLIMB_STEPS, CHUNK):
-            best = _trials_call("climb", day, best, start, min(CHUNK, CLIMB_STEPS - start))
-        cuts = _trials_call("tierCuts", kills)
+            best = _trials_call("climb", day, best, start, min(CHUNK, CLIMB_STEPS - start), day=day)
+        cuts = _trials_call("tierCuts", kills, day=day)
         db.add(CastleDefenseTiers(
-            day=day, rules=current_rules(), cuts=json.dumps(cuts),
+            day=day, rules=current_rules(day), cuts=json.dumps(cuts),
             best_kills=int(best["kills"]), best_layout=json.dumps(best["layout"]),
         ))
         try:
@@ -215,7 +234,7 @@ def validate_day(day: str) -> str:
 def _day(db: Session, day: str):
     """A day's rows that count: the ones played under the current rules."""
     return db.query(CastleDefenseScore).filter(
-        CastleDefenseScore.day == day, CastleDefenseScore.rules == current_rules()
+        CastleDefenseScore.day == day, CastleDefenseScore.rules == current_rules(day)
     )
 
 

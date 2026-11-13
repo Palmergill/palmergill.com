@@ -12,6 +12,7 @@ COPY backend/ .
 # The Castle Defense leaderboard replays runs in the game's own engine,
 # and works out each day's tiers with its trial layouts.
 COPY castle-defense/castleDefenseGame.js ./castle-defense/castleDefenseGame.js
+COPY castle-defense/castleDefenseGameRules3.js ./castle-defense/castleDefenseGameRules3.js
 COPY castle-defense/castleDefenseTrials.js ./castle-defense/castleDefenseTrials.js
 
 # Run as an unprivileged user; give it ownership of the app and SQLite data dir.
