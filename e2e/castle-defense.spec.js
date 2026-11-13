@@ -3,13 +3,13 @@ const { test, expect, signUp } = require('./helpers');
 
 // Day 1's map, pinned so the road and grass tiles below never move.
 // Column 5 runs down from the top as road; (6, 3), (3, 4) and (2, 6) are grass.
-// Its allotment: 2 Archers, 3 Cannons, 3 Frost, 1 Mage, 1 Flamethrower, 1 Spikes,
-// no Tar pits, 2 Mines.
+// Its allotment: 1 Archer, 2 Cannons, 2 Frost, no Mages, 2 Flamethrowers,
+// 1 Sniper, 3 Spikes, 2 Tar pits, no Mines.
 const DAY_ONE = '/castle-defense/?date=2026-10-18';
 
 // The patch notes have been seen, so they don't cover the board.
 test.beforeEach(async ({ page }) => {
-    await page.addInitScript(() => localStorage.setItem('castle-defense:patch', '1.0'));
+    await page.addInitScript(() => localStorage.setItem('castle-defense:patch', '2.0'));
 });
 
 // Click the centre of a board tile; the board is an 8 × 8 grid.
@@ -35,8 +35,8 @@ test("place the day's allotment, then start the run", async ({ page }) => {
     await expect(page.locator('#tiers li')).toHaveCount(6);
     await expect(page.locator('#tiers li').first()).toHaveText(/^Best found\s*[\d,]+$/);
     await expect(play).toBeDisabled();
-    await expect(page.getByRole('button', { name: /Tar pit/ })).toBeDisabled();
-    await expect(page.getByRole('button', { name: /Tar pit/ })).toContainText('None today');
+    await expect(page.getByRole('button', { name: /Mine/ })).toBeDisabled();
+    await expect(page.getByRole('button', { name: /Mine/ })).toContainText('None today');
 
     // Towers belong on the grass, traps on the road.
     await page.getByRole('button', { name: /Archer/ }).click();
@@ -44,23 +44,28 @@ test("place the day's allotment, then start the run", async ({ page }) => {
     await expect(page.locator('#toast')).toHaveText(/Towers go on the grass/);
     await clickTile(page, 6, 3);
     await expect(count).toHaveText('12 to place');
-    await expect(page.getByRole('button', { name: /Archer/ })).toContainText('1 of 2 left');
+    await expect(page.getByRole('button', { name: /Archer/ })).toContainText('0 of 1 left');
 
     await page.getByRole('button', { name: /Flamethrower/ }).click();
     await clickTile(page, 3, 4);
     await expect(count).toHaveText('11 to place');
-    await expect(page.getByRole('button', { name: /Flamethrower/ })).toContainText('0 of 1 left');
+    await expect(page.getByRole('button', { name: /Flamethrower/ })).toContainText('1 of 2 left');
 
     await page.getByRole('button', { name: /Spikes/ }).click();
     await clickTile(page, 2, 6);
     await expect(page.locator('#toast')).toHaveText(/Traps go on the road/);
     await clickTile(page, 5, 1);
-    await expect(page.getByRole('button', { name: /Spikes/ })).toContainText('0 of 1 left');
+    await expect(page.getByRole('button', { name: /Spikes/ })).toContainText('2 of 3 left');
 
-    // That was the only Spikes; picking it up gives it back.
+    // Picking it up gives it back.
     await clickTile(page, 5, 1);
-    await expect(page.getByRole('button', { name: /Spikes/ })).toContainText('1 of 1 left');
+    await expect(page.getByRole('button', { name: /Spikes/ })).toContainText('3 of 3 left');
     await expect(count).toHaveText('11 to place');
+
+    await page.getByRole('button', { name: /Sniper/ }).click();
+    await clickTile(page, 2, 6);
+    await expect(count).toHaveText('10 to place');
+    await expect(page.getByRole('button', { name: /Sniper/ })).toContainText('0 of 1 left');
 
     // Reset clears the board.
     await page.getByRole('button', { name: 'Reset' }).click();
@@ -225,7 +230,7 @@ test('the rules open from the header and cover every defense', async ({ page }) 
     await expect(card.getByRole('button', { name: 'How to play' })).toHaveAttribute('aria-pressed', 'true');
 
     await card.getByRole('button', { name: 'Defenses' }).click();
-    for (const name of ['Archer', 'Cannon', 'Frost', 'Mage', 'Flamethrower', 'Spikes', 'Tar pit', 'Mine']) {
+    for (const name of ['Archer', 'Cannon', 'Frost', 'Mage', 'Flamethrower', 'Sniper', 'Spikes', 'Tar pit', 'Mine']) {
         await expect(card.getByRole('heading', { name, exact: true })).toBeVisible();
     }
     await card.getByRole('button', { name: 'Zombies' }).click();

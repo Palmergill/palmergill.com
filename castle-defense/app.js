@@ -4,7 +4,7 @@
     const G = window.CastleDefenseGame;
     const STEP = G.STEP;
     const TYPES = [...G.TOWER_TYPES, ...G.TRAP_TYPES];
-    const SHARE_ICON = { archer: "🏹", cannon: "💣", frost: "❄️", mage: "🔮", flame: "🔥", spikes: "🔱", tar: "🛢️", mine: "💥" };
+    const SHARE_ICON = { archer: "🏹", cannon: "💣", frost: "❄️", mage: "🔮", flame: "🔥", sniper: "🔭", spikes: "🔱", tar: "🛢️", mine: "💥" };
 
     const $ = (id) => document.getElementById(id);
     const canvas = $("board");
@@ -243,6 +243,7 @@
         frost: "Icy shards that chip at everything in a small burst and slow it down.",
         mage: "Lightning that strikes one zombie and jumps to the nearest ones, losing 20% of its damage each jump. Every second level adds a jump.",
         flame: "A short spray that hits everything around its target and sets it alight. Burning zombies take damage every second, but run faster while they burn.",
+        sniper: "One heavy shot at a time from very long range, slow to reload. It always shoots the zombie in range with the most HP left.",
         spikes: "Hurts everything standing on it, every moment it stands there.",
         tar: "Slows everything that wades through and hurts it a little.",
         mine: "Blows up when a zombie steps on it, hitting everything nearby, then takes a few seconds to re-arm."
@@ -292,7 +293,7 @@
                 </ul>
                 <h3>Targeting</h3>
                 <ul class="cd-howto">
-                    <li>A tower attacks the zombie in range that is furthest along the road.</li>
+                    <li>A tower attacks the zombie in range that is furthest along the road. The Sniper instead shoots the one with the most HP left.</li>
                     <li>Range is measured from the centre of the tower's tile.</li>
                 </ul>`;
         }
@@ -315,7 +316,8 @@
                 <h3>Levels</h3>
                 <ul class="cd-howto">
                     <li>Every defense levels up on its own during the run, up to level ${G.MAX_LEVEL}.</li>
-                    <li>The defense that lands the killing blow earns ${G.KILL_XP} XP. Every other defense that hurt that zombie earns ${G.ASSIST_XP} XP for the assist.</li>
+                    <li>The defense that lands the killing blow earns 1 XP for every ${num(1 / G.XP_PER_HP)} HP the zombie started with, so tougher zombies, later waves and Zombie Kings are worth more.</li>
+                    <li>Every other defense that hurt that zombie earns ${pct(G.ASSIST_SHARE)} as much for the assist.</li>
                     <li>Levels need ${G.LEVEL_XP.map((x) => x.toLocaleString()).join(", ")} XP in total.</li>
                     <li>Each level adds ${pct(0.45)} of the level-1 damage, plus a little range, attack speed and blast radius. Slows and burns get stronger and last longer, and Mines re-arm faster.</li>
                 </ul>`;
@@ -738,6 +740,20 @@
             const pulse = 0.09 + Math.sin(time * 5) * 0.02;
             circle(c, cx + 0.2, cy - 0.2, pulse + 0.06, "rgba(200, 170, 255, 0.35)");
             circle(c, cx + 0.2, cy - 0.2, pulse, "#d8c2ff", "#8e6cd1", 0.03);
+        } else if (type === "sniper") {
+            circle(c, cx, cy, 0.3, "#5d6b45", "#3b4529", 0.05);
+            c.save();
+            c.translate(cx, cy);
+            c.rotate(angle);
+            roundRect(c, -0.12, -0.035, 0.56, 0.07, 0.02);
+            c.fillStyle = "#26231f";
+            c.fill();
+            roundRect(c, -0.02, -0.11, 0.2, 0.07, 0.03);
+            c.fillStyle = "#3d3a35";
+            c.fill();
+            circle(c, 0.18, -0.075, 0.03, "#9fd4e8");
+            c.restore();
+            circle(c, cx, cy, 0.1, "#4a5636");
         } else if (type === "flame") {
             circle(c, cx, cy, 0.3, "#8a3b22", "#5a2414", 0.05);
             c.save();
@@ -974,6 +990,19 @@
             ctx.restore();
             circle(ctx, e.tx, e.ty, e.r * (0.5 + t * 0.5), `rgba(255, 120, 40, ${0.45 * a})`);
             circle(ctx, e.tx, e.ty, e.r * 0.3 * a, `rgba(255, 230, 150, ${0.8 * a})`);
+        } else if (e.kind === "shot") {
+            // A tracer from the muzzle and a puff where it lands.
+            const a = 1 - t;
+            const ang = Math.atan2(e.ty - e.y, e.tx - e.x);
+            ctx.save();
+            ctx.strokeStyle = `rgba(255, 244, 200, ${0.9 * a})`;
+            ctx.lineWidth = 0.03;
+            ctx.beginPath();
+            ctx.moveTo(e.x + Math.cos(ang) * 0.44, e.y + Math.sin(ang) * 0.44);
+            ctx.lineTo(e.tx, e.ty);
+            ctx.stroke();
+            ctx.restore();
+            circle(ctx, e.tx, e.ty, 0.08 + t * 0.12, `rgba(255, 230, 160, ${0.7 * a})`);
         } else if (e.kind === "bolt") {
             ctx.save();
             ctx.lineJoin = "round";
@@ -1588,13 +1617,11 @@
 
     // ---------- patch notes ----------
     // Shown once per patch, the first time the game loads after it ships.
-    const PATCH = "1.0";
+    const PATCH = "2.0";
     const PATCH_NOTES = [
-        "New tower: the <b>Flamethrower</b>. Short range and splash damage, with a burn that hurts over time but speeds zombies up.",
-        "Frost, Tar and burns now stack with each other. Two of the same kind still count once: two Frost towers don't double the slow, but Frost and Tar do stack.",
-        'Each day a "Best Found" score is calculated by repeated trial and error by the server.',
-        "A new <b>📜 Rules</b> window covers every defense, zombie and scoring rule.",
-        "Smaller shop cards."
+        "New tower: the <b>Sniper</b>. Long range and heavy damage, but slow to fire. It always shoots the zombie in range with the most HP.",
+        "XP now comes from the HP of the zombie you kill. Tougher zombies and later waves are worth more, and a <b>Zombie King</b> is worth a lot. Assists still earn half.",
+        "Levels take more XP to make up for it."
     ];
 
     function showPatchNotes() {

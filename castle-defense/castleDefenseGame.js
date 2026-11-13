@@ -18,8 +18,8 @@
     const SIZE = 8;
     // Bumped whenever a change makes old scores incomparable; the leaderboard
     // only ranks runs played under the current rules. 1 was the gold budget,
-    // 2 the seven defenses before the Flamethrower.
-    const RULES = 3;
+    // 2 the seven defenses before the Flamethrower, 3 a flat 2 XP a kill.
+    const RULES = 4;
     const MAX_EACH = 3;
     // Limits on a day's allotment, checked by simulation (see dailyAllotment).
     const ALLOT_MIN_TOWERS = 3;
@@ -36,11 +36,13 @@
     // Day #1 of the daily map.
     const EPOCH = "2026-10-18";
 
-    // Total XP needed to reach level 2, 3, … 10. A kill is worth 2, an assist 1.
-    const LEVEL_XP = [10, 26, 50, 84, 130, 190, 265, 355, 460];
+    // Total XP needed to reach level 2, 3, … 10. A kill is worth XP_PER_HP
+    // of the zombie's full HP, so tougher zombies, later waves and Kings are
+    // worth more; an assist is worth ASSIST_SHARE of that.
+    const LEVEL_XP = [25, 80, 220, 550, 1300, 3000, 6500, 14000, 30000];
     const MAX_LEVEL = LEVEL_XP.length + 1;
-    const KILL_XP = 2;
-    const ASSIST_XP = 1;
+    const XP_PER_HP = 0.1;
+    const ASSIST_SHARE = 0.5;
 
     // Towers stand on grass and shoot; traps sit on a road tile and act on
     // whatever walks over them.
@@ -80,6 +82,15 @@
             name: "Flamethrower",
             plural: "Flamethrowers",
             base: { damage: 4, range: 1.3, rate: 3.0, splash: 0.55, burn: 6, burnFor: 2.0, haste: 0.3 },
+            projectile: null
+        },
+        // Picks off the toughest zombie in its long reach, one slow shot at a time.
+        sniper: {
+            kind: "tower",
+            name: "Sniper",
+            plural: "Snipers",
+            base: { damage: 260, range: 3.5, rate: 0.3 },
+            targets: "toughest",
             projectile: null
         },
         spikes: {
@@ -550,7 +561,7 @@
     }
 
     // Every defense that hurt a zombie shares the credit: the killing blow
-    // earns KILL_XP, every other one that hit it earns ASSIST_XP.
+    // earns XP for the zombie's HP, every other one that hit it half that.
     // A burn ticks every step, so it doesn't flash the zombie white.
     function damageZombie(state, z, amount, d, flash = true) {
         if (z.gone) return;
@@ -561,13 +572,14 @@
         z.gone = true;
         state.kills += 1;
         d.kills += 1;
-        addXp(state, d, KILL_XP);
+        const xp = z.maxHp * XP_PER_HP;
+        addXp(state, d, xp);
         for (const id of z.hitBy) {
             if (id === d.id) continue;
             const helper = findDefense(state, id);
             if (!helper) continue;
             helper.assists += 1;
-            addXp(state, helper, ASSIST_XP);
+            addXp(state, helper, xp * ASSIST_SHARE);
         }
         state.effects.push({ kind: "points", x: z.x, y: z.y, text: "+1", ttl: 0.7, life: 0.7 });
         state.effects.push({ kind: "splat", x: z.x, y: z.y, r: z.radius, ttl: 0.5, life: 0.5 });
@@ -616,11 +628,14 @@
         return Math.floor(z.x) === d.x && Math.floor(z.y) === d.y;
     }
 
-    function pickTarget(state, x, y, range) {
+    // Most towers shoot whoever is furthest along the road; a "toughest"
+    // tower shoots whoever has the most HP left, furthest along on a tie.
+    function pickTarget(state, x, y, range, targets) {
         let best = null;
         for (const z of live(state)) {
             if (Math.hypot(z.x - x, z.y - y) > range + z.radius * 0.5) continue;
-            if (!best || z.dist > best.dist) best = z;
+            if (!best) best = z;
+            else if (targets === "toughest" ? z.hp > best.hp || (z.hp === best.hp && z.dist > best.dist) : z.dist > best.dist) best = z;
         }
         return best;
     }
@@ -661,6 +676,11 @@
                 last = next;
             }
             state.effects.push({ kind: "bolt", points, ttl: 0.18, life: 0.18 });
+            return;
+        }
+        if (tower.type === "sniper") {
+            damageZombie(state, target, s.damage, tower);
+            state.effects.push({ kind: "shot", x: cx, y: cy, tx: target.x, ty: target.y, ttl: 0.2, life: 0.2 });
             return;
         }
         if (tower.type === "flame") {
@@ -773,7 +793,7 @@
             d.cooldown -= dt;
             if (d.cooldown > 0) continue;
             const s = stats(d.type, d.level);
-            const target = pickTarget(state, d.x + 0.5, d.y + 0.5, s.range);
+            const target = pickTarget(state, d.x + 0.5, d.y + 0.5, s.range, DEFENSES[d.type].targets);
             if (!target) {
                 d.cooldown = 0;
                 continue;
@@ -849,8 +869,8 @@
         STEP,
         MAX_LEVEL,
         LEVEL_XP,
-        KILL_XP,
-        ASSIST_XP,
+        XP_PER_HP,
+        ASSIST_SHARE,
         DEFENSES,
         TOWER_TYPES,
         TRAP_TYPES,

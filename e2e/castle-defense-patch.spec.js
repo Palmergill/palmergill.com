@@ -4,8 +4,8 @@ const { test, expect } = require('./helpers');
 test('the patch notes show on the first load, then stay away', async ({ page }) => {
     await page.goto('/castle-defense/');
     const card = page.getByRole('dialog');
-    await expect(card.getByRole('heading', { name: 'Patch 1.0' })).toBeVisible();
-    await expect(card).toContainText('Flamethrower');
+    await expect(card.getByRole('heading', { name: 'Patch 2.0' })).toBeVisible();
+    await expect(card).toContainText('Sniper');
 
     // Rules opens from the notes.
     await card.getByRole('button', { name: 'Rules' }).click();

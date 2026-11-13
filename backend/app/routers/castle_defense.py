@@ -18,7 +18,7 @@ from app.services import castle_defense
 router = APIRouter(prefix="/api/castle-defense", tags=["castle-defense"])
 
 DAY_PATTERN = r"^\d{4}-\d{2}-\d{2}$"
-TYPE_PATTERN = "^(archer|cannon|frost|mage|flame|spikes|tar|mine)$"
+TYPE_PATTERN = "^(archer|cannon|frost|mage|flame|sniper|spikes|tar|mine)$"
 
 
 class Placement(BaseModel):
