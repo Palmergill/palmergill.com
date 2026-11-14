@@ -132,19 +132,7 @@
     <script src="/shared/site-nav.js?v=23"></script>
     <script src="/shared/analytics.js?v=1"></script>
     <script src="/shared/api-base.js?v=1"></script>
-    <script>
-        // Throwaway until old days stop mattering: Patch 2.0 starts with the
-        // 2026-11-13 map, and earlier maps keep the engine they were played
-        // under. The server picks the same way (services/castle_defense.py).
-        (function () {
-            var asked = new URLSearchParams(location.search).get("date");
-            var now = new Date();
-            var today = now.getFullYear() + "-" + String(now.getMonth() + 1).padStart(2, "0") + "-" + String(now.getDate()).padStart(2, "0");
-            var day = /^\d{4}-\d{2}-\d{2}$/.test(asked || "") && !Number.isNaN(Date.parse(asked)) ? asked : today;
-            var engine = day < "2026-11-13" ? "./castleDefenseGameRules3.js?v=1" : "./castleDefenseGame.js?v=12";
-            document.write('<script src="' + engine + '"><\/script>');
-        })();
-    </script>
-    <script src="./app.js?v=35"></script>
+    <script src="./castleDefenseGame.js?v=12"></script>
+    <script src="./app.js?v=36"></script>
 </body>
 </html>

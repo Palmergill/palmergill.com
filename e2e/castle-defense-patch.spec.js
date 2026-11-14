@@ -2,8 +2,7 @@
 const { test, expect } = require('./helpers');
 
 test('the patch notes show on the first load, then stay away', async ({ page }) => {
-    // Patch 2.0 starts with the 2026-11-13 map.
-    await page.goto('/castle-defense/?date=2026-11-13');
+    await page.goto('/castle-defense/');
     const card = page.getByRole('dialog');
     await expect(card.getByRole('heading', { name: 'Patch 2.0' })).toBeVisible();
     await expect(card).toContainText('Sniper');

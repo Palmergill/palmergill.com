@@ -1,6 +1,6 @@
 from fastapi.testclient import TestClient
 
-from app.database import AnalyticsEvent, Base, SessionLocal, SiteCounter, engine
+from app.database import AnalyticsEvent, Base, CastleDefenseScore, SessionLocal, SiteCounter, engine
 from app.main import app
 from app.routers import analytics
 
@@ -14,6 +14,8 @@ def setup_function():
     try:
         db.query(SiteCounter).delete()
         db.query(AnalyticsEvent).delete()
+        # Games played also counts Castle Defense runs; other tests leave some.
+        db.query(CastleDefenseScore).delete()
         db.commit()
     finally:
         db.close()

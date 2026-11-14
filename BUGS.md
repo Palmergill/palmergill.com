@@ -21,6 +21,8 @@ Closed items are trimmed quarterly.
 
 ## Closed
 
+- The 2026-11-13 Castle Defense review: two posts of an account's first run of the day (two tabs, or the signed-out run auto-posting as another finishes) broke the one-row-per-day constraint during the replay and 500'd, losing that run; the loser now counts against the winner's row (`test_two_first_runs_posted_at_once_both_count`). Also removed the Patch 2.0 two-engine switch (`castleDefenseGameRules3.js`): every day now plays and replays on the current engine, so older days' maps and allotments changed. A browser's saved record is stamped with the engine's RULES, so a best from older rules is dropped instead of lingering. — closed 2026-11-13
+
 - The 2026-11-13 portfolio review closed ten findings, eight pinned at the end of `backend/tests/test_portfolio_api.py`.
   (1) "Replace my saved trades" with a file whose every row was skipped deleted the whole history; an upload with no usable rows now changes nothing.
   (2) BTC/ETH in a holdings snapshot were priced as stocks — the Grayscale mini trusts trading as `BTC` and `ETH`; snapshot rows for always-crypto symbols are crypto.

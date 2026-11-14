@@ -3,8 +3,8 @@ const { test, expect, signUp } = require('./helpers');
 
 // Day 1's map, pinned so the road and grass tiles below never move.
 // Column 5 runs down from the top as road; (6, 3), (3, 4) and (2, 6) are grass.
-// Its allotment: 2 Archers, 3 Cannons, 3 Frost, 1 Mage, 1 Flamethrower, 1 Spikes,
-// no Tar pits, 2 Mines.
+// Its allotment: 1 Archer, 2 Cannons, 2 Frost, no Mages, 2 Flamethrowers,
+// 1 Sniper, 3 Spikes, 2 Tar pits, no Mines.
 const DAY_ONE = '/castle-defense/?date=2026-10-18';
 
 // The patch notes have been seen, so they don't cover the board.
@@ -35,8 +35,8 @@ test("place the day's allotment, then start the run", async ({ page }) => {
     await expect(page.locator('#tiers li')).toHaveCount(6);
     await expect(page.locator('#tiers li').first()).toHaveText(/^Best found\s*[\d,]+$/);
     await expect(play).toBeDisabled();
-    await expect(page.getByRole('button', { name: /Tar pit/ })).toBeDisabled();
-    await expect(page.getByRole('button', { name: /Tar pit/ })).toContainText('None today');
+    await expect(page.getByRole('button', { name: /Mine/ })).toBeDisabled();
+    await expect(page.getByRole('button', { name: /Mine/ })).toContainText('None today');
 
     // Towers belong on the grass, traps on the road.
     await page.getByRole('button', { name: /Archer/ }).click();
@@ -44,23 +44,28 @@ test("place the day's allotment, then start the run", async ({ page }) => {
     await expect(page.locator('#toast')).toHaveText(/Towers go on the grass/);
     await clickTile(page, 6, 3);
     await expect(count).toHaveText('12 to place');
-    await expect(page.getByRole('button', { name: /Archer/ })).toContainText('1 of 2 left');
+    await expect(page.getByRole('button', { name: /Archer/ })).toContainText('0 of 1 left');
 
     await page.getByRole('button', { name: /Flamethrower/ }).click();
     await clickTile(page, 3, 4);
     await expect(count).toHaveText('11 to place');
-    await expect(page.getByRole('button', { name: /Flamethrower/ })).toContainText('0 of 1 left');
+    await expect(page.getByRole('button', { name: /Flamethrower/ })).toContainText('1 of 2 left');
 
     await page.getByRole('button', { name: /Spikes/ }).click();
     await clickTile(page, 2, 6);
     await expect(page.locator('#toast')).toHaveText(/Traps go on the road/);
     await clickTile(page, 5, 1);
-    await expect(page.getByRole('button', { name: /Spikes/ })).toContainText('0 of 1 left');
+    await expect(page.getByRole('button', { name: /Spikes/ })).toContainText('2 of 3 left');
 
-    // That was the only Spikes; picking it up gives it back.
+    // Picking it up gives it back.
     await clickTile(page, 5, 1);
-    await expect(page.getByRole('button', { name: /Spikes/ })).toContainText('1 of 1 left');
+    await expect(page.getByRole('button', { name: /Spikes/ })).toContainText('3 of 3 left');
     await expect(count).toHaveText('11 to place');
+
+    await page.getByRole('button', { name: /Sniper/ }).click();
+    await clickTile(page, 2, 6);
+    await expect(count).toHaveText('10 to place');
+    await expect(page.getByRole('button', { name: /Sniper/ })).toContainText('0 of 1 left');
 
     // Reset clears the board.
     await page.getByRole('button', { name: 'Reset' }).click();
@@ -103,6 +108,17 @@ test('share copies the result and says so', async ({ page, context }) => {
         /^🧟 Castle Defense #1 · \d+ kills\n🏅 .+ · tier [1-4] of 5\n🎯 \d+% of the best found \([\d,]+\)\n🏰 Fell on wave \d+\n(🔱 MVP: Spikes, level \d+, \d+ kills\n)?https:\/\/palmergill\.com\/castle-defense\/$/
     );
     await expect(page.locator('.cd-final__tier')).toContainText(/Tier [1-4] of 5 · \d+ more for /);
+});
+
+test('a best saved under older rules is dropped, the planned layout kept', async ({ page }) => {
+    await page.addInitScript(() => localStorage.setItem('castle-defense:v5:2026-10-18', JSON.stringify({
+        rules: 3, best: 999, runs: 4, bestLayout: { kills: 999, layout: [{ type: 'spikes', x: 5, y: 1 }] },
+        layout: [{ type: 'spikes', x: 5, y: 1 }],
+    })));
+    await page.goto(DAY_ONE);
+    await expect(page.locator('#bestValue')).toHaveText('—');
+    await expect(page.locator('#bestLayoutButton')).toBeHidden();
+    await expect(page.locator('#pieceCount')).toHaveText('12 to place');
 });
 
 test('your best layout comes back after you change it', async ({ page }) => {
@@ -218,8 +234,7 @@ test('a signed-in run shows up on the all-time board', async ({ page }) => {
 });
 
 test('the rules open from the header and cover every defense', async ({ page }) => {
-    // The first Patch 2.0 map, which has the Sniper.
-    await page.goto('/castle-defense/?date=2026-11-13');
+    await page.goto('/castle-defense/');
     await page.getByRole('button', { name: /Rules/ }).click();
     const card = page.getByRole('dialog');
     await expect(card.getByRole('heading', { name: 'Rules' })).toBeVisible();
