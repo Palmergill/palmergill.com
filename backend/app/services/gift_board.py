@@ -523,7 +523,8 @@ def update_item(db: Session, username: str, item_id: int, changes: Dict[str, Any
 
 
 def move_item(
-    db: Session, username: str, item_id: int, person_id: Optional[int], index: int
+    db: Session, username: str, item_id: int, person_id: Optional[int], index: int,
+    status: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Reorder an item, or move it to another column.
 
@@ -535,9 +536,11 @@ def move_item(
     if person_id is not None:
         owned_person(db, username, person_id)
     destination = [row for row in _column(db, username, person_id) if row.id != item.id]
-    if item.person_id != person_id:
+    if status is not None:
+        item.status = _check_status(status, person_id)
+    elif item.person_id != person_id:
         item.status = remap_status(item.status, person_id)
-        item.person_id = person_id
+    item.person_id = person_id
     _place(destination, item, index)
     db.commit()
     return board(db, username)

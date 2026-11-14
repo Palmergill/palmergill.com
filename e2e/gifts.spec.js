@@ -62,6 +62,20 @@ test('a member keeps private ideas and a wishlist, and nobody else sees them', a
     await expect(wishlist.locator('.card', { hasText: 'Herb garden kit' })).toContainText('Wanted');
     await expect(mom.locator('.card')).toHaveCount(1);
 
+    // A given gift moved over lands as received: off the public wishlist, so
+    // no warning and no question.
+    await page.getByRole('button', { name: 'Edit Pasta maker' }).click();
+    await editor.getByLabel('Status').selectOption('given');
+    await editor.getByLabel('List').selectOption({ label: 'My wishlist' });
+    await expect(editor.getByLabel('Status')).toHaveValue('received');
+    await expect(page.locator('#publicWarning')).toBeHidden();
+    await editor.getByRole('button', { name: 'Save' }).click();
+    await expect(wishlist.locator('.card', { hasText: 'Pasta maker' })).toContainText('Got it');
+    await page.getByRole('button', { name: 'Edit Pasta maker' }).click();
+    await editor.getByLabel('List').selectOption({ label: 'Mom' });
+    await editor.getByRole('button', { name: 'Save' }).click();
+    await expect(mom.locator('.card', { hasText: 'Pasta maker' })).toContainText('Given');
+
     // Everything survives a reload.
     await page.reload();
     await expect(column(page, 'Mom').locator('.card')).toHaveCount(1);

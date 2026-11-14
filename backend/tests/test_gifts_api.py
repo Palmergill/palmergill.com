@@ -367,3 +367,32 @@ def test_status_side_is_enforced_by_the_database_too():
         db.rollback()
     finally:
         db.close()
+
+
+def test_a_move_can_land_with_a_status_that_never_passes_through_public():
+    # The editor used to move first (an idea became a public "wanted" wish
+    # with its private note) and save the chosen status second.
+    client = _member_client()
+    viewer = _member_client()
+    person, idea, _wish = _seed(client)
+    me = client.get("/api/gifts/board").json()["username"]
+    client.patch(f"/api/gifts/items/{idea['id']}", json={"note": "surprise, don't tell"})
+    board = client.post(
+        f"/api/gifts/items/{idea['id']}/move", json={"person_id": None, "index": 0, "status": "received"}
+    ).json()
+    moved = next(i for i in board["items"] if i["id"] == idea["id"])
+    assert (moved["personId"], moved["status"]) == (None, "received")
+    seen = viewer.get(f"/api/gifts/wishlists/{me}").json()["items"]
+    assert idea["id"] not in [i["id"] for i in seen]
+
+
+def test_a_move_refuses_a_status_from_the_other_side():
+    client = _member_client()
+    person, idea, _wish = _seed(client)
+    response = client.post(
+        f"/api/gifts/items/{idea['id']}/move", json={"person_id": None, "index": 0, "status": "idea"}
+    )
+    assert response.status_code == 422
+    board = client.get("/api/gifts/board").json()
+    still = next(i for i in board["items"] if i["id"] == idea["id"])
+    assert (still["personId"], still["status"]) == (person["id"], "idea")

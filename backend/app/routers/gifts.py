@@ -80,6 +80,11 @@ class MoveItemRequest(BaseModel):
     # omitted field that happens to mean the same thing.
     person_id: Optional[int] = Field(..., ge=1)
     index: int = Field(..., ge=0, le=gift_board.MAX_ITEMS)
+    # The status to land with, for the destination side. Omitted: the old
+    # status carried across (see gift_board.remap_status). Set in the same
+    # commit so a gift never passes through "wanted" (public) on its way to
+    # a status that isn't.
+    status: Optional[str] = Field(None, pattern=STATUS_PATTERN)
 
 
 class LinkPreviewRequest(BaseModel):
@@ -205,7 +210,7 @@ def move_item(
     username: str = Depends(caller),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
-    return gift_board.move_item(db, username, item_id, body.person_id, body.index)
+    return gift_board.move_item(db, username, item_id, body.person_id, body.index, body.status)
 
 
 @router.delete("/items/{item_id}", status_code=204)

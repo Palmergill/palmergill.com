@@ -735,8 +735,16 @@
 
     // ── writes ──────────────────────────────────────────────────────────────
 
-    function confirmGoingPublic(item, destinationKey) {
-        if (destinationKey !== ME || item.personId === null) return true;
+    // The status a move to "Me" lands with when none is chosen: done-ness
+    // carries across, anything else becomes a public wish (as the server's
+    // remap_status does).
+    function landingStatus(item, destinationKey) {
+        if (destinationKey !== ME) return null;
+        return item.status === "given" ? "received" : "wanted";
+    }
+
+    function confirmGoingPublic(item, destinationKey, status = landingStatus(item, destinationKey)) {
+        if (destinationKey !== ME || item.personId === null || status !== "wanted") return true;
         return window.confirm(
             `Move "${item.title}" to your wishlist? Other members will be able to see it.`
         );
@@ -902,7 +910,7 @@
         if (!item) return;
         const form = els.itemForm.elements;
         const destination = form.column.value;
-        els.publicWarning.hidden = !(destination === ME && item.personId !== null);
+        els.publicWarning.hidden = !(destination === ME && item.personId !== null && form.status.value === "wanted");
         els.givenFields.hidden = destination === ME;
         const siblings = itemsIn(columnKey(item.personId));
         const position = siblings.findIndex((row) => row.id === item.id);
@@ -931,22 +939,16 @@
         if (Number.isNaN(priceCents)) return editorError("Enter a price like 25 or 24.99.");
 
         const destination = form.column.value;
+        const status = form.status.value;
         const changesSide = destination !== columnKey(item.personId);
-        if (changesSide && !confirmGoingPublic(item, destination)) return;
+        if (changesSide && !confirmGoingPublic(item, destination, status)) return;
 
         try {
             hideError();
-            // Move first: the status options shown were for the destination
-            // side, and the server only accepts a status for the side the row
-            // is on when the PATCH arrives.
-            if (changesSide) {
-                const board = await api(`/items/${item.id}/move`, {
-                    method: "POST",
-                    body: { person_id: personIdFromKey(destination), index: itemsIn(destination).length },
-                });
-                state.people = board.people;
-                state.items = board.items;
-            }
+            // Save the edits first, on the side the gift is on now, then move
+            // it with the status chosen for the destination in one request.
+            // Moving first made the gift public with its old text until the
+            // save landed, and left it that way if the save failed.
             const updated = await api(`/items/${item.id}`, {
                 method: "PATCH",
                 body: {
@@ -956,12 +958,20 @@
                     ...(state.editorLookedUp ? { preview_title: state.editorTitle } : {}),
                     price_cents: priceCents,
                     note: form.note.value.trim() || null,
-                    status: form.status.value,
+                    ...(changesSide ? {} : { status }),
                     occasion: destination === ME ? item.occasion : (form.occasion.value.trim() || null),
                     given_on: destination === ME ? item.givenOn : (form.givenOn.value || null),
                 },
             });
             state.items = state.items.map((row) => (row.id === updated.id ? updated : row));
+            if (changesSide) {
+                const board = await api(`/items/${item.id}/move`, {
+                    method: "POST",
+                    body: { person_id: personIdFromKey(destination), index: itemsIn(destination).length, status },
+                });
+                state.people = board.people;
+                state.items = board.items;
+            }
         } catch (error) {
             if (error instanceof ForbiddenError) return showSignedOut();
             render();
@@ -1146,9 +1156,13 @@
 
     els.itemForm.addEventListener("submit", saveItem);
     els.itemForm.elements.column.addEventListener("change", () => {
-        fillStatusOptions(els.itemForm.elements.status.value);
+        // Done-ness carries across the line (given ↔ received), as a drag does.
+        const form = els.itemForm.elements;
+        const carried = { given: "received", received: "given" }[form.status.value] || form.status.value;
+        fillStatusOptions(carried);
         syncEditor();
     });
+    els.itemForm.elements.status.addEventListener("change", syncEditor);
     byId("editorClose").addEventListener("click", () => els.itemEditor.close());
     byId("editorCancel").addEventListener("click", () => els.itemEditor.close());
     byId("deleteItem").addEventListener("click", deleteItem);
