@@ -985,3 +985,117 @@ def test_income_by_month_and_the_next_twelve_projected_on_todays_shares():
     projected = {m["month"]: m["amount"] for m in income["projected"]}
     assert len(projected) == 12 and income["projectedTotal"] == 5.0
     assert projected[(paid + timedelta(days=365)).strftime("%Y-%m")] == 5.0
+
+
+# ── 2026-11-13 review: each a bug that shipped ──────────────────────────────
+
+
+def test_replacing_trades_with_a_file_of_no_usable_rows_keeps_them():
+    client = _member_client()
+    _buy(client)
+    body = client.post("/api/stocks/portfolio/import", json={
+        "csv": "Symbol,Quantity,Date,Action\nAAPL,10,garbage,Buy\n", "kind": "transactions", "replace": True,
+    }).json()
+    assert body["imported"]["count"] == 0 and len(body["skipped"]) == 1
+    assert body["portfolio"]["transactionCount"] == 1
+
+
+def test_bitcoin_in_a_holdings_snapshot_is_crypto_not_the_btc_etf():
+    client = _member_client()
+    body = client.post("/api/stocks/portfolio/import", json={
+        "csv": "Symbol,Quantity,Cost Basis\nBTC,0.5,30000\nAAPL,1,100\n", "kind": "holdings",
+    }).json()
+    assets = {p["ticker"]: p["asset"] for p in body["portfolio"]["positions"]}
+    assert assets == {"BTC": "crypto", "AAPL": "stock"}
+    assert portfolio.market_symbol("BTC", assets["BTC"]) == "X:BTCUSD"
+
+
+def test_an_oversold_sell_leaves_the_chart_on_the_breakdowns_shares(monkeypatch):
+    from datetime import timedelta
+
+    _flat_history(monkeypatch, {"AAPL": 10.0})
+    client = _member_client()
+    today = portfolio.utc_today()
+    _buy(client, shares=10, price=10.0, day=(today - timedelta(days=30)).isoformat())
+    _buy(client, shares=15, price=10.0, day=(today - timedelta(days=20)).isoformat(), side="sell")
+    _buy(client, shares=10, price=10.0, day=(today - timedelta(days=10)).isoformat())
+    assert client.get("/api/stocks/portfolio").json()["positions"][0]["shares"] == 10
+    assert client.get("/api/stocks/portfolio/history").json()["points"][-1]["value"] == 100.0
+
+
+def test_a_name_closed_before_the_snapshot_and_bought_again_keeps_the_invested_line(monkeypatch):
+    from datetime import timedelta
+
+    _flat_history(monkeypatch, {"AAPL": 10.0, "MSFT": 10.0})
+    client = _member_client()
+    today = portfolio.utc_today()
+    snap = today - timedelta(days=60)
+    client.post("/api/stocks/portfolio/import", json={
+        "csv": "Symbol,Quantity,Cost Basis\nAAPL,10,100\n", "kind": "holdings", "as_of": snap.isoformat(),
+    })
+    _buy(client, "MSFT", shares=5, price=10.0, day=(snap - timedelta(days=30)).isoformat())
+    _buy(client, "MSFT", shares=5, price=12.0, day=(snap - timedelta(days=20)).isoformat(), side="sell")
+    _buy(client, "MSFT", shares=5, price=10.0, day=(snap + timedelta(days=10)).isoformat())
+    last = client.get("/api/stocks/portfolio/history").json()["points"][-1]
+    assert last["invested"] == 150.0 and last["value"] == 150.0
+
+
+def test_a_named_security_opens_its_holding_page():
+    client = _member_client()
+    _buy(client, ticker="IBIT call $100", shares=1, price=5.0)
+    response = client.get("/api/stocks/portfolio/holding", params={"ticker": "IBIT call $100"})
+    assert response.status_code == 200, response.text
+    assert response.json()["asset"] == "other"
+    assert client.get("/api/stocks/portfolio/holding", params={"ticker": "aapl"}).status_code == 404
+
+
+def test_the_same_dividend_from_two_sources_counts_once():
+    client = _member_client()
+    csv = (
+        "Symbol,Quantity,Price,Date,Action,Amount,Source\n"
+        "MSFT,10,400,2026-01-05,Buy,4000,Feed A\n"
+        "MSFT,10,400,2026-01-06,Buy,4000,Export B\n"
+        "MSFT,0,0,2026-03-12,Dividend,8.30,Feed A\n"
+        "MSFT,0,0,2026-03-12,Dividend,8.30,Export B\n"
+        "MSFT,0,0,2026-06-11,Dividend,8.30,Feed A\n"
+    )
+    body = client.post("/api/stocks/portfolio/import", json={"csv": csv}).json()["portfolio"]
+    assert body["positions"][0]["shares"] == 10
+    assert body["dividends"]["count"] == 2 and body["dividends"]["total"] == 16.6
+    rows = client.get("/api/stocks/portfolio/transactions", params={"side": "dividend"}).json()["rows"]
+    assert sorted(r["counted"] for r in rows) == [False, True, True]
+
+
+def test_realized_export_sells_snapshot_shares_first_with_an_unknown_term():
+    from datetime import timedelta
+
+    client = _member_client()
+    today = portfolio.utc_today()
+    snap = today - timedelta(days=30)
+    client.post("/api/stocks/portfolio/import", json={
+        "csv": "Symbol,Quantity,Cost Basis\nAAPL,10,1000\n", "kind": "holdings", "as_of": snap.isoformat(),
+    })
+    _buy(client, shares=5, price=150.0, day=(snap + timedelta(days=5)).isoformat())
+    _buy(client, shares=10, price=200.0, day=(snap + timedelta(days=10)).isoformat(), side="sell")
+    text = client.get("/api/stocks/portfolio/export", params={"kind": "realized"}).text
+    assert text.splitlines()[1].split(",")[7] == "Unknown"
+
+
+def test_a_failed_company_lookup_is_asked_again_later(monkeypatch):
+    from datetime import timedelta
+
+    monkeypatch.setattr(portfolio, "_rate_limited_until", None)
+    portfolio._meta.pop("ZZZT", None)
+    portfolio._meta_retry.pop("ZZZT", None)
+    answers = [None, {"name": "Zed", "sector": "Technology"}]
+    monkeypatch.setattr(portfolio, "_fetch_meta", lambda t: answers.pop(0))
+    db = SessionLocal()
+    try:
+        assert portfolio._company(db, ["ZZZT"], portfolio._Budget(4))["ZZZT"]["name"] is None
+        # Not asked again straight away...
+        assert portfolio._company(db, ["ZZZT"], portfolio._Budget(4))["ZZZT"]["name"] is None and len(answers) == 1
+        # ...but once the wait is over.
+        portfolio._meta_retry["ZZZT"] = portfolio._now() - timedelta(seconds=1)
+        assert portfolio._company(db, ["ZZZT"], portfolio._Budget(4))["ZZZT"]["name"] == "Zed"
+    finally:
+        db.close()

@@ -21,6 +21,17 @@ Closed items are trimmed quarterly.
 
 ## Closed
 
+- The 2026-11-13 portfolio review closed ten findings, eight pinned at the end of `backend/tests/test_portfolio_api.py`.
+  (1) "Replace my saved trades" with a file whose every row was skipped deleted the whole history; an upload with no usable rows now changes nothing.
+  (2) BTC/ETH in a holdings snapshot were priced as stocks — the Grayscale mini trusts trading as `BTC` and `ETH`; snapshot rows for always-crypto symbols are crypto.
+  (3) The value chart let an oversold sell drive shares negative, so every later point sat below the breakdown; sells are capped as in `build_positions`.
+  (4) A security closed before the snapshot and bought again after it blanked the chart's invested line for good; the snapshot now resets shares and cost on its day (and a weekend snapshot is applied before Monday's trades, not after).
+  (5) A no-ticker security ("IBIT call $100") 404'd on its holding page because the lookup was uppercased.
+  (6) The same dividend from two feeds counted twice; dividends are paired across sources by amount like trades.
+  (7) The realized-gains CSV ignored snapshot lots, so sales took later buys' lots and their terms; snapshot shares go first, term "Unknown".
+  (8) A failed company-name lookup was cached until restart; it's asked again after six hours.
+  (9) Reopening a holding after editing its trades showed the old data. (10) Out-of-order trade-list responses could replace a newer filter's rows. — closed 2026-11-13
+
 - (passkeys) Open sign-in challenges were capped at 2,000 site-wide and the cap refused new ones, so one anonymous script calling `POST /login/passkey/options` held every slot and passkey sign-in and setup 429'd for everyone; challenges now carry a hashed client key, each visitor keeps at most 10, and a full table drops its oldest instead of refusing. Also: a passkey removed on the account page but still offered by the device counted as a failed login (enough of them locked that network out of passwords) and now returns `unknownCredential` so the page can ask the browser to forget it; and the login page restarts passkey autofill after the button flow fails. Pinned in `backend/tests/test_passkeys.py`. — closed 2026-10-25
 
 - The 2026-10-15 whole-codebase review closed ten findings, each pinned in `backend/tests/test_review_regressions.py`.

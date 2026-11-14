@@ -810,7 +810,8 @@
 
     // ── activity ───────────────────────────────────────────────────────────
 
-    const trades = { offset: 0, total: 0, version: null, timer: null };
+    // `seq` numbers each request so a slow, older answer never replaces a newer one.
+    const trades = { offset: 0, total: 0, version: null, timer: null, seq: 0 };
 
     function fillSelect(select, values, allLabel) {
         const current = select.value;
@@ -848,8 +849,9 @@
     }
 
     async function loadTrades() {
+        const seq = ++trades.seq;
         const data = await run(() => api(`/transactions?${filterParams()}`));
-        if (!data) return;
+        if (!data || seq !== trades.seq) return;
         trades.total = data.total;
         const filtered = filterParams().toString().replace(/(^|&)(offset|limit)=[^&]*/g, '') !== '';
         const dupes = lastData?.duplicates.count || 0;
@@ -1674,16 +1676,20 @@
 
     // ── one holding ────────────────────────────────────────────────────────
 
-    const holding = { ticker: null, data: null, range: '1Y', timer: null, retries: 0 };
+    // `signature` is the trades and snapshot the data was loaded against, so
+    // a holding reopened after an edit is fetched again.
+    const holding = { ticker: null, data: null, range: '1Y', timer: null, retries: 0, signature: null };
 
     async function loadHolding(ticker, retry = false) {
         clearTimeout(holding.timer);
         if (!ticker) return;
+        const signature = lastData ? historySignature(lastData) : null;
         if (!retry) {
-            if (holding.ticker === ticker && holding.data) {
+            if (holding.ticker === ticker && holding.data && holding.signature === signature) {
                 renderHolding();
                 return;
             }
+            holding.signature = signature;
             holding.ticker = ticker;
             holding.data = null;
             holding.retries = 0;

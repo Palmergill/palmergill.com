@@ -61,6 +61,13 @@ CRYPTO_SYMBOLS = ALWAYS_CRYPTO | {
 CRYPTO_NAMES = {"BTC": "Bitcoin", "ETH": "Ethereum", "DOGE": "Dogecoin", "SOL": "Solana", "LTC": "Litecoin"}
 
 
+def holding_asset(ticker: str) -> str:
+    """A snapshot row's asset. A positions export says nothing more than the
+    symbol, so only the always-crypto ones count as crypto: priced as a
+    stock, "BTC" and "ETH" would be the Grayscale mini trusts."""
+    return "crypto" if ticker in ALWAYS_CRYPTO else "stock"
+
+
 def username_for(identity: Dict[str, Any]) -> str:
     username = accounts.normalize_username(str(identity.get("username", "")))
     if not username:
@@ -351,7 +358,12 @@ def add_transactions(
 ) -> Dict[str, int]:
     """Save trades. From an upload, rows identical to one already saved are
     skipped, so the same export twice doesn't double it, and the sample's
-    trades make way for real ones. A trade added by hand is just added."""
+    trades make way for real ones. A trade added by hand is just added.
+
+    A file with no usable rows changes nothing, even with `replace`: one
+    that failed to parse must not wipe the history it was meant to replace."""
+    if not rows:
+        return {"added": 0, "duplicates": 0, "removedSample": 0, "dividends": 0}
     query = db.query(PortfolioTransaction).filter(PortfolioTransaction.username == username)
     existing = query.all()
     removed_sample = 0
@@ -450,7 +462,9 @@ def build_positions(
         }
 
     for holding in holdings:
-        positions[holding.ticker] = {**blank(holding.ticker), "shares": holding.shares, "cost": holding.cost_basis}
+        positions[holding.ticker] = {
+            **blank(holding.ticker, holding_asset(holding.ticker)), "shares": holding.shares, "cost": holding.cost_basis,
+        }
 
     counted = ignored = sells = 0
     oversold: List[str] = []
@@ -537,6 +551,9 @@ PLAN_HISTORY_DAYS = 729
 
 _lock = threading.Lock()
 _meta: Dict[str, Dict[str, Optional[str]]] = {}
+# When a ticker whose details lookup failed may be asked about again.
+_meta_retry: Dict[str, datetime] = {}
+META_RETRY = timedelta(hours=6)
 _rate_limited_until: Optional[datetime] = None
 
 
@@ -594,7 +611,8 @@ def _fetch_closes(symbol: str, start: date, end: date) -> List[Tuple[date, float
         raise
 
 
-def _fetch_meta(ticker: str) -> Dict[str, Optional[str]]:
+def _fetch_meta(ticker: str) -> Optional[Dict[str, Optional[str]]]:
+    """Name and sector, or None when the provider couldn't say."""
     if stock_data_client._use_mock():
         data = stock_data_client.mock.get_stock_data(ticker) or {}
         return {"name": data.get("name"), "sector": data.get("sector")}
@@ -604,7 +622,7 @@ def _fetch_meta(ticker: str) -> Dict[str, Optional[str]]:
     except Exception as exc:  # noqa: BLE001 - a name is nice to have
         if "429" in str(exc):
             raise PolygonRateLimited(ticker) from exc
-        return {"name": None, "sector": None}
+        return None
     return {"name": details.get("name"), "sector": polygon._company_metadata(details).get("sector")}
 
 
@@ -752,13 +770,20 @@ def _company(db: Session, tickers: List[str], budget: _Budget) -> Dict[str, Dict
             result[ticker] = {"name": row.name, "sector": row.sector}
         elif ticker in _meta:
             result[ticker] = _meta[ticker]
-        elif budget.spend():
+        elif _meta_retry.get(ticker, _now()) <= _now() and budget.spend():
             try:
-                _meta[ticker] = _fetch_meta(ticker)
+                found = _fetch_meta(ticker)
             except PolygonRateLimited:
                 _rate_limited()
-                _meta.pop(ticker, None)
-            result[ticker] = _meta.get(ticker) or {"name": row.name if row else None, "sector": None}
+                found = None
+            else:
+                # A failed lookup is asked again later, not kept as "no name".
+                if found is None:
+                    _meta_retry[ticker] = _now() + META_RETRY
+            if found is not None:
+                _meta[ticker] = found
+                _meta_retry.pop(ticker, None)
+            result[ticker] = found or {"name": row.name if row else None, "sector": None}
         else:
             result[ticker] = {"name": row.name if row else None, "sector": None}
     return result
@@ -971,7 +996,12 @@ def find_duplicates(transactions: List[Any], across_labels: bool = False) -> Dic
                     break
                 if second.id in paired or (second.source or "", second.account or "") == origin:
                     continue
-                if _same_amount(first.shares, second.shares) and _same_price(first.price, second.price):
+                # A dividend has no shares or price; its amount is what matches.
+                if first.side == "dividend":
+                    same = _same_price(first.amount or 0.0, second.amount or 0.0)
+                else:
+                    same = _same_amount(first.shares, second.shares) and _same_price(first.price, second.price)
+                if same:
                     paired.update({first.id, second.id})
                     duplicates[second.id] = first
                     break
@@ -1026,12 +1056,16 @@ def load_adjusted(db: Session, username: str, budget: Optional[_Budget] = None) 
     for tx in stored:
         if tx.ticker in aliases:
             tx.ticker, tx.asset = aliases[tx.ticker], "stock"
-    # Dividends are cash, not shares: kept apart from the trades.
-    dividends = [t for t in stored if t.side == "dividend"]
-    stored = [t for t in stored if t.side != "dividend"]
+    # Dividends are cash, not shares: kept apart from the trades. The same
+    # payment from two feeds is paired like a trade (by its amount).
+    by_id = {t.id: t for t in stored}
     duplicates = find_duplicates(stored)
-    transactions = [t for t in stored if t.id not in duplicates]
-    stocks = sorted({t.ticker for t in transactions if (t.asset or "stock") == "stock"} | {h.ticker for h in holdings})
+    dividends = [t for t in stored if t.side == "dividend" and t.id not in duplicates]
+    transactions = [t for t in stored if t.side != "dividend" and t.id not in duplicates]
+    stocks = sorted(
+        {t.ticker for t in transactions if (t.asset or "stock") == "stock"}
+        | {h.ticker for h in holdings if holding_asset(h.ticker) == "stock"}
+    )
     if budget is not None and stocks:
         ensure_splits(db, stocks, budget)
     splits = splits_for(db, stocks)
@@ -1092,7 +1126,7 @@ def load_adjusted(db: Session, username: str, budget: Optional[_Budget] = None) 
 
     pair_counts: Dict[Tuple[str, str], int] = {}
     for dup_id, kept in duplicates.items():
-        dup = next(t for t in stored if t.id == dup_id)
+        dup = by_id[dup_id]
         key = (_label(dup.source, "No source"), _label(kept.source, "No source"))
         pair_counts[key] = pair_counts.get(key, 0) + 1
     info = {
@@ -1580,7 +1614,11 @@ def holding_detail(db: Session, username: str, ticker: str) -> Dict[str, Any]:
     pages know about the company."""
     holdings, transactions, info = load_adjusted(db, username, _Budget(SPLIT_CALLS_PER_REQUEST))
     positions, meta = build_positions(holdings, transactions)
-    ticker = ticker.strip().upper()
+    # A security with no market symbol keeps the label it was filed under
+    # ("IBIT call $100"), so it's matched as given before uppercasing.
+    ticker = ticker.strip()
+    if ticker not in positions:
+        ticker = ticker.upper()
     position = positions.get(ticker)
     if position is None:
         raise HTTPException(status_code=404, detail="Not in your portfolio.")
@@ -1789,7 +1827,7 @@ def value_history(db: Session, username: str) -> Dict[str, Any]:
     if not holdings and not transactions:
         return base
 
-    assets = {h.ticker: "stock" for h in holdings}
+    assets = {h.ticker: holding_asset(h.ticker) for h in holdings}
     held: Dict[str, List[date]] = {}
     for tx in transactions:
         assets[tx.ticker] = tx.asset or "stock"
@@ -1849,6 +1887,7 @@ def value_history(db: Session, username: str) -> Dict[str, Any]:
             cost[ticker] = None
     trades = [tx for tx in transactions if tx.trade_date > start or (not as_of and tx.trade_date >= start)]
     snapshot_cost = {h.ticker: h.cost_basis for h in holdings}
+    snapshot_shares = {h.ticker: h.shares for h in holdings}
 
     cursor = {symbol: 0 for symbol in closes}
     current: Dict[str, Tuple[date, float]] = {}
@@ -1862,6 +1901,18 @@ def value_history(db: Session, username: str) -> Dict[str, Any]:
     tick_value: Dict[str, float] = {}
     marks: Dict[str, Tuple[Dict[str, float], Dict[str, float]]] = {}
     points = []
+
+    def apply_snapshot() -> bool:
+        # The snapshot's day is where its shares and cost basis are known:
+        # after that day's trades, which it already includes. Anything not in
+        # it is held at nothing from here, as in the breakdown, so a later buy
+        # starts from a known cost of zero.
+        for ticker in shares:
+            shares[ticker], cost[ticker] = 0.0, 0.0
+        shares.update(snapshot_shares)
+        cost.update(snapshot_cost)
+        return True
+
     snapshot_applied = False
     t_index = 0
     day = start
@@ -1873,6 +1924,10 @@ def value_history(db: Session, username: str) -> Dict[str, Any]:
             while t_index < len(trades) and trades[t_index].trade_date <= day:
                 tx = trades[t_index]
                 t_index += 1
+                # A weekend snapshot is applied before the next trading
+                # day's trades, not after them.
+                if as_of and not snapshot_applied and tx.trade_date > as_of:
+                    snapshot_applied = apply_snapshot()
                 fees = tx.fees or 0.0
                 moved = tx.shares * tx.price + fees if tx.side == "buy" else -(tx.shares * tx.price - fees)
                 flow += moved
@@ -1883,10 +1938,17 @@ def value_history(db: Session, username: str) -> Dict[str, Any]:
                     shares[tx.ticker] = held_now + tx.shares
                     cost[tx.ticker] = None if basis is None else basis + tx.shares * tx.price + (tx.fees or 0.0)
                 else:
+                    # As in build_positions: a sell takes only the shares on
+                    # record, so an oversold one can't leave a negative count
+                    # that the next buys then fill back in.
                     sold = min(tx.shares, max(held_now, 0.0))
                     if basis is not None and held_now > EPSILON:
                         cost[tx.ticker] = basis - basis / held_now * sold
-                    shares[tx.ticker] = held_now - tx.shares
+                    shares[tx.ticker] = held_now - sold
+                    if shares[tx.ticker] < DUST_SHARES:
+                        shares[tx.ticker] = 0.0
+                        if cost.get(tx.ticker) is not None:
+                            cost[tx.ticker] = 0.0
                 last_trade[tx.ticker] = tx.price
             # A dividend is money paid out: a gain, then a withdrawal.
             while d_index < len(dividends) and dividends[d_index].trade_date <= day:
@@ -1898,10 +1960,7 @@ def value_history(db: Session, username: str) -> Dict[str, Any]:
                 bench_close = benchmark[b_index][1]
                 b_index += 1
             if as_of and day >= as_of and not snapshot_applied:
-                # The snapshot's day is where its cost basis is known: after
-                # that day's trades, which it already includes.
-                cost.update(snapshot_cost)
-                snapshot_applied = True
+                snapshot_applied = apply_snapshot()
             for symbol, series in closes.items():
                 i = cursor[symbol]
                 while i < len(series) and series[i][0] <= day:
@@ -2175,6 +2234,10 @@ def export_csv(db: Session, username: str, kind: str) -> str:
     as_of = meta["as_of"]
     writer.writerow(["Date sold", "Symbol", "Shares", "Sale price", "Proceeds", "Fees", "Realized gain",
                      "Term", "Account"])
+    # The snapshot's positions are the first lots, as on the Taxes tab, with
+    # no acquired date, so a sale from them has an unknown term.
+    for h in holdings:
+        lots[h.ticker] = [[h.shares, None]]
     for tx in sorted(transactions, key=lambda t: (t.trade_date, t.id)):
         if as_of and tx.trade_date <= as_of:
             continue
@@ -2183,15 +2246,21 @@ def export_csv(db: Session, username: str, kind: str) -> str:
             queue.append([tx.shares, tx.trade_date])
             continue
         # Term from the oldest lots the sale used, first-in, first-out.
-        left, oldest = tx.shares, None
+        left, used, oldest = tx.shares, False, None
         while left > EPSILON and queue:
             take = min(left, queue[0][0])
-            oldest = oldest or queue[0][1]
+            if not used:
+                used, oldest = True, queue[0][1]
             queue[0][0] -= take
             left -= take
             if queue[0][0] < DUST_SHARES:
                 queue.pop(0)
-        term = "" if oldest is None else ("Long" if (tx.trade_date - oldest).days > LONG_TERM_DAYS else "Short")
+        if not used:
+            term = ""
+        elif oldest is None:
+            term = "Unknown"
+        else:
+            term = "Long" if (tx.trade_date - oldest).days > LONG_TERM_DAYS else "Short"
         writer.writerow([
             tx.trade_date.isoformat(), tx.ticker, _csv_number(tx.shares, 6), _csv_number(tx.price),
             _csv_number(tx.shares * tx.price), _csv_number(tx.fees or 0.0),
