@@ -4,7 +4,7 @@ const STATIC_ASSETS = [
     '/poker/',
     '/poker/index.html',
     '/poker/style.css?v=26',
-    '/poker/app.js?v=21',
+    '/poker/app.js?v=22',
     '/poker/manifest.json',
     '/shared/casino-theme.css?v=3',
     '/shared/rules-viewer.css?v=1',

@@ -1441,6 +1441,7 @@ function updateGameDisplay() {
         if (lastHandNumber > 0) {
             // Previous hand completed, record it
             StatsManager.recordHandPlayed();
+            window.pgAnalytics?.track?.('game_played', { game: 'poker' });
         }
         lastHandNumber = gameState.hand_number;
         handResultRecorded = false; // Reset for new hand

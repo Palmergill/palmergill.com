@@ -3,7 +3,7 @@ const CACHE_PREFIX = 'blackjack-app-';
 const STATIC_ASSETS = [
     '/blackjack/',
     '/blackjack/index.html',
-    '/blackjack/app.js?v=13',
+    '/blackjack/app.js?v=14',
     '/blackjack/blackjackGame.js',
     '/blackjack/style.css?v=15',
     '/blackjack/manifest.json',

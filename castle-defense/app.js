@@ -1289,6 +1289,7 @@
     function finishRun({ kills, wave }) {
         const isBest = record.best == null || kills > record.best;
         record.runs += 1;
+        window.pgAnalytics?.track?.("game_played", { game: "castle-defense" });
         if (isBest) record.best = kills;
         writeRecord();
         keepBestLayout(kills, layoutOf(state));

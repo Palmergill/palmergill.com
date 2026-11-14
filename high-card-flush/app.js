@@ -301,6 +301,7 @@
             isPersistingOwnBankroll = false;
         }
 
+        window.pgAnalytics?.track?.("game_played", { game: "high-card-flush" });
         window.pgAnalytics?.track?.("high_card_flush_round_completed", {
             decision: state.decision,
             raise_multiplier: state.wagers.raise ? state.wagers.raise / state.wagers.ante : 0,

@@ -200,6 +200,20 @@ class DailySignupCounter(Base):
     updated_at = Column(DateTime, default=utc_now, onupdate=utc_now, nullable=False)
 
 
+class SiteCounter(Base):
+    """Lifetime site totals shown on the home page.
+
+    analytics_events is pruned after RETENTION_DAYS, so running totals live
+    here instead. Seeded once from whatever events still exist.
+    """
+
+    __tablename__ = "site_counters"
+
+    key = Column(String(40), primary_key=True)
+    value = Column(Integer, nullable=False, default=0)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now, nullable=False)
+
+
 class PasskeyCredential(Base):
     """A WebAuthn credential that signs one identity in without a password.
 

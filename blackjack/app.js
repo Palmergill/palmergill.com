@@ -504,6 +504,7 @@
                         biggestWin: Math.max(0, delta)
                     });
                 }
+                window.pgAnalytics?.track?.("game_played", { game: "blackjack" });
                 window.pgAnalytics?.track?.("blackjack_round_completed", {
                     balance: state.balance,
                     results: state.playerHands.map((hand) => hand.result || "unknown"),

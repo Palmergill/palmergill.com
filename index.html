@@ -119,6 +119,51 @@
         .btn.ghost { background: var(--card); border: 1px solid var(--line); color: var(--ink); }
         .btn.ghost:hover, .btn.ghost:focus-visible { border-color: var(--sage); color: var(--sage); transform: translateY(-2px); outline: none; }
 
+        .live-stats {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 10px 28px;
+            margin-top: 28px;
+            padding-top: 22px;
+            border-top: 1px solid var(--line);
+            max-width: 54ch;
+        }
+        .live-stats > * { opacity: 0; transition: opacity 0.5s ease; }
+        .live-stats.is-ready > * { opacity: 1; }
+        .live-stats .live {
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            font-size: 0.72rem;
+            font-weight: 700;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            color: var(--sage);
+        }
+        .live-stats .live::before {
+            content: "";
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--sage);
+            animation: live-pulse 2s ease-out infinite;
+        }
+        .live-stats .stat { display: flex; align-items: baseline; gap: 8px; }
+        .live-stats .stat b {
+            font-size: 1.45rem;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+            font-variant-numeric: tabular-nums;
+            color: var(--ink);
+        }
+        .live-stats .stat span { font-size: 0.9rem; color: var(--muted); }
+        .live-stats .stat.bump b { color: var(--sage); transition: color 0.2s ease; }
+        @keyframes live-pulse {
+            0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--sage) 55%, transparent); }
+            70%, 100% { box-shadow: 0 0 0 8px transparent; }
+        }
+
         .portrait {
             aspect-ratio: 4 / 5;
             border-radius: 20px;
@@ -473,6 +518,7 @@
         .js-welcome .hero .role,
         .js-welcome .hero .lede,
         .js-welcome .hero .cta,
+        .js-welcome .hero .live-stats,
         .js-welcome .hero .portrait {
             opacity: 0;
             animation: hero-rise 0.58s cubic-bezier(0.22, 1, 0.36, 1) forwards;
@@ -480,6 +526,7 @@
         .js-welcome .hero .role { animation-delay: 0.96s; }
         .js-welcome .hero .lede { animation-delay: 1.02s; }
         .js-welcome .hero .cta { animation-delay: 1.08s; }
+        .js-welcome .hero .live-stats { animation-delay: 1.14s; }
         .js-welcome .hero .portrait { animation-delay: 1s; }
 
         @keyframes splash-pop { from { opacity: 0; transform: scale(0.76); } to { opacity: 1; transform: scale(1); } }
@@ -515,6 +562,7 @@
             .js-welcome .hero .role,
             .js-welcome .hero .lede,
             .js-welcome .hero .cta,
+            .js-welcome .hero .live-stats,
             .js-welcome .hero .portrait {
                 opacity: 1 !important;
                 transform: none !important;
@@ -548,6 +596,11 @@
                     <a class="btn ghost" href="/about/">About me</a>
                     <a class="btn ghost" href="https://www.linkedin.com/in/palmer-gill-0081a7129/" target="_blank" rel="noopener noreferrer">Contact on LinkedIn</a>
                     <a class="btn ghost" href="/assets/Resume2026.pdf">Résumé</a>
+                </div>
+                <div class="live-stats" id="live-stats">
+                    <span class="live">Live</span>
+                    <span class="stat"><b data-stat="games_played">0</b><span>games played</span></span>
+                    <span class="stat"><b data-stat="page_views">0</b><span>page views</span></span>
                 </div>
             </div>
             <div class="portrait">
@@ -693,6 +746,54 @@
                 finishSplash();
             }
 
+        })();
+    </script>
+    <script>
+        (() => {
+            const root = document.getElementById('live-stats');
+            if (!root) return;
+            const fmt = new Intl.NumberFormat('en-US');
+            const shown = {};
+            const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+            function animate(el, from, to) {
+                if (reduced || from === to) { el.textContent = fmt.format(to); return; }
+                const start = performance.now();
+                const duration = from === 0 ? 1200 : 600;
+                const step = (now) => {
+                    const t = Math.min(1, (now - start) / duration);
+                    const eased = 1 - Math.pow(1 - t, 3);
+                    el.textContent = fmt.format(Math.round(from + (to - from) * eased));
+                    if (t < 1) requestAnimationFrame(step);
+                };
+                requestAnimationFrame(step);
+            }
+
+            async function refresh() {
+                try {
+                    const res = await fetch('/api/analytics/stats', { cache: 'no-store' });
+                    if (!res.ok) return;
+                    const data = await res.json();
+                    root.querySelectorAll('[data-stat]').forEach((el) => {
+                        const key = el.dataset.stat;
+                        const next = Number(data[key]);
+                        if (!Number.isFinite(next)) return;
+                        const prev = shown[key] ?? 0;
+                        if (key in shown && next > prev) {
+                            const stat = el.closest('.stat');
+                            stat.classList.add('bump');
+                            setTimeout(() => stat.classList.remove('bump'), 900);
+                        }
+                        animate(el, prev, next);
+                        shown[key] = next;
+                    });
+                    root.classList.add('is-ready');
+                } catch { /* stays hidden */ }
+            }
+
+            refresh();
+            setInterval(() => { if (!document.hidden) refresh(); }, 15000);
+            document.addEventListener('visibilitychange', () => { if (!document.hidden) refresh(); });
         })();
     </script>
 </body>

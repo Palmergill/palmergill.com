@@ -7,11 +7,13 @@ import time
 from datetime import datetime, timedelta
 from typing import Any, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, Field, field_validator
+from sqlalchemy import func, update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.database import AnalyticsEvent, get_db, utc_now
+from app.database import AnalyticsEvent, CastleDefenseScore, SiteCounter, get_db, utc_now
 
 router = APIRouter(prefix="/api/analytics", tags=["analytics"])
 
@@ -214,6 +216,52 @@ def record_analytics_event(
     return event
 
 
+COUNTER_PAGE_VIEWS = "page_views"
+COUNTER_GAMES_PLAYED = "games_played"
+GAME_PLAYED_EVENT = "game_played"
+# Events games sent before `game_played` existed, used only to seed the total.
+_LEGACY_GAME_EVENTS = ("blackjack_round_completed", "high_card_flush_round_completed")
+
+
+def _seed_counter(db: Session, key: str) -> int:
+    if key == COUNTER_PAGE_VIEWS:
+        return db.query(func.count(AnalyticsEvent.id)).filter(AnalyticsEvent.event_type == "page_view").scalar() or 0
+    legacy = (
+        db.query(func.count(AnalyticsEvent.id))
+        .filter(AnalyticsEvent.event_name.in_((*_LEGACY_GAME_EVENTS, GAME_PLAYED_EVENT)))
+        .scalar()
+        or 0
+    )
+    castle_runs = db.query(func.coalesce(func.sum(CastleDefenseScore.runs), 0)).scalar() or 0
+    return int(legacy) + int(castle_runs)
+
+
+def ensure_counter(db: Session, key: str) -> int:
+    row = db.get(SiteCounter, key)
+    if row is not None:
+        return row.value
+    value = _seed_counter(db, key)
+    db.add(SiteCounter(key=key, value=value))
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        row = db.get(SiteCounter, key)
+        return row.value if row else 0
+    return value
+
+
+def increment_counter(db: Session, key: str) -> None:
+    # Seeding counts existing events, so seed before the new event is written.
+    ensure_counter(db, key)
+    db.execute(
+        update(SiteCounter)
+        .where(SiteCounter.key == key)
+        .values(value=SiteCounter.value + 1, updated_at=utc_now())
+    )
+    db.commit()
+
+
 def cleanup_old_analytics(db: Session, days: int = RETENTION_DAYS) -> int:
     cutoff = utc_now() - timedelta(days=days)
     deleted = db.query(AnalyticsEvent).filter(AnalyticsEvent.timestamp < cutoff).delete()
@@ -235,6 +283,10 @@ def create_event(
     from app.main import client_ip
 
     path = payload.path or request.headers.get("x-analytics-path") or request.url.path
+    if payload.event_type == "page_view":
+        increment_counter(db, COUNTER_PAGE_VIEWS)
+    elif payload.event_name == GAME_PLAYED_EVENT:
+        increment_counter(db, COUNTER_GAMES_PLAYED)
     is_admin = path == "/admin" or path.startswith("/admin/") or path.startswith("/api/admin")
     event = record_analytics_event(
         db,
@@ -254,3 +306,12 @@ def create_event(
         metadata=payload.metadata,
     )
     return {"ok": True, "id": event.id}
+
+
+@router.get("/stats")
+def site_stats(response: Response, db: Session = Depends(get_db)):
+    response.headers["Cache-Control"] = "public, max-age=5"
+    return {
+        "games_played": ensure_counter(db, COUNTER_GAMES_PLAYED),
+        "page_views": ensure_counter(db, COUNTER_PAGE_VIEWS),
+    }

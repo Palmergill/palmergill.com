@@ -1383,6 +1383,7 @@ function resolveRoll(d1, d2) {
             biggestWin: Math.max(0, netRoll)
         });
     }
+    if (resolvedStake > 0) window.pgAnalytics?.track?.('game_played', { game: 'craps' });
     window.pgAnalytics?.track?.('craps_roll_resolved', {
         total,
         point,
