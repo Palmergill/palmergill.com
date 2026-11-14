@@ -67,6 +67,27 @@
         return error?.name === "NotAllowedError" || error?.name === "AbortError";
     }
 
+    // Set once this browser has signed in with or saved a passkey, so the
+    // login page can open the passkey prompt first instead of the form.
+    const DEVICE_KEY = "pg-passkey-device";
+
+    function rememberDevice(on) {
+        try {
+            if (on) localStorage.setItem(DEVICE_KEY, "1");
+            else localStorage.removeItem(DEVICE_KEY);
+        } catch {
+            // Storage blocked: the login page just shows the form first.
+        }
+    }
+
+    function deviceHasPasskey() {
+        try {
+            return localStorage.getItem(DEVICE_KEY) === "1";
+        } catch {
+            return false;
+        }
+    }
+
     function supported() {
         return Boolean(window.PublicKeyCredential && navigator.credentials?.create);
     }
@@ -90,15 +111,19 @@
                 excludeCredentials: descriptors(publicKey.excludeCredentials),
             },
         });
-        return postJSON("/login/passkey/register", { credential: credentialToJSON(credential), name });
+        const data = await postJSON("/login/passkey/register", { credential: credentialToJSON(credential), name });
+        rememberDevice(true);
+        return data;
     }
 
     // `conditional` hangs the request on the username field's autofill menu
     // instead of opening a dialog; pass a `signal` so a button press can take
-    // over from it.
-    async function signIn({ next, conditional = false, signal } = {}) {
+    // over from it. `onWaiting` runs once the browser holds the request, which
+    // is when the field should take focus: iOS offers only passwords to a
+    // field focused before the request exists.
+    async function signIn({ next, conditional = false, signal, onWaiting } = {}) {
         const { publicKey } = await postJSON("/login/passkey/options");
-        const credential = await navigator.credentials.get({
+        const pending = navigator.credentials.get({
             publicKey: {
                 ...publicKey,
                 challenge: toBytes(publicKey.challenge),
@@ -107,12 +132,17 @@
             mediation: conditional ? "conditional" : undefined,
             signal,
         });
+        onWaiting?.();
+        const credential = await pending;
         try {
-            return await postJSON("/login/passkey", { credential: credentialToJSON(credential), next });
+            const data = await postJSON("/login/passkey", { credential: credentialToJSON(credential), next });
+            rememberDevice(true);
+            return data;
         } catch (error) {
             // The server no longer holds this passkey. Where the browser
             // supports it, ask it to drop the passkey so it stops offering it.
             if (error.data?.unknownCredential) {
+                rememberDevice(false);
                 PublicKeyCredential.signalUnknownCredential?.({
                     rpId: publicKey.rpId,
                     credentialId: error.data.credentialId,
@@ -122,5 +152,5 @@
         }
     }
 
-    window.Passkeys = { supported, conditionalSupported, register, signIn, isCancelled };
+    window.Passkeys = { supported, conditionalSupported, deviceHasPasskey, register, signIn, isCancelled };
 })();

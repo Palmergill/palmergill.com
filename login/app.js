@@ -97,10 +97,10 @@
         }
     }
 
-    // Passkeys: a button that opens the browser's passkey dialog, plus the
-    // quieter autofill route — the username field's suggestions list any
-    // passkey saved for this site. Only one request can be pending, so the
-    // button aborts the autofill request before starting its own.
+    // Passkeys: a browser that has used one here gets the passkey prompt
+    // straight away; otherwise the username field's autofill lists any saved
+    // passkey, and the button opens the prompt by hand. Only one request can
+    // be pending, so each new one aborts the last.
     const passkeys = window.Passkeys;
     const passkeySection = document.getElementById("passkeySection");
     const passkeyButton = document.getElementById("passkeyButton");
@@ -112,23 +112,46 @@
         window.location.assign(data.redirect || safeNextPath());
     }
 
+    function focusUsername() {
+        if (!document.activeElement || document.activeElement === document.body) username.focus();
+    }
+
     async function startPasskeyAutofill() {
-        if (!(await passkeys.conditionalSupported())) return;
+        if (!(await passkeys.conditionalSupported())) {
+            focusUsername();
+            return;
+        }
         autofillRequest = new AbortController();
         try {
             passkeySignedIn(await passkeys.signIn({
                 next: safeNextPath(),
                 conditional: true,
                 signal: autofillRequest.signal,
+                onWaiting: focusUsername,
             }));
         } catch (error) {
             if (passkeys.isCancelled(error)) return;
             setStatus(error.message);
+            focusUsername();
             // A passkey the server turned down: offer the list again so
             // another can be picked. Anything else (the options request
             // failing) would only fail again, so stop there.
             if (error.status === 401) startPasskeyAutofill();
         }
+    }
+
+    async function openRememberedPasskey() {
+        const request = new AbortController();
+        autofillRequest = request;
+        try {
+            passkeySignedIn(await passkeys.signIn({ next: safeNextPath(), signal: request.signal }));
+            return;
+        } catch (error) {
+            // The button took over; it restarts autofill when it finishes.
+            if (request.signal.aborted) return;
+            if (!passkeys.isCancelled(error)) setStatus(error.message || "Unable to sign in with a passkey.");
+        }
+        startPasskeyAutofill();
     }
 
     if (passkeys?.supported()) {
@@ -151,9 +174,11 @@
                 passkeyButton.disabled = false;
             }
         });
-        startPasskeyAutofill();
+        if (passkeys.deviceHasPasskey()) openRememberedPasskey();
+        else startPasskeyAutofill();
+    } else {
+        username.focus();
     }
 
-    username.focus();
     revealSignupPrompt();
 })();

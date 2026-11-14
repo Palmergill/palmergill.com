@@ -27,9 +27,16 @@ async function addPasskey(page, password, name = 'Test device') {
     await expect(page.locator('.passkey-item__name')).toContainText([name]);
 }
 
+// A browser that has used a passkey gets the prompt on load. Tests of the
+// other routes start each page as a browser that never has.
+async function asNewDevice(page) {
+    await page.addInitScript(() => localStorage.removeItem('pg-passkey-device'));
+}
+
 // The virtual authenticator answers the login page's autofill request on its
 // own, so tests of the button switch autofill off first.
 async function withoutAutofill(page) {
+    await asNewDevice(page);
     await page.addInitScript(() => {
         if (window.PublicKeyCredential) {
             PublicKeyCredential.isConditionalMediationAvailable = async () => false;
@@ -61,6 +68,7 @@ test.describe('member', () => {
 });
 
 test('the username field offers a saved passkey through autofill', async ({ page }) => {
+    await asNewDevice(page);
     await addAuthenticator(page);
     const username = await signUp(page);
     await addPasskey(page, PASSWORD);
@@ -68,6 +76,23 @@ test('the username field offers a saved passkey through autofill', async ({ page
     await page.context().clearCookies();
     await page.goto('/login/?next=/');
     // No click: the autofill request resolves with the saved passkey.
+    await expect(page).not.toHaveURL(/\/login\//);
+    await expect(page.locator('.site-nav__username')).toHaveText(username);
+});
+
+test('a browser that saved a passkey gets the passkey prompt first', async ({ page }) => {
+    await addAuthenticator(page);
+    await page.addInitScript(() => {
+        if (window.PublicKeyCredential) {
+            PublicKeyCredential.isConditionalMediationAvailable = async () => false;
+        }
+    });
+    const username = await signUp(page);
+    await addPasskey(page, PASSWORD);
+
+    await page.context().clearCookies();
+    await page.goto('/login/?next=/');
+    // No click and no autofill: the prompt opens on load.
     await expect(page).not.toHaveURL(/\/login\//);
     await expect(page.locator('.site-nav__username')).toHaveText(username);
 });
