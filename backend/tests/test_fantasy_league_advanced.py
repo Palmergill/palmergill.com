@@ -57,3 +57,27 @@ def test_exact_median_score_adds_a_tie():
 
     assert records[2] == {"wins": 0, "losses": 1, "ties": 1, "games": 2, "win_pct": 0.25}
     assert records[3] == {"wins": 1, "losses": 0, "ties": 1, "games": 2, "win_pct": 0.75}
+
+
+def test_a_week_result_is_espns_call_to_the_hundredth():
+    # 100.04 to 100.00 is a win: rounding the margin to a tenth first made it
+    # a tie on both sides. An exact tie ESPN broke on its tiebreaker follows
+    # ESPN too.
+    from types import SimpleNamespace
+
+    from app.services import fantasy_league_week as week
+
+    teams = {1: {"name": "Home"}, 2: {"name": "Away"}, 3: {"name": "Three"}, 4: {"name": "Four"}}
+    close = SimpleNamespace(
+        is_complete=True, is_bye=False, winner="HOME", espn_matchup_id=1, playoff_tier="NONE",
+        home_team_id=1, home_points=100.04, away_team_id=2, away_points=100.0,
+    )
+    broken = SimpleNamespace(
+        is_complete=True, is_bye=False, winner="AWAY", espn_matchup_id=2, playoff_tier="NONE",
+        home_team_id=3, home_points=90.0, away_team_id=4, away_points=90.0,
+    )
+    results = week._results([close, broken], teams)
+    assert (results[1]["result"], results[1]["margin"], results[1]["points"]) == ("win", 0.04, 100.04)
+    assert (results[2]["result"], results[2]["margin"]) == ("loss", -0.04)
+    assert (results[3]["result"], results[4]["result"]) == ("loss", "win")
+    assert week._matchup_payload(close, teams)["margin"] == 0.04

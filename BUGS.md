@@ -21,6 +21,8 @@ Closed items are trimmed quarterly.
 
 ## Closed
 
+- (fantasy week) The weekly recap decided win/loss/tie from the margin rounded to a tenth, so a game ESPN scored 100.04–100.00 read as a tie on both sides (and dropped out of the win/loss awards); the slate also crowned the home team on any tie. Results now follow ESPN's stored `winner` (which settles its tiebreakers too), and scores and margins carry ESPN's two decimals. Pinned in `test_a_week_result_is_espns_call_to_the_hundredth`. — closed 2026-11-13
+
 - The 2026-11-13 Castle Defense review: two posts of an account's first run of the day (two tabs, or the signed-out run auto-posting as another finishes) broke the one-row-per-day constraint during the replay and 500'd, losing that run; the loser now counts against the winner's row (`test_two_first_runs_posted_at_once_both_count`). Also removed the Patch 2.0 two-engine switch (`castleDefenseGameRules3.js`): every day now plays and replays on the current engine, so older days' maps and allotments changed. A browser's saved record is stamped with the engine's RULES, so a best from older rules is dropped instead of lingering. — closed 2026-11-13
 
 - The 2026-11-13 portfolio review closed ten findings, eight pinned at the end of `backend/tests/test_portfolio_api.py`.

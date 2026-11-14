@@ -207,7 +207,7 @@
         const row = el("div", `score__side${isWinner ? " score__side--won" : ""}`);
         row.appendChild(el("span", "score__team", (side && side.name) || "—"));
         row.appendChild(
-            el("span", "score__points", F.formatPoints(side && side.points))
+            el("span", "score__points", F.formatScore(side && side.points))
         );
         return row;
     }
@@ -229,16 +229,21 @@
                 els.scoreboard.appendChild(card);
                 return;
             }
-            const homeWon = (matchup.home.points || 0) >= (matchup.away.points || 0);
-            card.appendChild(scoreSide(matchup.home, homeWon));
-            card.appendChild(scoreSide(matchup.away, !homeWon));
+            // ESPN's own winner: it scores to the hundredth and breaks ties.
+            const winner = matchup.winner
+                || (matchup.home.points > matchup.away.points ? "HOME"
+                    : matchup.away.points > matchup.home.points ? "AWAY" : "TIE");
+            card.appendChild(scoreSide(matchup.home, winner === "HOME"));
+            card.appendChild(scoreSide(matchup.away, winner === "AWAY"));
             card.appendChild(
                 el(
                     "p",
                     "score__meta",
-                    matchup.margin
-                        ? `Won by ${F.formatPoints(matchup.margin)}`
-                        : "Tied"
+                    winner === "TIE"
+                        ? "Tied"
+                        : matchup.margin
+                            ? `Won by ${F.formatScore(matchup.margin)}`
+                            : "Won on the tiebreaker"
                 )
             );
             els.scoreboard.appendChild(card);

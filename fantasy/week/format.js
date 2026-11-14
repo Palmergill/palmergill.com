@@ -48,6 +48,13 @@
         return Number.isFinite(number) ? number.toFixed(1) : "—";
     }
 
+    // A team's score, to the hundredth as ESPN keeps it: games are decided there.
+    function formatScore(value) {
+        if (value == null) return "—";
+        const number = Number(value);
+        return Number.isFinite(number) ? number.toFixed(2) : "—";
+    }
+
     function formatSigned(value) {
         if (value == null) return "—";
         const number = Number(value);
@@ -157,6 +164,7 @@
         formatAllPlay,
         formatPercent,
         formatPoints,
+        formatScore,
         formatSigned,
         gradeTier,
         movementLabel,

@@ -195,14 +195,15 @@ def _matchup_payload(
             "abbrev": team.get("abbrev"),
             "owner": team.get("owner"),
             "logo_url": team.get("logo_url"),
-            "points": _round(points, 1),
+            # ESPN scores to the hundredth; a game can be decided there.
+            "points": _round(points, 2),
         }
 
     home = side(row.home_team_id, row.home_points)
     away = side(row.away_team_id, row.away_points)
     margin = None
-    if home and away and home["points"] is not None and away["points"] is not None:
-        margin = _round(abs(home["points"] - away["points"]), 1)
+    if home and away and row.home_points is not None and row.away_points is not None:
+        margin = _round(abs(row.home_points - row.away_points), 2)
     return {
         "espn_matchup_id": row.espn_matchup_id,
         "playoff_tier": row.playoff_tier,
@@ -221,31 +222,36 @@ def _results(
     """One row per team that played: its score, its opponent, its result."""
     results: Dict[int, Dict[str, Any]] = {}
 
-    def record(team_id, points, opponent_id, opponent_points, is_bye, complete):
+    def record(team_id, points, opponent_id, opponent_points, is_bye, complete, decided):
         if team_id is None or points is None:
             return
         opponent = teams.get(opponent_id, {}) if opponent_id is not None else {}
+        # Unrounded: ESPN scores to the hundredth, and rounding to the tenth
+        # first turned a 100.04-100.00 win into a tie.
         margin = (
             None
             if opponent_points is None
-            else _round(points - opponent_points, 1)
+            else _round(points - opponent_points, 2)
         )
         if is_bye or opponent_id is None or margin is None:
             outcome = "bye" if is_bye else None
-        elif margin > 0:
+        elif decided is not None:
+            # ESPN's own call, which also settles a tie on its tiebreaker.
+            outcome = decided
+        elif points > opponent_points:
             outcome = "win"
-        elif margin < 0:
+        elif points < opponent_points:
             outcome = "loss"
         else:
             outcome = "tie"
         results[team_id] = {
-            "points": _round(points, 1),
+            "points": _round(points, 2),
             "opponent": (
                 {
                     "espn_team_id": opponent_id,
                     "name": opponent.get("name"),
                     "abbrev": opponent.get("abbrev"),
-                    "points": _round(opponent_points, 1),
+                    "points": _round(opponent_points, 2),
                 }
                 if opponent_id is not None
                 else None
@@ -259,6 +265,9 @@ def _results(
     for row in rows:
         if not row.is_complete:
             continue
+        winner = (row.winner or "").upper()
+        home_result = {"HOME": "win", "AWAY": "loss", "TIE": "tie"}.get(winner)
+        away_result = {"HOME": "loss", "AWAY": "win", "TIE": "tie"}.get(winner)
         record(
             row.home_team_id,
             row.home_points,
@@ -266,6 +275,7 @@ def _results(
             row.away_points,
             row.is_bye,
             row.is_complete,
+            home_result,
         )
         record(
             row.away_team_id,
@@ -274,6 +284,7 @@ def _results(
             row.home_points,
             row.is_bye,
             row.is_complete,
+            away_result,
         )
     return results
 
