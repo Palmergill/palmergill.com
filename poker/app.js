@@ -1910,9 +1910,13 @@ function updateActionButtons() {
     // Too short to make a legal raise: leave the button in place, disabled,
     // so the row keeps its shape and the tooltip says why.
     const minRaise = gameState.min_raise || 20;
-    const canRaise = myPlayer.chips > toCall + minRaise;
+    // A stack of exactly the call plus the minimum is a legal (all-in) raise.
+    const enoughChips = myPlayer.chips >= toCall + minRaise;
+    const reopened = gameState.raise_allowed !== false;
+    const canRaise = enoughChips && reopened;
     elements.btnRaise.disabled = !canRaise;
     if (canRaise) delete elements.btnRaise.dataset.tip;
+    else if (!reopened) elements.btnRaise.dataset.tip = 'A short all-in doesn’t reopen the raising — call or fold';
     else elements.btnRaise.dataset.tip = `Not enough chips to raise — a legal raise needs ${formatChips(toCall + minRaise)}`;
 }
 

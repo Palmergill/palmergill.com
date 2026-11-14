@@ -236,6 +236,9 @@ class AIManager:
         
         bot = self.bots[current.id]
         decision = bot.make_decision(self.game, current)
+        if decision['action'] in ('raise', 'all-in') and not self.game.can_raise(current.id):
+            # Back only to answer a short all-in: calling is the most it may do.
+            decision = {'action': 'call'}
         
         logger.info(f"Bot {current.name} decision: {decision}")
         

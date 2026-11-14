@@ -326,6 +326,17 @@ class PokerGame:
         self.acted_this_round = set()
         self.round_start_player = self.current_player_index
 
+        # A blind can take a whole short stack. Heads-up that left the
+        # all-in small blind as the player to act, where every action but a
+        # fold is refused: run the board out when nobody is left to bet
+        # against, and otherwise pass the turn to someone who can act.
+        able = [p for p in self.players if not p.folded and not p.is_all_in]
+        if self._betting_is_closed() and all(p.bet >= self.current_bet for p in able):
+            self._run_out_board()
+        elif self.players[self.current_player_index].is_all_in:
+            self._next_player()
+            self.round_start_player = self.current_player_index
+
         return True
 
     def _post_blind(self, player: Player, amount: int):
@@ -424,6 +435,8 @@ class PokerGame:
         player = self._get_player(player_id)
         if not player or player.folded or player.is_all_in:
             return False
+        if not self.can_raise(player_id):
+            return False
 
         call_amount = self.current_bet - player.bet
         total_needed = call_amount + amount
@@ -477,6 +490,13 @@ class PokerGame:
             self._next_player()
 
         return True
+
+    def can_raise(self, player_id: str) -> bool:
+        """Whether betting is open to this player. Only a full raise resets
+        who has acted, so a player who already acted is only back in this
+        round because a short all-in topped the bet: they may call or fold
+        the difference, not raise again."""
+        return player_id not in self.acted_this_round
 
     def _get_player(self, player_id: str) -> Optional[Player]:
         for p in self.players:
@@ -762,10 +782,14 @@ class PokerGame:
 
         # Set winners for display with best 5-card hand
         self.winners = []
+        # Everyone else folded: nobody called, so nobody sees the cards.
+        contested = len(active_players) > 1
         for p in active_players:
             if total_winnings[p.id] > 0:
                 # Get the best 5-card hand for this player
-                best_hand_cards = self._get_best_hand_cards(p.hand + self.community_cards)
+                best_hand_cards = (
+                    self._get_best_hand_cards(p.hand + self.community_cards) if contested else []
+                )
                 self.winners.append({
                     'id': p.id,
                     'name': p.name,
@@ -782,6 +806,8 @@ class PokerGame:
         # get_current_player mutates current_player_index when the current
         # slot is folded — avoid calling it twice from a serializer.
         current = self.get_current_player()
+        # Cards are only turned over when the hand was contested to the end.
+        contested = sum(1 for p in self.players if not p.folded) > 1
         hands_per_level = (
             self.tournament.get('hands_per_level', self.TOURNAMENT_HANDS_PER_LEVEL)
             if self.tournament else self.TOURNAMENT_HANDS_PER_LEVEL
@@ -794,7 +820,7 @@ class PokerGame:
             'community_cards': [c.to_dict() for c in self.community_cards],
             'players': [
                 {
-                    **p.to_dict(show_cards=for_player == p.id or (self.phase == 'showdown' and not p.folded)),
+                    **p.to_dict(show_cards=for_player == p.id or (self.phase == 'showdown' and contested and not p.folded)),
                     'is_dealer': idx == self.dealer_index and self.phase != 'waiting',
                     'is_small_blind': idx == getattr(self, 'small_blind_index', None),
                     'is_big_blind': idx == getattr(self, 'big_blind_index', None),
@@ -802,6 +828,7 @@ class PokerGame:
                 for idx, p in enumerate(self.players)
             ],
             'current_player': current.id if current else None,
+            'raise_allowed': bool(current) and self.can_raise(current.id),
             'dealer_index': self.dealer_index,
             'winners': self.winners,
             'last_action': self.last_action,
