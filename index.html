@@ -89,33 +89,21 @@
             padding-bottom: 46vh;
         }
 
-        .kicker {
-            display: inline-flex;
-            align-items: center;
-            gap: 10px;
-            font-size: 0.74rem;
-            font-weight: 700;
-            letter-spacing: 0.16em;
-            text-transform: uppercase;
-        }
-        .kicker::before {
-            content: "";
-            width: 28px;
-            height: 2px;
-            border-radius: 2px;
-            background: currentColor;
-        }
-
         h1.name {
-            margin: 12px 0 0 -0.03em;
+            margin: 0 0 0 -0.03em;
             font-size: clamp(3.1rem, 7.4vw, 5.8rem);
             line-height: 1;
             letter-spacing: -0.045em;
             font-weight: 700;
         }
+        .role {
+            margin-top: 12px;
+            font-size: clamp(1.05rem, 2.4vw, 1.2rem);
+            font-weight: 500;
+        }
         .lede {
-            max-width: 40ch;
-            margin-top: 18px;
+            max-width: 54ch;
+            margin-top: 22px;
             font-size: clamp(0.98rem, 1.5vw, 1.1rem);
             font-weight: 500;
         }
@@ -144,8 +132,6 @@
         }
         .links a.solid { background: var(--ink); border-color: rgba(255, 255, 255, 0.22); color: var(--bg); }
         .links a.solid:hover, .links a.solid:focus-visible { background: var(--sage); color: #fff; }
-        .links a.solid span { display: inline-block; animation: nudge 2.2s ease-in-out infinite; }
-        @keyframes nudge { 0%, 100% { transform: translateY(-1px); } 50% { transform: translateY(3px); } }
 
         .js .hero-inner > * {
             opacity: 0;
@@ -373,15 +359,14 @@
     <header class="hero">
         <canvas id="sky" aria-hidden="true"></canvas>
         <div class="wrap hero-inner">
-            <p class="kicker" style="--i:0">Full stack software engineer</p>
-            <h1 class="name" style="--i:1">Palmer Gill</h1>
-            <p class="lede" style="--i:2">Backend systems and identity at H-E-B. Markets, Bitcoin and browser games on the side.</p>
+            <h1 class="name" style="--i:0">Palmer Gill</h1>
+            <p class="role" style="--i:1">Full Stack Software Engineer</p>
+            <p class="lede" style="--i:2">I build full stack software with a focus on backend systems and identity and access management at H-E-B. Explore my projects across markets, Bitcoin, and browser games. Questions or feedback are welcome. Contact me here: <a href="mailto:jamespalmergill@gmail">jamespalmergill@gmail</a>.</p>
             <nav class="links" style="--i:3" aria-label="About Palmer">
-                <a class="solid" href="#work">Work <span aria-hidden="true">↓</span></a>
-                <a href="/about/">About</a>
+                <a class="solid" href="#work">See my work</a>
+                <a href="/about/">About me</a>
+                <a href="https://www.linkedin.com/in/palmer-gill-0081a7129/" target="_blank" rel="noopener noreferrer">Contact on LinkedIn</a>
                 <a href="/assets/Resume2026.pdf">Résumé</a>
-                <a href="https://www.linkedin.com/in/palmer-gill-0081a7129/" target="_blank" rel="noopener noreferrer">LinkedIn</a>
-                <a href="mailto:jamespalmergill@gmail">Email</a>
             </nav>
             <div class="live-stats" id="live-stats" style="--i:4">
                 <span class="live">Live</span>
