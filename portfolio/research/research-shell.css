@@ -4,18 +4,18 @@ body.app { font-family: var(--font); }
 
 .container > header {
     position: sticky; top: var(--top-h); z-index: 40; margin: 0 0 12px;
-    background: var(--card); border: 1px solid var(--line); border-radius: 4px;
+    background: var(--card); border: 1px solid var(--line); border-radius: var(--r);
     backdrop-filter: none; -webkit-backdrop-filter: none;
 }
 .container > header:has(.header-stock-content.hidden) { display: none; }
 #headerLogo, #searchIconBtnMain, #searchIconBtnInline { display: none !important; }
 .demo-banner { margin: 0 0 12px; }
-.watchlist-btn, .watchlist-btn[aria-pressed="true"] { background: var(--card); color: var(--ink); border: 1px solid var(--line-strong); border-radius: 3px; }
+.watchlist-btn, .watchlist-btn[aria-pressed="true"] { background: var(--card); color: var(--ink); border: 1px solid var(--line-strong); border-radius: var(--r-sm); }
 .watchlist-btn[aria-pressed="true"] { color: var(--accent); border-color: var(--accent); }
 
 .rp {
     display: flex; flex-wrap: wrap; align-items: center; gap: 6px 32px; margin: 0 0 12px; padding: 10px 18px;
-    background: var(--card); border: 1px solid var(--line); border-left: 2px solid var(--gold); border-radius: 2px; color: var(--muted); text-decoration: none; font-size: 12px;
+    background: var(--card); border: 1px solid var(--line); border-left: 2px solid var(--gold); border-radius: var(--r-sm); color: var(--muted); text-decoration: none; font-size: 12px;
 }
 .rp[hidden] { display: none; }
 .rp__title { color: var(--ink); font-weight: 600; font-size: 13px; }
@@ -32,7 +32,7 @@ body.app #empty { display: flex; flex-direction: column; gap: 16px; padding: 0; 
 body.app #empty.hidden { display: none; }
 body.app #empty > * { margin: 0; }
 body.app #empty .empty-illustration, body.app #empty .empty-title { display: none; }
-body.app #empty > .trending-stocks { background: var(--card); border: 1px solid var(--line); border-radius: 4px; padding: 16px 20px; max-width: none; width: 100%; }
+body.app #empty > .trending-stocks { background: var(--card); border: 1px solid var(--line); border-radius: var(--r); padding: 16px 20px; max-width: none; width: 100%; }
 body.app #empty > .trending-stocks[hidden] { display: none; }
 body.app #empty .compare-section { order: 4; }
 body.app #empty .compare-form { justify-content: flex-start; margin: 0; max-width: 420px; }
@@ -42,8 +42,9 @@ body.app #empty .trending-label-row { justify-content: space-between; }
 body.app #empty .trending-label-row .trending-label { margin-bottom: 0; }
 body.app #empty .trending-label-row { margin-bottom: 12px; }
 body.app #empty .trending-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; }
-body.app #empty .trending-stock { background: var(--card); border: 1px solid var(--line); border-radius: 3px; padding: 9px 12px; text-align: left; align-items: flex-start; box-shadow: none; }
-body.app #empty .trending-stock:hover { background: var(--surface); border-color: var(--line-strong); transform: none; }
+body.app #empty .trending-stock { background: var(--card); border: 1px solid var(--line); border-radius: var(--r-sm); padding: 9px 12px; text-align: left; align-items: flex-start; box-shadow: none; }
+body.app #empty .trending-stock { transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s; }
+body.app #empty .trending-stock:hover { background: var(--card); border-color: var(--gold); box-shadow: var(--lift-pop); transform: translateY(-1px); }
 
 @media (max-width: 900px) {
     .container.app-main { padding: 16px 16px 32px; }
@@ -57,7 +58,8 @@ body.app #empty .trending-stock:hover { background: var(--surface); border-color
 .rp strong { font-size: 16px; color: var(--forest); }
 
 /* The Private Bank look, as on the tracker: flat ivory cards, serif titles. */
-.ov-card, .card, .ov-tile { border-radius: 2px; }
+.ov-card, .card, .ov-tile { border-radius: var(--r); }
+.ov-card, .card, .ov-hero, .rp, .container > header, body.app #empty > .trending-stocks { box-shadow: var(--lift); }
 .ov-card { padding: 16px 20px 20px; }
 .ov-card-title, .ov-section-title, .ov-card h3 { color: var(--forest); font-family: var(--serif); font-size: 19px; font-weight: 500; letter-spacing: 0; }
 .ov-card-sub { color: var(--muted); font-size: 12px; }
@@ -65,10 +67,10 @@ body.app #empty .trending-stock:hover { background: var(--surface); border-color
 .ov-tile-value, .ec-stat-value, .ov-margin-value, .ov-v { font-family: var(--serif); font-weight: 500; color: var(--forest); }
 
 /* The headline chart: Robinhood-style, like the tracker's. */
-.ov-hero { --trend: var(--chart-up); background: var(--card); border: 1px solid var(--line); border-radius: 2px; padding: 18px 20px 12px; }
+.ov-hero { --trend: var(--chart-up); background: var(--card); border: 1px solid var(--line); border-radius: var(--r); padding: 22px 24px 14px; }
 .ov-hero.is-down { --trend: var(--chart-down); }
 .ov-hero-meta { color: var(--gold); text-transform: uppercase; letter-spacing: 0.12em; font-size: 11px; font-weight: 500; }
-.ov-price { font-family: var(--serif); font-weight: 500; font-size: 48px; letter-spacing: -0.01em; color: var(--forest); }
+.ov-price { font-family: var(--serif); font-weight: 500; font-size: 58px; line-height: 1; letter-spacing: -0.022em; color: var(--forest); }
 .ov-delta { font-weight: 600; font-size: 13px; }
 .ov-delta.is-up .ov-delta-arrow, .ov-delta.is-up .ov-delta-value,
 .ov-delta.is-down .ov-delta-arrow, .ov-delta.is-down .ov-delta-value { color: var(--trend); }
@@ -80,10 +82,10 @@ body.app #empty .trending-stock:hover { background: var(--surface); border-color
 .ov-chart-dates { padding-left: 4px; margin-top: 4px; }
 .ov-scrub-date { font-weight: 400; color: var(--muted); }
 .ov-scrub-date.is-scrubbing { font-weight: 600; color: var(--ink); }
-.ov-ranges { display: flex; gap: 6px; margin-top: 10px; padding: 0 0 8px; background: none; border-radius: 0; border-bottom: 1px solid var(--line); }
-.ov-range-btn { min-height: 0; padding: 4px 8px; border-radius: 0; border-bottom: 2px solid transparent; color: var(--trend); font-size: 12.5px; font-weight: 600; }
-.ov-range-btn:hover { background: var(--surface); }
-.ov-range-btn[aria-pressed="true"] { background: none; box-shadow: none; color: var(--trend); border-bottom-color: var(--trend); }
+.ov-ranges { display: flex; gap: 4px; margin-top: 12px; padding: 0 0 12px; background: none; border-radius: 0; border-bottom: 1px solid var(--line); }
+.ov-range-btn { min-height: 0; padding: 5px 11px; border: 0; border-radius: 999px; color: var(--trend); font-size: 12.5px; font-weight: 600; letter-spacing: 0.02em; transition: background-color 0.15s; }
+.ov-range-btn:hover { background: color-mix(in srgb, var(--trend) 9%, transparent); }
+.ov-range-btn[aria-pressed="true"] { background: color-mix(in srgb, var(--trend) 15%, transparent); box-shadow: none; color: var(--trend); }
 
 /* Research home tiles: ticker and price, name and change, a month's line. */
 body.app #empty .trending-grid { grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); }
@@ -100,16 +102,16 @@ body.app #empty .rt { display: flex; flex-direction: column; gap: 2px; padding: 
 .rt__spark.is-up polyline { stroke: var(--chart-up); }
 .rt__spark.is-down polyline { stroke: var(--chart-down); }
 body.app #empty .trending-label { font-family: var(--serif); font-size: 19px; font-weight: 500; color: var(--forest); }
-body.app #empty > .trending-stocks { border-radius: 2px; }
-.compare-form input { text-transform: none; background: var(--card); border-radius: 2px; }
-.compare-add-btn { border-radius: 2px; background: var(--forest); color: #fff; border: 0; }
+body.app #empty > .trending-stocks { border-radius: var(--r-sm); }
+.compare-form input { text-transform: none; background: var(--card); border-radius: var(--r-sm); }
+.compare-add-btn { border-radius: var(--r); background: linear-gradient(180deg, #17413a, var(--forest)); color: var(--gold-soft); border: 0; }
 
 /* The privacy switch, styled as on the tracker. */
 .pf-head__actions { display: flex; align-items: center; gap: 8px; flex: none; }
 .pf-head__actions[hidden] { display: none; }
 .pf-icon-button {
-    width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; padding: 0;
-    color: var(--soft); background: var(--card); border: 1px solid var(--line-strong); border-radius: 2px; cursor: pointer;
+    width: 34px; height: 34px; display: inline-flex; align-items: center; justify-content: center; padding: 0;
+    color: var(--soft); background: var(--card); border: 1px solid var(--line-strong); border-radius: var(--r); cursor: pointer;
 }
 .pf-icon-button:hover { background: var(--surface); color: var(--ink); }
 .pf-icon-button:focus-visible { outline: none; box-shadow: var(--focus-ring); }

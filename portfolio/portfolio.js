@@ -1536,6 +1536,23 @@
         });
     }
 
+    // The headline line's soft fill, fading to nothing at the chart's floor,
+    // and the dot that marks where the line stands now.
+    function areaFill(root, line, id, x0, x1, base) {
+        const defs = svg('defs');
+        const grad = svg('linearGradient', { id, x1: 0, y1: 0, x2: 0, y2: 1 });
+        grad.appendChild(svg('stop', { class: 'pf-chart__fill-top', offset: '0' }));
+        grad.appendChild(svg('stop', { class: 'pf-chart__fill-end', offset: '1' }));
+        defs.appendChild(grad);
+        root.appendChild(defs);
+        root.appendChild(svg('path', { class: 'pf-chart__area', fill: `url(#${id})`, d: `${line}L${x1.toFixed(1)},${base}L${x0.toFixed(1)},${base}Z` }));
+    }
+
+    function endDot(root, cx, cy) {
+        root.appendChild(svg('circle', { class: 'pf-chart__halo', cx, cy, r: 9 }));
+        root.appendChild(svg('circle', { class: 'pf-chart__end', cx, cy, r: 4 }));
+    }
+
     function compactMoney(value) {
         const abs = Math.abs(value);
         if (abs >= 1e6) return `$${(value / 1e6).toFixed(abs >= 1e7 ? 0 : 1)}M`;
@@ -1632,6 +1649,7 @@
                 .map((i, k) => `${k ? 'L' : 'M'}${x(i).toFixed(1)},${y(bench[i]).toFixed(1)}`).join('');
             root.appendChild(svg('path', { class: 'pf-chart__bench', d: benchLine }));
         }
+        areaFill(root, path(points.map((_, i) => i), 'value'), 'pfHistoryFill', x(0), x(points.length - 1), pad.top + innerH);
         runs(points, (p) => !p.estimated).forEach((indices) => {
             root.appendChild(svg('path', { class: 'pf-chart__line', d: path(indices, 'value') }));
         });
@@ -1639,6 +1657,7 @@
             root.appendChild(svg('path', { class: 'pf-chart__line pf-chart__line--estimated', d: path(indices, 'value') }));
         });
 
+        endDot(root, x(points.length - 1), y(points[points.length - 1].value));
         const cross = svg('line', { class: 'pf-chart__cross', y1: pad.top, y2: pad.top + innerH, visibility: 'hidden' });
         const dot = svg('circle', { class: 'pf-chart__dot', r: 4.5, visibility: 'hidden' });
         root.appendChild(cross);
@@ -1879,7 +1898,9 @@
         if (cost != null) {
             root.appendChild(svg('line', { class: 'pf-chart__avg', x1: pad.left, x2: width - pad.right, y1: y(cost), y2: y(cost) }));
         }
+        areaFill(root, line, 'pfHoldingFill', x(0), x(points.length - 1), pad.top + innerH);
         root.appendChild(svg('path', { class: 'pf-chart__line', d: line }));
+        endDot(root, x(points.length - 1), y(points[points.length - 1].close));
         trades.forEach((t) => {
             const i = indexOf(t.date);
             if (t.price > 0) root.appendChild(svg('circle', { class: `pf-chart__trade--${t.side}`, cx: x(i), cy: y(t.price), r: trades.length > 80 ? 3 : 4.5 }));
