@@ -61,32 +61,34 @@
             padding: 0 28px;
         }
 
-        /* ---- hero: the six projects wired into one live diagram, in the same line style as the tiles ---- */
+        /* ---- hero: the name sits on a field of drifting strands ---- */
         .hero {
             position: relative;
             display: flex;
-            align-items: center;
-            min-height: max(560px, calc(100vh - var(--site-nav-height)));
-            min-height: max(560px, calc(100svh - var(--site-nav-height)));
+            align-items: flex-end;
+            min-height: max(540px, calc(100vh - var(--site-nav-height)));
+            min-height: max(540px, calc(100svh - var(--site-nav-height)));
             overflow: hidden;
         }
-        #scene {
+        #field {
             position: absolute;
             inset: 0;
             width: 100%;
             height: 100%;
-            pointer-events: none;
+            -webkit-mask-image: linear-gradient(#000 72%, transparent);
+            mask-image: linear-gradient(#000 72%, transparent);
+            opacity: 0;
+            transition: opacity 1.4s ease;
         }
+        #field.on { opacity: 1; }
 
         .hero-inner {
             position: relative;
-            display: flex;
-            flex-direction: column;
-            align-items: flex-start;
-            padding-top: 32px;
-            padding-bottom: 48px;
+            padding-top: 48px;
+            padding-bottom: clamp(30px, 6vh, 64px);
+            pointer-events: none;
         }
-        .hero-inner > * { max-width: 42%; }
+        .hero-inner a { pointer-events: auto; }
 
         .kicker {
             display: inline-flex;
@@ -108,20 +110,39 @@
 
         h1.name {
             margin: 10px 0 0 -0.04em;
-            font-size: clamp(3.1rem, 6.2vw, 5.2rem);
-            line-height: 1.02;
-            letter-spacing: -0.045em;
+            font-size: clamp(4.4rem, 17.5vw, 13.5rem);
+            line-height: 0.88;
+            letter-spacing: -0.055em;
             font-weight: 700;
-            white-space: nowrap;
+            user-select: none;
         }
+        .name .line { display: block; white-space: nowrap; }
+        .name .line + .line { color: var(--sage); }
+        .name .ch { display: inline-block; will-change: transform; }
+        .js .name .ch {
+            opacity: 0;
+            transform: translateY(0.5em) rotate(6deg);
+            animation: ch-in 0.9s cubic-bezier(0.2, 1, 0.3, 1) forwards;
+            animation-delay: calc(0.12s + var(--i) * 0.055s);
+        }
+        @keyframes ch-in { to { opacity: 1; transform: none; } }
 
+        .hero-foot {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: flex-end;
+            justify-content: space-between;
+            gap: 22px 40px;
+            margin-top: clamp(22px, 4vh, 40px);
+        }
         .lede {
-            margin-top: 16px;
+            max-width: 44ch;
             color: var(--soft);
             font-size: clamp(0.98rem, 1.5vw, 1.08rem);
             font-weight: 500;
+            text-shadow: 0 0 4px var(--bg), 0 0 14px var(--bg);
         }
-        .links { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 22px; }
+        .links { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
         .links a {
             display: inline-flex;
             align-items: center;
@@ -130,7 +151,9 @@
             padding: 0 17px;
             border-radius: 999px;
             border: 1px solid var(--line-strong);
-            background: var(--card);
+            background: rgba(255, 255, 255, 0.62);
+            -webkit-backdrop-filter: blur(10px);
+            backdrop-filter: blur(10px);
             font-size: 0.87rem;
             font-weight: 600;
             text-decoration: none;
@@ -147,11 +170,12 @@
         .links a.solid span { display: inline-block; animation: nudge 2.2s ease-in-out infinite; }
         @keyframes nudge { 0%, 100% { transform: translateY(-1px); } 50% { transform: translateY(3px); } }
 
-        .js .hero-inner > * {
+        .js .kicker, .js .hero-foot {
             opacity: 0;
             animation: rise 0.8s cubic-bezier(0.2, 1, 0.3, 1) forwards;
-            animation-delay: calc(0.05s + var(--i, 0) * 0.08s);
         }
+        .js .kicker { animation-delay: 0.05s; }
+        .js .hero-foot { animation-delay: 0.75s; }
         @keyframes rise { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
 
         .live-stats {
@@ -159,9 +183,7 @@
             flex-wrap: wrap;
             align-items: center;
             gap: 8px 22px;
-            margin-top: 26px;
         }
-        .live-stats:not(.is-ready) { display: none; }
         .live-stats > * { opacity: 0; transition: opacity 0.5s ease; }
         .live-stats.is-ready > * { opacity: 1; }
         .live-stats .live {
@@ -348,15 +370,11 @@
         @media (max-width: 980px) {
             .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
         }
-        @media (max-width: 859px) {
-            .hero { align-items: flex-start; }
-            .hero-inner { padding-top: 40px; padding-bottom: clamp(330px, 50vh, 440px); }
-            .hero-inner > * { max-width: none; }
-        }
         @media (max-width: 620px) {
             .wrap { padding: 0 20px; }
             .tiles { grid-template-columns: 1fr; }
             .motif { aspect-ratio: 16 / 9; }
+            h1.name { font-size: clamp(4.4rem, 25vw, 8rem); }
         }
 
         @media (prefers-reduced-motion: reduce) {
@@ -372,22 +390,26 @@
 </head>
 <body>
     <header class="hero">
-        <canvas id="scene" aria-hidden="true"></canvas>
+        <canvas id="field" aria-hidden="true"></canvas>
         <div class="wrap hero-inner">
-            <p class="kicker" style="--i:0">Full stack software engineer</p>
-            <h1 class="name" style="--i:1">Palmer Gill</h1>
-            <p class="lede" style="--i:2">Backend systems and identity at H-E-B. Markets, Bitcoin and browser games on the side.</p>
-            <nav class="links" style="--i:3" aria-label="About Palmer">
-                <a class="solid" href="#work">Work <span aria-hidden="true">↓</span></a>
-                <a href="/about/">About</a>
-                <a href="/assets/Resume2026.pdf">Résumé</a>
-                <a href="https://www.linkedin.com/in/palmer-gill-0081a7129/" target="_blank" rel="noopener noreferrer">LinkedIn</a>
-                <a href="mailto:jamespalmergill@gmail">Email</a>
-            </nav>
-            <div class="live-stats" id="live-stats" style="--i:4">
-                <span class="live">Live</span>
-                <span class="stat"><b data-stat="games_played">0</b><span>games played</span></span>
-                <span class="stat"><b data-stat="page_views">0</b><span>page views</span></span>
+            <p class="kicker">Full stack software engineer</p>
+            <h1 class="name" aria-label="Palmer Gill"><span class="line" aria-hidden="true">Palmer</span><span class="line" aria-hidden="true">Gill</span></h1>
+            <div class="hero-foot">
+                <div>
+                    <p class="lede">Backend systems and identity at H-E-B. Markets, Bitcoin and browser games on the side.</p>
+                    <nav class="links" aria-label="About Palmer">
+                        <a class="solid" href="#work">Work <span aria-hidden="true">↓</span></a>
+                        <a href="/about/">About</a>
+                        <a href="/assets/Resume2026.pdf">Résumé</a>
+                        <a href="https://www.linkedin.com/in/palmer-gill-0081a7129/" target="_blank" rel="noopener noreferrer">LinkedIn</a>
+                        <a href="mailto:jamespalmergill@gmail">Email</a>
+                    </nav>
+                </div>
+                <div class="live-stats" id="live-stats">
+                    <span class="live">Live</span>
+                    <span class="stat"><b data-stat="games_played">0</b><span>games played</span></span>
+                    <span class="stat"><b data-stat="page_views">0</b><span>page views</span></span>
+                </div>
             </div>
         </div>
     </header>
@@ -505,6 +527,161 @@
             };
             const rgbOf = (hex) => { const n = parseInt(hex.slice(1), 16); return `${n >> 16},${(n >> 8) & 255},${n & 255}`; };
             const PALETTE = { sage: '#5b7152', clay: '#b96a4b', sky: '#5a7794', plum: '#8a6d8a', rose: '#b5677a', ochre: '#a9843f' };
+
+            /* ---------- hero: flow field ---------- */
+            const hero = document.querySelector('.hero');
+            const field = document.getElementById('field');
+            const fx = field.getContext('2d');
+            const strandColors = Object.values(PALETTE).map(rgbOf);
+            let FW = 0, FH = 0, strands = [], heroVisible = true;
+            const pointer = { x: -9999, y: -9999, on: false };
+            const pulses = [];
+
+            // smooth value noise over (x, y, time)
+            function noise(x, y, z) {
+                const xi = Math.floor(x), yi = Math.floor(y), zi = Math.floor(z);
+                const u = smooth(x - xi), v = smooth(y - yi), w = smooth(z - zi);
+                const l = (a, b, t) => a + (b - a) * t;
+                const p = (dx, dy, dz) => hash(xi + dx, yi + dy, zi + dz);
+                return l(
+                    l(l(p(0, 0, 0), p(1, 0, 0), u), l(p(0, 1, 0), p(1, 1, 0), u), v),
+                    l(l(p(0, 0, 1), p(1, 0, 1), u), l(p(0, 1, 1), p(1, 1, 1), u), v),
+                    w
+                );
+            }
+
+            function seed(s, fresh) {
+                s.x = Math.random() * FW;
+                s.y = Math.random() * FH;
+                s.px = []; s.py = [];
+                s.age = fresh ? Math.random() * 200 : 0;
+                s.max = 260 + Math.random() * 420;
+                s.speed = 0.7 + Math.random() * 1.1;
+                s.w = 0.7 + Math.random() * 1.5;
+                s.c = strandColors[(Math.random() * strandColors.length) | 0];
+                s.tick = 0;
+                return s;
+            }
+
+            function sizeField() {
+                const r = hero.getBoundingClientRect();
+                FW = r.width; FH = r.height;
+                field.width = Math.round(FW * DPR);
+                field.height = Math.round(FH * DPR);
+                fx.setTransform(DPR, 0, 0, DPR, 0, 0);
+                fx.lineCap = 'round';
+                fx.lineJoin = 'round';
+                const want = Math.round(clamp((FW * FH) / 3400, 130, 440));
+                strands = Array.from({ length: want }, () => seed({}, true));
+            }
+
+            function stepField(dt, time) {
+                const scale = 0.0016, z = time * 0.05;
+                for (const s of strands) {
+                    const a = (noise(s.x * scale, s.y * scale, z) - 0.5) * TAU * 2.4
+                        + (noise(s.x * scale * 2.7 + 40, s.y * scale * 2.7, z * 1.6) - 0.5) * 1.6;
+                    let vx = Math.cos(a) * s.speed, vy = Math.sin(a) * s.speed * 0.8;
+                    if (pointer.on) {
+                        const dx = s.x - pointer.x, dy = s.y - pointer.y;
+                        const d = Math.hypot(dx, dy) || 1;
+                        if (d < 280) {
+                            const f = (1 - d / 280) ** 2;
+                            vx += (-dy / d) * f * 4.2 + (dx / d) * f * 0.9;
+                            vy += (dx / d) * f * 4.2 + (dy / d) * f * 0.9;
+                        }
+                    }
+                    for (const p of pulses) {
+                        const dx = s.x - p.x, dy = s.y - p.y;
+                        const d = Math.hypot(dx, dy) || 1;
+                        const band = Math.abs(d - p.age * 520);
+                        if (band < 110) {
+                            const f = (1 - band / 110) * (1 - p.age / 1.5) * 7;
+                            vx += (dx / d) * f; vy += (dy / d) * f;
+                        }
+                    }
+                    s.x += vx * dt; s.y += vy * dt;
+                    s.age += dt;
+                    if (++s.tick % 3 === 0) {
+                        s.px.push(s.x); s.py.push(s.y);
+                        if (s.px.length > 70) { s.px.shift(); s.py.shift(); }
+                    }
+                    if (s.age > s.max || s.x < -60 || s.x > FW + 60 || s.y < -60 || s.y > FH + 60) seed(s, false);
+                }
+                for (let i = pulses.length - 1; i >= 0; i--) {
+                    pulses[i].age += dt / 60;
+                    if (pulses[i].age > 1.5) pulses.splice(i, 1);
+                }
+            }
+
+            function drawField() {
+                fx.clearRect(0, 0, FW, FH);
+                for (const s of strands) {
+                    const n = s.px.length;
+                    if (n < 2) continue;
+                    const env = Math.min(1, s.age / 50, (s.max - s.age) / 70);
+                    if (env <= 0) continue;
+                    // three overlapping passes, each shorter and heavier, so a strand swells toward its head
+                    for (let pass = 0; pass < 3; pass++) {
+                        const from = Math.floor(n * [0, 0.5, 0.8][pass]);
+                        fx.strokeStyle = `rgba(${s.c},${([0.24, 0.26, 0.3][pass] * env).toFixed(3)})`;
+                        fx.lineWidth = s.w * [1, 1.35, 1.75][pass];
+                        fx.beginPath();
+                        fx.moveTo(s.px[from], s.py[from]);
+                        for (let i = from + 1; i < n; i++) fx.lineTo(s.px[i], s.py[i]);
+                        fx.lineTo(s.x, s.y);
+                        fx.stroke();
+                    }
+                }
+            }
+
+            window.addEventListener('pointermove', (e) => {
+                const r = field.getBoundingClientRect();
+                pointer.x = e.clientX - r.left;
+                pointer.y = e.clientY - r.top;
+                pointer.on = pointer.y < r.height + 100;
+                pointer.cx = e.clientX; pointer.cy = e.clientY;
+            }, { passive: true });
+            document.addEventListener('pointerleave', () => { pointer.on = false; });
+            hero.addEventListener('pointerdown', (e) => {
+                if (reduced) return;
+                const r = field.getBoundingClientRect();
+                pulses.push({ x: e.clientX - r.left, y: e.clientY - r.top, age: 0 });
+                if (pulses.length > 4) pulses.shift();
+            });
+
+            /* ---------- hero: kinetic name ---------- */
+            const letters = [];
+            document.querySelectorAll('.name .line').forEach((line) => {
+                const text = line.textContent;
+                line.textContent = '';
+                for (const ch of text) {
+                    const span = document.createElement('span');
+                    span.className = 'ch';
+                    span.textContent = ch;
+                    span.style.setProperty('--i', letters.length);
+                    line.appendChild(span);
+                    letters.push({ el: span, cx: 0, cy: 0, w: 700 });
+                }
+            });
+            function measureLetters() {
+                for (const l of letters) {
+                    const r = l.el.getBoundingClientRect();
+                    l.cx = r.left + r.width / 2;
+                    l.cy = r.top + r.height / 2 + window.scrollY;
+                }
+            }
+            function stepLetters(time) {
+                const py = (pointer.cy ?? -9999) + window.scrollY;
+                letters.forEach((l, i) => {
+                    let w = 560 + 230 * Math.sin(time * 0.9 - i * 0.62);
+                    if (pointer.on) {
+                        const d = Math.hypot(l.cx - pointer.cx, l.cy - py);
+                        w += 320 * (1 - clamp(d / 340)) ** 2;
+                    }
+                    w = Math.round(clamp(w, 220, 800) / 4) * 4;
+                    if (w !== l.w) { l.w = w; l.el.style.fontWeight = w; }
+                });
+            }
 
             /* ---------- project motifs ---------- */
             function rr(c, x, y, w, h, r) {
@@ -782,9 +959,6 @@
                 },
             };
 
-            const hero = document.querySelector('.hero');
-            let heroVisible = true;
-
             const tiles = [...document.querySelectorAll('.tile')].map((el, i) => {
                 const cv = el.querySelector('.motif');
                 const accent = rgbOf(PALETTE[{ stock: 'sky', btc: 'clay', fantasy: 'plum', casino: 'sage', gifts: 'rose', castle: 'ochre' }[el.dataset.m]]);
@@ -841,183 +1015,52 @@
             seen.observe(hero);
             tiles.forEach((tile) => seen.observe(tile.el));
 
-            /* ---------- hero: the six projects wired into one diagram ---------- */
-            const scene = document.getElementById('scene');
-            const sx = scene.getContext('2d');
-            const KEYS = { stock: 'sky', btc: 'clay', fantasy: 'plum', casino: 'sage', gifts: 'rose', castle: 'ochre' };
-            const paleOf = (hex) => {
-                const n = parseInt(hex.slice(1), 16), bg = [250, 246, 240];
-                return `rgb(${[n >> 16, (n >> 8) & 255, n & 255].map((v, i) => Math.round(v + (bg[i] - v) * 0.88)).join(',')})`;
-            };
-            const VW = 272, VH = 204; // the size each motif is drawn at before it is scaled into its card
-            let SW = 0, SH = 0, wide = true, region = {}, card = {}, core = {}, nodes = [], time = 0;
-
-            // the part of a polyline between two distances along it
-            const slice = (pts, d0, d1) => walk(walk(pts, d1).reverse(), d1 - d0);
-
-            function layoutScene() {
-                const r = hero.getBoundingClientRect();
-                SW = r.width; SH = r.height;
-                scene.width = Math.round(SW * DPR);
-                scene.height = Math.round(SH * DPR);
-                wide = SW >= 860;
-                if (wide) {
-                    const cw = Math.min(SW, 1180) - 56, left = (SW - cw) / 2, h = Math.min(SH - 40, 700);
-                    region = { x: left + cw * 0.46, y: (SH - h) / 2, w: cw * 0.54, h };
-                } else {
-                    let bottom = 0;
-                    document.querySelectorAll('.hero-inner > *').forEach((el) => {
-                        const b = el.getBoundingClientRect();
-                        if (b.height) bottom = Math.max(bottom, b.bottom - r.top);
-                    });
-                    region = { x: 16, y: bottom + 20, w: SW - 32, h: SH - bottom - 36 };
-                }
-                const w = clamp(Math.min(region.w * 0.29, (region.h * 0.3) / 0.75), 84, 184);
-                card = { w, h: w * 0.75 };
-                const spots = wide
-                    ? [[0.2, 0.13], [0.77, 0.13], [0.88, 0.5], [0.74, 0.87], [0.24, 0.87], [0.12, 0.5]]
-                    : [[0.16, 0.14], [0.5, 0.14], [0.84, 0.14], [0.84, 0.86], [0.5, 0.86], [0.16, 0.86]];
-                core = { x: region.x + region.w * 0.5, y: region.y + region.h * 0.5, s: card.h * 0.62 };
-                const old = nodes;
-                nodes = Object.keys(KEYS).map((m, i) => {
-                    const x = clamp(region.x + spots[i][0] * region.w, region.x + w / 2, region.x + region.w - w / 2);
-                    const y = clamp(region.y + spots[i][1] * region.h, region.y + card.h / 2 + 16, region.y + region.h - card.h / 2);
-                    const dx = x - core.x, dy = y - core.y, upright = Math.abs(dy) > Math.abs(dx);
-                    const path = upright
-                        ? [[core.x, core.y], [core.x, core.y + dy / 2], [x, core.y + dy / 2], [x, y]]
-                        : [[core.x, core.y], [core.x + dx / 2, core.y], [core.x + dx / 2, y], [x, y]];
-                    const len = lengthOf(path), accent = rgbOf(PALETTE[KEYS[m]]);
-                    return {
-                        m, x, y, path, len, from: core.s * 0.72, to: len - (upright ? card.h : card.w) / 2 - 3,
-                        col: (a) => `rgba(${accent},${clamp(a).toFixed(3)})`, pale: paleOf(PALETTE[KEYS[m]]),
-                        t: old[i]?.t ?? 2 + i * 1.37, pulse: 0,
-                    };
-                });
-                if (reduced) drawScene();
-            }
-
-            function drawScene() {
-                const c = sx;
-                c.setTransform(DPR, 0, 0, DPR, 0, 0);
-                c.clearRect(0, 0, SW, SH);
-
-                // dot grid with a slow shimmer rolling across it, fading out toward the text
-                const gap = 26, x0 = wide ? Math.floor((region.x - 170) / gap) * gap + gap / 2 : gap / 2;
-                for (let y = gap / 2; y < SH; y += gap) {
-                    for (let x = Math.max(x0, gap / 2); x < SW; x += gap) {
-                        const fade = wide ? smooth((x - (region.x - 170)) / 190) : smooth((y - (region.y - 36)) / 60);
-                        if (!fade) continue;
-                        const wave = Math.max(0, Math.sin(x * 0.011 + y * 0.007 - time * 1.1));
-                        c.fillStyle = `rgba(146,138,125,${(fade * (0.2 + 0.42 * wave ** 3)).toFixed(3)})`;
-                        c.fillRect(x - 1, y - 1, 2, 2);
-                    }
-                }
-
-                c.lineCap = 'round'; c.lineJoin = 'round';
-                let corePulse = 0, coreTint = null;
-                nodes.forEach((n, i) => {
-                    const grow = reduced ? 1 : smooth((time - 0.35 - i * 0.1) / 0.75);
-                    n.pulse = 0;
-                    if (grow <= 0) return;
-                    poly(c, walk(n.path, n.len * grow));
-                    c.strokeStyle = n.col(0.4); c.lineWidth = 1.5; c.stroke();
-                    if (grow < 1) return;
-                    // packets run out to the project and back to the core, each on its own beat
-                    for (let dir = 0; dir < 2; dir++) {
-                        const period = 2.4 + hash(i, dir) * 1.9, p = ((time + hash(i, dir, 3) * 6) / period) % 1;
-                        if (p < 0.7) {
-                            const k = smooth(p / 0.7), span = n.to - n.from;
-                            const d = dir ? n.to - span * k : n.from + span * k;
-                            const tail = clamp(d + (dir ? 30 : -30), n.from, n.to);
-                            poly(c, slice(n.path, Math.min(d, tail), Math.max(d, tail)));
-                            c.strokeStyle = n.col(0.95); c.lineWidth = 3; c.stroke();
-                        } else {
-                            const fadeOut = 1 - (p - 0.7) / 0.3;
-                            if (dir) { if (fadeOut > corePulse) { corePulse = fadeOut; coreTint = n; } } else n.pulse = fadeOut;
-                        }
-                    }
-                });
-
-                nodes.forEach((n, i) => {
-                    const show = reduced ? 1 : smooth((time - 0.95 - i * 0.1) / 0.45);
-                    if (show <= 0) return;
-                    const { w, h } = card, rad = w * 0.1, k = 0.86 + 0.14 * show;
-                    c.save();
-                    c.translate(n.x, n.y); c.scale(k, k); c.globalAlpha = show;
-                    if (n.pulse > 0) {
-                        const g = (1 - n.pulse) * 10;
-                        rr(c, -w / 2 - g, -h / 2 - g, w + 2 * g, h + 2 * g, rad + g);
-                        c.strokeStyle = n.col(0.6 * n.pulse); c.lineWidth = 1.5; c.stroke();
-                    }
-                    c.shadowColor = 'rgba(60, 50, 35, 0.16)'; c.shadowBlur = 24; c.shadowOffsetY = 9;
-                    rr(c, -w / 2, -h / 2, w, h, rad); c.fillStyle = n.pale; c.fill();
-                    c.shadowColor = 'transparent';
-                    c.save();
-                    rr(c, -w / 2, -h / 2, w, h, rad); c.clip();
-                    c.translate(-w / 2, -h / 2); c.scale(w / VW, w / VW);
-                    motifs[n.m](c, VW, VH, n.t, n.col, { on: false });
-                    c.restore();
-                    rr(c, -w / 2, -h / 2, w, h, rad);
-                    c.strokeStyle = n.col(0.85); c.lineWidth = 1.5; c.stroke();
-                    c.font = `700 ${Math.max(10, w * 0.068).toFixed(1)}px "Plus Jakarta Sans", system-ui, sans-serif`;
-                    c.fillStyle = n.col(0.85);
-                    c.fillText(`0${i + 1}`, -w / 2 + 2, -h / 2 - 7);
-                    c.restore();
-                });
-
-                const show = reduced ? 1 : smooth((time - 0.1) / 0.5);
-                if (show > 0) {
-                    const s = core.s * (0.8 + 0.2 * show) * (1 + 0.02 * Math.sin(time * 2.2));
-                    c.save();
-                    c.translate(core.x, core.y); c.globalAlpha = show;
-                    c.setLineDash([3, 7]); c.lineDashOffset = -time * 12;
-                    dot(c, 0, 0, core.s * 0.98); c.strokeStyle = 'rgba(91,113,82,0.5)'; c.lineWidth = 1.5; c.stroke();
-                    c.setLineDash([]);
-                    if (coreTint) {
-                        const g = (1 - corePulse) * 12;
-                        rr(c, -s / 2 - g, -s / 2 - g, s + 2 * g, s + 2 * g, s * 0.24 + g);
-                        c.strokeStyle = coreTint.col(0.7 * corePulse); c.lineWidth = 2; c.stroke();
-                    }
-                    c.shadowColor = 'rgba(60, 50, 35, 0.22)'; c.shadowBlur = 22; c.shadowOffsetY = 8;
-                    rr(c, -s / 2, -s / 2, s, s, s * 0.24); c.fillStyle = PALETTE.sage; c.fill();
-                    c.shadowColor = 'transparent';
-                    c.font = `700 ${(s * 0.38).toFixed(1)}px "Plus Jakarta Sans", system-ui, sans-serif`;
-                    c.textAlign = 'center'; c.textBaseline = 'middle';
-                    c.fillStyle = '#fff'; c.fillText('PG', 0, s * 0.02);
-                    c.restore();
-                }
-            }
-
             /* ---------- one loop for everything ---------- */
-            layoutScene();
+            sizeField();
             let resizeTimer;
             window.addEventListener('resize', () => {
                 clearTimeout(resizeTimer);
-                resizeTimer = setTimeout(layoutScene, 120);
+                resizeTimer = setTimeout(() => {
+                    const r = hero.getBoundingClientRect();
+                    // mobile browsers resize on every scroll as the toolbar hides: only a width change reseeds
+                    if (Math.abs(r.width - FW) > 1 || Math.abs(r.height - FH) > 120) { sizeField(); if (reduced) still(); }
+                    measureLetters();
+                }, 150);
             });
-            // on narrow screens the diagram sits under the text, so it follows the text's height
-            new ResizeObserver(() => { if (!wide) layoutScene(); }).observe(document.querySelector('.hero-inner'));
-            document.fonts?.ready.then(layoutScene);
+            (document.fonts?.ready ?? Promise.resolve()).then(() => setTimeout(measureLetters, 1200));
 
-            if (reduced) return;
+            function still() {
+                for (let i = 0; i < 240; i++) stepField(1, 0);
+                drawField();
+            }
 
-            let last = performance.now();
+            field.classList.add('on');
+            if (reduced) {
+                still();
+                return;
+            }
+
+            let last = performance.now(), time = 0;
             function frame(now) {
-                const ms = Math.min(now - last, 50), dt = ms / 1000;
+                const ms = Math.min(now - last, 50);
                 last = now;
+                const dt = ms / 16.667;
+                time += ms / 1000;
                 if (heroVisible) {
-                    time += dt;
-                    for (const n of nodes) n.t += dt;
-                    drawScene();
+                    stepField(dt, time);
+                    drawField();
+                    stepLetters(time);
                 }
                 for (const tile of tiles) {
                     if (!tile.visible) continue;
                     tile.rate += ((tile.hover ? 2.4 : 1) - tile.rate) * 0.08;
-                    tile.t += dt * tile.rate;
+                    tile.t += (ms / 1000) * tile.rate;
                     paint(tile);
                 }
                 requestAnimationFrame(frame);
             }
+            // warm the field up so the first frame is already full of strands
+            for (let i = 0; i < 200; i++) stepField(1, 0);
             requestAnimationFrame((now) => { last = now; frame(now); });
         })();
     </script>
