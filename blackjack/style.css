@@ -688,7 +688,8 @@ button:disabled {
 @media (max-width: 760px) {
     .blackjack-shell {
         width: min(100vw - 14px, 1180px);
-        min-height: calc(100dvh - var(--site-nav-mobile-height, 56px));
+        min-height: calc(100dvh - var(--site-nav-mobile-height, 56px) - var(--casino-header-height, 0px));
+        grid-template-rows: auto auto minmax(0, 1fr) auto;
         gap: 6px;
         padding: 4px 0 8px;
     }
@@ -919,6 +920,113 @@ button:disabled {
     .icon-button {
         flex-basis: 42px;
         width: 42px;
+    }
+}
+
+/* Short phone screens (foldable cover displays, small phones): tighten the
+   table so the docked controls don't sit on top of the player's hand. */
+@media (max-width: 760px) and (max-height: 760px) {
+    .table {
+        grid-template-rows: auto minmax(98px, 0.8fr) auto minmax(116px, 1.2fr);
+    }
+
+    .hand-panel {
+        min-height: 96px;
+    }
+
+    .rules-tab {
+        min-height: 34px;
+    }
+}
+
+/* Short landscape (unfolded foldables, small tablets on their side): put the
+   controls in a right-hand column so the whole table fits on one screen. */
+@media (min-width: 761px) and (max-width: 1180px) and (max-height: 700px) and (orientation: landscape) {
+    .blackjack-shell {
+        grid-template-columns: minmax(0, 1fr) minmax(250px, 300px);
+        grid-template-rows: auto auto minmax(0, 1fr);
+        width: calc(100vw - 20px);
+        gap: 8px 10px;
+        padding: 6px 0 10px;
+    }
+
+    .game-header {
+        grid-column: 1 / -1;
+        min-height: 0;
+        gap: 12px;
+    }
+
+    .game-title span {
+        display: none;
+    }
+
+    h1 {
+        font-size: 1.9rem;
+    }
+
+    .shoe-meter {
+        padding: 5px 9px;
+    }
+
+    .session-stats {
+        grid-column: 2;
+        grid-row: 2;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 6px;
+    }
+
+    .session-tile {
+        padding: 6px 8px;
+    }
+
+    .table {
+        grid-column: 1;
+        grid-row: 2 / span 2;
+        grid-template-rows: auto minmax(84px, 0.85fr) auto minmax(130px, 1.15fr);
+        gap: 6px;
+        height: calc(100dvh - var(--site-nav-height, 52px) - var(--casino-header-height, 0px) - 84px);
+        min-height: 360px;
+        padding: 8px 12px 10px;
+    }
+
+    .card,
+    .empty-slot {
+        width: clamp(54px, 7vw, 72px);
+    }
+
+    .hand-panel {
+        min-height: 100px;
+    }
+
+    .control-panel {
+        position: static;
+        grid-column: 2;
+        grid-row: 3;
+        align-self: end;
+        width: 100%;
+        gap: 8px;
+        padding: 9px;
+    }
+
+    .betting-controls {
+        grid-template-columns: auto 1fr;
+        gap: 8px;
+    }
+
+    .chip-button {
+        width: min(100%, 44px);
+    }
+
+    .bet-stepper {
+        grid-column: 1 / -1;
+    }
+
+    .action-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .rules-panel {
+        grid-column: 1 / -1;
     }
 }
 
