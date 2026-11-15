@@ -61,88 +61,67 @@
             padding: 0 28px;
         }
 
-        /* ---- hero: the name sits on a field of drifting strands ---- */
+        /* ---- hero: a physics toy — tokens fall in, pile up, and can be dragged and thrown ---- */
         .hero {
             position: relative;
             display: flex;
-            align-items: flex-end;
-            min-height: max(540px, calc(100vh - var(--site-nav-height)));
-            min-height: max(540px, calc(100svh - var(--site-nav-height)));
+            align-items: center;
+            justify-content: center;
+            min-height: max(560px, calc(100vh - var(--site-nav-height)));
+            min-height: max(560px, calc(100svh - var(--site-nav-height)));
             overflow: hidden;
+            border-bottom: 1px solid var(--line-strong);
         }
-        #field {
+        #play {
             position: absolute;
             inset: 0;
             width: 100%;
             height: 100%;
-            -webkit-mask-image: linear-gradient(#000 72%, transparent);
-            mask-image: linear-gradient(#000 72%, transparent);
-            opacity: 0;
-            transition: opacity 1.4s ease;
+            -webkit-tap-highlight-color: transparent;
         }
-        #field.on { opacity: 1; }
 
         .hero-inner {
             position: relative;
-            padding-top: 48px;
-            padding-bottom: clamp(30px, 6vh, 64px);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            padding-top: 24px;
+            padding-bottom: clamp(120px, 22vh, 220px);
             pointer-events: none;
+            user-select: none;
+            -webkit-user-select: none;
         }
         .hero-inner a { pointer-events: auto; }
 
         .kicker {
-            display: inline-flex;
-            align-items: center;
-            gap: 10px;
+            padding: 0 6px;
             font-size: 0.74rem;
             font-weight: 700;
             letter-spacing: 0.16em;
             text-transform: uppercase;
             color: var(--sage);
         }
-        .kicker::before {
-            content: "";
-            width: 28px;
-            height: 2px;
-            border-radius: 2px;
-            background: currentColor;
-        }
 
         h1.name {
-            margin: 10px 0 0 -0.04em;
-            font-size: clamp(4.4rem, 17.5vw, 13.5rem);
-            line-height: 0.88;
-            letter-spacing: -0.055em;
+            margin-top: 6px;
+            padding: 0 0.12em;
+            font-size: clamp(3.1rem, 8vw, 6rem);
+            line-height: 1.05;
+            letter-spacing: -0.045em;
             font-weight: 700;
-            user-select: none;
+            white-space: nowrap;
         }
-        .name .line { display: block; white-space: nowrap; }
-        .name .line + .line { color: var(--sage); }
-        .name .ch { display: inline-block; will-change: transform; }
-        .js .name .ch {
-            opacity: 0;
-            transform: translateY(0.5em) rotate(6deg);
-            animation: ch-in 0.9s cubic-bezier(0.2, 1, 0.3, 1) forwards;
-            animation-delay: calc(0.12s + var(--i) * 0.055s);
-        }
-        @keyframes ch-in { to { opacity: 1; transform: none; } }
 
-        .hero-foot {
-            display: flex;
-            flex-wrap: wrap;
-            align-items: flex-end;
-            justify-content: space-between;
-            gap: 22px 40px;
-            margin-top: clamp(22px, 4vh, 40px);
-        }
         .lede {
-            max-width: 44ch;
+            max-width: 40ch;
+            margin-top: 12px;
+            padding: 0 6px;
             color: var(--soft);
             font-size: clamp(0.98rem, 1.5vw, 1.08rem);
             font-weight: 500;
-            text-shadow: 0 0 4px var(--bg), 0 0 14px var(--bg);
         }
-        .links { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
+        .links { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 20px; padding: 4px; }
         .links a {
             display: inline-flex;
             align-items: center;
@@ -151,9 +130,7 @@
             padding: 0 17px;
             border-radius: 999px;
             border: 1px solid var(--line-strong);
-            background: rgba(255, 255, 255, 0.62);
-            -webkit-backdrop-filter: blur(10px);
-            backdrop-filter: blur(10px);
+            background: var(--card);
             font-size: 0.87rem;
             font-weight: 600;
             text-decoration: none;
@@ -170,20 +147,23 @@
         .links a.solid span { display: inline-block; animation: nudge 2.2s ease-in-out infinite; }
         @keyframes nudge { 0%, 100% { transform: translateY(-1px); } 50% { transform: translateY(3px); } }
 
-        .js .kicker, .js .hero-foot {
+        .js .hero-inner > * {
             opacity: 0;
             animation: rise 0.8s cubic-bezier(0.2, 1, 0.3, 1) forwards;
+            animation-delay: calc(0.05s + var(--i, 0) * 0.08s);
         }
-        .js .kicker { animation-delay: 0.05s; }
-        .js .hero-foot { animation-delay: 0.75s; }
         @keyframes rise { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
 
         .live-stats {
             display: flex;
             flex-wrap: wrap;
             align-items: center;
+            justify-content: center;
             gap: 8px 22px;
+            margin-top: 22px;
+            padding: 0 6px;
         }
+        .live-stats:not(.is-ready) { display: none; }
         .live-stats > * { opacity: 0; transition: opacity 0.5s ease; }
         .live-stats.is-ready > * { opacity: 1; }
         .live-stats .live {
@@ -374,7 +354,8 @@
             .wrap { padding: 0 20px; }
             .tiles { grid-template-columns: 1fr; }
             .motif { aspect-ratio: 16 / 9; }
-            h1.name { font-size: clamp(4.4rem, 25vw, 8rem); }
+            .hero { align-items: flex-start; }
+            .hero-inner { padding-top: 44px; padding-bottom: 0; }
         }
 
         @media (prefers-reduced-motion: reduce) {
@@ -390,26 +371,22 @@
 </head>
 <body>
     <header class="hero">
-        <canvas id="field" aria-hidden="true"></canvas>
+        <canvas id="play" aria-hidden="true"></canvas>
         <div class="wrap hero-inner">
-            <p class="kicker">Full stack software engineer</p>
-            <h1 class="name" aria-label="Palmer Gill"><span class="line" aria-hidden="true">Palmer</span><span class="line" aria-hidden="true">Gill</span></h1>
-            <div class="hero-foot">
-                <div>
-                    <p class="lede">Backend systems and identity at H-E-B. Markets, Bitcoin and browser games on the side.</p>
-                    <nav class="links" aria-label="About Palmer">
-                        <a class="solid" href="#work">Work <span aria-hidden="true">↓</span></a>
-                        <a href="/about/">About</a>
-                        <a href="/assets/Resume2026.pdf">Résumé</a>
-                        <a href="https://www.linkedin.com/in/palmer-gill-0081a7129/" target="_blank" rel="noopener noreferrer">LinkedIn</a>
-                        <a href="mailto:jamespalmergill@gmail">Email</a>
-                    </nav>
-                </div>
-                <div class="live-stats" id="live-stats">
-                    <span class="live">Live</span>
-                    <span class="stat"><b data-stat="games_played">0</b><span>games played</span></span>
-                    <span class="stat"><b data-stat="page_views">0</b><span>page views</span></span>
-                </div>
+            <p class="kicker" style="--i:0">Full stack software engineer</p>
+            <h1 class="name" style="--i:1">Palmer Gill</h1>
+            <p class="lede" style="--i:2">Backend systems and identity at H-E-B. Markets, Bitcoin and browser games on the side.</p>
+            <nav class="links" style="--i:3" aria-label="About Palmer">
+                <a class="solid" href="#work">Work <span aria-hidden="true">↓</span></a>
+                <a href="/about/">About</a>
+                <a href="/assets/Resume2026.pdf">Résumé</a>
+                <a href="https://www.linkedin.com/in/palmer-gill-0081a7129/" target="_blank" rel="noopener noreferrer">LinkedIn</a>
+                <a href="mailto:jamespalmergill@gmail">Email</a>
+            </nav>
+            <div class="live-stats" id="live-stats" style="--i:4">
+                <span class="live">Live</span>
+                <span class="stat"><b data-stat="games_played">0</b><span>games played</span></span>
+                <span class="stat"><b data-stat="page_views">0</b><span>page views</span></span>
             </div>
         </div>
     </header>
@@ -528,160 +505,234 @@
             const rgbOf = (hex) => { const n = parseInt(hex.slice(1), 16); return `${n >> 16},${(n >> 8) & 255},${n & 255}`; };
             const PALETTE = { sage: '#5b7152', clay: '#b96a4b', sky: '#5a7794', plum: '#8a6d8a', rose: '#b5677a', ochre: '#a9843f' };
 
-            /* ---------- hero: flow field ---------- */
+            /* ---------- hero: physics toy ---------- */
             const hero = document.querySelector('.hero');
-            const field = document.getElementById('field');
-            const fx = field.getContext('2d');
-            const strandColors = Object.values(PALETTE).map(rgbOf);
-            let FW = 0, FH = 0, strands = [], heroVisible = true;
-            const pointer = { x: -9999, y: -9999, on: false };
-            const pulses = [];
+            const play = document.getElementById('play');
+            const px = play.getContext('2d');
+            const BG = [250, 246, 240];
+            const tint = (hex, k) => {
+                const n = parseInt(hex.slice(1), 16), c = [n >> 16, (n >> 8) & 255, n & 255];
+                return `rgb(${c.map((v, i) => Math.round(v + (BG[i] - v) * k)).join(',')})`;
+            };
+            const COLORS = Object.values(PALETTE).map((hex) => ({ full: hex, mid: tint(hex, 0.45), pale: tint(hex, 0.78) }));
+            const GRAVITY = 1900, MAX_BODIES = 54;
+            let PW = 0, PH = 0, unit = 1, heroVisible = true, clock = 0;
+            let bodies = [], queue = [], blocks = [], held = null, born = 0;
+            const grip = { x: 0, y: 0, dx: 0, dy: 0 };
 
-            // smooth value noise over (x, y, time)
-            function noise(x, y, z) {
-                const xi = Math.floor(x), yi = Math.floor(y), zi = Math.floor(z);
-                const u = smooth(x - xi), v = smooth(y - yi), w = smooth(z - zi);
-                const l = (a, b, t) => a + (b - a) * t;
-                const p = (dx, dy, dz) => hash(xi + dx, yi + dy, zi + dz);
-                return l(
-                    l(l(p(0, 0, 0), p(1, 0, 0), u), l(p(0, 1, 0), p(1, 1, 0), u), v),
-                    l(l(p(0, 0, 1), p(1, 0, 1), u), l(p(0, 1, 1), p(1, 1, 1), u), v),
-                    w
-                );
+            function makeBody(x, y, r) {
+                return {
+                    x, y, r, vx: 0, vy: 0, a: Math.random() * TAU, w: (Math.random() - 0.5) * 4,
+                    im: 1 / (r * r), color: COLORS[born % COLORS.length], kind: (hash(born, 11) * 7) | 0,
+                    id: born++, pop: 0, entered: false,
+                };
+            }
+            const randomRadius = () => {
+                const v = Math.random();
+                return (v < 0.14 ? 62 + Math.random() * 22 : v < 0.55 ? 34 + Math.random() * 16 : 17 + Math.random() * 13) * unit;
+            };
+
+            // the text is solid: tokens land on it, roll off it, and can't be dragged through it
+            function measureBlocks() {
+                const base = play.getBoundingClientRect();
+                blocks = [...document.querySelectorAll('.hero-inner > *')].map((el) => {
+                    const r = el.getBoundingClientRect();
+                    return { x: r.left - base.left, y: r.top - base.top, w: r.width, h: r.height };
+                }).filter((r) => r.w && r.h);
             }
 
-            function seed(s, fresh) {
-                s.x = Math.random() * FW;
-                s.y = Math.random() * FH;
-                s.px = []; s.py = [];
-                s.age = fresh ? Math.random() * 200 : 0;
-                s.max = 260 + Math.random() * 420;
-                s.speed = 0.7 + Math.random() * 1.1;
-                s.w = 0.7 + Math.random() * 1.5;
-                s.c = strandColors[(Math.random() * strandColors.length) | 0];
-                s.tick = 0;
-                return s;
-            }
-
-            function sizeField() {
+            function sizePlay() {
                 const r = hero.getBoundingClientRect();
-                FW = r.width; FH = r.height;
-                field.width = Math.round(FW * DPR);
-                field.height = Math.round(FH * DPR);
-                fx.setTransform(DPR, 0, 0, DPR, 0, 0);
-                fx.lineCap = 'round';
-                fx.lineJoin = 'round';
-                const want = Math.round(clamp((FW * FH) / 3400, 130, 440));
-                strands = Array.from({ length: want }, () => seed({}, true));
+                PW = r.width; PH = r.height;
+                unit = clamp(PW / 1150, 0.62, 1.12);
+                play.width = Math.round(PW * DPR);
+                play.height = Math.round(PH * DPR);
+                measureBlocks();
             }
 
-            function stepField(dt, time) {
-                const scale = 0.0016, z = time * 0.05;
-                for (const s of strands) {
-                    const a = (noise(s.x * scale, s.y * scale, z) - 0.5) * TAU * 2.4
-                        + (noise(s.x * scale * 2.7 + 40, s.y * scale * 2.7, z * 1.6) - 0.5) * 1.6;
-                    let vx = Math.cos(a) * s.speed, vy = Math.sin(a) * s.speed * 0.8;
-                    if (pointer.on) {
-                        const dx = s.x - pointer.x, dy = s.y - pointer.y;
-                        const d = Math.hypot(dx, dy) || 1;
-                        if (d < 280) {
-                            const f = (1 - d / 280) ** 2;
-                            vx += (-dy / d) * f * 4.2 + (dx / d) * f * 0.9;
-                            vy += (dx / d) * f * 4.2 + (dy / d) * f * 0.9;
+            function fill() {
+                const count = Math.round(clamp((PW * PH) / 36000, 16, 30));
+                const narrow = PW < 620;
+                const textBottom = blocks.reduce((m, r) => Math.max(m, r.y + r.h), 0);
+                for (let i = 0; i < count; i++) {
+                    const r = randomRadius();
+                    const x = r + Math.random() * (PW - 2 * r);
+                    // on a phone the text spans the screen, so tokens start below it rather than landing on top of it
+                    const y = narrow ? textBottom + r + 10 + Math.random() * 60 : -r - Math.random() * 260;
+                    queue.push({ at: 0.25 + i * 0.07, body: makeBody(x, y, r) });
+                }
+            }
+
+            function contact(b, nx, ny, pen) {
+                b.x += nx * pen; b.y += ny * pen;
+                const vn = b.vx * nx + b.vy * ny;
+                if (vn >= 0) return;
+                const e = vn < -140 ? 0.46 : 0;
+                b.vx -= (1 + e) * vn * nx; b.vy -= (1 + e) * vn * ny;
+                const tx = -ny, ty = nx, vt = b.vx * tx + b.vy * ty;
+                b.vx -= tx * vt * 0.012; b.vy -= ty * vt * 0.012;
+                b.w += (vt / b.r - b.w) * 0.25;
+            }
+
+            function collide(a, b) {
+                const dx = b.x - a.x, dy = b.y - a.y, min = a.r + b.r, d2 = dx * dx + dy * dy;
+                if (d2 >= min * min || d2 === 0) return;
+                const ia = a === held ? 0 : a.im, ib = b === held ? 0 : b.im, sum = ia + ib;
+                if (!sum) return;
+                const d = Math.sqrt(d2), nx = dx / d, ny = dy / d;
+                const fix = (Math.max(min - d - 0.4, 0) * 0.75) / sum;
+                a.x -= nx * fix * ia; a.y -= ny * fix * ia;
+                b.x += nx * fix * ib; b.y += ny * fix * ib;
+                const rvx = b.vx - a.vx, rvy = b.vy - a.vy, vn = rvx * nx + rvy * ny;
+                if (vn >= 0) return;
+                const j = (-(1 + (vn < -140 ? 0.4 : 0)) * vn) / sum;
+                a.vx -= j * ia * nx; a.vy -= j * ia * ny;
+                b.vx += j * ib * nx; b.vy += j * ib * ny;
+                const vt = rvx * -ny + rvy * nx;
+                a.w += (vt / a.r) * 0.05 * (ia / sum);
+                b.w += (vt / b.r) * 0.05 * (ib / sum);
+            }
+
+            function stepPhysics(dt) {
+                for (const b of bodies) {
+                    if (b === held) {
+                        b.vx = clamp((grip.x - grip.dx - b.x) * 22, -3200, 3200);
+                        b.vy = clamp((grip.y - grip.dy - b.y) * 22, -3200, 3200);
+                    } else {
+                        b.vy += GRAVITY * dt;
+                        b.vx *= 1 - 0.25 * dt; b.vy *= 1 - 0.25 * dt;
+                    }
+                    b.x += b.vx * dt; b.y += b.vy * dt;
+                    b.a += b.w * dt; b.w *= 1 - 0.9 * dt;
+                    if (b.y > b.r + 2) b.entered = true;
+                }
+                for (let pass = 0; pass < 4; pass++) {
+                    for (let i = 0; i < bodies.length; i++) for (let j = i + 1; j < bodies.length; j++) collide(bodies[i], bodies[j]);
+                    for (const b of bodies) {
+                        if (b.x < b.r) contact(b, 1, 0, b.r - b.x);
+                        if (b.x > PW - b.r) contact(b, -1, 0, b.x - (PW - b.r));
+                        if (b.y > PH - b.r) contact(b, 0, -1, b.y - (PH - b.r));
+                        if (b.entered && b.y < b.r) contact(b, 0, 1, b.r - b.y);
+                        for (const k of blocks) {
+                            const cx = clamp(b.x, k.x, k.x + k.w), cy = clamp(b.y, k.y, k.y + k.h);
+                            const dx = b.x - cx, dy = b.y - cy, d2 = dx * dx + dy * dy;
+                            if (d2 >= b.r * b.r) continue;
+                            if (d2 > 0) {
+                                const d = Math.sqrt(d2);
+                                contact(b, dx / d, dy / d, b.r - d);
+                            } else {
+                                // centre is inside the box: leave by the nearest side
+                                const sides = [[b.x - k.x, -1, 0], [k.x + k.w - b.x, 1, 0], [b.y - k.y, 0, -1], [k.y + k.h - b.y, 0, 1]];
+                                const [gap, nx, ny] = sides.reduce((m, v) => (v[0] < m[0] ? v : m));
+                                contact(b, nx, ny, gap + b.r);
+                            }
                         }
                     }
-                    for (const p of pulses) {
-                        const dx = s.x - p.x, dy = s.y - p.y;
-                        const d = Math.hypot(dx, dy) || 1;
-                        const band = Math.abs(d - p.age * 520);
-                        if (band < 110) {
-                            const f = (1 - band / 110) * (1 - p.age / 1.5) * 7;
-                            vx += (dx / d) * f; vy += (dy / d) * f;
+                }
+            }
+
+            function drawBody(b) {
+                const { r, color } = b, c = px;
+                const s = (1 - (1 - b.pop) ** 3) * (b === held ? 1.05 : 1);
+                dot(c, b.x, b.y + r * 0.13 + (b === held ? 5 : 0), r * s);
+                c.fillStyle = 'rgba(60, 50, 35, 0.09)'; c.fill();
+                c.save();
+                c.translate(b.x, b.y); c.rotate(b.a); c.scale(s, s);
+                dot(c, 0, 0, r);
+                switch (b.kind) {
+                    case 0: // solid
+                        c.fillStyle = color.full; c.fill();
+                        break;
+                    case 1: // ring
+                        c.fillStyle = color.pale; c.fill();
+                        dot(c, 0, 0, r * 0.8); c.strokeStyle = color.full; c.lineWidth = r * 0.4; c.stroke();
+                        break;
+                    case 2: // half and half
+                        c.fillStyle = color.pale; c.fill();
+                        c.beginPath(); c.arc(0, 0, r, 0, Math.PI); c.fillStyle = color.full; c.fill();
+                        break;
+                    case 3: // target
+                        c.fillStyle = color.full; c.fill();
+                        dot(c, 0, 0, r * 0.66); c.fillStyle = color.pale; c.fill();
+                        dot(c, 0, 0, r * 0.32); c.fillStyle = color.full; c.fill();
+                        break;
+                    case 4: // off-centre eye
+                        c.fillStyle = color.mid; c.fill();
+                        dot(c, r * 0.36, 0, r * 0.42); c.fillStyle = '#fff'; c.fill();
+                        dot(c, r * 0.46, 0, r * 0.18); c.fillStyle = color.full; c.fill();
+                        break;
+                    case 5: // stripes
+                        c.fillStyle = color.pale; c.fill();
+                        c.save(); c.clip();
+                        c.fillStyle = color.full;
+                        for (let i = -2; i <= 2; i++) c.fillRect(-r, i * r * 0.44 - r * 0.11, r * 2, r * 0.22);
+                        c.restore();
+                        break;
+                    default: // pips
+                        c.fillStyle = color.full; c.fill();
+                        c.fillStyle = color.pale;
+                        for (let i = 0; i < 5; i++) {
+                            const ang = (i / 4) * TAU, d = i < 4 ? r * 0.5 : 0;
+                            dot(c, Math.cos(ang) * d, Math.sin(ang) * d, r * 0.15); c.fill();
                         }
-                    }
-                    s.x += vx * dt; s.y += vy * dt;
-                    s.age += dt;
-                    if (++s.tick % 3 === 0) {
-                        s.px.push(s.x); s.py.push(s.y);
-                        if (s.px.length > 70) { s.px.shift(); s.py.shift(); }
-                    }
-                    if (s.age > s.max || s.x < -60 || s.x > FW + 60 || s.y < -60 || s.y > FH + 60) seed(s, false);
                 }
-                for (let i = pulses.length - 1; i >= 0; i--) {
-                    pulses[i].age += dt / 60;
-                    if (pulses[i].age > 1.5) pulses.splice(i, 1);
-                }
+                c.restore();
             }
 
-            function drawField() {
-                fx.clearRect(0, 0, FW, FH);
-                for (const s of strands) {
-                    const n = s.px.length;
-                    if (n < 2) continue;
-                    const env = Math.min(1, s.age / 50, (s.max - s.age) / 70);
-                    if (env <= 0) continue;
-                    // three overlapping passes, each shorter and heavier, so a strand swells toward its head
-                    for (let pass = 0; pass < 3; pass++) {
-                        const from = Math.floor(n * [0, 0.5, 0.8][pass]);
-                        fx.strokeStyle = `rgba(${s.c},${([0.24, 0.26, 0.3][pass] * env).toFixed(3)})`;
-                        fx.lineWidth = s.w * [1, 1.35, 1.75][pass];
-                        fx.beginPath();
-                        fx.moveTo(s.px[from], s.py[from]);
-                        for (let i = from + 1; i < n; i++) fx.lineTo(s.px[i], s.py[i]);
-                        fx.lineTo(s.x, s.y);
-                        fx.stroke();
-                    }
-                }
+            function drawPlay() {
+                px.setTransform(DPR, 0, 0, DPR, 0, 0);
+                px.clearRect(0, 0, PW, PH);
+                for (const b of bodies) if (b !== held) drawBody(b);
+                if (held) drawBody(held);
             }
 
-            window.addEventListener('pointermove', (e) => {
-                const r = field.getBoundingClientRect();
-                pointer.x = e.clientX - r.left;
-                pointer.y = e.clientY - r.top;
-                pointer.on = pointer.y < r.height + 100;
-                pointer.cx = e.clientX; pointer.cy = e.clientY;
-            }, { passive: true });
-            document.addEventListener('pointerleave', () => { pointer.on = false; });
-            hero.addEventListener('pointerdown', (e) => {
-                if (reduced) return;
-                const r = field.getBoundingClientRect();
-                pulses.push({ x: e.clientX - r.left, y: e.clientY - r.top, age: 0 });
-                if (pulses.length > 4) pulses.shift();
+            function tickPlay(seconds) {
+                clock += seconds;
+                while (queue.length && queue[0].at <= clock) bodies.push(queue.shift().body);
+                for (const b of bodies) b.pop = Math.min(1, b.pop + seconds * 3.2);
+                stepPhysics(seconds / 2);
+                stepPhysics(seconds / 2);
+            }
+
+            const local = (e) => { const r = play.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; };
+            function bodyAt(x, y, slop = 0) {
+                for (let i = bodies.length - 1; i >= 0; i--) {
+                    const b = bodies[i];
+                    if (Math.hypot(b.x - x, b.y - y) <= b.r + slop) return b;
+                }
+                return null;
+            }
+            play.addEventListener('pointerdown', (e) => {
+                if (e.button) return;
+                const [x, y] = local(e);
+                const hit = bodyAt(x, y, e.pointerType === 'touch' ? 10 : 0);
+                if (hit) {
+                    held = hit;
+                    grip.x = x; grip.y = y; grip.dx = x - hit.x; grip.dy = y - hit.y;
+                    play.setPointerCapture(e.pointerId);
+                    play.style.cursor = 'grabbing';
+                    return;
+                }
+                // empty space: drop in a new token, retiring the oldest once the hero is full
+                if (blocks.some((k) => x > k.x && x < k.x + k.w && y > k.y && y < k.y + k.h)) return;
+                if (bodies.length >= MAX_BODIES) bodies.shift();
+                const fresh = makeBody(x, y, randomRadius());
+                fresh.entered = true;
+                bodies.push(fresh);
             });
-
-            /* ---------- hero: kinetic name ---------- */
-            const letters = [];
-            document.querySelectorAll('.name .line').forEach((line) => {
-                const text = line.textContent;
-                line.textContent = '';
-                for (const ch of text) {
-                    const span = document.createElement('span');
-                    span.className = 'ch';
-                    span.textContent = ch;
-                    span.style.setProperty('--i', letters.length);
-                    line.appendChild(span);
-                    letters.push({ el: span, cx: 0, cy: 0, w: 700 });
-                }
+            play.addEventListener('pointermove', (e) => {
+                const [x, y] = local(e);
+                if (held) { grip.x = x; grip.y = y; return; }
+                play.style.cursor = bodyAt(x, y) ? 'grab' : '';
             });
-            function measureLetters() {
-                for (const l of letters) {
-                    const r = l.el.getBoundingClientRect();
-                    l.cx = r.left + r.width / 2;
-                    l.cy = r.top + r.height / 2 + window.scrollY;
-                }
-            }
-            function stepLetters(time) {
-                const py = (pointer.cy ?? -9999) + window.scrollY;
-                letters.forEach((l, i) => {
-                    let w = 560 + 230 * Math.sin(time * 0.9 - i * 0.62);
-                    if (pointer.on) {
-                        const d = Math.hypot(l.cx - pointer.cx, l.cy - py);
-                        w += 320 * (1 - clamp(d / 340)) ** 2;
-                    }
-                    w = Math.round(clamp(w, 220, 800) / 4) * 4;
-                    if (w !== l.w) { l.w = w; l.el.style.fontWeight = w; }
-                });
-            }
+            const release = () => { held = null; play.style.cursor = ''; };
+            play.addEventListener('pointerup', release);
+            play.addEventListener('pointercancel', release);
+            // a finger that lands on a token drags it; anywhere else it scrolls the page as usual
+            play.addEventListener('touchstart', (e) => {
+                const t = e.touches[0], r = play.getBoundingClientRect();
+                if (bodyAt(t.clientX - r.left, t.clientY - r.top, 10)) e.preventDefault();
+            }, { passive: false });
 
             /* ---------- project motifs ---------- */
             function rr(c, x, y, w, h, r) {
@@ -1016,51 +1067,44 @@
             tiles.forEach((tile) => seen.observe(tile.el));
 
             /* ---------- one loop for everything ---------- */
-            sizeField();
+            sizePlay();
+            fill();
             let resizeTimer;
             window.addEventListener('resize', () => {
                 clearTimeout(resizeTimer);
-                resizeTimer = setTimeout(() => {
-                    const r = hero.getBoundingClientRect();
-                    // mobile browsers resize on every scroll as the toolbar hides: only a width change reseeds
-                    if (Math.abs(r.width - FW) > 1 || Math.abs(r.height - FH) > 120) { sizeField(); if (reduced) still(); }
-                    measureLetters();
-                }, 150);
+                resizeTimer = setTimeout(sizePlay, 120);
             });
-            (document.fonts?.ready ?? Promise.resolve()).then(() => setTimeout(measureLetters, 1200));
+            // the text rises into place on load, so its boxes are re-read once it has settled
+            [600, 1400, 2400].forEach((ms) => setTimeout(measureBlocks, ms));
+            document.fonts?.ready.then(measureBlocks);
+            new ResizeObserver(measureBlocks).observe(document.querySelector('.hero-inner'));
 
-            function still() {
-                for (let i = 0; i < 240; i++) stepField(1, 0);
-                drawField();
-            }
-
-            field.classList.add('on');
             if (reduced) {
-                still();
-                return;
+                // no tumbling intro: everything is already at rest, and only moves if it is dragged
+                document.querySelectorAll('.hero-inner > *').forEach((el) => { el.style.animation = 'none'; el.style.opacity = 1; });
+                measureBlocks();
+                for (let i = 0; i < 900; i++) tickPlay(1 / 60);
+                for (const b of bodies) { b.vx = b.vy = b.w = 0; }
             }
 
-            let last = performance.now(), time = 0;
+            let last = performance.now();
             function frame(now) {
-                const ms = Math.min(now - last, 50);
+                const ms = Math.min(now - last, 34);
                 last = now;
-                const dt = ms / 16.667;
-                time += ms / 1000;
                 if (heroVisible) {
-                    stepField(dt, time);
-                    drawField();
-                    stepLetters(time);
+                    tickPlay(ms / 1000);
+                    drawPlay();
                 }
-                for (const tile of tiles) {
-                    if (!tile.visible) continue;
-                    tile.rate += ((tile.hover ? 2.4 : 1) - tile.rate) * 0.08;
-                    tile.t += (ms / 1000) * tile.rate;
-                    paint(tile);
+                if (!reduced) {
+                    for (const tile of tiles) {
+                        if (!tile.visible) continue;
+                        tile.rate += ((tile.hover ? 2.4 : 1) - tile.rate) * 0.08;
+                        tile.t += (ms / 1000) * tile.rate;
+                        paint(tile);
+                    }
                 }
                 requestAnimationFrame(frame);
             }
-            // warm the field up so the first frame is already full of strands
-            for (let i = 0; i < 200; i++) stepField(1, 0);
             requestAnimationFrame((now) => { last = now; frame(now); });
         })();
     </script>
