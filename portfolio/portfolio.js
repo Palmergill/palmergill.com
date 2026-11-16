@@ -376,15 +376,21 @@
         return `<div><dt>${label}</dt><dd class="${valueClass}">${value}</dd></div>`;
     }
 
+    // Everything the portfolio has made: what's held, what's been sold, and
+    // the dividends paid along the way.
+    function totalReturn(data) {
+        return (data.totals.gain || 0) + (data.totals.realizedGain || 0) + (data.dividends.total || 0);
+    }
+
     // The statement's lead figures, under the total.
     function renderMetrics(data) {
         const t = data.totals;
         const items = [];
         const withPct = (amount, pct) => (privacy ? fmtPct(pct, true) : `${fmtSigned(amount, true)}<span class="pf-sub">${fmtPct(pct, true)}</span>`);
         if (t.gain != null) items.push(metric('Unrealized', withPct(t.gain, t.gainPct), tone(t.gain)));
-        if (!privacy && (t.gain != null || t.realizedGain != null)) {
-            const total = (t.gain || 0) + (t.realizedGain || 0);
-            items.push(metric('Total gain', fmtSigned(total, true), tone(total)));
+        if (!privacy && (t.gain != null || t.realizedGain != null || data.dividends.count)) {
+            const total = totalReturn(data);
+            items.push(metric('Total return', fmtSigned(total, true), tone(total)));
         }
         if (!privacy && t.costBasis) items.push(metric('Cost basis', fmtMoney(t.costBasis, true)));
         const d = data.dividends;
@@ -740,13 +746,14 @@
 
     function renderGains(data) {
         const t = data.totals;
-        const total = (t.gain || 0) + (t.realizedGain || 0);
+        const total = totalReturn(data);
         $('gainTiles').innerHTML = [
             privacy
                 ? gainTile('Unrealized', fmtPct(t.gainPct, true), 'On open positions', tone(t.gain))
                 : gainTile('Unrealized', fmtSigned(t.gain, true), t.gainPct == null ? 'On open positions' : `${fmtPct(t.gainPct, true)} on ${fmtMoney(t.costBasis, true)} cost`, tone(t.gain)),
             gainTile('Realized', fmtSigned(t.realizedGain, true), '', tone(t.realizedGain)),
-            gainTile('Total gain', fmtSigned(total, true), '', tone(total)),
+            ...(data.dividends.count ? [gainTile('Income', fmtSigned(data.dividends.total, true), '', tone(data.dividends.total))] : []),
+            gainTile('Total return', fmtSigned(total, true), '', tone(total)),
             gainTile('Fees paid', fmtMoney(t.fees, true), privacy ? '' : `${fmtMoney(t.invested, true)} bought · ${fmtMoney(t.withdrawn, true)} sold`),
         ].join('');
 
