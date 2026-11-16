@@ -412,9 +412,13 @@
         $('todayChange').innerHTML = privacy
             ? `<p class="pf-today ${tone(t.dayChange)}">${fmtPct(t.dayChangePct, true)}</p>`
             : `<p class="pf-today ${tone(t.dayChange)}">${fmtSigned(t.dayChange, true)}</p><p class="pf-sub ${tone(t.dayChange)}">${fmtPct(t.dayChangePct, true)}</p>`;
+        $('todayCard').classList.toggle('is-up', t.dayChange > 0);
+        $('todayCard').classList.toggle('is-down', t.dayChange < 0);
+        const widest = Math.max(...movers.map((p) => Math.abs(p.dayChangePct)), 0) || 1;
         $('moversBody').innerHTML = movers.map((p) => `
             <tr data-ticker="${escapeHtml(p.ticker)}">
-                <td>${securityLink(p)}</td>
+                <td><span class="pf-sec">${badge(p.ticker)}${securityLink(p)}</span></td>
+                <td class="pf-mover"><span class="pf-mover__bar ${tone(p.dayChange)}" style="width:${(Math.abs(p.dayChangePct) / widest * 100).toFixed(0)}%"></span></td>
                 ${dayPill(p)}
             </tr>`).join('');
     }
@@ -501,12 +505,30 @@
         $('allocationModes').querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.mode === allocationMode)));
         const groups = allocationGroups(data);
         els.sectorCard.hidden = !groups.length;
-        const largest = Math.max(...groups.map((g) => g.weight || 0)) || 1;
-        els.sectorBars.innerHTML = groups.map((g) => `
+        // A ring of the groups, largest first from twelve o'clock, and its key.
+        const R = 52;
+        const around = 2 * Math.PI * R;
+        const total = groups.reduce((sum, g) => sum + (g.weight || 0), 0) || 1;
+        let turned = 0;
+        const arcs = groups.map((g, i) => {
+            const share = (g.weight || 0) / total;
+            // A hair of gap between slices, when there's more than one.
+            const length = Math.max(share * around - (groups.length > 1 ? 2 : 0), 0.5);
+            const arc = `<circle class="pf-donut__arc pf-slice--${Math.min(i, 8)}" cx="70" cy="70" r="${R}" stroke-dasharray="${length.toFixed(2)} ${(around - length).toFixed(2)}" stroke-dashoffset="${(-turned * around).toFixed(2)}"><title>${escapeHtml(g.label)} ${fmtPct(g.weight)}</title></circle>`;
+            turned += share;
+            return arc;
+        }).join('');
+        const lead = groups[0];
+        $('sectorDonut').innerHTML = lead ? `
+            <svg viewBox="0 0 140 140" role="img" aria-label="Allocation by ${allocationMode}">
+                <g transform="rotate(-90 70 70)">${arcs}</g>
+                <text class="pf-donut__figure" x="70" y="70" text-anchor="middle">${fmtPct(lead.weight)}</text>
+                <text class="pf-donut__label" x="70" y="87" text-anchor="middle">${escapeHtml(lead.label.length > 16 ? `${lead.label.slice(0, 15)}…` : lead.label)}</text>
+            </svg>` : '';
+        els.sectorBars.innerHTML = groups.map((g, i) => `
             <li>
-                <span>${escapeHtml(g.label)}</span>
+                <span class="pf-alloc__name"><i class="pf-alloc__dot pf-slice--${Math.min(i, 8)}"></i>${escapeHtml(g.label)}</span>
                 <span class="pf-alloc__value">${fmtPct(g.weight)}${privacy ? '' : `<em>${fmtMoney(g.value, true)}</em>`}</span>
-                <div class="pf-alloc__bar"><i style="width:${((g.weight || 0) / largest) * 100}%"></i></div>
             </li>`).join('');
     }
     $('allocationModes').addEventListener('click', (event) => {
@@ -526,8 +548,15 @@
         return `${fmtPrice(p.price)}${note}`;
     }
 
+    // A round monogram for a security, its tint fixed by the ticker.
+    function badge(ticker) {
+        let hash = 0;
+        for (const ch of ticker) hash = (hash * 131 + ch.charCodeAt(0)) % 997;
+        return `<span class="pf-badge pf-badge--${hash % 8}" aria-hidden="true">${escapeHtml(ticker.slice(0, 2).toUpperCase())}</span>`;
+    }
+
     function securityCell(p) {
-        return `${securityLink(p)}${p.name && p.name !== p.ticker ? `<span class="pf-name" title="${escapeHtml(p.name)}">${escapeHtml(p.name)}</span>` : ''}`;
+        return `<span class="pf-sec">${badge(p.ticker)}<span class="pf-sec__text">${securityLink(p)}${p.name && p.name !== p.ticker ? `<span class="pf-name" title="${escapeHtml(p.name)}">${escapeHtml(p.name)}</span>` : ''}</span></span>`;
     }
 
     function gainCell(p, extra = '') {
@@ -543,7 +572,7 @@
         const span = Math.max(...closes) - lo || 1;
         const d = closes.map((c, i) => `${i ? 'L' : 'M'}${((i / (closes.length - 1)) * 72).toFixed(1)},${(22 - ((c - lo) / span) * 20).toFixed(1)}`).join('');
         const up = closes[closes.length - 1] >= closes[0];
-        return `<td class="num ${extra}"><svg class="pf-spark ${up ? 'is-up' : 'is-down'}" viewBox="0 0 72 24" aria-hidden="true"><path d="${d}"/></svg></td>`;
+        return `<td class="num ${extra}"><svg class="pf-spark ${up ? 'is-up' : 'is-down'}" viewBox="0 0 72 24" aria-hidden="true"><path class="pf-spark__fill" d="${d}L72,24L0,24Z"/><path d="${d}"/></svg></td>`;
     }
 
     // The latest day's move, against the close before it.

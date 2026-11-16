@@ -475,16 +475,6 @@
 .pf-tile__sub { margin-top: 2px; color: var(--muted); }
 .pf-today { font-size: 38px; letter-spacing: -0.015em; }
 
-/* Allocation: the bars step from forest to gold down the list. */
-.pf-alloc { gap: 12px; }
-.pf-alloc__bar { height: 5px; border-radius: 999px; overflow: hidden; }
-.pf-alloc__bar i { border-radius: 999px; transition: width 0.5s var(--ease); }
-.pf-alloc li:nth-child(2) .pf-alloc__bar i { background: #2a5a4d; }
-.pf-alloc li:nth-child(3) .pf-alloc__bar i { background: var(--sky); }
-.pf-alloc li:nth-child(4) .pf-alloc__bar i { background: #8f9a6a; }
-.pf-alloc li:nth-child(5) .pf-alloc__bar i { background: var(--gold); }
-.pf-alloc li:nth-child(n+6) .pf-alloc__bar i { background: #dcc48c; }
-
 /* Tables */
 .pf-table th { padding-bottom: 9px; }
 .pf-table td { padding: 10px 10px; transition: background-color 0.12s; }
@@ -533,4 +523,114 @@
     .pf-table td { padding: 9px 5px; }
     .pf-hero .pf-ranges { gap: 0; justify-content: space-between; }
     .pf-hero .pf-ranges button { padding: 5px 9px; }
+}
+
+/* ── The statement ─────────────────────────────────────────────────────── */
+
+/* The headline panel: deep forest, ivory figures, a lit line. Everything
+   inside reads the same tokens, turned for a dark ground. */
+.pf-hero {
+    --card: #0f2f27; --ink: #fbf6e6; --soft: #c8d6cc; --muted: #8fa89b;
+    --line: rgba(243, 230, 196, 0.12); --line-strong: rgba(243, 230, 196, 0.24); --surface: rgba(255, 255, 255, 0.07);
+    --chart-up: #3ddc84; --chart-down: #ff7d52; --gain: #3ddc84; --loss: #ff9072; --bench: #86a094;
+    color: var(--soft); border: 0; padding: 26px 28px 18px;
+    background:
+        radial-gradient(620px 300px at 0% 0%, rgba(201, 162, 77, 0.2), rgba(201, 162, 77, 0) 70%),
+        radial-gradient(700px 420px at 100% 100%, color-mix(in srgb, var(--trend) 13%, transparent), transparent 70%),
+        linear-gradient(160deg, #17413a 0%, #0f2f27 45%, #0a221c 100%);
+    box-shadow: inset 0 0 0 1px rgba(201, 162, 77, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 24px 44px -26px rgba(10, 34, 28, 0.75);
+}
+.pf-hero__label { color: #dcc07a; }
+.pf-hero__value { color: #fbf6e6; }
+.pf-hero__value.is-gain { color: var(--gain); }
+.pf-hero__value.is-loss { color: var(--loss); }
+.pf-hero__top { flex-wrap: wrap; gap: 18px 32px; }
+.pf-hero .pf-chart__line { filter: drop-shadow(0 0 7px color-mix(in srgb, var(--trend) 60%, transparent)); }
+.pf-hero .pf-chart__fill-top { stop-opacity: 0.32; }
+.pf-hero .pf-chart__invested { stroke: #cdb98a; opacity: 0.75; }
+.pf-hero .pf-key--invested { border-top-color: #cdb98a; }
+.pf-hero .pf-chart__avg { stroke: #dcc07a; }
+.pf-hero .pf-key--avg { border-top-color: #dcc07a; }
+.pf-hero .pf-chart__guide { stroke: rgba(243, 230, 196, 0.2); }
+.pf-hero .pf-chart__cross { stroke: #fbf6e6; }
+.pf-hero .pf-ranges button:hover { background: color-mix(in srgb, var(--trend) 14%, transparent); }
+.pf-hero .pf-ranges button[aria-pressed="true"] { background: color-mix(in srgb, var(--trend) 22%, transparent); }
+.pf-hero .pf-legend-toggle:hover { background: var(--surface); }
+.pf-hero .pf-chart__empty { color: var(--muted); }
+
+/* The lead figures, set into the headline's top right. */
+.pf-hero .pf-metrics { display: flex; flex-wrap: wrap; gap: 14px 0; background: none; border: 0; border-radius: 0; box-shadow: none; overflow: visible; }
+.pf-hero .pf-metrics { padding-top: 6px; }
+.pf-hero .pf-metrics div { padding: 2px 16px; box-shadow: none; border-left: 1px solid var(--line-strong); }
+.pf-hero .pf-metrics div:last-child { padding-right: 0; }
+.pf-hero .pf-metrics dt { color: #b9c9be; }
+.pf-hero .pf-metrics dd { color: #fbf6e6; font-size: 22px; }
+.pf-hero .pf-metrics dd.is-gain { color: var(--gain); }
+.pf-hero .pf-metrics dd.is-loss { color: var(--loss); }
+.pf-hero .pf-metrics dd .pf-sub { color: inherit; opacity: 0.85; }
+
+/* Panels: a gold thread along the top edge, and warm figure bands. */
+.pf-card:not(.pf-hero) { background-image: linear-gradient(90deg, var(--gold) 0, rgba(201, 162, 77, 0.35) 22%, rgba(201, 162, 77, 0) 58%); background-size: 100% 2px; background-repeat: no-repeat; }
+.pf-tiles { background: linear-gradient(180deg, #fdf7e8, #fbf3df); border-color: #eadfc4; }
+.pf-tile { box-shadow: -1px -1px 0 #eadfc4; }
+.pf-tiles--flat { border-top-color: #eadfc4; }
+.pf-tile__label { color: #9a7b2f; }
+
+/* Today leans green or red with the day. */
+#todayCard.is-up { background-color: #f7fbf3; background-image: linear-gradient(90deg, var(--gain) 0, rgba(31, 122, 77, 0.3) 22%, rgba(31, 122, 77, 0) 58%), linear-gradient(180deg, rgba(31, 122, 77, 0.1), rgba(31, 122, 77, 0) 150px); background-size: 100% 2px, 100% 100%; }
+#todayCard.is-down { background-image: linear-gradient(90deg, var(--loss) 0, rgba(166, 61, 47, 0.3) 22%, rgba(166, 61, 47, 0) 58%), linear-gradient(180deg, rgba(166, 61, 47, 0.09), rgba(166, 61, 47, 0) 150px); background-size: 100% 2px, 100% 100%; }
+.pf-mover { width: 34%; padding-left: 0; padding-right: 0; }
+.pf-mover__bar { display: block; height: 5px; margin-left: auto; border-radius: 999px; background: var(--line-strong); min-width: 4px; }
+.pf-mover__bar.is-gain { background: linear-gradient(90deg, rgba(31, 122, 77, 0.25), var(--gain)); }
+.pf-mover__bar.is-loss { background: linear-gradient(90deg, rgba(166, 61, 47, 0.25), var(--loss)); }
+
+/* A security's monogram. */
+.pf-sec { display: inline-flex; align-items: center; gap: 11px; min-width: 0; vertical-align: middle; }
+.pf-sec__text { min-width: 0; }
+.pf-badge {
+    flex: none; width: 30px; height: 30px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center;
+    font-size: 10.5px; font-weight: 600; letter-spacing: 0.04em; line-height: 1;
+    box-shadow: inset 0 0 0 1px rgba(31, 42, 36, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.6);
+}
+.pf-badge--0 { background: #dfeae2; color: #17413a; }
+.pf-badge--1 { background: #f3e6c4; color: #7a5a12; }
+.pf-badge--2 { background: #f1ddd0; color: #8a4a26; }
+.pf-badge--3 { background: #d9e6ea; color: #2f5a6b; }
+.pf-badge--4 { background: #e8dde8; color: #6d4a5e; }
+.pf-badge--5 { background: #e6e9cf; color: #5a6426; }
+.pf-badge--6 { background: #f4dcd7; color: #96392c; }
+.pf-badge--7 { background: #dde2ee; color: #3f4f7a; }
+.pf-spark path.pf-spark__fill { stroke: none; opacity: 0.13; }
+.pf-spark.is-up .pf-spark__fill { fill: var(--chart-up); }
+.pf-spark.is-down .pf-spark__fill { fill: var(--chart-down); }
+
+/* Allocation: a ring and its key. */
+.pf-donut { width: 168px; margin: 2px auto 18px; }
+.pf-donut svg { display: block; width: 100%; height: auto; }
+.pf-donut__arc { fill: none; stroke-width: 15; transition: stroke-width 0.15s; }
+.pf-donut__arc:hover { stroke-width: 19; }
+.pf-donut__figure { font-family: var(--serif); font-size: 25px; font-weight: 500; fill: var(--forest); font-variant-numeric: tabular-nums; }
+.pf-donut__label { font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase; fill: var(--muted); }
+.pf-slice--0 { stroke: #0f2f27; background: #0f2f27; }
+.pf-slice--1 { stroke: #c9a24d; background: #c9a24d; }
+.pf-slice--2 { stroke: #4d7a6c; background: #4d7a6c; }
+.pf-slice--3 { stroke: #b8683c; background: #b8683c; }
+.pf-slice--4 { stroke: #8fae8a; background: #8fae8a; }
+.pf-slice--5 { stroke: #6d4a5e; background: #6d4a5e; }
+.pf-slice--6 { stroke: #4f6f8a; background: #4f6f8a; }
+.pf-slice--7 { stroke: #e0c98f; background: #e0c98f; }
+.pf-slice--8 { stroke: #b5ad9a; background: #b5ad9a; }
+.pf-alloc { gap: 0; }
+.pf-alloc li { grid-template-columns: minmax(0, 1fr) auto; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--line); }
+.pf-alloc li:last-child { border-bottom: 0; padding-bottom: 0; }
+.pf-alloc__name { display: flex; align-items: center; gap: 9px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pf-alloc__dot { flex: none; width: 9px; height: 9px; border-radius: 3px; }
+
+@media (max-width: 560px) {
+    .pf-hero { padding: 20px 18px 14px; }
+    .pf-hero .pf-metrics { width: 100%; display: grid; grid-template-columns: 1fr 1fr; gap: 14px 0; padding-top: 14px; border-top: 1px solid var(--line); }
+    .pf-hero .pf-metrics div { padding: 0 14px 0 0; border-left: 0; box-shadow: none; }
+    .pf-hero .pf-metrics dd { font-size: 20px; }
+    .pf-badge { width: 26px; height: 26px; font-size: 9.5px; }
+    .pf-sec { gap: 8px; }
 }
