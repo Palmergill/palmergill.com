@@ -833,7 +833,16 @@ def test_tax_lots_are_first_in_first_out_with_their_terms():
     assert [(lot["shares"], lot["term"]) for lot in taxes["lots"]] == [(6, "long"), (10, "short")]
     assert taxes["long"] == pytest.approx(6 * (200 - 100))
     assert taxes["short"] == pytest.approx(10 * (200 - 250))
-    assert taxes["lots"][1]["longTermOn"] == (today - timedelta(days=100) + timedelta(days=366)).isoformat()
+    assert taxes["lots"][1]["longTermOn"] == portfolio.long_term_from(today - timedelta(days=100)).isoformat()
+
+
+def test_long_term_starts_the_day_after_the_anniversary_leap_years_included():
+    from datetime import date
+
+    assert portfolio.long_term_from(date(2025, 12, 19)) == date(2026, 12, 20)
+    # A year with a Feb 29 in it is 366 days long: still the day after.
+    assert portfolio.long_term_from(date(2023, 3, 15)) == date(2024, 3, 16)
+    assert portfolio.long_term_from(date(2024, 2, 29)) == date(2025, 3, 1)
 
 
 def test_familiar_sectors_and_unclassified(monkeypatch):
@@ -983,8 +992,20 @@ def test_income_by_month_and_the_next_twelve_projected_on_todays_shares():
     _buy(client, "AAPL", shares=10, price=200.0, day=(today - timedelta(days=10)).isoformat())
     income = client.get("/api/stocks/portfolio").json()["dividends"]
     projected = {m["month"]: m["amount"] for m in income["projected"]}
-    assert len(projected) == 12 and income["projectedTotal"] == 5.0
+    assert len(projected) == 13 and income["projectedTotal"] == 5.0
     assert projected[(paid + timedelta(days=365)).strftime("%Y-%m")] == 5.0
+
+
+def test_a_dividend_already_paid_this_month_is_still_in_the_next_twelve_months():
+    from datetime import date
+    from types import SimpleNamespace
+
+    today = date(2026, 11, 16)
+    paid = [SimpleNamespace(ticker="AAPL", trade_date=date(2026, m, 5), amount=8.75) for m in (2, 5, 8, 11)]
+    income = portfolio._income_calendar(paid, [], {"AAPL": 35.0}, today)
+    projected = {m["month"]: m["amount"] for m in income["projected"]}
+    assert income["projectedTotal"] == 35.0
+    assert projected["2027-11"] == 8.75 and projected["2026-11"] == 0.0
 
 
 # ── 2026-11-13 review: each a bug that shipped ──────────────────────────────

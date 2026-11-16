@@ -972,6 +972,8 @@
     // Each day's return on what was invested that day (see rangeReturn).
     function dailyReturns(points) {
         const out = [];
+        const opening = openingGain(points);
+        if (opening) out.push({ date: points[0].date, r: opening.gain / opening.base });
         for (let i = 1; i < points.length; i += 1) {
             const flow = points[i].flow || 0;
             const base = points[i - 1].value + Math.max(flow, 0);
@@ -1432,6 +1434,17 @@
         return key;
     }
 
+    // The very first day of a history built from trades alone: what was
+    // bought that day and what it closed at. A range that starts there counts
+    // that day's gain too, as the contribution figures do; any later start, or
+    // a history that opens on a holdings snapshot, counts from the day's close.
+    function openingGain(points) {
+        const first = points[0];
+        if (!first || history.data?.asOf || first !== history.data?.points?.[0]) return null;
+        const base = first.flow || 0;
+        return base > 0 ? { gain: first.value - base, base } : null;
+    }
+
     // The gain over a range, less money put in or taken out, and its percent
     // as a time-weighted return: each day's gain on what was invested that
     // day, chained. A first $2k buy growing to $45k by adding money then
@@ -1440,6 +1453,12 @@
         let gain = 0;
         let growth = 1;
         let counted = false;
+        const opening = openingGain(points);
+        if (opening) {
+            gain = opening.gain;
+            growth = 1 + opening.gain / opening.base;
+            counted = true;
+        }
         for (let i = 1; i < points.length; i += 1) {
             const flow = points[i].flow || 0;
             const day = points[i].value - points[i - 1].value - flow;

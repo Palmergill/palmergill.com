@@ -1213,7 +1213,14 @@ def _day_change(shares: float, price: float, prev_close: float, trades: List[Any
 # Tax lots: brokers sell the oldest shares first unless told otherwise, so the
 # lots are first-in, first-out, beside the average cost the rest of the page
 # uses. A lot held more than a year is long-term.
-LONG_TERM_DAYS = 365
+def long_term_from(bought: date) -> date:
+    """The first day a lot bought on `bought` is long-term: the day after its
+    one-year anniversary (a Feb 29 purchase's anniversary is Feb 28)."""
+    try:
+        anniversary = bought.replace(year=bought.year + 1)
+    except ValueError:
+        anniversary = bought.replace(year=bought.year + 1, day=28)
+    return anniversary + timedelta(days=1)
 
 
 def tax_lots(holdings: List[Any], transactions: List[Any]) -> Dict[str, List[Dict[str, Any]]]:
@@ -1257,7 +1264,7 @@ def _tax_summary(lots: Dict[str, List[Dict[str, Any]]], prices: Dict[str, Option
             if lot["date"] is None:
                 term, long_on = "unknown", None
             else:
-                long_on = lot["date"] + timedelta(days=LONG_TERM_DAYS + 1)
+                long_on = long_term_from(lot["date"])
                 term = "long" if today >= long_on else "short"
             totals[term] += gain
             rows.append({
@@ -1299,14 +1306,17 @@ def _month_key(day: date, ahead: int = 0) -> str:
 
 def _income_calendar(dividends: List[Any], transactions: List[Any], shares_now: Dict[str, float], today: date) -> Dict[str, Any]:
     """Dividends received in each of the last twelve months, and the next
-    twelve projected: each payment of the past year again a year on, per
-    share, on the shares held now."""
+    twelve months projected: each payment of the past year again a year on,
+    per share, on the shares held now. A year from today lands part-way
+    through a month, so the projection runs from this month to the same month
+    next year: a payment already received this month is due again in that
+    last one."""
     received = {_month_key(today, -i): 0.0 for i in range(11, -1, -1)}
     for d in dividends:
         key = _month_key(d.trade_date)
         if key in received:
             received[key] += d.amount or 0.0
-    projected = {_month_key(today, i): 0.0 for i in range(0, 12)}
+    projected = {_month_key(today, i): 0.0 for i in range(0, 13)}
     year_ago = today - timedelta(days=365)
     for d in dividends:
         held = shares_now.get(d.ticker, 0.0)
@@ -1893,9 +1903,11 @@ def value_history(db: Session, username: str) -> Dict[str, Any]:
     current: Dict[str, Tuple[date, float]] = {}
     # Each holding's share of the gain over the standard ranges: its value
     # and the money put into it, marked where each range starts.
+    # The same day counts as the page's range buttons, so a range's
+    # contributions add up to the gain the chart shows for it.
     range_starts = {
-        "1M": today - timedelta(days=30), "3M": today - timedelta(days=91),
-        "YTD": date(today.year, 1, 1), "1Y": today - timedelta(days=365),
+        "1M": today - timedelta(days=31), "3M": today - timedelta(days=92),
+        "YTD": date(today.year, 1, 1), "1Y": today - timedelta(days=366),
     }
     tick_flow: Dict[str, float] = {}
     tick_value: Dict[str, float] = {}
@@ -2260,7 +2272,7 @@ def export_csv(db: Session, username: str, kind: str) -> str:
         elif oldest is None:
             term = "Unknown"
         else:
-            term = "Long" if (tx.trade_date - oldest).days > LONG_TERM_DAYS else "Short"
+            term = "Long" if tx.trade_date >= long_term_from(oldest) else "Short"
         writer.writerow([
             tx.trade_date.isoformat(), tx.ticker, _csv_number(tx.shares, 6), _csv_number(tx.price),
             _csv_number(tx.shares * tx.price), _csv_number(tx.fees or 0.0),
