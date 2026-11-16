@@ -420,7 +420,6 @@
     .pf-panel > :nth-child(2), .pf-dash__rail > :nth-child(2) { animation-delay: 0.05s; }
     .pf-panel > :nth-child(3) { animation-delay: 0.1s; }
     .pf-panel > :nth-child(n+4) { animation-delay: 0.15s; }
-    .pf-chart svg { animation: pf-fade 0.5s ease both; }
     .pf-chart__halo { animation: pf-pulse 2.6s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
 }
 @keyframes pf-fade { from { opacity: 0; } to { opacity: 1; } }
@@ -633,4 +632,75 @@
     .pf-hero .pf-metrics dd { font-size: 20px; }
     .pf-badge { width: 26px; height: 26px; font-size: 9.5px; }
     .pf-sec { gap: 8px; }
+}
+
+/* ── Motion ────────────────────────────────────────────────────────────── */
+
+@keyframes pf-draw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+@keyframes pf-grow-x { from { transform: scaleX(0); } to { transform: none; } }
+@keyframes pf-grow-y { from { transform: scaleY(0); } to { transform: none; } }
+@keyframes pf-sweep { from { stroke-dasharray: 0 var(--around); } to { stroke-dasharray: var(--len) var(--rest); } }
+@keyframes pf-pop { from { opacity: 0; transform: scale(0.4); } to { opacity: 1; transform: none; } }
+@keyframes pf-drift { from { transform: translate(-12%, 6%); } to { transform: translate(22%, -8%); } }
+
+/* The headline's glow wanders slowly behind the chart. */
+.pf-hero { position: relative; overflow: hidden; }
+.pf-hero > * { position: relative; }
+.pf-hero::before {
+    content: ''; position: absolute; right: -8%; bottom: -30%; width: 70%; aspect-ratio: 1.6; border-radius: 50%; pointer-events: none;
+    background: radial-gradient(closest-side, color-mix(in srgb, var(--trend) 20%, transparent), transparent);
+}
+.pf-hero .pf-chart svg { overflow: visible; }
+
+/* The ring answers the cursor. */
+.pf-donut__arc { cursor: pointer; transition: stroke-width 0.18s, opacity 0.18s; }
+.pf-alloc li { transition: opacity 0.18s; cursor: default; }
+#sectorCard.is-focused .pf-donut__arc:not(.is-on), #sectorCard.is-focused .pf-alloc li:not(.is-on) { opacity: 0.35; }
+.pf-donut__arc.is-on { stroke-width: 19; }
+.pf-alloc__dot { transition: transform 0.18s; }
+.pf-alloc li.is-on .pf-alloc__dot { transform: scale(1.35); }
+
+.pf-badge { transition: transform 0.2s var(--ease); }
+tr:hover > td .pf-badge { transform: scale(1.1) rotate(-4deg); }
+.pf-table tr[data-ticker]:hover .pf-spark { transform: scaleY(1.12); }
+.pf-spark { transition: transform 0.2s var(--ease); transform-origin: center bottom; }
+.pf-tile, .pf-hero .pf-metrics div { transition: background-color 0.2s; }
+.pf-tile:hover { background-color: rgba(201, 162, 77, 0.09); }
+.pf-incomebar rect:not(.pf-incomebar__hit) { transition: opacity 0.15s; }
+.pf-incomechart:hover .pf-incomebar:not(:hover) rect:not(.pf-incomebar__hit) { opacity: 0.45; }
+.pf-contrib li { transition: background-color 0.15s; }
+.pf-contrib li:hover { background: #f8f3e6; }
+.pf-upcoming__list li { transition: padding-left 0.2s var(--ease); }
+.pf-upcoming__list li:hover { padding-left: 4px; }
+
+@media (prefers-reduced-motion: no-preference) {
+    .pf-hero::before { animation: pf-drift 16s ease-in-out infinite alternate; }
+
+    /* A chart that shows something new draws its line, then fills in. */
+    .pf-chart svg.is-fresh .pf-chart__line:not(.pf-chart__line--estimated) { stroke-dasharray: 1; animation: pf-draw 1.2s cubic-bezier(0.45, 0, 0.2, 1) both; }
+    .pf-chart svg.is-fresh .pf-chart__area { animation: pf-fade 0.9s 0.55s ease both; }
+    .pf-chart svg.is-fresh .pf-chart__invested, .pf-chart svg.is-fresh .pf-chart__bench,
+    .pf-chart svg.is-fresh .pf-chart__avg, .pf-chart svg.is-fresh .pf-chart__line--estimated { animation: pf-fade 0.8s 0.3s ease both; }
+    .pf-chart svg.is-fresh .pf-chart__end { animation: pf-pop 0.35s 1.1s var(--ease) both; transform-box: fill-box; transform-origin: center; }
+    .pf-chart svg.is-fresh .pf-chart__halo { animation: pf-fade 0.3s 1.2s both, pf-pulse 2.6s 1.5s ease-in-out infinite; }
+    .pf-chart svg.is-fresh [class^="pf-chart__trade"] { animation: pf-pop 0.3s 0.9s var(--ease) both; transform-box: fill-box; transform-origin: center; }
+
+    .pf-spark__line { stroke-dasharray: 1; animation: pf-draw 0.9s ease-out both; }
+    .pf-spark__fill { animation: pf-fade 0.6s 0.5s both; }
+    .pf-donut__arc { animation: pf-sweep 0.9s calc(var(--i) * 70ms) cubic-bezier(0.3, 0.7, 0.2, 1) both; }
+    .pf-donut__figure, .pf-donut__label { animation: pf-fade 0.5s 0.4s both; }
+    .pf-alloc li { animation: pf-rise 0.4s var(--ease) both; }
+    .pf-alloc li:nth-child(2) { animation-delay: 0.05s; } .pf-alloc li:nth-child(3) { animation-delay: 0.1s; }
+    .pf-alloc li:nth-child(4) { animation-delay: 0.15s; } .pf-alloc li:nth-child(n+5) { animation-delay: 0.2s; }
+
+    .pf-mover__bar { transform-origin: right; animation: pf-grow-x 0.6s 0.2s var(--ease) both; }
+    .pf-contrib__bar i.is-gain { transform-origin: left; animation: pf-grow-x 0.7s var(--ease) both; }
+    .pf-contrib__bar i.is-loss { transform-origin: right; animation: pf-grow-x 0.7s var(--ease) both; }
+    .pf-incomechart rect:not(.pf-incomebar__hit), .pf-yearchart rect { transform-box: fill-box; transform-origin: bottom; animation: pf-grow-y 0.6s var(--ease) both; }
+    .pf-heat__cell { animation: pf-fade 0.5s both; }
+    #topHoldingsTable tbody tr, .pf-movers tr { animation: pf-rise 0.4s var(--ease) both; }
+    #topHoldingsTable tbody tr:nth-child(2), .pf-movers tr:nth-child(2) { animation-delay: 0.04s; }
+    #topHoldingsTable tbody tr:nth-child(3), .pf-movers tr:nth-child(3) { animation-delay: 0.08s; }
+    #topHoldingsTable tbody tr:nth-child(4), .pf-movers tr:nth-child(4) { animation-delay: 0.12s; }
+    #topHoldingsTable tbody tr:nth-child(n+5), .pf-movers tr:nth-child(n+5) { animation-delay: 0.16s; }
 }

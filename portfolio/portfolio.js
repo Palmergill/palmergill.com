@@ -366,10 +366,73 @@
     }
 
     // Private, the hero shows the range's return instead (set with the chart).
+    // Roll a figure from what it last showed to its new value. `settle` puts
+    // the final text in at once: before a scrub, or where nothing animates.
+    const calm = window.matchMedia('(prefers-reduced-motion: reduce)');
+    function settle(el) {
+        cancelAnimationFrame(el.rolling);
+        clearTimeout(el.rollEnd);
+        if (el.rollText != null) el.textContent = el.rollText;
+    }
+    function rollTo(el, value, format) {
+        const from = el.rolled ?? 0;
+        el.rolled = value;
+        el.rollText = format(value);
+        cancelAnimationFrame(el.rolling);
+        clearTimeout(el.rollEnd);
+        if (calm.matches || document.hidden || from === value) { el.textContent = el.rollText; return; }
+        const began = performance.now();
+        const step = (now) => {
+            const t = Math.min(1, (now - began) / 700);
+            el.textContent = format(from + (value - from) * (1 - (1 - t) ** 3));
+            if (t < 1) el.rolling = requestAnimationFrame(step);
+        };
+        el.rolling = requestAnimationFrame(step);
+        // A tab that isn't painting gets no frames: land on the figure anyway.
+        el.rollEnd = setTimeout(() => settle(el), 900);
+    }
+    function showFigure(el, text) {
+        settle(el);
+        el.rolled = null;
+        el.rollText = text;
+        el.textContent = text;
+    }
+
+    // While a chart is being scrubbed its headline shows the day under the
+    // cursor; leaving puts back what was there.
+    function scrubber(valueEl, subEl) {
+        let saved = null;
+        return {
+            show(value, valueClass, subHtml) {
+                if (!saved) {
+                    settle(valueEl);
+                    saved = { text: valueEl.textContent, cls: valueEl.className, sub: subEl.innerHTML };
+                }
+                valueEl.textContent = value;
+                if (valueClass != null) valueEl.className = valueClass;
+                subEl.innerHTML = subHtml;
+            },
+            clear() {
+                if (!saved) return;
+                valueEl.textContent = saved.text;
+                valueEl.className = saved.cls;
+                subEl.innerHTML = saved.sub;
+                saved = null;
+            },
+        };
+    }
+
+    // A chart draws its line in when what it shows changes, not on a resize.
+    function markFresh(host, root, key) {
+        root.classList.toggle('is-fresh', host.dataset.drawn !== key);
+        host.dataset.drawn = key;
+    }
+
     function renderHero(data) {
         $('heroLabel').textContent = privacy ? 'Return' : 'Total value';
         els.heroValue.className = 'pf-hero__value';
-        els.heroValue.textContent = privacy ? '—' : fmtMoney(data.totals.marketValue, true);
+        if (privacy) showFigure(els.heroValue, '—');
+        else rollTo(els.heroValue, data.totals.marketValue, (v) => fmtMoney(v, true));
     }
 
     function metric(label, value, valueClass = '') {
@@ -500,6 +563,22 @@
             .map((s) => ({ label: s.sector, value: s.marketValue, weight: s.weight }));
     }
 
+    // The ring's centre names the slice under the cursor, or the largest.
+    let donutGroups = [];
+    function focusSlice(index) {
+        const g = donutGroups[index ?? 0];
+        if (!g || !$('donutFigure')) return;
+        $('donutFigure').textContent = fmtPct(g.weight);
+        $('donutLabel').textContent = g.label.length > 16 ? `${g.label.slice(0, 15)}…` : g.label;
+        els.sectorCard.classList.toggle('is-focused', index != null);
+        els.sectorCard.querySelectorAll('[data-slice]').forEach((node) => node.classList.toggle('is-on', index != null && Number(node.dataset.slice) === index));
+    }
+    els.sectorCard.addEventListener('mouseover', (event) => {
+        const node = event.target.closest('[data-slice]');
+        focusSlice(node ? Number(node.dataset.slice) : null);
+    });
+    els.sectorCard.addEventListener('mouseleave', () => focusSlice(null));
+
     function renderSectors(data) {
         if (!knownSectors(data).length) allocationMode = 'holding';
         $('allocationModes').querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.mode === allocationMode)));
@@ -514,7 +593,7 @@
             const share = (g.weight || 0) / total;
             // A hair of gap between slices, when there's more than one.
             const length = Math.max(share * around - (groups.length > 1 ? 2 : 0), 0.5);
-            const arc = `<circle class="pf-donut__arc pf-slice--${Math.min(i, 8)}" cx="70" cy="70" r="${R}" stroke-dasharray="${length.toFixed(2)} ${(around - length).toFixed(2)}" stroke-dashoffset="${(-turned * around).toFixed(2)}"><title>${escapeHtml(g.label)} ${fmtPct(g.weight)}</title></circle>`;
+            const arc = `<circle class="pf-donut__arc pf-slice--${Math.min(i, 8)}" data-slice="${i}" cx="70" cy="70" r="${R}" style="--len:${length.toFixed(2)};--rest:${(around - length).toFixed(2)};--around:${around.toFixed(2)};--i:${i}" stroke-dasharray="${length.toFixed(2)} ${(around - length).toFixed(2)}" stroke-dashoffset="${(-turned * around).toFixed(2)}"><title>${escapeHtml(g.label)} ${fmtPct(g.weight)}</title></circle>`;
             turned += share;
             return arc;
         }).join('');
@@ -522,11 +601,13 @@
         $('sectorDonut').innerHTML = lead ? `
             <svg viewBox="0 0 140 140" role="img" aria-label="Allocation by ${allocationMode}">
                 <g transform="rotate(-90 70 70)">${arcs}</g>
-                <text class="pf-donut__figure" x="70" y="70" text-anchor="middle">${fmtPct(lead.weight)}</text>
-                <text class="pf-donut__label" x="70" y="87" text-anchor="middle">${escapeHtml(lead.label.length > 16 ? `${lead.label.slice(0, 15)}…` : lead.label)}</text>
+                <text class="pf-donut__figure" id="donutFigure" x="70" y="70" text-anchor="middle"></text>
+                <text class="pf-donut__label" id="donutLabel" x="70" y="87" text-anchor="middle"></text>
             </svg>` : '';
+        donutGroups = groups;
+        focusSlice(null);
         els.sectorBars.innerHTML = groups.map((g, i) => `
-            <li>
+            <li data-slice="${i}">
                 <span class="pf-alloc__name"><i class="pf-alloc__dot pf-slice--${Math.min(i, 8)}"></i>${escapeHtml(g.label)}</span>
                 <span class="pf-alloc__value">${fmtPct(g.weight)}${privacy ? '' : `<em>${fmtMoney(g.value, true)}</em>`}</span>
             </li>`).join('');
@@ -572,7 +653,7 @@
         const span = Math.max(...closes) - lo || 1;
         const d = closes.map((c, i) => `${i ? 'L' : 'M'}${((i / (closes.length - 1)) * 72).toFixed(1)},${(22 - ((c - lo) / span) * 20).toFixed(1)}`).join('');
         const up = closes[closes.length - 1] >= closes[0];
-        return `<td class="num ${extra}"><svg class="pf-spark ${up ? 'is-up' : 'is-down'}" viewBox="0 0 72 24" aria-hidden="true"><path class="pf-spark__fill" d="${d}L72,24L0,24Z"/><path d="${d}"/></svg></td>`;
+        return `<td class="num ${extra}"><svg class="pf-spark ${up ? 'is-up' : 'is-down'}" viewBox="0 0 72 24" aria-hidden="true"><path class="pf-spark__fill" d="${d}L72,24L0,24Z"/><path class="pf-spark__line" pathLength="1" d="${d}"/></svg></td>`;
     }
 
     // The latest day's move, against the close before it.
@@ -1528,7 +1609,7 @@
         $('historyCard').classList.toggle('is-down', (pct ?? gain) < 0);
         if (privacy) {
             els.heroValue.className = `pf-hero__value ${tone(pct)}`;
-            els.heroValue.textContent = fmtPct(pct, true);
+            showFigure(els.heroValue, fmtPct(pct, true));
             sub.textContent = `Over ${history.range}`;
         } else {
             sub.innerHTML = `<span class="pf-history-change ${tone(gain)}">${fmtSigned(gain, true)}${pct == null ? '' : ` (${fmtPct(pct, true)})`}</span>`;
@@ -1706,7 +1787,7 @@
         }
         areaFill(root, path(points.map((_, i) => i), 'value'), 'pfHistoryFill', x(0), x(points.length - 1), pad.top + innerH);
         runs(points, (p) => !p.estimated).forEach((indices) => {
-            root.appendChild(svg('path', { class: 'pf-chart__line', d: path(indices, 'value') }));
+            root.appendChild(svg('path', { class: 'pf-chart__line', pathLength: 1, d: path(indices, 'value') }));
         });
         runs(points, (p) => p.estimated).forEach((indices) => {
             root.appendChild(svg('path', { class: 'pf-chart__line pf-chart__line--estimated', d: path(indices, 'value') }));
@@ -1732,19 +1813,26 @@
             dot.setAttribute('cy', y(p.value));
             cross.setAttribute('visibility', 'visible');
             dot.setAttribute('visibility', 'visible');
-            const shown = privacy ? fmtPct(returns[i] ?? 0, true) : fmtMoney(p.value, true);
-            const parts = [fmtDay(p.date), `${shown}${p.estimated ? ' (est.)' : ''}`];
-            showTip(event, parts.join(' · '));
+            const day = `<span class="pf-bench">${fmtDay(p.date)}${p.estimated ? ' · estimated' : ''}</span>`;
+            if (privacy) {
+                const r = returns[i] ?? 0;
+                scrub.show(fmtPct(r, true), `pf-hero__value ${tone(r)}`, day);
+            } else {
+                const { gain, pct } = rangeReturn(points.slice(0, i + 1));
+                scrub.show(fmtMoney(p.value, true), null, `<span class="pf-history-change ${tone(gain)}">${fmtSigned(gain, true)}${pct == null ? '' : ` (${fmtPct(pct, true)})`}</span> <span class="pf-dot">·</span>${day}`);
+            }
         }
+        const scrub = scrubber(els.heroValue, $('historySub'));
         hit.addEventListener('mousemove', hover);
         hit.addEventListener('touchmove', (event) => { hover(event.touches[0]); event.preventDefault(); }, { passive: false });
         const leave = () => {
             cross.setAttribute('visibility', 'hidden');
             dot.setAttribute('visibility', 'hidden');
-            hideTip();
+            scrub.clear();
         };
         hit.addEventListener('mouseleave', leave);
         hit.addEventListener('touchend', leave);
+        markFresh(host, root, `${history.range}:${points[0].date}:${points[points.length - 1].date}:${points.length}`);
         host.appendChild(root);
     }
 
@@ -1768,7 +1856,7 @@
             holding.data = null;
             holding.retries = 0;
             $('holdingName').textContent = ticker;
-            $('holdingPrice').textContent = '—';
+            showFigure($('holdingPrice'), '—');
             $('holdingSub').textContent = 'Loading…';
             $('holdingChart').innerHTML = '';
             ['holdingTiles', 'holdingFacts', 'holdingAbout', 'holdingTrades', 'holdingRanges'].forEach((id) => { $(id).innerHTML = ''; });
@@ -1816,7 +1904,8 @@
         const pos = d.position;
         const tag = ASSET_TAGS[d.asset] ? ` · ${ASSET_TAGS[d.asset]}` : '';
         $('holdingName').textContent = `${d.ticker}${d.name && d.name !== d.ticker ? ` · ${d.name}` : ''}${tag}`;
-        $('holdingPrice').textContent = fmtPrice(d.price);
+        if (d.price == null) showFigure($('holdingPrice'), '—');
+        else rollTo($('holdingPrice'), d.price, fmtPrice);
 
         // Price chart.
         holding.range = renderRanges(d.closes, $('holdingRanges'), holding.range);
@@ -1954,7 +2043,7 @@
             root.appendChild(svg('line', { class: 'pf-chart__avg', x1: pad.left, x2: width - pad.right, y1: y(cost), y2: y(cost) }));
         }
         areaFill(root, line, 'pfHoldingFill', x(0), x(points.length - 1), pad.top + innerH);
-        root.appendChild(svg('path', { class: 'pf-chart__line', d: line }));
+        root.appendChild(svg('path', { class: 'pf-chart__line', pathLength: 1, d: line }));
         endDot(root, x(points.length - 1), y(points[points.length - 1].close));
         trades.forEach((t) => {
             const i = indexOf(t.date);
@@ -1978,17 +2067,21 @@
             dot.setAttribute('cy', y(p.close));
             cross.setAttribute('visibility', 'visible');
             dot.setAttribute('visibility', 'visible');
-            showTip(event, `${fmtDay(p.date)} · ${fmtPrice(p.close)}`);
+            const first = points[0].close;
+            const change = p.close - first;
+            scrub.show(fmtPrice(p.close), null, `<span class="pf-history-change ${tone(change)}">${privacy ? fmtPct(change / first, true) : `${fmtSigned(change)} (${fmtPct(change / first, true)})`}</span> <span class="pf-dot">·</span><span class="pf-bench">${fmtDay(p.date)}</span>`);
         }
+        const scrub = scrubber($('holdingPrice'), $('holdingSub'));
         hit.addEventListener('mousemove', hover);
         hit.addEventListener('touchmove', (event) => { hover(event.touches[0]); event.preventDefault(); }, { passive: false });
         const leave = () => {
             cross.setAttribute('visibility', 'hidden');
             dot.setAttribute('visibility', 'hidden');
-            hideTip();
+            scrub.clear();
         };
         hit.addEventListener('mouseleave', leave);
         hit.addEventListener('touchend', leave);
+        markFresh(host, root, `${holding.ticker}:${holding.range}:${points[0].date}:${points[points.length - 1].date}:${points.length}`);
         host.appendChild(root);
     }
 
