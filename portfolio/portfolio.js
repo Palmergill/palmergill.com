@@ -1434,7 +1434,7 @@
         $('incomeRecent').innerHTML = `
             <thead><tr><th scope="col">Date</th><th scope="col">Security</th><th scope="col" class="num">Amount</th></tr></thead>
             <tbody>${d.recent.map((r) => `
-                <tr data-ticker="${escapeHtml(r.ticker)}"><td class="pf-muted">${fmtDay(r.date)}</td><td>${securityLink({ ticker: r.ticker, asset: 'stock' })}</td><td class="num pf-strong">${fmtMoney(r.amount)}</td></tr>`).join('')
+                <tr data-ticker="${escapeHtml(r.ticker)}"><td class="pf-muted">${fmtDay(r.date)}</td><td>${securityLink({ ticker: r.ticker, asset: 'stock' })}${r.estimated ? '<span class="pf-tag">Estimated</span>' : ''}</td><td class="num pf-strong">${fmtMoney(r.amount)}</td></tr>`).join('')
                 || '<tr><td colspan="3" class="pf-muted">No dividends yet.</td></tr>'}
             </tbody>`;
     }
@@ -2339,13 +2339,16 @@
 
     function schedulePendingRetry(data) {
         clearTimeout(pendingTimer);
-        if (!data.totals.pendingPrices) {
+        if (!data.totals.pendingPrices && !data.pendingDividends) {
             pendingRetries = 0;
             return;
         }
         if (pendingRetries >= MAX_PENDING_RETRIES) return;
         pendingRetries += 1;
-        pendingTimer = setTimeout(() => load(), (data.retryAfter || 3) * 1000);
+        // Dividend histories come a stock a request, gently: the provider's
+        // allowance is small and prices go first.
+        const wait = data.totals.pendingPrices ? (data.retryAfter || 3) : Math.max(data.retryAfter || 3, 15);
+        pendingTimer = setTimeout(() => load(), wait * 1000);
     }
 
     async function load() {

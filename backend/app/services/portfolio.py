@@ -31,8 +31,8 @@ from sqlalchemy.orm import Session
 
 from app import accounts
 from app.database import (
-    PortfolioHolding, PortfolioTransaction, PortfolioWatch, PriceBackfill, PriceClose, PriceCoverage, SplitCheck, StockSplit,
-    StockSummary,
+    DividendCheck, PortfolioHolding, PortfolioTransaction, PortfolioWatch, PriceBackfill, PriceClose, PriceCoverage, SplitCheck,
+    StockDividend, StockSplit, StockSummary,
 )
 from app.services.polygon_client import PolygonPlanLimited, PolygonRateLimited
 from app.services.stock_data_client import stock_data_client
@@ -935,6 +935,150 @@ def splits_for(db: Session, tickers: List[str]) -> Dict[str, List[Tuple[date, fl
     return {t: sorted(v) for t, v in result.items()}
 
 
+# ── dividends from the public record ────────────────────────────────────────
+#
+# Most exports carry trades but not the dividends they earned. Every stock's
+# dividend history is public, and the trades say how many shares were held
+# the day before each ex-date, so a payment missing from the file is worked
+# out: shares then (in that day's shares, before later splits) times the
+# declared cash per share, received on the pay date. A payment the file does
+# record, near the same dates, is kept instead. Each stock's history is asked
+# for once and rechecked every few days, a call per request, since the
+# provider's allowance is small and prices come first.
+
+DIVIDEND_RECHECK = timedelta(days=3)
+DIVIDEND_CALLS_PER_REQUEST = 1
+# A recorded payment this close to an estimated one's ex-date and pay date
+# is the same payment.
+RECORDED_BEFORE = timedelta(days=5)
+RECORDED_AFTER = timedelta(days=12)
+# Sample data's payers: cash per share and the months they go ex.
+SAMPLE_PAYERS = {
+    "AAPL": (0.25, (2, 5, 8, 11)), "MSFT": (0.83, (2, 5, 8, 11)), "JPM": (1.25, (1, 4, 7, 10)),
+    "XOM": (0.99, (2, 5, 8, 11)), "KO": (0.51, (3, 6, 9, 11)), "JNJ": (1.24, (2, 5, 8, 11)),
+    "VTI": (0.93, (3, 6, 9, 12)), "SCHD": (0.26, (3, 6, 9, 12)), "GOOGL": (0.21, (3, 6, 9, 12)),
+}
+
+
+def _sample_dividends(ticker: str) -> List[Tuple[date, Optional[date], float]]:
+    payer = SAMPLE_PAYERS.get(ticker)
+    if not payer:
+        return []
+    amount, months = payer
+    today = utc_today()
+    out = []
+    for year in range(today.year - 6, today.year + 1):
+        for month in months:
+            ex = date(year, month, 10)
+            if ex <= today + timedelta(days=45):
+                out.append((ex, ex + timedelta(days=14), amount))
+    return out
+
+
+def _fetch_dividends(ticker: str) -> List[Tuple[date, Optional[date], float]]:
+    if stock_data_client._use_mock():
+        return _sample_dividends(ticker)
+    stock_data_client._require_real_data_configured()
+    return stock_data_client.polygon.get_dividends(ticker)
+
+
+def ensure_dividends(db: Session, tickers: List[str], budget: _Budget) -> int:
+    """Ask the provider for stocks' dividend histories, within budget.
+    Returns how many have never been asked about yet."""
+    checks = {c.ticker: c for c in db.query(DividendCheck).filter(DividendCheck.ticker.in_(tickers))}
+    for ticker in tickers:
+        check = checks.get(ticker)
+        if check and _naive_now() - check.checked_at < DIVIDEND_RECHECK:
+            continue
+        if not budget.spend():
+            break
+        try:
+            found = _fetch_dividends(ticker)
+        except PolygonRateLimited:
+            _rate_limited()
+            break
+        except Exception as exc:  # noqa: BLE001 - recorded dividends still count
+            logger.warning("[%s] dividends unavailable: %s", ticker, type(exc).__name__)
+            found = None
+        if found is not None:
+            db.query(StockDividend).filter(StockDividend.ticker == ticker).delete()
+            for ex, pay, amount in found:
+                db.add(StockDividend(ticker=ticker, ex_date=ex, pay_date=pay, cash_amount=amount))
+        if check is None:
+            check = DividendCheck(ticker=ticker, checked_at=_naive_now(), found=found is not None)
+            db.add(check)
+            checks[ticker] = check
+        else:
+            check.checked_at = _naive_now()
+            check.found = check.found or found is not None
+        db.commit()
+    return sum(1 for t in tickers if t not in checks)
+
+
+def dividend_history(db: Session, tickers: List[str]) -> Dict[str, List[Tuple[date, Optional[date], float]]]:
+    out: Dict[str, List[Tuple[date, Optional[date], float]]] = {}
+    if not tickers:
+        return out
+    for row in db.query(StockDividend).filter(StockDividend.ticker.in_(tickers)).order_by(StockDividend.ex_date):
+        out.setdefault(row.ticker, []).append((row.ex_date, row.pay_date, row.cash_amount))
+    return out
+
+
+def estimate_dividends(
+    holdings: List[Any], transactions: List[Any], recorded: List[Any],
+    splits: Dict[str, List[Tuple[date, float]]], history: Dict[str, List[Tuple[date, Optional[date], float]]],
+    today: date,
+) -> List[Any]:
+    """Payments the public record says were made on shares held, that the
+    file doesn't have. Holdings and trades are in today's shares."""
+    as_of = holdings[0].as_of if holdings else None
+    snapshot = {h.ticker: h.shares for h in holdings}
+    trades: Dict[str, List[Any]] = {}
+    for tx in transactions:
+        trades.setdefault(tx.ticker, []).append(tx)
+    have: Dict[str, List[date]] = {}
+    for d in recorded:
+        have.setdefault(d.ticker, []).append(d.trade_date)
+
+    def signed(tx: Any) -> float:
+        return tx.shares if tx.side == "buy" else -tx.shares
+
+    out = []
+    for ticker, rows in history.items():
+        txs = trades.get(ticker, [])
+        firsts = [t.trade_date for t in txs]
+        if as_of and ticker in snapshot:
+            firsts.append(as_of)
+        if not firsts:
+            continue
+        known_from = min(firsts)
+        for ex, pay, cash in rows:
+            paid = pay or ex
+            if ex <= known_from or paid > today:
+                continue
+            # Held at the close the day before the ex-date.
+            if as_of:
+                if ex > as_of:
+                    shares = snapshot.get(ticker, 0.0) + sum(signed(t) for t in txs if as_of < t.trade_date < ex)
+                else:
+                    shares = snapshot.get(ticker, 0.0) - sum(signed(t) for t in txs if ex <= t.trade_date <= as_of)
+            else:
+                shares = sum(signed(t) for t in txs if t.trade_date < ex)
+            if shares <= EPSILON:
+                continue
+            amount = shares / _split_factor(splits.get(ticker, []), ex) * cash
+            if amount < 0.005:
+                continue
+            if any(ex - RECORDED_BEFORE <= day <= paid + RECORDED_AFTER for day in have.get(ticker, [])):
+                continue
+            out.append(SimpleNamespace(
+                id=None, ticker=ticker, asset="stock", side="dividend", trade_date=paid, shares=None, price=None,
+                fees=0.0, account=None, source=None, notes=None, amount=round(amount, 2), realized_reported=None,
+                label=ticker, estimated=True,
+            ))
+    return out
+
+
 def _split_factor(splits: List[Tuple[date, float]], day: date) -> float:
     # A split takes effect from the open on its execution date, so a trade
     # on that day is already in the new shares.
@@ -1070,6 +1214,9 @@ def load_adjusted(db: Session, username: str, budget: Optional[_Budget] = None) 
     if budget is not None and stocks:
         ensure_splits(db, stocks, budget)
     splits = splits_for(db, stocks)
+    unasked = 0
+    if budget is not None and stocks:
+        unasked = ensure_dividends(db, stocks, _Budget(DIVIDEND_CALLS_PER_REQUEST))
 
     # Closes near each pre-split trade, to spot trades already adjusted.
     affected = {t.ticker for t in transactions if t.ticker in splits and _split_factor(splits[t.ticker], t.trade_date) != 1.0}
@@ -1130,8 +1277,12 @@ def load_adjusted(db: Session, username: str, budget: Optional[_Budget] = None) 
         dup = by_id[dup_id]
         key = (_label(dup.source, "No source"), _label(kept.source, "No source"))
         pair_counts[key] = pair_counts.get(key, 0) + 1
+    estimated = estimate_dividends(
+        adjusted_holdings, adjusted_trades, dividends, splits, dividend_history(db, stocks), utc_today(),
+    )
     info = {
-        "dividends": sorted(dividends, key=lambda t: (t.trade_date, t.id)),
+        "dividends": sorted(dividends + estimated, key=lambda t: (t.trade_date, t.id or 0)),
+        "dividendsUnasked": unasked,
         "applied": sorted(applied.values(), key=lambda a: a["date"], reverse=True),
         "tradesAdjusted": sum(1 for t in adjusted_trades if t.split_factor != 1.0),
         "alreadyAdjusted": already,
@@ -1291,10 +1442,11 @@ def _dividend_summary(dividends: List[Any], total_value: float, today: date) -> 
         "trailing12m": trailing,
         "yield": _ratio(trailing, total_value),
         "count": len(dividends),
+        "estimatedCount": sum(1 for d in dividends if getattr(d, "estimated", False)),
         "byTicker": sorted(({"ticker": t, "amount": a} for t, a in by_ticker.items()), key=lambda r: -r["amount"]),
         "byYear": {str(y): a for y, a in by_year.items()},
         "recent": [
-            {"ticker": d.ticker, "date": d.trade_date.isoformat(), "amount": d.amount}
+            {"ticker": d.ticker, "date": d.trade_date.isoformat(), "amount": d.amount, "estimated": getattr(d, "estimated", False)}
             for d in sorted(dividends, key=lambda d: d.trade_date, reverse=True)[:12]
         ],
     }
@@ -1512,7 +1664,9 @@ def breakdown(db: Session, username: str) -> Dict[str, Any]:
             # The page's own figure for the same sells, to set beside it.
             "computed": sum(meta["realized_by_tx"].get(t.id, 0.0) for t in reported) if reported else None,
         },
-        "splits": {k: v for k, v in split_info.items() if k not in ("duplicates", "duplicatePairs", "aliases", "dividends")},
+        "splits": {k: v for k, v in split_info.items() if k not in ("duplicates", "duplicatePairs", "aliases", "dividends", "dividendsUnasked")},
+        # Stocks whose public dividend history hasn't been fetched yet.
+        "pendingDividends": split_info["dividendsUnasked"],
         "aliases": split_info["aliases"],
         "duplicates": {"count": len(split_info["duplicates"]), "pairs": split_info["duplicatePairs"]},
         "facets": {
@@ -1707,7 +1861,7 @@ def holding_detail(db: Session, username: str, ticker: str) -> Dict[str, Any]:
         ],
         "company": facts,
         "dividends": [
-            {"date": d.trade_date.isoformat(), "amount": d.amount}
+            {"date": d.trade_date.isoformat(), "amount": d.amount, "estimated": getattr(d, "estimated", False)}
             for d in reversed(info["dividends"]) if d.ticker == ticker
         ],
         "lots": _tax_summary(

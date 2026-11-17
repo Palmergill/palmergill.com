@@ -1,5 +1,5 @@
 import requests
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from typing import Optional, Dict, List
 import os
 import logging
@@ -282,6 +282,31 @@ class PolygonClient:
                 break
             params = {"apiKey": self.api_key}
         return rows
+
+    def get_dividends(self, ticker: str) -> List[tuple]:
+        """(ex-date, pay date or None, cash per share) for every cash
+        dividend in US dollars the provider has for one ticker, in one call."""
+        response = requests.get(
+            f"{self.BASE_URL}/v3/reference/dividends",
+            params={"ticker": ticker, "limit": 1000, "apiKey": self.api_key},
+            timeout=15,
+        )
+        if response.status_code == 429:
+            raise PolygonRateLimited(ticker)
+        response.raise_for_status()
+        out = []
+        for r in response.json().get("results") or []:
+            if not r.get("ex_dividend_date") or r.get("cash_amount") is None:
+                continue
+            if (r.get("currency") or "USD").upper() != "USD":
+                continue
+            pay = r.get("pay_date")
+            out.append((
+                date.fromisoformat(r["ex_dividend_date"]),
+                date.fromisoformat(pay) if pay else None,
+                float(r["cash_amount"]),
+            ))
+        return out
 
     def get_splits(self, ticker: str) -> List[tuple]:
         """(execution date, split_from, split_to) for every split, in one call."""

@@ -1389,6 +1389,30 @@ class SplitCheck(Base):
     found = Column(Boolean, nullable=False, default=False)
 
 
+class StockDividend(Base):
+    """One cash dividend, as the price provider reports it: `cash_amount` per
+    share as declared, to holders on the day before `ex_date`, paid on
+    `pay_date`. Public market data, not per account."""
+
+    __tablename__ = "stock_dividends"
+
+    id = Column(Integer, primary_key=True)
+    ticker = Column(String, nullable=False, index=True)
+    ex_date = Column(Date, nullable=False)
+    pay_date = Column(Date, nullable=True)
+    cash_amount = Column(Float, nullable=False)
+
+
+class DividendCheck(Base):
+    """When a ticker's dividend history was last asked for, found or not."""
+
+    __tablename__ = "dividend_checks"
+
+    ticker = Column(String, primary_key=True)
+    checked_at = Column(DateTime, nullable=False)
+    found = Column(Boolean, nullable=False, default=False)
+
+
 class PriceCoverage(Base):
     """Which days the price provider has been asked about for one symbol.
 

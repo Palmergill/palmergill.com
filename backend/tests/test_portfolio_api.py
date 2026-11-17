@@ -1175,3 +1175,86 @@ def test_a_failed_company_lookup_is_asked_again_later(monkeypatch):
         assert portfolio._company(db, ["ZZZT"], portfolio._Budget(4))["ZZZT"]["name"] == "Zed"
     finally:
         db.close()
+
+
+def _trade(ticker, side, shares, day):
+    from types import SimpleNamespace
+
+    return SimpleNamespace(ticker=ticker, side=side, shares=shares, trade_date=day)
+
+
+def test_dividends_are_worked_out_from_shares_held_before_each_ex_date():
+    from datetime import date
+
+    today = date(2026, 11, 16)
+    history = {"AAPL": [
+        (date(2025, 2, 10), date(2025, 2, 24), 1.00),   # before the first buy
+        (date(2025, 5, 10), date(2025, 5, 24), 0.50),   # 10 held
+        (date(2025, 8, 10), date(2025, 8, 24), 0.50),   # bought 5 more on the ex-date: not entitled
+        (date(2025, 11, 10), date(2025, 11, 24), 0.50), # 15 held, 3 sold since
+        (date(2026, 11, 10), date(2026, 12, 1), 0.50),  # not paid yet
+    ]}
+    trades = [
+        _trade("AAPL", "buy", 10, date(2025, 3, 1)),
+        _trade("AAPL", "buy", 5, date(2025, 8, 10)),
+        _trade("AAPL", "sell", 3, date(2025, 12, 1)),
+    ]
+    got = portfolio.estimate_dividends([], trades, [], {}, history, today)
+    assert [(d.trade_date, d.amount) for d in got] == [
+        (date(2025, 5, 24), 5.0), (date(2025, 8, 24), 5.0), (date(2025, 11, 24), 7.5),
+    ]
+    assert all(d.estimated and d.side == "dividend" for d in got)
+
+
+def test_estimated_dividends_yield_to_recorded_ones_and_respect_splits():
+    from datetime import date
+    from types import SimpleNamespace
+
+    today = date(2026, 11, 16)
+    history = {"NVDA": [(date(2024, 3, 5), date(2024, 3, 27), 0.04), (date(2024, 9, 12), date(2024, 10, 3), 0.01)]}
+    # 40 shares in today's terms; a 10-for-1 split on Jun 10, 2024.
+    trades = [_trade("NVDA", "buy", 40, date(2024, 1, 2))]
+    splits = {"NVDA": [(date(2024, 6, 10), 10.0)]}
+    recorded = [SimpleNamespace(ticker="NVDA", trade_date=date(2024, 10, 3), amount=0.4)]
+    got = portfolio.estimate_dividends([], trades, recorded, splits, history, today)
+    assert [(d.trade_date, d.amount) for d in got] == [(date(2024, 3, 27), 0.16)]
+
+
+def test_dividends_from_a_snapshot_back_out_later_trades():
+    from datetime import date
+    from types import SimpleNamespace
+
+    today = date(2026, 11, 16)
+    holdings = [SimpleNamespace(ticker="KO", shares=100, as_of=date(2026, 6, 30))]
+    trades = [_trade("KO", "buy", 20, date(2026, 5, 1)), _trade("KO", "buy", 50, date(2026, 8, 1))]
+    history = {"KO": [
+        (date(2026, 3, 13), date(2026, 4, 1), 0.5),   # before anything known
+        (date(2026, 6, 13), date(2026, 7, 1), 0.5),   # the snapshot's 100: no trades from Jun 13 to Jun 30
+        (date(2026, 9, 12), date(2026, 10, 1), 0.5),  # 100 + 50
+    ]}
+    got = portfolio.estimate_dividends(holdings, trades, [], {}, history, today)
+    assert [(d.trade_date, d.amount) for d in got] == [(date(2026, 7, 1), 50.0), (date(2026, 10, 1), 75.0)]
+
+
+def test_breakdown_counts_public_dividends_and_says_which_are_estimated(monkeypatch):
+    from datetime import timedelta
+
+    today = portfolio.utc_today()
+    ex, pay = today - timedelta(days=40), today - timedelta(days=20)
+    from app.database import DividendCheck, StockDividend
+
+    db = SessionLocal()
+    try:
+        db.query(StockDividend).delete()
+        db.query(DividendCheck).delete()
+        db.commit()
+    finally:
+        db.close()
+    monkeypatch.setattr(portfolio, "_fetch_dividends", lambda ticker: [(ex, pay, 0.5)] if ticker == "AAPL" else [])
+    _flat_history(monkeypatch, {"AAPL": 200.0})
+    client = _member_client()
+    _buy(client, shares=10, price=150.0, day=(today - timedelta(days=90)).isoformat())
+    d = client.get("/api/stocks/portfolio").json()
+    assert d["pendingDividends"] == 0
+    assert d["dividends"]["total"] == 5.0 and d["dividends"]["estimatedCount"] == 1
+    assert d["dividends"]["recent"] == [{"ticker": "AAPL", "date": pay.isoformat(), "amount": 5.0, "estimated": True}]
