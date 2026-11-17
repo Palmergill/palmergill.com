@@ -1436,8 +1436,8 @@
 
     const history = { data: null, range: '1Y', signature: null, retries: 0, timer: null };
 
-    // Whether the cost lines (invested, average cost) are drawn; remembered
-    // per browser. Hidden, the y axis fits the price or value alone.
+    // Whether a holding's average-cost line is drawn; remembered per browser.
+    // Hidden, the y axis fits the price alone.
     let showCost = true;
     try { showCost = localStorage.getItem('pf.showCost') !== 'false'; } catch { /* storage blocked */ }
     function syncCostToggles() {
@@ -1449,7 +1449,6 @@
         showCost = !showCost;
         try { localStorage.setItem('pf.showCost', String(showCost)); } catch { /* storage blocked */ }
         syncCostToggles();
-        if (currentTab() === 'overview' && history.data) renderHistory();
         if (currentTab() === 'holding' && holding.data) renderHolding();
     });
 
@@ -1472,18 +1471,6 @@
         if (history.data) renderHistory();
         if (holding.data) renderHolding();
         if (watch.data) renderWatchlist();
-    });
-
-    // Whether the S&P 500 line is drawn; remembered per browser.
-    let showBench = true;
-    try { showBench = localStorage.getItem('pf.showBench') !== 'false'; } catch { /* storage blocked */ }
-    document.querySelectorAll('[data-bench-toggle]').forEach((b) => b.setAttribute('aria-pressed', String(showBench)));
-    document.addEventListener('click', (event) => {
-        if (!event.target.closest('[data-bench-toggle]')) return;
-        showBench = !showBench;
-        try { localStorage.setItem('pf.showBench', String(showBench)); } catch { /* storage blocked */ }
-        document.querySelectorAll('[data-bench-toggle]').forEach((b) => b.setAttribute('aria-pressed', String(showBench)));
-        if (history.data) renderHistory();
     });
 
     // Reload the history only when what it's built from changed, not when the
@@ -1603,7 +1590,6 @@
             drawChart([]);
             return;
         }
-        $('historyLegend').hidden = false;
         const { gain, pct } = rangeReturn(points);
         // The line, its dot and the range buttons go red when the range is down.
         $('historyCard').classList.toggle('is-down', (pct ?? gain) < 0);
@@ -1613,12 +1599,6 @@
             sub.textContent = `Over ${history.range}`;
         } else {
             sub.innerHTML = `<span class="pf-history-change ${tone(gain)}">${fmtSigned(gain, true)}${pct == null ? '' : ` (${fmtPct(pct, true)})`}</span>`;
-        }
-        const bench = points.filter((p) => p.benchmark != null);
-        $('benchmarkKey').hidden = bench.length < 2;
-        if (bench.length > 1) {
-            const benchPct = bench[bench.length - 1].benchmark / bench[0].benchmark - 1;
-            sub.insertAdjacentHTML('beforeend', ` <span class="pf-bench"><span class="pf-dot">·</span>S&amp;P 500 <strong class="${tone(benchPct)}">${fmtPct(benchPct, true)}</strong></span>`);
         }
 
         const notes = [];
@@ -1632,7 +1612,7 @@
         if (history.data.sampleData) notes.push('Sample prices.');
         note.textContent = notes.join(' ');
         note.hidden = !notes.length;
-        $('estimatedKey').hidden = !estimated;
+        $('historyLegend').hidden = !estimated;
         drawChart(points);
     }
 
@@ -1717,20 +1697,6 @@
     }
 
     // About one date label per 110px, never crowding the ends.
-    // What the same money would be worth in the S&P 500: the range's opening
-    // value bought the index, and every deposit or withdrawal after it bought
-    // or sold the index that day.
-    function benchmarkValues(points) {
-        let units = null;
-        const out = points.map((p) => {
-            if (p.benchmark == null) return null;
-            if (units == null) units = p.value / p.benchmark;
-            else units += (p.flow || 0) / p.benchmark;
-            return units * p.benchmark;
-        });
-        return out.filter((v) => v != null).length > 1 ? out : null;
-    }
-
     // A chart is drawn to its box, so a box that changes size redraws it.
     function redrawOnResize(id, redraw) {
         new ResizeObserver(([entry]) => {
@@ -1755,12 +1721,7 @@
         const innerW = width - pad.left - pad.right;
         const innerH = height - pad.top - pad.bottom;
 
-        const bench = showBench ? benchmarkValues(points) : null;
-        const values = points.flatMap((p, i) => [
-            p.value,
-            ...(showCost && p.invested != null ? [p.invested] : []),
-            ...(bench && bench[i] != null ? [bench[i]] : []),
-        ]);
+        const values = points.map((p) => p.value);
         let lo = Math.min(...values);
         let hi = Math.max(...values);
         // A little room above and below the line, and no axis to round to.
@@ -1772,19 +1733,11 @@
         const y = (v) => pad.top + (1 - (v - lo) / (hi - lo)) * innerH;
         const path = (indices, key) => indices.map((i, k) => `${k ? 'L' : 'M'}${x(i).toFixed(1)},${y(points[i][key]).toFixed(1)}`).join('');
 
-        const root = svg('svg', { viewBox: `0 0 ${width} ${height}`, role: 'img', 'aria-label': `Portfolio value and amount invested from ${points[0].date} to ${points[points.length - 1].date}` });
+        const root = svg('svg', { viewBox: `0 0 ${width} ${height}`, role: 'img', 'aria-label': `Portfolio value from ${points[0].date} to ${points[points.length - 1].date}` });
         sparseAxes(root, points, { lo, hi, x, y, width, height, pad });
         // Private, the tooltip gives the return from the range's start.
         const returns = privacy ? points.map((_, i) => rangeReturn(points.slice(0, i + 1)).pct) : null;
 
-        runs(points, (p) => showCost && p.invested != null).forEach((indices) => {
-            root.appendChild(svg('path', { class: 'pf-chart__invested', d: path(indices, 'invested') }));
-        });
-        if (bench) {
-            const benchLine = points.map((_, i) => i).filter((i) => bench[i] != null)
-                .map((i, k) => `${k ? 'L' : 'M'}${x(i).toFixed(1)},${y(bench[i]).toFixed(1)}`).join('');
-            root.appendChild(svg('path', { class: 'pf-chart__bench', d: benchLine }));
-        }
         areaFill(root, path(points.map((_, i) => i), 'value'), 'pfHistoryFill', x(0), x(points.length - 1), pad.top + innerH);
         runs(points, (p) => !p.estimated).forEach((indices) => {
             root.appendChild(svg('path', { class: 'pf-chart__line', pathLength: 1, d: path(indices, 'value') }));

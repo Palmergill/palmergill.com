@@ -136,8 +136,6 @@
 .pf-chart__guide { stroke: var(--line); stroke-width: 1; stroke-dasharray: 2 4; }
 .pf-chart__line { fill: none; stroke: var(--trend, var(--forest)); stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round; }
 .pf-chart__line--estimated { stroke-dasharray: 5 5; opacity: 0.75; }
-.pf-chart__invested { fill: none; stroke: #b9af98; stroke-width: 1.25; stroke-linejoin: round; }
-.pf-chart__bench { fill: none; stroke: var(--bench); stroke-width: 1.25; stroke-dasharray: 3 3; stroke-linejoin: round; }
 .pf-chart__avg { stroke: var(--soft); stroke-width: 1.5; stroke-dasharray: 5 4; opacity: 0.8; }
 .pf-chart__cross { stroke: var(--line-strong); stroke-width: 1; stroke-dasharray: 3 3; }
 .pf-chart__dot { fill: var(--trend, var(--forest)); stroke: var(--card); stroke-width: 2.5; }
@@ -147,8 +145,6 @@
 .pf-chart-legend[hidden], .pf-chart-legend li[hidden] { display: none; }
 .pf-chart-legend li { display: inline-flex; align-items: center; gap: 6px; }
 .pf-key { width: 14px; height: 0; border-top: 2.5px solid var(--trend, var(--forest)); }
-.pf-key--invested { border-top: 1.5px solid #b9af98; }
-.pf-key--bench { border-top: 1.5px dashed var(--bench); }
 .pf-key--avg { border-top: 1.5px dashed var(--soft); }
 .pf-key--estimated { border-top: 2px dashed var(--trend, var(--forest)); }
 .pf-legend-toggle { display: inline-flex; align-items: center; gap: 6px; border: 0; border-radius: var(--r-sm); background: none; font: inherit; color: inherit; padding: 2px 4px; cursor: pointer; }
@@ -546,8 +542,6 @@
 .pf-hero__top { flex-wrap: wrap; gap: 18px 32px; }
 .pf-hero .pf-chart__line { filter: drop-shadow(0 0 7px color-mix(in srgb, var(--trend) 60%, transparent)); }
 .pf-hero .pf-chart__fill-top { stop-opacity: 0.32; }
-.pf-hero .pf-chart__invested { stroke: #cdb98a; opacity: 0.75; }
-.pf-hero .pf-key--invested { border-top-color: #cdb98a; }
 .pf-hero .pf-chart__avg { stroke: #dcc07a; }
 .pf-hero .pf-key--avg { border-top-color: #dcc07a; }
 .pf-hero .pf-chart__guide { stroke: rgba(243, 230, 196, 0.2); }
@@ -679,7 +673,6 @@ tr:hover > td .pf-badge { transform: scale(1.1) rotate(-4deg); }
     /* A chart that shows something new draws its line, then fills in. */
     .pf-chart svg.is-fresh .pf-chart__line:not(.pf-chart__line--estimated) { stroke-dasharray: 1; animation: pf-draw 1.2s cubic-bezier(0.45, 0, 0.2, 1) both; }
     .pf-chart svg.is-fresh .pf-chart__area { animation: pf-fade 0.9s 0.55s ease both; }
-    .pf-chart svg.is-fresh .pf-chart__invested, .pf-chart svg.is-fresh .pf-chart__bench,
     .pf-chart svg.is-fresh .pf-chart__avg, .pf-chart svg.is-fresh .pf-chart__line--estimated { animation: pf-fade 0.8s 0.3s ease both; }
     .pf-chart svg.is-fresh .pf-chart__end { animation: pf-pop 0.35s 1.1s var(--ease) both; transform-box: fill-box; transform-origin: center; }
     .pf-chart svg.is-fresh .pf-chart__halo { animation: pf-fade 0.3s 1.2s both, pf-pulse 2.6s 1.5s ease-in-out infinite; }

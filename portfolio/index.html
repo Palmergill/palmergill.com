@@ -13,7 +13,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400&family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="app-shell.css?v=6">
-    <link rel="stylesheet" href="portfolio.css?v=27">
+    <link rel="stylesheet" href="portfolio.css?v=28">
 </head>
 <body class="app">
 <noscript>
@@ -113,9 +113,7 @@
                         <div class="pf-ranges" id="historyRanges" role="group" aria-label="Time range"></div>
                         <ul class="pf-chart-legend" id="historyLegend" hidden>
                             <li><span class="pf-key pf-key--value"></span>Value</li>
-                            <li><button type="button" class="pf-legend-toggle" data-cost-toggle aria-pressed="true"><span class="pf-key pf-key--invested"></span>Invested (cost basis)</button></li>
-                            <li id="benchmarkKey" hidden><button type="button" class="pf-legend-toggle" data-bench-toggle aria-pressed="true"><span class="pf-key pf-key--bench"></span>S&amp;P 500</button></li>
-                            <li id="estimatedKey" hidden><span class="pf-key pf-key--estimated"></span>Estimated</li>
+                            <li><span class="pf-key pf-key--estimated"></span>Estimated</li>
                         </ul>
                         <p class="pf-note" id="historyNote" hidden></p>
                     </section>
@@ -497,6 +495,6 @@
     <script src="/shared/api-base.js?v=1"></script>
     <script src="/shared/analytics.js?v=1"></script>
     <script src="app-shell.js?v=4"></script>
-    <script src="portfolio.js?v=42"></script>
+    <script src="portfolio.js?v=43"></script>
 </body>
 </html>
