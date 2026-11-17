@@ -4,7 +4,7 @@
 }
 
 .pf-head__actions { display: flex; align-items: center; gap: 8px; flex: none; }
-.pf-head__actions[hidden] { display: none; }
+.pf-head__actions[hidden], .pf-card[hidden] { display: none; }
 #dashboard { display: flex; flex-direction: column; gap: 12px; }
 #dashboard[hidden] { display: none; }
 #main { display: flex; flex-direction: column; gap: 12px; }
@@ -198,7 +198,7 @@
 .pf-table tr[data-ticker]:hover td { background: var(--surface); }
 .pf-table tr[data-ticker]:hover td:first-child { box-shadow: -8px 0 0 var(--surface); }
 .pf-table tr[data-ticker]:hover td:last-child { box-shadow: 8px 0 0 var(--surface); }
-.pf-table th[data-sort] button { background: none; border: 0; padding: 0; font: inherit; color: inherit; cursor: pointer; display: inline-flex; gap: 4px; align-items: center; }
+.pf-table th[data-sort] button { background: none; border: 0; padding: 0; font: inherit; color: inherit; text-transform: inherit; letter-spacing: inherit; cursor: pointer; display: inline-flex; gap: 4px; align-items: center; }
 .pf-table th[data-sort] button::after { content: "↕"; opacity: 0; font-size: 10px; }
 .pf-table th[data-sort]:hover button::after { opacity: 0.5; }
 .pf-table th[aria-sort="ascending"] button::after { content: "↑"; opacity: 1; }
@@ -320,6 +320,11 @@
     .pf-card { padding: 14px 16px 16px; }
     .pf-tiles--flat { margin: 0 -16px -16px; }
     .pf-table-wrap { margin: 0 -16px; padding: 0 16px; }
+    /* Trades keeps date, security, side and amount on a phone; this lets them fit. */
+    .pf-table--tx td { font-size: 12.5px; }
+    .pf-table--tx .pf-side { padding: 2px 7px; }
+    .pf-table--tx td:last-child { padding-left: 0; }
+    .pf-table--tx .pf-remove { padding: 2px 3px; }
     .pf-hero { padding: 16px 16px 12px; }
     .pf-hero__top { flex-direction: column; }
     .pf-hero__value { font-size: 38px; }

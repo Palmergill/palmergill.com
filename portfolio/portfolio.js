@@ -684,7 +684,7 @@
                 <td>${securityCell(p)}</td>
                 ${weightCell(p)}
                 <td class="num pf-strong">${fmtMoney(p.marketValue, true)}</td>
-                ${dayPill(p)}
+                ${dayCell(p)}
                 ${gainCell(p, 'pf-hide-sm')}
                 ${sparkCell(p, 'pf-hide-md')}
             </tr>`).join('') || '<tr><td colspan="6" class="pf-muted">No open positions.</td></tr>';
@@ -830,6 +830,8 @@
     function renderAccounts(data) {
         activityTable($('accountsTable'), data.accounts, 'Account');
         activityTable($('sourcesTable'), data.sources, 'Source');
+        // One source says nothing the account table doesn't already.
+        $('sourcesCard').hidden = data.sources.length < 2;
         $('accountOptions').innerHTML = data.facets.accounts.map((a) => `<option value="${escapeHtml(a)}">`).join('');
     }
 
@@ -986,11 +988,11 @@
                     : t.counted ? '' : '<span class="pf-tag" title="On or before your holdings date, so it is already in them">in holdings</span>'}</td>
                 <td>${t.aliasOf ? `${securityLink({ ticker: t.aliasOf, asset: 'stock' })}<span class="pf-tag" title="Filed as “${escapeHtml(t.ticker)}” in this source">${escapeHtml(t.ticker)}</span>` : securityLink(t)}${t.notes ? `<span class="pf-name pf-note-cell" title="${escapeHtml(t.notes)}">${escapeHtml(t.notes)}</span>` : ''}</td>
                 <td><span class="pf-side pf-side--${t.side}">${SIDE_LABELS[t.side] || t.side}</span></td>
-                ${t.side === 'dividend' ? `<td class="num pf-muted">—</td>
+                ${t.side === 'dividend' ? `<td class="num pf-hide-sm pf-muted">—</td>
                 <td class="num pf-hide-sm pf-muted">—</td>` : t.splitFactor !== 1
-                    ? `<td class="num" title="Adjusted for stock splits since the trade">${fmtShares(t.adjustedShares)}<span class="pf-sub">${fmtShares(t.shares)} as traded</span></td>
+                    ? `<td class="num pf-hide-sm" title="Adjusted for stock splits since the trade">${fmtShares(t.adjustedShares)}<span class="pf-sub">${fmtShares(t.shares)} as traded</span></td>
                 <td class="num pf-hide-sm">${fmtPrice(t.adjustedPrice)}<span class="pf-sub">${fmtPrice(t.price)} as traded</span></td>`
-                    : `<td class="num">${fmtShares(t.shares)}</td>
+                    : `<td class="num pf-hide-sm">${fmtShares(t.shares)}</td>
                 <td class="num pf-hide-sm">${fmtPrice(t.price)}</td>`}
                 <td class="num">${fmtMoney(t.amount)}${t.fees ? `<span class="pf-sub">${fmtMoney(t.fees)} fees</span>` : ''}</td>
                 <td class="num pf-hide-md">${realized}</td>
