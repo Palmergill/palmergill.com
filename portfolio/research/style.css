@@ -1077,24 +1077,18 @@ button .ripple {
     margin-bottom: 4px;
 }
 
-/* Tab Content */
+/* Tab Content: inactive tabs leave the layout entirely, so they add no height. */
 .tab-content {
-    opacity: 0;
-    visibility: hidden;
-    position: absolute;
-    width: 100%;
-    transform: translateX(20px);
-    transition: opacity 0.3s ease, transform 0.3s ease, visibility 0.3s;
-    pointer-events: none;
+    display: none;
 }
 
 .tab-content.active {
-    opacity: 1;
-    visibility: visible;
-    position: relative;
-    transform: translateX(0);
-    pointer-events: auto;
+    display: block;
+    animation: tab-fade 0.25s ease both;
 }
+
+@keyframes tab-fade { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .tab-content.active { animation: none; } }
 
 /* Container for tab content to maintain layout */
 .tab-content-container {

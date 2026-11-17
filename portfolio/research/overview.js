@@ -991,21 +991,24 @@
 
         redrawers = [drawPrice, drawEps, drawEc, drawRev, drawPe].filter(Boolean);
         redrawers.forEach((fn) => fn());
-        lastWidth = root.clientWidth;
+        lastWidth = frameWidth();
+    }
+
+    // Hidden tabs take no width, so measure the tab container, which always shows.
+    function frameWidth() {
+        return document.querySelector('.tab-content-container')?.clientWidth || 0;
     }
 
     function redraw() {
-        const root = document.getElementById('overviewViz');
-        if (!root || !state.data || !root.clientWidth) return;
-        lastWidth = root.clientWidth;
+        if (!state.data || !frameWidth()) return;
+        lastWidth = frameWidth();
         redrawers.forEach((fn) => fn());
     }
 
     window.addEventListener('resize', () => {
         clearTimeout(resizeTimer);
         resizeTimer = setTimeout(() => {
-            const root = document.getElementById('overviewViz');
-            if (root && root.clientWidth !== lastWidth) redraw();
+            if (frameWidth() !== lastWidth) redraw();
         }, 120);
     });
 

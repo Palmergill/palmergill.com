@@ -1553,6 +1553,13 @@
     // as a time-weighted return: each day's gain on what was invested that
     // day, chained. A first $2k buy growing to $45k by adding money then
     // reads as its real gain, not +2,000%.
+    // The dollar change carries the color; the percent beside it stays neutral,
+    // since deposits can make the two disagree in sign.
+    function rangeChangeHtml(gain, pct) {
+        const rate = pct == null ? '' : ` <span class="pf-history-rate">(${fmtPct(pct, true)})</span>`;
+        return `<span class="pf-history-change ${tone(gain)}">${fmtSigned(gain, true)}</span>${rate}`;
+    }
+
     function rangeReturn(points) {
         let gain = 0;
         let growth = 1;
@@ -1591,14 +1598,15 @@
             return;
         }
         const { gain, pct } = rangeReturn(points);
-        // The line, its dot and the range buttons go red when the range is down.
-        $('historyCard').classList.toggle('is-down', (pct ?? gain) < 0);
+        // The line, its dot and the range buttons go red when the range lost money;
+        // with amounts hidden only the percent shows, so it decides instead.
+        $('historyCard').classList.toggle('is-down', (privacy ? (pct ?? gain) : gain) < 0);
         if (privacy) {
             els.heroValue.className = `pf-hero__value ${tone(pct)}`;
             showFigure(els.heroValue, fmtPct(pct, true));
             sub.textContent = `Over ${history.range}`;
         } else {
-            sub.innerHTML = `<span class="pf-history-change ${tone(gain)}">${fmtSigned(gain, true)}${pct == null ? '' : ` (${fmtPct(pct, true)})`}</span>`;
+            sub.innerHTML = rangeChangeHtml(gain, pct);
         }
 
         const notes = [];
@@ -1772,7 +1780,7 @@
                 scrub.show(fmtPct(r, true), `pf-hero__value ${tone(r)}`, day);
             } else {
                 const { gain, pct } = rangeReturn(points.slice(0, i + 1));
-                scrub.show(fmtMoney(p.value, true), null, `<span class="pf-history-change ${tone(gain)}">${fmtSigned(gain, true)}${pct == null ? '' : ` (${fmtPct(pct, true)})`}</span> <span class="pf-dot">·</span>${day}`);
+                scrub.show(fmtMoney(p.value, true), null, `${rangeChangeHtml(gain, pct)} <span class="pf-dot">·</span>${day}`);
             }
         }
         const scrub = scrubber(els.heroValue, $('historySub'));

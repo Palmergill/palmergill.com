@@ -353,6 +353,7 @@
 .pf-hero__stats .pf-history-change { font-weight: 600; }
 .pf-hero__stats .pf-history-change.is-gain { color: var(--chart-up); }
 .pf-hero__stats .pf-history-change.is-loss { color: var(--chart-down); }
+.pf-hero__stats .pf-history-rate { color: #b9c9be; font-weight: 500; }
 
 .pf-spark { display: block; width: 72px; height: 24px; margin-left: auto; overflow: visible; }
 .pf-spark path { fill: none; stroke-width: 1.5; stroke-linejoin: round; stroke-linecap: round; }
