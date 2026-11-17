@@ -37,6 +37,7 @@ from app.database import (
 from app.services.polygon_client import PolygonPlanLimited, PolygonRateLimited
 from app.services.stock_data_client import stock_data_client
 from app.services.tiingo_client import TiingoRateLimited, tiingo_client
+from app.services import treasury
 
 logger = logging.getLogger(__name__)
 
@@ -2041,6 +2042,8 @@ def value_history(db: Session, username: str) -> Dict[str, Any]:
     return {
         **base, "points": points, "pending": waiting, "backfilling": backfilling,
         "complete": not waiting, "retryAfter": retry, "attribution": attribution,
+        # The 3-month T-bill rate by month, for the Sharpe ratio.
+        "riskFree": treasury.rates_since(points[0]["date"]) if points else [],
     }
 
 
@@ -2069,6 +2072,9 @@ def position_brief(db: Session, username: str) -> Dict[str, Any]:
 # ── upcoming events ─────────────────────────────────────────────────────────
 
 UPCOMING_DAYS = 45
+# A dividend is usually paid two to four weeks after it goes ex, so the
+# calendar looks this far back for ones gone ex but not yet paid.
+PAY_LAG_DAYS = 45
 _calendar_cache: Dict[Any, Tuple[datetime, Dict[str, List[Dict[str, Any]]]]] = {}
 
 
@@ -2120,13 +2126,17 @@ def _mock_events(tickers: List[str], today: date) -> List[Dict[str, Any]]:
         if seed % 3:
             events.append({"ticker": ticker, "kind": "earnings", "date": (today + timedelta(days=seed % 40 + 2)).isoformat(), "hour": "amc" if seed % 2 else "bmo"})
         if seed % 2 == 0:
-            events.append({"ticker": ticker, "kind": "dividend", "date": (today + timedelta(days=seed % 30 + 4)).isoformat(), "amount": round(0.2 + seed % 7 * 0.11, 2)})
+            ex = today + timedelta(days=seed % 30 - 8)
+            events.append({
+                "ticker": ticker, "kind": "dividend", "date": ex.isoformat(),
+                "payDate": (ex + timedelta(days=14 + seed % 10)).isoformat(), "amount": round(0.2 + seed % 7 * 0.11, 2),
+            })
     return events
 
 
 def upcoming(db: Session, username: str) -> Dict[str, Any]:
-    """Open stock positions' earnings reports and ex-dividend dates over the
-    next few weeks, soonest first."""
+    """Open stock positions' earnings reports and dividends over the next few
+    weeks, soonest first: a dividend from its ex-date until it's paid."""
     holdings, transactions, _ = load_adjusted(db, username)
     positions, _ = build_positions(holdings, transactions)
     held = {
@@ -2141,7 +2151,7 @@ def upcoming(db: Session, username: str) -> Dict[str, Any]:
         events = _mock_events(sorted(held), today)
     else:
         earnings = _calendar(("earnings", today), lambda: _earnings_by_ticker(today, end))
-        dividends = _calendar(("dividends", today), lambda: _dividends_by_ticker(today, end))
+        dividends = _calendar(("dividends", today), lambda: _dividends_by_ticker(today - timedelta(days=PAY_LAG_DAYS), end))
         events = []
         for ticker in held:
             events += [{"ticker": ticker, "kind": "earnings", **e} for e in earnings.get(ticker, [])]
@@ -2150,7 +2160,14 @@ def upcoming(db: Session, username: str) -> Dict[str, Any]:
         if e["kind"] == "dividend" and e.get("amount") is not None:
             e["total"] = round(e["amount"] * held[e["ticker"]]["shares"], 2)
     events.sort(key=lambda e: (e["date"], e["ticker"], e["kind"]))
-    return {"events": [e for e in events if today.isoformat() <= e["date"] <= end.isoformat()]}
+    first, last = today.isoformat(), end.isoformat()
+
+    # A dividend counts while it's still to go ex or still to be paid.
+    def ahead(e: Dict[str, Any]) -> bool:
+        if first <= e["date"] <= last:
+            return True
+        return e["kind"] == "dividend" and e["date"] < first and first <= (e.get("payDate") or "") <= last
+    return {"events": [e for e in events if ahead(e)]}
 
 
 # ── watchlist ───────────────────────────────────────────────────────────────

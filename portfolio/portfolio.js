@@ -520,7 +520,8 @@
         drawUpcoming();
     }
     function drawUpcoming() {
-        const events = upcoming.events.slice(0, UPCOMING_ROWS);
+        // A dividend already gone ex waits on the Income tab for its pay day.
+        const events = upcoming.events.filter((e) => e.kind !== 'dividend' || e.date >= today()).slice(0, UPCOMING_ROWS);
         $('upcoming').hidden = !events.length;
         const what = (e) => {
             if (e.kind === 'earnings') return `Earnings${e.hour === 'bmo' ? ' · before open' : e.hour === 'amc' ? ' · after close' : ''}`;
@@ -1186,13 +1187,23 @@
             const vb = pairs.reduce((s, p) => s + (p[1] - mb) ** 2, 0);
             beta = vb ? cov / vb : null;
         }
+        // Sharpe: the yearly return over the 3-month T-bill rate, averaged
+        // across the range's months, per unit of volatility.
+        const first = points[0].date.slice(0, 7);
+        const last = points[points.length - 1].date.slice(0, 7);
+        const rates = (history.data?.riskFree || []).filter((m) => m.month >= first && m.month <= last);
+        const riskFree = rates.length ? rates.reduce((s, m) => s + m.rate, 0) / rates.length : null;
+        const volatility = Math.sqrt(variance * 252);
+        const sharpe = riskFree == null || !volatility ? null : (mean * 252 - riskFree) / volatility;
         return {
+            riskFree,
+            sharpe,
             total: growth - 1,
             annual: years >= 1 ? growth ** (1 / years) - 1 : null,
             years,
             drawdown,
             trough,
-            volatility: Math.sqrt(variance * 252),
+            volatility,
             bench: bench.length > 1 ? bench[bench.length - 1].benchmark / bench[0].benchmark - 1 : null,
             beta,
         };
@@ -1241,6 +1252,7 @@
                 stat('Annualized', s.annual == null ? '—' : fmtPct(s.annual, true), s.annual == null ? '' : `${s.years.toFixed(1)} years`, tone(s.annual)),
                 stat('Max drawdown', fmtPct(s.drawdown, true), s.trough ? `Low ${fmtDay(s.trough)}` : '', tone(s.drawdown)),
                 stat('Volatility', fmtPct(s.volatility), 'Annualized'),
+                ...(s.sharpe == null ? [] : [stat('Sharpe', s.sharpe.toFixed(2), `T-bills ${fmtPct(s.riskFree)}`)]),
                 stat('Beta', s.beta == null ? '—' : s.beta.toFixed(2), 'vs S&amp;P 500'),
             ].join('');
         }
@@ -1431,17 +1443,23 @@
             </tbody>`;
     }
 
-    // Ex-dividend dates ahead for what's held, from the same calendar as the
-    // Overview's upcoming list.
+    // Dividends on what's held that are still to be paid, by pay day, from
+    // the same calendar as the Overview's upcoming list.
     function drawIncomeUpcoming() {
-        const events = upcoming.events.filter((e) => e.kind === 'dividend');
+        const now = today();
+        const events = upcoming.events
+            .filter((e) => e.kind === 'dividend' && (e.payDate || e.date) >= now)
+            .sort((a, b) => (a.payDate || a.date).localeCompare(b.payDate || b.date));
         $('incomeUpcomingCard').hidden = !events.length;
         $('incomeUpcoming').innerHTML = events.map((e) => {
-            const day = new Date(`${e.date}T00:00:00Z`);
-            const amount = e.amount == null ? '' : privacy || e.total == null ? `${fmtPrice(e.amount)}/sh` : fmtMoney(e.total);
+            const day = new Date(`${e.payDate || e.date}T00:00:00Z`);
+            const perShare = e.amount == null ? '' : `${fmtPrice(e.amount)}/sh`;
+            const amount = privacy || e.total == null ? perShare : fmtMoney(e.total);
+            const what = [`Ex-dividend ${eventDay.format(new Date(`${e.date}T00:00:00Z`))}`];
+            if (perShare && amount !== perShare) what.push(perShare);
             return `<li>
                 <span class="pf-cal__date"><small>${MONTHS[day.getUTCMonth()]}</small><b>${day.getUTCDate()}</b></span>
-                <span class="pf-cal__what"><a class="pf-ticker" href="${holdingHref(e.ticker)}">${escapeHtml(e.ticker)}</a><small>Ex-dividend${e.amount != null && !privacy && e.total != null ? ` · ${fmtPrice(e.amount)}/sh` : ''}</small></span>
+                <span class="pf-cal__what"><a class="pf-ticker" href="${holdingHref(e.ticker)}">${escapeHtml(e.ticker)}</a><small>${e.payDate ? '' : 'Pay date not set · '}${what.join(' · ')}</small></span>
                 <span class="pf-cal__amount">${amount}</span>
             </li>`;
         }).join('');

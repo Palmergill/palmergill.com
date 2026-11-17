@@ -942,6 +942,61 @@ def test_upcoming_lists_held_stocks_earnings_and_ex_dividend_dates_soonest_first
     assert events[0]["total"] == 2.5 and events[1]["hour"] == "amc"
 
 
+def test_upcoming_keeps_a_dividend_gone_ex_until_it_is_paid(monkeypatch):
+    from datetime import timedelta
+
+    today = portfolio.utc_today()
+    day = lambda d: (today + timedelta(days=d)).isoformat()  # noqa: E731
+    asked = []
+
+    def calendar(start, end):
+        asked.append(start)
+        return {"AAPL": [
+            {"date": day(-10), "payDate": day(6), "amount": 0.25},
+            {"date": day(-30), "payDate": day(-2), "amount": 0.25},
+        ]}
+
+    monkeypatch.setattr(portfolio.stock_data_client, "_use_mock", lambda: False)
+    monkeypatch.setattr(portfolio, "_calendar_cache", {})
+    monkeypatch.setattr(portfolio, "_earnings_by_ticker", lambda start, end: {})
+    monkeypatch.setattr(portfolio, "_dividends_by_ticker", calendar)
+    _flat_history(monkeypatch, {"AAPL": 200.0})
+    client = _member_client()
+    _buy(client, shares=4, price=150.0)
+    events = client.get("/api/stocks/portfolio/upcoming").json()["events"]
+    assert [(e["date"], e["payDate"]) for e in events] == [(day(-10), day(6))]
+    assert asked == [today - timedelta(days=portfolio.PAY_LAG_DAYS)]
+
+
+def test_history_carries_the_t_bill_rate_from_its_first_month(monkeypatch):
+    from datetime import timedelta
+
+    from app.services import treasury
+
+    monkeypatch.setattr(treasury, "monthly_rates", lambda today=None: {"2000-01": 0.05, "2099-01": 0.04})
+    _flat_history(monkeypatch, {"AAPL": 200.0})
+    client = _member_client()
+    _buy(client, shares=1, price=150.0, day=(portfolio.utc_today() - timedelta(days=40)).isoformat())
+    assert client.get("/api/stocks/portfolio/history").json()["riskFree"] == [{"month": "2099-01", "rate": 0.04}]
+
+
+def test_t_bill_rates_parse_fred_csv_and_fall_back_to_empty(monkeypatch):
+    from app.services import treasury
+
+    monkeypatch.setattr(treasury.stock_data_client, "_use_mock", lambda: False)
+    monkeypatch.setattr(treasury, "_cache", {})
+    monkeypatch.delenv("FRED_API_KEY", raising=False)
+    monkeypatch.setattr(treasury, "_fetch_text", lambda url: "observation_date,TB3MS\n2026-09-01,4.12\n2026-10-01,.\n")
+    assert treasury.monthly_rates() == {"2026-09": 0.0412}
+
+    def down(url):
+        raise OSError("offline")
+
+    monkeypatch.setattr(treasury, "_cache", {})
+    monkeypatch.setattr(treasury, "_fetch_text", down)
+    assert treasury.monthly_rates() == {}
+
+
 def test_a_failed_calendar_leaves_the_other_and_is_not_asked_again_at_once(monkeypatch):
     from datetime import timedelta
 
