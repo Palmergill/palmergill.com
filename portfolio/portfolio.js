@@ -27,7 +27,6 @@
         gains: [['gains', 'Performance'], ['income', 'Income'], ['taxes', 'Taxes']],
         activity: [['activity', 'Trades'], ['accounts', 'Accounts']],
     };
-    let hasIncome = false;
     const TABS = ['overview', 'holdings', 'gains', 'income', 'taxes', 'watchlist', 'activity', 'accounts'];
     // A position past this share of the portfolio is flagged.
     const CONCENTRATED = 0.25;
@@ -302,7 +301,6 @@
         bar.hidden = !tabs;
         if (!tabs) return;
         bar.innerHTML = tabs
-            .filter(([key]) => key !== 'income' || hasIncome)
             .map(([key, label]) => `<a href="#${key}"${key === tab ? ' aria-current="page"' : ''}>${label}</a>`).join('');
     }
 
@@ -1418,8 +1416,6 @@
 
     function renderIncome(data) {
         const d = data.dividends;
-        hasIncome = d.count > 0;
-        renderSubtabs(currentTab());
         $('incomeTrailing').textContent = fmtMoney(d.trailing12m, true);
         $('incomeTrailingSub').textContent = d.yield == null ? '' : `${fmtPct(d.yield)} yield`;
         $('incomeProjected').textContent = fmtMoney(d.projectedTotal, true);
