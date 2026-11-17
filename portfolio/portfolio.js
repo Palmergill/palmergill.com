@@ -190,7 +190,7 @@
     function today() {
         return isoDay(new Date());
     }
-    const ASSET_TAGS = { crypto: 'Crypto', other: 'No ticker' };
+    const ASSET_TAGS = { other: 'No ticker' };
     const SIDE_LABELS = { buy: 'Buy', sell: 'Sell', dividend: 'Dividend' };
     function holdingHref(ticker) {
         return `#holding/${encodeURIComponent(ticker)}`;
@@ -1962,8 +1962,10 @@
         research.hidden = d.asset !== 'stock';
         research.href = `/portfolio/research/?ticker=${encodeURIComponent(d.ticker)}`;
         const meta = [...new Set([c.sector, c.industry, c.headquarters, c.employees ? `${countFormat.format(c.employees)} employees` : null].filter(Boolean))];
+        // Bitcoin needs no About.
+        $('holdingAbout').closest('.pf-card').hidden = d.asset === 'crypto';
         $('holdingAbout').innerHTML = d.asset !== 'stock'
-            ? `<p>${d.asset === 'crypto' ? 'Cryptocurrency' : 'No market data.'}</p>`
+            ? '<p>No market data.</p>'
             : d.company
                 ? `${meta.length ? `<p class="pf-about__meta">${meta.map(escapeHtml).join(' · ')}</p>` : ''}
                    <p>${escapeHtml(c.description || 'No description on file.')}</p>

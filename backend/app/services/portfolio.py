@@ -752,7 +752,7 @@ KNOWN_SECTORS = {
     **dict.fromkeys(("LIN", "NEM", "FCX"), "Materials"),
     **dict.fromkeys(("SPY", "VOO", "IVV", "VTI", "QQQ", "DIA", "IWM", "SCHD", "VT", "VXUS", "VEA", "VWO", "VUG", "VTV",
                      "SCHB", "SCHX", "ITOT", "RSP", "QQQM", "SPLG"), "Funds"),
-    **dict.fromkeys(("IBIT", "FBTC", "GBTC", "BITO", "ETHA", "MSTR"), "Crypto"),
+    **dict.fromkeys(("IBIT", "FBTC", "GBTC", "BITO", "MSTR"), "Bitcoin"),
     **dict.fromkeys(("BND", "AGG", "TLT", "SHY", "IEF", "BIL", "SGOV", "TIP"), "Bonds"),
     **dict.fromkeys(("GLD", "IAU", "SLV"), "Commodities"),
 }
@@ -824,7 +824,7 @@ def quotes(db: Session, positions: Dict[str, Dict[str, Any]]) -> Dict[str, Dict[
                 .order_by(PriceClose.day.desc()).first()
             )
         if position["asset"] == "crypto":
-            info = {"name": CRYPTO_NAMES.get(ticker, ticker), "sector": "Crypto"}
+            info = {"name": CRYPTO_NAMES.get(ticker, ticker), "sector": "Bitcoin"}
         elif position["asset"] == "other":
             info = {"name": None, "sector": "Other holdings"}
         else:
