@@ -141,14 +141,27 @@
         return '$' + Number(p).toFixed(2);
     }
 
+    // Rounded as the tracker rounds: two figures, a true minus sign.
     function fmtChange(c) {
         if (c == null || !Number.isFinite(c)) return '';
-        const sign = c >= 0 ? '+' : '';
-        return `${sign}${c.toFixed(2)}%`;
+        const digits = Math.abs(c) < 1 ? 2 : Math.abs(c) < 10 ? 1 : 0;
+        const text = `${Math.abs(c).toFixed(digits)}%`;
+        return c > 0 ? `+${text}` : c < 0 ? `\u2212${text}` : text;
     }
 
-    // A research-home tile: ticker and price, name and day change, and the
-    // last month's closes when there are some. Shared with "Your holdings".
+    // The tracker's monogram: the same tint for the same ticker on every page.
+    function badge(ticker) {
+        let hash = 0;
+        for (const ch of ticker) hash = (hash * 131 + ch.charCodeAt(0)) % 997;
+        const mark = document.createElement('span');
+        mark.className = `pf-badge pf-badge--${hash % 8}`;
+        mark.setAttribute('aria-hidden', 'true');
+        mark.textContent = ticker.slice(0, 2).toUpperCase();
+        return mark;
+    }
+
+    // A research-home tile: monogram, ticker and price, name and day change, and
+    // the last month's closes when there are some. Shared with "Your holdings".
     function tile({ ticker, name, price, changePercent, spark }) {
         const btn = document.createElement('button');
         btn.className = 'trending-stock rt';
@@ -166,10 +179,16 @@
             return line;
         };
         const tone = changePercent == null ? '' : changePercent >= 0 ? 'is-positive' : 'is-negative';
-        btn.append(
+        const text = document.createElement('span');
+        text.className = 'rt__text';
+        text.append(
             row('rt__top', ticker, price != null ? fmtPrice(price) : ''),
             row('rt__sub', name || '', fmtChange(changePercent), tone),
         );
+        const head = document.createElement('span');
+        head.className = 'rt__head';
+        head.append(badge(ticker), text);
+        btn.append(head);
         const closes = (spark || []).filter((v) => Number.isFinite(v));
         if (closes.length > 1) {
             const lo = Math.min(...closes);
@@ -181,13 +200,32 @@
             svg.setAttribute('preserveAspectRatio', 'none');
             svg.setAttribute('aria-hidden', 'true');
             svg.setAttribute('class', `rt__spark ${closes[closes.length - 1] >= closes[0] ? 'is-up' : 'is-down'}`);
+            const fill = document.createElementNS(ns, 'polygon');
+            fill.setAttribute('points', `0,24 ${points} 100,24`);
             const line = document.createElementNS(ns, 'polyline');
             line.setAttribute('points', points);
             line.setAttribute('vector-effect', 'non-scaling-stroke');
-            svg.append(line);
+            svg.append(fill, line);
             btn.append(svg);
         }
         return btn;
+    }
+
+    // Even rows: as many columns as fit, then spread so no tile sits alone.
+    const balanced = new WeakSet();
+    const sizer = typeof ResizeObserver === 'function' ? new ResizeObserver((entries) => entries.forEach((e) => fit(e.target))) : null;
+    function fit(grid) {
+        const n = grid.children.length;
+        if (!n || !grid.clientWidth) return;
+        const least = grid.clientWidth < 520 ? 136 : 168; // a phone fits two narrower tiles
+        const most = Math.max(1, Math.floor((grid.clientWidth + 8) / least));
+        const rows = Math.ceil(n / most);
+        grid.style.setProperty('--cols', String(Math.min(most, Math.ceil(n / rows))));
+    }
+    function balance(grid) {
+        if (!grid) return;
+        fit(grid);
+        if (sizer && !balanced.has(grid)) { balanced.add(grid); sizer.observe(grid); }
     }
 
     function render() {
@@ -223,6 +261,7 @@
             frag.appendChild(btn);
         });
         grid.replaceChildren(frag);
+        balance(grid);
     }
 
     function wire() {
@@ -268,6 +307,6 @@
     }
 
     window.Watchlist = {
-        add, remove, isSaved, touchSnapshot, syncToggleButton, render, tile
+        add, remove, isSaved, touchSnapshot, syncToggleButton, render, tile, balance
     };
 })();

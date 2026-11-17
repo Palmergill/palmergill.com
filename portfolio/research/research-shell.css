@@ -87,22 +87,36 @@ body.app #empty .trending-stock:hover { background: var(--card); border-color: v
 .ov-range-btn:hover { background: color-mix(in srgb, var(--trend) 9%, transparent); }
 .ov-range-btn[aria-pressed="true"] { background: color-mix(in srgb, var(--trend) 15%, transparent); box-shadow: none; color: var(--trend); }
 
-/* Research home tiles: ticker and price, name and change, a month's line. */
-body.app #empty .trending-grid { grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); }
-body.app #empty .rt { display: flex; flex-direction: column; gap: 2px; padding: 10px 12px 8px; cursor: pointer; font: inherit; color: var(--ink); }
+/* Research home tiles, in the tracker's terms: monogram, ticker and price,
+   name and change, a month's line in the muted gain and loss colors. */
+body.app #empty .trending-grid { grid-template-columns: repeat(var(--cols, 4), minmax(0, 1fr)); gap: 10px; }
+body.app #empty .rt { display: flex; flex-direction: column; gap: 8px; padding: 12px 14px 10px; cursor: pointer; font: inherit; color: var(--ink); border-radius: var(--r); box-shadow: var(--lift); }
+.rt__head { display: flex; align-items: center; gap: 10px; width: 100%; min-width: 0; }
+.rt__text { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
 .rt__top, .rt__sub { display: flex; justify-content: space-between; gap: 8px; width: 100%; font-variant-numeric: tabular-nums; }
-.rt__top { font-weight: 600; font-size: 13px; }
-.rt__top span:last-child { font-family: var(--serif); font-weight: 500; font-size: 14px; color: var(--forest); }
+.rt__top { font-weight: 600; font-size: 13px; letter-spacing: 0.02em; }
+.rt__top span:last-child { font-family: var(--serif); font-weight: 500; font-size: 15px; color: var(--forest); letter-spacing: 0; }
 .rt__sub { color: var(--muted); font-size: 11.5px; }
 .rt__sub span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rt__sub .is-positive { color: var(--gain); font-weight: 500; }
 .rt__sub .is-negative { color: var(--loss); font-weight: 500; }
-.rt__spark { display: block; width: 100%; height: 24px; margin-top: 6px; }
-.rt__spark polyline { fill: none; stroke-width: 1.5; stroke-linejoin: round; }
-.rt__spark.is-up polyline { stroke: var(--chart-up); }
-.rt__spark.is-down polyline { stroke: var(--chart-down); }
+.rt__spark { display: block; width: 100%; height: 28px; }
+.rt__spark polyline { fill: none; stroke-width: 1.6; stroke-linejoin: round; }
+.rt__spark polygon { stroke: none; fill-opacity: 0.1; }
+.rt__spark.is-up polyline { stroke: var(--gain); }
+.rt__spark.is-down polyline { stroke: var(--loss); }
+.rt__spark.is-up polygon { fill: var(--gain); }
+.rt__spark.is-down polygon { fill: var(--loss); }
+@media (max-width: 560px) {
+    body.app #empty .trending-grid { grid-template-columns: repeat(var(--cols, 2), minmax(0, 1fr)); gap: 8px; }
+    body.app #empty > .trending-stocks { padding: 14px 14px; }
+    body.app #empty .rt { padding: 10px 10px 8px; }
+    .rt__head { gap: 8px; }
+    .rt .pf-badge { display: none; } /* two tiles a row leave no room for it */
+    body.app #empty .trending-grid > .rt:last-child:nth-child(odd) { grid-column: 1 / -1; }
+    .rt__top span:last-child { font-size: 14px; }
+}
 body.app #empty .trending-label { font-family: var(--serif); font-size: 19px; font-weight: 500; color: var(--forest); }
-body.app #empty > .trending-stocks { border-radius: var(--r-sm); }
 .compare-form input { text-transform: none; background: var(--card); border-radius: var(--r-sm); }
 .compare-add-btn { border-radius: var(--r); background: linear-gradient(180deg, #17413a, var(--forest)); color: var(--gold-soft); border: 0; }
 

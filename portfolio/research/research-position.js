@@ -79,6 +79,7 @@
         }));
         section.append(label, grid);
         home.prepend(section);
+        window.Watchlist.balance(grid);
     }
 
     // The tracker's privacy switch, shared through this browser's storage.
