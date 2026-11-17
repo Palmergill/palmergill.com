@@ -464,10 +464,16 @@
     }
 
     // The day's change and what moved it most.
+    // The movers rank by percent or by dollars; with amounts hidden, by percent.
+    let moverMode = 'percent';
+    try { if (localStorage.getItem('pf.movers') === 'value') moverMode = 'value'; } catch { /* storage blocked */ }
     function renderToday(data) {
         const t = data.totals;
-        const movers = data.positions.filter((p) => p.dayChangePct != null)
-            .sort((a, b) => Math.abs(b.dayChangePct) - Math.abs(a.dayChangePct)).slice(0, 5);
+        const key = moverMode === 'value' && !privacy ? 'dayChange' : 'dayChangePct';
+        const movers = data.positions.filter((p) => p[key] != null)
+            .sort((a, b) => Math.abs(b[key]) - Math.abs(a[key])).slice(0, 5);
+        $('moverModes').hidden = privacy;
+        $('moverModes').querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.mode === moverMode)));
         $('todayCard').hidden = t.dayChange == null;
         if (t.dayChange == null) return;
         const asOf = data.positions.map((p) => p.priceAsOf).filter(Boolean).sort().pop();
@@ -477,14 +483,22 @@
             : `<p class="pf-today ${tone(t.dayChange)}">${fmtSigned(t.dayChange, true)}</p><p class="pf-sub ${tone(t.dayChange)}">${fmtPct(t.dayChangePct, true)}</p>`;
         $('todayCard').classList.toggle('is-up', t.dayChange > 0);
         $('todayCard').classList.toggle('is-down', t.dayChange < 0);
-        const widest = Math.max(...movers.map((p) => Math.abs(p.dayChangePct)), 0) || 1;
+        const widest = Math.max(...movers.map((p) => Math.abs(p[key])), 0) || 1;
         $('moversBody').innerHTML = movers.map((p) => `
             <tr data-ticker="${escapeHtml(p.ticker)}">
                 <td><span class="pf-sec">${badge(p.ticker)}${securityLink(p)}</span></td>
-                <td class="pf-mover"><span class="pf-mover__bar ${tone(p.dayChange)}" style="width:${(Math.abs(p.dayChangePct) / widest * 100).toFixed(0)}%"></span></td>
+                <td class="pf-mover"><span class="pf-mover__bar ${tone(p.dayChange)}" style="width:${(Math.abs(p[key]) / widest * 100).toFixed(0)}%"></span></td>
                 ${dayPill(p)}
             </tr>`).join('');
     }
+
+    $('moverModes').addEventListener('click', (event) => {
+        const button = event.target.closest('button[data-mode]');
+        if (!button || !lastData) return;
+        moverMode = button.dataset.mode;
+        try { localStorage.setItem('pf.movers', moverMode); } catch { /* storage blocked */ }
+        renderToday(lastData);
+    });
 
     // Earnings and ex-dividend dates for what you hold: asked for again only
     // when the set of holdings changes.
