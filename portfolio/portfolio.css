@@ -358,7 +358,7 @@
 .pf-hero__stats .pf-history-change { font-weight: 600; }
 .pf-hero__stats .pf-history-change.is-gain { color: var(--chart-up); }
 .pf-hero__stats .pf-history-change.is-loss { color: var(--chart-down); }
-.pf-hero__stats .pf-history-rate { color: #b9c9be; font-weight: 500; }
+.pf-hero__stats .pf-history-rate { color: var(--muted); font-weight: 500; }
 
 .pf-spark { display: block; width: 72px; height: 24px; margin-left: auto; overflow: visible; }
 .pf-spark path { fill: none; stroke-width: 1.5; stroke-linejoin: round; stroke-linecap: round; }
@@ -529,50 +529,21 @@
 
 /* ── The statement ─────────────────────────────────────────────────────── */
 
-/* The headline panel: deep forest, ivory figures, a lit line. Everything
-   inside reads the same tokens, turned for a dark ground. */
-.pf-hero {
-    --card: #0f2f27; --ink: #fbf6e6; --soft: #c8d6cc; --muted: #8fa89b;
-    --line: rgba(243, 230, 196, 0.12); --line-strong: rgba(243, 230, 196, 0.24); --surface: rgba(255, 255, 255, 0.07);
-    --chart-up: #3ddc84; --chart-down: #ff7d52; --gain: #3ddc84; --loss: #ff9072; --bench: #86a094;
-    color: var(--soft); border: 0; padding: 26px 28px 18px;
-    background:
-        radial-gradient(620px 300px at 0% 0%, rgba(201, 162, 77, 0.2), rgba(201, 162, 77, 0) 70%),
-        radial-gradient(700px 420px at 100% 100%, color-mix(in srgb, var(--trend) 13%, transparent), transparent 70%),
-        linear-gradient(160deg, #17413a 0%, #0f2f27 45%, #0a221c 100%);
-    box-shadow: inset 0 0 0 1px rgba(201, 162, 77, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 24px 44px -26px rgba(10, 34, 28, 0.75);
-}
-.pf-hero__label { color: #dcc07a; }
-.pf-hero__value { color: #fbf6e6; }
-.pf-hero__value.is-gain { color: var(--gain); }
-.pf-hero__value.is-loss { color: var(--loss); }
+/* The headline panel. */
 .pf-hero__top { flex-wrap: wrap; gap: 18px 32px; }
-.pf-hero .pf-chart__line { filter: drop-shadow(0 0 7px color-mix(in srgb, var(--trend) 60%, transparent)); }
-.pf-hero .pf-chart__fill-top { stop-opacity: 0.32; }
-/* Red-orange over forest turns brown at full strength, so a falling range fills lighter. */
-.pf-hero.is-down .pf-chart__fill-top { stop-opacity: 0.14; }
-.pf-hero .pf-chart__avg { stroke: #dcc07a; }
-.pf-hero .pf-key--avg { border-top-color: #dcc07a; }
-.pf-hero .pf-chart__guide { stroke: rgba(243, 230, 196, 0.2); }
-.pf-hero .pf-chart__cross { stroke: #fbf6e6; }
-.pf-hero .pf-ranges button:hover { background: color-mix(in srgb, var(--trend) 14%, transparent); }
-.pf-hero .pf-ranges button[aria-pressed="true"] { background: color-mix(in srgb, var(--trend) 22%, transparent); }
-.pf-hero .pf-legend-toggle:hover { background: var(--surface); }
-.pf-hero .pf-chart__empty { color: var(--muted); }
 
 /* The lead figures, set into the headline's top right. */
 .pf-hero .pf-metrics { display: flex; flex-wrap: wrap; gap: 14px 0; background: none; border: 0; border-radius: 0; box-shadow: none; overflow: visible; }
 .pf-hero .pf-metrics { padding-top: 6px; }
 .pf-hero .pf-metrics div { padding: 2px 16px; box-shadow: none; border-left: 1px solid var(--line-strong); }
 .pf-hero .pf-metrics div:last-child { padding-right: 0; }
-.pf-hero .pf-metrics dt { color: #b9c9be; }
-.pf-hero .pf-metrics dd { color: #fbf6e6; font-size: 22px; }
+.pf-hero .pf-metrics dd { font-size: 22px; }
 .pf-hero .pf-metrics dd.is-gain { color: var(--gain); }
 .pf-hero .pf-metrics dd.is-loss { color: var(--loss); }
 .pf-hero .pf-metrics dd .pf-sub { color: inherit; opacity: 0.85; }
 
 /* Panels: a gold thread along the top edge, and warm figure bands. */
-.pf-card:not(.pf-hero) { background-image: linear-gradient(90deg, var(--gold) 0, rgba(201, 162, 77, 0.35) 22%, rgba(201, 162, 77, 0) 58%); background-size: 100% 2px; background-repeat: no-repeat; }
+.pf-card { background-image: linear-gradient(90deg, var(--gold) 0, rgba(201, 162, 77, 0.35) 22%, rgba(201, 162, 77, 0) 58%); background-size: 100% 2px; background-repeat: no-repeat; }
 .pf-tiles { background: linear-gradient(180deg, #fdf7e8, #fbf3df); border-color: #eadfc4; }
 .pf-tile { box-shadow: -1px -1px 0 #eadfc4; }
 .pf-tiles--flat { border-top-color: #eadfc4; }
@@ -632,16 +603,6 @@
 @keyframes pf-grow-y { from { transform: scaleY(0); } to { transform: none; } }
 @keyframes pf-sweep { from { stroke-dasharray: 0 var(--around); } to { stroke-dasharray: var(--len) var(--rest); } }
 @keyframes pf-pop { from { opacity: 0; transform: scale(0.4); } to { opacity: 1; transform: none; } }
-@keyframes pf-drift { from { transform: translate(-12%, 6%); } to { transform: translate(22%, -8%); } }
-
-/* The headline's glow wanders slowly behind the chart. */
-.pf-hero { position: relative; overflow: hidden; }
-.pf-hero > * { position: relative; }
-.pf-hero::before {
-    content: ''; position: absolute; right: -8%; bottom: -30%; width: 70%; aspect-ratio: 1.6; border-radius: 50%; pointer-events: none;
-    background: radial-gradient(closest-side, color-mix(in srgb, var(--trend) 20%, transparent), transparent);
-}
-.pf-hero .pf-chart svg { overflow: visible; }
 
 /* The ring answers the cursor. */
 .pf-donut__arc { cursor: pointer; transition: stroke-width 0.18s, opacity 0.18s; }
@@ -665,7 +626,6 @@ tr:hover > td .pf-badge { transform: scale(1.1) rotate(-4deg); }
 .pf-upcoming__list li:hover { padding-left: 4px; }
 
 @media (prefers-reduced-motion: no-preference) {
-    .pf-hero::before { animation: pf-drift 16s ease-in-out infinite alternate; }
 
     /* A chart that shows something new draws its line, then fills in. */
     .pf-chart svg.is-fresh .pf-chart__line:not(.pf-chart__line--estimated) { stroke-dasharray: 1; animation: pf-draw 1.2s cubic-bezier(0.45, 0, 0.2, 1) both; }
