@@ -655,3 +655,131 @@ tr:hover > td .pf-badge { transform: scale(1.1) rotate(-4deg); }
     #topHoldingsTable tbody tr:nth-child(4), .pf-movers tr:nth-child(4) { animation-delay: 0.12s; }
     #topHoldingsTable tbody tr:nth-child(n+5), .pf-movers tr:nth-child(n+5) { animation-delay: 0.16s; }
 }
+
+/* ── Analysis ─────────────────────────────────────────────────────────── */
+.pf-grid--wide { grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr); }
+@media (max-width: 1100px) { .pf-grid--wide { grid-template-columns: minmax(0, 1fr); } }
+.pf-ranges--chip { gap: 2px; }
+.pf-ranges--chip button { border: 0; border-radius: var(--r-sm); padding: 3px 9px; font-weight: 600; }
+.pf-ranges--chip button[aria-pressed="true"] { color: var(--forest); background: var(--surface); }
+
+/* Performance hero: the return line over the S&P 500's, then a strip of stats. */
+.pf-perf { padding-bottom: 0; }
+.pf-perf .pf-hero__top { align-items: flex-end; }
+.pf-perf .pf-chart-legend { margin: 0 0 4px; }
+.pf-chart--perf { height: 300px; }
+.pf-key--bench { border-top: 2px dashed var(--bench); }
+.pf-chart__bench { fill: none; stroke: var(--bench); stroke-width: 1.6; stroke-dasharray: 4 4; stroke-linejoin: round; }
+.pf-chart__bench-dot { fill: var(--bench); stroke: var(--card); stroke-width: 2; }
+.pf-perf .pf-ranges { border-bottom: 0; padding-bottom: 12px; }
+.pf-strip { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); margin: 0 -20px; border-top: 1px solid var(--line); }
+.pf-strip:empty { display: none; }
+.pf-stat { padding: 14px 20px 16px; box-shadow: -1px 0 0 var(--line); min-width: 0; }
+.pf-stat__label { font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase; font-weight: 500; color: var(--muted); }
+.pf-stat__value { margin-top: 4px; font-family: var(--serif); font-size: 22px; font-weight: 500; color: var(--forest); font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
+.pf-stat__value.is-gain { color: var(--gain); }
+.pf-stat__value.is-loss { color: var(--loss); }
+.pf-stat__sub { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; min-height: 1.45em; }
+
+/* Total return, built up a step at a time. */
+.pf-bridge { display: flex; flex-direction: column; gap: 10px; }
+.pf-bridge__row { display: grid; grid-template-columns: 92px minmax(0, 1fr) 96px; align-items: center; gap: 12px; font-size: 13px; }
+.pf-bridge__label { color: var(--soft); }
+.pf-bridge__track { position: relative; height: 22px; }
+.pf-bridge__bar { position: absolute; top: 0; bottom: 0; border-radius: 2px; }
+.pf-bridge__bar.is-gain { background: var(--gain); opacity: 0.55; }
+.pf-bridge__bar.is-loss { background: var(--loss); opacity: 0.8; }
+.pf-bridge__bar.is-total { background: var(--forest); }
+.pf-bridge__value { text-align: right; font-weight: 500; color: var(--ink); font-variant-numeric: tabular-nums; }
+.pf-bridge__value.is-gain { color: var(--gain); }
+.pf-bridge__value.is-loss { color: var(--loss); }
+.pf-bridge__row--total { border-top: 1px solid var(--line); padding-top: 10px; }
+.pf-bridge__row--total .pf-bridge__label { color: var(--forest); font-weight: 600; }
+.pf-bridge__row--total .pf-bridge__value { font-family: var(--serif); font-size: 18px; }
+
+/* Monthly heat table: empty months greyed, the year's total set apart. */
+.pf-heat td.pf-heat__empty { background: var(--surface); opacity: 0.5; border: 2px solid var(--card); border-radius: 6px; }
+.pf-heat td.pf-heat__total { border-left: 1px solid var(--line); }
+
+/* Drawdown */
+.pf-ddchart { height: 180px; }
+.pf-ddchart svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.pf-ddchart .pf-zero { stroke: var(--line-strong); }
+.pf-dd__area { fill: var(--loss); opacity: 0.13; }
+.pf-dd__line { fill: none; stroke: var(--loss); stroke-width: 1.5; stroke-linejoin: round; }
+.pf-dd__low { fill: var(--loss); }
+.pf-dd__label { fill: var(--loss); font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+/* Realized by year: a column a year, each one a way into that year's trades. */
+.pf-years { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 10px; height: 200px; }
+.pf-year { display: grid; grid-template-rows: minmax(0, 1fr) auto auto; justify-items: center; gap: 4px; padding: 0; border: 0; background: none; font: inherit; cursor: pointer; min-width: 0; border-radius: var(--r-sm); }
+.pf-year:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.pf-year__col { display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: 4px; width: 100%; height: 100%; min-height: 0; }
+.pf-year__value { font-size: 11.5px; font-weight: 600; color: var(--ink); font-variant-numeric: tabular-nums; white-space: nowrap; min-height: 1.3em; }
+.pf-year__value.is-gain { color: var(--gain); }
+.pf-year__value.is-loss { color: var(--loss); }
+.pf-year__bar { width: 100%; max-width: 56px; flex: none; border-radius: 2px 2px 0 0; opacity: 0.8; transition: opacity 0.15s; }
+.pf-year__bar.is-gain { background: var(--gain); }
+.pf-year__bar.is-loss { background: var(--loss); }
+.pf-year:hover .pf-year__bar { opacity: 1; }
+.pf-year__year { width: 100%; text-align: center; border-top: 1px solid var(--line-strong); padding-top: 5px; font-size: 12px; color: var(--soft); }
+.pf-year__trades { font-size: 11px; color: var(--muted); white-space: nowrap; }
+
+/* Income */
+.pf-income-figs { display: flex; gap: 44px; flex-wrap: wrap; }
+.pf-hero__value--projected { color: #a07c2c; }
+.pf-income-hero .pf-hero__top { align-items: flex-end; }
+.pf-income-hero .pf-chart-legend { margin: 0 0 4px; }
+.pf-income-hero .pf-incomechart { height: 220px; margin-top: 20px; }
+.pf-payer { display: grid; grid-template-columns: 64px minmax(0, 1fr) 84px 50px; gap: 12px; align-items: center; height: 32px; font-size: 13px; }
+.pf-payer__track { height: 8px; background: var(--surface); border-radius: 999px; overflow: hidden; }
+.pf-payer__track span { display: block; height: 100%; background: var(--forest); border-radius: 999px; }
+.pf-payer__amount { text-align: right; font-weight: 500; color: var(--ink); font-variant-numeric: tabular-nums; }
+.pf-payer__share { text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; }
+.pf-cal { list-style: none; }
+.pf-cal li { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--line); }
+.pf-cal li:last-child { border-bottom: 0; }
+.pf-cal__date { text-align: center; line-height: 1.1; border: 1px solid var(--line-strong); border-radius: var(--r-sm); padding: 4px 0; }
+.pf-cal__date small { display: block; font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+.pf-cal__date b { font-family: var(--serif); font-size: 17px; font-weight: 500; color: var(--forest); }
+.pf-cal__what small { display: block; font-size: 12px; color: var(--muted); }
+.pf-cal__amount { font-weight: 500; color: #a07c2c; font-variant-numeric: tabular-nums; }
+
+/* Taxes */
+.pf-taxstats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.pf-taxstats .pf-stat { padding: 0 20px; }
+.pf-taxstats .pf-stat:first-child { padding-left: 0; box-shadow: none; }
+.pf-taxstats .pf-stat__value { font-size: 26px; }
+.pf-split { display: flex; height: 12px; margin-top: 20px; border-radius: 999px; overflow: hidden; background: var(--surface); }
+.pf-split[hidden], .pf-split-key[hidden] { display: none; }
+.pf-split span { display: block; height: 100%; }
+.pf-split--sg { background: var(--gold); }
+.pf-split--lg { background: var(--gain); }
+.pf-split--sl { background: #c97b6c; }
+.pf-split--ll { background: var(--loss); }
+.pf-split-key { list-style: none; display: flex; flex-wrap: wrap; gap: 4px 18px; margin-top: 10px; font-size: 12px; color: var(--muted); }
+.pf-split-key i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
+.pf-soon { list-style: none; }
+.pf-soon li { display: grid; grid-template-columns: 70px minmax(0, 1fr) 84px; gap: 12px; align-items: center; padding: 9px 0; border-bottom: 1px solid var(--line); font-size: 13px; }
+.pf-soon li:last-child { border-bottom: 0; }
+.pf-soon small { display: block; font-size: 12px; color: var(--muted); font-weight: 400; font-variant-numeric: tabular-nums; }
+.pf-soon small.is-gain { color: var(--gain); }
+.pf-soon small.is-loss { color: var(--loss); }
+.pf-soon__track { height: 6px; background: var(--surface); border-radius: 999px; overflow: hidden; }
+.pf-soon__track span { display: block; height: 100%; background: var(--gold); border-radius: 999px; }
+.pf-soon__days { text-align: right; font-weight: 500; color: var(--ink); font-variant-numeric: tabular-nums; }
+.pf-harvest-total { font-family: var(--serif); font-size: 19px; font-weight: 500; font-variant-numeric: tabular-nums; }
+.pf-harvest-total.is-loss { color: var(--loss); }
+
+@media (max-width: 720px) {
+    .pf-strip { margin: 0 -16px; grid-template-columns: 1fr 1fr; }
+    .pf-stat { padding: 12px 16px; box-shadow: -1px 0 0 var(--line), 0 -1px 0 var(--line); }
+    .pf-chart--perf { height: 220px; }
+    .pf-taxstats { grid-template-columns: 1fr 1fr; row-gap: 16px; }
+    .pf-taxstats .pf-stat:nth-child(odd) { padding-left: 0; box-shadow: none; }
+    .pf-taxstats .pf-stat:nth-child(even) { box-shadow: -1px 0 0 var(--line); }
+    .pf-perf .pf-hero__top, .pf-income-hero .pf-hero__top { align-items: flex-start; }
+    .pf-income-figs { gap: 28px; }
+    .pf-years { gap: 6px; }
+    .pf-year__trades { display: none; }
+}
