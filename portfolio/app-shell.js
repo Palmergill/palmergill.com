@@ -90,9 +90,18 @@
             <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>
             <input id="appSearchInput" type="search" placeholder="Research a ticker or company" aria-label="Research a ticker or company" autocomplete="off" spellcheck="false" role="combobox" aria-expanded="false" aria-controls="appSearchList">
             <kbd>${mac ? '⌘' : 'Ctrl '}K</kbd>
-            <ul class="app-search__list" id="appSearchList" role="listbox" hidden></ul>`;
+            <ul class="app-search__list" id="appSearchList" role="listbox" hidden></ul>
+            <button type="button" class="app-search__open" aria-label="Research a ticker or company" aria-expanded="false" aria-controls="appSearchInput"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg></button>`;
         const input = document.getElementById('appSearchInput');
         const list = document.getElementById('appSearchList');
+        // On a phone the field folds into an icon and opens on its own row.
+        const opener = host.querySelector('.app-search__open');
+        const setOpen = (open) => {
+            host.classList.toggle('is-open', open);
+            opener.setAttribute('aria-expanded', String(open));
+        };
+        opener.addEventListener('click', () => { setOpen(true); input.focus(); });
+        input.addEventListener('blur', () => { if (!input.value.trim()) setOpen(false); });
         let results = [];
         let active = -1;
         let timer = null;
@@ -158,6 +167,7 @@
         document.addEventListener('keydown', (event) => {
             if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
                 event.preventDefault();
+                setOpen(true);
                 input.focus();
                 input.select();
             }

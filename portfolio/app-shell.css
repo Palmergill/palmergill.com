@@ -122,6 +122,8 @@ body.app {
 .app-search__list li span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .app-search__list li.is-active, .app-search__list li:hover { background: var(--surface); }
 .app-main { max-width: 1280px; margin: 0 auto; padding: 24px 28px 72px; }
+.app-search__open { display: none; }
+
 
 @media (max-width: 900px) {
     body.app { padding-left: 0; padding-bottom: calc(60px + env(safe-area-inset-bottom)); }
@@ -142,4 +144,17 @@ body.app {
     .app-search { order: 3; flex: 1 0 100%; margin-left: 0; }
     .app-search kbd { display: none; }
     .app-main { padding: 16px 16px 32px; }
+}
+
+@media (max-width: 560px) {
+    .app-search { order: 2; flex: none; margin-left: 0; }
+    .app-search:not(.is-open) > svg, .app-search:not(.is-open) input { display: none; }
+    .app-search:not(.is-open) .app-search__open {
+        display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; padding: 0; cursor: pointer;
+        background: var(--card); border: 1px solid var(--line); border-radius: var(--r);
+        box-shadow: 0 1px 0 rgba(255, 255, 255, 0.8) inset, 0 1px 2px rgba(31, 42, 36, 0.05);
+    }
+    .app-search__open svg { width: 15px; height: 15px; fill: none; stroke: var(--soft); stroke-width: 2; stroke-linecap: round; }
+    .app-search__open:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+    .app-search.is-open { order: 3; flex: 1 0 100%; }
 }
