@@ -357,8 +357,9 @@
 
 .pf-spark { display: block; width: 72px; height: 24px; margin-left: auto; overflow: visible; }
 .pf-spark path { fill: none; stroke-width: 1.5; stroke-linejoin: round; stroke-linecap: round; }
-.pf-spark.is-up path { stroke: var(--chart-up); }
-.pf-spark.is-down path { stroke: var(--chart-down); }
+/* Table sparklines use the muted figure colors; the bright pair is for the dark headline charts. */
+.pf-spark.is-up path { stroke: var(--gain); }
+.pf-spark.is-down path { stroke: var(--loss); }
 
 .pf-button { background: var(--forest); border-color: var(--forest); color: var(--gold-soft); }
 .pf-button--quiet { background: var(--card); color: var(--forest); border-color: var(--line-strong); }
@@ -543,6 +544,8 @@
 .pf-hero__top { flex-wrap: wrap; gap: 18px 32px; }
 .pf-hero .pf-chart__line { filter: drop-shadow(0 0 7px color-mix(in srgb, var(--trend) 60%, transparent)); }
 .pf-hero .pf-chart__fill-top { stop-opacity: 0.32; }
+/* Red-orange over forest turns brown at full strength, so a falling range fills lighter. */
+.pf-hero.is-down .pf-chart__fill-top { stop-opacity: 0.14; }
 .pf-hero .pf-chart__avg { stroke: #dcc07a; }
 .pf-hero .pf-key--avg { border-top-color: #dcc07a; }
 .pf-hero .pf-chart__guide { stroke: rgba(243, 230, 196, 0.2); }
@@ -594,9 +597,10 @@
 .pf-badge--5 { background: #e6e9cf; color: #5a6426; }
 .pf-badge--6 { background: #f4dcd7; color: #96392c; }
 .pf-badge--7 { background: #dde2ee; color: #3f4f7a; }
-.pf-spark path.pf-spark__fill { stroke: none; opacity: 0.13; }
-.pf-spark.is-up .pf-spark__fill { fill: var(--chart-up); }
-.pf-spark.is-down .pf-spark__fill { fill: var(--chart-down); }
+/* fill-opacity, not opacity: the fade-in animation ends at opacity 1 and would override it. */
+.pf-spark path.pf-spark__fill { stroke: none; fill-opacity: 0.1; }
+.pf-spark.is-up .pf-spark__fill { fill: var(--gain); }
+.pf-spark.is-down .pf-spark__fill { fill: var(--loss); }
 
 /* Allocation: a ring and its key. */
 .pf-donut { width: 168px; margin: 2px auto 18px; }
