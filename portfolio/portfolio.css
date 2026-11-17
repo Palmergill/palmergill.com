@@ -150,7 +150,7 @@
 .pf-legend-toggle { display: inline-flex; align-items: center; gap: 6px; border: 0; border-radius: var(--r-sm); background: none; font: inherit; color: inherit; padding: 2px 4px; cursor: pointer; }
 .pf-legend-toggle:hover { background: var(--surface); }
 .pf-legend-toggle:focus-visible { outline: none; box-shadow: var(--focus-ring); }
-.pf-legend-toggle[aria-pressed="false"] { color: var(--muted); text-decoration: line-through; }
+.pf-legend-toggle[aria-pressed="false"] { color: var(--muted); opacity: 0.7; }
 .pf-legend-toggle[aria-pressed="false"] .pf-key { opacity: 0.35; }
 .pf-marker { display: inline-block; width: 9px; height: 9px; border-radius: 50%; }
 .pf-marker--buy, .pf-chart__trade--buy { background: var(--gain); fill: var(--gain); }

@@ -1884,7 +1884,7 @@
             $('holdingChart').closest('.pf-hero').classList.toggle('is-down', change < 0);
             sub.innerHTML = `<span class="pf-history-change ${tone(change)}">${privacy ? fmtPct(change / first, true) : `${fmtSigned(change)} (${fmtPct(change / first, true)})`}</span>`;
             const avg = d.open ? pos.avgCost : null;
-            const trades = d.trades.filter((t) => t.date >= points[0].date);
+            const trades = d.trades.filter((t) => t.date >= points[0].date && (t.side === 'buy' || t.side === 'sell'));
             $('holdingLegend').hidden = false;
             $('avgCostKey').hidden = avg == null;
             $('tradeKeys').hidden = !trades.length;
@@ -1981,7 +1981,7 @@
         const innerH = height - pad.top - pad.bottom;
 
         const cost = showCost ? avgCost : null;
-        const values = points.map((p) => p.close).concat(cost != null ? [cost] : [], trades.map((t) => t.price).filter((v) => v > 0));
+        const values = points.map((p) => p.close).concat(cost != null ? [cost] : []);
         let lo = Math.min(...values);
         let hi = Math.max(...values);
         // A little room above and below the line, and no axis to round to.
@@ -1990,7 +1990,8 @@
         hi += margin;
         const x = (i) => pad.left + (i / (points.length - 1)) * innerW;
         const y = (v) => pad.top + (1 - (v - lo) / (hi - lo)) * innerH;
-        // A trade sits on the first close on or after its date.
+        // A trade sits on the line at the first close on or after its date; its own
+        // price can be pre-split or off the close, which left dots floating.
         const indexOf = (iso) => {
             const i = points.findIndex((p) => p.date >= iso);
             return i === -1 ? points.length - 1 : i;
@@ -2010,7 +2011,7 @@
         endDot(root, x(points.length - 1), y(points[points.length - 1].close));
         trades.forEach((t) => {
             const i = indexOf(t.date);
-            if (t.price > 0) root.appendChild(svg('circle', { class: `pf-chart__trade--${t.side}`, cx: x(i), cy: y(t.price), r: trades.length > 80 ? 3 : 4.5 }));
+            root.appendChild(svg('circle', { class: `pf-chart__trade--${t.side}`, cx: x(i), cy: y(points[i].close), r: trades.length > 80 ? 3 : 4.5 }));
         });
 
         const cross = svg('line', { class: 'pf-chart__cross', y1: pad.top, y2: pad.top + innerH, visibility: 'hidden' });
