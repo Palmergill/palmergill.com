@@ -947,7 +947,13 @@ def splits_for(db: Session, tickers: List[str]) -> Dict[str, List[Tuple[date, fl
 # provider's allowance is small and prices come first.
 
 DIVIDEND_RECHECK = timedelta(days=3)
+# A history neither provider could give is asked for again sooner.
+DIVIDEND_RETRY = timedelta(hours=1)
 DIVIDEND_CALLS_PER_REQUEST = 1
+# The rest are fetched in the background, one every this many seconds, so
+# a long list fills in without the page open and without bursting the
+# provider's per-minute allowance.
+DIVIDEND_FETCH_SPACING = 15
 # A recorded payment this close to an estimated one's ex-date and pay date
 # is the same payment.
 RECORDED_BEFORE = timedelta(days=5)
@@ -976,10 +982,39 @@ def _sample_dividends(ticker: str) -> List[Tuple[date, Optional[date], float]]:
 
 
 def _fetch_dividends(ticker: str) -> List[Tuple[date, Optional[date], float]]:
+    """Polygon first, for its pay dates; Tiingo when Polygon can't answer or
+    has nothing (it covers mutual funds, which Polygon's stock data doesn't).
+    A rate limit is passed up so the caller can wait."""
     if stock_data_client._use_mock():
         return _sample_dividends(ticker)
     stock_data_client._require_real_data_configured()
-    return stock_data_client.polygon.get_dividends(ticker)
+    failure: Optional[Exception] = None
+    try:
+        found = stock_data_client.polygon.get_dividends(ticker)
+        if found:
+            return found
+    except PolygonRateLimited:
+        raise
+    except Exception as exc:  # noqa: BLE001 - try the other provider
+        logger.warning("[%s] Polygon dividends unavailable: %s", ticker, exc)
+        failure = exc
+    if tiingo_client.is_configured():
+        try:
+            return tiingo_client.get_dividends(ticker)
+        except TiingoRateLimited:
+            if failure:
+                raise failure
+            return []
+    if failure:
+        raise failure
+    return []
+
+
+def _dividend_check_due(check: Optional[Any]) -> bool:
+    if check is None:
+        return True
+    age = _naive_now() - check.checked_at
+    return age >= (DIVIDEND_RECHECK if check.found else DIVIDEND_RETRY)
 
 
 def ensure_dividends(db: Session, tickers: List[str], budget: _Budget) -> int:
@@ -988,7 +1023,7 @@ def ensure_dividends(db: Session, tickers: List[str], budget: _Budget) -> int:
     checks = {c.ticker: c for c in db.query(DividendCheck).filter(DividendCheck.ticker.in_(tickers))}
     for ticker in tickers:
         check = checks.get(ticker)
-        if check and _naive_now() - check.checked_at < DIVIDEND_RECHECK:
+        if not _dividend_check_due(check):
             continue
         if not budget.spend():
             break
@@ -1010,9 +1045,52 @@ def ensure_dividends(db: Session, tickers: List[str], budget: _Budget) -> int:
             checks[ticker] = check
         else:
             check.checked_at = _naive_now()
-            check.found = check.found or found is not None
+            check.found = found is not None
         db.commit()
-    return sum(1 for t in tickers if t not in checks)
+    unasked = [t for t in tickers if t not in checks]
+    due = [t for t in tickers if _dividend_check_due(checks.get(t))]
+    if due and not stock_data_client._use_mock():
+        _queue_dividends(due)
+    return len(unasked)
+
+
+_dividend_queue: List[str] = []
+_dividend_queue_lock = threading.Lock()
+_dividend_worker: Optional[threading.Thread] = None
+
+
+def _queue_dividends(tickers: List[str]) -> None:
+    """Fetch these stocks' histories in the background, spaced out."""
+    global _dividend_worker
+    with _dividend_queue_lock:
+        for t in tickers:
+            if t not in _dividend_queue:
+                _dividend_queue.append(t)
+        if _dividend_worker is None or not _dividend_worker.is_alive():
+            _dividend_worker = threading.Thread(target=_drain_dividends, name="dividend-histories", daemon=True)
+            _dividend_worker.start()
+
+
+def _drain_dividends() -> None:
+    import time
+
+    from app.database import SessionLocal
+
+    while True:
+        time.sleep(DIVIDEND_FETCH_SPACING)
+        if _rate_limited_until and _rate_limited_until > _now():
+            continue
+        with _dividend_queue_lock:
+            if not _dividend_queue:
+                return
+            ticker = _dividend_queue.pop(0)
+        db = SessionLocal()
+        try:
+            ensure_dividends(db, [ticker], _Budget(1))
+        except Exception as exc:  # noqa: BLE001 - keep the worker alive
+            logger.warning("[%s] background dividends failed: %s", ticker, exc)
+        finally:
+            db.close()
 
 
 def dividend_history(db: Session, tickers: List[str]) -> Dict[str, List[Tuple[date, Optional[date], float]]]:
@@ -1048,7 +1126,9 @@ def estimate_dividends(
         txs = trades.get(ticker, [])
         firsts = [t.trade_date for t in txs]
         if as_of and ticker in snapshot:
-            firsts.append(as_of)
+            # As the value history does: a snapshot's shares are taken to
+            # have been held a year before its date, less later trades.
+            firsts.append(as_of - timedelta(days=365))
         if not firsts:
             continue
         known_from = min(firsts)

@@ -1228,12 +1228,12 @@ def test_dividends_from_a_snapshot_back_out_later_trades():
     holdings = [SimpleNamespace(ticker="KO", shares=100, as_of=date(2026, 6, 30))]
     trades = [_trade("KO", "buy", 20, date(2026, 5, 1)), _trade("KO", "buy", 50, date(2026, 8, 1))]
     history = {"KO": [
-        (date(2026, 3, 13), date(2026, 4, 1), 0.5),   # before anything known
+        (date(2026, 3, 13), date(2026, 4, 1), 0.5),   # a year before the snapshot: 100 less May's 20
         (date(2026, 6, 13), date(2026, 7, 1), 0.5),   # the snapshot's 100: no trades from Jun 13 to Jun 30
         (date(2026, 9, 12), date(2026, 10, 1), 0.5),  # 100 + 50
     ]}
     got = portfolio.estimate_dividends(holdings, trades, [], {}, history, today)
-    assert [(d.trade_date, d.amount) for d in got] == [(date(2026, 7, 1), 50.0), (date(2026, 10, 1), 75.0)]
+    assert [(d.trade_date, d.amount) for d in got] == [(date(2026, 4, 1), 40.0), (date(2026, 7, 1), 50.0), (date(2026, 10, 1), 75.0)]
 
 
 def test_breakdown_counts_public_dividends_and_says_which_are_estimated(monkeypatch):
@@ -1258,3 +1258,32 @@ def test_breakdown_counts_public_dividends_and_says_which_are_estimated(monkeypa
     assert d["pendingDividends"] == 0
     assert d["dividends"]["total"] == 5.0 and d["dividends"]["estimatedCount"] == 1
     assert d["dividends"]["recent"] == [{"ticker": "AAPL", "date": pay.isoformat(), "amount": 5.0, "estimated": True}]
+
+
+def test_dividend_history_falls_back_to_tiingo_when_polygon_fails_or_has_none(monkeypatch):
+    from datetime import date
+
+    monkeypatch.setattr(portfolio.stock_data_client, "_use_mock", lambda: False)
+    monkeypatch.setattr(portfolio.stock_data_client, "_require_real_data_configured", lambda: None)
+    monkeypatch.setattr(portfolio.tiingo_client, "is_configured", lambda: True)
+    monkeypatch.setattr(portfolio.tiingo_client, "get_dividends", lambda t: [(date(2025, 3, 3), None, 0.4)])
+
+    def refused(ticker):
+        raise RuntimeError("403 not on this plan")
+
+    monkeypatch.setattr(portfolio.stock_data_client.polygon, "get_dividends", refused)
+    assert portfolio._fetch_dividends("VTSAX") == [(date(2025, 3, 3), None, 0.4)]
+    monkeypatch.setattr(portfolio.stock_data_client.polygon, "get_dividends", lambda t: [])
+    assert portfolio._fetch_dividends("VTSAX") == [(date(2025, 3, 3), None, 0.4)]
+    monkeypatch.setattr(portfolio.stock_data_client.polygon, "get_dividends", lambda t: [(date(2025, 3, 3), date(2025, 3, 20), 0.4)])
+    assert portfolio._fetch_dividends("VTI") == [(date(2025, 3, 3), date(2025, 3, 20), 0.4)]
+
+
+def test_a_failed_dividend_history_is_asked_again_within_hours_not_days():
+    from datetime import timedelta
+    from types import SimpleNamespace
+
+    now = portfolio._naive_now()
+    assert portfolio._dividend_check_due(SimpleNamespace(checked_at=now - timedelta(hours=2), found=False))
+    assert not portfolio._dividend_check_due(SimpleNamespace(checked_at=now - timedelta(hours=2), found=True))
+    assert portfolio._dividend_check_due(SimpleNamespace(checked_at=now - timedelta(days=4), found=True))

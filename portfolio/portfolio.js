@@ -1428,6 +1428,8 @@
                 <span class="pf-payer__amount">${fmtMoney(r.amount)}</span>
                 <span class="pf-payer__share">${fmtPct(r.amount / (d.total || 1))}</span>
             </div>`).join('') || '<p class="pf-muted">No dividends yet.</p>';
+        $('incomeNote').textContent = data.pendingDividends ? `Loading dividend history for ${plural(data.pendingDividends, 'stock')}…` : '';
+        $('incomeNote').hidden = !data.pendingDividends;
         drawIncomeChart();
         drawIncomeUpcoming();
         $('incomeRecentSub').textContent = d.count ? `${plural(d.count, 'payment')}${privacy ? '' : ` · ${fmtMoney(d.total, true)}`}` : '';
@@ -2343,11 +2345,12 @@
             pendingRetries = 0;
             return;
         }
-        if (pendingRetries >= MAX_PENDING_RETRIES) return;
+        // Dividend histories load in the background, a stock every few
+        // seconds: check back gently, and for longer than for prices.
+        const limit = data.totals.pendingPrices ? MAX_PENDING_RETRIES : MAX_PENDING_RETRIES * 4;
+        if (pendingRetries >= limit) return;
         pendingRetries += 1;
-        // Dividend histories come a stock a request, gently: the provider's
-        // allowance is small and prices go first.
-        const wait = data.totals.pendingPrices ? (data.retryAfter || 3) : Math.max(data.retryAfter || 3, 15);
+        const wait = data.totals.pendingPrices ? (data.retryAfter || 3) : Math.max(data.retryAfter || 3, 20);
         pendingTimer = setTimeout(() => load(), wait * 1000);
     }
 

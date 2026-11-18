@@ -77,6 +77,21 @@ class TiingoClient:
             cumulative *= float(row.get("splitFactor") or 1.0)
         return sorted(closes)
 
+    def get_dividends(self, ticker: str, start: date = date(2000, 1, 1)) -> List[Tuple[date, None, float]]:
+        """(ex-date, None, cash per share as paid) for every dividend in the
+        daily bars: Tiingo marks each on its ex-date, with no pay date.
+        Covers mutual funds too."""
+        rows = self._get(
+            f"/tiingo/daily/{ticker.replace('.', '-').lower()}/prices",
+            {"startDate": start.isoformat(), "columns": "date,divCash"},
+        )
+        out = []
+        for row in rows or []:
+            cash = row.get("divCash")
+            if cash and float(cash) > 0 and row.get("date"):
+                out.append((datetime.fromisoformat(row["date"][:10]).date(), None, float(cash)))
+        return sorted(out)
+
     def get_crypto_closes(self, pair: str, start: date) -> List[Tuple[date, float]]:
         """(date, close) for a crypto pair like "btcusd", one bar a day."""
         data = self._get(
