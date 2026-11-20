@@ -2,13 +2,13 @@
    Research section: forest green and gold on ivory, serif figures. The older
    token names (--sage, --clay, ...) are what research/style.css reads. */
 :root {
-    --bg: #f6f2e9;
+    --bg: #f4efe4;
     --card: #fffdf8;
     --surface: #f2ecdf;
     --ink: #1f2a24;
     --soft: #4d5249;
     --muted: #8c836d;
-    --line: #e8e0cf;
+    --line: #ebe3d3;
     --line-strong: #d9ccb0;
     --forest: #0f2f27;
     --forest-2: #17413a;
@@ -30,14 +30,16 @@
     --chart-up: #00a805;
     --chart-down: #ff5000;
     --focus-ring: 0 0 0 2px rgba(201, 162, 77, 0.55);
-    /* Corners and lift: panels sit a hair above the page, controls stay crisp. */
-    --r: 5px;
-    --r-sm: 3px;
-    --lift: 0 1px 0 rgba(255, 255, 255, 0.8) inset, 0 1px 2px rgba(31, 42, 36, 0.04), 0 10px 28px -18px rgba(31, 42, 36, 0.22);
+    /* Corners and lift: soft panels that float a little off the page; controls
+       a step tighter (--r-ctl) so buttons don't turn into pills. */
+    --r: 10px;
+    --r-sm: 6px;
+    --r-ctl: 7px;
+    --lift: 0 1px 0 rgba(255, 255, 255, 0.9) inset, 0 1px 2px rgba(31, 42, 36, 0.035), 0 16px 36px -24px rgba(31, 42, 36, 0.22);
     --lift-pop: 0 2px 6px rgba(31, 42, 36, 0.06), 0 18px 40px -16px rgba(31, 42, 36, 0.28);
     --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
-    --nav-w: 204px;
-    --top-h: 60px;
+    --nav-w: 216px;
+    --top-h: 64px;
     --font: "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
     --serif: "Source Serif 4", Georgia, "Times New Roman", serif;
     --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -72,20 +74,28 @@ body.app {
 .app-nav__brand { display: flex; align-items: center; gap: 11px; height: var(--top-h); flex: none; padding: 0 20px; color: var(--gold-soft); font-family: var(--serif); font-size: 21px; font-weight: 500; letter-spacing: 0.01em; text-decoration: none; }
 /* The mark: a gold lozenge, as on a letterhead. */
 .app-nav__brand::before { content: ''; width: 9px; height: 9px; flex: none; border: 1.5px solid var(--gold); transform: rotate(45deg); box-shadow: inset 0 0 0 2px var(--forest), inset 0 0 0 6px rgba(201, 162, 77, 0.55); }
-.app-nav__links { display: flex; flex-direction: column; gap: 2px; flex: 1; padding: 0 10px; }
+.app-nav__links { display: flex; flex-direction: column; gap: 3px; flex: 1; padding: 6px 12px 0; }
 .app-nav__links a {
-    display: flex; align-items: center; gap: 11px; padding: 9px 10px; border-radius: var(--r-sm);
+    display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: var(--r-ctl);
     color: #a9bfb3; font-size: 14px; text-decoration: none;
     transition: color 0.15s, background-color 0.15s;
 }
 .app-nav__links a[hidden] { display: none; }
 .app-nav__links a svg, .app-nav__more svg { width: 17px; height: 17px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
 .app-nav__links a:hover { color: var(--gold-soft); background: rgba(255, 255, 255, 0.05); }
-.app-nav__links a[aria-current="page"] { color: #fbf1d6; font-weight: 500; background: linear-gradient(90deg, rgba(201, 162, 77, 0.22), rgba(201, 162, 77, 0.05)); box-shadow: inset 2px 0 0 var(--gold); }
+.app-nav__links a[aria-current="page"] { color: #fbf1d6; font-weight: 500; background: linear-gradient(90deg, rgba(201, 162, 77, 0.2), rgba(201, 162, 77, 0.07)); box-shadow: inset 0 0 0 1px rgba(201, 162, 77, 0.24); }
 .app-nav__links a[aria-current="page"] svg { color: var(--gold); }
 .app-nav a:focus-visible, .app-nav button:focus-visible { outline: none; box-shadow: inset var(--focus-ring); }
 .app-nav__more { display: none; }
-.app-nav__foot { border-top: 1px solid rgba(201, 162, 77, 0.18); margin: 0 20px; padding-top: 12px; display: flex; flex-direction: column; gap: 6px; font-size: 12.5px; }
+.app-nav__foot { border-top: 1px solid rgba(201, 162, 77, 0.18); margin: 0 20px; padding-top: 14px; display: flex; flex-direction: column; gap: 10px; font-size: 12.5px; }
+/* The signed-in account: a gold-ringed initial beside the name. */
+.app-nav__who { display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1; }
+.app-nav__user button { flex: none; white-space: nowrap; }
+.app-nav__who i {
+    flex: none; width: 28px; height: 28px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center;
+    font: 500 13px var(--serif); font-style: normal; color: var(--gold-soft);
+    background: rgba(201, 162, 77, 0.14); box-shadow: inset 0 0 0 1px rgba(201, 162, 77, 0.45);
+}
 .app-nav__user { display: flex; justify-content: space-between; align-items: center; gap: 8px; color: var(--gold-soft); font-weight: 500; }
 .app-nav__user span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .app-nav__foot a, .app-nav__foot button { background: none; border: 0; padding: 0; font: inherit; font-weight: 400; color: #8fa89b; text-decoration: none; cursor: pointer; }
@@ -94,24 +104,24 @@ body.app {
 /* Top bar */
 .app-top {
     position: sticky; top: 0; z-index: 50; height: var(--top-h); margin: 0;
-    display: flex; flex-wrap: nowrap; justify-content: flex-start; align-items: center; gap: 16px; padding: 0 28px;
-    background: rgba(247, 243, 234, 0.82);
+    display: flex; flex-wrap: nowrap; justify-content: flex-start; align-items: center; gap: 16px; padding: 0 32px;
+    background: rgba(244, 239, 228, 0.84);
     -webkit-backdrop-filter: saturate(1.5) blur(14px); backdrop-filter: saturate(1.5) blur(14px);
     border-bottom: 1px solid var(--line);
 }
-.app-top__title { color: var(--forest); font-family: var(--serif); font-size: 24px; font-weight: 500; letter-spacing: -0.005em; white-space: nowrap; }
+.app-top__title { color: var(--forest); font-family: var(--serif); font-size: 27px; font-weight: 500; letter-spacing: -0.015em; white-space: nowrap; }
 .app-search { position: relative; flex: 0 1 340px; margin-left: auto; }
 .app-search input {
-    width: 100%; height: 34px; padding: 0 44px 0 32px; font: inherit; font-size: 13px; color: var(--ink);
-    background: var(--card); border: 1px solid var(--line); border-radius: var(--r);
+    width: 100%; height: 36px; padding: 0 44px 0 34px; font: inherit; font-size: 13px; color: var(--ink);
+    background: var(--card); border: 1px solid var(--line); border-radius: 999px;
     box-shadow: 0 1px 0 rgba(255, 255, 255, 0.8) inset, 0 1px 2px rgba(31, 42, 36, 0.04);
     transition: border-color 0.15s, box-shadow 0.15s;
 }
 .app-search input:hover { border-color: var(--line-strong); }
 .app-search input::placeholder { color: var(--muted); }
 .app-search input:focus { outline: none; border-color: var(--gold); box-shadow: var(--focus-ring); }
-.app-search > svg { position: absolute; left: 10px; top: 10px; width: 14px; height: 14px; fill: none; stroke: var(--muted); stroke-width: 2; stroke-linecap: round; pointer-events: none; }
-.app-search kbd { position: absolute; right: 8px; top: 8px; font: 400 11px var(--font); color: var(--muted); border: 1px solid var(--line); border-radius: var(--r-sm); padding: 0 4px; pointer-events: none; }
+.app-search > svg { position: absolute; left: 13px; top: 11px; width: 14px; height: 14px; fill: none; stroke: var(--muted); stroke-width: 2; stroke-linecap: round; pointer-events: none; }
+.app-search kbd { position: absolute; right: 10px; top: 9px; font: 400 11px var(--font); color: var(--muted); border: 1px solid var(--line); border-radius: var(--r-sm); padding: 0 4px; pointer-events: none; }
 .app-search__list {
     position: absolute; left: 0; right: 0; top: calc(100% + 6px); max-height: 360px; overflow-y: auto; padding: 3px; list-style: none;
     background: var(--card); border: 1px solid var(--line-strong); border-radius: var(--r); box-shadow: var(--lift-pop);
@@ -121,7 +131,7 @@ body.app {
 .app-search__list li strong { font-size: 13px; font-weight: 600; color: var(--ink); min-width: 56px; }
 .app-search__list li span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .app-search__list li.is-active, .app-search__list li:hover { background: var(--surface); }
-.app-main { max-width: 1280px; margin: 0 auto; padding: 24px 28px 72px; }
+.app-main { max-width: 1280px; margin: 0 auto; padding: 28px 32px 80px; }
 .app-search__open { display: none; }
 
 /* A security's monogram, its tint fixed by the ticker; shared by the tracker and research. */

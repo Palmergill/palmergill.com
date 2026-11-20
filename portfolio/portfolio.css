@@ -783,3 +783,62 @@ tr:hover > td .pf-badge { transform: scale(1.1) rotate(-4deg); }
     .pf-years { gap: 6px; }
     .pf-year__trades { display: none; }
 }
+
+/* ── Refinement ───────────────────────────────────────────────────────────
+   More air, softer panels, fewer rules: the gold edge marks the page's lead
+   panel only, tables rule their rows lightly, controls keep a tighter corner. */
+
+#dashboard, #main, .pf-panel, .pf-dash, .pf-dash__rail, .pf-grid { gap: 20px; }
+.pf-card { padding: 24px 28px 26px; border-color: #ece4d3; }
+.pf-card:not(.pf-hero) { background-image: none; }
+.pf-hero { padding: 28px 30px 18px; }
+.pf-card__head { margin-bottom: 18px; }
+.pf-card__title { font-size: 21px; letter-spacing: -0.012em; line-height: 1.2; }
+.pf-card__sub { margin-top: 4px; }
+.pf-table-wrap { margin: 0 -28px; padding: 0 28px; }
+.pf-tiles--flat { margin: 0 -28px -26px; }
+.pf-strip { margin: 0 -30px; }
+.pf-stat { padding: 16px 30px 18px; }
+
+/* Controls */
+.pf-button, .pf-icon-button, .pf-field input, .pf-field select, .pf-filters input, .pf-filters select, .pf-menu__list, .pf-drop, .pf-add, .pf-banner { border-radius: var(--r-ctl); }
+.pf-button { height: 36px; padding: 0 16px; }
+.pf-icon-button { width: 36px; height: 36px; }
+.pf-card__head .pf-button { height: 30px; padding: 0 12px; border-radius: 999px; }
+.pf-banner { padding: 12px 16px; }
+
+/* Tables: a quiet header rule, lighter row rules, roomier rows. */
+.pf-table th { border-bottom-color: var(--line-strong); color: #9b9179; padding-bottom: 10px; }
+.pf-table td { padding-top: 12px; padding-bottom: 12px; border-bottom-color: #f1ebdd; }
+.pf-movers td { padding-top: 11px; padding-bottom: 11px; }
+.pf-table tr[data-ticker]:hover td { background: #faf5ea; }
+.pf-table tr[data-ticker]:hover td:first-child { box-shadow: -12px 0 0 #faf5ea; }
+.pf-table tr[data-ticker]:hover td:last-child { box-shadow: 12px 0 0 #faf5ea; }
+.pf-table tfoot td { border-top-color: var(--line-strong); padding-top: 14px; }
+
+/* Lists ruled like the tables. */
+.pf-alloc li, .pf-upcoming__list li, .pf-contrib li, .pf-cal li, .pf-soon li, .pf-facts div { border-bottom-color: #f1ebdd; }
+.pf-upcoming { margin-top: 20px; padding-top: 16px; }
+.pf-alloc li { padding: 10px 0; }
+
+/* Figures: the headline breathes, the bands lose their box-in-a-box look. */
+.pf-hero__value { font-size: 62px; margin-top: 10px; }
+.pf-hero .pf-metrics div { padding: 2px 20px; border-left-color: var(--line); }
+.pf-tiles { border-color: #efe5cc; }
+.pf-tile { padding: 18px 24px 19px; }
+.pf-today { font-size: 40px; }
+.pf-subtabs { gap: 30px; }
+
+@media (max-width: 560px) {
+    #dashboard, #main, .pf-panel, .pf-dash, .pf-dash__rail, .pf-grid { gap: 12px; }
+    .pf-card { padding: 18px 16px 18px; }
+    .pf-hero { padding: 20px 18px 14px; }
+    .pf-hero__value { font-size: 44px; }
+    .pf-table-wrap { margin: 0 -16px; padding: 0 16px; }
+    .pf-tiles--flat { margin: 0 -16px -18px; }
+    .pf-strip { margin: 0 -18px; }
+    .pf-stat { padding: 12px 16px; }
+    .pf-tile { padding: 12px 16px 13px; }
+    .pf-table td { padding-top: 10px; padding-bottom: 10px; }
+    .pf-hero .pf-metrics div { padding: 0 14px 0 0; }
+}

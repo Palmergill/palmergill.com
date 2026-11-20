@@ -74,8 +74,9 @@
             box.innerHTML = `<a href="${loginHref()}">Sign in</a>`;
             return;
         }
-        box.innerHTML = '<span></span><button type="button">Sign out</button>';
-        box.querySelector('span').textContent = username;
+        box.innerHTML = '<span class="app-nav__who"><i aria-hidden="true"></i><span></span></span><button type="button">Sign out</button>';
+        box.querySelector('.app-nav__who i').textContent = username.slice(0, 1).toUpperCase();
+        box.querySelector('.app-nav__who span').textContent = username;
         box.querySelector('button').addEventListener('click', async () => {
             await fetch('/login/logout', { method: 'POST', credentials: 'same-origin', headers: { Accept: 'application/json' } }).catch(() => {});
             window.location.assign(loginHref());

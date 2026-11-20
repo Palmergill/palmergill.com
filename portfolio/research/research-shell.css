@@ -132,3 +132,23 @@ body.app #empty .trending-label { font-family: var(--serif); font-size: 19px; fo
 .pf-icon-button[aria-pressed="true"] { background: var(--forest); color: var(--gold-soft); border-color: var(--forest); }
 .pf-icon-button svg { width: 16px; height: 16px; fill: currentColor; }
 .pf-icon-button svg.pf-stroke { fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+
+/* Refinement, as on the tracker: more air between panels, softer corners. */
+.container.app-main { padding: 28px 32px 72px; }
+.container > header { margin-bottom: 16px; }
+.rp { margin-bottom: 20px; border-radius: var(--r); }
+body.app #empty { gap: 20px; }
+body.app #empty > .trending-stocks { padding: 22px 26px 24px; }
+body.app #empty .trending-label { margin-bottom: 16px; }
+@media (min-width: 720px) {
+    .overview-viz { gap: 20px; }
+    .ov-tiles { gap: 16px; }
+    .ov-pair { gap: 20px; }
+    .ov-card { padding: 22px 26px 24px; }
+}
+@media (max-width: 900px) {
+    .container.app-main { padding: 16px 16px 32px; }
+}
+@media (max-width: 560px) {
+    body.app #empty > .trending-stocks { padding: 14px 14px; }
+}
